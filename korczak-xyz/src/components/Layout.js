@@ -5,7 +5,7 @@ import Navbar from './Navbar'
 
 export default function Layout({ children }) {
     return (
-        <div className="min-h-full font-roboto font-extralight">
+        <div className="min-h-full font-roboto font-light">
 
             <Navbar />
 
