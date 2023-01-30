@@ -46,7 +46,7 @@ export default function index() {
     <Layout>
       <ul className='flex flex-col justify-center gap-4'>
         {buttons.map((button) => (
-          <BigButton icon={button.icon} text={button.text} backgroundColor={button.backgroundColor} />
+          <BigButton {...button} />
         ))}
       </ul>
     </Layout>
