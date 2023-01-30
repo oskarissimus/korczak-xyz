@@ -5,27 +5,17 @@ import Navbar from './Navbar'
 
 export default function Layout({ children }) {
     return (
-        <>
-            {/*
-        This example requires updating your template:
+        <div className="min-h-full font-roboto font-extralight">
 
-        ```
-        <html class="h-full bg-gray-100">
-        <body class="h-full">
-        ```
-      */}
-            <div className="min-h-full">
+            <Navbar />
 
-                <Navbar />
+            <Header title="Dashboard" />
 
-                <Header title="Dashboard" />
-
-                <main>
-                    <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
-                        {children}
-                    </div>
-                </main>
-            </div>
-        </>
+            <main>
+                <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
+                    {children}
+                </div>
+            </main>
+        </div>
     )
 }
