@@ -1,6 +1,8 @@
 import React from 'react'
 import { Disclosure } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import { graphql, useStaticQuery } from 'gatsby'
+import { GatsbyImage, getImage } from "gatsby-plugin-image"
 
 const navigation = [
     { name: 'Dashboard', href: '#', current: true },
@@ -17,6 +19,18 @@ function classNames(...classes) {
 
 
 export default function Navbar() {
+    const data = useStaticQuery(graphql`
+    query MyQuery {
+        file(relativePath: {eq: "logo.png"}) {
+          id
+          childImageSharp {
+            gatsbyImageData
+          }
+        }
+      }
+    `)
+    const image = getImage(data.file)
+    console.log(data)
     return (
         <Disclosure as="nav" className="bg-gray-800">
             {({ open }) => (
@@ -25,11 +39,7 @@ export default function Navbar() {
                         <div className="flex h-16 items-center justify-between">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <img
-                                        className="h-8 w-8"
-                                        src="https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500"
-                                        alt="Your Company"
-                                    />
+                                    <GatsbyImage image={image} alt="Your Company" className='h-8 w-8' />
                                 </div>
                                 <div className="hidden md:block">
                                     <div className="ml-10 flex items-baseline space-x-4">
@@ -89,3 +99,4 @@ export default function Navbar() {
         </Disclosure>
     )
 }
+
