@@ -22,6 +22,8 @@ function MenuItem({ name, href }) {
 export default function Navbar() {
     return (
         <nav className='flex justify-end gap-8 m-8'>
+            <MenuItem name='korczak.xyz' href='/' />
+            <div className='grow' />
             {navigation.map(item => (
                 <MenuItem key={item.name} {...item} />
             ))}
