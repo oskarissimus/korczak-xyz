@@ -13,7 +13,7 @@ const navigation = [
 
 function MenuItem({ name, href }) {
     return (
-        <a key={name} href={href} >
+        <a key={name} href={href} className='text-lg'>
             {name}
         </a>
     )
