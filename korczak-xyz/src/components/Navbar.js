@@ -1,4 +1,5 @@
 import React from 'react'
+import MenuItem from './MenuItem'
 
 const navigation = [
     { name: 'Home', href: '' },
@@ -8,16 +9,6 @@ const navigation = [
     { name: 'Blog', href: '/blog' },
     { name: 'Tech-support', href: '/oskar-tech-support' },
 ]
-
-
-
-function MenuItem({ name, href }) {
-    return (
-        <a key={name} href={href} className='text-lg'>
-            {name}
-        </a>
-    )
-}
 
 export default function Navbar() {
     return (
