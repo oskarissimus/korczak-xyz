@@ -2,6 +2,7 @@ import React from 'react'
 import Layout from '../components/Layout'
 import { solid, brands, regular } from '@fortawesome/fontawesome-svg-core/import.macro'
 import BigButton from '../components/BigButton'
+import PageContent from '../components/PageContent'
 
 const buttons = [
   {
@@ -44,11 +45,13 @@ const buttons = [
 export default function index() {
   return (
     <Layout>
-      <ul className='flex flex-col justify-center gap-4'>
-        {buttons.map(button => (
-          <BigButton key={button.text} {...button} />
-        ))}
-      </ul>
+      <PageContent title="Home">
+        <ul className='flex flex-col justify-center gap-4'>
+          {buttons.map(button => (
+            <BigButton key={button.text} {...button} />
+          ))}
+        </ul>
+      </PageContent>
     </Layout>
   )
 }
