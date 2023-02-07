@@ -9,7 +9,7 @@ export default function Layout({ children }) {
 
             <Navbar />
 
-            <Header title="Dashboard" />
+            <Header title="Home" />
 
             <main>
                 <div className="mx-auto max-w-3xl py-6 sm:px-6 lg:px-8">
