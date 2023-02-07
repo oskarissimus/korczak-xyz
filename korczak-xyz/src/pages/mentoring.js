@@ -4,11 +4,13 @@ import PageContent from "../components/PageContent"
 import { graphql } from "gatsby"
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import Calendar from "../components/Calendar"
+import ContactForm from "../components/ContactForm"
 
 export default function Mentoring({ data }) {
     return (
         <Layout>
             <PageContent title={"Mentoring"}>
+
                 <GatsbyImage image={getImage(data.file)} alt="Mentoring" />
                 <p>
                     I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free 😉
@@ -29,6 +31,8 @@ export default function Mentoring({ data }) {
                     Mentoring sessions are up to 1 hour long.
 
                 </p>
+                <ContactForm />
+
             </PageContent>
         </Layout>
     )
