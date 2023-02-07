@@ -43,7 +43,7 @@ export default function ContactForm() {
                 <span className="font-bold">
                     Message
                 </span>
-                <textarea name="message" className="block w-full mt-1" required="required" placeholder="Enter your message">
+                <textarea name="message" className="block w-full mt-1" required="required" placeholder="Enter your message" rows="5">
 
                 </textarea>
             </label>
