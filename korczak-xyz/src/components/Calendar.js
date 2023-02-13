@@ -1,6 +1,6 @@
 import React, { useEffect, useContext } from 'react'
 import Cal, { getCalApi } from "@calcom/embed-react";
-import { ThemeContext } from './ThemeContext';
+import ThemeContext from '../context/ThemeContext';
 
 export default function Calendar() {
     const { theme } = useContext(ThemeContext)
