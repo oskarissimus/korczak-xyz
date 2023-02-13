@@ -1,9 +1,10 @@
 import React from 'react'
+import { Link } from 'gatsby'
 
 export default function MenuItem({ name, href }) {
     return (
-        <a key={name} href={href} className='text-lg'>
+        <Link key={name} href={href} className='text-lg'>
             {name}
-        </a>
+        </Link>
     )
 }
