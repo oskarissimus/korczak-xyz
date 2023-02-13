@@ -11,3 +11,7 @@ html {
 html.dark {
     background-color: black;
 }
+
+html.dark img {
+    filter: brightness(80%)
+}
