@@ -4,7 +4,7 @@ import PageContent from "../components/PageContent"
 import { graphql } from "gatsby"
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import Calendar from "../components/Calendar"
-import ContactForm from "../components/ContactForm"
+import ContactFormWrapper from "../components/ContactForm/ContactFormWrapper"
 
 export default function Mentoring({ data }) {
     return (
@@ -31,7 +31,7 @@ export default function Mentoring({ data }) {
                     Mentoring sessions are up to 1 hour long.
 
                 </p>
-                <ContactForm />
+                <ContactFormWrapper />
 
             </PageContent>
         </Layout>
