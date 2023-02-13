@@ -27,7 +27,7 @@ export default function ContactForm() {
 
     return (
         <form
-            accept-charset="UTF-8"
+            acceptCharset="UTF-8"
             className="flex flex-col gap-4"
         >
             <NameField />

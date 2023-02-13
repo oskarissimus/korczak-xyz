@@ -1,36 +1,31 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState, useContext } from 'react'
 import Footer from './Footer'
 import Navbar from './Navbar'
+import { ThemeContext, getTheme } from './ThemeContext'
 
 
 export default function Layout({ children }) {
+    const [theme, setTheme] = useState(getTheme())
+
     return (
-        <div className="min-h-full font-default min-w-full flex flex-col items-center text-base text-justify leading-relaxed text-gray-900 dark:text-gray-300">
-            <div className='flex flex-col items-stretch w-full max-w-6xl gap-20'>
-                <Navbar />
-                {children}
-                <Footer />
-                <DarkModeSwitch />
+        <ThemeContext.Provider value={{ theme, setTheme }}>
+            <div className="min-h-full font-default min-w-full flex flex-col items-center text-base text-justify leading-relaxed text-gray-900 dark:text-gray-300">
+                <div className='flex flex-col items-stretch w-full max-w-6xl gap-20'>
+                    <Navbar />
+                    {children}
+                    <Footer />
+                    <DarkModeSwitch />
+                </div>
             </div>
-        </div>
+        </ThemeContext.Provider>
     )
 }
 
 
-function getTheme() {
-    if (localStorage.theme) {
-        return localStorage.theme
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark'
-    } else {
-        return 'light'
-    }
-}
 
 
 function DarkModeSwitch() {
-    const [theme, setTheme] = useState(getTheme())
-
+    const { theme, setTheme } = useContext(ThemeContext)
     useEffect(() => {
         if (theme === 'dark') {
             localStorage.theme = "dark"
@@ -43,7 +38,7 @@ function DarkModeSwitch() {
 
     const toggleTheme = useCallback(() => {
         setTheme(theme === 'dark' ? 'light' : 'dark')
-    }, [theme])
+    }, [theme, setTheme])
 
 
     return (

@@ -1,19 +1,15 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useContext } from 'react'
 import Cal, { getCalApi } from "@calcom/embed-react";
+import { ThemeContext } from './ThemeContext';
 
 export default function Calendar() {
+    const { theme } = useContext(ThemeContext)
     useEffect(() => {
-        (async function () {
-            const cal = await getCalApi();
-            cal("ui", { "styles": { "branding": { "brandColor": "#000000" } }, "hideEventTypeDetails": true });
-        })();
-    }, [])
-    return (
-        <Cal
-            calLink="oskarissimus/mentoring"
-            config={{
-                theme: "light",
-            }}
-        />
-    )
+        async function setupCal() {
+            const cal = await getCalApi()
+            cal("ui", { theme, hideEventTypeDetails: true })
+        }
+        setupCal()
+    }, [theme])
+    return <Cal calLink="oskarissimus/mentoring" config={{ theme }} />
 }
