@@ -2,7 +2,7 @@ import React from 'react'
 import MenuItem from './MenuItem'
 
 const navigation = [
-    { name: 'Home', href: '' },
+    { name: 'Home', href: '/' },
     { name: 'About', href: '/about' },
     { name: 'Mentoring', href: '/mentoring' },
     { name: 'Courses', href: '/courses' },
