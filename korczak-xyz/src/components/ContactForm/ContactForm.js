@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { Button, EmailField, GotchaField, MessageField, NameField } from './ContactFormFields';
-import { getFormFromEvent, getDataFromForm, enrichDataWithToken, sendForm } from './ContactFormHelpers';
+import { getFormFromEvent, getDataFromForm, enrichDataWithToken, sendForm, clearForm } from './ContactFormHelpers';
 
 export default function ContactForm() {
     const { executeRecaptcha } = useGoogleReCaptcha();
@@ -22,6 +22,7 @@ export default function ContactForm() {
         const data = getDataFromForm(form);
         const dataWithToken = enrichDataWithToken(data, token);
         sendForm(dataWithToken);
+        clearForm(form);
     }, [obtainToken]);
 
     return (

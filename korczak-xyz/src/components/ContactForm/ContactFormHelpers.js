@@ -29,4 +29,8 @@ const enrichDataWithToken = (data, token) => {
     return data;
 }
 
-export { sendForm, getFormFromEvent, getDataFromForm, enrichDataWithToken }
+const clearForm = form => {
+    form.reset();
+}
+
+export { sendForm, getFormFromEvent, getDataFromForm, enrichDataWithToken, clearForm };
