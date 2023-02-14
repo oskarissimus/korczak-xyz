@@ -22,8 +22,46 @@ export default function DarkModeSwitch() {
     return (
         <label className="fixed inline-flex cursor-pointer bottom-20 left-20">
             <input type="checkbox" className="sr-only peer" onChange={toggleTheme} checked={theme === 'dark'} />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-            <span className="ml-3 text-sm font-medium">Dark mode</span>
+            <div className="
+            w-[105px]
+            h-[56px]
+            bg-gray-200
+            rounded-full
+            text-center
+            leading-[40px]
+            text-[36px]
+            scale-[1]
+            
+            peer
+            peer-focus:outline-none
+            peer-focus:ring-4
+            peer-focus:ring-blue-300
+
+            peer-checked:bg-gray-400
+
+            peer-checked:after:border-gray-900
+            peer-checked:after:translate-x-full
+            peer-checked:after:text-white
+            peer-checked:after:bg-gray-700
+
+            after:content-['☼']
+            after:absolute
+            after:top-[4px]
+            after:left-[4px]
+            after:bg-white
+            after:border-gray-300
+            after:border
+            after:rounded-full
+            after:h-12
+            after:w-12
+            after:transition-all
+            
+            dark:after:content-['☾']
+            dark:after:text-gray-700
+            dark:bg-gray-700
+            dark:peer-focus:ring-blue-800
+            dark:border-gray-600
+            "></div>
         </label>
     )
 }
