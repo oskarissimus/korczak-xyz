@@ -62,6 +62,7 @@ export default function DarkModeSwitch() {
             dark:peer-focus:ring-blue-800
             dark:border-gray-600
             "></div>
+            <span className="sr-only">Dark mode</span>
         </label>
     )
 }
