@@ -25,4 +25,10 @@ module.exports = {
       },
     },
   ],
+  siteMetadata: {
+    title: `korczak.xyz`,
+    description: `Personal website of Oskar Korczak`,
+    image: `/logo.png`,
+    siteUrl: `https://korczakxyzmain.gatsbyjs.io/`,
+  },
 }

@@ -33,7 +33,7 @@ const buttons = [
   {
     icon: regular("list-alt"),
     text: "Posts",
-    backgroundColor: "bg-[#f29e4c]"
+    backgroundColor: "bg-[#87420D]"
   },
   {
     icon: brands("github"),
