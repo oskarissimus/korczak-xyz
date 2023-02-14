@@ -11,7 +11,7 @@ function getTheme() {
     }
 }
 
-const ThemeContext = createContext({ theme: getTheme(), setTheme: () => { } })
+const ThemeContext = createContext({ theme: "dark", setTheme: () => { } })
 
 function ThemeProvider({ children }) {
     const [theme, setTheme] = useState(getTheme())
