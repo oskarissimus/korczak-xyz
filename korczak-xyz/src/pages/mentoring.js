@@ -6,7 +6,10 @@ import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import Calendar from "../components/Calendar"
 import ContactFormWrapper from "../components/ContactForm/ContactFormWrapper"
 import ThemeContext from "../context/ThemeContext"
-
+import { Seo } from "../components/Seo"
+export const Head = () => (
+    <Seo />
+)
 function findNode(name, theme) {
     return node => node.name === `${name}-${theme === 'dark' ? 'bw' : 'color'}`
 }

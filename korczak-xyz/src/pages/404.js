@@ -1,6 +1,7 @@
 import React from "react";
 import Layout from "../components/Layout"
 import PageContent from "../components/PageContent"
+import { Seo } from "../components/Seo"
 
 export default function PageNotFound() {
     return (
@@ -11,3 +12,6 @@ export default function PageNotFound() {
         </Layout>
     )
 }
+export const Head = () => (
+    <Seo />
+)

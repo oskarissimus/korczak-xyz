@@ -5,7 +5,10 @@ import PageContent from "../../components/PageContent"
 import { graphql } from "gatsby";
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import ThemeContext from "../../context/ThemeContext"
-
+import { Seo } from "../../components/Seo"
+export const Head = () => (
+    <Seo />
+)
 
 
 function CourseSection({ title, imageColor, imageBW, description, link }) {

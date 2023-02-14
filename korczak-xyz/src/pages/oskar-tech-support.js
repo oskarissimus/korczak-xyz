@@ -6,7 +6,10 @@ import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import { regular } from '@fortawesome/fontawesome-svg-core/import.macro'
 import ContactFormWrapper from "../components/ContactForm/ContactFormWrapper"
 import BigButton from "../components/BigButton";
-
+import { Seo } from "../components/Seo"
+export const Head = () => (
+    <Seo />
+)
 export default function OskarTechSupport({ data }) {
     return (
         <Layout>

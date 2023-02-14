@@ -3,7 +3,10 @@ import Layout from '../components/Layout'
 import { solid, brands, regular } from '@fortawesome/fontawesome-svg-core/import.macro'
 import BigButton from '../components/BigButton'
 import PageContent from '../components/PageContent'
-
+import { Seo } from "../components/Seo"
+export const Head = () => (
+  <Seo />
+)
 const buttons = [
   {
     icon: solid("door-open"),

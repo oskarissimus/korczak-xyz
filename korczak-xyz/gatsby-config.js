@@ -11,19 +11,25 @@ module.exports = {
   // flags: {
   //   DEV_SSR: true
   // },
-  plugins: ['gatsby-plugin-postcss',
+  plugins: [{
+    resolve: `gatsby-plugin-manifest`,
+    options: {
+      icon: `src/images/logo.png`,
+    },
+  },
+    'gatsby-plugin-postcss',
     `gatsby-plugin-image`,
     `gatsby-plugin-sharp`,
     `gatsby-transformer-sharp`,
-    {
-      resolve: `gatsby-source-filesystem`,
-      options: {
-        // The unique name for each instance
-        name: `images`,
-        // Path to the directory
-        path: `${__dirname}/src/images/`,
-      },
+  {
+    resolve: `gatsby-source-filesystem`,
+    options: {
+      // The unique name for each instance
+      name: `images`,
+      // Path to the directory
+      path: `${__dirname}/src/images/`,
     },
+  },
   ],
   siteMetadata: {
     title: `korczak.xyz`,
