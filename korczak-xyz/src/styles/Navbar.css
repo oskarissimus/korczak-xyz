@@ -9,6 +9,11 @@
     display: none;
 }
 
+.navbar_outer_wrapper {
+    width: 100%;
+    max-width: 72rem;
+}
+
 @media (max-width: 640px) {
     .navbar {
         display: none;
@@ -18,12 +23,17 @@
         display: block;
         cursor: pointer;
         font-size: 3rem;
+        margin: 2rem;
     }
 
     .navbar_burger_wrapper {
+        width: 100%;
         display: flex;
         justify-content: flex-end;
-        margin: 2rem;
         border-bottom: 1px solid #ccc;
+    }
+
+    .navbar_outer_wrapper {
+        display: flex;
     }
 }

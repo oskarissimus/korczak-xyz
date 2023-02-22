@@ -16,7 +16,7 @@ const navigation = [
 
 export default function Navbar() {
     return (
-        <div>
+        <div className='navbar_outer_wrapper'>
             <div className='navbar_burger_wrapper'>
                 <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
             </div>

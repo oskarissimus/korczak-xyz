@@ -8,8 +8,8 @@ import * as styles from '../styles/layout.module.css'
 export default function Layout({ children }) {
     return (
         <div className={styles.outer_wrapper}>
+            <Navbar />
             <div className={styles.wrapper}>
-                <Navbar />
                 {children}
                 <Footer />
                 <DarkModeSwitch />
