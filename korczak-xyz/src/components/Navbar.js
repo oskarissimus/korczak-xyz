@@ -15,12 +15,16 @@ const navigation = [
 ]
 
 export default function Navbar() {
+    const [isMenuOpen, setIsMenuOpen] = React.useState(false)
     return (
         <div className='navbar_outer_wrapper'>
-            <div className='navbar_burger_wrapper'>
+            <button
+                className='navbar_burger_wrapper'
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
                 <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
-            </div>
-            <nav className='navbar'>
+            </button>
+            <nav className={`navbar${isMenuOpen ? ' navbar-open' : ''}`}>
                 <MenuItem name='korczak.xyz' href='/' />
                 <div className='grow' />
                 {navigation.map(item => (
