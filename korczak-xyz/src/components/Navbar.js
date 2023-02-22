@@ -25,8 +25,8 @@ export default function Navbar() {
                 <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
             </button>
             <nav className={`navbar${isMenuOpen ? ' navbar-open' : ''}`}>
-                <MenuItem name='korczak.xyz' href='/' />
-                <div className='grow' />
+                <MenuItem name='korczak.xyz' href='/' className="sm:block hidden" />
+                <div className='grow hidden sm:block' />
                 {navigation.map(item => (
                     <MenuItem key={item.name} {...item} />
                 ))}
