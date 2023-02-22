@@ -1,0 +1,21 @@
+.outer_wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 72rem;
+    gap: 5rem;
+}
+
+/* when screen size is mobile, add padding to outer_wrapper */
+@media (max-width: 640px) {
+    .outer_wrapper {
+        padding: 0 1rem;
+    }
+}

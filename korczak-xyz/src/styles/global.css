@@ -6,10 +6,12 @@
 
 html {
     background-color: white;
+    color: rgb(17, 24, 39);
 }
 
 html.dark {
     background-color: black;
+    color: rgb(209, 213, 219);
 }
 
 html.dark img {
