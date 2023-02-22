@@ -1,5 +1,6 @@
 import React from 'react'
 import MenuItem from './MenuItem'
+import "../styles/Navbar.css"
 
 const navigation = [
     { name: 'Home', href: '/' },
@@ -12,7 +13,7 @@ const navigation = [
 
 export default function Navbar() {
     return (
-        <nav className='flex justify-end gap-8 m-8'>
+        <nav className='navbar'>
             <MenuItem name='korczak.xyz' href='/' />
             <div className='grow' />
             {navigation.map(item => (
