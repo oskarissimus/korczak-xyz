@@ -5,8 +5,25 @@
     margin: 2rem;
 }
 
+.navbar_burger {
+    display: none;
+}
+
 @media (max-width: 640px) {
     .navbar {
         display: none;
+    }
+
+    .navbar_burger {
+        display: block;
+        cursor: pointer;
+        font-size: 3rem;
+    }
+
+    .navbar_burger_wrapper {
+        display: flex;
+        justify-content: flex-end;
+        margin: 2rem;
+        border-bottom: 1px solid #ccc;
     }
 }
