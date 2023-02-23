@@ -1,14 +1,13 @@
 import React from 'react'
 import Footer from './Footer'
 import Navbar from './Navbar'
-import * as styles from '../styles/layout.module.css'
 
 
 export default function Layout({ children }) {
     return (
-        <div className={styles.outer_wrapper}>
+        <div className="flex flex-col items-center gap-2">
             <Navbar />
-            <div className={styles.wrapper}>
+            <div className="flex flex-col items-stretch w-full max-w-screen-md p-4 md:p-0 gap-4">
                 {children}
                 <Footer />
             </div>
