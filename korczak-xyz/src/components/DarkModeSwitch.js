@@ -37,11 +37,6 @@ export default function DarkModeSwitch({ className }) {
             text-[36px]
             scale-[0.5]
             
-            peer
-            peer-focus:outline-none
-            peer-focus:ring-4
-            peer-focus:ring-blue-300
-
             peer-checked:bg-gray-400
 
             peer-checked:after:border-gray-900
