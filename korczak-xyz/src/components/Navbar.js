@@ -34,7 +34,9 @@ export default function Navbar() {
         dark:bg-black
         '>
             <div className='flex items-center justify-end ml-4'>
-                <MenuItem name='korczak.xyz' href='/' className="md:hidden block" />
+                <div className="md:hidden block" >
+                    <MenuItem name='korczak.xyz' href='/' />
+                </div>
                 <div className='grow md:hidden' />
                 <DarkModeSwitch className='block md:hidden' />
                 <button
