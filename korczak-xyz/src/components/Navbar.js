@@ -3,6 +3,8 @@ import MenuItem from './MenuItem'
 import { solid } from '@fortawesome/fontawesome-svg-core/import.macro'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import DarkModeSwitch from './DarkModeSwitch'
+import { graphql, useStaticQuery } from 'gatsby'
+import { GatsbyImage, getImage } from 'gatsby-plugin-image'
 
 
 const navigation = [
@@ -16,6 +18,16 @@ const navigation = [
 
 export default function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false)
+    const data = useStaticQuery(graphql`
+        query LogoQuery {
+            file(relativePath: { eq: "logo.png" }) {
+                childImageSharp {
+                    gatsbyImageData(width: 30)
+                }
+            }
+        }
+    `)
+
     return (
         <div className='
         flex
@@ -34,7 +46,8 @@ export default function Navbar() {
         dark:bg-black
         '>
             <div className='flex items-center justify-end ml-4'>
-                <div className="md:hidden block" >
+                <div className="md:hidden flex gap-3" >
+                    <GatsbyImage image={getImage(data.file)} alt="logo" />
                     <MenuItem name='korczak.xyz' href='/' />
                 </div>
                 <div className='grow md:hidden' />
@@ -75,7 +88,10 @@ export default function Navbar() {
                 ${isMenuOpen ? ' flex' : ' hidden'}
                 `
             }>
-                <MenuItem name='korczak.xyz' href='/' className="md:block hidden" />
+                <div className="md:flex hidden gap-3">
+                    <GatsbyImage image={getImage(data.file)} alt="logo" />
+                    <MenuItem name='korczak.xyz' href='/' />
+                </div>
                 <div className='grow hidden md:block' />
                 {navigation.map(item => (
                     <MenuItem key={item.name} {...item} />
@@ -85,5 +101,4 @@ export default function Navbar() {
         </div>
     )
 }
-
 
