@@ -37,6 +37,7 @@ export default function Navbar() {
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     height='2rem'
                     width='2rem'
+                    aria-label='Menu'
                 >
                     <FontAwesomeIcon
                         icon={solid("burger")}
