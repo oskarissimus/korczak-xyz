@@ -51,7 +51,9 @@ export default function index() {
       <PageContent title="Home">
         <ul className='flex flex-col justify-center gap-4'>
           {buttons.map(button => (
-            <BigButton key={button.text} {...button} />
+            <li>
+              <BigButton key={button.text} {...button} />
+            </li>
           ))}
         </ul>
       </PageContent>
