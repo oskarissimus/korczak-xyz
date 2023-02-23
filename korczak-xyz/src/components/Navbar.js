@@ -21,6 +21,7 @@ export default function Navbar() {
             <button
                 className='navbar_burger_wrapper'
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
+                style={{ fontSize: '2rem' }}
             >
                 <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
             </button>
