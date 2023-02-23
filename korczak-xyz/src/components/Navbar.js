@@ -21,6 +21,7 @@ export default function Navbar() {
         flex
         flex-col
         border-b
+        md:border-b-0
         border-gray-400
         sticky
         md:relative
