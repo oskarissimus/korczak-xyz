@@ -49,5 +49,10 @@
         left: 0;
         width: 100%;
         background-color: #fff;
+        z-index: 100;
+    }
+
+    html.dark .navbar_outer_wrapper {
+        background-color: black;
     }
 }
