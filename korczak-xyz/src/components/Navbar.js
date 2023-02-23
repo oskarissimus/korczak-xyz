@@ -20,8 +20,10 @@ export default function Navbar() {
         <div className='
         flex
         flex-col
-        border-b-red
-        fixed
+        border-b
+        border-gray-400
+        sticky
+        md:relative
         top-0
         left-0
         w-full
@@ -68,12 +70,12 @@ export default function Navbar() {
                 ${isMenuOpen ? ' flex' : ' hidden'}
                 `
             }>
-                <MenuItem name='korczak.xyz' href='/' className="sm:block hidden" />
-                <div className='grow hidden sm:block' />
+                <MenuItem name='korczak.xyz' href='/' className="md:block hidden" />
+                <div className='grow hidden md:block' />
                 {navigation.map(item => (
                     <MenuItem key={item.name} {...item} />
                 ))}
-                <DarkModeSwitch className='hidden sm:block' />
+                <DarkModeSwitch className='hidden md:block' />
             </nav>
         </div>
     )
