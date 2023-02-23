@@ -3,6 +3,7 @@ import MenuItem from './MenuItem'
 import "../styles/Navbar.css"
 import { solid } from '@fortawesome/fontawesome-svg-core/import.macro'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import DarkModeSwitch from './DarkModeSwitch'
 
 
 const navigation = [
@@ -18,6 +19,8 @@ export default function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false)
     return (
         <div className='navbar_outer_wrapper'>
+            <DarkModeSwitch />
+
             <button
                 className='navbar_burger_wrapper'
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
