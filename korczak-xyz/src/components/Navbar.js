@@ -19,22 +19,24 @@ export default function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false)
     return (
         <div className='navbar_outer_wrapper'>
-            <DarkModeSwitch />
-
-            <button
-                className='navbar_burger_wrapper'
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                height='2rem'
-                width='2rem'
-            >
-                <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
-            </button>
+            <div className='flex items-center justify-end'>
+                <DarkModeSwitch className='block sm:hidden' />
+                <button
+                    className='flex sm:hidden'
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    height='2rem'
+                    width='2rem'
+                >
+                    <FontAwesomeIcon icon={solid("burger")} className="navbar_burger" />
+                </button>
+            </div>
             <nav className={`navbar${isMenuOpen ? ' navbar-open' : ''}`}>
                 <MenuItem name='korczak.xyz' href='/' className="sm:block hidden" />
                 <div className='grow hidden sm:block' />
                 {navigation.map(item => (
                     <MenuItem key={item.name} {...item} />
                 ))}
+                <DarkModeSwitch className='hidden sm:block' />
             </nav>
         </div>
     )

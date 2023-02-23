@@ -3,10 +3,7 @@
     justify-content: flex-end;
     gap: 2rem;
     margin: 2rem;
-}
-
-.navbar_burger {
-    display: none;
+    align-items: center;
 }
 
 .navbar_outer_wrapper {
@@ -34,11 +31,6 @@
         margin: 1rem 1.5rem;
     }
 
-    .navbar_burger_wrapper {
-        width: 100%;
-        display: flex;
-        justify-content: flex-end;
-    }
 
     .navbar_outer_wrapper {
         display: flex;

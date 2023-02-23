@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useContext } from 'react'
 import ThemeContext from '../context/ThemeContext'
 
 
-export default function DarkModeSwitch() {
+export default function DarkModeSwitch({ className }) {
     const { theme, setTheme } = useContext(ThemeContext)
     useEffect(() => {
         if (theme === 'dark') {
@@ -20,8 +20,13 @@ export default function DarkModeSwitch() {
 
 
     return (
-        <label className="fixed inline-flex cursor-pointer bottom-20 left-20">
-            <input type="checkbox" className="sr-only peer" onChange={toggleTheme} checked={theme === 'dark'} />
+        <label className={className}>
+            <input
+                type="checkbox"
+                className="sr-only peer"
+                onChange={toggleTheme}
+                checked={theme === 'dark'}
+            />
             <div className="
             w-[105px]
             h-[56px]
@@ -30,7 +35,7 @@ export default function DarkModeSwitch() {
             text-center
             leading-[40px]
             text-[36px]
-            scale-[1]
+            scale-[0.5]
             
             peer
             peer-focus:outline-none
