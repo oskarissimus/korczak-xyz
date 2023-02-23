@@ -45,5 +45,6 @@ module.exports = {
     description: `Personal website of Oskar Korczak`,
     image: `/logo.png`,
     siteUrl: `https://korczakxyzmain.gatsbyjs.io/`,
+    lang: `en`,
   },
 }
