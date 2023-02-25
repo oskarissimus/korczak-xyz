@@ -15,37 +15,38 @@ I wanted to have 10×30 pixels on my matrix, maybe not enough to display images,
 These are very good LEDs. However I laughed for a while when i noticed that “they couldn’t imagine how beautiful life without me”. A little dark.
 ## Playing with LEDs
 When my packages finally arrived from China, I quickly connected them to arduino and started playing with them.
-<video controls src="/videos/blog/led-matrix/playing-with-leds.mp4"></video>
+`youtube: 2-hwGV2hLpU`
 First usage of LED strip
 ## Building matrix
 
 Well, after having some fun with LED strips it was time to glue together some cardboard, and make backplate with size 1x1m, Than I plugged everything to power supply and arduino, and was truly amazed with LED control software
-<video controls src="/videos/blog/led-matrix/building-matrix.mp4"></video>
+`youtube: JDR4Wz0-VFU`
 Playing around with LED matrix
 
 ## Further assembly
 
-<video controls src="/videos/blog/led-matrix/further-assembly-on-the-floor.mp4"></video>
+`youtube: I-fwW-TVWJo`
 I separated pixels with stripes of cardboard secured to the backplate with hot glue. After that I covered it with foil, to disperse light, and create sensation of square pixels.
-<video controls src="/videos/blog/led-matrix/further-assembly-on-the-desk.mp4"></video>
+
+`youtube: MXAwmhOfveE`
 Comparison of matrix with and without foil
 
 ## Writing code
 
 When hardware was ready i opened Arduino IDE and implemented Snake and Tetris, because i thought those are appropriate games for screen with resolution of 10px x 10px. I have source code for that somewhere on old hard drive, and I will share it, when I will find it.
-<video controls src="/videos/blog/led-matrix/writing-code.mp4"></video>
+`youtube: MBs8jBqcsIw`
 Writing code for snake
 
 ## Testing
 
-<video controls src="/videos/blog/led-matrix/testing-display-of-numbers.mp4"></video>
+`youtube: lzloEHUfXow`
 Testing display of numbers on LED matrix
 
 ## Games
-<video controls src="/videos/blog/led-matrix/snake-without-clock.mp4"></video>
+`youtube: pGL7U9LC1UQ`
 Snake gameplay without game clock implemented yet
 
-<video controls src="/videos/blog/led-matrix/tetris-gameplay.mp4"></video>
+`youtube: 2nQtkvzXlh8`
 Tetris gameplay
 
 ## Game controller
@@ -60,7 +61,7 @@ controller wiring
 controller in all its glory
 ![close-up on joystick](../images/blog/led-matrix/joystick-close-up.jpg "close-up on joystick")
 close-up on joystick
-<video controls src="/videos/blog/led-matrix/joystick.mp4"></video>
+`youtube: BXvUJtiB-Cc`
 
 ## Whats next?
 
