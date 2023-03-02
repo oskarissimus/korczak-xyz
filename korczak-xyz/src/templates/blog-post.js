@@ -4,13 +4,12 @@ import Layout from "../components/Layout"
 import PageContent from "../components/PageContent"
 import "../styles/blog-post.css"
 
-export default function BlogPost({ data }) {
-  const { html } = data.markdownRemark
-  const { title, slug } = data.markdownRemark.frontmatter
+export default function BlogPost({ data, location, children }) {
+  const { title } = data.mdx.frontmatter
   return (
     <Layout>
       <PageContent title={title}>
-        <div className="blog_post" dangerouslySetInnerHTML={{ __html: html }} />
+        <section itemProp="articleBody">{children}</section>
       </PageContent>
     </Layout>
   )
@@ -18,8 +17,7 @@ export default function BlogPost({ data }) {
 
 export const query = graphql`
 query BlogPost($slug: String) {
-    markdownRemark(frontmatter: {slug: {eq: $slug}}) {
-      html
+  mdx(frontmatter: {slug: {eq: $slug}}) {
       frontmatter {
         slug
         title
