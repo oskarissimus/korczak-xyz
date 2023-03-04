@@ -12,12 +12,12 @@ const ImageContainer = ({ children }) => (
     </div>
 )
 
-export default function Papaj() {
+export default function Gallery() {
     return (
         <div style={{ display: "flex", gap: 20 }}>
             <ImageContainer>
                 <StaticImage
-                    src="../images/blog/led-matrix/nes-controller.jpg"
+                    src="../../images/blog/led-matrix/nes-controller.jpg"
                     alt="NES controller"
                     {...staticImageProps}
                 />
@@ -25,7 +25,7 @@ export default function Papaj() {
             </ImageContainer>
             <ImageContainer>
                 <StaticImage
-                    src="../images/blog/led-matrix/nespi.png"
+                    src="../../images/blog/led-matrix/nespi.png"
                     alt="NESPi case"
                     {...staticImageProps}
                 />
@@ -33,7 +33,7 @@ export default function Papaj() {
             </ImageContainer>
             <ImageContainer>
                 <StaticImage
-                    src="../images/blog/led-matrix/raspberry-pi.jpg"
+                    src="../../images/blog/led-matrix/raspberry-pi.jpg"
                     alt="Raspberry Pi"
                     {...staticImageProps}
                 />
