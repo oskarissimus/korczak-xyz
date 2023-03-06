@@ -7,7 +7,7 @@ const staticImageProps = {
     style: { display: "block" },
 };
 
-export default function Gallery() {
+export default function GalleryWhatsNext() {
     return (
         <div style={{ display: "flex", gap: 20 }}>
             <ImageContainer>
