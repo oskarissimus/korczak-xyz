@@ -9,7 +9,7 @@ export default function BlogPost({ data, location, children }) {
   return (
     <Layout>
       <PageContent title={title}>
-        <section itemProp="articleBody">{children}</section>
+        <section className="blog_post" itemProp="articleBody">{children}</section>
       </PageContent>
     </Layout>
   )

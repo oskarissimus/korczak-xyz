@@ -1,3 +1,16 @@
 .blog_post h2 {
     font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+.blog_post p {
+    margin-bottom: 40px;
+}
+
+.blog_post .gatsby-resp-image-wrapper {
+    margin: 30px 0;
+}
+
+.blog_post .embedVideo-container {
+    margin: 30px 0;
 }
