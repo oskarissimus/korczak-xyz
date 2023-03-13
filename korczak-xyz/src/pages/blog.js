@@ -3,6 +3,7 @@ import Layout from "../components/Layout"
 import PageContent from "../components/PageContent"
 import { Seo } from "../components/Seo"
 import { graphql } from "gatsby"
+import { GatsbyImage, getImage } from "gatsby-plugin-image"
 
 export const Head = () => (
     <Seo />
@@ -19,8 +20,9 @@ export default function Blog({ data }) {
         <Layout>
             <PageContent title="Blog">
                 <ul>
-                    {posts.map(({ frontmatter: { slug, title, date } }) => (
+                    {posts.map(({ frontmatter: { slug, title, date, featuredImage } }) => (
                         <li key={slug}>
+                            <GatsbyImage image={getImage(featuredImage)} alt={title} />
                             <a href={slug}>{title}</a>
                             <span> - {formatDate(date)}</span>
                         </li>
@@ -39,6 +41,15 @@ query BlogPosts {
           slug
           title
           date
+          featuredImage {
+            childImageSharp {
+                gatsbyImageData(
+                    width: 200
+                    placeholder: BLURRED
+                    formats: [AUTO, WEBP, AVIF]
+                )
+                }
+            }
         }
       }
     }
