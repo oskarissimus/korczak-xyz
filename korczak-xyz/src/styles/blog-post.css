@@ -19,3 +19,8 @@
     list-style: disc;
     padding-left: 2rem;
 }
+
+.blog_post ol {
+    list-style: decimal;
+    padding-left: 2rem;
+}
