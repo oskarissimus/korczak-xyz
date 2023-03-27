@@ -70,6 +70,13 @@ module.exports = {
         path: `${__dirname}/src/blog/`,
       },
     },
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        name: `courses`,
+        path: `${__dirname}/src/courses/`,
+      },
+    },
   ],
   siteMetadata: {
     title: `korczak.xyz`,
