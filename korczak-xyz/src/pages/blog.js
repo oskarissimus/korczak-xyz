@@ -4,7 +4,6 @@ import PageContent from "../components/PageContent"
 import { Seo } from "../components/Seo"
 import { graphql } from "gatsby"
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
-import "../styles/blog-list.css"
 
 export const Head = () => (
     <Seo />
