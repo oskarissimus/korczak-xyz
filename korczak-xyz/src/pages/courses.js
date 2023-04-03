@@ -38,50 +38,60 @@ function RedButton({ text, link }) {
 }
 
 export default function Courses({ data }) {
-    const courses = [
-        {
-            title: "Zaawansowane narzędzia web-testera",
-            imageColor: data.allFile.nodes.find(node => node.name === "zaawansowane-narzedzia-web-testera-color"),
-            imageBW: data.allFile.nodes.find(node => node.name === "zaawansowane-narzedzia-web-testera-bw"),
-            description: "Na kurs składa się 12 1-godzinnych indywidualnych spotkań z kursantem. Terminy spotkań są ustalane indywidualnie. Celem kursu jest zapoznanie z zaawansowanymi narzędziami stosowanymi w pracy web-testera. Oprócz materiału omawianego podczas spotkań prowadzący przedstawia również dodatkowe materiały do pracy własnej, które mają na celu utrwalić wiedzę i umiejętności kursanta.",
-            link: "/courses/kurs-zaawansowane-narzedzia-web-testera/",
-        },
-        {
-            title: "Wybrane aspekty sieciowe",
-            imageColor: data.allFile.nodes.find(node => node.name === "wybrane-aspekty-sieciowe-color"),
-            imageBW: data.allFile.nodes.find(node => node.name === "wybrane-aspekty-sieciowe-bw"),
-            description: "Kurs ma na celu przybliżyć deweloperom wybrane aspekty sieciowe w praktyczny sposób. Zagadnienia są wybrane w taki sposób, aby kompleksowo omówić informacje potrzebne żeby skutecznie działać jako full-stack developer z pełną kontrolą nad sieciowością aplikacji.",
-            link: "/courses/kurs-wybrane-aspekty-sieciowe/",
-        },
-        {
-            title: "Programowanie backend w JS",
-            imageColor: data.allFile.nodes.find(node => node.name === "programowanie-backend-w-js-color"),
-            imageBW: data.allFile.nodes.find(node => node.name === "programowanie-backend-w-js-bw"),
-            description: "Kurs jest przeznaczony dla rozpoczynających swoją przygodę z programowaniem. Kurs jest podzielony pięć części: programistyczne abecadło, zaawansowane aspekty języka, typescript, narzędzia backendowe w JS, projekt programistyczny. Każda z tych części jest opisana niżej. Na kurs składają się zarówno spotkania z mentorem jak i praca własna kursanta pomiędzy spotkaniami.",
-            link: "/courses/kurs-programowanie-backend-w-js/",
-        }
-    ]
+    const courses = data.allMdx.nodes;
     return (
         <Layout>
             <PageContent title="Courses">
                 <div className="flex flex-col gap-20" >
-                    {courses.map((course, index) => (
-                        <CourseSection key={index} {...course} />
-                    ))}
+                    {courses.map(
+                        ({ excerpt, frontmatter: { slug, title, date, excerpt: courseExcerpt, featuredImageColor, featuredImageBW } }) => (
+                            <CourseSection
+                                key={slug}
+                                title={title}
+                                imageColor={featuredImageColor}
+                                imageBW={featuredImageBW}
+                                description={courseExcerpt}
+                                link={slug}
+                            />
+                        )
+
+
+                    )}
                 </div>
             </PageContent>
         </Layout>
     )
 }
 export const query = graphql`
-query CoursesColorImages {
-    allFile(filter: {relativeDirectory: {eq: "courses"}}) {
-        nodes {
-            name
+query Courses {
+    allMdx(filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/courses/"}}} sort: {fields: frontmatter___date, order: DESC}) {
+      nodes {
+        excerpt
+        frontmatter {
+          slug
+          title
+          date
+          excerpt
+          featuredImageColor {
             childImageSharp {
-                gatsbyImageData
+                gatsbyImageData(
+                    width: 800
+                    placeholder: BLURRED
+                    formats: [AUTO, WEBP, AVIF]
+                )
+                }
+            }
+            featuredImageBW {
+                childImageSharp {
+                    gatsbyImageData(
+                        width: 800
+                        placeholder: BLURRED
+                        formats: [AUTO, WEBP, AVIF]
+                    )
+                }
             }
         }
+      }
     }
-}
+  }
 `
