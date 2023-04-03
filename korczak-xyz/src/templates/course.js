@@ -2,7 +2,7 @@ import { graphql } from "gatsby";
 import React, { useContext } from "react";
 import Layout from "../components/Layout"
 import PageContent from "../components/PageContent"
-import "../styles/blog-post.css"
+import "../styles/course.css"
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
 import ThemeContext from "../context/ThemeContext"
 
@@ -14,7 +14,7 @@ export default function BlogPost({ data, location, children }) {
       <PageContent title={title}>
         {theme === "dark" && <GatsbyImage image={getImage(data.mdx.frontmatter.featuredImageBW)} alt={title} />}
         {theme === "light" && <GatsbyImage image={getImage(data.mdx.frontmatter.featuredImageColor)} alt={title} />}
-        <section className="blog_post" itemProp="articleBody">{children}</section>
+        <section className="course" itemProp="articleBody">{children}</section>
       </PageContent>
     </Layout>
   )
