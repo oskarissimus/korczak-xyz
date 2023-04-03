@@ -1,11 +1,11 @@
 import { Link } from "gatsby";
 import React, { useContext } from "react";
-import Layout from "../../components/Layout"
-import PageContent from "../../components/PageContent"
+import Layout from "../components/Layout"
+import PageContent from "../components/PageContent"
 import { graphql } from "gatsby";
 import { GatsbyImage, getImage } from "gatsby-plugin-image"
-import ThemeContext from "../../context/ThemeContext"
-import { Seo } from "../../components/Seo"
+import ThemeContext from "../context/ThemeContext"
+import { Seo } from "../components/Seo"
 export const Head = () => (
     <Seo />
 )
