@@ -43,7 +43,11 @@ export default function OskarLive() {
     return (
         <Layout>
             <PageContent title={"Oskar live"}>
-                <StaticImage src="../images/oskar-live.png" alt="Oskar Tech Support" />
+                <StaticImage
+                    src="../images/oskar-live.png"
+                    alt="Oskar Live"
+                    layout="fullWidth"
+                />
                 <p>
                     I am streaming weekly on mondays 16:30-17:30 CEST on zoom
                     and on YouTube
@@ -68,7 +72,7 @@ export default function OskarLive() {
                         icon={icon({ name: "right-to-bracket" })}
                         text="Join on Zoom"
                         backgroundColor="bg-[#0000ff]"
-                        link="https://us06web.zoom.us/j/81325961194?pwd=aUlhRTlFMUZiZnNqRmpQcitqcHVoZz09"
+                        to="https://us06web.zoom.us/j/81325961194?pwd=aUlhRTlFMUZiZnNqRmpQcitqcHVoZz09"
                     />
                     <BigButton
                         icon={icon({
@@ -76,7 +80,7 @@ export default function OskarLive() {
                         })}
                         text="Join on YouTube"
                         backgroundColor="bg-[#ff0000]"
-                        link="https://www.youtube.com/channel/@korczakxyz"
+                        to="https://www.youtube.com/@korczakxyz/streams"
                     />
                 </div>
 

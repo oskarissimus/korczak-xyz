@@ -2,8 +2,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import React from 'react'
 import { Link } from 'gatsby'
 
-export default function BigButton({ icon, text, backgroundColor, href }) {
-    console.log(href)
+export default function BigButton({ icon, text, backgroundColor, to }) {
     return (
         <Link className={`
         ${backgroundColor}
@@ -21,7 +20,7 @@ export default function BigButton({ icon, text, backgroundColor, href }) {
         pb-1
         font-light
         `}
-            to={href}
+            to={to}
         >
             <p>
                 <FontAwesomeIcon icon={icon} />

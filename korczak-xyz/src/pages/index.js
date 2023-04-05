@@ -12,43 +12,43 @@ const buttons = [
     icon: solid("door-open"),
     text: "Oskar tech-support",
     backgroundColor: "bg-[#b90000]",
-    href: "/oskar-tech-support"
+    to: "/oskar-tech-support"
   },
   {
     icon: brands("discord"),
     text: "Discord community",
     backgroundColor: "bg-[#7289d9]",
-    href: "https://discord.gg/DwbvwjJM7N"
+    to: "https://discord.gg/DwbvwjJM7N"
   },
   {
     icon: brands("youtube"),
     text: "Youtube channel",
     backgroundColor: "bg-[#ff0000]",
-    href: "https://www.youtube.com/@korczakxyz"
+    to: "https://www.youtube.com/@korczakxyz"
   },
   {
     icon: solid("laptop-code"),
     text: "Courses",
     backgroundColor: "bg-[#a4036f]",
-    href: "/courses"
+    to: "/courses"
   },
   {
     icon: regular("lightbulb"),
     text: "Mentoring",
     backgroundColor: "bg-[#048ba8]",
-    href: "/mentoring"
+    to: "/mentoring"
   },
   {
     icon: regular("list-alt"),
     text: "Blog",
     backgroundColor: "bg-[#87420D]",
-    href: "/blog"
+    to: "/blog"
   },
   {
     icon: brands("github"),
     text: "Github",
     backgroundColor: "bg-[#333]",
-    href: "https://github.com/oskarissimus"
+    to: "https://github.com/oskarissimus"
   },
 ]
 
