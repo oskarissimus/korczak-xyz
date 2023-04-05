@@ -13,7 +13,7 @@ const navigation = [
     { name: 'Mentoring', href: '/mentoring' },
     { name: 'Courses', href: '/courses' },
     { name: 'Blog', href: '/blog' },
-    { name: 'Tech-support', href: '/oskar-tech-support' },
+    { name: 'Oskar live', href: '/oskar-live' },
 ]
 
 export default function Navbar() {
