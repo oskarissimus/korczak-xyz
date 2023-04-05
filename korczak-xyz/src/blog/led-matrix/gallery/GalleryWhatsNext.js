@@ -1,6 +1,6 @@
 import React from "react";
 import { StaticImage } from "gatsby-plugin-image";
-import { ImageContainer } from "./ImageContainer";
+import { ImageContainer } from "../../components/ImageContainer";
 
 const staticImageProps = {
     aspectRatio: 3 / 2,

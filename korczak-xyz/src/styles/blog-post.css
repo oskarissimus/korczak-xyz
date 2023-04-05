@@ -5,6 +5,7 @@
 
 .blog_post p {
     margin: 40px 0;
+    text-align: justify;
 }
 
 .blog_post .gatsby-resp-image-wrapper {
