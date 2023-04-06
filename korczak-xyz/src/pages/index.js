@@ -4,9 +4,12 @@ import { solid, brands, regular } from '@fortawesome/fontawesome-svg-core/import
 import BigButton from '../components/BigButton'
 import PageContent from '../components/PageContent'
 import { Seo } from "../components/Seo"
+import { graphql } from "gatsby"
+
 export const Head = () => (
   <Seo />
 )
+
 const buttons = [
   {
     icon: solid("door-open"),
@@ -67,3 +70,17 @@ export default function index() {
     </Layout>
   )
 }
+
+export const query = graphql`
+  query ($language: String!) {
+    locales: allLocale(filter: {language: {eq: $language}}) {
+      edges {
+        node {
+          ns
+          data
+          language
+        }
+      }
+    }
+  }
+`;

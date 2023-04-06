@@ -7,6 +7,7 @@ import Calendar from "../components/Calendar"
 import ContactFormWrapper from "../components/ContactForm/ContactFormWrapper"
 import ThemeContext from "../context/ThemeContext"
 import { Seo } from "../components/Seo"
+import { Trans } from 'gatsby-plugin-react-i18next';
 export const Head = () => (
     <Seo />
 )
@@ -24,23 +25,24 @@ export default function Mentoring({ data }) {
             <PageContent title={"Mentoring"}>
                 <GatsbyImage image={image} alt="Mentoring" />
                 <p>
-                    I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free 😉
+                    <Trans>
+                        I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free 😉
+                    </Trans>
                 </p>
                 <Calendar />
-                <p>
-                    I can help you with:
-                </p>
+                <p><Trans>I can help you with:</Trans></p>
                 <ul className="list-disc list-inside pl-6">
-                    <li>Python</li>
-                    <li>Environment setup</li>
-                    <li>Linux command-line</li>
-                    <li>Docker</li>
-                    <li>Kubernetes</li>
-                    <li>React</li>
+                    <li><Trans>Python</Trans></li>
+                    <li><Trans>Environment setup</Trans></li>
+                    <li><Trans>Linux command-line</Trans></li>
+                    <li><Trans>Docker</Trans></li>
+                    <li><Trans>Kubernetes</Trans></li>
+                    <li><Trans>React</Trans></li>
                 </ul>
                 <p>
-                    Mentoring sessions are up to 1 hour long.
-
+                    <Trans>
+                        Mentoring sessions are up to 1 hour long.
+                    </Trans>
                 </p>
                 <ContactFormWrapper />
 
@@ -48,8 +50,9 @@ export default function Mentoring({ data }) {
         </Layout>
     )
 }
+
 export const query = graphql`
-query MentoringImages {
+query MentoringImagesAndLocale($language: String!) {
     allFile(filter: {name: {regex: "/mentoring-(color|bw)/"}}) {
         nodes {
           name
@@ -58,5 +61,14 @@ query MentoringImages {
           }
         }
       }
+    locales: allLocale(filter: {language: {eq: $language}}) {
+      edges {
+        node {
+          ns
+          data
+          language
+        }
+      }
+    }
   }
-`
+`;
