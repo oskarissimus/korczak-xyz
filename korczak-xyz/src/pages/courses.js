@@ -63,8 +63,11 @@ export default function Courses({ data }) {
     )
 }
 export const query = graphql`
-query Courses {
-    allMdx(filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/courses/"}}} sort: {fields: frontmatter___date, order: DESC}) {
+query coursesPage {
+    allMdx(
+      filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/courses/"}}}
+      sort: {frontmatter: {date: DESC}}
+    ) {
       nodes {
         excerpt
         frontmatter {
@@ -74,22 +77,14 @@ query Courses {
           excerpt
           featuredImageColor {
             childImageSharp {
-                gatsbyImageData(
-                    width: 800
-                    placeholder: BLURRED
-                    formats: [AUTO, WEBP, AVIF]
-                )
-                }
+              gatsbyImageData(width: 800, placeholder: BLURRED, formats: [AUTO, WEBP, AVIF])
             }
-            featuredImageBW {
-                childImageSharp {
-                    gatsbyImageData(
-                        width: 800
-                        placeholder: BLURRED
-                        formats: [AUTO, WEBP, AVIF]
-                    )
-                }
+          }
+          featuredImageBW {
+            childImageSharp {
+              gatsbyImageData(width: 800, placeholder: BLURRED, formats: [AUTO, WEBP, AVIF])
             }
+          }
         }
       }
     }

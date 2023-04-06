@@ -42,8 +42,11 @@ export default function Blog({ data }) {
 }
 
 export const query = graphql`
-query BlogPosts {
-    allMdx(filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/blog/"}}} sort: {fields: frontmatter___date, order: DESC}) {
+query BlogPostsPage {
+    allMdx(
+      filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/blog/"}}}
+      sort: {frontmatter: {date: DESC}}
+    ) {
       nodes {
         excerpt
         frontmatter {
@@ -52,13 +55,9 @@ query BlogPosts {
           date
           featuredImage {
             childImageSharp {
-                gatsbyImageData(
-                    width: 200
-                    placeholder: BLURRED
-                    formats: [AUTO, WEBP, AVIF]
-                )
-                }
+              gatsbyImageData(width: 200, placeholder: BLURRED, formats: [AUTO, WEBP, AVIF])
             }
+          }
         }
       }
     }
