@@ -5,6 +5,7 @@ import BigButton from '../components/BigButton'
 import PageContent from '../components/PageContent'
 import { Seo } from "../components/Seo"
 import { graphql } from "gatsby"
+import { useTranslation } from "gatsby-plugin-react-i18next"
 
 export const Head = () => (
   <Seo />
@@ -55,10 +56,11 @@ const buttons = [
   },
 ]
 
-export default function index() {
+export default function Index() {
+  const { t } = useTranslation()
   return (
     <Layout>
-      <PageContent title="Home">
+      <PageContent title={t("Home")}>
         <ul className='flex flex-col justify-center gap-4'>
           {buttons.map(button => (
             <li key={button.text}>
