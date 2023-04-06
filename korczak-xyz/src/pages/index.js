@@ -10,9 +10,9 @@ export const Head = () => (
 const buttons = [
   {
     icon: solid("door-open"),
-    text: "Oskar tech-support",
+    text: "Oskar live",
     backgroundColor: "bg-[#b90000]",
-    to: "/oskar-tech-support"
+    to: "/oskar-live"
   },
   {
     icon: brands("discord"),

@@ -1,9 +1,9 @@
 import React from 'react'
 import { Link } from 'gatsby'
 
-export default function MenuItem({ className, name, href }) {
+export default function MenuItem({ className, name, to }) {
     return (
-        <Link key={name} to={href} className={`${className} text-lg`}>
+        <Link key={name} to={to} className={`${className}`}>
             {name}
         </Link>
     )

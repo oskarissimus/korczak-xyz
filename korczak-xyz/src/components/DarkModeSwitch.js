@@ -28,6 +28,7 @@ export default function DarkModeSwitch({ className }) {
                 checked={theme === 'dark'}
             />
             <div className="
+            mx-[-20px]
             w-[105px]
             h-[56px]
             bg-gray-200
