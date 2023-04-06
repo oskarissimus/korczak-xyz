@@ -19,15 +19,23 @@ exports.createPages = async ({ graphql, actions }) => {
         nodes {
           frontmatter {
             slug
+            language
           }
           internal {
             contentFilePath
           }
         }
       }
+      plugin: sitePlugin(name: {eq: "gatsby-plugin-react-i18next"}) {
+        pluginOptions
+      }
     }
   `);
-
+  const defaultLanguage = data.plugin.pluginOptions.defaultLanguage;
+  console.log(`defaultLanguage = ${defaultLanguage}`);
+  function languagePath(language) {
+    return language === defaultLanguage ? '' : '/' + language;
+  }
   // Create blog pages
   data.blogPosts.nodes.forEach(node => {
     actions.createPage({
@@ -39,10 +47,17 @@ exports.createPages = async ({ graphql, actions }) => {
 
   // Create course pages
   data.courses.nodes.forEach(node => {
-    actions.createPage({
-      path: '/courses/' + node.frontmatter.slug,
+    console.log(`Creating course page for ${node.frontmatter.slug} in ${node.frontmatter.language}`);
+    const page = {
+      path: languagePath(node.frontmatter.language) + '/courses/' + node.frontmatter.slug,
+      matchPath: languagePath(node.frontmatter.language) + '/courses/' + node.frontmatter.slug,
       component: `${courseTemplate}?__contentFilePath=${node.internal.contentFilePath}`,
-      context: { slug: node.frontmatter.slug },
-    });
+      context: {
+        slug: node.frontmatter.slug,
+        language: node.frontmatter.language,
+      },
+    };
+    console.log(page);
+    actions.createPage(page);
   });
 };

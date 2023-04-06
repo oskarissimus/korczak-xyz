@@ -35,12 +35,8 @@ module.exports = {
         },
         pages: [
           {
-            matchPath: '/:lang?/blog/:uid',
+            matchPath: '/:lang?/courses/:uid',
             getLanguageFromPath: true,
-          },
-          {
-            matchPath: '/preview',
-            languages: ['en']
           }
         ]
       }

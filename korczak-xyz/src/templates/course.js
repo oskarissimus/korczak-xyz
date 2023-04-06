@@ -19,10 +19,11 @@ export default function BlogPost({ data, location, children }) {
     </Layout>
   )
 }
-
 export const query = graphql`
-query Course($slug: String) {
-  mdx(frontmatter: {slug: {eq: $slug}}) {
+  query CoursePage($slug: String!, $language: String!) {
+    mdx(
+      frontmatter: {slug: {eq: $slug}, language: {eq: $language}}
+    ) {
       frontmatter {
         slug
         title
@@ -46,5 +47,14 @@ query Course($slug: String) {
         }
       }
     }
+    locales: allLocale(filter: {language: {eq: $language}}) {
+      edges {
+        node {
+          ns
+          data
+          language
+        }
+      }
+    }
   }
-  `
+`;
