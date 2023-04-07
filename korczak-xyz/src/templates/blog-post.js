@@ -16,11 +16,20 @@ export default function BlogPost({ data, location, children }) {
 }
 
 export const query = graphql`
-query BlogPost($slug: String) {
+query BlogPost($slug: String!, $language: String!) {
   mdx(frontmatter: {slug: {eq: $slug}}) {
       frontmatter {
         slug
         title
+      }
+    }
+    locales: allLocale(filter: {language: {eq: $language}}) {
+      edges {
+        node {
+          ns
+          data
+          language
+        }
       }
     }
   }

@@ -3,6 +3,11 @@
     margin: 20px 0;
 }
 
+.blog_post h3 {
+    font-size: 2rem;
+    margin: 20px 0;
+}
+
 .blog_post p {
     margin: 40px 0;
     text-align: justify;
