@@ -7,6 +7,8 @@ import { Seo } from "../components/Seo"
 import { icon } from '@fortawesome/fontawesome-svg-core/import.macro'
 import BigButton from "../components/BigButton";
 import Countdown from 'react-countdown';
+import { graphql } from "gatsby";
+import { Trans, useTranslation } from 'gatsby-plugin-react-i18next';
 
 export const Head = () => (
     <Seo />
@@ -35,11 +37,16 @@ function itsLiveTime() {
     // return true
 }
 
-function formatCountdown({ days, hours, minutes, seconds }) {
-    return `${days} Days ${hours} Hours ${minutes} Minutes ${seconds} Seconds`
+function FormatCountdown({ days, hours, minutes, seconds }) {
+    return (
+        <>
+            {days} <Trans>Days</Trans> {hours} <Trans>Hours</Trans> {minutes} <Trans>Minutes</Trans> {seconds} <Trans>Seconds</Trans>
+        </>
+    )
 }
 
 export default function OskarLive() {
+    const { t } = useTranslation();
     return (
         <Layout>
             <PageContent title={"Oskar live"}>
@@ -49,28 +56,28 @@ export default function OskarLive() {
                     layout="fullWidth"
                 />
                 <p>
-                    I am streaming weekly on mondays 16:30-17:30 CEST on zoom
-                    and on YouTube
-                    where I am working on my projects and answering questions.
+                    <Trans>
+                        I am streaming weekly on mondays 16:30-17:30 CEST on zoom and on YouTube where I am working on my projects and answering questions.
+                    </Trans>
                 </p>
                 <div className="flex justify-center my-10">
-                    {itsLiveTime() && <div className="text-green-500 text-6xl">Live now!</div >}
+                    {itsLiveTime() && <div className="text-green-500 text-6xl"><Trans>Live now!</Trans></div>}
                     {itsLiveTime() || <div>
-                        time to next stream:
+                        <Trans>time to next stream:</Trans>
                         <div className="text-red-500 text-3xl">
                             <Countdown
                                 date={dateOfNextLiveBegin()}
-                                renderer={formatCountdown}
+                                renderer={FormatCountdown}
                             />
                         </div>
                     </div>
                     }
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-col sm:flex-row">
 
                     <BigButton
                         icon={icon({ name: "right-to-bracket" })}
-                        text="Join on Zoom"
+                        text={t("Join on Zoom")}
                         backgroundColor="bg-[#0000ff]"
                         to="https://us06web.zoom.us/j/81325961194?pwd=aUlhRTlFMUZiZnNqRmpQcitqcHVoZz09"
                     />
@@ -78,7 +85,7 @@ export default function OskarLive() {
                         icon={icon({
                             name: "youtube", style: "brands"
                         })}
-                        text="Join on YouTube"
+                        text={t("Join on YouTube")}
                         backgroundColor="bg-[#ff0000]"
                         to="https://www.youtube.com/@korczakxyz/streams"
                     />
@@ -90,3 +97,16 @@ export default function OskarLive() {
         </Layout>
     )
 }
+export const query = graphql`
+  query ($language: String!) {
+    locales: allLocale(filter: {language: {eq: $language}}) {
+      edges {
+        node {
+          ns
+          data
+          language
+        }
+      }
+    }
+  }
+`;
