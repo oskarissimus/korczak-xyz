@@ -9,6 +9,7 @@ exports.createPages = async ({ graphql, actions }) => {
         nodes {
           frontmatter {
             slug
+            language
           }
           internal {
             contentFilePath
@@ -57,11 +58,12 @@ exports.createPages = async ({ graphql, actions }) => {
   data.blogPosts.nodes.forEach(node => {
     console.log(`Creating blog page for ${node.frontmatter.slug}`);
     const page = {
-      path: '/blog/' + node.frontmatter.slug,
-      matchPath: '/blog/' + node.frontmatter.slug,
+      path: languagePath(node.frontmatter.language) + '/blog/' + node.frontmatter.slug,
+      matchPath: languagePath(node.frontmatter.language) + '/blog/' + node.frontmatter.slug,
       component: `${postTemplate}?__contentFilePath=${node.internal.contentFilePath}`,
       context: {
         slug: node.frontmatter.slug,
+        language: node.frontmatter.language,
       },
     };
     console.log(page);

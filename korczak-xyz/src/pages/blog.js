@@ -45,7 +45,7 @@ export default function Blog({ data }) {
 export const query = graphql`
 query BlogPostsPage ($language: String!) {
   allMdx(
-    filter: {frontmatter: {published: {eq: true}}, internal: {contentFilePath: {regex: "/src/blog/"}}}
+    filter: {frontmatter: {published: {eq: true}, language: {eq: $language}}, internal: {contentFilePath: {regex: "/src/blog/"}}}
     sort: {frontmatter: {date: DESC}}
     ) {
       nodes {
