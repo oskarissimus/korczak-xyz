@@ -25,16 +25,20 @@ function dateOfNextMonday(dest_hour, dest_minutes) {
     return d
 }
 
+
 function dateOfNextLiveBegin() {
     return dateOfNextMonday(16, 30)
 }
-function dateOfNextLiveEnd() {
-    return dateOfNextMonday(17, 30)
-}
 
 function itsLiveTime() {
-    return new Date() > dateOfNextLiveBegin() && new Date() < dateOfNextLiveEnd()
-    // return true
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+    const minutes = now.getMinutes();
+    if ((day === 1) && ((hour === 16 && minutes >= 30) || (hour === 17 && minutes <= 30))) {
+        return true
+    }
+    return false
 }
 
 function FormatCountdown({ days, hours, minutes, seconds }) {
@@ -47,6 +51,7 @@ function FormatCountdown({ days, hours, minutes, seconds }) {
 
 export default function OskarLive() {
     const { t } = useTranslation();
+    console.log("itsLiveTime()", itsLiveTime())
     return (
         <Layout>
             <PageContent title={"Oskar live"}>
