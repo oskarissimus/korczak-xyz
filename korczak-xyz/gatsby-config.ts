@@ -1,20 +1,13 @@
-/**
- * Configure your Gatsby site with this file.
- *
- * See: https://www.gatsbyjs.com/docs/reference/config-files/gatsby-config/
- */
+import type { GatsbyConfig } from "gatsby";
 
-/**
- * @type {import('gatsby').GatsbyConfig}
- */
-module.exports = {
+const config: GatsbyConfig = {
   plugins: [
     {
       resolve: `gatsby-source-filesystem`,
       options: {
         path: `${__dirname}/locales`,
-        name: `locale`
-      }
+        name: `locale`,
+      },
     },
     {
       resolve: `gatsby-plugin-react-i18next`,
@@ -23,15 +16,13 @@ module.exports = {
         languages: [`en`, `pl`],
         defaultLanguage: `en`,
         siteUrl: `https://korczak.xyz/`,
-        // if you are using trailingSlash gatsby config include it here, as well (the default is 'always')
         trailingSlash: 'always',
-        // you can pass any i18next options
         i18nextOptions: {
           interpolation: {
-            escapeValue: false // not needed for react as it escapes by default
+            escapeValue: false, // not needed for react as it escapes by default
           },
           keySeparator: false,
-          nsSeparator: false
+          nsSeparator: false,
         },
         pages: [
           {
@@ -41,10 +32,9 @@ module.exports = {
           {
             matchPath: '/:lang?/blog/:uid',
             getLanguageFromPath: true,
-          }
-
-        ]
-      }
+          },
+        ],
+      },
     },
     {
       resolve: 'gatsby-plugin-mdx',
@@ -56,29 +46,29 @@ module.exports = {
             options: {
               maxWidth: 768,
               showCaptions: true,
-            }
+            },
           },
           {
             resolve: "gatsby-remark-embed-video",
             options: {
               width: 768,
-              related: false, //Optional: Will remove related videos from the end of an embedded YouTube video.
-              noIframeBorder: true, //Optional: Disable insertion of <style> border: 0
-              loadingStrategy: 'lazy', //Optional: Enable support for lazy-load offscreen iframes. Default is disabled.
+              related: false,
+              noIframeBorder: true,
+              loadingStrategy: 'lazy',
               urlOverrides: [
                 {
                   id: "youtube",
-                  embedURL: videoId =>
+                  embedURL: (videoId: string) =>
                     `https://www.youtube-nocookie.com/embed/${videoId}`,
                 },
-              ], //Optional: Override URL of a service provider, e.g to enable youtube-nocookie support
-              containerClass: "embedVideo-container", //Optional: Custom CSS class for iframe container, for multiple classes separate them by space
-              iframeId: false, //Optional: if true, iframe's id will be set to what is provided after 'video:' (YouTube IFrame player API requires iframe id)
-            }
+              ],
+              containerClass: "embedVideo-container",
+              iframeId: false,
+            },
           },
-          "gatsby-remark-responsive-iframe"
-        ]
-      }
+          "gatsby-remark-responsive-iframe",
+        ],
+      },
     },
     {
       resolve: `gatsby-plugin-manifest`,
@@ -93,9 +83,7 @@ module.exports = {
     {
       resolve: `gatsby-source-filesystem`,
       options: {
-        // The unique name for each instance
         name: `images`,
-        // Path to the directory
         path: `${__dirname}/src/images/`,
       },
     },
@@ -121,4 +109,6 @@ module.exports = {
     siteUrl: `https://korczak.xyz/`,
     lang: `en`,
   },
-}
+};
+
+export default config;
