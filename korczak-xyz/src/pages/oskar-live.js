@@ -39,7 +39,6 @@ function FormatCountdown({ days, hours, minutes, seconds }) {
 
 export default function OskarLive() {
     const { t } = useTranslation();
-    console.log("itsLiveTime()", itsLiveTime())
     return (
         <Layout>
             <PageContent title={"Oskar live"}>
