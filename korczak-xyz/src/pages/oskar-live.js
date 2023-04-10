@@ -9,36 +9,24 @@ import BigButton from "../components/BigButton";
 import Countdown from 'react-countdown';
 import { graphql } from "gatsby";
 import { Trans, useTranslation } from 'gatsby-plugin-react-i18next';
+import parser from "cron-parser"
 
 export const Head = () => (
     <Seo />
 )
 
-function dateOfNextMonday(dest_hour, dest_minutes) {
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-    const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
-    const milliseconds = now.getMilliseconds();
-    const d = new Date(now.getTime() + (8 - day) * 24 * 60 * 60 * 1000 + (dest_hour - hour) * 60 * 60 * 1000 + (dest_minutes - minutes) * 60 * 1000 + (0 - seconds) * 1000 + (0 - milliseconds));
-    return d
+function dateOfNextLiveBegin() {
+    return parser.parseExpression("30 16 * * 1").next().toDate()
 }
 
-
-function dateOfNextLiveBegin() {
-    return dateOfNextMonday(16, 30)
+function dateOfNextLiveEnd() {
+    return parser.parseExpression("30 17 * * 1").next().toDate()
 }
 
 function itsLiveTime() {
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-    const minutes = now.getMinutes();
-    if ((day === 1) && ((hour === 16 && minutes >= 30) || (hour === 17 && minutes <= 30))) {
-        return true
-    }
-    return false
+    const nextLiveBegin = dateOfNextLiveBegin()
+    const nextLiveEnd = dateOfNextLiveEnd()
+    return nextLiveBegin > nextLiveEnd
 }
 
 function FormatCountdown({ days, hours, minutes, seconds }) {
