@@ -1061,25 +1061,25 @@
   resolved "https://registry.yarnpkg.com/@builder.io/partytown/-/partytown-0.7.6.tgz#697acea6b552167a4dd43ddd4827018aa42e0364"
   integrity sha512-snXIGNiZpqjno3XYQN2lbBB+05hsQR/LSttbtIW1c0gmZ7Kh/DIo0YrxlDxCDulAMFPFM8J+4voLwvYepSj3sw==
 
-"@calcom/embed-core@*":
-  version "1.1.3"
-  resolved "https://registry.yarnpkg.com/@calcom/embed-core/-/embed-core-1.1.3.tgz#b3432cb24f2507e6059e471d408b4735b6ff43a3"
-  integrity sha512-+yd6gCztYK9BIA0ch835nXi6O3SsWLBspBIP/gQDY1Jv0P4gEluoKD0yj2Dp03pffwSSskFuLCqM0Srwqdo0ug==
+"@calcom/embed-core@^1.1.5":
+  version "1.1.5"
+  resolved "https://registry.yarnpkg.com/@calcom/embed-core/-/embed-core-1.1.5.tgz#34cd44465c39877006fb842abee50ffcb55f84bc"
+  integrity sha512-iBVpTOemIq5bK5LiNFugnN9eK2CIVpejkylQw+nPBMttA6ypAlMf3SZmW7KsSjaeK9qYDxOoyvEwagsBygtPeA==
 
-"@calcom/embed-react@^1.0.9":
-  version "1.0.10"
-  resolved "https://registry.yarnpkg.com/@calcom/embed-react/-/embed-react-1.0.10.tgz#0d8390b651bbac674704c4d55366fdd19a8382e7"
-  integrity sha512-gpcbHOyCS+AbYwf7x0Q1kqx6rcwuryrMrTn/LxKpTJxNeNVBwPJh0qQZjtaoLQhBDWy3LXgCCsf8FegZ+XXb6w==
+"@calcom/embed-react@^1.0.12":
+  version "1.0.12"
+  resolved "https://registry.yarnpkg.com/@calcom/embed-react/-/embed-react-1.0.12.tgz#7479125ad3b50054df4663bec9c1b95d895b1546"
+  integrity sha512-JQb+WFvD+wMmOZIGSePvh6MHbg36tY2dA0q2LtB8ak2id6isvogrUPh0dSveiFYY0dd/xfPoNaiWwH3B8cmqcw==
   dependencies:
-    "@calcom/embed-core" "*"
-    "@calcom/embed-snippet" "*"
+    "@calcom/embed-core" "^1.1.5"
+    "@calcom/embed-snippet" "^1.0.7"
 
-"@calcom/embed-snippet@*":
-  version "1.0.5"
-  resolved "https://registry.yarnpkg.com/@calcom/embed-snippet/-/embed-snippet-1.0.5.tgz#e050d6307b07798a35c28679bdab6882fe0fe482"
-  integrity sha512-bPO6Yqomd/Zz8Ij2wk9el/JFzdosk7/nsNDfZDwjpLxGqVBF46dgtwoL+rpTnY2EK0uBNIkOp6oXg4sZSFEeQQ==
+"@calcom/embed-snippet@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@calcom/embed-snippet/-/embed-snippet-1.0.7.tgz#3d243537713141a7315915daddaa1d607f8c7043"
+  integrity sha512-OV/O9IvQ5xTVWkIqIPkJmdjA3X9AnpJH1dYEB7IVjy5wOCwpikruHAabEStrR4KVVTNn/jtskhavZgmOwQ5vHQ==
   dependencies:
-    "@calcom/embed-core" "*"
+    "@calcom/embed-core" "^1.1.5"
 
 "@eslint/eslintrc@^0.4.3":
   version "0.4.3"
