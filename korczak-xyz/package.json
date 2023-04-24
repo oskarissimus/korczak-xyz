@@ -36,7 +36,7 @@
     "gatsby-remark-images": "^7.7.0",
     "gatsby-remark-responsive-iframe": "^6.8.0",
     "gatsby-source-filesystem": "^5.5.0",
-    "gatsby-transformer-sharp": "^5.5.0",
+    "gatsby-transformer-sharp": "^5.9.0",
     "i18next": "^22.4.14",
     "jest-environment-jsdom": "^29.5.0",
     "react": "^18.2.0",
