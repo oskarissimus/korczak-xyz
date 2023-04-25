@@ -35,7 +35,10 @@ const localStorageMock = () => {
 
 describe('ThemeContext', () => {
   beforeEach(() => {
-    window.localStorage = localStorageMock();
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock(),
+      writable: true,
+    });
     matchMediaMock();
   });
 
