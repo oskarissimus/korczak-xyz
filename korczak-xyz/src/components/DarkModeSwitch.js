@@ -1,23 +1,12 @@
-import React, { useCallback, useEffect, useContext } from 'react'
-import ThemeContext from '../context/ThemeContext'
-
+import React, { useContext } from 'react';
+import ThemeContext from '../context/ThemeContext';
 
 export default function DarkModeSwitch({ className }) {
-    const { theme, setTheme } = useContext(ThemeContext)
-    useEffect(() => {
-        if (theme === 'dark') {
-            localStorage.theme = "dark"
-            document.documentElement.classList.add("dark")
-        } else {
-            localStorage.theme = "light"
-            document.documentElement.classList.remove("dark")
-        }
-    }, [theme])
+    const { theme, setTheme } = useContext(ThemeContext);
 
-    const toggleTheme = useCallback(() => {
-        setTheme(theme === 'dark' ? 'light' : 'dark')
-    }, [theme, setTheme])
-
+    const toggleTheme = () => {
+        setTheme(theme === 'dark' ? 'light' : 'dark');
+    };
 
     return (
         <label className={className}>
@@ -28,42 +17,43 @@ export default function DarkModeSwitch({ className }) {
                 checked={theme === 'dark'}
             />
             <div className="
-            mx-[-20px]
-            w-[105px]
-            h-[56px]
-            bg-gray-200
-            rounded-full
-            text-center
-            leading-[40px]
-            text-[36px]
-            scale-[0.5]
-            
-            peer-checked:bg-gray-400
+        mx-[-20px]
+        w-[105px]
+        h-[56px]
+        bg-gray-200
+        rounded-full
+        text-center
+        leading-[40px]
+        text-[36px]
+        scale-[0.5]
 
-            peer-checked:after:border-gray-900
-            peer-checked:after:translate-x-full
-            peer-checked:after:text-white
-            peer-checked:after:bg-gray-700
+        peer-checked:bg-gray-400
 
-            after:content-['☼']
-            after:absolute
-            after:top-[4px]
-            after:left-[4px]
-            after:bg-white
-            after:border-gray-300
-            after:border
-            after:rounded-full
-            after:h-12
-            after:w-12
-            after:transition-all
-            
-            dark:after:content-['☾']
-            dark:after:text-gray-700
-            dark:bg-gray-700
-            dark:peer-focus:ring-blue-800
-            dark:border-gray-600
-            "></div>
+        peer-checked:after:border-gray-900
+        peer-checked:after:translate-x-full
+        peer-checked:after:text-white
+        peer-checked:after:bg-gray-700
+
+        after:content-['☼']
+        after:absolute
+        after:top-[4px]
+        after:left-[4px]
+        after:bg-white
+        after:border-gray-300
+        after:border
+        after:rounded-full
+        after:h-12
+        after:w-12
+        after:transition-all
+
+        dark:after:content-['☾']
+        dark:after:text-gray-700
+        dark:bg-gray-700
+        dark:peer-focus:ring-blue-800
+        dark:border-gray-600
+        ">
+            </div>
             <span className="sr-only">Dark mode</span>
         </label>
-    )
+    );
 }

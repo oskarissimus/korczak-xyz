@@ -1,22 +1,17 @@
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode, useEffect } from 'react';
 
 interface ThemeContextType {
   theme: string;
   setTheme: (theme: string) => void;
 }
 
-function getTheme(): string {
-  if (localStorage.theme) {
-    return localStorage.theme;
-  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark';
-  } else {
-    return 'light';
-  }
-}
+const initialTheme = () => {
+  if (typeof window === 'undefined') return 'dark';
+  return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+};
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: initialTheme(),
   setTheme: () => {},
 });
 
@@ -25,7 +20,14 @@ interface ThemeProviderProps {
 }
 
 function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<string>(getTheme());
+  const [theme, setTheme] = useState<string>(initialTheme());
+
+  useEffect(() => {
+    theme === 'dark'
+      ? (localStorage.setItem('theme', 'dark'), document.documentElement.classList.add('dark'))
+      : (localStorage.setItem('theme', 'light'), document.documentElement.classList.remove('dark'));
+  }, [theme]);
+
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
