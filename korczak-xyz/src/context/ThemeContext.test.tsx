@@ -25,12 +25,17 @@ const localStorageMock = () => {
     setItem: (key: string, value: string) => (storage[key] = value),
     removeItem: (key: string) => delete storage[key],
     clear: () => (storage = {}),
+    length: Object.keys(storage).length,
+    key: (index: number) => {
+      const keys = Object.keys(storage);
+      return index < keys.length ? keys[index] : null;
+    },
   };
 };
 
 describe('ThemeContext', () => {
   beforeEach(() => {
-    Object.assign(window, { localStorage: localStorageMock() });
+    window.localStorage = localStorageMock();
     matchMediaMock();
   });
 
