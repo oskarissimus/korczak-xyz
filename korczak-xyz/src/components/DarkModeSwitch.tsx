@@ -1,7 +1,11 @@
 import React, { useContext } from 'react';
 import ThemeContext from '../context/ThemeContext';
 
-export default function DarkModeSwitch({ className }) {
+interface DarkModeSwitchProps {
+    className?: string;
+}
+
+const DarkModeSwitch: React.FC<DarkModeSwitchProps> = ({ className }) => {
     const { theme, setTheme } = useContext(ThemeContext);
 
     const toggleTheme = () => {
@@ -56,4 +60,6 @@ export default function DarkModeSwitch({ className }) {
             <span className="sr-only">Dark mode</span>
         </label>
     );
-}
+};
+
+export default DarkModeSwitch;
