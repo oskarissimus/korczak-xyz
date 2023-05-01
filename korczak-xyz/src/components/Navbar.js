@@ -6,37 +6,7 @@ import DarkModeSwitch from './DarkModeSwitch'
 import { graphql, useStaticQuery } from 'gatsby'
 import { GatsbyImage, getImage } from 'gatsby-plugin-image'
 import { Link, useI18next, useTranslation } from 'gatsby-plugin-react-i18next'
-import ReactCountryFlag from "react-country-flag"
-const emojiSupport = require('detect-emoji-support');
-
-
-const langToCountryCode = {
-    en: 'GB',
-    pl: 'PL'
-}
-
-const langToFlagEmoji = {
-    en: '🇬🇧',
-    pl: '🇵🇱'
-}
-
-function Flag({ lng }) {
-    if (emojiSupport) {
-        return <span
-            role="img"
-            aria-label={lng}
-            className="text-2xl"
-        >
-            {langToFlagEmoji[lng]}
-        </span>
-    }
-    return <ReactCountryFlag
-        countryCode={langToCountryCode[lng]}
-        svg
-        className="text-2xl"
-    />
-
-}
+import Flag from './Flag'
 
 
 export default function Navbar() {
