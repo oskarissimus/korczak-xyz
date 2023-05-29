@@ -18,7 +18,6 @@ export default function Navbar() {
         { name: t('Mentoring'), to: '/mentoring' },
         { name: t('Courses'), to: '/courses' },
         { name: t('Blog'), to: '/blog' },
-        { name: t('Oskar live'), to: '/oskar-live' },
     ]
     const [isMenuOpen, setIsMenuOpen] = React.useState(false)
     const data = useStaticQuery(graphql`
