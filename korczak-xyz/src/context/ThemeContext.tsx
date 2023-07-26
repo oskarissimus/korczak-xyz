@@ -12,7 +12,7 @@ const initialTheme = () => {
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: initialTheme(),
-  setTheme: () => {},
+  setTheme: () => { },
 });
 
 interface ThemeProviderProps {
@@ -36,4 +36,4 @@ function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export default ThemeContext;
-export { ThemeProvider };
+export { ThemeProvider, ThemeContextType };

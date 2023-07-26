@@ -1,9 +1,11 @@
 import React, { useEffect, useContext } from 'react'
 import Cal, { getCalApi } from "@calcom/embed-react";
-import ThemeContext from '../context/ThemeContext';
+import ThemeContext, { ThemeContextType } from '../context/ThemeContext';
 
-export default function Calendar() {
-    const { theme } = useContext(ThemeContext)
+
+
+const Calendar: React.FC = () => {
+    const { theme } = useContext<ThemeContextType>(ThemeContext)
     useEffect(() => {
         async function setupCal() {
             const cal = await getCalApi()
@@ -13,3 +15,5 @@ export default function Calendar() {
     }, [theme])
     return <Cal calLink="oskarissimus/mentoring" config={{ theme }} />
 }
+
+export default Calendar;
