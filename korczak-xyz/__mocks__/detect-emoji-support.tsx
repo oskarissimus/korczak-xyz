@@ -1,1 +1,1 @@
-module.exports = () => true;
+module.exports = jest.fn().mockImplementation(() => true);
