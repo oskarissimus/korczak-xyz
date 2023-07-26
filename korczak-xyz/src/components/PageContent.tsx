@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { ReactNode } from 'react'
 import Header from './Header'
 
-export default function PageContent({ title, children }) {
+interface PageContentProps {
+    title: string,
+    children: ReactNode
+}
+
+const PageContent: React.FC<PageContentProps> = ({ title, children }) => {
     return (
         <div className='flex flex-col items-center'>
             <div className='flex flex-col max-w-screen-md w-full gap-16'>
@@ -11,3 +16,5 @@ export default function PageContent({ title, children }) {
         </div>
     )
 }
+
+export default PageContent;
