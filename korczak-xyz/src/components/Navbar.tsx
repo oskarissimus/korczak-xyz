@@ -4,7 +4,7 @@ import { icon } from '@fortawesome/fontawesome-svg-core/import.macro'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import DarkModeSwitch from './DarkModeSwitch'
 import { graphql, useStaticQuery } from 'gatsby'
-import { GatsbyImage, getImage, IGatsbyImageData } from 'gatsby-plugin-image'
+import { GatsbyImage, IGatsbyImageData } from 'gatsby-plugin-image'
 import { Link, useI18next, useTranslation } from 'gatsby-plugin-react-i18next'
 import Flag from './Flag'
 
@@ -31,7 +31,7 @@ const Navbar: React.FC<NavbarProps> = () => {
     }
   `)
 
-    const imageData = data.file?.childImageSharp?.gatsbyImageData as IGatsbyImageData | undefined
+    const imageData = data?.file?.childImageSharp?.gatsbyImageData as IGatsbyImageData | undefined
 
     return (
         <div className='flex flex-col border-b md:border-b-0 border-gray-400 sticky md:relative top-0 left-0 w-full z-30 md:max-w-6xl bg-white dark:bg-black mr-10 lg:text-lg'>
