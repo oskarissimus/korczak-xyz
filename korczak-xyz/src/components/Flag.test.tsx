@@ -4,8 +4,6 @@ import '@testing-library/jest-dom/extend-expect';
 import Flag from './Flag';
 const emojiSupport = require('detect-emoji-support');
 
-// Mock the detect-emoji-support module
-jest.mock('detect-emoji-support');
 
 describe('Flag component', () => {
   afterEach(() => {
