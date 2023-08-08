@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import ContactForm from './ContactForm';
@@ -10,13 +9,15 @@ jest.mock('react-google-recaptcha-v3', () => ({
 }));
 
 describe('<ContactForm />', () => {
+    const mockedUseGoogleReCaptcha = useGoogleReCaptcha as jest.MockedFunction<typeof useGoogleReCaptcha>;
+
     it('renders without crashing', () => {
-        useGoogleReCaptcha.mockReturnValue({ executeRecaptcha: jest.fn() });
+        mockedUseGoogleReCaptcha.mockReturnValue({ executeRecaptcha: jest.fn() });
         render(<ContactForm />);
     });
 
     it('contains the expected fields', () => {
-        useGoogleReCaptcha.mockReturnValue({ executeRecaptcha: jest.fn() });
+        mockedUseGoogleReCaptcha.mockReturnValue({ executeRecaptcha: jest.fn() });
         const { getByPlaceholderText } = render(<ContactForm />);
         expect(getByPlaceholderText(/name/i)).toBeInTheDocument();
         expect(getByPlaceholderText(/email/i)).toBeInTheDocument();
@@ -25,7 +26,7 @@ describe('<ContactForm />', () => {
 
     it('handles form submission', async () => {
         const executeRecaptchaMock = jest.fn().mockResolvedValue('test_token');
-        useGoogleReCaptcha.mockReturnValue({ executeRecaptcha: executeRecaptchaMock });
+        mockedUseGoogleReCaptcha.mockReturnValue({ executeRecaptcha: executeRecaptchaMock });
 
         const { getByText, getByPlaceholderText } = render(<ContactForm />);
         fireEvent.change(getByPlaceholderText(/name/i), { target: { value: 'Test Name' } });
