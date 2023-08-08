@@ -1,7 +1,13 @@
+window.alert = jest.fn();
 import { sendForm, getFormFromEvent, getDataFromForm, enrichDataWithToken, clearForm } from './ContactFormHelpers';
 
 // Mocking the fetch function for sendForm tests
-global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => Promise.resolve(new Response())) as jest.MockedFunction<typeof fetch>;
+global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) =>
+    Promise.resolve({
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("mocked response"),
+        ok: true
+    } as Response)) as jest.MockedFunction<typeof fetch>;
 
 describe('sendForm', () => {
     it('calls fetch with the correct URL and data', async () => {

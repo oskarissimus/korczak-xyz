@@ -1,9 +1,9 @@
 import React, { useCallback } from 'react';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { Button, EmailField, GotchaField, MessageField, NameField } from './ContactFormFields';
-import { getFormFromEvent, getDataFromForm, enrichDataWithToken, sendForm, clearForm } from './ContactFormHelpers';
+import { getDataFromForm, enrichDataWithToken, sendForm, clearForm } from './ContactFormHelpers';
 
-export default function ContactForm() {
+const ContactForm: React.FC = () => {
     const { executeRecaptcha } = useGoogleReCaptcha();
 
     const obtainToken = useCallback(async () => {
@@ -15,10 +15,11 @@ export default function ContactForm() {
         return token;
     }, [executeRecaptcha])
 
-    const handleSubmit = useCallback(async event => {
+    const handleSubmit = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const token = await obtainToken();
-        const form = getFormFromEvent(event);
+        const form = event.currentTarget;
+        if (!form) return;
         const data = getDataFromForm(form);
         const dataWithToken = enrichDataWithToken(data, token);
         sendForm(dataWithToken);
@@ -34,7 +35,7 @@ export default function ContactForm() {
             <EmailField />
             <MessageField />
             <GotchaField />
-            <Button onClick={handleSubmit} />
+            <Button onClick={handleSubmit as any} />
         </form>
 
     )
@@ -42,3 +43,5 @@ export default function ContactForm() {
 
 
 
+
+export default ContactForm;
