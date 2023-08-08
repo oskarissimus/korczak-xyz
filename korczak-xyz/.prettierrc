@@ -6,5 +6,8 @@
     "importOrderSortSpecifiers": true,
     "plugins": [
         "@trivago/prettier-plugin-sort-imports"
-    ]
+    ],
+    "singleQuote": true,
+    "arrowParens": "avoid",
+    "jsxSingleQuote": true
 }
