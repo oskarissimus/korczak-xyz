@@ -4,10 +4,14 @@ import DarkModeSwitch from './DarkModeSwitch';
 import ThemeContext from '../context/ThemeContext';
 
 describe('DarkModeSwitch', () => {
-    test('toggles theme on change', () => {
+    test.each([
+        { initial: 'light', expected: 'dark' },
+        { initial: 'dark', expected: 'light' }
+    ])('toggles from %s theme to %s theme on click', (theme) => {
         const setTheme = jest.fn();
+
         const { getByRole } = render(
-            <ThemeContext.Provider value={{ theme: 'light', setTheme }}>
+            <ThemeContext.Provider value={{ theme: theme.initial, setTheme }}>
                 <DarkModeSwitch />
             </ThemeContext.Provider>
         );
@@ -15,6 +19,6 @@ describe('DarkModeSwitch', () => {
         const switchElement = getByRole('checkbox');
         fireEvent.click(switchElement);
 
-        expect(setTheme).toHaveBeenCalledWith('dark');
+        expect(setTheme).toHaveBeenCalledWith(theme.expected);
     });
 });
