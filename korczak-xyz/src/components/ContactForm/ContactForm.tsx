@@ -30,6 +30,7 @@ const ContactForm: React.FC = () => {
         <form
             acceptCharset="UTF-8"
             className="flex flex-col gap-4"
+            data-testid="contact-form"
         >
             <NameField />
             <EmailField />
