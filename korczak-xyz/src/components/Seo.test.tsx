@@ -1,7 +1,8 @@
 import React from 'react';
-import { Seo } from './Seo';
+import { renderToString } from 'react-dom/server';
+
 import { useSiteMetadata } from '../hooks/use-site-metadata';
-import { renderToString } from "react-dom/server";
+import { Seo } from './Seo';
 
 jest.mock('../hooks/use-site-metadata');
 
@@ -25,7 +26,7 @@ describe('Seo component', () => {
     });
   });
 
-  test("renders without crashing", () => {
+  test('renders without crashing', () => {
     const seoElement = <Seo />;
     expect(checkRenderWithoutCrashing(seoElement)).toBe(true);
   });

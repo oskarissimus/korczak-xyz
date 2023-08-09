@@ -1,26 +1,29 @@
 import React, { useContext } from 'react';
+
 import ThemeContext from '../context/ThemeContext';
 
 interface DarkModeSwitchProps {
-    className?: string;
+  className?: string;
 }
 
 const DarkModeSwitch: React.FC<DarkModeSwitchProps> = ({ className }) => {
-    const { theme, setTheme } = useContext(ThemeContext);
+  const { theme, setTheme } = useContext(ThemeContext);
 
-    const toggleTheme = () => {
-        setTheme(theme === 'dark' ? 'light' : 'dark');
-    };
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
-    return (
-        <label className={className}>
-            <input
-                type="checkbox"
-                className="sr-only peer"
-                onChange={toggleTheme}
-                checked={theme === 'dark'}
-            />
-            <div className="
+  return (
+    <label className={className}>
+      <input
+        type='checkbox'
+        className='sr-only peer'
+        onChange={toggleTheme}
+        checked={theme === 'dark'}
+      />
+      <div
+        data-testid='dark-mode-switch'
+        className="
         mx-[-20px]
         w-[105px]
         h-[56px]
@@ -55,11 +58,12 @@ const DarkModeSwitch: React.FC<DarkModeSwitchProps> = ({ className }) => {
         dark:bg-gray-700
         dark:peer-focus:ring-blue-800
         dark:border-gray-600
-        ">
-            </div>
-            <span className="sr-only">Dark mode</span>
-        </label>
-    );
+        "
+      ></div>
+      <span className='sr-only'>Dark mode</span>
+    </label>
+  );
 };
 
 export default DarkModeSwitch;
+export type { DarkModeSwitchProps };
