@@ -1,26 +1,20 @@
 import { IGatsbyImageData } from 'gatsby-plugin-image';
 import React from 'react';
 
+import useMainNavMenuData from '../../hooks/use-main-nav-menu-data';
 import DarkModeSwitch from '../DarkModeSwitch';
 import LanguageSwitcher from './LanguageSwitcher';
 import Logo from './Logo';
 import NavigationItems from './NavigationItems';
 
 interface MainNavMenuProps {
-  navigation: { name: string; to: string }[];
   isMenuOpen: boolean;
-  languages: string[];
-  originalPath: string;
   imageData: IGatsbyImageData | undefined;
 }
 
-const MainNavMenu: React.FC<MainNavMenuProps> = ({
-  navigation,
-  isMenuOpen,
-  languages,
-  originalPath,
-  imageData,
-}) => {
+const MainNavMenu: React.FC<MainNavMenuProps> = ({ isMenuOpen, imageData }) => {
+  const { languages, originalPath, navigation } = useMainNavMenuData();
+
   return (
     <nav
       className={`
