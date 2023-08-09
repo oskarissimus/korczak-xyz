@@ -1,10 +1,10 @@
-import { GatsbyImage, IGatsbyImageData } from 'gatsby-plugin-image';
-import { Link } from 'gatsby-plugin-react-i18next';
+import { IGatsbyImageData } from 'gatsby-plugin-image';
 import React from 'react';
 
 import DarkModeSwitch from '../DarkModeSwitch';
-import Flag from '../Flag';
-import MenuItem from '../MenuItem';
+import LanguageSwitcher from './LanguageSwitcher';
+import LogoSection from './LogoSection';
+import NavigationItems from './NavigationItems';
 
 interface MainNavMenuProps {
   navigation: { name: string; to: string }[];
@@ -28,22 +28,11 @@ const MainNavMenu: React.FC<MainNavMenuProps> = ({
         ${isMenuOpen ? 'flex' : 'hidden'}
       `}
     >
-      <div className='md:flex hidden gap-3'>
-        {imageData && <GatsbyImage image={imageData} alt='logo' />}
-        <MenuItem name='korczak.xyz' to='/' />
-      </div>
+      <LogoSection imageData={imageData} />
       <div className='grow hidden md:block' />
-      {navigation.map(item => (
-        <MenuItem key={item.name} {...item} />
-      ))}
+      <NavigationItems navigation={navigation} />
       <DarkModeSwitch className='hidden md:block' />
-      <div className='flex gap-3'>
-        {languages.map(lng => (
-          <Link to={originalPath} language={lng} key={lng}>
-            <Flag lng={lng} />
-          </Link>
-        ))}
-      </div>
+      <LanguageSwitcher languages={languages} originalPath={originalPath} />
     </nav>
   );
 };
