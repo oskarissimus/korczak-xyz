@@ -18,10 +18,9 @@ describe('useMainNavMenuData', () => {
     mockedUseI18next.mockReturnValue({
       languages: ['en', 'es'],
       originalPath: '/original-path',
-      i18n: {}, // Mock other required properties
+      i18n: {},
       t: jest.fn(),
       ready: true,
-      // Add other required properties with mock values...
     });
 
     mockedUseTranslation.mockReturnValue({
@@ -35,7 +34,6 @@ describe('useMainNavMenuData', () => {
         };
         return translations[key] || key;
       },
-      // Mock other required properties...
     });
 
     const { result } = renderHook(() => useMainNavMenuData());

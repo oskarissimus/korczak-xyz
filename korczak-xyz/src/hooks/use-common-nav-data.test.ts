@@ -3,8 +3,6 @@ import { useStaticQuery } from 'gatsby';
 
 import useCommonNavData from './use-common-nav-data';
 
-// Update with the path to your hook
-
 jest.mock('gatsby', () => ({
   graphql: jest.fn(),
   useStaticQuery: jest.fn(),
@@ -12,7 +10,6 @@ jest.mock('gatsby', () => ({
 
 describe('useCommonNavData', () => {
   beforeEach(() => {
-    // Reset the mocks before each test
     (useStaticQuery as jest.Mock).mockReset();
   });
 
@@ -22,7 +19,6 @@ describe('useCommonNavData', () => {
         childImageSharp: {
           gatsbyImageData: {
             width: 30,
-            // Mock other properties if needed...
           },
         },
       },
@@ -32,8 +28,5 @@ describe('useCommonNavData', () => {
 
     expect(result.current.isMenuOpen).toBe(false);
     expect(result.current.imageData).toEqual({ width: 30 });
-    // You can add more assertions based on the behavior you expect...
-
-    // You can also test the behavior of setIsMenuOpen if needed...
   });
 });
