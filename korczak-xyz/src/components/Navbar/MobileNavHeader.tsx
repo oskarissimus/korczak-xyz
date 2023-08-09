@@ -23,6 +23,5 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
     </div>
   );
 };
-};
 
 export default MobileNavHeader;
