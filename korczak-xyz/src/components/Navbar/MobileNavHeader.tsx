@@ -1,10 +1,9 @@
-import { icon } from '@fortawesome/fontawesome-svg-core/import.macro';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { GatsbyImage, IGatsbyImageData } from 'gatsby-plugin-image';
+import { IGatsbyImageData } from 'gatsby-plugin-image';
 import React from 'react';
 
 import DarkModeSwitch from '../DarkModeSwitch';
-import MenuItem from '../MenuItem';
+import Logo from './Logo';
+import MenuButton from './MenuButton';
 
 interface MobileNavHeaderProps {
   setIsMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -17,22 +16,10 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
 }) => {
   return (
     <div className='flex items-center justify-end ml-4'>
-      <div className='md:hidden flex gap-3'>
-        {imageData && <GatsbyImage image={imageData} alt='logo' />}
-        <MenuItem name='korczak.xyz' to='/' />
-      </div>
+      <Logo imageData={imageData} />
       <div className='grow md:hidden' />
       <DarkModeSwitch className='block md:hidden' />
-      <button
-        className='flex md:hidden'
-        onClick={() => setIsMenuOpen(prev => !prev)}
-        aria-label='Menu'
-      >
-        <FontAwesomeIcon
-          icon={icon({ name: 'burger', style: 'solid' })}
-          className='block md:hidden cursor-pointer text-3xl my-6 mx-4'
-        />
-      </button>
+      <MenuButton setIsMenuOpen={setIsMenuOpen} />
     </div>
   );
 };
