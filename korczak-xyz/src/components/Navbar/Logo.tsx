@@ -5,13 +5,19 @@ import MenuItem from '../MenuItem';
 
 interface LogoProps {
   imageData: IGatsbyImageData | undefined;
+  className?: string;
+  name?: string;
 }
 
-const Logo: React.FC<LogoProps> = ({ imageData }) => {
+const Logo: React.FC<LogoProps> = ({
+  imageData,
+  className = '',
+  name = 'korczak.xyz',
+}) => {
   return (
-    <div className='md:hidden flex gap-3'>
+    <div className={`flex gap-3 ${className}`}>
       {imageData && <GatsbyImage image={imageData} alt='logo' />}
-      <MenuItem name='korczak.xyz' to='/' />
+      <MenuItem name={name} to='/' />
     </div>
   );
 };

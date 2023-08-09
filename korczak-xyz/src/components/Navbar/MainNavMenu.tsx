@@ -3,7 +3,7 @@ import React from 'react';
 
 import DarkModeSwitch from '../DarkModeSwitch';
 import LanguageSwitcher from './LanguageSwitcher';
-import LogoSection from './LogoSection';
+import Logo from './Logo';
 import NavigationItems from './NavigationItems';
 
 interface MainNavMenuProps {
@@ -28,7 +28,7 @@ const MainNavMenu: React.FC<MainNavMenuProps> = ({
         ${isMenuOpen ? 'flex' : 'hidden'}
       `}
     >
-      <LogoSection imageData={imageData} />
+      <Logo imageData={imageData} className='md:flex hidden' />
       <div className='grow hidden md:block' />
       <NavigationItems navigation={navigation} />
       <DarkModeSwitch className='hidden md:block' />

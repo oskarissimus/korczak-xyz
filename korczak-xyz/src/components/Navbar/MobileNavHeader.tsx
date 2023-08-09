@@ -16,12 +16,13 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
 }) => {
   return (
     <div className='flex items-center justify-end ml-4'>
-      <Logo imageData={imageData} />
+      <Logo imageData={imageData} className='md:hidden' />
       <div className='grow md:hidden' />
       <DarkModeSwitch className='block md:hidden' />
       <MenuButton setIsMenuOpen={setIsMenuOpen} />
     </div>
   );
+};
 };
 
 export default MobileNavHeader;
