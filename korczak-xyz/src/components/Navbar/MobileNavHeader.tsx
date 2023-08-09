@@ -7,13 +7,11 @@ import DarkModeSwitch from '../DarkModeSwitch';
 import MenuItem from '../MenuItem';
 
 interface MobileNavHeaderProps {
-  isMenuOpen: boolean;
-  setIsMenuOpen: (value: boolean) => void;
+  setIsMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   imageData: IGatsbyImageData | undefined;
 }
 
 const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
-  isMenuOpen,
   setIsMenuOpen,
   imageData,
 }) => {
@@ -27,7 +25,7 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
       <DarkModeSwitch className='block md:hidden' />
       <button
         className='flex md:hidden'
-        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        onClick={() => setIsMenuOpen(prev => !prev)}
         aria-label='Menu'
       >
         <FontAwesomeIcon

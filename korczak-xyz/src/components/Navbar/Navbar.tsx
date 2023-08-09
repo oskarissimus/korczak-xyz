@@ -17,11 +17,7 @@ const Navbar: React.FC<NavbarProps> = () => {
   } = useNavbarData();
   return (
     <div className='flex flex-col border-b md:border-b-0 border-gray-400 sticky md:relative top-0 left-0 w-full z-30 md:max-w-6xl bg-white dark:bg-black mr-10 lg:text-lg'>
-      <MobileNavHeader
-        isMenuOpen={isMenuOpen}
-        setIsMenuOpen={setIsMenuOpen}
-        imageData={imageData}
-      />
+      <MobileNavHeader setIsMenuOpen={setIsMenuOpen} imageData={imageData} />
       <MainNavMenu
         navigation={navigation}
         isMenuOpen={isMenuOpen}
