@@ -5,7 +5,6 @@ import React from 'react';
 import { MenuItemProps } from '../MenuItem';
 import Logo from './Logo';
 
-// Mocking the MenuItem and GatsbyImage components
 jest.mock('../MenuItem', () => (props: MenuItemProps) => (
   <div data-testid='mocked-menu-item' {...props}></div>
 ));

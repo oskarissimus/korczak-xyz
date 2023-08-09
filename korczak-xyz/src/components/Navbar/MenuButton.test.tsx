@@ -2,10 +2,7 @@ import '@testing-library/jest-dom/extend-expect';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 
-// for the "toBeInTheDocument" matcher
 import MenuButton from './MenuButton';
-
-// adjust the path accordingly
 
 describe('<MenuButton />', () => {
   it('renders the button', () => {

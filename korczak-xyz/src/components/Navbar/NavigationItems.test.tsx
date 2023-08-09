@@ -4,8 +4,6 @@ import React from 'react';
 
 import NavigationItems from './NavigationItems';
 
-// adjust the path accordingly
-
 describe('<NavigationItems />', () => {
   const sampleNavigation = [
     { name: 'Home', to: '/home' },
@@ -17,7 +15,7 @@ describe('<NavigationItems />', () => {
     const { getAllByTestId } = render(
       <NavigationItems navigation={sampleNavigation} />,
     );
-    const menuItems = getAllByTestId('menu-item'); // Assuming you have data-testid="menu-item" on each MenuItem
+    const menuItems = getAllByTestId('menu-item');
     expect(menuItems).toHaveLength(sampleNavigation.length);
   });
 
