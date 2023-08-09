@@ -1,6 +1,7 @@
 import React from 'react';
-import ReactCountryFlag from "react-country-flag";
-const emojiSupport = require("detect-emoji-support");
+import ReactCountryFlag from 'react-country-flag';
+
+const emojiSupport = require('detect-emoji-support');
 
 interface FlagProps {
   lng: string;
@@ -8,18 +9,18 @@ interface FlagProps {
 
 const langToCountryCode: { [key: string]: string } = {
   en: 'GB',
-  pl: 'PL'
-}
+  pl: 'PL',
+};
 
 const langToFlagEmoji: { [key: string]: string } = {
   en: '🇬🇧',
-  pl: '🇵🇱'
-}
+  pl: '🇵🇱',
+};
 
 export default function Flag({ lng }: FlagProps): JSX.Element {
   if (emojiSupport()) {
     return (
-      <span role="img" aria-label={lng} className="text-2xl">
+      <span role='img' aria-label={lng} className='text-2xl'>
         {langToFlagEmoji[lng]}
       </span>
     );
@@ -28,8 +29,10 @@ export default function Flag({ lng }: FlagProps): JSX.Element {
     <ReactCountryFlag
       countryCode={langToCountryCode[lng]}
       svg
-      className="text-2xl"
-      data-testid="fallback-flag"
+      className='text-2xl'
+      data-testid='fallback-flag'
     />
   );
 }
+
+export { FlagProps };
