@@ -17,3 +17,4 @@ const NavigationItems: React.FC<NavigationItemsProps> = ({ navigation }) => {
 };
 
 export default NavigationItems;
+export type { NavigationItemsProps };

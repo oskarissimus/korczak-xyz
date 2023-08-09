@@ -18,7 +18,7 @@ const MainNavMenu: React.FC<MainNavMenuProps> = ({ isMenuOpen, imageData }) => {
   return (
     <nav
       className={`
-        flex items-end md:items-center gap-4 ml-6 mr-6 md:mr-0 md:mt-4 mb-6 flex-col md:flex md:flex-row
+        items-end md:items-center gap-4 ml-6 mr-6 md:mr-0 md:mt-4 mb-6 flex-col md:flex md:flex-row
         ${isMenuOpen ? 'flex' : 'hidden'}
       `}
     >
