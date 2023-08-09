@@ -12,6 +12,7 @@ const MenuButton: React.FC<MenuButtonProps> = ({ setIsMenuOpen }) => {
       className='flex md:hidden'
       onClick={() => setIsMenuOpen(prev => !prev)}
       aria-label='Menu'
+      data-testid='menu-button'
     >
       <FontAwesomeIcon
         icon={icon({ name: 'burger', style: 'solid' })}

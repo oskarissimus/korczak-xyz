@@ -15,7 +15,7 @@ const Logo: React.FC<LogoProps> = ({
   name = 'korczak.xyz',
 }) => {
   return (
-    <div className={`flex gap-3 ${className}`}>
+    <div className={`flex gap-3 ${className}`} data-testid='logo'>
       {imageData && <GatsbyImage image={imageData} alt='logo' />}
       <MenuItem name={name} to='/' />
     </div>

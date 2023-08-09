@@ -22,6 +22,7 @@ const DarkModeSwitch: React.FC<DarkModeSwitchProps> = ({ className }) => {
         checked={theme === 'dark'}
       />
       <div
+        data-testid='dark-mode-switch'
         className="
         mx-[-20px]
         w-[105px]
