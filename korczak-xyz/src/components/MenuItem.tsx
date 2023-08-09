@@ -9,7 +9,7 @@ interface MenuItemProps {
 
 const MenuItem: React.FC<MenuItemProps> = ({ className = '', name, to }) => {
   return (
-    <Link key={name} to={to} className={className}>
+    <Link to={to} className={className} data-testid='menu-item'>
       {name}
     </Link>
   );
