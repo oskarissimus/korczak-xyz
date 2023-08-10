@@ -1,0 +1,78 @@
+---
+title: Portowanie JS do TS z użyciem ChatGPT
+slug: porting-js-to-ts-with-chatgpt
+date: 2023-08-18
+published: false
+featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
+language: pl
+---
+
+![port](../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg "port")
+
+## Wstęp
+Kolega mi opowiadał że pracował raz przy projekcie którego celem było przeportowanie kodu z pythona 2 do 3. To był projekt dla całego teamu na kilka kwartałów. Generalnie ludzie się na tym wypalali. Tak się składa że to był projekt open-source który na dodatek nie był zbyt dobrze pokryty testami. Generalnie nic przyjemnego.
+
+## Strona osobista
+Ja zrobiłem swoją stronę osobistą początkowo w wordpress, później przepisałem ją w Gatsby w JS. No i coraz popularniejszy stawał się ChatGPT więc uznałem że można spróbować przeportować to na TS. Dodam tylko że nie znałem za bardzo TS. Nie jest to jakiś recket-science ale no nie napisałem do tamtej pory żadnego kodu w TS. Można powiedzieć że ChatGPT nie tylko przeportował mi codebase ale również nauczył TS i zrobił coverage.
+
+## Pierwsze próby
+Pierwsze próby wyglądały dość obiecująco, ponieważ JS i TS są w gruncie rzeczy dość podobne. Przeportowanie pojedynczego pliku zazwyczaj nie było problemem dla ChataGPT. Postanowiłem więc pójść dalej i zautomatyzować portowanie
+
+## Porter
+porter - tak nazywa się moja próba napisania automatu do portowania całego repozytorium z języka programowania X na język programowania Y. Kod źródłowy jest dostępny na github jednak nie jest to działająca rzecz. Teoretycznie zadanie wydawało się proste
+
+![dont crash into each other](../../images/blog/porting-js-to-ts-with-chatgpt/dont-crash-into-each-other.jpg "dont crash into each other")
+
+### Pierwsze podejście
+```py
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+    file.write(ported)
+```
+
+### Sprawdźmy czy kod działa
+```py
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    test_errors = test(ported)
+    if errors:
+        prompt_gpt_to_fix_errors(ported, errors)
+
+    file.write(ported)
+```
+
+### Sprawdźmy czy kod się kompiluje
+```py
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    compilation_errors = compile(ported)
+    if compilation_errors:
+        prompt_gpt_to_fix_errors(ported, errors)
+
+    test_errors = test(ported)
+    if errors:
+        prompt_gpt_to_fix_errors(ported, errors)
+
+    file.write(ported)
+```
+
+### Czasami jedna runda poprawek nie wystarcza
+```py
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    compilation_errors = compile(ported)
+    while compilation_errors:
+        prompt_gpt_to_fix_errors(ported, errors)
+
+    test_errors = test(ported)
+    while errors:
+        prompt_gpt_to_fix_errors(ported, errors)
+
+    file.write(ported)
+```
+
+## Attribution
+Photo by <a href="https://unsplash.com/@esmonde?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Esmonde Yong</a> on <a href="https://unsplash.com/photos/wFpJV5EWrSM?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
