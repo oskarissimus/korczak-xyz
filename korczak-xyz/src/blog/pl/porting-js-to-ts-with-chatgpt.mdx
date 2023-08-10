@@ -74,5 +74,39 @@ for file in files:
     file.write(ported)
 ```
 
-## Attribution
+## Refleksja
+Wydaje się że dodaliśmy sporo logiki specyficznej dla danego problemu - nie jest to ogólne rozwiązanie portowania z języka X na Y. Jestem sobie w stanie wyobrazić że w wielu przypadkach nie jest to tak proste że można portować po prostu pliki po kolei. Czasami trzeba stworzyć więcej plików wprowadzić zmiany w jakichś innych itp. Jednak, wydaje się że ChatGPT powinien to wiedzieć. W końcu możemy zapytać go w jaki sposób przeportować codebase z języka X na Y i bez problemnu odpowie i ułoży plan działania.
+
+## BabyAGI, AutoGPT
+Te projekty są bardzo ambitne i generalnie chodzi o to żeby GPT sam się promptował w pętli i w ten sposób rozwiązywał złożone problemy uwzględniajac planowanie i wykonywanie działań. Kiedy zacząłem z nich korzystać okazało się że nie jest to takie proste i diabeł tkwi w szczegółach
+1. Jest drogo - GPT3.5 co prawda nie jest super drogie per request ale kontekst jest zbyt krótki i generalnie nie ogarnia tak dobrze jak GPT4, a odpalenie jednego eksperymentu z GPT4 kosztowało kilka dolarów, więc jak sobie to szybko policzyłem to na takie eksperymenty mnie nie stać, szczególnie biorąc pod uwagę że nie wiadomo czy na koniec to będzie działać
+2. Długo to trwa - GPT3.5 jest szybkie, ale nie ogarnia, a GPT4 jest sporo wolniejsze więc każdy test sporo trwa
+3. Dobre promptowanie jest trudne
+4. Nie miałem dostępu do API GPT4 więc korzystałem z API kolegi, ale to też ma swoje wady
+
+
+## Langchain
+W tym projekcie chodzi o to żeby zdefiniować narzędzia dla GPT, takie jak np:
+- walidacja kodu `tsc --noEmit`
+- testowanie kodu `npm run test`
+- klonowanie repozytorium `git clone ...`
+
+W ten sposób ułatwiamy zadanie, żeby GPT nie musiał wszystkiego kminić od zera
+
+Był mały sukces, wydaje mi się że z użyciem któregoś z tych narzędzi udało mi się sprawić że po wpisaniu komendy w stylu
+```
+python porter.py <link do repo>
+```
+Skrypt przeportował jeden plik, zrobił commit i otworzył pull-requesta
+
+## Ostateczne rozwiazanie
+Po kilku nieprzespanych nocach, wzlotach i upadkach, uznałem że problem jest za duży na moją głowę, albo że narzędzia nie są jeszcze wystarczająco mocne, żeby dało się napisać portera. Postanowiłem że większą wartość będzie miało dla mnie wykonanie zadania niż tworzenie narzędzia które nie wiadomo czy da się stworzyć. Dlatego postawiłem na stary sprawdzony wzorzec projektowy kopiego-pasta. Czyli plik po pliku kopiowałem do ChatuGPT następnie wklejałem do IDE, odpalałem testy, kompilator i feedowałem spowrotem do ChatuGPT jeśli były błędy.
+
+## Nowe funkcjonalności
+Jakiś miesiąc temu do ChatuGPT został dodany Code Interpreter. Fajną rzeczą jest to że można mu wrzucić zip z kodem i on umie sobie po nim chodzić i czytać pliki itp. Ułatwiło to sprawę.
+
+## Podsumowanie
+Bez ChatuGPT pewnie nie umiałbym nadal TS a także bym miał o wiele słabszy codebase, pełna automatyzacja takich złożonych zadań wydaje się że jest jeszcze poza zasięgiem, ale w tej branży sprawy idą tak szybko że może już ktoś to zrobił :p
+
+## Uznanie autorstwa
 Photo by <a href="https://unsplash.com/@esmonde?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Esmonde Yong</a> on <a href="https://unsplash.com/photos/wFpJV5EWrSM?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
