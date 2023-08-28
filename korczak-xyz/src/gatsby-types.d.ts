@@ -2825,10 +2825,10 @@ type MentoringImagesAndLocaleQueryVariables = Exact<{
 
 type MentoringImagesAndLocaleQuery = { readonly allFile: { readonly nodes: ReadonlyArray<{ readonly name: string, readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null }> }, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
 
-type CreatePagesQueryQueryVariables = Exact<{ [key: string]: never; }>;
+type CreatePagesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-type CreatePagesQueryQuery = { readonly blogPosts: { readonly nodes: ReadonlyArray<{ readonly frontmatter: { readonly slug: string | null, readonly language: string | null } | null, readonly internal: { readonly contentFilePath: string | null } }> }, readonly courses: { readonly nodes: ReadonlyArray<{ readonly frontmatter: { readonly slug: string | null, readonly language: string | null } | null, readonly internal: { readonly contentFilePath: string | null } }> }, readonly plugin: { readonly pluginOptions: Record<string, unknown> | null } | null };
+type CreatePagesQuery = { readonly blogPosts: { readonly nodes: ReadonlyArray<{ readonly frontmatter: { readonly slug: string | null, readonly language: string | null } | null, readonly internal: { readonly contentFilePath: string | null } }> }, readonly courses: { readonly nodes: ReadonlyArray<{ readonly frontmatter: { readonly slug: string | null, readonly language: string | null } | null, readonly internal: { readonly contentFilePath: string | null } }> }, readonly plugin: { readonly pluginOptions: Record<string, unknown> | null } | null };
 
 
 }

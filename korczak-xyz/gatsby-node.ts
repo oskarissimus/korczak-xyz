@@ -8,8 +8,8 @@ export const createPages: GatsbyNode['createPages'] = async ({
   graphql,
   actions,
 }) => {
-  const result = await graphql<Queries.CreatePagesQueryQuery>(`
-    query CreatePagesQuery {
+  const result = await graphql<Queries.CreatePagesQuery>(`
+    query CreatePages {
       blogPosts: allMdx(
         filter: { internal: { contentFilePath: { regex: "/blog/" } } }
       ) {
