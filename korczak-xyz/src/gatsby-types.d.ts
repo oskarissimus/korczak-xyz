@@ -2787,6 +2787,18 @@ type CoursePageQueryVariables = Exact<{
 
 type CoursePageQuery = { readonly mdx: { readonly frontmatter: { readonly slug: string | null, readonly title: string | null, readonly featuredImageColor: { readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null } | null, readonly featuredImageBW: { readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null } | null } | null } | null, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
 
+type CourseSectionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+type CourseSectionQuery = { readonly allMdx: { readonly nodes: ReadonlyArray<{ readonly excerpt: string | null, readonly frontmatter: { readonly excerpt: string | null, readonly slug: string | null, readonly title: string | null, readonly featuredImageColor: { readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null } | null, readonly featuredImageBW: { readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null } | null } | null }> } };
+
+type CoursesPageQueryVariables = Exact<{
+  language: Scalars['String'];
+}>;
+
+
+type CoursesPageQuery = { readonly allMdx: { readonly nodes: ReadonlyArray<{ readonly frontmatter: { readonly slug: string | null } | null }> } };
+
 type GatsbyImageSharpFixedFragment = { readonly base64: string | null, readonly width: number, readonly height: number, readonly src: string, readonly srcSet: string };
 
 type GatsbyImageSharpFixed_noBase64Fragment = { readonly width: number, readonly height: number, readonly src: string, readonly srcSet: string };
