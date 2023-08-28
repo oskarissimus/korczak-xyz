@@ -16,7 +16,7 @@ module.exports = {
         __PATH_PREFIX__: '',
     },
     setupFiles: ['<rootDir>/loadershim.js'],
-    setupFilesAfterEnv: ['@testing-library/jest-dom/extend-expect', './jest.setup.js'],
+    setupFilesAfterEnv: ['@testing-library/jest-dom', './jest.setup.js'],
     collectCoverage: true,
     coverageReporters: ['json', 'lcov', 'text', 'clover'],
 };
