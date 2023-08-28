@@ -1,6 +1,7 @@
-import type { GatsbyConfig } from "gatsby";
+import type { GatsbyConfig } from 'gatsby';
 
 const config: GatsbyConfig = {
+  graphqlTypegen: true,
   plugins: [
     {
       resolve: `gatsby-source-filesystem`,
@@ -49,7 +50,7 @@ const config: GatsbyConfig = {
             },
           },
           {
-            resolve: "gatsby-remark-embed-video",
+            resolve: 'gatsby-remark-embed-video',
             options: {
               width: 768,
               related: false,
@@ -57,16 +58,16 @@ const config: GatsbyConfig = {
               loadingStrategy: 'lazy',
               urlOverrides: [
                 {
-                  id: "youtube",
+                  id: 'youtube',
                   embedURL: (videoId: string) =>
                     `https://www.youtube-nocookie.com/embed/${videoId}`,
                 },
               ],
-              containerClass: "embedVideo-container",
+              containerClass: 'embedVideo-container',
               iframeId: false,
             },
           },
-          "gatsby-remark-responsive-iframe",
+          'gatsby-remark-responsive-iframe',
         ],
       },
     },
