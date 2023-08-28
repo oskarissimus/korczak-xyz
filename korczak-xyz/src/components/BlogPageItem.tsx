@@ -16,7 +16,8 @@ export interface BlogPost {
 }
 
 export function formatDate(date: string | null): string {
-  const d = new Date(date || 0);
+  if (!date) return 'Invalid Date';
+  const d = new Date(date);
   return d.toLocaleDateString();
 }
 
