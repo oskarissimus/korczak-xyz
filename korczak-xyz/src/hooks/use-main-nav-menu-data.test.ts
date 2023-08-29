@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook } from '@testing-library/react';
 import { useI18next, useTranslation } from 'gatsby-plugin-react-i18next';
 
 import useMainNavMenuData from './use-main-nav-menu-data';

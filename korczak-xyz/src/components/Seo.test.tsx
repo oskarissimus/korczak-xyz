@@ -1,19 +1,10 @@
+import { render } from '@testing-library/react';
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 
 import { useSiteMetadata } from '../hooks/use-site-metadata';
 import { Seo } from './Seo';
 
 jest.mock('../hooks/use-site-metadata');
-
-const checkRenderWithoutCrashing = (element: React.ReactElement): boolean => {
-  try {
-    renderToString(element);
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
 
 describe('Seo component', () => {
   beforeEach(() => {
@@ -27,7 +18,6 @@ describe('Seo component', () => {
   });
 
   test('renders without crashing', () => {
-    const seoElement = <Seo />;
-    expect(checkRenderWithoutCrashing(seoElement)).toBe(true);
+    render(<Seo />);
   });
 });
