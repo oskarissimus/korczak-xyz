@@ -37,7 +37,7 @@
     "gatsby-remark-images": "^7.11.0",
     "gatsby-remark-responsive-iframe": "^6.12.0",
     "gatsby-source-filesystem": "^5.12.0",
-    "gatsby-transformer-sharp": "^5.11.0",
+    "gatsby-transformer-sharp": "^5.12.0",
     "i18next": "^22.5.1",
     "react": "^18.2.0",
     "react-countdown": "^2.3.5",
