@@ -6853,6 +6853,15 @@ gatsby-remark-images@^7.11.0:
     unist-util-select "^3.0.4"
     unist-util-visit-parents "^3.1.1"
 
+gatsby-remark-prismjs@^7.12.0:
+  version "7.12.0"
+  resolved "https://registry.yarnpkg.com/gatsby-remark-prismjs/-/gatsby-remark-prismjs-7.12.0.tgz#eab6cfac831379a0b6959afead6e2504b25712ab"
+  integrity sha512-W5NETUn0UTdvfNUfCnAgfpEI0wIlWk0UDTOvqUFptvyN8R6UW3FMm+KC18uv9WOQyKMgvNGU+UjJ1towTQvNLw==
+  dependencies:
+    "@babel/runtime" "^7.20.13"
+    parse-numeric-range "^1.3.0"
+    unist-util-visit "^2.0.3"
+
 gatsby-remark-responsive-iframe@^6.12.0:
   version "6.12.0"
   resolved "https://registry.yarnpkg.com/gatsby-remark-responsive-iframe/-/gatsby-remark-responsive-iframe-6.12.0.tgz#dec01db286542e3d5a1c0bb44fdc82e9640cc275"
@@ -10445,6 +10454,11 @@ parse-json@^5.0.0, parse-json@^5.2.0:
     json-parse-even-better-errors "^2.3.0"
     lines-and-columns "^1.1.6"
 
+parse-numeric-range@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/parse-numeric-range/-/parse-numeric-range-1.3.0.tgz#7c63b61190d61e4d53a1197f0c83c47bb670ffa3"
+  integrity sha512-twN+njEipszzlMJd4ONUYgSfZPDxgHhT9Ahed5uTigpQn90FggW4SA/AIPq/6a149fTbE9qBEcSwE3FAEp6wQQ==
+
 parse-path@^7.0.0:
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/parse-path/-/parse-path-7.0.0.tgz#605a2d58d0a749c8594405d8cc3a2bf76d16099b"
@@ -10977,6 +10991,11 @@ pretty-format@^29.0.0, pretty-format@^29.6.3:
     "@jest/schemas" "^29.6.3"
     ansi-styles "^5.0.0"
     react-is "^18.0.0"
+
+prismjs@^1.29.0:
+  version "1.29.0"
+  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.29.0.tgz#f113555a8fa9b57c35e637bba27509dcf802dd12"
+  integrity sha512-Kx/1w86q/epKcmte75LNrEoT+lX8pBpavuAbvJWRXar7Hz8jrtF+e3vY751p0R8H9HdArwaCTNDDzHg/ScJK1Q==
 
 probe-image-size@^7.2.3:
   version "7.2.3"

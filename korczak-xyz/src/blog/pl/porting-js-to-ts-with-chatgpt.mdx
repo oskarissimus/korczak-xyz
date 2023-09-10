@@ -24,14 +24,14 @@ Porter - tak nazywa się moja próba napisania automatu do portowania całego re
 ![dont crash into each other](../../images/blog/porting-js-to-ts-with-chatgpt/dont-crash-into-each-other.jpg "dont crash into each other")
 
 ### Pierwsze podejście
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
     file.write(ported)
 ```
 
 ### Sprawdźmy czy kod działa
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 
@@ -43,7 +43,7 @@ for file in files:
 ```
 
 ### Sprawdźmy czy kod się kompiluje
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 
@@ -59,7 +59,7 @@ for file in files:
 ```
 
 ### Czasami jedna runda poprawek nie wystarcza
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 

@@ -24,14 +24,14 @@ Porter - this is my attempt at creating an automaton for porting an entire repos
 ![dont crash into each other](../../images/blog/porting-js-to-ts-with-chatgpt/dont-crash-into-each-other.jpg "dont crash into each other")
 
 ### First approach
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
     file.write(ported)
 ```
 
 ### Let's check if the code works
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 
@@ -43,7 +43,7 @@ for file in files:
 ```
 
 ### Let's check if the code compiles
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 
@@ -59,7 +59,7 @@ for file in files:
 ```
 
 ### Sometimes one round of fixes is not enough
-```py
+```js
 for file in files:
     ported = prompt_gpt_to_port_file(file)
 
