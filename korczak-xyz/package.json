@@ -67,7 +67,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.2.18",
     "@types/testing-library__react": "^10.2.0",
-    "autoprefixer": "^10.4.15",
+    "autoprefixer": "^10.4.20",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^29.6.2",
     "babel-plugin-macros": "^3.1.0",
