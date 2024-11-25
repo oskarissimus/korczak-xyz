@@ -60,24 +60,7 @@ const config: GatsbyConfig = {
               showCaptions: true,
             },
           },
-          {
-            resolve: 'gatsby-remark-embed-video',
-            options: {
-              width: 768,
-              related: false,
-              noIframeBorder: true,
-              loadingStrategy: 'lazy',
-              urlOverrides: [
-                {
-                  id: 'youtube',
-                  embedURL: (videoId: string) =>
-                    `https://www.youtube-nocookie.com/embed/${videoId}`,
-                },
-              ],
-              containerClass: 'embedVideo-container',
-              iframeId: false,
-            },
-          },
+
           'gatsby-remark-responsive-iframe',
         ],
       },
