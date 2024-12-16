@@ -10,5 +10,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
-        patterns: ["*"]
+      react:
+        patterns: ["*react*"]
+      gatsby:
+        patterns: ["*gatsby*"]
