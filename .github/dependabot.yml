@@ -9,3 +9,6 @@ updates:
     directory: "/korczak-xyz/" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      dependencies:
+        patterns: ["*"]
