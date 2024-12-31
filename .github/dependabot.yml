@@ -9,8 +9,4 @@ updates:
     directory: "/korczak-xyz/" # Location of package manifests
     schedule:
       interval: "weekly"
-    groups:
-      react:
-        patterns: ["*react*"]
-      gatsby:
-        patterns: ["*gatsby*"]
+    open-pull-requests-limit: 100
