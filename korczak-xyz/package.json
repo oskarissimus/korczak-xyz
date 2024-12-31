@@ -14,7 +14,7 @@
     "coverage": "nyc jest"
   },
   "dependencies": {
-    "@calcom/embed-react": "^1.5.1",
+    "@calcom/embed-react": "^1.5.2",
     "@fortawesome/fontawesome-svg-core": "^6.4.2",
     "@fortawesome/free-brands-svg-icons": "^6.7.1",
     "@fortawesome/free-regular-svg-icons": "^6.7.2",
