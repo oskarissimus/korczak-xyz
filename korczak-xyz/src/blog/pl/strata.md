@@ -7,6 +7,9 @@ featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
 language: pl
 ---
 
+David Gilmour npaisał "Wish you were here" korzystając z czterech akordów. Tworząc moją adaptację zdecydowałem się pójść o krok dalej. Oprócz G C D a użyłem również akordu E-dur. W warstwie lirycznej postawiłem natomiast na prostotę i zamiast wyszukanych przenośni uznałem że bardziej adekwatne będzie użycie wulgaryzmów które celniej opisują stan męskiego umysłu czy uczuć które towarzyszą stracie.
+
+
 G          C
 Jak hujowo jest
 G       C
@@ -18,7 +21,7 @@ kurwa brata
 
 E           A
 Graliśmy se w piłkę
-E            A
+E    A
 Albo w komputer
 E         A
 Jaraliśmy szlugi
