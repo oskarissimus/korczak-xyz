@@ -23,7 +23,7 @@
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@mdx-js/react": "^2.3.0",
-    "core-js": "^3.38.1",
+    "core-js": "^3.40.0",
     "cron-parser": "^4.9.0",
     "detect-emoji-support": "^0.1.7",
     "gatsby": "^5.14.1",
