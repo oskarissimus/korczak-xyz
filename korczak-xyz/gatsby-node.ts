@@ -3,6 +3,7 @@ import path from 'path';
 
 const postTemplate = path.resolve('./src/templates/blog-post.js');
 const courseTemplate = path.resolve('./src/templates/course.js');
+const songTemplate = path.resolve('./src/templates/song.js');
 
 export const createPages: GatsbyNode['createPages'] = async ({
   graphql,
@@ -29,6 +30,22 @@ export const createPages: GatsbyNode['createPages'] = async ({
         nodes {
           frontmatter {
             slug
+            language
+          }
+          internal {
+            contentFilePath
+          }
+        }
+      }
+      songs: allMdx(
+        filter: { internal: { contentFilePath: { regex: "/songs/" } } }
+      ) {
+        nodes {
+          frontmatter {
+            slug
+            author
+            title
+            published
             language
           }
           internal {
@@ -84,6 +101,26 @@ export const createPages: GatsbyNode['createPages'] = async ({
         '/blog/' +
         node.frontmatter.slug,
       component: `${postTemplate}?__contentFilePath=${node.internal.contentFilePath}`,
+      context: {
+        slug: node.frontmatter.slug,
+        language: node.frontmatter.language,
+      },
+    };
+    actions.createPage(page);
+  });
+
+  // Create song pages
+  data.songs.nodes.forEach((node: any) => {
+    const page = {
+      path:
+        languagePath(node.frontmatter.language) +
+        '/songs/' +
+        node.frontmatter.slug,
+      matchPath:
+        languagePath(node.frontmatter.language) +
+        '/songs/' +
+        node.frontmatter.slug,
+      component: `${songTemplate}?__contentFilePath=${node.internal.contentFilePath}`,
       context: {
         slug: node.frontmatter.slug,
         language: node.frontmatter.language,

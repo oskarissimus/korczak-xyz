@@ -1,11 +1,11 @@
 ---
 title: Skrywana złość
-slug: hidden-anger
-date: 2025-09-01
+slug: skrywana-zlosc
+author: OK
 published: false
-featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
 language: pl
 ---
+```song
 E      a
 Siedzę i czekam
 E      a
@@ -41,3 +41,4 @@ E      e
 I będę żałował
 G      E
 I będę miał spokój
+```

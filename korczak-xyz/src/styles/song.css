@@ -1,0 +1,6 @@
+html.dark pre[class*='language-'] {
+  background: none;
+}
+html pre[class*='language-'] {
+  background: none;
+}

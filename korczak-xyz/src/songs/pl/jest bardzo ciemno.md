@@ -1,12 +1,11 @@
 ---
-title: Strata
-slug: loss
-date: 2025-09-01
+title: Jest bardzo ciemno
+slug: jest-bardzo-ciemno
+author: OK
 published: false
-featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
 language: pl
 ---
-
+```song
 E a
 Jest bardzo ciemno na blokowisku
 E a
@@ -30,3 +29,4 @@ Lecz jestem z synkiem takim malutkim
 Że ledwie się obraca na brzuszek
 Po co mi słońce na blokowisku
 Kiedy jest ze mną taki maluszek
+```

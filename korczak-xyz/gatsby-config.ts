@@ -34,6 +34,10 @@ const config: GatsbyConfig = {
             matchPath: '/:lang?/blog/:uid',
             getLanguageFromPath: true,
           },
+          {
+            matchPath: '/:lang?/songs/:uid',
+            getLanguageFromPath: true,
+          },
         ],
       },
     },
@@ -94,6 +98,13 @@ const config: GatsbyConfig = {
       options: {
         name: `courses`,
         path: `${__dirname}/src/courses/`,
+      },
+    },
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        name: `songs`,
+        path: `${__dirname}/src/songs/`,
       },
     },
   ],

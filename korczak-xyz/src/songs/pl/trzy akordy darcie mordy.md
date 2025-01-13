@@ -1,12 +1,12 @@
 ---
 title: Trzy akordy darcie mordy
 slug: trzy-akordy-darcie-mordy
-date: 2025-01-12
+author: Brudne Dzieci Sida
 published: false
 language: pl
 ---
 
-
+```song
        A     D     A
 Czasem życie traci sens
        A         D   A
@@ -51,3 +51,4 @@ Niech się zdzierają struny głosowe
     punk rock!
   A E         A
     punk rock!
+```

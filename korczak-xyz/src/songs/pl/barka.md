@@ -1,12 +1,11 @@
 ---
 title: Barka
 slug: barka
-date: 2025-01-12
+author: papiez xd
 published: false
-featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
 language: pl
 ---
-
+```song
    D A               D        D7 
 1. Pan kiedyś stanął nad brzegiem, 
        G   e             A     A7 
@@ -33,4 +32,5 @@ Mych kropli potu i samotności.
 
 4. Dziś wypłyniemy już razem, 
 Łowić serca na morzach dusz ludzkich, 
-Twej prawdy siecią i słowem życia. 
+Twej prawdy siecią i słowem życia.
+```

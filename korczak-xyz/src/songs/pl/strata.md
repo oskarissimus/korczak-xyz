@@ -1,9 +1,8 @@
 ---
 title: Strata
-slug: loss
-date: 2025-09-01
+slug: strata
+author: OK
 published: false
-featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
 language: pl
 ---
 
@@ -14,6 +13,7 @@ Inspiracje:
 - Brudne Dzieci Sida
 - Pink floyd wish you were here
 
+```song
 G          C
 Jak hujowo jest
 G       C
@@ -40,3 +40,4 @@ E       A
 A teraz tak pierdoli
 E         A
 Że czasem nie mam siły
+```
