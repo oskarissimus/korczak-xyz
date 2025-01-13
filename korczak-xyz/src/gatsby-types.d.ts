@@ -2776,7 +2776,7 @@ type BlogPostQueryVariables = Exact<{
 }>;
 
 
-type BlogPostQuery = { readonly mdx: { readonly frontmatter: { readonly slug: string | null, readonly title: string | null } | null } | null, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
+type BlogPostQuery = { readonly mdx: { readonly frontmatter: { readonly slug: string | null, readonly title: string | null } | null } | null, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null } }> } };
 
 type BlogPostsPageQueryVariables = Exact<{
   language: Scalars['String'];
