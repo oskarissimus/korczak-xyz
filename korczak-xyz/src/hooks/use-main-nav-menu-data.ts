@@ -12,6 +12,7 @@ function useMainNavMenuData() {
       { name: t('Mentoring'), to: '/mentoring' },
       { name: t('Courses'), to: '/courses' },
       { name: t('Blog'), to: '/blog' },
+      { name: t('Songs'), to: '/songs' },
     ],
     [t],
   );

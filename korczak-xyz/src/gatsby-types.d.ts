@@ -2776,7 +2776,7 @@ type BlogPostQueryVariables = Exact<{
 }>;
 
 
-type BlogPostQuery = { readonly mdx: { readonly frontmatter: { readonly slug: string | null, readonly title: string | null } | null } | null, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
+type BlogPostQuery = { readonly mdx: { readonly frontmatter: { readonly slug: string | null, readonly title: string | null } | null } | null, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null } }> } };
 
 type BlogPostsPageQueryVariables = Exact<{
   language: Scalars['String'];
@@ -2842,6 +2842,13 @@ type MentoringImagesAndLocaleQueryVariables = Exact<{
 
 
 type MentoringImagesAndLocaleQuery = { readonly allFile: { readonly nodes: ReadonlyArray<{ readonly name: string, readonly childImageSharp: { readonly gatsbyImageData: import('gatsby-plugin-image').IGatsbyImageData } | null }> }, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
+
+type SongsPageQueryVariables = Exact<{
+  language: Scalars['String'];
+}>;
+
+
+type SongsPageQuery = { readonly allMdx: { readonly nodes: ReadonlyArray<{ readonly excerpt: string | null, readonly frontmatter: { readonly slug: string | null, readonly title: string | null, readonly author: string | null } | null }> }, readonly locales: { readonly edges: ReadonlyArray<{ readonly node: { readonly ns: string | null, readonly data: string | null, readonly language: string | null } }> } };
 
 type CreatePagesQueryVariables = Exact<{ [key: string]: never; }>;
 
