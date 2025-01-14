@@ -1,6 +1,5 @@
 import { renderHook } from '@testing-library/react';
 import { useI18next, useTranslation } from 'gatsby-plugin-react-i18next';
-
 import useMainNavMenuData from './use-main-nav-menu-data';
 
 const mockedUseI18next = useI18next as jest.Mock;
@@ -31,6 +30,7 @@ describe('useMainNavMenuData', () => {
           Mentoring: 'Mentoring',
           Courses: 'Courses',
           Blog: 'Blog',
+          Songs: 'Songs',
         };
         return translations[key] || key;
       },
@@ -46,6 +46,7 @@ describe('useMainNavMenuData', () => {
       { name: 'Mentoring', to: '/mentoring' },
       { name: 'Courses', to: '/courses' },
       { name: 'Blog', to: '/blog' },
+      { name: 'Songs', to: '/songs' },
     ]);
   });
 });
