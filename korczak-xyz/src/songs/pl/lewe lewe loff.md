@@ -1,0 +1,46 @@
+---
+title: Lewe lewe loff
+slug: lewe-lewe-loff
+author: Kult
+published: false
+language: pl
+---
+```song
+a                  C
+Chcę Ci powiedzieć jak bardzo Cię cenię
+G                  D
+Chcę Ci powiedzieć jak bardzo Cię podziwiam
+Chcę Ci powiedzieć: „uważaj na te drogi”
+Ale nie mam odwagi
+
+Jest czwarta w nocy. Piszę przez chwilę
+To, co mi się we łbie ułożyło
+Chciałbym, chociaż za oknem wiatr dmucha
+Zanucić Ci prosto do ucha
+
+Ref:
+Lewe, lewe, lewe loff, loff, loff, loff 4x
+
+Ty masz to co ja chciał-
+Bym mieć, gdybym kilka lat mniej miał
+I tylko chcę Cię ostrzec:
+Nie wyważaj drzwi otwartych na oścież
+
+Ty masz taką mądrość głupią
+Niech, której wszyscy od Ciebie się uczą
+I tylko chcę Ci powiedzieć
+Ten pociąg nie pojedzie jeśli Ty w nim nie będziesz
+
+Ref
+
+Przed chwilą o tym śniłem
+Że na jakimś dworcu wszystko zostawiłem
+Niewiadomy niepokój obudził mnie
+Dlatego teraz siedzę i piszę
+Ale żadne słowa tego nie opiszą
+Co poczuć może człowiek ciemną jesienną nocą
+Dlatego już kończę ten list
+Listopad 1993
+
+Ref
+```
