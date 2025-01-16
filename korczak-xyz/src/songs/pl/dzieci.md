@@ -1,0 +1,39 @@
+---
+title: Dzieci
+slug: dzieci
+author: Elektryczne Gitary
+published: false
+language: pl
+---
+```song
+d             C
+Dzieci wesoło wybiegły ze szkoły
+Zapaliły papierosy, wyciągnęły flaszki
+Chodnik zapluły, ludzi przepędziły
+Siedzą na ławeczkach i ryczą do siebie
+
+Ref.
+Wszyscy mamy źle w głowach, że żyjemy
+Hej, hej, la, la, la, la, hej, hej, hej, hej
+Wszyscy mamy źle w głowach, że żyjemy
+Hej, hej, la, la, la, la, hej, hej, hej, hej
+
+Tony papieru, tomy analiz
+Genialne myśli, tłumy na sali
+Godziny modlitw, lata nauki
+Przysięgi, plany, podpisy, druki
+
+Ref
+
+Wzorce, przykłady, szlachetne zabiegi
+Łańcuchy dłoni, zwarte szeregi
+Warstwy tradycji, wieki kultury
+Tydzień dobroci, ręce do góry
+
+Ref
+
+Dzieci wesoło wybiegły ze szkoły
+Zapaliły papierosy, wyciągnęły flaszki
+Chodnik zapluły, ludzi przepędziły
+Siedzą na ławeczkach i ryczą do siebie
+```
