@@ -33,4 +33,23 @@ Mych kropli potu i samotności.
 4. Dziś wypłyniemy już razem, 
 Łowić serca na morzach dusz ludzkich, 
 Twej prawdy siecią i słowem życia.
+
+5. Piotr także stanał nad brzegiem,
+Spojrzał w niebo, bo dzień się nachylił,
+Już chciał yć z Tobą i w tamtej chwili.
+
+Ref.: O, Panie Ty na niego spojrzałeś,
+Zawołałeś, aby przyszedł do Ciebie,
+Swoją barkę pozostawił na brzegu,
+Inny rybak teraz zacznie Twój łów.
+
+6.Panie dalszy rejs odwołany
+Bo Sternika do Siebie wezwałeś
+A nam brak siły nadzieja zgasła.
+
+Ref.: O Chryste przecież burze szaleją
+Ratuj barkę bo bez Ciebie zginiemy
+"Nie lękajcie się! A wypłyńcie na głębie”
+Cała naprzód nowy świta już dzień 
+
 ```
