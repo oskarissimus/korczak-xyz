@@ -5,5 +5,11 @@
     "Courses": "Kursy",
     "Blog": "Blog",
     "Oskar live": "Oskar live",
-    "Songs": "Teksty"
+    "Songs": "Teksty",
+    "/": "/pl",
+    "/about": "/pl/about",
+    "/mentoring": "/pl/mentoring",
+    "/courses": "/pl/courses",
+    "/blog": "/pl/blog",
+    "/songs": "/pl/songs"
 }

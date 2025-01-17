@@ -7,12 +7,12 @@ function useMainNavMenuData() {
 
   const navigation = React.useMemo(
     () => [
-      { name: t('Home'), to: '/' },
-      { name: t('About'), to: '/about' },
-      { name: t('Mentoring'), to: '/mentoring' },
-      { name: t('Courses'), to: '/courses' },
-      { name: t('Blog'), to: '/blog' },
-      { name: t('Songs'), to: '/songs' },
+      { name: t('Home'), to: t('/') },
+      { name: t('About'), to: t('/about') },
+      { name: t('Mentoring'), to: t('/mentoring') },
+      { name: t('Courses'), to: t('/courses') },
+      { name: t('Blog'), to: t('/blog') },
+      { name: t('Songs'), to: t('/songs') },
     ],
     [t],
   );
