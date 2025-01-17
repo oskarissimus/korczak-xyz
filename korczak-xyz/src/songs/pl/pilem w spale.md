@@ -10,20 +10,26 @@ a
 Idą sobie polną drogą
 a
 Tacy którzy dużo mogą
-a
+E
 Trąbka im do marszu gra
 E
 Dyrektory i prezesy
 E
 Łase toto na sukcesy
-E
+a
 A tymczasem ja
 
+a
 Piłem w Spale spałem w Pile
+a
 I to jak na razie tyle
+E
 Hej o hej
+E
 Znak szczególny mam na ciele
+E
 Wytatuowany jeleń
+a
 Hej łoo hej
 On ma rogi gdzie ja mięśnie
 Jak ja schudnę to on wklęśnie
