@@ -1,7 +1,7 @@
 ---
 title: Barka
 slug: barka
-author: papiez xd
+author: Cesáreo Gabarain, Stanisław Szmidt
 published: false
 language: pl
 ---
