@@ -2,7 +2,7 @@
 title: Za daleko
 slug: za-daleko
 author: Brudne dzieci sida
-published: false
+published: true
 language: pl
 ---
 ```song

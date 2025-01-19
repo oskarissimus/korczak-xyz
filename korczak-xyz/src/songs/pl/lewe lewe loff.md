@@ -2,7 +2,7 @@
 title: Lewe lewe loff
 slug: lewe-lewe-loff
 author: Kult
-published: false
+published: true
 language: pl
 ---
 ```song

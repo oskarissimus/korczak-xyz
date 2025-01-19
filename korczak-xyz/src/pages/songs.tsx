@@ -1,7 +1,6 @@
 import { Link, PageProps, graphql } from 'gatsby';
 import React from 'react';
 
-import { BlogPageItem } from '../components/BlogPageItem';
 import Layout from '../components/Layout';
 import PageContent from '../components/PageContent';
 import { Seo } from '../components/Seo';
@@ -32,7 +31,7 @@ export const query = graphql`
   query SongsPage($language: String!) {
     allMdx(
       filter: {
-        frontmatter: { language: { eq: $language } }
+        frontmatter: { published: { eq: true }, language: { eq: $language } }
         internal: { contentFilePath: { regex: "/src/songs/" } }
       }
       sort: [{ frontmatter: { author: ASC } }, { frontmatter: { title: ASC } }]

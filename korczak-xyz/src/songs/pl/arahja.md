@@ -2,7 +2,7 @@
 title: Arahja
 slug: arahja
 author: Kult
-published: false
+published: true
 language: pl
 ---
 ```song

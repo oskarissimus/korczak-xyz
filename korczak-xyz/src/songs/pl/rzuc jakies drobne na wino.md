@@ -2,7 +2,7 @@
 title: Rzuć jakieś drobne na wino
 slug: rzuc-jakies-drobne-na-wino
 author: Brudne Dzieci Sida
-published: false
+published: true
 language: pl
 ---
 ```song

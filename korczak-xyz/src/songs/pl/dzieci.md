@@ -2,7 +2,7 @@
 title: Dzieci
 slug: dzieci
 author: Elektryczne Gitary
-published: false
+published: true
 language: pl
 ---
 ```song

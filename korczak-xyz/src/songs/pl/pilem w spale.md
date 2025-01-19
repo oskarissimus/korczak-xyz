@@ -2,7 +2,7 @@
 title: Piłem w Spale spałem w Pile
 slug: pilem-w-spale-spalem-w-pile
 author: Artur Andrus
-published: false
+published: true
 language: pl
 ---
 ```song

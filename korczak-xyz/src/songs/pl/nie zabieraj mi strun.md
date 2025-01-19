@@ -2,7 +2,7 @@
 title: Nie zabieraj mi strun
 slug: nie-zabieraj-mi-strun
 author: Maxel
-published: false
+published: true
 language: pl
 ---
 ```song

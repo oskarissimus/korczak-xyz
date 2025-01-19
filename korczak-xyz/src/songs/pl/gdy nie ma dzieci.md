@@ -2,7 +2,7 @@
 title: Gdy nie ma dzieci
 slug: gdy-nie-ma-dzieci
 author: Kult
-published: false
+published: true
 language: pl
 ---
 ```song

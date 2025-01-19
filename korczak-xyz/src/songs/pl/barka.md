@@ -2,7 +2,7 @@
 title: Barka
 slug: barka
 author: Cesáreo Gabarain, Stanisław Szmidt
-published: false
+published: true
 language: pl
 ---
 ```song

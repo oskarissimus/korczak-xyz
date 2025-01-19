@@ -2,7 +2,7 @@
 title: Trzy akordy darcie mordy
 slug: trzy-akordy-darcie-mordy
 author: Brudne Dzieci Sida
-published: false
+published: true
 language: pl
 ---
 

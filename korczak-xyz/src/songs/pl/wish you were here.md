@@ -2,7 +2,7 @@
 title: Wish you were here
 slug: wish-you-were-here
 author: Pink Floyd
-published: false
+published: true
 language: pl
 ---
 ```song

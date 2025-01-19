@@ -2,7 +2,7 @@
 title: Jest bardzo ciemno
 slug: jest-bardzo-ciemno
 author: OK
-published: false
+published: true
 language: pl
 ---
 ```song

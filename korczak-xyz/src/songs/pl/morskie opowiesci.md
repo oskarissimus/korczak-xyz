@@ -2,7 +2,7 @@
 title: Morskie Opowieści
 slug: morskie-opowiesci
 author: Szanty
-published: false
+published: true
 language: pl
 ---
 ```song
