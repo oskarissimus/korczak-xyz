@@ -54,7 +54,7 @@ I do zupy mlecznej
 
 Był na "Lwowie" młody majtek
 Czort, Rasputin, bestia taka
-Że sam krcił kabeztanem
+Że sam kręcił kabeztanem
 I to bez handszpaka
 
     Hej! Ha! ...,
