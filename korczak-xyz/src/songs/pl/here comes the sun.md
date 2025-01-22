@@ -7,46 +7,47 @@ language: pl
 ---
 ```song
 
-G                   C              A7
+C                   F              D7
 Here comes the sun, here comes the sun,
-           G
+           C
 And I say it's all right
 
-G                          C                D
+C                          F                G
 Little darling, its been a long cold lonely winter
-G                             C                     D
+C                             F                     G
 Little darling, it feels like years since it's been here
 
-G                   C              A7
+C                   F              D7
 Here comes the sun, here comes the sun,
-          G
+          C
 And I say it's all right
 
-G                             C             D
+C                             F             G
 Little darling, the smiles returning to the faces
-G                             C                     D
+C                             F                     G
 Little darling, it seems like years since it's been here
 
-G                   C              A7
+C                   F              D7
 Here comes the sun, here comes the sun,
-          G
+          C
 And I say it's all right
 
-g7   F    C           G
+c7   Bb   F           C
 Sun, sun, sun, here it comes... x5
 
-G                           C             D
+C                           F             G
 Little darling, I feel that ice is slowly melting
-G                             C                     D
+C                             F                     G
 Little darling, it seems like years since it's been clear
 
-G                   C              A7
+C                   F              D7
 Here comes the sun, here comes the sun,
-          G
+          C
 And I say it's all right
 
-G                   C              A7
+C                   F              D7
 Here comes the sun, here comes the sun,
-G
+C
 It's all right
+```
 ```
