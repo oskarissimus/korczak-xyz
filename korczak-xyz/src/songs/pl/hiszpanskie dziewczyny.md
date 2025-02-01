@@ -30,13 +30,19 @@ I głowę baranią sterczącą wśród wzgórz,
 I statki stojące na redzie przy Plymouth.
 Klarować kotwicę najwyższy czas już.
 
+Ref.
+
 3. A potem znów żagle na masztach rozkwitną,
 Kurs szyper wyznaczy do Portland i Wight.
 I znów stara łajba potoczy się ciężko
 Przez fale w kierunku na Beachie Fairlie Land.
 
+Ref.
+
 4. Zabłysną nam bielą skał zęby pod Dover.
 I znów noc w kubryku, wśród legend i bajd.
 Powoli i znojnie tak płynie nam życie
 Na wodach i w portach South Foreland Light.
+
+Ref.
 ```
