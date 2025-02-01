@@ -1,3 +1,7 @@
+---
+import ThemeIcon from "../components/ThemeIcon.astro";
+---
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -16,18 +20,38 @@
           <li><a href="/songs">Songs</a></li>
         </ul>
       </nav>
+      <ThemeIcon />
     </header>
+
     <slot />
   </body>
 </html>
 <style>
   body {
+    background-color: #f0f0f0;
+    color: #111111;
+    a {
+      color: #131313;
+    }
+  }
+
+  :global(.dark) {
+    body {
+      background-color: #111111;
+      color: #f0f0f0;
+    }
+    a {
+      color: #f0f0f0;
+    }
+  }
+
+  body {
     display: flex;
     flex-direction: column;
     margin: 0;
     font-family: Arial, sans-serif;
-    max-width: 1024px; /* lg size */
-    margin: 0 auto; /* center the content */
+    max-width: 1024px;
+    margin: 0 auto;
   }
 
   header {
@@ -35,8 +59,6 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
-    background-color: #f8f8f8;
-    border-bottom: 1px solid #ddd;
   }
 
   h1 {
@@ -60,10 +82,12 @@
 
   a {
     text-decoration: none;
-    color: #333;
   }
 
-  a:hover {
-    text-decoration: underline;
+  nav ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    gap: 1rem;
   }
 </style>
