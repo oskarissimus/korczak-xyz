@@ -7,14 +7,63 @@
     <title>korczak.xyz</title>
   </head>
   <body>
-    <h1><a href="/">korczak.xyz</a></h1>
-    <nav>
-      <ul>
-        <li><a href="/about">About</a></li>
-        <li><a href="/blog">Blog</a></li>
-        <li><a href="/songs">Songs</a></li>
-      </ul>
-    </nav>
+    <header>
+      <h1><a href="/">korczak.xyz</a></h1>
+      <nav>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/songs">Songs</a></li>
+        </ul>
+      </nav>
+    </header>
     <slot />
   </body>
 </html>
+<style>
+  body {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    max-width: 1024px; /* lg size */
+    margin: 0 auto; /* center the content */
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+  }
+
+  h1 {
+    margin: 0;
+  }
+
+  nav {
+    margin-left: auto;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+  }
+
+  li {
+    margin-left: 1rem;
+  }
+
+  a {
+    text-decoration: none;
+    color: #333;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+</style>
