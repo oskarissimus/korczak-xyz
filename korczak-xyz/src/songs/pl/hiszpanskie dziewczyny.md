@@ -22,7 +22,7 @@ e                  G          D
 W noc ciemną i złą nam będzie się śnił.
 C          D         e
 Leniwie popłyną znów rejsu godziny,
-C                            B7        Em
+C                            H7        e
 Wspomnienie ust waszych przysporzy nam sił.
 
 2. Niedługo ujrzymy znów w dali Cape Deadman
