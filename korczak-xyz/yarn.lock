@@ -4851,12 +4851,12 @@ create-jest@^29.7.0:
     jest-util "^29.7.0"
     prompts "^2.0.1"
 
-cron-parser@^4.9.0:
-  version "4.9.0"
-  resolved "https://registry.yarnpkg.com/cron-parser/-/cron-parser-4.9.0.tgz#0340694af3e46a0894978c6f52a6dbb5c0f11ad5"
-  integrity sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==
+cron-parser@^5.1.1:
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/cron-parser/-/cron-parser-5.1.1.tgz#89e322245f830669949a5c526487ebfda1be65e0"
+  integrity sha512-xNhwjTUTJcvevF4EvOxB3xYpEKC/qOAmykR+2Qf91ARIfdbjStUwo8qpem6jjzdwFgoo4pnf3sS264xG0G858w==
   dependencies:
-    luxon "^3.2.1"
+    luxon "^3.6.1"
 
 cross-fetch@^3.1.5:
   version "3.1.5"
@@ -9408,10 +9408,10 @@ lru-queue@^0.1.0:
   dependencies:
     es5-ext "~0.10.2"
 
-luxon@^3.2.1:
-  version "3.3.0"
-  resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.3.0.tgz#d73ab5b5d2b49a461c47cedbc7e73309b4805b48"
-  integrity sha512-An0UCfG/rSiqtAIiBPO0Y9/zAnHUZxAMiCpTd5h2smgsj7GGmcenvrvww2cqNA8/4A5ZrD1gJpHN2mIHZQF+Mg==
+luxon@^3.6.1:
+  version "3.6.1"
+  resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.6.1.tgz#d283ffc4c0076cb0db7885ec6da1c49ba97e47b0"
+  integrity sha512-tJLxrKJhO2ukZ5z0gyjY1zPh3Rh88Ej9P7jNrZiHMUXHae1yvI2imgOZtL1TO8TW6biMMKfTtAOoEJANgtWBMQ==
 
 lz-string@^1.5.0:
   version "1.5.0"
