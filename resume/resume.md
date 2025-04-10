@@ -12,6 +12,7 @@ Seasoned SWE with strong Python, TS and DevOps. Built ML pipeline for ID recogni
 Jun 2023 - Present (1 year 10 months)
 - Maintained and improved bioinformatic genomics pipelines with Python, Django, Bash, and BDS.
 - Created PowerBI data visualizations with PostgreSQL in AWS
+- Optimised 100x amount of queries and 10x page load times
 
 ## Devs-Mentoring
 ### Mentor
@@ -25,9 +26,9 @@ Sep 2022 - Jan 2025 (2 years 4 months)
 ### Python developer
 Feb 2022 - Dec 2022 (11 months)
 - Created a REST API facade for full-text search in large datasets, streamlining data access and enhancing query performance.
-- Developed a cloud microservice integrating data from various sources into unified GraphQL interface, improving data management efficiency.
+- Optimised 10x time and resources (memory, VM time) of data service with stream processing and async Python
+- Optimised 5x time to obtain data from web service with enabling of HTTP2
 - Python, FastAPI, Pytest, Async Python, Apache Solr, OAuth2, Docker, GCP, Terraform, Strawberry GraphQL
-- HTTP2
 
 ## Igoria Trade
 ### Blockchain developer
