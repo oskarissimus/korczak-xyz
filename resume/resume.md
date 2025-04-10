@@ -2,6 +2,25 @@
 Seasoned SWE with strong Python, TS and DevOps. Built ML pipeline for ID recognition in KYC process in fintech. Setted up and maintained on-premise Kubernetes cluster. Active in local meet-ups with talks and projects.
 
 # Experience
+## Holisticon
+
+
+## Devs-Mentoring
+### Mentor
+Sep 2022 - Jan 2025 (2 years 4 months)
+- Mentored frontend developers, teaching GIT, HTML, CSS, JS, React, Redux, resulting in successful career transformations.
+- Assigned and rewieved programing tasks, fostering confidence and practical proficency.
+- Aided mentees in developing personal projects, enhancing portfolios and job prospects
+- Conducted code-reviews and promoted best practices, improving code quality and performance
+
+## Neontri
+### Python developer
+Feb 2022 - Dec 2022 (11 months)
+- Created a REST API facade for full-text search in large datasets, streamlining data access and enhancing query performance.
+- Developed a cloud microservice integrating data from various sources into unified GraphQL interface, improving data management efficiency.
+- Python, FastAPI, Pytest, Async Python, Apache Solr, OAuth2, Docker, GCP, Terraform, Strawberry GraphQL
+- HTTP2
+
 ## Igoria Trade
 ### Blockchain developer
 Mar 2021 - Apr 2022 (1 year 2 months)
