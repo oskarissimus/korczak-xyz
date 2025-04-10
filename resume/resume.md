@@ -1,9 +1,17 @@
 # Oskar Korczak
+- linkedin.com/in/oskar-korczak
+- github.com/oskarissimus
+- [email]
+- [telephone]
+
 Seasoned SWE with strong Python, TS and DevOps. Built ML pipeline for ID recognition in KYC process in fintech. Setted up and maintained on-premise Kubernetes cluster. Active in local meet-ups with talks and projects.
 
 # Experience
 ## Holisticon
-
+### Senior Software Engineer
+Jun 2023 - Present (1 year 10 months)
+- Maintained and improved bioinformatic genomics pipelines with Python, Django, Bash, and BDS.
+- Created PowerBI data visualizations with PostgreSQL in AWS
 
 ## Devs-Mentoring
 ### Mentor
