@@ -13,18 +13,22 @@ C
 Dilerów, maklerów, warty honorowe
 I jeszcze wąsacza olewam na zdrowie
 Prymasa w lampasach, komuchy nie lubię
+
 Tylko na Tobie naprawdę mi zależy
 Tylko Ciebie naprawdę potrzebuję
 I kiedy kiedy znikasz, kiedy Ciebie nie ma
 W powietrzu czuję, czegoś mi brakuje
+
 Ludzie mówią, że jestem pijakiem
 Chodnikowym równym chłopakiem
 Ludzie mówią, że nie trzymam tonacji
 Nie ćwiczę gam nowej demokracji
+
 Ale ja mam w sobie mordercę
 Wojownika, chcę zjeść Twoje serce
 Chcę mieć w Tobie przyjaciela
 Poczuć coś, poczuć coś, coś Ci dać
+
 Oh yeah! Chcę Ci powiedzieć
 I love you, I love you, I love you, I love you
 Oh yeah! Nie jestem mądry
