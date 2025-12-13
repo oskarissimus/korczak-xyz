@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import prettier from 'prettier';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -111,6 +112,16 @@ async function cleanHtml(page) {
   });
 }
 
+// Format HTML using Prettier
+async function formatHtml(html) {
+  return await prettier.format(html, {
+    parser: 'html',
+    printWidth: 120,
+    tabWidth: 2,
+    useTabs: false,
+  });
+}
+
 // Check if a path should be crawled
 function shouldCrawl(pathname) {
   if (!pathname) return false;
@@ -138,7 +149,12 @@ async function fetchPage(page, urlPath, config) {
     }
 
     // Get HTML content
-    const html = config.clean ? await cleanHtml(page) : await page.content();
+    let html = config.clean ? await cleanHtml(page) : await page.content();
+
+    // Format HTML if clean mode is enabled
+    if (config.clean) {
+      html = await formatHtml(html);
+    }
 
     // Save HTML file
     const filename = pathToFilename(normalizedPath, config.url);
