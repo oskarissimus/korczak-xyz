@@ -1,0 +1,15 @@
+{
+  "name": "snapshot-crawler",
+  "version": "1.0.0",
+  "description": "Crawl websites and capture HTML snapshots for migration evaluation",
+  "type": "module",
+  "bin": {
+    "snapshot-crawler": "./crawler.js"
+  },
+  "scripts": {
+    "crawl": "node crawler.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
