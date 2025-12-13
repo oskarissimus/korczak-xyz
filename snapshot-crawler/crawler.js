@@ -146,6 +146,19 @@ async function cleanHtml(page) {
       }
     });
 
+    // Remove HTML comments
+    const walker = document.createTreeWalker(
+      document.documentElement,
+      NodeFilter.SHOW_COMMENT,
+      null,
+      false
+    );
+    const comments = [];
+    while (walker.nextNode()) {
+      comments.push(walker.currentNode);
+    }
+    comments.forEach(comment => comment.remove());
+
     return document.documentElement.outerHTML;
   });
 }
