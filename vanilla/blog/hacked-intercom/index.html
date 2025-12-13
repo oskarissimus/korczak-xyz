@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hacked intercom | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Hacked intercom | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Hacked intercom</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><img src="/assets/images/blog/entry-phone/finished-internals.png" alt="internals" title="internals"></p>
+<p>In 2018, I was staying at a friend’s place. I made a copy of the apartment keys, but it was impossible to duplicate the front door key as the original was bent. The locksmith said such a key couldn’t be copied. The original key could open the front door as usual, but when I asked if it could be straightened, the locksmith explained that it would almost certainly break. I couldn’t really ask the landlord for an extra key because, well, they didn’t know I was living there.</p>
+<h2>The Intercom Worked Well</h2>
+<p><img src="/assets/images/blog/entry-phone/external.png" alt="regular intercom" title="regular intercom">
+The intercom was typical for an old building near the Olsztyn Old Town. Each apartment had its own button, with no codes or advanced features. Here’s how the intercom functioned:</p>
+<ol>
+<li>Call a specific apartment.</li>
+<li>Answer the call.</li>
+<li>Talk.</li>
+<li>Open the door.
+My plan was to connect an Arduino to features 1 and 4. Later, I discovered it was quite amusing to tap into feature 3.</li>
+</ol>
+<h2>Arduino</h2>
+<p><img src="/assets/images/blog/entry-phone/loose-internals.jpg" alt="loose internals" title="loose internals">
+I bought a few Arduino boards from a Chinese seller for two dollars each. Using a multimeter and the intercom documentation I found online, I figured out which pins to connect to the Arduino&#39;s ADC. Implementing it was fairly straightforward. The only annoying part was uploading code to the Arduino—this is always a hassle with such projects unless you have exceptionally long cables or clever code-upload methods like WiFi. I didn’t have any of that.
+<youtube-embed video-id="6tuDXU8ow9M"></youtube-embed></p>
+<h2>Algorithm</h2>
+<p>To open the door, I needed to call my apartment four times at specific intervals. This would trigger a relay in the circuit where the door is usually opened. I had to set broad timing tolerances to make it usable and include a timeout for when the system would reset.
+<youtube-embed video-id="KKOZTo64eQk"></youtube-embed></p>
+<h2>Wifi</h2>
+<p>By 2018, everyone had a smartphone, so you might wonder why I didn’t just use that for remotely opening the door after connecting to the intercom line. Simply put, it was too unstable—I didn’t want to rely on it. Remember, this was my only way to access the building when my friend wasn’t home. There were a few times when I had it set up with WiFi using ESP32, and for some unknown reason, it froze and stopped working.</p>
+<h2>Sounds</h2>
+<p><youtube-embed video-id="lfNpqSJsEVw"></youtube-embed>
+Once I had the basic system working, I started thinking about enhancements. It turned out to be quite simple to tap into the line transmitting the intercom audio—an analog signal. I connected a tiny MP3 player board from a Chinese seller, about the size of a micro-SD card. I loaded it with funny sounds, which played whenever the correct &quot;code&quot; (four rings at even intervals) was entered. </p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

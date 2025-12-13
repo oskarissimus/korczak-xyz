@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gdy nie ma dzieci | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Gdy nie ma dzieci | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Gdy nie ma dzieci</h1>
+      <p class="text-muted">Kult</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="i0y-NSv2H-U"></youtube-embed></p>
+<pre class="song">a                              E
+Jedna flaszka, druga flaszka i też trzecia, kurde bele, leci
+Dom stoi zupełnie pusty nocą kurzą się dookoła rupiecie
+Wracamy chwiejnym krokiem po okrążeniu nad ranem
+Po schodach na piechotę raczej rady nie damy
+
+Ref.
+Wyjechali na wakacje wszyscy nasi podopieczni
+Gdy nie ma dzieci w domu – to jesteśmy niegrzeczni
+Wyjechali na wakacje wszyscy nasi podopieczni
+Gdy nie ma w domu dzieci – to jesteśmy niegrzeczni
+
+Trasa bardzo dobrze znana od jednego baru do baru
+Poznaje się tych albo owych i mamy troszeczkę kataru
+Jeśli wiesz, o czym ja mówię. Natomiast zupełnym rankiem
+Wychylam, patrząc tępo ostatnią bez gazu szklankę, he
+
+Ref
+
+Jeszcze kilka dni i nocy, i wszystko wróci do normy
+Będziemy zorganizowani i poważni, uczesani i przezorni
+Jednak jeszcze dzisiaj i jutro, pojutrze i popojutrze
+Pozwól nocy kochana, życiu nosa utrzeć
+
+Ref 2x</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

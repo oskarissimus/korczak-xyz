@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My experience with React | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="My experience with React | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">My experience with React</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p>Once upon a time I wrote a front-end of web app in pure JavaScript with a little help of jQuery. It was a quick way to start. However, when my project grew I noticed a sad consequence of my approach: the code after just about a year was total Spagetti!
+<img src="/assets/images/blog/my-experience-with-react/spaghetti.jpg" alt="Spaghetti code">
+Liść zdjęcie utworzone przez jcomp - pl.freepik.com</p>
+<h2>Vanilla JS - gateway drug</h2>
+<p>I thank that some developers start with JS this way.</p>
+<ol>
+<li>Oh! I can have button just by typing <code>&lt;button&gt;</code> in my HTML file! Great! Let&#39;s see how do I make it do something after clicking.</li>
+<li>So I use JavaScript for that [BE CAREFUL]</li>
+<li>Let&#39;s add some <code>onClick=&quot;alert(&#39;clicked&#39;)&quot;</code> attribute to my button</li>
+<li>Then after some time You find out about [DANGEROUS] <code>getElementById()</code>. At this point a real madness about Vanilla JS begins…</li>
+</ol>
+<p>When I write code, I often have a feeling about what it should do. Sometimes of course there is some specification, but my inner hacker always wants something to be done by just written code. This is why using <code>getElementById()</code> is so tempting every time. Just define id for element, than copy-paste some code from Stack Overflow, and boom! Work is done. However creating an app this way leads to anger, anger leads to hate and hate leads to spaghetti code.
+<img src="/assets/images/blog/my-experience-with-react/gateway-drug.jpg" alt="Too much vanilla JS is dangerous">
+Tło zdjęcie utworzone przez Waewkidja - pl.freepik.com</p>
+<h2>Dark times</h2>
+<p>Ok, so I managed to deploy my freshly created legacy code to production. Did I mention I had no code review whatsoever? Surprisingly this code worked more often than not, and nobody asked for too much changes in it, so I leaved it for about 6 months. After that stability of the app came into question, and I was wondering about fixing things, improving compatibility with browsers, etc. I didn&#39;t even want to look at it. It was about 900 lines in pure JS with atrocities like <code>getElementById()</code> everywhere. I heard about this great React. That it is easy and powerful. However, I never was into front-end so I didn&#39;t start learning it. After watching some videos on YouTube about it, I got grasp of key concepts of React. As it grew on me, I decided to get out of this Legacy-Hell created by myself.
+<img src="/assets/images/blog/my-experience-with-react/react.png" alt="React is the way"></p>
+<h2>Quickstart with React</h2>
+<p>When I got basic concepts of React - components, state, props everything started to get brighter. I finally could make some sensible modules, isolate thing from each other, use some nice architecture and hierarchy. Not only that! After making Hello World in React it was clear to me that creating front-end this way is even easier than in vanilla JS! In about a week I was able to get rid of ugly 900 lines of my own legacy and replace it with fresh React code.</p>
+<p>Every time when I learned new feature of React I really appreciate its design. It is great! Use React!</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

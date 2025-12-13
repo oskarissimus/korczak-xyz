@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Domofon zhakowany | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Domofon zhakowany | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Domofon zhakowany</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><img src="/assets/images/blog/entry-phone/finished-internals.png" alt="wnętrzności" title="wnętrzności"></p>
+<p>W 2018 waletowałem u kolegi. Dorobiłem klucze do mieszkania, ale nie dało się dorobić klucza do klatki schodowej ponieważ oryginał był zgięty. Ślusarz powiedział że nie da się takiego klucza skopiować. Oryginał normalnie otwierał drzwi do klatki. Pytałem czy da się taki klucz wyprostować ale powiedział że prawie napewno się od tego złamie. Nie za bardzo dało się poprosić landlorda o dodatkowy klucz dla mnie, bo w końcu nie wiedział że tam mieszkam.</p>
+<h2>Domofon dobrze działał</h2>
+<p><img src="/assets/images/blog/entry-phone/external.png" alt="zwykły domofon" title="zwykły domofon">
+Domofon był normalny jak w starej kamienicy niedaleko Olsztyńskiej starówki. Każde mieszkanie miało swój przycisk, bez żadnych kodów itp. Funkcjonalności domofonu</p>
+<ol>
+<li>dzwonienie do wybranego mieszkania</li>
+<li>odbieranie połączenia</li>
+<li>rozmowa</li>
+<li>otwieranie drzwi
+Miałem zamiar podłączyć arduino do punktów 1. oraz 4. Jak się później okazało całkiem zabawne było później połączenie się z punktem 3.</li>
+</ol>
+<h2>Arduino</h2>
+<p><img src="/assets/images/blog/entry-phone/loose-internals.jpg" alt="lużne wnętrzności" title="lużne wnętrzności">
+Kupiłem od chińczyka kilka sztuk po dwa dolary. Wykorzystałem multimetr i dokumentację domofonu znalezioną w internecie aby rozkminić do których pinów połączyć ADC z Arduino. Następnie Implementacja była już dość prosta. upierdliwe było jedynie wgrywanie kodu na arduino jak to zwykle przy takich projektach, gdzie nie można zbyt szybko iterować. Chyba że ma się piekielnie długie kable lub jakieś sprytne wgrywanie kodu przez wifi itp. ja nie miałem
+<youtube-embed video-id="6tuDXU8ow9M"></youtube-embed></p>
+<h2>Algorytm</h2>
+<p>Należało zadzwonic 4 razy (w określonych odstępach czasowych) do mojego mieszkania aby puścić napięcie na obwód z przekaźnikiem który był w miejscu gdzie normalnie otwiera się furtkę. Musiałem dać szerokie widełki czasowe aby dało się z tego korzystać i pewien czas po którym się to resetowało.
+<youtube-embed video-id="KKOZTo64eQk"></youtube-embed></p>
+<h2>Wifi</h2>
+<p>W 2018 każdy już miał smartfona więc można się zastanawiać czemu tego nie użyłem w moim projekcie aby po prostu zdalnie otwierać furtkę jak już byłem podłączony do linii domofonu? Któtko mówiąc było to bardzo niestabilne - nie chciałem na tym polegać - przypomnę że była to moja jedyna opcja wejścia na klatkę jak nie było kumpla w domu. I zdarzyło się parę razy że miałem to już skonfigurowane na wifi na ESP32, i nie wiadomo czemu coś się zawiesiło i przestało działać</p>
+<h2>Dźwięki</h2>
+<p><youtube-embed video-id="lfNpqSJsEVw"></youtube-embed>
+Jak już miałem działającą rzecz, dalej się zastanawiałm co można ulepszyć. I okazało się że dość łatwo można podłaczyć się do linii gdzie jest przekazywany dźwięk rozmowy domofonu - sygnał analogowy. Podłączyłem odtwarzacz mp3 od chińczyka który był malutką płytką drukowaną wielkości karty micro-sd. Była tam oczywiście również karta na którą wgrałem śmieszne dźwięki które były odtwarzane po tym jak wprowadziło się prawidłowy kod - cztery dzwonki w równych odstępach.</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

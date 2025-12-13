@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zaawansowane narzędzia web-testera | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Zaawansowane narzędzia web-testera | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Zaawansowane narzędzia web-testera</h1>
+    </header>
+    <main>
+      <article class="blog-post">
+        <section>
+          <p>Na kurs składa się <strong>12 1-godzinnych indywidualnych spotkań</strong> z kursantem. Terminy spotkań są ustalane indywidualnie. Celem kursu jest zapoznanie z zaawansowanymi narzędziami stosowanymi w pracy web-testera. Oprócz materiału omawianego podczas spotkań prowadzący przedstawia również dodatkowe materiały do pracy własnej, które mają na celu utrwalić wiedzę i umiejętności kursanta.</p>
+<h2>Tematyka kursu:</h2>
+<ol>
+<li>Narzędzia deweloperskie w Chrome</li>
+<li>Postman</li>
+<li>Wprowadzenie do Python + Selenium</li>
+</ol>
+<h2>Tematy spotkań</h2>
+<ol>
+<li>Omówienie możliwości narzędzi deweloperskich w Chrome</li>
+<li>Badanie elementu i dynamiczne modyfikowanie jego właściwości</li>
+<li>JavaScript console</li>
+<li>Zakładka network - omówienie budowy pakiety HTTP</li>
+<li>Zakładka network - analiza i praktyczne wykorzystanie</li>
+<li>Postman - wprowadzenie i omówienie możliwości</li>
+<li>Postman - tworzenie requestów</li>
+<li>Postman - workspaces, collections</li>
+<li>Python - wprowadzenie</li>
+<li>Python - zmienne, instrukcje warunkowe</li>
+<li>Python - pętle, funkcje</li>
+<li>Python - konfiguracja środowiska selenium</li>
+</ol>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

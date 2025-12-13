@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LED matrix | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="LED matrix | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">LED matrix</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><img src="..//assets/images/blog/led-matrix/tetris.png" alt="Tetris played on my DIY LED matrix"></p>
+<p>Sometime in early 2018 I started building my DIY LED matrix. Plan was quite simple. Take led strip from China, put it on cardboard, and connect it into arduino. I knew it was possible, because i saw projects like that many times on YouTube.</p>
+<h2>Original plan</h2>
+<p>I wanted to have 10x30 pixels on my matrix, maybe not enough to display images, but sufficient to play some simple games, like tetris or pong, maybe display some animations, or just plain colors. It would have dimensions like 33 x 100 cm. When LEDs from China arrived, I was surprised to notice, that I cant control them individually, but every 3 of them are connected in series. It meant that instead of 300 pixels, I would only have 100. Also every pixel would have 10×10 cm diameters, giving me matrix with size of 1mx1m.
+<img src="..//assets/images/blog/led-matrix/led-strip.jpg" alt="Led strip">
+These are very good LEDs. However I laughed for a while when i noticed that “they couldn’t imagine how beautiful life without me”. A little dark.</p>
+<h2>Playing with LEDs</h2>
+<p>When my packages finally arrived from China, I quickly connected them to arduino and started playing with them.</p>
+<p><youtube-embed video-id="2-hwGV2hLpU"></youtube-embed>
+First usage of LED strip</p>
+<h2>Building matrix</h2>
+<p>Well, after having some fun with LED strips it was time to glue together some cardboard, and make backplate with size 1x1m, Than I plugged everything to power supply and arduino, and was truly amazed with LED control software</p>
+<p><youtube-embed video-id="JDR4Wz0-VFU"></youtube-embed>
+Playing around with LED matrix</p>
+<h2>Further assembly</h2>
+<p><youtube-embed video-id="I-fwW-TVWJo"></youtube-embed></p>
+<p>I separated pixels with stripes of cardboard secured to the backplate with hot glue. After that I covered it with foil, to disperse light, and create sensation of square pixels.</p>
+<p><youtube-embed video-id="MXAwmhOfveE"></youtube-embed>
+Comparison of matrix with and without foil</p>
+<h2>Writing code</h2>
+<p>When hardware was ready i opened Arduino IDE and implemented Snake and Tetris, because i thought those are appropriate games for screen with resolution of 10px x 10px. I have source code for that somewhere on old hard drive, and I will share it, when I will find it.
+<youtube-embed video-id="MBs8jBqcsIw"></youtube-embed>
+Writing code for snake</p>
+<h2>Testing</h2>
+<p><youtube-embed video-id="lzloEHUfXow"></youtube-embed>
+Testing display of numbers on LED matrix</p>
+<h2>Games</h2>
+<p><youtube-embed video-id="pGL7U9LC1UQ"></youtube-embed>
+Snake gameplay without game clock implemented yet</p>
+<p><youtube-embed video-id="2nQtkvzXlh8"></youtube-embed>
+Tetris gameplay</p>
+<h2>Game controller</h2>
+<p>Well, game controller was made from piece of wooden stick that i found outside... let pictures speak for themselves</p>
+<p>&lt;Gallery names={[&quot;controller-wiring&quot;, &quot;controller-wiring-with-laptop&quot;, &quot;controller-in-all-its-glory&quot;]} /&gt;
+<img src="..//assets/images/blog/led-matrix/joystick-close-up.jpg" alt="Close-up on joystick" title="close-up on joystick"></p>
+<p><code>youtube: BXvUJtiB-Cc</code></p>
+<h2>Whats next?</h2>
+<p>I would like to make another one with PVC and plexiglass to have nicer finish. I would like to use Raspberry Pi instead of Arduino and retro controllers instead of wooden stick
+&lt;Gallery names={[&quot;nes-controller&quot;, &quot;nespi&quot;, &quot;raspberry-pi&quot;]} /&gt;</p>
+<h2>Images attribution</h2>
+<p>Last three images are not mine, so are reused with attribution</p>
+<ul>
+<li>Evan-Amos, Public domain, via Wikimedia Commons</li>
+<li>Gareth Halfacree from Bradford, UK, CC BY-SA 2.0 <a href="https://creativecommons.org/licenses/by-sa/2.0">https://creativecommons.org/licenses/by-sa/2.0</a>, via Wikimedia Commons</li>
+<li>Michael Henzler / Wikimedia Commons</li>
+</ul>
+<p>All other images and videos were created by me, and I publish them as Pubic Domain</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

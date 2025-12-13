@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Barka | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Barka | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Barka</h1>
+      <p class="text-muted">Cesáreo Gabarain, Stanisław Szmidt</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="sJs4oyhh7P8"></youtube-embed></p>
+<pre class="song">   D A               D        D7 
+1. Pan kiedyś stanął nad brzegiem, 
+       G   e             A     A7 
+Szukał ludzi gotowych pójść za Nim, 
+     D       A           D      D7 
+By łowić serca słów Bożych Prawdą. 
+
+       G   A                D       h 
+Ref. O Panie, to Ty na mnie spojrzałeś, 
+     e   A               D    D7 
+Twoje usta dziś wyrzekły me imię. 
+      G   A           D      h 
+Swoją barkę pozostawiam na brzegu, 
+       e   A                D    A
+Razem z Tobą nowy zacznę dziś łów. 
+
+2. Jestem ubogim człowiekiem, 
+Moim skarbem są ręce gotowe 
+Do pracy z Tobą i czyste serce. 
+
+3. Ty potrzebujesz mych dłoni, 
+Mego serca młodego zapałem, 
+Mych kropli potu i samotności. 
+
+4. Dziś wypłyniemy już razem, 
+Łowić serca na morzach dusz ludzkich, 
+Twej prawdy siecią i słowem życia.
+
+5. Piotr także stanał nad brzegiem,
+Spojrzał w niebo, bo dzień się nachylił,
+Już chciał być z Tobą i w tamtej chwili.
+
+Ref.: O, Panie Ty na niego spojrzałeś,
+Zawołałeś, aby przyszedł do Ciebie,
+Swoją barkę pozostawił na brzegu,
+Inny rybak teraz zacznie Twój łów.
+
+6.Panie dalszy rejs odwołany
+Bo Sternika do Siebie wezwałeś
+A nam brak siły nadzieja zgasła.
+
+Ref.: O Chryste przecież burze szaleją
+Ratuj barkę bo bez Ciebie zginiemy
+&quot;Nie lękajcie się! A wypłyńcie na głębie”
+Cała naprzód nowy świta już dzień 
+</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

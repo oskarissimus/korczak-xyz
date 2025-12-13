@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rzuć jakieś drobne na wino | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Rzuć jakieś drobne na wino | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Rzuć jakieś drobne na wino</h1>
+      <p class="text-muted">Brudne Dzieci Sida</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="ZZD7nboweXs"></youtube-embed></p>
+<pre class="song">A             D            G               A
+Do Krotoszyna na Folk Fest przyjechał punk co się zowie
+Badzioli pięć, agrafek sześć, irokez cud na głowie
+Gdy go spotkałem na Folk Fest on do mnie tak nawinął
+&quot;Mam ksywę Jabol, wiesz jak jest, rzuć jakieś drobne na wino!&quot;
+
+Bo wiesz jak jest, bo wiesz jak jest
+Rzuć jakieś drobne na wino!
+
+Hej, w Krotoszynie fajnie jest, browary tam są tanie
+Muzyka tam od rana gra i kończy się nad ranem
+Każdy na ryju uśmiech ma, lecz Jabol z kwaśną miną
+Smętnie po błoniach snuje się i sępi drobne na wino.
+
+Bo wiesz jak jest, bo wiesz jak jest
+Rzuć jakieś drobne na wino!
+
+Ujrzałem go, jak w błocie spał przy polu namiotowym
+Tuż obok niego walał się kubeczek plastikowy
+Trącam go ręką, wołam doń: &quot;wstawaj że, pijaczyno!&quot;
+A on mi na to: &quot;Punk's not dead! Rzuć jakieś drobne na wino!&quot;
+
+Bo punk's not dead! Bo punk's not dead!
+Rzuć jakieś drobne na wino</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moje doświadczenie z React | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Moje doświadczenie z React | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Moje doświadczenie z React</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p>Dawno, dawno temu napisałem front-end aplikacji internetowej w czystym JavaScript, z niewielką pomocą jQuery. Był to szybki sposób, aby rozpocząć pracę. Jednak, gdy mój projekt zaczął rosnąć, zauważyłem smutną konsekwencję mojego podejścia - po około roku kod stał się całkowitym &quot;makaronem&quot;!
+<img src="/assets/images/blog/my-experience-with-react/spaghetti.jpg" alt="Spaghetti code">
+Liść zdjęcie utworzone przez jcomp - pl.freepik.com</p>
+<h2>Vanilla JS - brama do nałogu</h2>
+<p>Myślę, że niektórzy programiści zaczynają pracę z JavaScriptem w taki sposób:</p>
+<ol>
+<li>O! Mogę dodać przycisk tylko przez wpisanie <code>&lt;button&gt;</code> w pliku HTML! Świetnie! Zobaczmy, jak zrobić, żeby coś się działo po jego kliknięciu.</li>
+<li>Stosuję więc do tego JavaScript [OSTROŻNIE].</li>
+<li>Dodajmy atrybut <code>onClick=&quot;alert(&#39;clicked&#39;)&quot;</code> do mojego przycisku.</li>
+<li>Następnie, po jakimś czasie dowiadujesz się o [NIEBEZPIECZNEJ] funkcji <code>getElementById()</code>. W tym momencie zaczyna się prawdziwe szaleństwo związane z Vanilla JS...</li>
+</ol>
+<p>Podczas pisania kodu często mam poczucie, co on powinien robić. Oczywiście, czasem jest jakaś specyfikacja, ale mój wewnętrzny &quot;haker&quot; zawsze chce, aby coś było wykonane tylko za pomocą napisanego kodu. Dlatego korzystanie z <code>getElementById()</code> jest tak kuszące za każdym razem. Wystarczy zdefiniować id dla elementu, skopiować i wkleić kod ze Stack Overflow, i bum! Praca wykonana. Jednak tworzenie aplikacji w ten sposób prowadzi do frustracji, frustracja prowadzi do złości, a złość prowadzi do chaotycznego kodu typu spaghetti.
+<img src="/assets/images/blog/my-experience-with-react/gateway-drug.jpg" alt="Za dużo czystego JS to niebezpieczeństwo">
+Tło zdjęcie utworzone przez Waewkidja - pl.freepik.com</p>
+<h2>Czasy ciemności</h2>
+<p>Udało mi się wdrożyć mój nowo stworzony kod do produkcji. Czy wspomniałem, że nie miałem żadnej recenzji kodu? Zaskakująco, ten kod działał większość czasu i nikt nie prosił o większe zmiany, więc zostawiłem go na około 6 miesięcy. Po tym czasie stabilność aplikacji stanęła pod znakiem zapytania, a ja zacząłem zastanawiać się, jak poprawić rzeczy, ulepszyć kompatybilność z przeglądarkami, itd. Nie chciałem nawet patrzeć na ten kod. Składał się z około 900 linii czystego JavaScriptu, z przerażającymi rzeczami, takimi jak <code>getElementById()</code> wszędzie. </p>
+<p>Usłyszałem o React, że jest łatwy i potężny. Nigdy jednak nie interesowałem się front-endem, więc nie zacząłem go uczyć się od razu. Po obejrzeniu kilku filmów na YouTube o React, zrozumiałem kluczowe koncepcje. Stopniowo zaczynałem poznawać to narzędzie i postanowiłem wyjść z piekła legacy, które sam stworzyłem.</p>
+<p><img src="/assets/images/blog/my-experience-with-react/react.png" alt="React lepszy"></p>
+<h2>Szybki start z React</h2>
+<p>Kiedy zrozumiałem podstawowe koncepcje Reacta - komponenty, stan, właściwości - wszystko zaczęło się robić jasne. W końcu mogłem tworzyć sensowne moduły, izolować rzeczy od siebie, używać fajnej architektury i hierarchii. A to nie wszystko! Po stworzeniu &quot;Hello World&quot; w React zdałem sobie sprawę, że tworzenie front-endu w ten sposób jest jeszcze łatwiejsze niż w czystym JavaScript! W ciągu tygodnia udało mi się pozbyć brzydkich 900 linii mojego własnego legacy i zastąpić je świeżym kodem w React.</p>
+<p>Za każdym razem, kiedy uczyłem się nowych funkcji Reacta, doceniałem to w jaki sposób jest zaprojektowany. React lepszy!</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

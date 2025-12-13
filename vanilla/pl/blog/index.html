@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Blog | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Blog</h1>
+    </header>
+    <main>
+      <ul class="blog-list">
+        
+        <li class="blog-item">
+          <h2><a href="/pl/blog/hacked-intercom/">Domofon zhakowany</a></h2>
+          <div class="blog-item-content">
+            <img src="/assets/images/blog/entry-phone/thumbnail.png" alt="Domofon zhakowany" loading="lazy">
+            <p>W 2018 waletowałem u kolegi. Dorobiłem klucze do mieszkania, ale nie dało się dorobić klucza do klatki schodowej ponieważ oryginał był zgięty. Ślusarz powiedział że nie da się takiego klucza skopiować...</p>
+          </div>
+          <hr>
+          <span class="date">11/25/2024</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/porting-js-to-ts-with-chatgpt/">Portowanie JS do TS z użyciem ChatGPT</a></h2>
+          <div class="blog-item-content">
+            <img src="/assets/images/blog/porting-js-to-ts-with-chatgpt/port.jpg" alt="Portowanie JS do TS z użyciem ChatGPT" loading="lazy">
+            <p>Wstęp Kolega mi opowiadał, że pracował raz przy projekcie, którego celem było portowanie kodu z Pythona 2 do 3. To był projekt dla całego teamu na kilka kwartałów. Ludzie się na tym wypalali. Tak się...</p>
+          </div>
+          <hr>
+          <span class="date">08/18/2023</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/dark-side/">Rekonstrukcja okładki albumu Dark Side Of The Moon</a></h2>
+          <div class="blog-item-content">
+            <img src="../../../images/blog/dark-side/final-result.jpg" alt="Rekonstrukcja okładki albumu Dark Side Of The Moon" loading="lazy">
+            <p>Cel Każdy fan Pink Floyd zna płytę Dark Side Of The Moon. Wiele osób nawet nie znających tej płyty kojarzy jej ikoniczą okładkę. Jest ona bardzo prosta - zawiera schemat rozszeczepienia światła białeg...</p>
+          </div>
+          <hr>
+          <span class="date">04/07/2023</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/display-stand-upgrade/">Ulepszenie uchwytu monitora</a></h2>
+          <div class="blog-item-content">
+            <img src="../../../images/blog/display-stand-upgrade/they-taking-the-hobbits.jpg" alt="Ulepszenie uchwytu monitora" loading="lazy">
+            <p>Problem Sprzedawca uchwytu do monitora który kupiłem zapewniał że nadaje się on do monitorów o przekątnej max 27 cali. W pwnym sensie jest to prawda, ale tylko kiedy monitory ustawione są w jednej pła...</p>
+          </div>
+          <hr>
+          <span class="date">04/05/2023</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/load-testing/">Testy wydajnościowe</a></h2>
+          <div class="blog-item-content">
+            <img src="/assets/images/blog/load-testing/gauges.jpg" alt="Testy wydajnościowe" loading="lazy">
+            <p>Aplikacje stworzone z myślą o obsłudze dużej ilości użytkowników potrafią wygenerować duże rachunki za zużycie serwerów. Czasami chcemy wprowadzić optymalizację która ma poprawić wydajność, ale jak sp...</p>
+          </div>
+          <hr>
+          <span class="date">01/02/2023</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/led-matrix/">Tablica LED</a></h2>
+          <div class="blog-item-content">
+            <img src="../../../images/blog/led-matrix/tetris.png" alt="Tablica LED" loading="lazy">
+            <p>Pewnego razu, na początku 2018 roku, zacząłem budować swoją własną matrycę LED. Plan był dość prosty. Wziąć taśmę LED z Chin, umieścić ją na tekturze i podłączyć do Arduino. Wiedziałem, że to możliwe,...</p>
+          </div>
+          <hr>
+          <span class="date">07/15/2021</span>
+        </li>
+      
+        <li class="blog-item">
+          <h2><a href="/pl/blog/my-experience-with-react/">Moje doświadczenie z React</a></h2>
+          <div class="blog-item-content">
+            <img src="/assets/images/blog/my-experience-with-react/react.png" alt="Moje doświadczenie z React" loading="lazy">
+            <p>Dawno, dawno temu napisałem front-end aplikacji internetowej w czystym JavaScript, z niewielką pomocą jQuery. Był to szybki sposób, aby rozpocząć pracę. Jednak, gdy mój projekt zaczął rosnąć, zauważył...</p>
+          </div>
+          <hr>
+          <span class="date">07/07/2021</span>
+        </li>
+      
+      </ul>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

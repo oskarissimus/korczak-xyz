@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nie zabieraj mi strun | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Nie zabieraj mi strun | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Nie zabieraj mi strun</h1>
+      <p class="text-muted">Maxel</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="tV-ktK1tGDs"></youtube-embed></p>
+<pre class="song">G                   a
+Wszystko tobie dziś oddam
+C              G
+wszystko czego zażądasz
+całą swoją tęsknotę
+gorzki smutek i żal
+
+Ref.:
+Nie zabieraj mi strun
+zostaw mi moją gitarę
+wszystko to starczy mi
+na calutkie życie 2x
+
+Raz ci dałem potrzymać
+moje wesołe nuty
+lecz mi wszystkie porwałaś
+za twe żale i smutki
+
+Ref 2x
+
+Wczoraj byliśmy razem
+rwałaś kwiatki na łące
+a ja śpiewałem ci piosnkę
+w lato nasze gorące
+
+Ref 2x
+
+Wszystko tobie dziś oddam
+wszystko czego zażądasz
+całą swoją tęsknotę
+gorzki smutek i żal
+
+Ref 4x</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

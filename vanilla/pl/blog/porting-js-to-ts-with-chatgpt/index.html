@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portowanie JS do TS z użyciem ChatGPT | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Portowanie JS do TS z użyciem ChatGPT | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Portowanie JS do TS z użyciem ChatGPT</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><youtube-embed video-id="7ih7E_Viesg"></youtube-embed></p>
+<h2>Wstęp</h2>
+<p>Kolega mi opowiadał, że pracował raz przy projekcie, którego celem było portowanie kodu z Pythona 2 do 3. To był projekt dla całego teamu na kilka kwartałów. Ludzie się na tym wypalali. Tak się składa, że to był projekt open-source, który dodatkowo nie był zbyt dobrze pokryty testami. Nic przyjemnego.</p>
+<h2>Strona osobista</h2>
+<p>Ja zrobiłem swoją stronę osobistą początkowo w WordPress, później przepisałem ją w Gatsby w JS. No i stawał się coraz popularniejszy ChatGPT, więc uznałem, że można spróbować przeportować to na TS. Dodam tylko, że nie znałem za bardzo TS. Nie jest to rocket science, ale nie napisałem do tamtej pory żadnego kodu w TS. Można powiedzieć, że ChatGPT nie tylko przeportował mi codebase, ale również nauczył TS i zrobił coverage.</p>
+<h2>Pierwsze próby</h2>
+<p>Pierwsze próby wyglądały dość obiecująco, ponieważ JS i TS są w gruncie rzeczy dość podobne. Przeportowanie pojedynczego pliku zazwyczaj nie było problemem dla ChatGPT. Postanowiłem więc pójść dalej i zautomatyzować portowanie.</p>
+<h2>Porter</h2>
+<p>Porter - tak nazywa się moja próba napisania automatu do portowania całego repozytorium z języka programowania X na język programowania Y. Kod źródłowy jest dostępny na GitHub, jednak nie jest to działająca rzecz. Teoretycznie zadanie wydawało się proste.</p>
+<p><img src="/assets/images/blog/porting-js-to-ts-with-chatgpt/dont-crash-into-each-other.jpg" alt="dont crash into each other" title="dont crash into each other"></p>
+<h3>Pierwsze podejście</h3>
+<pre class="language-js"><code class="language-js"><span class="token keyword">for</span> file <span class="token keyword">in</span> <span class="token literal-property property">files</span><span class="token operator">:</span>
+    ported <span class="token operator">=</span> <span class="token function">prompt_gpt_to_port_file</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span>
+    file<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span></code></pre><h3>Sprawdźmy czy kod działa</h3>
+<pre class="language-js"><code class="language-js"><span class="token keyword">for</span> file <span class="token keyword">in</span> <span class="token literal-property property">files</span><span class="token operator">:</span>
+    ported <span class="token operator">=</span> <span class="token function">prompt_gpt_to_port_file</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span>
+
+    test_errors <span class="token operator">=</span> <span class="token function">test</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token literal-property property">test_errors</span><span class="token operator">:</span>
+        <span class="token function">prompt_gpt_to_fix_errors</span><span class="token punctuation">(</span>ported<span class="token punctuation">,</span> test_errors<span class="token punctuation">)</span>
+
+    file<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span></code></pre><h3>Sprawdźmy czy kod się kompiluje</h3>
+<pre class="language-js"><code class="language-js"><span class="token keyword">for</span> file <span class="token keyword">in</span> <span class="token literal-property property">files</span><span class="token operator">:</span>
+    ported <span class="token operator">=</span> <span class="token function">prompt_gpt_to_port_file</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span>
+
+    compilation_errors <span class="token operator">=</span> <span class="token function">compile</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token literal-property property">compilation_errors</span><span class="token operator">:</span>
+        <span class="token function">prompt_gpt_to_fix_errors</span><span class="token punctuation">(</span>ported<span class="token punctuation">,</span> compilation_errors<span class="token punctuation">)</span>
+
+    test_errors <span class="token operator">=</span> <span class="token function">test</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token literal-property property">test_errors</span><span class="token operator">:</span>
+        <span class="token function">prompt_gpt_to_fix_errors</span><span class="token punctuation">(</span>ported<span class="token punctuation">,</span> test_errors<span class="token punctuation">)</span>
+
+    file<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span></code></pre><h3>Czasami jedna runda poprawek nie wystarcza</h3>
+<pre class="language-js"><code class="language-js"><span class="token keyword">for</span> file <span class="token keyword">in</span> <span class="token literal-property property">files</span><span class="token operator">:</span>
+    ported <span class="token operator">=</span> <span class="token function">prompt_gpt_to_port_file</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span>
+
+    compilation_errors <span class="token operator">=</span> <span class="token function">compile</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span>
+    <span class="token keyword">while</span> <span class="token literal-property property">compilation_errors</span><span class="token operator">:</span>
+        <span class="token function">prompt_gpt_to_fix_errors</span><span class="token punctuation">(</span>ported<span class="token punctuation">,</span> compilation_errors<span class="token punctuation">)</span>
+
+    test_errors <span class="token operator">=</span> <span class="token function">test</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span>
+    <span class="token keyword">while</span> <span class="token literal-property property">test_errors</span><span class="token operator">:</span>
+        <span class="token function">prompt_gpt_to_fix_errors</span><span class="token punctuation">(</span>ported<span class="token punctuation">,</span> test_errors<span class="token punctuation">)</span>
+
+    file<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>ported<span class="token punctuation">)</span></code></pre><h2>Refleksja</h2>
+<p>Wydaje się, że dodaliśmy sporo logiki specyficznej dla danego problemu - nie jest to ogólne rozwiązanie portowania z języka X na Y. Jestem sobie w stanie wyobrazić, że w wielu przypadkach nie jest to tak proste, że można portować po prostu pliki po kolei. Czasami trzeba stworzyć więcej plików, wprowadzić zmiany w jakichś innych itp. Jednak wydaje się, że ChatGPT powinien to wiedzieć. W końcu możemy zapytać go, w jaki sposób przeportować codebase z języka X na Y i bez problemu odpowie i ułoży plan działania.</p>
+<h2>BabyAGI, AutoGPT</h2>
+<p>Te projekty są bardzo ambitne i chodzi o to, żeby GPT sam się promptował w pętli i w ten sposób rozwiązywał złożone problemy uwzględniając planowanie i wykonywanie działań. Kiedy zacząłem z nich korzystać, okazało się, że nie jest to takie proste i diabeł tkwi w szczegółach:</p>
+<ol>
+<li>Jest drogo - GPT3.5 co prawda nie jest super drogie per request, ale kontekst jest zbyt krótki i nie ogarnia tak dobrze, jak GPT4. A odpalenie jednego eksperymentu z GPT4 kosztowało kilka dolarów, więc jak sobie to szybko policzyłem, to na takie eksperymenty mnie nie stać, szczególnie biorąc pod uwagę, że nie wiadomo czy na koniec to będzie działać. szczególnie biorąc pod uwagę że nie wiadomo czy na koniec to będzie działać</li>
+<li>Długo to trwa - GPT3.5 jest szybkie, ale nie ogarnia, a GPT4 jest sporo wolniejsze, więc każdy test sporo trwa.</li>
+<li>Dobre promptowanie jest trudne.</li>
+<li>Nie miałem dostępu do API GPT-4, więc korzystałem z API kolegi, ale to też ma swoje wady.</li>
+</ol>
+<h2>Langchain</h2>
+<p>W tym projekcie chodzi o to, żeby zdefiniować narzędzia dla GPT, takie jak np:</p>
+<ul>
+<li>walidacja kodu <code>tsc --noEmit</code></li>
+<li>testowanie kodu <code>npm run test</code></li>
+<li>klonowanie repozytorium <code>git clone ...</code></li>
+</ul>
+<p>W ten sposób ułatwiamy zadanie, żeby GPT nie musiał wszystkiego kminić od zera.</p>
+<p>Był mały sukces. Wydaje mi się, że z użyciem któregoś z tych narzędzi udało mi się sprawić, że po wpisaniu komendy w stylu:</p>
+<pre><code>python porter.py &lt;link do repo&gt;
+</code></pre>
+<p>Skrypt przeportował jeden plik, zrobił commit i otworzył pull-requesta.</p>
+<h2>Ostateczne rozwiazanie</h2>
+<p>Po kilku nieprzespanych nocach, wzlotach i upadkach, uznałem, że problem jest za duży na moją głowę, albo że narzędzia nie są jeszcze wystarczająco mocne, żeby dało się napisać portera. Postanowiłem, że większą wartość będzie miało dla mnie wykonanie zadania niż tworzenie narzędzia, które nie wiadomo czy da się stworzyć. Dlatego postawiłem na stary sprawdzony wzorzec projektowy kopiego-pasta. Czyli plik po pliku kopiowałem do ChatuGPT, następnie wklejałem do IDE, odpalałem testy, kompilator i feedowałem spowrotem do ChatuGPT jeśli były błędy.</p>
+<h2>Nowe funkcjonalności</h2>
+<p>Miesiąc temu do ChatuGPT został dodany Code Interpreter. Fajną rzeczą jest to, że można mu wrzucić zip z kodem i on umie sobie po nim chodzić i czytać pliki itp. Ułatwiło to sprawę.</p>
+<h2>Podsumowanie</h2>
+<p>Bez ChatuGPT nadal nie umiałbym TS, a także bym miał o wiele słabszy codebase. Pełna automatyzacja takich złożonych zadań wydaje się, że jest jeszcze poza zasięgiem, ale w tej branży sprawy idą tak szybko, że może już ktoś to zrobił :p</p>
+<h2>Uznanie autorstwa</h2>
+<p>Photo by <a href="https://unsplash.com/@esmonde?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Esmonde Yong</a> on <a href="https://unsplash.com/photos/wFpJV5EWrSM?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a></p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

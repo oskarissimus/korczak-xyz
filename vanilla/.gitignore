@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output (generated HTML pages)
+# Keep these tracked since they're the actual site output
+# Uncomment below if you prefer to regenerate on deploy
+# /blog/*/index.html
+# /courses/*/index.html
+# /songs/*/index.html
+# /pl/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*

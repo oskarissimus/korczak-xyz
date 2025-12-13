@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Płonie ognisko w lesie | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Płonie ognisko w lesie | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Płonie ognisko w lesie</h1>
+      <p class="text-muted">Kapela biesiadna</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="HiIJUHVU73k"></youtube-embed></p>
+<pre class="song">  C
+1. Płonie ognisko w lesie,
+        G             C
+Wiatr smętną piosnkę niesie,
+Przy ogniu zaś drużyna
+gawędę rozpoczyna.
+
+Ref. Czuj, czuj, czuwaj, czuj, czuj, czuwaj,
+Rozlega się dokoła.
+Czuj, czuj, czuwaj, czuj, czuj, czuwaj,
+Najstarszy druch zawoła
+
+2. Przestańcie się już bawić
+I czas swój marnotrawić.
+Niech każdy z was się szczerze,
+Do pracy swej zabierze.
+
+Ref. Tak tak, tak tak, tak tak
+Do pracy swej zabierze 2x
+
+Tak tak, tak tak, tak tak 2x
+
+3. Wiatr w lesie cicho gwarzy,
+Śpią wszyscy, oprócz straży,
+A ponad śpiących głowy,
+Rozlega się głos sowy.
+
+Ref. Hu hu, hu hu, hu hu
+Rozlega się krzyk sowy 2x
+
+Hu hu, hu hu 2x</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backend JavaScript Programming | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Backend JavaScript Programming | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Backend JavaScript Programming</h1>
+    </header>
+    <main>
+      <article class="blog-post">
+        <section>
+          <p>The course is designed for beginners in programming. The course is divided into five parts: programming basics, advanced language features, TypeScript, backend tools in JS, and programming project. Each of these parts is described below. The course consists of mentor meetings and student&#39;s own work between meetings.</p>
+<h2>Student&#39;s own work between meetings</h2>
+<ul>
+<li>Familiarization with the theoretical part of the next topic</li>
+<li>Solving of tasks to consolidate previously discussed topics</li>
+</ul>
+<h2>Mentor meeting</h2>
+<ul>
+<li>Discussion of issues requiring further explanation</li>
+<li>Code review of tasks completed by the student, aimed at directing towards good programming practices</li>
+<li>Introduction to the next topic</li>
+<li>Tips for solving more difficult tasks</li>
+</ul>
+<h2>Course parts:</h2>
+<h3>1. Programming basics</h3>
+<p>In this part of the course, we progress from the first &quot;Hello world,&quot; through variables, data types, operators, conditional statements, loops, objects, and arrays, up to functions. These concepts are common to all programming languages, and a good understanding and mastery of them is crucial to continue learning.</p>
+<h3>2. Advanced language features</h3>
+<p>After mastering the programming basics, the student can move on to more advanced concepts such as:</p>
+<ul>
+<li>Anonymous functions</li>
+<li>Asynchronous programming</li>
+<li>Exceptions</li>
+<li>Unit testing</li>
+<li>Modules</li>
+<li>Object-oriented programming</li>
+<li>npm dependency management</li>
+<li>Environment management</li>
+</ul>
+<p>These topics must be discussed to be able to read and create more advanced code. This is also important because the above concepts are used in frameworks/libraries which are the focus of the next part of the course.</p>
+<h3>3. TypeScript</h3>
+<p>TypeScript is a language that contains additional syntax for managing types in written code. This is necessary if the code is to be of high quality and stable in production deployments.</p>
+<h3>4. Backend tools in JavaScript</h3>
+<p>This part of the course focuses on getting to know the tools used to create backend applications in JS. This can be ExpressJS, GCP SDK, Azure SDK, or 0Auth. The choice of technology depends on the student&#39;s needs.</p>
+<h3>5. Programming project</h3>
+<p>The best way to consolidate knowledge is to use it in practice. Therefore, the last part of the course is the student&#39;s independent execution of a programming project. The goal is to write an application from scratch that will implement the functionalities defined by the student. Both the conceptual process - what the application should do - and the process of creating and deploying the application will be supported by the mentor. This will allow for practice in writing code according to specification, managing tasks, using GIT, deployment, and testing of the written code.</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mentoring | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Mentoring | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Mentoring</h1>
+    </header>
+    <main>
+      <div class="mentoring-content">
+        <img src="/assets/images/mentoring-color.png" alt="Mentoring" data-light="/assets/images/mentoring-color.png" data-dark="/assets/images/mentoring-bw.png" style="max-width: 300px;">
+        <p data-i18n="I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free">I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free</p>
+        <p data-i18n="I can help you with:">I can help you with:</p>
+        <ul class="mentoring-list">
+          <li>Python</li>
+          <li data-i18n="Environment setup">Environment setup</li>
+          <li data-i18n="Linux command-line">Linux command-line</li>
+          <li>Docker</li>
+          <li>Kubernetes</li>
+          <li>React</li>
+        </ul>
+        <p data-i18n="Mentoring sessions are up to 1 hour long.">Mentoring sessions are up to 1 hour long.</p>
+
+        <h2 class="mt-4">Calendar</h2>
+        <calendar-embed cal-link="oskarissimus/mentoring"></calendar-embed>
+
+        <h2 class="mt-4">Contact</h2>
+        <contact-form></contact-form>
+      </div>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

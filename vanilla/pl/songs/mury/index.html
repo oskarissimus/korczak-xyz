@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mury | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Mury | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Mury</h1>
+      <p class="text-muted">Jacek Kaczmarski</p>
+    </header>
+    <main>
+      <article class="song-content">
+        <p><youtube-embed video-id="Nw20s005sG4"></youtube-embed></p>
+<pre class="song">   e              H7        e
+1. On natchniony i młody był,
+e                          H7
+Ich nie policzyłby nikt
+C              H7        C
+On im dodawał pieśnią sił,
+C              H7        e
+Śpiewał że blisko już świt.
+
+Świec tysiące palili mu,
+Znad głów podnosił się dym,
+Śpiewał, że czas by runął mur...
+Oni śpiewali wraz z nim:
+
+Ref.:
+          H7              e
+Wyrwij murom zęby krat!
+          H7              e
+Zerwij kajdany, połam bat!
+      a               e
+A mury runą, runą, runą
+        H7              e
+I pogrzebią stary świat!
+x2
+
+2. Wkrótce na pamięć znali pieśń
+I sama melodia bez słów
+Niosła ze sobą starą treść
+Dreszcze na wskroś serc i głów
+
+Śpiewali więc, klaskali w rytm
+Jak wystrzał, poklask ich brzmiał
+I ciążył łańcuch, zwlekał świt
+On wciąż śpiewał i grał
+
+Ref. x2
+
+3. Aż zobaczyli ilu ich
+Poczuli siłę i czas
+I z pieśnią, że już blisko świt
+Szli ulicami miast
+
+Zwalali pomniki i rwali bruk
+&quot;Ten z nami, ten przeciw nam!&quot;
+&quot;Kto sam ten nasz najgorszy wróg!&quot;
+A śpiewak także był sam
+
+Ref.:
+Patrzył na równy tłumów marsz
+Milczał wsłuchany w kroków huk
+A mury rosły, rosły, rosły
+Łańcuch kołysał się u nóg
+
+Patrzy na równy tłumów marsz
+Milczy wsłuchany w kroków huk
+A mury rosną, rosną, rosną
+Łańcuch kołysze się u nóg</pre>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

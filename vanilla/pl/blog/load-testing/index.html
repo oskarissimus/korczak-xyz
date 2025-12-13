@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Testy wydajnościowe | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Testy wydajnościowe | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Testy wydajnościowe</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><img src="/assets/images/blog/load-testing/gauges.jpg" alt="gauges" title="gauges"></p>
+<p>Aplikacje stworzone z myślą o obsłudze dużej ilości użytkowników potrafią wygenerować duże rachunki za zużycie serwerów. Czasami chcemy wprowadzić optymalizację która ma poprawić wydajność, ale jak sprawdzić czy faktycznie tak jest?</p>
+<h2>Korzyści testów wydajnościowych</h2>
+<p>Z tematem load-testingu spotkałem się już w pracy. Generalnie najprostszy wariant to przytrzymać F5 na otwartej stronie którą chcemy przetestować i jak serwer wytrzyma - dobra nasza :p. Czasami jednak przydatne jest ilościowe podejście do sprawy. Dobrze żeby narzędzie do testów wydajnościowych pokazało jakiś raport w którym zawarte będą konkretne informacje - ile czasu średnio potrzebował request na dany endpoint, jaką mieliśmy wariancję, określone percentyle (np 50, 75, 90, 99), czy wszelkie inne dobra dostarczane przez statystykę matematyczną.</p>
+<h2>Jak zamierzam przedstawić temat?</h2>
+<p>W celu przybliżenia tego tematu, postaram się omówić jego istotne elementy, a także zaprezentować w jaki sposób można zaimplementować takie testy wydajnościowe na przykładzie Python i Azure. Jednocześnie postaram się żeby ten przykład był na tyle uniwersalny żeby można go było potraktować jako rusztowanie do rzeczywistych zastosowań. W tym celu zostanie stworzone repo na github z całym potrzebnym kodem oraz seria streamów na Youtube gdzie będę po kolei przechodził przez cały proces. Linki do YT oraz GH znajdują się na stronie głównej</p>
+<h2>Inspiracje</h2>
+<ul>
+<li><a href="https://gist.github.com/mda590/7a9a6b21b74ae10aa350b1703e2724a0">Python script useful for stress testing systems</a></li>
+<li><a href="https://medium.com/@tferreiraw/performing-load-tests-with-python-locust-io-62de7d91eebd">Performing load tests with Python + Locust.io | by Thiago Ferreira | Medium</a></li>
+<li><a href="https://www.blazemeter.com/blog/performance-testing-vs-load-testing-vs-stress-testing">Performance Testing vs. Load Testing vs. Stress Testing | Blazemeter by Perforce</a></li>
+</ul>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Courses | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Courses | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Courses</h1>
+    </header>
+    <main>
+      
+        <div class="course-section">
+          <h3>Advanced Web Tester Tools</h3>
+          <img src="/assets/images/courses/zaawansowane-narzedzia-web-testera-color.png" alt="Advanced Web Tester Tools" data-light="/assets/images/courses/zaawansowane-narzedzia-web-testera-color.png" data-dark="/assets/images/courses/zaawansowane-narzedzia-web-testera-bw.png" loading="lazy">
+          <p>The course consists of 12 one-hour individual sessions with the trainee. Session dates are set individually. The aim of the course is to introduce advanced tools used in the work of a web tester. In addition to the material covered during the sessions, the trainer also provides additional materials for the trainee to work on independently, which aim to consolidate knowledge and skills.</p>
+          <a href="/courses/advanced-web-testing-tools/" class="read-more-button">Read more</a>
+        </div>
+      
+        <div class="course-section">
+          <h3>Backend JavaScript Programming</h3>
+          <img src="/assets/images/courses/programowanie-backend-w-javascript-color.png" alt="Backend JavaScript Programming" data-light="/assets/images/courses/programowanie-backend-w-javascript-color.png" data-dark="/assets/images/courses/programowanie-backend-w-javascript-bw.png" loading="lazy">
+          <p>The course aims to provide developers with a practical understanding of selected network aspects. The topics are chosen in a way that comprehensively covers the information necessary to effectively operate as a full-stack developer with full control over the network behavior of the application.</p>
+          <a href="/courses/backend-javascript/" class="read-more-button">Read more</a>
+        </div>
+      
+        <div class="course-section">
+          <h3>Selected Network Aspects</h3>
+          <img src="/assets/images/courses/wybrane-aspekty-sieciowe-color.png" alt="Selected Network Aspects" data-light="/assets/images/courses/wybrane-aspekty-sieciowe-color.png" data-dark="/assets/images/courses/wybrane-aspekty-sieciowe-bw.png" loading="lazy">
+          <p>The course aims to provide developers with a practical understanding of selected network aspects. The topics are chosen in a way that comprehensively covers the information necessary to effectively operate as a full-stack developer with full control over the network behavior of the application.</p>
+          <a href="/courses/selected-network-aspects/" class="read-more-button">Read more</a>
+        </div>
+      
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

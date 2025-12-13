@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tablica LED | korczak.xyz</title>
+  <meta name="description" content="Personal website of Oskar Korczak">
+  <meta name="image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:title" content="Tablica LED | korczak.xyz">
+  <meta property="og:description" content="Personal website of Oskar Korczak">
+  <meta property="og:image" content="https://korczak.xyz/assets/images/logo.png">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="icon" type="image/png" href="/assets/images/logo.png">
+
+  <script>
+    // Initialize theme immediately to prevent flash
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="site-container">
+    <site-navbar></site-navbar>
+    <div class="content-wrapper">
+      <div class="page-content">
+  <div class="page-inner">
+    <header class="page-header">
+      <h1 class="page-title">Tablica LED</h1>
+    </header>
+    <main>
+      <article class="blog-post" itemscope itemtype="http://schema.org/BlogPosting">
+        <section itemprop="articleBody">
+          <p><img src="..//assets/images/blog/led-matrix/tetris.png" alt="Gra w Tetrisa ma mojej tablicy LED"></p>
+<p>Pewnego razu, na początku 2018 roku, zacząłem budować swoją własną matrycę LED. Plan był dość prosty. Wziąć taśmę LED z Chin, umieścić ją na tekturze i podłączyć do Arduino. Wiedziałem, że to możliwe, ponieważ widziałem wiele razy podobne projekty na YouTube.</p>
+<h2>Pierwotny plan</h2>
+<p>Chciałem stworzyć macierz o wymiarach 10x30 pikseli. Mimo że nie byłaby ona wystarczająca do wyświetlania obrazów, to miałaby wystarczająco dużo pikseli, aby zagrać w proste gry takie jak Tetris czy Pong, a także wyświetlać animacje lub jednolite kolory. Macierz ta miałaby wymiary około 33x100 cm. Jednak, kiedy otrzymałem LED-y z Chin, okazało się, że nie mogę nimi sterować indywidualnie - każde trzy z nich były połączone szeregowo. To oznaczało, że zamiast 300 pikseli, miałbym tylko 100. Co więcej, każdy piksel miał średnicę 10x10 cm, co oznaczało, że macierz miałaby wymiary aż 1mx1m.
+<img src="..//assets/images/blog/led-matrix/led-strip.jpg" alt="Taśma LED">
+Te diody LED są naprawdę wysokiej jakości. Jednak nie mogłem się powstrzymać od śmiechu, kiedy zauważyłem napis na opakowaniu mówiący, że &quot;nie potrafią sobie wyobrazić, jak piękne może być życie bez mnie&quot;. To trochę zabawne, ale jednocześnie ma w sobie nutkę mroku.</p>
+<h2>Zabawa LEDami</h2>
+<p>Kiedy moje przesyłki w końcu dotarły z Chin, szybko podłączyłem je do Arduino i zacząłem się nimi bawić.</p>
+<p><youtube-embed video-id="2-hwGV2hLpU"></youtube-embed></p>
+<p>Pierwsze użycie taśmy LED</p>
+<h2>Budowa matrycy</h2>
+<p>Po zabawie z taśmami LED nadeszła pora na konstrukcję: skleiłem kawałki tektury, tworząc płytę o wymiarach 1x1m. Gdy wszystko zostało podłączone do zasilania i Arduino, muszę przyznać, że oprogramowanie do sterowania diodami LED zrobiło na mnie ogromne wrażenie.</p>
+<p><youtube-embed video-id="JDR4Wz0-VFU"></youtube-embed>
+Zabawa z matrycą LED</p>
+<h2>Dalszy montaż</h2>
+<p><youtube-embed video-id="I-fwW-TVWJo"></youtube-embed></p>
+<p>Rozdzieliłem piksele za pomocą pasków tektury, które przymocowałem do tylnej płyty za pomocą kleju na gorąco. Następnie pokryłem to folią, aby rozproszyć światło i stworzyć wrażenie kwadratowych pikseli.</p>
+<p><youtube-embed video-id="MXAwmhOfveE"></youtube-embed>
+Porównanie tablicy z folią i bez</p>
+<h2>Pisanie kodu</h2>
+<p>Kiedy sprzęt był już gotowy, uruchomiłem Arduino IDE i zaimplementowałem gry Snake oraz Tetris, uznając je za odpowiednie dla ekranu o rozdzielczości 10px na 10px. Kod źródłowy tych gier mam gdzieś na starej płycie, i gdy tylko go odnajdę, z przyjemnością się nim podzielę.
+<youtube-embed video-id="MBs8jBqcsIw"></youtube-embed>
+Pisanie kodu Snake</p>
+<h2>Testowanie</h2>
+<p><youtube-embed video-id="lzloEHUfXow"></youtube-embed>
+Testowanie wyświetlania cyfr na matrycy LED</p>
+<h2>Gry</h2>
+<p><youtube-embed video-id="pGL7U9LC1UQ"></youtube-embed>
+Gra w Snake, zegar gry nie został jeszcze zaimplementowany.</p>
+<p><youtube-embed video-id="2nQtkvzXlh8"></youtube-embed>
+Gra w Tetrisa</p>
+<h2>Kontroler</h2>
+<p>No cóż, kontroler gry powstał z kawałka drewnianego patyczka, który znalazłem na dworze... Zdjęcia mówią same za siebie.</p>
+<p>&lt;Gallery names={[&quot;controller-wiring&quot;, &quot;controller-wiring-with-laptop&quot;, &quot;controller-in-all-its-glory&quot;]} /&gt;
+<img src="..//assets/images/blog/led-matrix/joystick-close-up.jpg" alt="Zbliżenie na joystick"></p>
+<p><youtube-embed video-id="BXvUJtiB-Cc"></youtube-embed></p>
+<h2>Co dalej?</h2>
+<p>Chciałbym wykonać kolejną wersję z PVC i pleksi, aby uzyskać estetycznie lepsze wykończenie. Zamiast Arduino, chciałbym użyć Raspberry Pi oraz zastąpić drewniany patyczek klasycznymi kontrolerami retro.
+&lt;Gallery names={[&quot;nes-controller&quot;, &quot;nespi&quot;, &quot;raspberry-pi&quot;]} /&gt;</p>
+<h2>Uznanie autorstwa</h2>
+<p>Trzy ostatnie zdjęcia nie należą do mnie, więc zostały użyte z podaniem źródła.</p>
+<ul>
+<li>Evan-Amos, Public domain, via Wikimedia Commons</li>
+<li>Gareth Halfacree from Bradford, UK, CC BY-SA 2.0 <a href="https://creativecommons.org/licenses/by-sa/2.0">https://creativecommons.org/licenses/by-sa/2.0</a>, via Wikimedia Commons</li>
+<li>Michael Henzler / Wikimedia Commons</li>
+</ul>
+<p>Pozostałe zdjęcia i filmy są mojego autorstwa, a ja publikuję je jako utwory w domenie publicznej.</p>
+
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+
+      <footer class="site-footer">
+        <a href="/">korczak.xyz</a>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+---
+title: Portowanie JS do TS z użyciem ChatGPT
+slug: porting-js-to-ts-with-chatgpt
+date: 2023-08-18
+published: true
+featuredImage: ../../images/blog/porting-js-to-ts-with-chatgpt/port.jpg
+language: pl
+---
+import Youtube from "../../components/Youtube";
+
+<Youtube videoId="7ih7E_Viesg" />
+
+## Wstęp
+Kolega mi opowiadał, że pracował raz przy projekcie, którego celem było portowanie kodu z Pythona 2 do 3. To był projekt dla całego teamu na kilka kwartałów. Ludzie się na tym wypalali. Tak się składa, że to był projekt open-source, który dodatkowo nie był zbyt dobrze pokryty testami. Nic przyjemnego.
+
+## Strona osobista
+Ja zrobiłem swoją stronę osobistą początkowo w WordPress, później przepisałem ją w Gatsby w JS. No i stawał się coraz popularniejszy ChatGPT, więc uznałem, że można spróbować przeportować to na TS. Dodam tylko, że nie znałem za bardzo TS. Nie jest to rocket science, ale nie napisałem do tamtej pory żadnego kodu w TS. Można powiedzieć, że ChatGPT nie tylko przeportował mi codebase, ale również nauczył TS i zrobił coverage.
+
+## Pierwsze próby
+Pierwsze próby wyglądały dość obiecująco, ponieważ JS i TS są w gruncie rzeczy dość podobne. Przeportowanie pojedynczego pliku zazwyczaj nie było problemem dla ChatGPT. Postanowiłem więc pójść dalej i zautomatyzować portowanie.
+
+## Porter
+Porter - tak nazywa się moja próba napisania automatu do portowania całego repozytorium z języka programowania X na język programowania Y. Kod źródłowy jest dostępny na GitHub, jednak nie jest to działająca rzecz. Teoretycznie zadanie wydawało się proste.
+
+![dont crash into each other](../../images/blog/porting-js-to-ts-with-chatgpt/dont-crash-into-each-other.jpg "dont crash into each other")
+
+### Pierwsze podejście
+```js
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+    file.write(ported)
+```
+
+### Sprawdźmy czy kod działa
+```js
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    test_errors = test(ported)
+    if test_errors:
+        prompt_gpt_to_fix_errors(ported, test_errors)
+
+    file.write(ported)
+```
+
+### Sprawdźmy czy kod się kompiluje
+```js
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    compilation_errors = compile(ported)
+    if compilation_errors:
+        prompt_gpt_to_fix_errors(ported, compilation_errors)
+
+    test_errors = test(ported)
+    if test_errors:
+        prompt_gpt_to_fix_errors(ported, test_errors)
+
+    file.write(ported)
+```
+
+### Czasami jedna runda poprawek nie wystarcza
+```js
+for file in files:
+    ported = prompt_gpt_to_port_file(file)
+
+    compilation_errors = compile(ported)
+    while compilation_errors:
+        prompt_gpt_to_fix_errors(ported, compilation_errors)
+
+    test_errors = test(ported)
+    while test_errors:
+        prompt_gpt_to_fix_errors(ported, test_errors)
+
+    file.write(ported)
+```
+
+## Refleksja
+Wydaje się, że dodaliśmy sporo logiki specyficznej dla danego problemu - nie jest to ogólne rozwiązanie portowania z języka X na Y. Jestem sobie w stanie wyobrazić, że w wielu przypadkach nie jest to tak proste, że można portować po prostu pliki po kolei. Czasami trzeba stworzyć więcej plików, wprowadzić zmiany w jakichś innych itp. Jednak wydaje się, że ChatGPT powinien to wiedzieć. W końcu możemy zapytać go, w jaki sposób przeportować codebase z języka X na Y i bez problemu odpowie i ułoży plan działania.
+
+## BabyAGI, AutoGPT
+Te projekty są bardzo ambitne i chodzi o to, żeby GPT sam się promptował w pętli i w ten sposób rozwiązywał złożone problemy uwzględniając planowanie i wykonywanie działań. Kiedy zacząłem z nich korzystać, okazało się, że nie jest to takie proste i diabeł tkwi w szczegółach:
+1. Jest drogo - GPT3.5 co prawda nie jest super drogie per request, ale kontekst jest zbyt krótki i nie ogarnia tak dobrze, jak GPT4. A odpalenie jednego eksperymentu z GPT4 kosztowało kilka dolarów, więc jak sobie to szybko policzyłem, to na takie eksperymenty mnie nie stać, szczególnie biorąc pod uwagę, że nie wiadomo czy na koniec to będzie działać. szczególnie biorąc pod uwagę że nie wiadomo czy na koniec to będzie działać
+2. Długo to trwa - GPT3.5 jest szybkie, ale nie ogarnia, a GPT4 jest sporo wolniejsze, więc każdy test sporo trwa.
+3. Dobre promptowanie jest trudne.
+4. Nie miałem dostępu do API GPT-4, więc korzystałem z API kolegi, ale to też ma swoje wady.
+
+
+## Langchain
+W tym projekcie chodzi o to, żeby zdefiniować narzędzia dla GPT, takie jak np:
+- walidacja kodu `tsc --noEmit`
+- testowanie kodu `npm run test`
+- klonowanie repozytorium `git clone ...`
+
+W ten sposób ułatwiamy zadanie, żeby GPT nie musiał wszystkiego kminić od zera.
+
+Był mały sukces. Wydaje mi się, że z użyciem któregoś z tych narzędzi udało mi się sprawić, że po wpisaniu komendy w stylu:
+```
+python porter.py <link do repo>
+```
+Skrypt przeportował jeden plik, zrobił commit i otworzył pull-requesta.
+
+## Ostateczne rozwiazanie
+Po kilku nieprzespanych nocach, wzlotach i upadkach, uznałem, że problem jest za duży na moją głowę, albo że narzędzia nie są jeszcze wystarczająco mocne, żeby dało się napisać portera. Postanowiłem, że większą wartość będzie miało dla mnie wykonanie zadania niż tworzenie narzędzia, które nie wiadomo czy da się stworzyć. Dlatego postawiłem na stary sprawdzony wzorzec projektowy kopiego-pasta. Czyli plik po pliku kopiowałem do ChatuGPT, następnie wklejałem do IDE, odpalałem testy, kompilator i feedowałem spowrotem do ChatuGPT jeśli były błędy.
+
+## Nowe funkcjonalności
+Miesiąc temu do ChatuGPT został dodany Code Interpreter. Fajną rzeczą jest to, że można mu wrzucić zip z kodem i on umie sobie po nim chodzić i czytać pliki itp. Ułatwiło to sprawę.
+
+## Podsumowanie
+Bez ChatuGPT nadal nie umiałbym TS, a także bym miał o wiele słabszy codebase. Pełna automatyzacja takich złożonych zadań wydaje się, że jest jeszcze poza zasięgiem, ale w tej branży sprawy idą tak szybko, że może już ktoś to zrobił :p
+
+## Uznanie autorstwa
+Photo by <a href="https://unsplash.com/@esmonde?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Esmonde Yong</a> on <a href="https://unsplash.com/photos/wFpJV5EWrSM?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
