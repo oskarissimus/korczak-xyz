@@ -1,0 +1,176 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="icon" href="/favicon-32x32.png?v=3f375ebeb9d94fff277d7f3d685b24d9" type="image/png" />
+  </head>
+  <body>
+    <div id="___gatsby">
+      <div tabindex="-1" id="gatsby-focus-wrapper">
+        <div>
+          <div>
+            <div>
+              <div>
+                <div>
+                  <div><img alt="" /></div>
+                  <img alt="logo" />
+                </div>
+                <a href="/">korczak.xyz</a>
+              </div>
+              <div></div>
+              <label
+                ><input type="checkbox" checked="" />
+                <div></div>
+                <span>Dark mode</span></label
+              ><button aria-label="Menu">
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M61.1 224C45 224 32 211 32 194.9c0-1.9 .2-3.7 .6-5.6C37.9 168.3 78.8 32 256 32s218.1 136.3 223.4 157.3c.5 1.9 .6 3.7 .6 5.6c0 16.1-13 29.1-29.1 29.1L61.1 224zM144 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm240 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32zM272 96a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zM16 304c0-26.5 21.5-48 48-48l384 0c26.5 0 48 21.5 48 48s-21.5 48-48 48L64 352c-26.5 0-48-21.5-48-48zm16 96c0-8.8 7.2-16 16-16l416 0c8.8 0 16 7.2 16 16l0 16c0 35.3-28.7 64-64 64L96 480c-35.3 0-64-28.7-64-64l0-16z"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <nav>
+              <div>
+                <div>
+                  <div><img alt="" /></div>
+                  <img alt="logo" />
+                </div>
+                <a href="/">korczak.xyz</a>
+              </div>
+              <div></div>
+              <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
+              ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a
+              ><label
+                ><input type="checkbox" checked="" />
+                <div></div>
+                <span>Dark mode</span></label
+              >
+              <div>
+                <a aria-current="page" hreflang="en" href="/blog/my-experience-with-react/"><img alt="" /></a
+                ><a hreflang="pl" href="/pl/blog/my-experience-with-react/"><img alt="" /></a>
+              </div>
+            </nav>
+          </div>
+          <div>
+            <div>
+              <div>
+                <header><h1>My experience with React</h1></header>
+                <main>
+                  <section itemprop="articleBody">
+                    <p>
+                      Once upon a time I wrote a front-end of web app in pure JavaScript with a little help of jQuery.
+                      It was a quick way to start. However, when my project grew I noticed a sad consequence of my
+                      approach: the code after just about a year was total Spagetti! <span></span>
+                    </p>
+                    <figure>
+                      <span>
+                        <a
+                          href="/static/856889cb02d426444b779a7d8b717710/72e01/spaghetti.jpg"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <span></span>
+                          <img alt="Spaghetti code" />
+                        </a>
+                      </span>
+                      <figcaption>Spaghetti code</figcaption>
+                    </figure>
+                    Liść zdjęcie utworzone przez jcomp - pl.freepik.com
+                    <p></p>
+                    <h2>Vanilla JS - gateway drug</h2>
+                    <p>I thank that some developers start with JS this way.</p>
+                    <ol>
+                      <li>
+                        Oh! I can have button just by typing <span><code>&lt;button&gt;</code></span> in my HTML file!
+                        Great! Let's see how do I make it do something after clicking.
+                      </li>
+                      <li>So I use JavaScript for that [BE CAREFUL]</li>
+                      <li>
+                        Let's add some <span><code>onClick="alert('clicked')"</code></span> attribute to my button
+                      </li>
+                      <li>
+                        Then after some time You find out about [DANGEROUS] <span><code>getElementById()</code></span
+                        >. At this point a real madness about Vanilla JS begins…
+                      </li>
+                    </ol>
+                    <p>
+                      When I write code, I often have a feeling about what it should do. Sometimes of course there is
+                      some specification, but my inner hacker always wants something to be done by just written code.
+                      This is why using <span><code>getElementById()</code></span> is so tempting every time. Just
+                      define id for element, than copy-paste some code from Stack Overflow, and boom! Work is done.
+                      However creating an app this way leads to anger, anger leads to hate and hate leads to spaghetti
+                      code. <span></span>
+                    </p>
+                    <figure>
+                      <span>
+                        <a
+                          href="/static/18ef3cafc2e4d75e177df8f34a29ce22/72e01/gateway-drug.jpg"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <span></span>
+                          <img alt="Too much vanilla JS is dangerous" />
+                        </a>
+                      </span>
+                      <figcaption>Too much vanilla JS is dangerous</figcaption>
+                    </figure>
+                    Tło zdjęcie utworzone przez Waewkidja - pl.freepik.com
+                    <p></p>
+                    <h2>Dark times</h2>
+                    <p>
+                      Ok, so I managed to deploy my freshly created legacy code to production. Did I mention I had no
+                      code review whatsoever? Surprisingly this code worked more often than not, and nobody asked for
+                      too much changes in it, so I leaved it for about 6 months. After that stability of the app came
+                      into question, and I was wondering about fixing things, improving compatibility with browsers,
+                      etc. I didn't even want to look at it. It was about 900 lines in pure JS with atrocities like
+                      <span><code>getElementById()</code></span> everywhere. I heard about this great React. That it is
+                      easy and powerful. However, I never was into front-end so I didn't start learning it. After
+                      watching some videos on YouTube about it, I got grasp of key concepts of React. As it grew on me,
+                      I decided to get out of this Legacy-Hell created by myself. <span></span>
+                    </p>
+                    <figure>
+                      <span>
+                        <a
+                          href="/static/3ec3f237e465382b06f405641828068e/2bef9/react.png"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <span></span>
+                          <img alt="React is the way" />
+                        </a>
+                      </span>
+                      <figcaption>React is the way</figcaption>
+                    </figure>
+                    <p></p>
+                    <h2>Quickstart with React</h2>
+                    <p>
+                      When I got basic concepts of React - components, state, props everything started to get brighter.
+                      I finally could make some sensible modules, isolate thing from each other, use some nice
+                      architecture and hierarchy. Not only that! After making Hello World in React it was clear to me
+                      that creating front-end this way is even easier than in vanilla JS! In about a week I was able to
+                      get rid of ugly 900 lines of my own legacy and replace it with fresh React code.
+                    </p>
+                    <p>
+                      Every time when I learned new feature of React I really appreciate its design. It is great! Use
+                      React!
+                    </p>
+                  </section>
+                </main>
+              </div>
+            </div>
+            <footer><a href="/">korczak.xyz</a></footer>
+          </div>
+        </div>
+      </div>
+      <div id="gatsby-announcer" aria-live="assertive" aria-atomic="true"></div>
+    </div>
+  </body>
+</html>

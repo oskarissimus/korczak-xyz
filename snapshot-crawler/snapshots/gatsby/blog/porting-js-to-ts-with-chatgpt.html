@@ -1,0 +1,274 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="icon" href="/favicon-32x32.png?v=3f375ebeb9d94fff277d7f3d685b24d9" type="image/png" />
+  </head>
+  <body>
+    <div id="___gatsby">
+      <div tabindex="-1" id="gatsby-focus-wrapper">
+        <div>
+          <div>
+            <div>
+              <div>
+                <div>
+                  <div><img alt="" /></div>
+                  <img alt="logo" />
+                </div>
+                <a href="/">korczak.xyz</a>
+              </div>
+              <div></div>
+              <label
+                ><input type="checkbox" checked="" />
+                <div></div>
+                <span>Dark mode</span></label
+              ><button aria-label="Menu">
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M61.1 224C45 224 32 211 32 194.9c0-1.9 .2-3.7 .6-5.6C37.9 168.3 78.8 32 256 32s218.1 136.3 223.4 157.3c.5 1.9 .6 3.7 .6 5.6c0 16.1-13 29.1-29.1 29.1L61.1 224zM144 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm240 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32zM272 96a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zM16 304c0-26.5 21.5-48 48-48l384 0c26.5 0 48 21.5 48 48s-21.5 48-48 48L64 352c-26.5 0-48-21.5-48-48zm16 96c0-8.8 7.2-16 16-16l416 0c8.8 0 16 7.2 16 16l0 16c0 35.3-28.7 64-64 64L96 480c-35.3 0-64-28.7-64-64l0-16z"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <nav>
+              <div>
+                <div>
+                  <div><img alt="" /></div>
+                  <img alt="logo" />
+                </div>
+                <a href="/">korczak.xyz</a>
+              </div>
+              <div></div>
+              <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
+              ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a
+              ><label
+                ><input type="checkbox" checked="" />
+                <div></div>
+                <span>Dark mode</span></label
+              >
+              <div>
+                <a aria-current="page" hreflang="en" href="/blog/porting-js-to-ts-with-chatgpt/"><img alt="" /></a
+                ><a hreflang="pl" href="/pl/blog/porting-js-to-ts-with-chatgpt/"><img alt="" /></a>
+              </div>
+            </nav>
+          </div>
+          <div>
+            <div>
+              <div>
+                <header><h1>Porting JS to TS using ChatGPT</h1></header>
+                <main>
+                  <section itemprop="articleBody">
+                    <iframe
+                      width="560"
+                      height="315"
+                      src="https://www.youtube.com/embed/7ih7E_Viesg"
+                      title="YouTube video player"
+                      frameborder="0"
+                      allow="
+                        accelerometer;
+                        autoplay;
+                        clipboard-write;
+                        encrypted-media;
+                        gyroscope;
+                        picture-in-picture;
+                        web-share;
+                      "
+                      referrerpolicy="strict-origin-when-cross-origin"
+                      allowfullscreen=""
+                    ></iframe>
+                    <h2>Introduction</h2>
+                    <p>
+                      A colleague told me that he once worked on a project aimed at porting code from Python 2 to 3. It
+                      was a project for the whole team spanning several quarters. People burned out on it.
+                      Coincidentally, it was an open-source project that was also not very well covered by tests. Not
+                      pleasant.
+                    </p>
+                    <h2>Personal website</h2>
+                    <p>
+                      I initially created my personal website in WordPress, then rewrote it in Gatsby in JS. ChatGPT was
+                      becoming more popular, so I decided to try porting it to TS. I'll add that I didn't really know TS
+                      very well. It's not rocket science, but until then I hadn't written any code in TS. One could say
+                      that ChatGPT not only ported my codebase but also taught me TS and did coverage.
+                    </p>
+                    <h2>First attempts</h2>
+                    <p>
+                      The first attempts looked quite promising because JS and TS are fundamentally quite similar.
+                      Porting a single file was usually not a problem for ChatGPT. So I decided to go further and
+                      automate the porting.
+                    </p>
+                    <h2>Porter</h2>
+                    <p>
+                      Porter - this is my attempt at creating an automaton for porting an entire repository from
+                      programming language X to programming language Y. The source code is available on GitHub, but it's
+                      not a working thing. Theoretically, the task seemed simple.
+                    </p>
+                    <span
+                      ><figure>
+                        <span>
+                          <a
+                            href="/static/a9607d38d6441d5eba4516868c7ad536/c08c5/dont-crash-into-each-other.jpg"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            <span></span>
+                            <img alt="dont crash into each other" />
+                          </a>
+                        </span>
+                        <figcaption>dont crash into each other</figcaption>
+                      </figure></span
+                    >
+                    <h3>First approach</h3>
+                    <span
+                      ><div>
+                        <pre><code><span>for</span> file <span>in</span> <span>files</span><span>:</span>
+    ported <span>=</span> <span>prompt_gpt_to_port_file</span><span>(</span>file<span>)</span>
+    file<span>.</span><span>write</span><span>(</span>ported<span>)</span></code></pre>
+                      </div></span
+                    >
+                    <h3>Let's check if the code works</h3>
+                    <span
+                      ><div>
+                        <pre><code><span>for</span> file <span>in</span> <span>files</span><span>:</span>
+    ported <span>=</span> <span>prompt_gpt_to_port_file</span><span>(</span>file<span>)</span>
+
+    test_errors <span>=</span> <span>test</span><span>(</span>ported<span>)</span>
+    <span>if</span> <span>test_errors</span><span>:</span>
+        <span>prompt_gpt_to_fix_errors</span><span>(</span>ported<span>,</span> test_errors<span>)</span>
+
+    file<span>.</span><span>write</span><span>(</span>ported<span>)</span></code></pre>
+                      </div></span
+                    >
+                    <h3>Let's check if the code compiles</h3>
+                    <span
+                      ><div>
+                        <pre><code><span>for</span> file <span>in</span> <span>files</span><span>:</span>
+    ported <span>=</span> <span>prompt_gpt_to_port_file</span><span>(</span>file<span>)</span>
+
+    compilation_errors <span>=</span> <span>compile</span><span>(</span>ported<span>)</span>
+    <span>if</span> <span>compilation_errors</span><span>:</span>
+        <span>prompt_gpt_to_fix_errors</span><span>(</span>ported<span>,</span> compilation_errors<span>)</span>
+
+    test_errors <span>=</span> <span>test</span><span>(</span>ported<span>)</span>
+    <span>if</span> <span>test_errors</span><span>:</span>
+        <span>prompt_gpt_to_fix_errors</span><span>(</span>ported<span>,</span> test_errors<span>)</span>
+
+    file<span>.</span><span>write</span><span>(</span>ported<span>)</span></code></pre>
+                      </div></span
+                    >
+                    <h3>Sometimes one round of fixes is not enough</h3>
+                    <span
+                      ><div>
+                        <pre><code><span>for</span> file <span>in</span> <span>files</span><span>:</span>
+    ported <span>=</span> <span>prompt_gpt_to_port_file</span><span>(</span>file<span>)</span>
+
+    compilation_errors <span>=</span> <span>compile</span><span>(</span>ported<span>)</span>
+    <span>while</span> <span>compilation_errors</span><span>:</span>
+        <span>prompt_gpt_to_fix_errors</span><span>(</span>ported<span>,</span> compilation_errors<span>)</span>
+
+    test_errors <span>=</span> <span>test</span><span>(</span>ported<span>)</span>
+    <span>while</span> <span>test_errors</span><span>:</span>
+        <span>prompt_gpt_to_fix_errors</span><span>(</span>ported<span>,</span> test_errors<span>)</span>
+
+    file<span>.</span><span>write</span><span>(</span>ported<span>)</span></code></pre>
+                      </div></span
+                    >
+                    <h2>Reflection</h2>
+                    <p>
+                      It seems that we added a lot of logic specific to a particular problem - it's not a general
+                      solution for porting from language X to Y. I can imagine that in many cases it's not as simple as
+                      just porting files one by one. Sometimes you have to create more files, make changes in some
+                      others, etc. However, it seems that ChatGPT should know that. After all, we can ask it how to port
+                      a codebase from language X to Y, and it will readily respond and outline a plan of action.
+                    </p>
+                    <h2>BabyAGI, AutoGPT</h2>
+                    <p>
+                      These projects are very ambitious, aiming for GPT to prompt itself in a loop, thus solving complex
+                      problems by planning and executing actions. When I started using them, it turned out that it
+                      wasn't that simple, and the devil is in the details:
+                    </p>
+                    <ol>
+                      <li>
+                        It's expensive - GPT3.5 isn't super expensive per request, but the context is too short and
+                        doesn't perform as well as GPT4. Running one experiment with GPT4 cost a few dollars, so when I
+                        quickly calculated, I couldn't afford such experiments, especially considering it's uncertain if
+                        it would work in the end.
+                      </li>
+                      <li>
+                        It takes a long time - GPT3.5 is fast but doesn't perform well, and GPT4 is much slower, so
+                        every test takes a long time.
+                      </li>
+                      <li>Good prompting is difficult.</li>
+                      <li>
+                        I didn't have access to the GPT-4 API, so I used a friend's API, but that has its drawbacks.
+                      </li>
+                    </ol>
+                    <h2>Langchain</h2>
+                    <p>The idea of this project is to define tools for GPT, such as:</p>
+                    <ul>
+                      <li>Code validation tsc --noEmit</li>
+                      <li>Code testing npm run test</li>
+                      <li>Repository cloning git clone ...</li>
+                    </ul>
+                    <p>This way, we make it easier for GPT not to have to figure everything out from scratch.</p>
+                    <p>
+                      There was a minor success. I think that using one of these tools, I managed to make it so that
+                      after entering a command like:
+                    </p>
+                    <span
+                      ><div>
+                        <pre><code>python porter.py &lt;link to the repo&gt;</code></pre>
+                      </div></span
+                    >
+                    <p>The script ported one file, made a commit, and opened a pull request.</p>
+                    <h2>Final solution</h2>
+                    <p>
+                      After several sleepless nights, ups and downs, I concluded that the problem was too big for me, or
+                      that the tools weren't powerful enough yet to write a porter. I decided that doing the task would
+                      be more valuable to me than creating a tool that was uncertain if it could be created. Therefore,
+                      I relied on the old tried-and-true design pattern of copy-paste. So, I copied each file to
+                      ChatGPT, pasted it into the IDE, ran tests, the compiler, and fed it back to ChatGPT if there were
+                      errors.
+                    </p>
+                    <h2>New features</h2>
+                    <p>
+                      A month ago, a Code Interpreter was added to ChatGPT. A cool thing is that you can throw a zip
+                      with code at it, and it can navigate and read files, etc. This made things easier.
+                    </p>
+                    <h2>Conclusion</h2>
+                    <p>
+                      Without ChatGPT, I still wouldn't know TS, and my codebase would be much weaker. Full automation
+                      of such complex tasks seems still out of reach, but things move so fast in this industry that
+                      maybe someone has already done it :p
+                    </p>
+                    <h2>Image credits</h2>
+                    <p>
+                      Photo by
+                      <a
+                        href="https://unsplash.com/@esmonde?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText"
+                        >Esmonde Yong</a
+                      >
+                      on
+                      <a
+                        href="https://unsplash.com/photos/wFpJV5EWrSM?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText"
+                        >Unsplash</a
+                      >
+                    </p>
+                  </section>
+                </main>
+              </div>
+            </div>
+            <footer><a href="/">korczak.xyz</a></footer>
+          </div>
+        </div>
+      </div>
+      <div id="gatsby-announcer" aria-live="assertive" aria-atomic="true"></div>
+    </div>
+  </body>
+</html>
