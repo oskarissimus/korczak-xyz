@@ -25,8 +25,6 @@ class SiteNavbar extends HTMLElement {
     const navItems = [
       { href: lang === 'pl' ? '/pl/' : '/', text: t['Home'] || 'Home' },
       { href: lang === 'pl' ? '/pl/about/' : '/about/', text: t['About'] || 'About' },
-      { href: lang === 'pl' ? '/pl/mentoring/' : '/mentoring/', text: t['Mentoring'] || 'Mentoring' },
-      { href: lang === 'pl' ? '/pl/courses/' : '/courses/', text: t['Courses'] || 'Courses' },
       { href: lang === 'pl' ? '/pl/blog/' : '/blog/', text: t['Blog'] || 'Blog' },
       { href: lang === 'pl' ? '/pl/songs/' : '/songs/', text: t['Songs'] || 'Songs' },
     ];

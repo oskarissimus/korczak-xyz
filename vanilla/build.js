@@ -52,10 +52,8 @@ async function build() {
   // Read templates
   const baseTemplate = await fs.readFile(`${TEMPLATES_DIR}/base.html`, 'utf-8');
   const blogPostTemplate = await fs.readFile(`${TEMPLATES_DIR}/blog-post.html`, 'utf-8');
-  const courseTemplate = await fs.readFile(`${TEMPLATES_DIR}/course.html`, 'utf-8');
   const songTemplate = await fs.readFile(`${TEMPLATES_DIR}/song.html`, 'utf-8');
   const blogListTemplate = await fs.readFile(`${TEMPLATES_DIR}/blog-list.html`, 'utf-8');
-  const coursesListTemplate = await fs.readFile(`${TEMPLATES_DIR}/courses-list.html`, 'utf-8');
   const songsListTemplate = await fs.readFile(`${TEMPLATES_DIR}/songs-list.html`, 'utf-8');
 
   // Process blog posts
@@ -65,13 +63,6 @@ async function build() {
     blogPosts[lang] = posts;
   }
 
-  // Process courses
-  const courses = { en: [], pl: [] };
-  for (const lang of ['en', 'pl']) {
-    const items = await processContentType('courses', lang, courseTemplate, baseTemplate);
-    courses[lang] = items;
-  }
-
   // Process songs (Polish only)
   const songs = { pl: [] };
   const songItems = await processContentType('songs', 'pl', songTemplate, baseTemplate);
@@ -79,7 +70,6 @@ async function build() {
 
   // Generate listing pages
   await generateBlogListing(blogPosts, blogListTemplate, baseTemplate);
-  await generateCoursesListing(courses, coursesListTemplate, baseTemplate);
   await generateSongsListing(songs, songsListTemplate, baseTemplate);
 
   // Copy static pages
@@ -291,41 +281,6 @@ async function generateBlogListing(blogPosts, template, baseTemplate) {
   }
 }
 
-async function generateCoursesListing(courses, template, baseTemplate) {
-  for (const lang of ['en', 'pl']) {
-    const items = courses[lang];
-
-    const itemsHtml = items.map(course => {
-      const href = lang === 'en' ? `/courses/${course.slug}/` : `/pl/courses/${course.slug}/`;
-      const imgColor = course.featuredImageColor || '';
-      const imgBW = course.featuredImageBW || imgColor;
-
-      return `
-        <div class="course-section">
-          <h3>${course.title}</h3>
-          ${imgColor ? `<img src="${imgColor}" alt="${course.title}" data-light="${imgColor}" data-dark="${imgBW}" loading="lazy">` : ''}
-          <p>${course.excerpt}</p>
-          <a href="${href}" class="read-more-button">${lang === 'pl' ? 'Dowiedz się więcej' : 'Read more'}</a>
-        </div>
-      `;
-    }).join('');
-
-    const html = template.replace('{{items}}', itemsHtml);
-    const fullHtml = baseTemplate
-      .replace(/\{\{title\}\}/g, `${lang === 'pl' ? 'Kursy' : 'Courses'} | korczak.xyz`)
-      .replace('{{lang}}', lang)
-      .replace('{{content}}', html);
-
-    const outputPath = lang === 'en'
-      ? `${OUTPUT_DIR}/courses/index.html`
-      : `${OUTPUT_DIR}/pl/courses/index.html`;
-
-    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-    await fs.writeFile(outputPath, fullHtml);
-    console.log(`  Built: courses/${lang}/index`);
-  }
-}
-
 async function generateSongsListing(songs, template, baseTemplate) {
   // Songs are Polish only
   const items = songs.pl;
@@ -360,7 +315,7 @@ async function generateSongsListing(songs, template, baseTemplate) {
 }
 
 async function copyStaticPages(baseTemplate) {
-  const staticPages = ['index', 'about', 'mentoring', '404'];
+  const staticPages = ['index', 'about', '404'];
 
   for (const page of staticPages) {
     try {
