@@ -101,6 +101,28 @@ async function cleanHtml(page) {
     // Remove stylesheet links
     document.querySelectorAll('link[rel="stylesheet"]').forEach(el => el.remove());
 
+    // Clean up head - keep only essential meta tags
+    const head = document.head;
+    if (head) {
+      [...head.children].forEach(el => {
+        const tagName = el.tagName.toLowerCase();
+        // Keep charset meta
+        if (tagName === 'meta' && el.getAttribute('charset')) return;
+        // Keep viewport meta
+        if (tagName === 'meta' && el.getAttribute('name') === 'viewport') return;
+        // Keep description meta
+        if (tagName === 'meta' && el.getAttribute('name') === 'description') return;
+        // Keep image meta
+        if (tagName === 'meta' && el.getAttribute('name') === 'image') return;
+        // Keep icon link
+        if (tagName === 'link' && el.getAttribute('rel') === 'icon') return;
+        // Keep title
+        if (tagName === 'title') return;
+        // Remove everything else
+        el.remove();
+      });
+    }
+
     // Simplify picture elements - replace with simple img
     document.querySelectorAll('picture').forEach(picture => {
       const img = picture.querySelector('img');
