@@ -95,17 +95,55 @@ async function cleanHtml(page) {
     // Remove style tags
     document.querySelectorAll('style').forEach(el => el.remove());
 
+    // Remove noscript tags (often contain duplicate content)
+    document.querySelectorAll('noscript').forEach(el => el.remove());
+
     // Remove stylesheet links
     document.querySelectorAll('link[rel="stylesheet"]').forEach(el => el.remove());
 
+    // Simplify picture elements - replace with simple img
+    document.querySelectorAll('picture').forEach(picture => {
+      const img = picture.querySelector('img');
+      if (img) {
+        const alt = img.getAttribute('alt') || '';
+        const simpleImg = document.createElement('img');
+        simpleImg.setAttribute('alt', alt);
+        picture.replaceWith(simpleImg);
+      } else {
+        picture.remove();
+      }
+    });
+
+    // Simplify remaining img elements - keep only alt attribute
+    document.querySelectorAll('img').forEach(img => {
+      const alt = img.getAttribute('alt') || '';
+      // Remove all attributes except alt
+      [...img.attributes].forEach(attr => {
+        if (attr.name !== 'alt') {
+          img.removeAttribute(attr.name);
+        }
+      });
+      img.setAttribute('alt', alt);
+    });
+
     // Remove class attributes from all elements
     document.querySelectorAll('[class]').forEach(el => el.removeAttribute('class'));
+
+    // Remove style attributes from all elements
+    document.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
 
     // Remove data-* attributes (framework artifacts)
     document.querySelectorAll('*').forEach(el => {
       [...el.attributes]
         .filter(attr => attr.name.startsWith('data-'))
         .forEach(attr => el.removeAttribute(attr.name));
+    });
+
+    // Remove aria-hidden divs that are just placeholders
+    document.querySelectorAll('div[aria-hidden="true"]').forEach(el => {
+      if (!el.textContent.trim()) {
+        el.remove();
+      }
     });
 
     return document.documentElement.outerHTML;
