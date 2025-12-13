@@ -30,7 +30,7 @@
               </div>
               <div></div>
               <label
-                ><input type="checkbox" checked="" />
+                ><input type="checkbox" />
                 <div></div>
                 <span>Dark mode</span></label
               ><button aria-label="Menu">
@@ -60,13 +60,14 @@
               <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
               ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a
               ><label
-                ><input type="checkbox" checked="" />
+                ><input type="checkbox" />
                 <div></div>
                 <span>Dark mode</span></label
               >
               <div>
-                <a aria-current="page" hreflang="en" href="/blog/led-matrix/"><img alt="" /></a
-                ><a hreflang="pl" href="/pl/blog/led-matrix/"><img alt="" /></a>
+                <a aria-current="page" hreflang="en" href="/blog/led-matrix/"
+                  ><span role="img" aria-label="en">🇬🇧</span></a
+                ><a hreflang="pl" href="/pl/blog/led-matrix/"><span role="img" aria-label="pl">🇵🇱</span></a>
               </div>
             </nav>
           </div>
@@ -103,24 +104,25 @@
                       It would have dimensions like 33 x 100 cm. When LEDs from China arrived, I was surprised to
                       notice, that I cant control them individually, but every 3 of them are connected in series. It
                       meant that instead of 300 pixels, I would only have 100. Also every pixel would have 10×10 cm
-                      diameters, giving me matrix with size of 1mx1m. <span></span>
+                      diameters, giving me matrix with size of 1mx1m.
+                      <span
+                        ><figure>
+                          <span>
+                            <a
+                              href="/static/46f7dd36c91c30fa3bd0c552a39f621c/ac99c/led-strip.jpg"
+                              target="_blank"
+                              rel="noopener"
+                            >
+                              <span></span>
+                              <img alt="Led strip" />
+                            </a>
+                          </span>
+                          <figcaption>Led strip</figcaption>
+                        </figure></span
+                      >
+                      These are very good LEDs. However I laughed for a while when i noticed that “they couldn’t imagine
+                      how beautiful life without me”. A little dark.
                     </p>
-                    <figure>
-                      <span>
-                        <a
-                          href="/static/46f7dd36c91c30fa3bd0c552a39f621c/ac99c/led-strip.jpg"
-                          target="_blank"
-                          rel="noopener"
-                        >
-                          <span></span>
-                          <img alt="Led strip" />
-                        </a>
-                      </span>
-                      <figcaption>Led strip</figcaption>
-                    </figure>
-                    These are very good LEDs. However I laughed for a while when i noticed that “they couldn’t imagine
-                    how beautiful life without me”. A little dark.
-                    <p></p>
                     <h2>Playing with LEDs</h2>
                     <p>
                       When my packages finally arrived from China, I quickly connected them to arduino and started
@@ -391,8 +393,5 @@
       </div>
       <div id="gatsby-announcer" aria-live="assertive" aria-atomic="true"></div>
     </div>
-    <!-- slice-start id="_gatsby-scripts-1" -->
-
-    <!-- slice-end id="_gatsby-scripts-1" -->
   </body>
 </html>
