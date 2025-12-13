@@ -14,6 +14,7 @@ function parseArgs() {
     output: path.resolve(__dirname, 'snapshots'),
     startPaths: ['/'],
     concurrency: 5,
+    clean: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -29,6 +30,8 @@ function parseArgs() {
     } else if (args[i] === '--concurrency' && args[i + 1]) {
       config.concurrency = parseInt(args[i + 1], 10);
       i++;
+    } else if (args[i] === '--clean') {
+      config.clean = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       console.log(`
 Snapshot Crawler - Capture HTML snapshots of a website
@@ -40,6 +43,7 @@ Options:
   --output <dir>        Output directory for snapshots (default: ./snapshots)
   --start <paths>       Comma-separated start paths (default: /)
   --concurrency <n>     Number of parallel requests (default: 5)
+  --clean               Strip scripts, styles, and class attributes for clean HTML
   --help, -h            Show this help message
 
 Examples:
@@ -81,6 +85,32 @@ function pathToFilename(urlPath, baseUrl) {
   return normalized.slice(1) + '.html';
 }
 
+// Clean HTML by removing scripts, styles, and class attributes
+async function cleanHtml(page) {
+  return await page.evaluate(() => {
+    // Remove script tags
+    document.querySelectorAll('script').forEach(el => el.remove());
+
+    // Remove style tags
+    document.querySelectorAll('style').forEach(el => el.remove());
+
+    // Remove stylesheet links
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(el => el.remove());
+
+    // Remove class attributes from all elements
+    document.querySelectorAll('[class]').forEach(el => el.removeAttribute('class'));
+
+    // Remove data-* attributes (framework artifacts)
+    document.querySelectorAll('*').forEach(el => {
+      [...el.attributes]
+        .filter(attr => attr.name.startsWith('data-'))
+        .forEach(attr => el.removeAttribute(attr.name));
+    });
+
+    return document.documentElement.outerHTML;
+  });
+}
+
 // Check if a path should be crawled
 function shouldCrawl(pathname) {
   if (!pathname) return false;
@@ -108,7 +138,7 @@ async function fetchPage(page, urlPath, config) {
     }
 
     // Get HTML content
-    const html = await page.content();
+    const html = config.clean ? await cleanHtml(page) : await page.content();
 
     // Save HTML file
     const filename = pathToFilename(normalizedPath, config.url);
