@@ -29,8 +29,9 @@ const href = lang === 'en' ? `/blog/${slug}/` : `/pl/blog/${slug}/`;
       <Image
         src={featuredImage}
         alt={title || "Post's featured image"}
-        width={200}
-        height={133}
+        width={129}
+        height={86}
+        class="object-cover w-[129px] h-[86px] min-w-[129px] max-w-[129px] flex-shrink-0"
       />
     )}
     {excerpt && <p>{excerpt}</p>}
