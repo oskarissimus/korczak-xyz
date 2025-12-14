@@ -136,9 +136,32 @@ async function cleanHtml(page) {
       }
     });
 
-    // Simplify remaining img elements - keep only alt attribute
+    // Simplify figure elements - extract img and caption as separate elements
+    document.querySelectorAll('figure').forEach(figure => {
+      const img = figure.querySelector('img');
+      const figcaption = figure.querySelector('figcaption');
+      const parent = figure.parentNode;
+
+      if (img) {
+        const alt = img.getAttribute('alt') || (figcaption ? figcaption.textContent.trim() : '');
+        const simpleImg = document.createElement('img');
+        simpleImg.setAttribute('alt', alt);
+        // Wrap in p like Astro does
+        const p = document.createElement('p');
+        p.appendChild(simpleImg);
+        parent.insertBefore(p, figure);
+      }
+      figure.remove();
+    });
+
+    // Simplify remaining img elements - keep only alt attribute, remove empty alt images
     document.querySelectorAll('img').forEach(img => {
       const alt = img.getAttribute('alt') || '';
+      // Remove images with empty alt (spacer/placeholder images)
+      if (!alt.trim()) {
+        img.remove();
+        return;
+      }
       // Remove all attributes except alt
       [...img.attributes].forEach(attr => {
         if (attr.name !== 'alt') {
@@ -234,17 +257,104 @@ async function cleanHtml(page) {
     }
     comments.forEach(comment => comment.remove());
 
+    // 1. Remove dev toolbars (gatsby-qod, astro-dev-toolbar, etc.)
+    document.querySelectorAll('gatsby-qod, astro-dev-toolbar').forEach(el => el.remove());
+
+    // 2. Remove checked attribute from checkboxes (runtime state, not markup)
+    document.querySelectorAll('input[type="checkbox"]').forEach(el =>
+      el.removeAttribute('checked')
+    );
+
+    // 3. Normalize SVG fill - remove fill from both svg and path (visual noise)
+    document.querySelectorAll('svg').forEach(svg => {
+      svg.removeAttribute('fill');
+      svg.querySelectorAll('path').forEach(path => {
+        path.removeAttribute('fill');
+      });
+    });
+
+    // 4. Remove empty divs
+    function removeEmptyDivs() {
+      let removed;
+      do {
+        removed = false;
+        document.querySelectorAll('div').forEach(div => {
+          if (!div.innerHTML.trim() || (div.children.length === 0 && !div.textContent.trim())) {
+            div.remove();
+            removed = true;
+          }
+        });
+      } while (removed);
+    }
+    removeEmptyDivs();
+
+    // 5. Unwrap single-child wrapper divs (collapse redundant nesting)
+    function unwrapSingleChildDivs() {
+      let unwrapped;
+      do {
+        unwrapped = false;
+        document.querySelectorAll('div').forEach(div => {
+          // If div has only one child element and no text content
+          if (div.children.length === 1 && !div.textContent.replace(div.children[0].textContent, '').trim()) {
+            const child = div.children[0];
+            // Don't unwrap if parent needs the div for structure
+            if (child.tagName === 'DIV' || child.tagName === 'IMG') {
+              div.replaceWith(child);
+              unwrapped = true;
+            }
+          }
+        });
+      } while (unwrapped);
+    }
+    unwrapSingleChildDivs();
+
+    // Unwrap spans that only contain block elements (no text siblings)
+    document.querySelectorAll('span').forEach(span => {
+      // Skip spans with meaningful attributes
+      if (span.getAttribute('role') || span.getAttribute('aria-label')) return;
+      // Skip spans with direct text content
+      const hasDirectText = [...span.childNodes].some(
+        node => node.nodeType === 3 && node.textContent.trim()
+      );
+      if (hasDirectText) return;
+      // Unwrap if contains only block elements
+      const blockTags = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'TABLE', 'FIGURE'];
+      const allBlockChildren = [...span.children].every(child => blockTags.includes(child.tagName));
+      if (span.children.length > 0 && allBlockChildren) {
+        while (span.firstChild) {
+          span.parentNode.insertBefore(span.firstChild, span);
+        }
+        span.remove();
+      }
+    });
+
+    // Remove lang attribute from html (or normalize it)
+    document.documentElement.removeAttribute('lang');
+
     return document.documentElement.outerHTML;
   });
 }
 
+// Normalize quotes (curly to straight)
+function normalizeQuotes(text) {
+  return text
+    .replace(/[\u2018\u2019]/g, "'")  // curly single quotes to straight
+    .replace(/[\u201C\u201D]/g, '"'); // curly double quotes to straight
+}
+
 // Format HTML using Prettier
 async function formatHtml(html) {
+  // Normalize quotes before formatting
+  html = normalizeQuotes(html);
+
   return await prettier.format(html, {
     parser: 'html',
     printWidth: 120,
     tabWidth: 2,
     useTabs: false,
+    htmlWhitespaceSensitivity: 'ignore',  // Ignore whitespace differences
+    bracketSameLine: true,                 // Keep > on same line
+    singleAttributePerLine: false,         // Keep attributes together
   });
 }
 
@@ -267,12 +377,30 @@ async function fetchPage(page, urlPath, config) {
   try {
     const response = await page.goto(url, {
       waitUntil: 'domcontentloaded',
-      timeout: 15000
+      timeout: 30000
     });
+
+    // Wait for content to render (SPAs like Gatsby/React need time to hydrate)
+    await page.waitForTimeout(2000);
 
     if (!response || response.status() >= 400) {
       return { path: normalizedPath, status: response?.status() || 0, links: [] };
     }
+
+    // Extract links BEFORE cleaning (cleanHtml modifies the DOM)
+    const currentUrl = page.url();
+    const links = await page.$$eval('a[href]', (anchors, pageUrl) => {
+      return anchors.map((a) => {
+        const href = a.getAttribute('href');
+        if (!href) return null;
+        try {
+          const resolved = new URL(href, pageUrl);
+          return resolved.pathname;
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+    }, currentUrl);
 
     // Get HTML content
     let html = config.clean ? await cleanHtml(page) : await page.content();
@@ -287,21 +415,6 @@ async function fetchPage(page, urlPath, config) {
     const filePath = path.join(config.output, filename);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, html);
-
-    // Extract links
-    const currentUrl = page.url();
-    const links = await page.$$eval('a[href]', (anchors, pageUrl) => {
-      return anchors.map((a) => {
-        const href = a.getAttribute('href');
-        if (!href) return null;
-        try {
-          const resolved = new URL(href, pageUrl);
-          return resolved.pathname;
-        } catch {
-          return null;
-        }
-      }).filter(Boolean);
-    }, currentUrl);
 
     return {
       path: normalizedPath,
