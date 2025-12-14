@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
           <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
           ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/hacked-intercom/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -78,7 +56,7 @@
                   że prawie napewno się od tego złamie. Nie za bardzo dało się poprosić landlorda o dodatkowy klucz dla
                   mnie, bo w końcu nie wiedział że tam mieszkam.
                 </p>
-                <h2 id="domofon-dobrze-działał">Domofon dobrze działał</h2>
+                <h2>Domofon dobrze działał</h2>
                 <p>
                   <img alt="zwykły domofon" /> Domofon był normalny jak w starej kamienicy niedaleko Olsztyńskiej
                   starówki. Każde mieszkanie miało swój przycisk, bez żadnych kodów itp. Funkcjonalności domofonu
@@ -92,7 +70,7 @@
                     całkiem zabawne było później połączenie się z punktem 3.
                   </li>
                 </ol>
-                <h2 id="arduino">Arduino</h2>
+                <h2>Arduino</h2>
                 <p>
                   <img alt="lużne wnętrzności" /> Kupiłem od chińczyka kilka sztuk po dwa dolary. Wykorzystałem
                   multimetr i dokumentację domofonu znalezioną w internecie aby rozkminić do których pinów połączyć ADC
@@ -118,7 +96,7 @@
                   referrerpolicy="strict-origin-when-cross-origin"
                   allowfullscreen=""
                 ></iframe>
-                <h2 id="algorytm">Algorytm</h2>
+                <h2>Algorytm</h2>
                 <p>
                   Należało zadzwonic 4 razy (w określonych odstępach czasowych) do mojego mieszkania aby puścić napięcie
                   na obwód z przekaźnikiem który był w miejscu gdzie normalnie otwiera się furtkę. Musiałem dać szerokie
@@ -142,7 +120,7 @@
                   referrerpolicy="strict-origin-when-cross-origin"
                   allowfullscreen=""
                 ></iframe>
-                <h2 id="wifi">Wifi</h2>
+                <h2>Wifi</h2>
                 <p>
                   W 2018 każdy już miał smartfona więc można się zastanawiać czemu tego nie użyłem w moim projekcie aby
                   po prostu zdalnie otwierać furtkę jak już byłem podłączony do linii domofonu? Któtko mówiąc było to
@@ -150,7 +128,7 @@
                   klatkę jak nie było kumpla w domu. I zdarzyło się parę razy że miałem to już skonfigurowane na wifi na
                   ESP32, i nie wiadomo czemu coś się zawiesiło i przestało działać
                 </p>
-                <h2 id="dźwięki">Dźwięki</h2>
+                <h2>Dźwięki</h2>
                 <iframe
                   width="560"
                   height="315"

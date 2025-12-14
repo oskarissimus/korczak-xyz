@@ -168,6 +168,59 @@ async function cleanHtml(page) {
       }
     });
 
+    // Unwrap <astro-island> elements (keep children)
+    document.querySelectorAll('astro-island').forEach(island => {
+      while (island.firstChild) {
+        island.parentNode.insertBefore(island.firstChild, island);
+      }
+      island.remove();
+    });
+
+    // Unwrap Gatsby wrapper divs (keep children)
+    ['#___gatsby', '#gatsby-focus-wrapper'].forEach(selector => {
+      const wrapper = document.querySelector(selector);
+      if (wrapper) {
+        while (wrapper.firstChild) {
+          wrapper.parentNode.insertBefore(wrapper.firstChild, wrapper);
+        }
+        wrapper.remove();
+      }
+    });
+    document.querySelector('#gatsby-announcer')?.remove();
+
+    // Normalize favicon URLs (strip query strings)
+    document.querySelectorAll('link[rel="icon"]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href) link.setAttribute('href', href.split('?')[0]);
+    });
+
+    // Remove cosmetic SVG attributes (keep content)
+    document.querySelectorAll('svg').forEach(svg => {
+      ['xmlns', 'aria-hidden', 'focusable', 'role'].forEach(attr =>
+        svg.removeAttribute(attr)
+      );
+    });
+
+    // Remove aria-current attributes
+    document.querySelectorAll('[aria-current]').forEach(el =>
+      el.removeAttribute('aria-current')
+    );
+
+    // Remove element IDs
+    document.querySelectorAll('[id]').forEach(el =>
+      el.removeAttribute('id')
+    );
+
+    // Remove hreflang attributes
+    document.querySelectorAll('[hreflang]').forEach(el =>
+      el.removeAttribute('hreflang')
+    );
+
+    // Remove tabindex attributes
+    document.querySelectorAll('[tabindex]').forEach(el =>
+      el.removeAttribute('tabindex')
+    );
+
     // Remove HTML comments
     const walker = document.createTreeWalker(
       document.documentElement,

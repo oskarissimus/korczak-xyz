@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
           <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
           ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/porting-js-to-ts-with-chatgpt/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -88,13 +66,13 @@
                   referrerpolicy="strict-origin-when-cross-origin"
                   allowfullscreen=""
                 ></iframe>
-                <h2 id="wstęp">Wstęp</h2>
+                <h2>Wstęp</h2>
                 <p>
                   Kolega mi opowiadał, że pracował raz przy projekcie, którego celem było portowanie kodu z Pythona 2 do
                   3. To był projekt dla całego teamu na kilka kwartałów. Ludzie się na tym wypalali. Tak się składa, że
                   to był projekt open-source, który dodatkowo nie był zbyt dobrze pokryty testami. Nic przyjemnego.
                 </p>
-                <h2 id="strona-osobista">Strona osobista</h2>
+                <h2>Strona osobista</h2>
                 <p>
                   Ja zrobiłem swoją stronę osobistą początkowo w WordPress, później przepisałem ją w Gatsby w JS. No i
                   stawał się coraz popularniejszy ChatGPT, więc uznałem, że można spróbować przeportować to na TS. Dodam
@@ -102,29 +80,25 @@
                   żadnego kodu w TS. Można powiedzieć, że ChatGPT nie tylko przeportował mi codebase, ale również
                   nauczył TS i zrobił coverage.
                 </p>
-                <h2 id="pierwsze-próby">Pierwsze próby</h2>
+                <h2>Pierwsze próby</h2>
                 <p>
                   Pierwsze próby wyglądały dość obiecująco, ponieważ JS i TS są w gruncie rzeczy dość podobne.
                   Przeportowanie pojedynczego pliku zazwyczaj nie było problemem dla ChatGPT. Postanowiłem więc pójść
                   dalej i zautomatyzować portowanie.
                 </p>
-                <h2 id="porter">Porter</h2>
+                <h2>Porter</h2>
                 <p>
                   Porter - tak nazywa się moja próba napisania automatu do portowania całego repozytorium z języka
                   programowania X na język programowania Y. Kod źródłowy jest dostępny na GitHub, jednak nie jest to
                   działająca rzecz. Teoretycznie zadanie wydawało się proste.
                 </p>
                 <p><img alt="dont crash into each other" /></p>
-                <h3 id="pierwsze-podejście">Pierwsze podejście</h3>
-                <pre
-                  tabindex="0"
-                ><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
+                <h3>Pierwsze podejście</h3>
+                <pre><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
 <span><span>    ported </span><span>=</span><span> prompt_gpt_to_port_file</span><span>(file)</span></span>
 <span><span>    file</span><span>.write</span><span>(ported)</span></span></code></pre>
-                <h3 id="sprawdźmy-czy-kod-działa">Sprawdźmy czy kod działa</h3>
-                <pre
-                  tabindex="0"
-                ><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
+                <h3>Sprawdźmy czy kod działa</h3>
+                <pre><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
 <span><span>    ported </span><span>=</span><span> prompt_gpt_to_port_file</span><span>(file)</span></span>
 <span></span>
 <span><span>    test_errors </span><span>=</span><span> test</span><span>(ported)</span></span>
@@ -132,10 +106,8 @@
 <span><span>        prompt_gpt_to_fix_errors</span><span>(ported</span><span>,</span><span> test_errors)</span></span>
 <span></span>
 <span><span>    file</span><span>.write</span><span>(ported)</span></span></code></pre>
-                <h3 id="sprawdźmy-czy-kod-się-kompiluje">Sprawdźmy czy kod się kompiluje</h3>
-                <pre
-                  tabindex="0"
-                ><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
+                <h3>Sprawdźmy czy kod się kompiluje</h3>
+                <pre><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
 <span><span>    ported </span><span>=</span><span> prompt_gpt_to_port_file</span><span>(file)</span></span>
 <span></span>
 <span><span>    compilation_errors </span><span>=</span><span> compile</span><span>(ported)</span></span>
@@ -147,10 +119,8 @@
 <span><span>        prompt_gpt_to_fix_errors</span><span>(ported</span><span>,</span><span> test_errors)</span></span>
 <span></span>
 <span><span>    file</span><span>.write</span><span>(ported)</span></span></code></pre>
-                <h3 id="czasami-jedna-runda-poprawek-nie-wystarcza">Czasami jedna runda poprawek nie wystarcza</h3>
-                <pre
-                  tabindex="0"
-                ><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
+                <h3>Czasami jedna runda poprawek nie wystarcza</h3>
+                <pre><code><span><span>for file </span><span>in</span><span> files</span><span>:</span></span>
 <span><span>    ported </span><span>=</span><span> prompt_gpt_to_port_file</span><span>(file)</span></span>
 <span></span>
 <span><span>    compilation_errors </span><span>=</span><span> compile</span><span>(ported)</span></span>
@@ -162,7 +132,7 @@
 <span><span>        prompt_gpt_to_fix_errors</span><span>(ported</span><span>,</span><span> test_errors)</span></span>
 <span></span>
 <span><span>    file</span><span>.write</span><span>(ported)</span></span></code></pre>
-                <h2 id="refleksja">Refleksja</h2>
+                <h2>Refleksja</h2>
                 <p>
                   Wydaje się, że dodaliśmy sporo logiki specyficznej dla danego problemu - nie jest to ogólne
                   rozwiązanie portowania z języka X na Y. Jestem sobie w stanie wyobrazić, że w wielu przypadkach nie
@@ -171,7 +141,7 @@
                   możemy zapytać go, w jaki sposób przeportować codebase z języka X na Y i bez problemu odpowie i ułoży
                   plan działania.
                 </p>
-                <h2 id="babyagi-autogpt">BabyAGI, AutoGPT</h2>
+                <h2>BabyAGI, AutoGPT</h2>
                 <p>
                   Te projekty są bardzo ambitne i chodzi o to, żeby GPT sam się promptował w pętli i w ten sposób
                   rozwiązywał złożone problemy uwzględniając planowanie i wykonywanie działań. Kiedy zacząłem z nich
@@ -192,7 +162,7 @@
                   <li>Dobre promptowanie jest trudne.</li>
                   <li>Nie miałem dostępu do API GPT-4, więc korzystałem z API kolegi, ale to też ma swoje wady.</li>
                 </ol>
-                <h2 id="langchain">Langchain</h2>
+                <h2>Langchain</h2>
                 <p>W tym projekcie chodzi o to, żeby zdefiniować narzędzia dla GPT, takie jak np:</p>
                 <ul>
                   <li>walidacja kodu <code>tsc --noEmit</code></li>
@@ -204,9 +174,9 @@
                   Był mały sukces. Wydaje mi się, że z użyciem któregoś z tych narzędzi udało mi się sprawić, że po
                   wpisaniu komendy w stylu:
                 </p>
-                <pre tabindex="0"><code><span><span>python porter.py &lt;link do repo&gt;</span></span></code></pre>
+                <pre><code><span><span>python porter.py &lt;link do repo&gt;</span></span></code></pre>
                 <p>Skrypt przeportował jeden plik, zrobił commit i otworzył pull-requesta.</p>
-                <h2 id="ostateczne-rozwiazanie">Ostateczne rozwiazanie</h2>
+                <h2>Ostateczne rozwiazanie</h2>
                 <p>
                   Po kilku nieprzespanych nocach, wzlotach i upadkach, uznałem, że problem jest za duży na moją głowę,
                   albo że narzędzia nie są jeszcze wystarczająco mocne, żeby dało się napisać portera. Postanowiłem, że
@@ -215,18 +185,18 @@
                   po pliku kopiowałem do ChatuGPT, następnie wklejałem do IDE, odpalałem testy, kompilator i feedowałem
                   spowrotem do ChatuGPT jeśli były błędy.
                 </p>
-                <h2 id="nowe-funkcjonalności">Nowe funkcjonalności</h2>
+                <h2>Nowe funkcjonalności</h2>
                 <p>
                   Miesiąc temu do ChatuGPT został dodany Code Interpreter. Fajną rzeczą jest to, że można mu wrzucić zip
                   z kodem i on umie sobie po nim chodzić i czytać pliki itp. Ułatwiło to sprawę.
                 </p>
-                <h2 id="podsumowanie">Podsumowanie</h2>
+                <h2>Podsumowanie</h2>
                 <p>
                   Bez ChatuGPT nadal nie umiałbym TS, a także bym miał o wiele słabszy codebase. Pełna automatyzacja
                   takich złożonych zadań wydaje się, że jest jeszcze poza zasięgiem, ale w tej branży sprawy idą tak
                   szybko, że może już ktoś to zrobił :p
                 </p>
-                <h2 id="uznanie-autorstwa">Uznanie autorstwa</h2>
+                <h2>Uznanie autorstwa</h2>
                 <p>
                   Photo by
                   <a

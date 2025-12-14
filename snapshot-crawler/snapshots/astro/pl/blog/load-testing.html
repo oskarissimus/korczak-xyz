@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
           <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
           ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/load-testing/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -76,7 +54,7 @@
                   zużycie serwerów. Czasami chcemy wprowadzić optymalizację która ma poprawić wydajność, ale jak
                   sprawdzić czy faktycznie tak jest?
                 </p>
-                <h2 id="korzyści-testów-wydajnościowych">Korzyści testów wydajnościowych</h2>
+                <h2>Korzyści testów wydajnościowych</h2>
                 <p>
                   Z tematem load-testingu spotkałem się już w pracy. Generalnie najprostszy wariant to przytrzymać F5 na
                   otwartej stronie którą chcemy przetestować i jak serwer wytrzyma - dobra nasza :p. Czasami jednak
@@ -85,7 +63,7 @@
                   dany endpoint, jaką mieliśmy wariancję, określone percentyle (np 50, 75, 90, 99), czy wszelkie inne
                   dobra dostarczane przez statystykę matematyczną.
                 </p>
-                <h2 id="jak-zamierzam-przedstawić-temat">Jak zamierzam przedstawić temat?</h2>
+                <h2>Jak zamierzam przedstawić temat?</h2>
                 <p>
                   W celu przybliżenia tego tematu, postaram się omówić jego istotne elementy, a także zaprezentować w
                   jaki sposób można zaimplementować takie testy wydajnościowe na przykładzie Python i Azure.
@@ -94,7 +72,7 @@
                   potrzebnym kodem oraz seria streamów na Youtube gdzie będę po kolei przechodził przez cały proces.
                   Linki do YT oraz GH znajdują się na stronie głównej
                 </p>
-                <h2 id="inspiracje">Inspiracje</h2>
+                <h2>Inspiracje</h2>
                 <ul>
                   <li>
                     <a href="https://gist.github.com/mda590/7a9a6b21b74ae10aa350b1703e2724a0"

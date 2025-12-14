@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
           <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
           ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/dark-side/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -71,7 +49,7 @@
             <main>
               <section itemprop="articleBody">
                 <p><img alt="Final result" /></p>
-                <h2 id="cel">Cel</h2>
+                <h2>Cel</h2>
                 <p>
                   Każdy fan Pink Floyd zna płytę Dark Side Of The Moon. Wiele osób nawet nie znających tej płyty kojarzy
                   jej ikoniczą okładkę. Jest ona bardzo prosta - zawiera schemat rozszeczepienia światła białego na
@@ -79,12 +57,12 @@
                   białym nie kojarzy się żadna barwa - jest ono neutralne - może być co najwyżej jaśniejsze lub
                   ciemniejsze. Jak się jednak okazuje są w nim ukryte wszystkie barwy tęczy
                 </p>
-                <h2 id="pryzmat">Pryzmat</h2>
+                <h2>Pryzmat</h2>
                 <p>
                   Od dziecka chciałem wykonać to doświadczenie, jednak z wiekiem zapomina się o dziecięcych marzeniach i
                   jak wiele innych zaleglo ono na zakurzonym regale przeszłości.
                 </p>
-                <h2 id="muzyka">Muzyka</h2>
+                <h2>Muzyka</h2>
                 <p>
                   Mówi się że muzyka łagodzi obyczaje, jednak gdy puszczałem przy mojej dziewczynie muzykę którą lubię,
                   szybko przeszliśmy do rozmowy o guście muzycznym. Dokładniej przedmiotem rozmowy były utwory które
@@ -93,7 +71,7 @@
                   nagrania Pink Floyd z tego albumu. Za każdym razem była to ciekawa wędrówka, szczególnie gdy odbywało
                   się ją od początku do końca.
                 </p>
-                <h2 id="okładka">Okładka</h2>
+                <h2>Okładka</h2>
                 <p>
                   Aby dopełnić doświadczenia w pewnym momencie tchnęło mnie że być może rysunek rozszczepienia światła
                   nie oddaje tego samego co faktyczne barwy składowe światła białego. Okładkę oglądałem tylko na ekranie
@@ -103,7 +81,7 @@
                   przez ekran nie ma fali o dłgości odpowiadającej barwie żółtej. Więc można powiedzieć że widzimy ten
                   kolor, ale go tam nie ma.
                 </p>
-                <h2 id="fiolet">Fiolet</h2>
+                <h2>Fiolet</h2>
                 <p>
                   W zasadzie nie stanowi to większego problemu. Z doświadczenia wiemy że “oszukiwanie” oka żeby za
                   pomocą modyfikacji natężenia trzech kolorów móc zobaczyć ich miliony, sprawdza się bardzo dobrze.
@@ -114,7 +92,7 @@
                   źródło światła niebieskiego ma większą długość fali - jest bardziej niebieskie. W warunkach
                   naturalnych oczywiście ten kolor istnieje - jest to coś w rodzaju koloru atramentowego.
                 </p>
-                <h2 id="układ">Układ</h2>
+                <h2>Układ</h2>
                 <p>Żeby móc wykonać doświadczenie, zamówiłem potrzebne komponenty</p>
                 <ul>
                   <li>Pryzmat</li>
@@ -129,13 +107,13 @@
                   żarówkę w pudełku. Zrobiłem w nim otwór o średnikcy kilku milimetrów. Żarówka znajdowała się
                   kilkanaście centymetrów od otworu, tak aby wychodzące przez niego promienie były +/- równoległe.
                 </p>
-                <h2 id="ustawienie-pryzmatu">Ustawienie pryzmatu</h2>
+                <h2>Ustawienie pryzmatu</h2>
                 <p>
                   Jak się okazało było to niebanalne zadanie. W takich improwizowanych warunkach, z początkowo małą
                   jasnością wiązki, uzyskanie rozszczepienia światła było dość trudne. Trzeba było trochę pokręcić
                   pryzmatem aby kąt i miejsce padania światła na pryzmat było odpowiednie.
                 </p>
-                <h2 id="obserwacje">Obserwacje</h2>
+                <h2>Obserwacje</h2>
                 <p>
                   Początkowo obserwowałem rozszczepione światło na kartce papieru. Było to satysfakcjonujące na
                   początku, jednak chciałem zobaczyć więcej. Postanowiłem że spojrzę bezpośrednio w pryzmat. Szybko
@@ -144,7 +122,7 @@
                   ułamek całego światła generowanego przez żarówkę. Podsumowując uznałem że będzie to bezpieczne dla
                   moich oczu.
                 </p>
-                <h2 id="patrząc-w-spektrum">Patrząc w spektrum</h2>
+                <h2>Patrząc w spektrum</h2>
                 <p>
                   Bezpośrednie doświadczenie spoglądania w spektrum to coś co polecam każdemu. Całe spektrum miało kilka
                   centymetrów długości. Przesuwałem głowę z prawa do lewa i barwy zmieniały się. Niby nic wielkiego. Ale
@@ -155,7 +133,7 @@
                   również fiolet o którym już wspomniałem, a który tak trudno zobaczyć w innych warunkach. Szczególnie w
                   takiej czystości.
                 </p>
-                <h2 id="mankamenty-układu">Mankamenty układu</h2>
+                <h2>Mankamenty układu</h2>
                 <p>
                   Po pierwsze - mało było tej tęczy. Można było ją tylko zobaczyć w ciemnym pomieszczeniu. Docelowo
                   chciałem mieć interaktywną dekorację którą można podziwiać nie tylko w ciemni. Po drugie miałem źródło
@@ -163,12 +141,12 @@
                   Po trzecie - układ był dość duży i mało kompaktowy, raczej niepraktyczny do zastosowania jako
                   dekoracja.
                 </p>
-                <h2 id="ulepszenia">Ulepszenia</h2>
+                <h2>Ulepszenia</h2>
                 <p>
                   Dość ważną cechą układu było dla mnie zasilanie bateryjne - aby nie było konieczne podłączenie do
                   sieci w trakcie korzystania. Stąd też napięcie wybranej żarówki 12V.
                 </p>
-                <h3 id="żarówka">Żarówka</h3>
+                <h3>Żarówka</h3>
                 <div>
                   <div><img alt="Bulbs" /> Bulbs</div>
                 </div>
@@ -180,7 +158,7 @@
                   związany z komunikacją mięszy terminalem power-delivery a power bankiem. Tak czy inaczej, zostałem
                   przy żarówce halogenowej 10W 12V o złączu G4.
                 </p>
-                <h3 id="zwierciadło">Zwierciadło</h3>
+                <h3>Zwierciadło</h3>
                 <p>
                   Aby zwiększyć intensywność wiązki światła bez zwiększania mocy żarówki, postanowiłem zastosować
                   reflektor. W tym celu kupiłem dwie latarki i zwierciadło paraboliczne. Z praktycznego punktu widzenia
@@ -204,13 +182,13 @@
                   <div><img alt="Signaling flashlight" /> Signaling flashlight</div>
                   <div><img alt="Bad flashlight" /> Bad flashlight</div>
                 </div>
-                <h3 id="soczewka">Soczewka</h3>
+                <h3>Soczewka</h3>
                 <p>
                   Spytałem również w hackerspace czy ktoś ma pomysł na ulepszenie układu i jeden z kolegów zasugerował
                   żeby użyć soczewki. Wydaje się to całkiem sensowne. Ale nie mam soczewki i uznałem że narazie nie będę
                   szedł tą drogą.
                 </p>
-                <h3 id="sczelina">Sczelina</h3>
+                <h3>Sczelina</h3>
                 <div>
                   <div><img alt="Small rainbow" /> Small rainbow</div>
                   <div><img alt="Big rainbow" /> Big rainbow</div>
@@ -220,7 +198,7 @@
                   pryzmat ma na jedej ściance osłonę z podłużną szczeliną. Stosując szczelinę zamiast okrągłego otworu,
                   dostaję więcej tęczy :)
                 </p>
-                <h2 id="iteracja-2">Iteracja 2</h2>
+                <h2>Iteracja 2</h2>
                 <div>
                   <div><img alt="Iteration 2 demo" /> Iteration 2 demo</div>
                 </div>
@@ -230,7 +208,7 @@
                   położenia reflektora względem żarówki, oraz mała precyzja wymiarów szczeliny (wycięta nożem do tapet w
                   kartonie). Postanowiłem że w takim razie czas na kolejny prototyp.
                 </p>
-                <h2 id="iteracja-3">Iteracja 3</h2>
+                <h2>Iteracja 3</h2>
                 <p>
                   Wybrałem się do hackerspace. Tutaj należy wspomnieć o bardzo pomocnych członkach tej społeczności.
                   Chciałem wyciąć coś laserem w płycie HDF 2mm - pyk jest kolega któy pokazał mi wszystko co i jak i już
@@ -252,7 +230,7 @@
                   <div><img alt="Iteration 3 early test" /> Iteration 3 early test</div>
                   <div><img alt="Iteration 3 screen" /> Iteration 3 screen</div>
                 </div>
-                <h2 id="finalizacja">Finalizacja</h2>
+                <h2>Finalizacja</h2>
                 <p>
                   Myślałem że może by coś jeszcze lepiej - ale głos że jest wystarczająco dobrze zwyciężył i
                   zdecydowałem się przejść do końcowej fazy projektu. W tym celu kupiłem białą płytę meblową o
@@ -267,7 +245,7 @@
                   <div><img alt="Final assembly top" /> Final assembly top</div>
                   <div><img alt="Final assembly bottom" /> Final assembly bottom</div>
                 </div>
-                <h2 id="co-dalej">Co dalej?</h2>
+                <h2>Co dalej?</h2>
                 <p>
                   Może kiedyś to ulepszę, ale póki co temat uważam za zamknięty. Jeden z moich kolegów zajmujący się
                   muzyką, zainspirował się moim projektem. Nagrał intro podobne rytmicznie do wstępu do Money z DSOTM.

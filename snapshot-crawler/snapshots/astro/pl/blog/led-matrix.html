@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
           <div></div>
           <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
           ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/led-matrix/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -76,7 +54,7 @@
                   Wziąć taśmę LED z Chin, umieścić ją na tekturze i podłączyć do Arduino. Wiedziałem, że to możliwe,
                   ponieważ widziałem wiele razy podobne projekty na YouTube.
                 </p>
-                <h2 id="pierwotny-plan">Pierwotny plan</h2>
+                <h2>Pierwotny plan</h2>
                 <p>
                   Chciałem stworzyć macierz o wymiarach 10x30 pikseli. Mimo że nie byłaby ona wystarczająca do
                   wyświetlania obrazów, to miałaby wystarczająco dużo pikseli, aby zagrać w proste gry takie jak Tetris
@@ -89,7 +67,7 @@
                   zauważyłem napis na opakowaniu mówiący, że “nie potrafią sobie wyobrazić, jak piękne może być życie
                   bez mnie”. To trochę zabawne, ale jednocześnie ma w sobie nutkę mroku.
                 </p>
-                <h2 id="zabawa-ledami">Zabawa LEDami</h2>
+                <h2>Zabawa LEDami</h2>
                 <p>
                   Kiedy moje przesyłki w końcu dotarły z Chin, szybko podłączyłem je do Arduino i zacząłem się nimi
                   bawić.
@@ -113,7 +91,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Pierwsze użycie taśmy LED</p>
-                <h2 id="budowa-matrycy">Budowa matrycy</h2>
+                <h2>Budowa matrycy</h2>
                 <p>
                   Po zabawie z taśmami LED nadeszła pora na konstrukcję: skleiłem kawałki tektury, tworząc płytę o
                   wymiarach 1x1m. Gdy wszystko zostało podłączone do zasilania i Arduino, muszę przyznać, że
@@ -138,7 +116,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Zabawa z matrycą LED</p>
-                <h2 id="dalszy-montaż">Dalszy montaż</h2>
+                <h2>Dalszy montaż</h2>
                 <iframe
                   width="560"
                   height="315"
@@ -180,7 +158,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Porównanie tablicy z folią i bez</p>
-                <h2 id="pisanie-kodu">Pisanie kodu</h2>
+                <h2>Pisanie kodu</h2>
                 <p>
                   Kiedy sprzęt był już gotowy, uruchomiłem Arduino IDE i zaimplementowałem gry Snake oraz Tetris,
                   uznając je za odpowiednie dla ekranu o rozdzielczości 10px na 10px. Kod źródłowy tych gier mam gdzieś
@@ -205,7 +183,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Pisanie kodu Snake</p>
-                <h2 id="testowanie">Testowanie</h2>
+                <h2>Testowanie</h2>
                 <iframe
                   width="560"
                   height="315"
@@ -225,7 +203,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Testowanie wyświetlania cyfr na matrycy LED</p>
-                <h2 id="gry">Gry</h2>
+                <h2>Gry</h2>
                 <iframe
                   width="560"
                   height="315"
@@ -264,7 +242,7 @@
                   allowfullscreen=""
                 ></iframe>
                 <p>Gra w Tetrisa</p>
-                <h2 id="kontroler">Kontroler</h2>
+                <h2>Kontroler</h2>
                 <p>
                   No cóż, kontroler gry powstał z kawałka drewnianego patyczka, który znalazłem na dworze… Zdjęcia mówią
                   same za siebie.
@@ -293,7 +271,7 @@
                   referrerpolicy="strict-origin-when-cross-origin"
                   allowfullscreen=""
                 ></iframe>
-                <h2 id="co-dalej">Co dalej?</h2>
+                <h2>Co dalej?</h2>
                 <p>
                   Chciałbym wykonać kolejną wersję z PVC i pleksi, aby uzyskać estetycznie lepsze wykończenie. Zamiast
                   Arduino, chciałbym użyć Raspberry Pi oraz zastąpić drewniany patyczek klasycznymi kontrolerami retro.
@@ -303,7 +281,7 @@
                   <div><img alt="Nespi" /> Nespi</div>
                   <div><img alt="Raspberry pi" /> Raspberry pi</div>
                 </div>
-                <h2 id="uznanie-autorstwa">Uznanie autorstwa</h2>
+                <h2>Uznanie autorstwa</h2>
                 <p>Trzy ostatnie zdjęcia nie należą do mnie, więc zostały użyte z podaniem źródła.</p>
                 <ul>
                   <li>Evan-Amos, Public domain, via Wikimedia Commons</li>
