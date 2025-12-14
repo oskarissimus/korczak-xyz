@@ -1,0 +1,32 @@
+.blog_post h2 {
+    font-size: 3rem;
+    margin: 20px 0;
+}
+
+.blog_post h3 {
+    font-size: 2rem;
+    margin: 20px 0;
+}
+
+.blog_post p {
+    margin: 40px 0;
+    text-align: justify;
+}
+
+.blog_post .gatsby-resp-image-wrapper {
+    margin: 30px 0;
+}
+
+.blog_post .embedVideo-container {
+    margin: 30px 0;
+}
+
+.blog_post ul {
+    list-style: disc;
+    padding-left: 2rem;
+}
+
+.blog_post ol {
+    list-style: decimal;
+    padding-left: 2rem;
+}

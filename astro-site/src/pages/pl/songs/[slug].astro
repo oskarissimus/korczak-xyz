@@ -1,0 +1,28 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../../../layouts/Layout.astro';
+import PageContent from '../../../components/PageContent.astro';
+import '../../../styles/song.css';
+
+export async function getStaticPaths() {
+  const songs = await getCollection('songs', ({ data }) =>
+    data.published && data.language === 'pl'
+  );
+
+  return songs.map((song) => ({
+    params: { slug: song.data.slug },
+    props: { song },
+  }));
+}
+
+const { song } = Astro.props;
+const { Content } = await render(song);
+---
+
+<Layout title={`${song.data.title} | korczak.xyz`} lang="pl">
+  <PageContent title={song.data.title}>
+    <section class="blog_post" itemprop="articleBody">
+      <Content />
+    </section>
+  </PageContent>
+</Layout>

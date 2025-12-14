@@ -1,0 +1,79 @@
+---
+import { Image } from 'astro:assets';
+import logoImage from '../../assets/images/logo.png';
+import DarkModeSwitch from './DarkModeSwitch';
+import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
+
+interface Props {
+  lang: Lang;
+  currentPath: string;
+}
+
+const { lang, currentPath } = Astro.props;
+const t = useTranslations(lang);
+
+const navigation = [
+  { name: t('Home'), to: lang === 'en' ? '/' : '/pl/' },
+  { name: t('About'), to: lang === 'en' ? '/about/' : '/pl/about/' },
+  { name: t('Mentoring'), to: lang === 'en' ? '/mentoring/' : '/pl/mentoring/' },
+  { name: t('Courses'), to: lang === 'en' ? '/courses/' : '/pl/courses/' },
+  { name: t('Blog'), to: lang === 'en' ? '/blog/' : '/pl/blog/' },
+  { name: t('Songs'), to: lang === 'en' ? '/songs/' : '/pl/songs/' },
+];
+
+// Get alternate language path for language switcher
+const enPath = lang === 'en' ? currentPath : getAlternateLangPath(currentPath, lang, 'en');
+const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, lang, 'pl');
+---
+
+<div class="flex flex-col border-b md:border-b-0 border-gray-400 sticky md:relative top-0 left-0 w-full z-30 md:max-w-6xl bg-white dark:bg-black mr-10 lg:text-lg">
+  <!-- Mobile header -->
+  <div class="flex items-center justify-end ml-4">
+    <div class="flex gap-3 md:hidden">
+      <Image src={logoImage} alt="logo" width={24} height={24} />
+      <a href={lang === 'en' ? '/' : '/pl/'}>korczak.xyz</a>
+    </div>
+    <div class="grow md:hidden"></div>
+    <DarkModeSwitch className="block md:hidden" client:load />
+    <button
+      class="flex md:hidden"
+      aria-label="Menu"
+      id="menu-button"
+    >
+      <svg class="block md:hidden cursor-pointer text-3xl my-6 mx-4 w-8 h-8" fill="currentColor" viewBox="0 0 448 512">
+        <path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Desktop nav / Mobile dropdown -->
+  <nav id="main-nav" class="items-end md:items-center gap-4 ml-6 mr-6 md:mr-0 md:mt-4 mb-6 flex-col md:flex md:flex-row hidden md:flex">
+    <div class="flex gap-3 md:flex hidden">
+      <Image src={logoImage} alt="logo" width={24} height={24} />
+      <a href={lang === 'en' ? '/' : '/pl/'}>korczak.xyz</a>
+    </div>
+    <div class="grow hidden md:block"></div>
+    {navigation.map(item => (
+      <a href={item.to}>{item.name}</a>
+    ))}
+    <DarkModeSwitch className="hidden md:block" client:load />
+    <div class="flex gap-3">
+      <a href={enPath}>
+        <span role="img" aria-label="en" class="text-2xl">🇬🇧</span>
+      </a>
+      <a href={plPath}>
+        <span role="img" aria-label="pl" class="text-2xl">🇵🇱</span>
+      </a>
+    </div>
+  </nav>
+</div>
+
+<script>
+  const menuButton = document.getElementById('menu-button');
+  const mainNav = document.getElementById('main-nav');
+
+  menuButton?.addEventListener('click', () => {
+    mainNav?.classList.toggle('hidden');
+    mainNav?.classList.toggle('flex');
+  });
+</script>

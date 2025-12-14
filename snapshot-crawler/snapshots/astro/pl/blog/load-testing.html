@@ -1,0 +1,123 @@
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="Personal website of Oskar Korczak" />
+    <meta name="image" content="https://korczak.xyz/logo.png" />
+    <link rel="icon" href="/favicon-32x32.png" type="image/png" />
+    <title>Testy wydajnościowe | korczak.xyz</title>
+  </head>
+  <body>
+    <div>
+      <div>
+        <div>
+          <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
+          <div></div>
+          <astro-island
+            uid="Z1QhqvY"
+            prefix="r2"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"block md:hidden"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" checked="" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <button aria-label="Menu" id="menu-button">
+            <svg fill="currentColor" viewBox="0 0 448 512">
+              <path
+                d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <nav id="main-nav">
+          <div><img alt="logo" /> <a href="/pl/">korczak.xyz</a></div>
+          <div></div>
+          <a href="/pl/">Główna</a><a href="/pl/about/">O mnie</a><a href="/pl/mentoring/">Mentoring</a
+          ><a href="/pl/courses/">Kursy</a><a href="/pl/blog/">Blog</a><a href="/pl/songs/">Teksty</a>
+          <astro-island
+            uid="18Ow2c"
+            prefix="r3"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"hidden md:block"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <div>
+            <a href="/blog/load-testing/"> <span role="img" aria-label="en">🇬🇧</span> </a>
+            <a href="/pl/blog/load-testing/"> <span role="img" aria-label="pl">🇵🇱</span> </a>
+          </div>
+        </nav>
+      </div>
+      <div>
+        <div>
+          <div>
+            <header><h1>Testy wydajnościowe</h1></header>
+            <main>
+              <section itemprop="articleBody">
+                <p><img alt="gauges" /></p>
+                <p>
+                  Aplikacje stworzone z myślą o obsłudze dużej ilości użytkowników potrafią wygenerować duże rachunki za
+                  zużycie serwerów. Czasami chcemy wprowadzić optymalizację która ma poprawić wydajność, ale jak
+                  sprawdzić czy faktycznie tak jest?
+                </p>
+                <h2 id="korzyści-testów-wydajnościowych">Korzyści testów wydajnościowych</h2>
+                <p>
+                  Z tematem load-testingu spotkałem się już w pracy. Generalnie najprostszy wariant to przytrzymać F5 na
+                  otwartej stronie którą chcemy przetestować i jak serwer wytrzyma - dobra nasza :p. Czasami jednak
+                  przydatne jest ilościowe podejście do sprawy. Dobrze żeby narzędzie do testów wydajnościowych pokazało
+                  jakiś raport w którym zawarte będą konkretne informacje - ile czasu średnio potrzebował request na
+                  dany endpoint, jaką mieliśmy wariancję, określone percentyle (np 50, 75, 90, 99), czy wszelkie inne
+                  dobra dostarczane przez statystykę matematyczną.
+                </p>
+                <h2 id="jak-zamierzam-przedstawić-temat">Jak zamierzam przedstawić temat?</h2>
+                <p>
+                  W celu przybliżenia tego tematu, postaram się omówić jego istotne elementy, a także zaprezentować w
+                  jaki sposób można zaimplementować takie testy wydajnościowe na przykładzie Python i Azure.
+                  Jednocześnie postaram się żeby ten przykład był na tyle uniwersalny żeby można go było potraktować
+                  jako rusztowanie do rzeczywistych zastosowań. W tym celu zostanie stworzone repo na github z całym
+                  potrzebnym kodem oraz seria streamów na Youtube gdzie będę po kolei przechodził przez cały proces.
+                  Linki do YT oraz GH znajdują się na stronie głównej
+                </p>
+                <h2 id="inspiracje">Inspiracje</h2>
+                <ul>
+                  <li>
+                    <a href="https://gist.github.com/mda590/7a9a6b21b74ae10aa350b1703e2724a0"
+                      >Python script useful for stress testing systems</a
+                    >
+                  </li>
+                  <li>
+                    <a href="https://medium.com/@tferreiraw/performing-load-tests-with-python-locust-io-62de7d91eebd"
+                      >Performing load tests with Python + Locust.io | by Thiago Ferreira | Medium</a
+                    >
+                  </li>
+                  <li>
+                    <a href="https://www.blazemeter.com/blog/performance-testing-vs-load-testing-vs-stress-testing"
+                      >Performance Testing vs. Load Testing vs. Stress Testing | Blazemeter by Perforce</a
+                    >
+                  </li>
+                </ul>
+              </section>
+            </main>
+          </div>
+        </div>
+        <footer><a href="/pl/">korczak.xyz</a></footer>
+      </div>
+    </div>
+  </body>
+</html>

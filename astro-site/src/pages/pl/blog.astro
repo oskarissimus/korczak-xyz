@@ -1,0 +1,29 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import PageContent from '../../components/PageContent.astro';
+import BlogPageItem from '../../components/BlogPageItem.astro';
+
+const posts = await getCollection('blog-pl', ({ data }) =>
+  data.published
+);
+
+// Sort by date descending
+posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+---
+
+<Layout title="Blog | korczak.xyz" lang="pl">
+  <PageContent title="Blog">
+    <ul class="flex flex-col gap-10">
+      {posts.map(post => (
+        <BlogPageItem
+          slug={post.data.slug}
+          title={post.data.title}
+          date={post.data.date}
+          featuredImage={post.data.featuredImage}
+          lang="pl"
+        />
+      ))}
+    </ul>
+  </PageContent>
+</Layout>
