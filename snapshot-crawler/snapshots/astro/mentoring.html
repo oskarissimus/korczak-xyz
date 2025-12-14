@@ -13,24 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r6"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            ssr=""
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -38,27 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
           <div></div>
           <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
           ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r7"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            ssr=""
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/mentoring/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -78,17 +54,6 @@
                 feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule
                 meeting, or contact me using form on the bottom of this page. First meeting is free 😉
               </p>
-              <astro-island
-                uid="Z22EvLi"
-                prefix="r4"
-                component-url="/_astro/Calendar.r3v1cE9h.js"
-                component-export="default"
-                renderer-url="/_astro/client.9unXo8s5.js"
-                props="{}"
-                ssr=""
-                client="load"
-                opts='{"name":"Calendar","value":true}'
-              ></astro-island>
               <p>I can help you with:</p>
               <ul>
                 <li>Python</li>
@@ -99,27 +64,15 @@
                 <li>React</li>
               </ul>
               <p>Mentoring sessions are up to 1 hour long.</p>
-              <astro-island
-                uid="21MnzY"
-                prefix="r5"
-                component-url="/_astro/ContactFormWrapper.fH-D-WJv.js"
-                component-export="default"
-                renderer-url="/_astro/client.9unXo8s5.js"
-                props="{}"
-                ssr=""
-                client="load"
-                opts='{"name":"ContactFormWrapper","value":true}'
-                await-children=""
-                ><form accept-charset="UTF-8">
-                  <label><span>Name</span><input type="text" placeholder="Enter name" required="" name="name" /></label
-                  ><label
-                    ><span>Email</span><input type="email" placeholder="Enter email" required="" name="email" /></label
-                  ><label
-                    ><span>Message</span
-                    ><textarea name="message" required="" placeholder="Enter message"></textarea></label
-                  ><input type="hidden" name="_gotcha" /><button type="submit">Submit</button>
-                </form></astro-island
-              >
+              <form accept-charset="UTF-8">
+                <label><span>Name</span><input type="text" placeholder="Enter name" required="" name="name" /></label
+                ><label
+                  ><span>Email</span><input type="email" placeholder="Enter email" required="" name="email" /></label
+                ><label
+                  ><span>Message</span
+                  ><textarea name="message" required="" placeholder="Enter message"></textarea></label
+                ><input type="hidden" name="_gotcha" /><button type="submit">Submit</button>
+              </form>
             </main>
           </div>
         </div>

@@ -13,23 +13,12 @@
         <div>
           <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
           <div></div>
-          <astro-island
-            uid="Z1QhqvY"
-            prefix="r2"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"block md:hidden"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" checked="" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
-          <button aria-label="Menu" id="menu-button">
+          <button aria-label="Menu">
             <svg fill="currentColor" viewBox="0 0 448 512">
               <path
                 d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
@@ -37,26 +26,15 @@
             </svg>
           </button>
         </div>
-        <nav id="main-nav">
+        <nav>
           <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
           <div></div>
           <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
           ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
-          <astro-island
-            uid="18Ow2c"
-            prefix="r3"
-            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
-            component-export="default"
-            renderer-url="/_astro/client.9unXo8s5.js"
-            props='{"className":[0,"hidden md:block"]}'
-            client="load"
-            opts='{"name":"DarkModeSwitch","value":true}'
-            await-children=""
-            ><label
-              ><input type="checkbox" />
-              <div></div>
-              <span>Dark mode</span></label
-            ></astro-island
+          <label
+            ><input type="checkbox" checked="" />
+            <div></div>
+            <span>Dark mode</span></label
           >
           <div>
             <a href="/blog/load-testing/"> <span role="img" aria-label="en">🇬🇧</span> </a>
@@ -76,7 +54,7 @@
                   Sometimes we want to introduce an optimization to improve performance, but how can we check if it
                   actually works?
                 </p>
-                <h2 id="benefits-of-performance-testing">Benefits of performance testing</h2>
+                <h2>Benefits of performance testing</h2>
                 <p>
                   I’ve encountered the topic of load testing at work. Generally, the simplest way to do it is to keep
                   pressing F5 on the opened page that we want to test and see if the server can handle it - good for us
@@ -85,7 +63,7 @@
                   variance we had, certain percentiles (e.g. 50, 75, 90, 99), or any other stats provided by
                   mathematics.
                 </p>
-                <h2 id="how-will-i-present-the-topic">How will I present the topic?</h2>
+                <h2>How will I present the topic?</h2>
                 <p>
                   To introduce this topic, I will try to discuss its essential elements and show how performance testing
                   can be implemented using Python and Azure. At the same time, I will try to make this example universal
@@ -93,7 +71,7 @@
                   will be created with all the necessary code, and a series of streams on YouTube where I will go
                   through the whole process step by step. Links to YT and GH can be found on the main page.
                 </p>
-                <h2 id="inspirations">Inspirations</h2>
+                <h2>Inspirations</h2>
                 <ul>
                   <li>
                     <a href="https://gist.github.com/mda590/7a9a6b21b74ae10aa350b1703e2724a0"
