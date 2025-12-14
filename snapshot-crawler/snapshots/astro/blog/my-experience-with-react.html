@@ -1,0 +1,134 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="Personal website of Oskar Korczak" />
+    <meta name="image" content="https://korczak.xyz/logo.png" />
+    <link rel="icon" href="/favicon-32x32.png" type="image/png" />
+    <title>My experience with React | korczak.xyz</title>
+  </head>
+  <body>
+    <div>
+      <div>
+        <div>
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <astro-island
+            uid="Z1QhqvY"
+            prefix="r2"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"block md:hidden"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <button aria-label="Menu" id="menu-button">
+            <svg fill="currentColor" viewBox="0 0 448 512">
+              <path
+                d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <nav id="main-nav">
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
+          ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
+          <astro-island
+            uid="18Ow2c"
+            prefix="r3"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"hidden md:block"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" checked="" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <div>
+            <a href="/blog/my-experience-with-react/"> <span role="img" aria-label="en">🇬🇧</span> </a>
+            <a href="/pl/blog/my-experience-with-react/"> <span role="img" aria-label="pl">🇵🇱</span> </a>
+          </div>
+        </nav>
+      </div>
+      <div>
+        <div>
+          <div>
+            <header><h1>My experience with React</h1></header>
+            <main>
+              <section itemprop="articleBody">
+                <p>
+                  Once upon a time I wrote a front-end of web app in pure JavaScript with a little help of jQuery. It
+                  was a quick way to start. However, when my project grew I noticed a sad consequence of my approach:
+                  the code after just about a year was total Spagetti!
+                  <img alt="Spaghetti code" />
+                  Liść zdjęcie utworzone przez jcomp - pl.freepik.com
+                </p>
+                <h2 id="vanilla-js---gateway-drug">Vanilla JS - gateway drug</h2>
+                <p>I thank that some developers start with JS this way.</p>
+                <ol>
+                  <li>
+                    Oh! I can have button just by typing <code>&lt;button&gt;</code> in my HTML file! Great! Let’s see
+                    how do I make it do something after clicking.
+                  </li>
+                  <li>So I use JavaScript for that [BE CAREFUL]</li>
+                  <li>Let’s add some <code>onClick="alert('clicked')"</code> attribute to my button</li>
+                  <li>
+                    Then after some time You find out about [DANGEROUS] <code>getElementById()</code>. At this point a
+                    real madness about Vanilla JS begins…
+                  </li>
+                </ol>
+                <p>
+                  When I write code, I often have a feeling about what it should do. Sometimes of course there is some
+                  specification, but my inner hacker always wants something to be done by just written code. This is why
+                  using <code>getElementById()</code> is so tempting every time. Just define id for element, than
+                  copy-paste some code from Stack Overflow, and boom! Work is done. However creating an app this way
+                  leads to anger, anger leads to hate and hate leads to spaghetti code.
+                  <img alt="Too much vanilla JS is dangerous" />
+                  Tło zdjęcie utworzone przez Waewkidja - pl.freepik.com
+                </p>
+                <h2 id="dark-times">Dark times</h2>
+                <p>
+                  Ok, so I managed to deploy my freshly created legacy code to production. Did I mention I had no code
+                  review whatsoever? Surprisingly this code worked more often than not, and nobody asked for too much
+                  changes in it, so I leaved it for about 6 months. After that stability of the app came into question,
+                  and I was wondering about fixing things, improving compatibility with browsers, etc. I didn’t even
+                  want to look at it. It was about 900 lines in pure JS with atrocities like
+                  <code>getElementById()</code> everywhere. I heard about this great React. That it is easy and
+                  powerful. However, I never was into front-end so I didn’t start learning it. After watching some
+                  videos on YouTube about it, I got grasp of key concepts of React. As it grew on me, I decided to get
+                  out of this Legacy-Hell created by myself. <img alt="React is the way" />
+                </p>
+                <h2 id="quickstart-with-react">Quickstart with React</h2>
+                <p>
+                  When I got basic concepts of React - components, state, props everything started to get brighter. I
+                  finally could make some sensible modules, isolate thing from each other, use some nice architecture
+                  and hierarchy. Not only that! After making Hello World in React it was clear to me that creating
+                  front-end this way is even easier than in vanilla JS! In about a week I was able to get rid of ugly
+                  900 lines of my own legacy and replace it with fresh React code.
+                </p>
+                <p>
+                  Every time when I learned new feature of React I really appreciate its design. It is great! Use React!
+                </p>
+              </section>
+            </main>
+          </div>
+        </div>
+        <footer><a href="/">korczak.xyz</a></footer>
+      </div>
+    </div>
+  </body>
+</html>

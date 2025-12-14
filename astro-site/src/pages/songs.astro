@@ -1,0 +1,34 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import { useTranslations } from '../i18n';
+
+const t = useTranslations('en');
+
+// Songs are only in Polish, so this page just shows a message or redirects
+const songs = await getCollection('songs', ({ data }) =>
+  data.published && data.language === 'pl'
+);
+
+// Sort by author then title
+songs.sort((a, b) => {
+  const authorCompare = a.data.author.localeCompare(b.data.author);
+  if (authorCompare !== 0) return authorCompare;
+  return a.data.title.localeCompare(b.data.title);
+});
+---
+
+<Layout title={`${t('Songs')} | korczak.xyz`} lang="en">
+  <PageContent title={t('Songs')}>
+    <ul class="flex flex-col gap-10">
+      {songs.map(song => (
+        <li>
+          <a href={`/pl/songs/${song.data.slug}/`}>
+            {song.data.author}: {song.data.title}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </PageContent>
+</Layout>

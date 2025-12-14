@@ -1,0 +1,309 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="Personal website of Oskar Korczak" />
+    <meta name="image" content="https://korczak.xyz/logo.png" />
+    <link rel="icon" href="/favicon-32x32.png" type="image/png" />
+    <title>LED matrix | korczak.xyz</title>
+  </head>
+  <body>
+    <div>
+      <div>
+        <div>
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <astro-island
+            uid="Z1QhqvY"
+            prefix="r2"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"block md:hidden"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" checked="" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <button aria-label="Menu" id="menu-button">
+            <svg fill="currentColor" viewBox="0 0 448 512">
+              <path
+                d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <nav id="main-nav">
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
+          ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
+          <astro-island
+            uid="18Ow2c"
+            prefix="r3"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"hidden md:block"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <div>
+            <a href="/blog/led-matrix/"> <span role="img" aria-label="en">🇬🇧</span> </a>
+            <a href="/pl/blog/led-matrix/"> <span role="img" aria-label="pl">🇵🇱</span> </a>
+          </div>
+        </nav>
+      </div>
+      <div>
+        <div>
+          <div>
+            <header><h1>LED matrix</h1></header>
+            <main>
+              <section itemprop="articleBody">
+                <p><img alt="Tetris played on my DIY LED matrix" /></p>
+                <p>
+                  Sometime in early 2018 I started building my DIY LED matrix. Plan was quite simple. Take led strip
+                  from China, put it on cardboard, and connect it into arduino. I knew it was possible, because i saw
+                  projects like that many times on YouTube.
+                </p>
+                <h2 id="original-plan">Original plan</h2>
+                <p>
+                  I wanted to have 10x30 pixels on my matrix, maybe not enough to display images, but sufficient to play
+                  some simple games, like tetris or pong, maybe display some animations, or just plain colors. It would
+                  have dimensions like 33 x 100 cm. When LEDs from China arrived, I was surprised to notice, that I cant
+                  control them individually, but every 3 of them are connected in series. It meant that instead of 300
+                  pixels, I would only have 100. Also every pixel would have 10×10 cm diameters, giving me matrix with
+                  size of 1mx1m.
+                  <img alt="Led strip" />
+                  These are very good LEDs. However I laughed for a while when i noticed that “they couldn’t imagine how
+                  beautiful life without me”. A little dark.
+                </p>
+                <h2 id="playing-with-leds">Playing with LEDs</h2>
+                <p>
+                  When my packages finally arrived from China, I quickly connected them to arduino and started playing
+                  with them.
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/2-hwGV2hLpU"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>First usage of LED strip</p>
+                <h2 id="building-matrix">Building matrix</h2>
+                <p>
+                  Well, after having some fun with LED strips it was time to glue together some cardboard, and make
+                  backplate with size 1x1m, Than I plugged everything to power supply and arduino, and was truly amazed
+                  with LED control software
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/JDR4Wz0-VFU"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Playing around with LED matrix</p>
+                <h2 id="further-assembly">Further assembly</h2>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/I-fwW-TVWJo"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>
+                  I separated pixels with stripes of cardboard secured to the backplate with hot glue. After that I
+                  covered it with foil, to disperse light, and create sensation of square pixels.
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/MXAwmhOfveE"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Comparison of matrix with and without foil</p>
+                <h2 id="writing-code">Writing code</h2>
+                <p>
+                  When hardware was ready i opened Arduino IDE and implemented Snake and Tetris, because i thought those
+                  are appropriate games for screen with resolution of 10px x 10px. I have source code for that somewhere
+                  on old hard drive, and I will share it, when I will find it.
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/MBs8jBqcsIw"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Writing code for snake</p>
+                <h2 id="testing">Testing</h2>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/lzloEHUfXow"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Testing display of numbers on LED matrix</p>
+                <h2 id="games">Games</h2>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/pGL7U9LC1UQ"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Snake gameplay without game clock implemented yet</p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/2nQtkvzXlh8"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>Tetris gameplay</p>
+                <h2 id="game-controller">Game controller</h2>
+                <p>
+                  Well, game controller was made from piece of wooden stick that i found outside… let pictures speak for
+                  themselves
+                </p>
+                <div>
+                  <div><img alt="Controller wiring" /> Controller wiring</div>
+                  <div><img alt="Controller wiring with laptop" /> Controller wiring with laptop</div>
+                  <div><img alt="Controller in all its glory" /> Controller in all its glory</div>
+                </div>
+                <p><img alt="Close-up on joystick" /></p>
+                <p><code>youtube: BXvUJtiB-Cc</code></p>
+                <h2 id="whats-next">Whats next?</h2>
+                <p>
+                  I would like to make another one with PVC and plexiglass to have nicer finish. I would like to use
+                  Raspberry Pi instead of Arduino and retro controllers instead of wooden stick
+                </p>
+                <div>
+                  <div><img alt="Nes controller" /> Nes controller</div>
+                  <div><img alt="Nespi" /> Nespi</div>
+                  <div><img alt="Raspberry pi" /> Raspberry pi</div>
+                </div>
+                <h2 id="images-attribution">Images attribution</h2>
+                <p>Last three images are not mine, so are reused with attribution</p>
+                <ul>
+                  <li>Evan-Amos, Public domain, via Wikimedia Commons</li>
+                  <li>
+                    Gareth Halfacree from Bradford, UK, CC BY-SA 2.0
+                    <a href="https://creativecommons.org/licenses/by-sa/2.0"
+                      >https://creativecommons.org/licenses/by-sa/2.0</a
+                    >, via Wikimedia Commons
+                  </li>
+                  <li>Michael Henzler / Wikimedia Commons</li>
+                </ul>
+                <p>All other images and videos were created by me, and I publish them as Pubic Domain</p>
+              </section>
+            </main>
+          </div>
+        </div>
+        <footer><a href="/">korczak.xyz</a></footer>
+      </div>
+    </div>
+  </body>
+</html>

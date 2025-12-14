@@ -1,0 +1,187 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="Personal website of Oskar Korczak" />
+    <meta name="image" content="https://korczak.xyz/logo.png" />
+    <link rel="icon" href="/favicon-32x32.png" type="image/png" />
+    <title>Hacked intercom | korczak.xyz</title>
+  </head>
+  <body>
+    <div>
+      <div>
+        <div>
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <astro-island
+            uid="Z1QhqvY"
+            prefix="r2"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"block md:hidden"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" checked="" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <button aria-label="Menu" id="menu-button">
+            <svg fill="currentColor" viewBox="0 0 448 512">
+              <path
+                d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <nav id="main-nav">
+          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
+          <div></div>
+          <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
+          ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
+          <astro-island
+            uid="18Ow2c"
+            prefix="r3"
+            component-url="/_astro/DarkModeSwitch.BQNEYJL_.js"
+            component-export="default"
+            renderer-url="/_astro/client.9unXo8s5.js"
+            props='{"className":[0,"hidden md:block"]}'
+            client="load"
+            opts='{"name":"DarkModeSwitch","value":true}'
+            await-children=""
+            ><label
+              ><input type="checkbox" />
+              <div></div>
+              <span>Dark mode</span></label
+            ></astro-island
+          >
+          <div>
+            <a href="/blog/hacked-intercom/"> <span role="img" aria-label="en">🇬🇧</span> </a>
+            <a href="/pl/blog/hacked-intercom/"> <span role="img" aria-label="pl">🇵🇱</span> </a>
+          </div>
+        </nav>
+      </div>
+      <div>
+        <div>
+          <div>
+            <header><h1>Hacked intercom</h1></header>
+            <main>
+              <section itemprop="articleBody">
+                <p><img alt="internals" /></p>
+                <p>
+                  In 2018, I was staying at a friend’s place. I made a copy of the apartment keys, but it was impossible
+                  to duplicate the front door key as the original was bent. The locksmith said such a key couldn’t be
+                  copied. The original key could open the front door as usual, but when I asked if it could be
+                  straightened, the locksmith explained that it would almost certainly break. I couldn’t really ask the
+                  landlord for an extra key because, well, they didn’t know I was living there.
+                </p>
+                <h2 id="the-intercom-worked-well">The Intercom Worked Well</h2>
+                <p>
+                  <img alt="regular intercom" /> The intercom was typical for an old building near the Olsztyn Old Town.
+                  Each apartment had its own button, with no codes or advanced features. Here’s how the intercom
+                  functioned:
+                </p>
+                <ol>
+                  <li>Call a specific apartment.</li>
+                  <li>Answer the call.</li>
+                  <li>Talk.</li>
+                  <li>
+                    Open the door. My plan was to connect an Arduino to features 1 and 4. Later, I discovered it was
+                    quite amusing to tap into feature 3.
+                  </li>
+                </ol>
+                <h2 id="arduino">Arduino</h2>
+                <p>
+                  <img alt="loose internals" /> I bought a few Arduino boards from a Chinese seller for two dollars
+                  each. Using a multimeter and the intercom documentation I found online, I figured out which pins to
+                  connect to the Arduino’s ADC. Implementing it was fairly straightforward. The only annoying part was
+                  uploading code to the Arduino—this is always a hassle with such projects unless you have exceptionally
+                  long cables or clever code-upload methods like WiFi. I didn’t have any of that.
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/6tuDXU8ow9M"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <h2 id="algorithm">Algorithm</h2>
+                <p>
+                  To open the door, I needed to call my apartment four times at specific intervals. This would trigger a
+                  relay in the circuit where the door is usually opened. I had to set broad timing tolerances to make it
+                  usable and include a timeout for when the system would reset.
+                </p>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/KKOZTo64eQk"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <h2 id="wifi">Wifi</h2>
+                <p>
+                  By 2018, everyone had a smartphone, so you might wonder why I didn’t just use that for remotely
+                  opening the door after connecting to the intercom line. Simply put, it was too unstable—I didn’t want
+                  to rely on it. Remember, this was my only way to access the building when my friend wasn’t home. There
+                  were a few times when I had it set up with WiFi using ESP32, and for some unknown reason, it froze and
+                  stopped working.
+                </p>
+                <h2 id="sounds">Sounds</h2>
+                <iframe
+                  width="560"
+                  height="315"
+                  src="https://www.youtube.com/embed/lfNpqSJsEVw"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="
+                    accelerometer;
+                    autoplay;
+                    clipboard-write;
+                    encrypted-media;
+                    gyroscope;
+                    picture-in-picture;
+                    web-share;
+                  "
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen=""
+                ></iframe>
+                <p>
+                  Once I had the basic system working, I started thinking about enhancements. It turned out to be quite
+                  simple to tap into the line transmitting the intercom audio—an analog signal. I connected a tiny MP3
+                  player board from a Chinese seller, about the size of a micro-SD card. I loaded it with funny sounds,
+                  which played whenever the correct “code” (four rings at even intervals) was entered.
+                </p>
+              </section>
+            </main>
+          </div>
+        </div>
+        <footer><a href="/">korczak.xyz</a></footer>
+      </div>
+    </div>
+  </body>
+</html>
