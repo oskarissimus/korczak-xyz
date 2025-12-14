@@ -1,4 +1,4 @@
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
@@ -11,152 +11,153 @@
     <div>
       <div>
         <div>
-          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
-          <div></div>
-          <label
-            ><input type="checkbox" checked="" />
-            <div></div>
-            <span>Dark mode</span></label
-          >
+          <div>
+            <img alt="logo" />
+            <a href="/">korczak.xyz</a>
+          </div>
+          <label>
+            <input type="checkbox" />
+            <span>Dark mode</span>
+          </label>
           <button aria-label="Menu">
-            <svg fill="currentColor" viewBox="0 0 448 512">
+            <svg viewBox="0 0 512 512">
               <path
-                d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"
-              ></path>
+                d="M61.1 224C45 224 32 211 32 194.9c0-1.9 .2-3.7 .6-5.6C37.9 168.3 78.8 32 256 32s218.1 136.3 223.4 157.3c.5 1.9 .6 3.7 .6 5.6c0 16.1-13 29.1-29.1 29.1L61.1 224zM144 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm240 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32zM272 96a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zM16 304c0-26.5 21.5-48 48-48l384 0c26.5 0 48 21.5 48 48s-21.5 48-48 48L64 352c-26.5 0-48-21.5-48-48zm16 96c0-8.8 7.2-16 16-16l416 0c8.8 0 16 7.2 16 16l0 16c0 35.3-28.7 64-64 64L96 480c-35.3 0-64-28.7-64-64l0-16z"></path>
             </svg>
           </button>
         </div>
         <nav>
-          <div><img alt="logo" /> <a href="/">korczak.xyz</a></div>
-          <div></div>
-          <a href="/">Home</a><a href="/about/">About</a><a href="/mentoring/">Mentoring</a
-          ><a href="/courses/">Courses</a><a href="/blog/">Blog</a><a href="/songs/">Songs</a>
-          <label
-            ><input type="checkbox" checked="" />
-            <div></div>
-            <span>Dark mode</span></label
-          >
           <div>
-            <a href="/blog/hacked-intercom/"> <span role="img" aria-label="en">🇬🇧</span> </a>
-            <a href="/pl/blog/hacked-intercom/"> <span role="img" aria-label="pl">🇵🇱</span> </a>
+            <img alt="logo" />
+            <a href="/">korczak.xyz</a>
+          </div>
+          <a href="/">Home</a>
+          <a href="/about/">About</a>
+          <a href="/mentoring/">Mentoring</a>
+          <a href="/courses/">Courses</a>
+          <a href="/blog/">Blog</a>
+          <a href="/songs/">Songs</a>
+          <label>
+            <input type="checkbox" />
+            <span>Dark mode</span>
+          </label>
+          <div>
+            <a href="/blog/hacked-intercom/"><span role="img" aria-label="en">🇬🇧</span></a>
+            <a href="/pl/blog/hacked-intercom/"><span role="img" aria-label="pl">🇵🇱</span></a>
           </div>
         </nav>
       </div>
       <div>
         <div>
-          <div>
-            <header><h1>Hacked intercom</h1></header>
-            <main>
-              <section itemprop="articleBody">
-                <p><img alt="internals" /></p>
-                <p>
-                  In 2018, I was staying at a friend’s place. I made a copy of the apartment keys, but it was impossible
-                  to duplicate the front door key as the original was bent. The locksmith said such a key couldn’t be
-                  copied. The original key could open the front door as usual, but when I asked if it could be
-                  straightened, the locksmith explained that it would almost certainly break. I couldn’t really ask the
-                  landlord for an extra key because, well, they didn’t know I was living there.
-                </p>
-                <h2>The Intercom Worked Well</h2>
-                <p>
-                  <img alt="regular intercom" /> The intercom was typical for an old building near the Olsztyn Old Town.
-                  Each apartment had its own button, with no codes or advanced features. Here’s how the intercom
-                  functioned:
-                </p>
-                <ol>
-                  <li>Call a specific apartment.</li>
-                  <li>Answer the call.</li>
-                  <li>Talk.</li>
-                  <li>
-                    Open the door. My plan was to connect an Arduino to features 1 and 4. Later, I discovered it was
-                    quite amusing to tap into feature 3.
-                  </li>
-                </ol>
-                <h2>Arduino</h2>
-                <p>
-                  <img alt="loose internals" /> I bought a few Arduino boards from a Chinese seller for two dollars
-                  each. Using a multimeter and the intercom documentation I found online, I figured out which pins to
-                  connect to the Arduino’s ADC. Implementing it was fairly straightforward. The only annoying part was
-                  uploading code to the Arduino—this is always a hassle with such projects unless you have exceptionally
-                  long cables or clever code-upload methods like WiFi. I didn’t have any of that.
-                </p>
-                <iframe
-                  width="560"
-                  height="315"
-                  src="https://www.youtube.com/embed/6tuDXU8ow9M"
-                  title="YouTube video player"
-                  frameborder="0"
-                  allow="
-                    accelerometer;
-                    autoplay;
-                    clipboard-write;
-                    encrypted-media;
-                    gyroscope;
-                    picture-in-picture;
-                    web-share;
-                  "
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  allowfullscreen=""
-                ></iframe>
-                <h2>Algorithm</h2>
-                <p>
-                  To open the door, I needed to call my apartment four times at specific intervals. This would trigger a
-                  relay in the circuit where the door is usually opened. I had to set broad timing tolerances to make it
-                  usable and include a timeout for when the system would reset.
-                </p>
-                <iframe
-                  width="560"
-                  height="315"
-                  src="https://www.youtube.com/embed/KKOZTo64eQk"
-                  title="YouTube video player"
-                  frameborder="0"
-                  allow="
-                    accelerometer;
-                    autoplay;
-                    clipboard-write;
-                    encrypted-media;
-                    gyroscope;
-                    picture-in-picture;
-                    web-share;
-                  "
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  allowfullscreen=""
-                ></iframe>
-                <h2>Wifi</h2>
-                <p>
-                  By 2018, everyone had a smartphone, so you might wonder why I didn’t just use that for remotely
-                  opening the door after connecting to the intercom line. Simply put, it was too unstable—I didn’t want
-                  to rely on it. Remember, this was my only way to access the building when my friend wasn’t home. There
-                  were a few times when I had it set up with WiFi using ESP32, and for some unknown reason, it froze and
-                  stopped working.
-                </p>
-                <h2>Sounds</h2>
-                <iframe
-                  width="560"
-                  height="315"
-                  src="https://www.youtube.com/embed/lfNpqSJsEVw"
-                  title="YouTube video player"
-                  frameborder="0"
-                  allow="
-                    accelerometer;
-                    autoplay;
-                    clipboard-write;
-                    encrypted-media;
-                    gyroscope;
-                    picture-in-picture;
-                    web-share;
-                  "
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  allowfullscreen=""
-                ></iframe>
-                <p>
-                  Once I had the basic system working, I started thinking about enhancements. It turned out to be quite
-                  simple to tap into the line transmitting the intercom audio—an analog signal. I connected a tiny MP3
-                  player board from a Chinese seller, about the size of a micro-SD card. I loaded it with funny sounds,
-                  which played whenever the correct “code” (four rings at even intervals) was entered.
-                </p>
-              </section>
-            </main>
-          </div>
+          <header><h1>Hacked intercom</h1></header>
+          <main>
+            <section itemprop="articleBody">
+              <p><img alt="internals" /></p>
+              <p>
+                In 2018, I was staying at a friend's place. I made a copy of the apartment keys, but it was impossible
+                to duplicate the front door key as the original was bent. The locksmith said such a key couldn't be
+                copied. The original key could open the front door as usual, but when I asked if it could be
+                straightened, the locksmith explained that it would almost certainly break. I couldn't really ask the
+                landlord for an extra key because, well, they didn't know I was living there.
+              </p>
+              <h2>The Intercom Worked Well</h2>
+              <p>
+                <img alt="regular intercom" />
+                The intercom was typical for an old building near the Olsztyn Old Town. Each apartment had its own
+                button, with no codes or advanced features. Here's how the intercom functioned:
+              </p>
+              <ol>
+                <li>Call a specific apartment.</li>
+                <li>Answer the call.</li>
+                <li>Talk.</li>
+                <li>
+                  Open the door. My plan was to connect an Arduino to features 1 and 4. Later, I discovered it was quite
+                  amusing to tap into feature 3.
+                </li>
+              </ol>
+              <h2>Arduino</h2>
+              <p>
+                <img alt="loose internals" />
+                I bought a few Arduino boards from a Chinese seller for two dollars each. Using a multimeter and the
+                intercom documentation I found online, I figured out which pins to connect to the Arduino's ADC.
+                Implementing it was fairly straightforward. The only annoying part was uploading code to the
+                Arduino—this is always a hassle with such projects unless you have exceptionally long cables or clever
+                code-upload methods like WiFi. I didn't have any of that.
+              </p>
+              <iframe
+                width="560"
+                height="315"
+                src="https://www.youtube.com/embed/6tuDXU8ow9M"
+                title="YouTube video player"
+                frameborder="0"
+                allow="
+                  accelerometer;
+                  autoplay;
+                  clipboard-write;
+                  encrypted-media;
+                  gyroscope;
+                  picture-in-picture;
+                  web-share;
+                "
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen=""></iframe>
+              <h2>Algorithm</h2>
+              <p>
+                To open the door, I needed to call my apartment four times at specific intervals. This would trigger a
+                relay in the circuit where the door is usually opened. I had to set broad timing tolerances to make it
+                usable and include a timeout for when the system would reset.
+              </p>
+              <iframe
+                width="560"
+                height="315"
+                src="https://www.youtube.com/embed/KKOZTo64eQk"
+                title="YouTube video player"
+                frameborder="0"
+                allow="
+                  accelerometer;
+                  autoplay;
+                  clipboard-write;
+                  encrypted-media;
+                  gyroscope;
+                  picture-in-picture;
+                  web-share;
+                "
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen=""></iframe>
+              <h2>Wifi</h2>
+              <p>
+                By 2018, everyone had a smartphone, so you might wonder why I didn't just use that for remotely opening
+                the door after connecting to the intercom line. Simply put, it was too unstable—I didn't want to rely on
+                it. Remember, this was my only way to access the building when my friend wasn't home. There were a few
+                times when I had it set up with WiFi using ESP32, and for some unknown reason, it froze and stopped
+                working.
+              </p>
+              <h2>Sounds</h2>
+              <iframe
+                width="560"
+                height="315"
+                src="https://www.youtube.com/embed/lfNpqSJsEVw"
+                title="YouTube video player"
+                frameborder="0"
+                allow="
+                  accelerometer;
+                  autoplay;
+                  clipboard-write;
+                  encrypted-media;
+                  gyroscope;
+                  picture-in-picture;
+                  web-share;
+                "
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen=""></iframe>
+              <p>
+                Once I had the basic system working, I started thinking about enhancements. It turned out to be quite
+                simple to tap into the line transmitting the intercom audio—an analog signal. I connected a tiny MP3
+                player board from a Chinese seller, about the size of a micro-SD card. I loaded it with funny sounds,
+                which played whenever the correct "code" (four rings at even intervals) was entered.
+              </p>
+            </section>
+          </main>
         </div>
         <footer><a href="/">korczak.xyz</a></footer>
       </div>
