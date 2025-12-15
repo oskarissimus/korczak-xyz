@@ -6,7 +6,7 @@ published: true
 language: pl
 ---
 
-```song
+```plaintext
 G                    D
 Olewam rząd, mandaty drogowe
 C

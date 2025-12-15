@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
+import SongListItem from '../components/SongListItem.astro';
 import { useTranslations } from '../i18n';
 
 const t = useTranslations('en');
@@ -23,11 +24,11 @@ songs.sort((a, b) => {
   <PageContent title={t('Songs')}>
     <ul class="flex flex-col gap-10">
       {songs.map(song => (
-        <li>
-          <a href={`/pl/songs/${song.data.slug}/`}>
-            {song.data.author}: {song.data.title}
-          </a>
-        </li>
+        <SongListItem
+          slug={song.data.slug}
+          title={song.data.title}
+          author={song.data.author}
+        />
       ))}
     </ul>
   </PageContent>

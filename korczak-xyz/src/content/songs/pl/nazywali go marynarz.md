@@ -5,7 +5,7 @@ author: Artur Andrus
 published: true
 language: pl
 ---
-```song
+```plaintext
     d    C    d
 Nazywali go marynarz,
     d     C       F
