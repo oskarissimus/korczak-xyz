@@ -1,13 +1,26 @@
 import Cal, { getCalApi } from '@calcom/embed-react';
-import { useStore } from '@nanostores/react';
-import { useEffect } from 'react';
-import { themeStore, initTheme } from '../stores/theme';
+import { useEffect, useState } from 'react';
+
+function getTheme(): 'light' | 'dark' {
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+}
 
 export default function Calendar() {
-  const theme = useStore(themeStore);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
-    initTheme();
+    setTheme(getTheme());
+
+    const observer = new MutationObserver(() => {
+      setTheme(getTheme());
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets';
 import logoImage from '../../assets/images/logo.png';
-import DarkModeSwitch from './DarkModeSwitch';
+import ThemeToggle from './ThemeToggle.astro';
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
 
 interface Props {
@@ -34,7 +34,7 @@ const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, l
       <a href={lang === 'en' ? '/' : '/pl/'}>korczak.xyz</a>
     </div>
     <div class="grow md:hidden"></div>
-    <DarkModeSwitch className="block md:hidden" client:load />
+    <div class="block md:hidden"><ThemeToggle /></div>
     <button
       class="flex md:hidden"
       aria-label="Menu"
@@ -56,7 +56,7 @@ const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, l
     {navigation.map(item => (
       <a href={item.to}>{item.name}</a>
     ))}
-    <DarkModeSwitch className="hidden md:block" client:load />
+    <div class="hidden md:block"><ThemeToggle /></div>
     <div class="flex gap-3">
       <a href={enPath}>
         <span role="img" aria-label="en" class="text-2xl">🇬🇧</span>
