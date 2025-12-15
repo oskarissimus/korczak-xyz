@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import { useTranslations } from '../i18n';
+
+const t = useTranslations('en');
+---
+
+<Layout title="404 | korczak.xyz" lang="en">
+  <PageContent title={t('Page not found')}>
+    <p>The page you're looking for doesn't exist.</p>
+  </PageContent>
+</Layout>

@@ -1,0 +1,14 @@
+---
+import type { Lang } from '../i18n';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = 'en' } = Astro.props;
+const homeLink = lang === 'en' ? '/' : '/pl/';
+---
+
+<footer class="flex gap-8 m-8">
+  <a href={homeLink}>korczak.xyz</a>
+</footer>

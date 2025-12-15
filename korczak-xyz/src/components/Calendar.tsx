@@ -1,10 +1,15 @@
 import Cal, { getCalApi } from '@calcom/embed-react';
-import React, { useContext, useEffect } from 'react';
+import { useStore } from '@nanostores/react';
+import { useEffect } from 'react';
+import { themeStore, initTheme } from '../stores/theme';
 
-import ThemeContext, { ThemeContextType } from '../context/ThemeContext';
+export default function Calendar() {
+  const theme = useStore(themeStore);
 
-const Calendar: React.FC = () => {
-  const { theme } = useContext<ThemeContextType>(ThemeContext);
+  useEffect(() => {
+    initTheme();
+  }, []);
+
   useEffect(() => {
     async function setupCal() {
       const cal = await getCalApi();
@@ -12,7 +17,6 @@ const Calendar: React.FC = () => {
     }
     setupCal();
   }, [theme]);
-  return <Cal calLink='oskarissimus/mentoring' config={{ theme }} />;
-};
 
-export default Calendar;
+  return <Cal calLink="oskarissimus/mentoring" config={{ theme }} />;
+}

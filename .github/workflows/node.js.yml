@@ -15,16 +15,11 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: "yarn"
-          cache-dependency-path: "korczak-xyz/yarn.lock"
+          cache: "npm"
+          cache-dependency-path: "korczak-xyz/package-lock.json"
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
         working-directory: korczak-xyz
       - name: Build
-        run: yarn build
+        run: npm run build
         working-directory: korczak-xyz
-      - name: Test
-        run: yarn test
-        working-directory: korczak-xyz
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3

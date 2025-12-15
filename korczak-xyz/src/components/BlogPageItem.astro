@@ -1,0 +1,41 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  slug: string;
+  title: string;
+  date: Date;
+  excerpt?: string;
+  featuredImage?: ImageMetadata;
+  lang: string;
+}
+
+const { slug, title, date, excerpt, featuredImage, lang } = Astro.props;
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString();
+}
+
+const href = lang === 'en' ? `/blog/${slug}/` : `/pl/blog/${slug}/`;
+---
+
+<li class="flex flex-col items-start gap-2">
+  <h2 class="text-2xl font-bold">
+    <a href={href}>{title}</a>
+  </h2>
+  <div class="flex flex-row items-center gap-2">
+    {featuredImage && (
+      <Image
+        src={featuredImage}
+        alt={title || "Post's featured image"}
+        width={129}
+        height={86}
+        class="object-cover w-[129px] h-[86px] min-w-[129px] max-w-[129px] flex-shrink-0"
+      />
+    )}
+    {excerpt && <p>{excerpt}</p>}
+  </div>
+  <hr class="w-full border-1 border-gray-500" />
+  <span>{formatDate(date)}</span>
+</li>

@@ -1,10 +1,6 @@
-import React from 'react'
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3'
-import ContactForm from './ContactForm'
+import ContactForm from './ContactForm';
+
+// Simplified version without reCAPTCHA for now
 export default function ContactFormWrapper() {
-    return (
-        <GoogleReCaptchaProvider reCaptchaKey="6Lf-apkaAAAAAHYePzpdMhbG_u7njBLSVE5rOON5">
-            <ContactForm />
-        </GoogleReCaptchaProvider>
-    )
+  return <ContactForm />;
 }
