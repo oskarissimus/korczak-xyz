@@ -7,6 +7,12 @@ interface Button {
 
 export const buttons: Button[] = [
   {
+    icon: 'music',
+    text: 'Songs',
+    backgroundColor: 'bg-[#1db954]',
+    to: '/songs/'
+  },
+  {
     icon: 'discord',
     text: 'Discord community',
     backgroundColor: 'bg-[#7289d9]',
@@ -45,6 +51,12 @@ export const buttons: Button[] = [
 ];
 
 export const buttonsPl: Button[] = [
+  {
+    icon: 'music',
+    text: 'Piosenki',
+    backgroundColor: 'bg-[#1db954]',
+    to: '/pl/songs/'
+  },
   {
     icon: 'discord',
     text: 'Spolecznosc Discord',
