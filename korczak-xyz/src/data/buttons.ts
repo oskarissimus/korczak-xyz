@@ -48,6 +48,12 @@ export const buttons: Button[] = [
     backgroundColor: 'bg-[#333]',
     to: 'https://github.com/oskarissimus'
   },
+  {
+    icon: 'linkedin',
+    text: 'LinkedIn',
+    backgroundColor: 'bg-[#0077b5]',
+    to: 'https://www.linkedin.com/in/oskar-korczak/'
+  },
 ];
 
 export const buttonsPl: Button[] = [
@@ -92,5 +98,11 @@ export const buttonsPl: Button[] = [
     text: 'Github',
     backgroundColor: 'bg-[#333]',
     to: 'https://github.com/oskarissimus'
+  },
+  {
+    icon: 'linkedin',
+    text: 'LinkedIn',
+    backgroundColor: 'bg-[#0077b5]',
+    to: 'https://www.linkedin.com/in/oskar-korczak/'
   },
 ];
