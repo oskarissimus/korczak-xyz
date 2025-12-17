@@ -18,24 +18,121 @@ function formatDate(date: Date): string {
 }
 
 const href = lang === 'en' ? `/blog/${slug}/` : `/pl/blog/${slug}/`;
+
+// Check if post is recent (within last 30 days)
+const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 1000);
 ---
 
-<li class="flex flex-col items-start gap-2">
-  <h2 class="text-2xl font-bold">
-    <a href={href}>{title}</a>
-  </h2>
-  <div class="flex flex-row items-center gap-2">
+<li class="blog-item">
+  <div class="blog-item-header">
+    <span class="blog-icon">#</span>
+    <h2 class="blog-title">
+      <a href={href}>{title}</a>
+    </h2>
+    {isRecent && <span class="blink new-badge">NEW!</span>}
+  </div>
+  <div class="blog-item-content">
     {featuredImage && (
       <Image
         src={featuredImage}
         alt={title || "Post's featured image"}
-        width={129}
-        height={86}
-        class="object-cover w-[129px] h-[86px] min-w-[129px] max-w-[129px] flex-shrink-0"
+        width={120}
+        height={80}
+        class="blog-image"
       />
     )}
-    {excerpt && <p>{excerpt}</p>}
+    <div class="blog-text">
+      {excerpt && <p class="blog-excerpt">{excerpt}</p>}
+      <span class="blog-date">[{formatDate(date)}]</span>
+    </div>
   </div>
-  <hr class="w-full border-1 border-gray-500" />
-  <span>{formatDate(date)}</span>
 </li>
+
+<style>
+  .blog-item {
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 15px;
+    list-style: none;
+  }
+
+  .blog-item-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .blog-icon {
+    background: var(--retro-teal);
+    color: var(--retro-yellow);
+    padding: 5px 10px;
+    border: 2px inset var(--retro-dark-gray);
+    font-weight: bold;
+  }
+
+  .blog-title {
+    font-family: 'VT323', monospace;
+    font-size: 1.4rem;
+    flex-grow: 1;
+  }
+
+  .blog-title a {
+    color: var(--retro-navy);
+    text-decoration: none;
+  }
+
+  .blog-title a:hover {
+    color: var(--retro-teal);
+    text-decoration: underline;
+  }
+
+  .new-badge {
+    background: var(--retro-red);
+    color: var(--retro-white);
+    padding: 3px 8px;
+    font-size: 0.9rem;
+    font-weight: bold;
+  }
+
+  .blog-item-content {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .blog-image {
+    border: 2px inset var(--retro-dark-gray);
+    flex-shrink: 0;
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+  }
+
+  .blog-text {
+    flex-grow: 1;
+  }
+
+  .blog-excerpt {
+    color: var(--retro-black);
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+  }
+
+  .blog-date {
+    color: var(--retro-teal);
+    font-size: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .blog-item-content {
+      flex-direction: column;
+    }
+
+    .blog-image {
+      width: 100%;
+      height: auto;
+      max-height: 150px;
+    }
+  }
+</style>

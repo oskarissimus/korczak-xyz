@@ -1,5 +1,4 @@
 ---
-import '../styles/global.css';
 import Navbar from '../components/Navbar/Navbar.astro';
 import Footer from '../components/Footer.astro';
 import type { Lang } from '../i18n';
@@ -28,22 +27,340 @@ const currentPath = Astro.url.pathname;
     <meta name="image" content="https://korczak.xyz/logo.png" />
     <link rel="icon" href="/favicon-32x32.png" type="image/png" />
     <title>{title}</title>
-    <script is:inline>
-      // Prevent flash of wrong theme
-      (function() {
-        const theme = localStorage.getItem('theme') ||
-          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        if (theme === 'dark') document.documentElement.classList.add('dark');
-      })();
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div class="flex flex-col items-center gap-2">
+    <div class="container">
       <Navbar lang={lang} currentPath={currentPath} />
-      <div class="flex flex-col items-stretch w-full max-w-screen-md p-4 md:p-0 gap-4">
-        <slot />
-        <Footer lang={lang} />
-      </div>
+      <slot />
+      <Footer lang={lang} />
     </div>
   </body>
 </html>
+
+<style is:global>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --retro-navy: #000080;
+    --retro-teal: #008080;
+    --retro-yellow: #ffff00;
+    --retro-cyan: #00ffff;
+    --retro-magenta: #ff00ff;
+    --retro-gray: #c0c0c0;
+    --retro-dark-gray: #808080;
+    --retro-white: #ffffff;
+    --retro-black: #000000;
+    --retro-green: #00ff00;
+    --retro-red: #ff0000;
+  }
+
+  body {
+    font-family: 'VT323', monospace;
+    min-height: 100vh;
+    background: var(--retro-navy);
+    color: var(--retro-yellow);
+    padding: 20px;
+    padding-bottom: 60px;
+    font-size: 1.25rem;
+    line-height: 1.4;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Window styling */
+  .window {
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    margin-bottom: 20px;
+  }
+
+  .title-bar {
+    background: linear-gradient(90deg, var(--retro-navy), #1084d0);
+    color: white;
+    padding: 4px 8px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .title-buttons {
+    display: flex;
+    gap: 4px;
+  }
+
+  .title-btn {
+    width: 16px;
+    height: 16px;
+    background: var(--retro-gray);
+    border: 2px outset var(--retro-white);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--retro-black);
+  }
+
+  .title-btn:hover {
+    background: #a0a0a0;
+  }
+
+  .title-btn:active {
+    border-style: inset;
+  }
+
+  .window-content {
+    padding: 20px;
+    background: var(--retro-teal);
+    color: var(--retro-white);
+  }
+
+  /* Links */
+  a {
+    color: var(--retro-cyan);
+    text-decoration: underline;
+  }
+
+  a:hover {
+    color: var(--retro-yellow);
+  }
+
+  a:visited {
+    color: var(--retro-magenta);
+  }
+
+  /* Retro buttons */
+  .retro-btn {
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 10px 20px;
+    font-family: 'VT323', monospace;
+    font-size: 1.2rem;
+    color: var(--retro-black);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .retro-btn:hover {
+    background: #a0a0a0;
+    color: var(--retro-black);
+  }
+
+  .retro-btn:active {
+    border-style: inset;
+  }
+
+  /* Animations */
+  @keyframes rainbow {
+    0% { color: #ff0000; }
+    16% { color: #ff8800; }
+    33% { color: #ffff00; }
+    50% { color: #00ff00; }
+    66% { color: #0088ff; }
+    83% { color: #ff00ff; }
+    100% { color: #ff0000; }
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+
+  .rainbow-text {
+    animation: rainbow 3s infinite;
+  }
+
+  .blink {
+    animation: blink 1s infinite;
+  }
+
+  /* Visitor counter style */
+  .visitor-counter {
+    background: var(--retro-black);
+    display: inline-block;
+    padding: 5px 15px;
+    border: 2px inset var(--retro-dark-gray);
+  }
+
+  .visitor-counter span {
+    font-family: 'VT323', monospace;
+    color: var(--retro-green);
+    font-size: 1.2rem;
+  }
+
+  /* Marquee */
+  .marquee-container {
+    background: var(--retro-black);
+    padding: 10px;
+    overflow: hidden;
+    border: 2px inset var(--retro-dark-gray);
+  }
+
+  .marquee-text {
+    white-space: nowrap;
+    animation: marquee 15s linear infinite;
+    color: var(--retro-green);
+    font-size: 1.3rem;
+  }
+
+  /* Under construction */
+  .under-construction {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .construction-gif {
+    width: 40px;
+    height: 40px;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--retro-yellow),
+      var(--retro-yellow) 10px,
+      var(--retro-black) 10px,
+      var(--retro-black) 20px
+    );
+    animation: spin 2s linear infinite;
+  }
+
+  @keyframes spin {
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Images */
+  img {
+    max-width: 100%;
+    height: auto;
+    border: 3px outset var(--retro-white);
+  }
+
+  /* Lists */
+  ul, ol {
+    margin-left: 20px;
+    margin-bottom: 15px;
+  }
+
+  li {
+    margin-bottom: 5px;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Press Start 2P', cursive;
+    margin-bottom: 15px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-size: clamp(0.8rem, 3vw, 1.2rem);
+    color: var(--retro-yellow);
+    text-shadow: 3px 3px var(--retro-magenta);
+  }
+
+  h2 {
+    font-size: clamp(0.7rem, 2.5vw, 1rem);
+    color: var(--retro-cyan);
+  }
+
+  h3 {
+    font-size: clamp(0.6rem, 2vw, 0.9rem);
+    color: var(--retro-green);
+  }
+
+  /* Paragraphs */
+  p {
+    margin-bottom: 15px;
+  }
+
+  /* Code */
+  code {
+    background: var(--retro-black);
+    color: var(--retro-green);
+    padding: 2px 6px;
+    font-family: 'VT323', monospace;
+    border: 1px inset var(--retro-dark-gray);
+  }
+
+  pre {
+    background: var(--retro-black);
+    color: var(--retro-green);
+    padding: 15px;
+    overflow-x: auto;
+    border: 2px inset var(--retro-dark-gray);
+    margin-bottom: 15px;
+  }
+
+  pre code {
+    border: none;
+    padding: 0;
+  }
+
+  /* Form elements */
+  input, textarea, select {
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem;
+    background: var(--retro-white);
+    border: 2px inset var(--retro-dark-gray);
+    padding: 8px;
+    color: var(--retro-black);
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: 2px solid var(--retro-cyan);
+  }
+
+  button {
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem;
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--retro-black);
+  }
+
+  button:hover {
+    background: #a0a0a0;
+  }
+
+  button:active {
+    border-style: inset;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    body {
+      padding: 10px;
+      font-size: 1.1rem;
+    }
+
+    .window-content {
+      padding: 15px;
+    }
+
+    h1 {
+      font-size: 0.7rem;
+    }
+  }
+</style>

@@ -17,39 +17,98 @@ const t = useTranslations(lang);
 
 const href = lang === 'en' ? `/courses/${slug}/` : `/pl/courses/${slug}/`;
 
-// We'll use color image by default, and swap with JS for dark mode
+// Use color image (we're removing dark mode for retro design)
 const image = featuredImageColor || featuredImageBW;
 ---
 
-<div class="flex flex-col gap-8">
-  <h3 class="text-4xl">{title}</h3>
+<div class="course-card">
+  <div class="course-header">
+    <span class="course-icon">&lt;/&gt;</span>
+    <h3 class="course-title">{title}</h3>
+  </div>
   {image && (
-    <div class="course-image-container">
-      {featuredImageColor && (
-        <Image
-          src={featuredImageColor}
-          alt={title}
-          width={800}
-          class="course-image-color block dark:hidden"
-        />
-      )}
-      {featuredImageBW && (
-        <Image
-          src={featuredImageBW}
-          alt={title}
-          width={800}
-          class="course-image-bw hidden dark:block"
-        />
-      )}
+    <div class="course-image-wrapper">
+      <Image
+        src={image}
+        alt={title}
+        width={800}
+        class="course-image"
+      />
     </div>
   )}
-  {excerpt && <p>{excerpt}</p>}
-  <div>
-    <a
-      class="bg-red-500 hover:bg-red-400 text-white py-4 px-6"
-      href={href}
-    >
-      {t('Read more')}
-    </a>
-  </div>
+  {excerpt && <p class="course-excerpt">{excerpt}</p>}
+  <a class="course-btn" href={href}>
+    &gt;&gt; {t('Read more')} &lt;&lt;
+  </a>
 </div>
+
+<style>
+  .course-card {
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .course-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .course-icon {
+    background: var(--retro-navy);
+    color: var(--retro-cyan);
+    padding: 8px 12px;
+    border: 2px inset var(--retro-dark-gray);
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.7rem;
+  }
+
+  .course-title {
+    font-family: 'VT323', monospace;
+    font-size: 1.6rem;
+    color: var(--retro-navy);
+    margin: 0;
+  }
+
+  .course-image-wrapper {
+    border: 3px inset var(--retro-dark-gray);
+    background: var(--retro-black);
+    padding: 5px;
+  }
+
+  .course-image {
+    width: 100%;
+    height: auto;
+    border: none;
+  }
+
+  .course-excerpt {
+    color: var(--retro-black);
+    font-size: 1.2rem;
+    line-height: 1.5;
+  }
+
+  .course-btn {
+    background: var(--retro-teal);
+    border: 3px outset var(--retro-white);
+    padding: 12px 20px;
+    color: var(--retro-yellow);
+    font-size: 1.2rem;
+    text-decoration: none;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  .course-btn:hover {
+    background: #006666;
+    color: var(--retro-white);
+  }
+
+  .course-btn:active {
+    border-style: inset;
+  }
+</style>

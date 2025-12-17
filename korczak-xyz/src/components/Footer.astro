@@ -9,6 +9,47 @@ const { lang = 'en' } = Astro.props;
 const homeLink = lang === 'en' ? '/' : '/pl/';
 ---
 
-<footer class="flex gap-8 m-8">
-  <a href={homeLink}>korczak.xyz</a>
+<footer class="retro-footer">
+  <div class="marquee-container">
+    <div class="marquee-text">
+      *** Welcome to korczak.xyz! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! *** Best viewed in Netscape Navigator 4.0 ***
+    </div>
+  </div>
+
+  <div class="under-construction">
+    <div class="construction-gif"></div>
+    <span class="construction-text">Under Construction - <a href={homeLink}>korczak.xyz</a> - Est. 2024</span>
+    <div class="construction-gif"></div>
+  </div>
+
+  <div class="footer-counter">
+    <div class="visitor-counter">
+      <span>Visitors: 1337420</span>
+    </div>
+  </div>
 </footer>
+
+<style>
+  .retro-footer {
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .construction-text {
+    color: var(--retro-yellow);
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .construction-text a {
+    color: var(--retro-cyan);
+  }
+
+  .footer-counter {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+  }
+</style>
