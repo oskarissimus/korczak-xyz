@@ -1,23 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import PageContent from '../components/PageContent.astro';
-import BigButton from '../components/BigButton.astro';
-import DesignSwitcher from '../components/DesignSwitcher.astro';
-import { buttons } from '../data/buttons';
-import { useTranslations } from '../i18n';
-
-const t = useTranslations('en');
+import HomePage from '../templates/HomePage.astro';
 ---
 
-<Layout title="korczak.xyz" lang="en">
-  <PageContent title={t('Home')}>
-    <ul class="flex flex-col justify-center gap-4">
-      {buttons.map(button => (
-        <li>
-          <BigButton {...button} />
-        </li>
-      ))}
-    </ul>
-  </PageContent>
-  <DesignSwitcher current="Original" />
-</Layout>
+<HomePage lang="en" />

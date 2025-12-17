@@ -1,0 +1,108 @@
+---
+import Layout from '../layouts/Layout.astro';
+import BigButton from '../components/BigButton.astro';
+import { getButtons } from '../data/buttons';
+import { useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const buttons = getButtons(lang, t);
+---
+
+<Layout title="korczak.xyz" lang={lang}>
+  <!-- Hero Window -->
+  <div class="window">
+    <div class="title-bar">
+      <span>{t('hero.welcome')}</span>
+      <div class="title-buttons">
+        <div class="title-btn">_</div>
+        <div class="title-btn">[]</div>
+        <div class="title-btn">X</div>
+      </div>
+    </div>
+    <div class="window-content hero-content">
+      <h1 class="hero-title rainbow-text">* OSKAR KORCZAK *</h1>
+      <p class="hero-subtitle">{t('hero.subtitle')}</p>
+      <div class="visitor-counter">
+        <span>{t('hero.visitors')}: 1337420</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Links Window -->
+  <div class="window">
+    <div class="title-bar">
+      <span>{t('hero.myLinks')}</span>
+      <div class="title-buttons">
+        <div class="title-btn">X</div>
+      </div>
+    </div>
+    <div class="links-content">
+      <ul class="links-list">
+        {buttons.map(button => (
+          <li>
+            <BigButton {...button} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .hero-content {
+    text-align: center;
+    padding: 30px 20px;
+  }
+
+  .hero-title {
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.8rem, 3vw, 1.3rem);
+    text-shadow: 3px 3px var(--retro-magenta);
+    margin-bottom: 15px;
+  }
+
+  .hero-subtitle {
+    font-size: 1.5rem;
+    color: var(--retro-cyan);
+    margin-bottom: 20px;
+  }
+
+  .links-content {
+    padding: 15px;
+    background: var(--retro-teal);
+  }
+
+  .links-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  @media (max-width: 600px) {
+    .links-list {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .hero-content {
+      padding: 20px 15px;
+    }
+
+    .hero-title {
+      font-size: 0.7rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1.2rem;
+    }
+  }
+</style>

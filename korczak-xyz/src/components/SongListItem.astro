@@ -1,17 +1,85 @@
 ---
+import { type Lang, getLocalizedPath } from '../i18n';
+
 interface Props {
   slug: string;
   title: string;
   author: string;
+  lang?: Lang;
 }
 
-const { slug, title, author } = Astro.props;
+const { slug, title, author, lang = 'pl' } = Astro.props;
+const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
 ---
 
-<li class="flex flex-col items-start gap-1">
-  <h2 class="text-2xl font-bold">
-    <a href={`/pl/songs/${slug}/`} class="hover:underline">{title}</a>
-  </h2>
-  <span class="text-gray-500 dark:text-gray-400">{author}</span>
-  <hr class="w-full border-1 border-gray-300 dark:border-gray-700 mt-2" />
+<li class="song-item">
+  <span class="song-icon">*</span>
+  <div class="song-info">
+    <h2 class="song-title">
+      <a href={songUrl}>{title}</a>
+    </h2>
+    <span class="song-author">[{author}]</span>
+  </div>
 </li>
+
+<style>
+  .song-item {
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 12px 15px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .song-item:hover {
+    background: #b0b0b0;
+  }
+
+  .song-icon {
+    background: var(--retro-magenta);
+    color: var(--retro-white);
+    padding: 5px 10px;
+    border: 2px inset var(--retro-dark-gray);
+    font-weight: bold;
+    font-size: 1.2rem;
+  }
+
+  .song-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .song-title {
+    font-family: 'VT323', monospace;
+    font-size: 1.3rem;
+    margin: 0;
+  }
+
+  .song-title a {
+    color: var(--retro-navy);
+    text-decoration: none;
+  }
+
+  .song-title a:hover {
+    color: var(--retro-teal);
+    text-decoration: underline;
+  }
+
+  .song-author {
+    color: var(--retro-teal);
+    font-size: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .song-item {
+      padding: 10px 12px;
+    }
+
+    .song-title {
+      font-size: 1.1rem;
+    }
+  }
+</style>

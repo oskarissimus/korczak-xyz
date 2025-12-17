@@ -18,6 +18,22 @@ export const ui = {
     'Songs': 'Songs',
     'Oskar live': 'Oskar live',
 
+    // Homepage
+    'hero.welcome': 'Welcome to Oskar\'s Homepage!',
+    'hero.subtitle': 'Software Engineer | Mentor | Builder',
+    'hero.visitors': 'Visitors',
+    'hero.myLinks': 'My Links',
+
+    // Button texts
+    'btn.songs': 'Songs',
+    'btn.discord': 'Discord community',
+    'btn.youtube': 'Youtube channel',
+    'btn.courses': 'Courses',
+    'btn.mentoring': 'Mentoring',
+    'btn.blog': 'Blog',
+    'btn.github': 'Github',
+    'btn.linkedin': 'LinkedIn',
+
     // About page
     'As a software development expert with 7 years of experience, I\'ve built a unique skill set that spans Python, JavaScript, Java, Bash, SQL, and C#. Also, I\'ve developed a strong foundation in DevOps practices, leveraging tools like Docker and Kubernetes to create efficient and scalable applications. 💪': 'As a software development expert with 7 years of experience, I\'ve built a unique skill set that spans Python, JavaScript, Java, Bash, SQL, and C#. Also, I\'ve developed a strong foundation in DevOps practices, leveraging tools like Docker and Kubernetes to create efficient and scalable applications. 💪',
     'Throughout my journey, I\'ve devoted myself to inspiring growth in others 🌱, sharing my knowledge as an experienced teacher and mentor. Being a part of numerous successful projects 🏆 has helped me understand what works best when collaborating with diverse teams.': 'Throughout my journey, I\'ve devoted myself to inspiring growth in others 🌱, sharing my knowledge as an experienced teacher and mentor. Being a part of numerous successful projects 🏆 has helped me understand what works best when collaborating with diverse teams.',
@@ -33,6 +49,8 @@ export const ui = {
     'Kubernetes': 'Kubernetes',
     'React': 'React',
     'Mentoring sessions are up to 1 hour long.': 'Mentoring sessions are up to 1 hour long.',
+    'mentoring.scheduleMeeting': 'Schedule a Meeting',
+    'mentoring.contactForm': 'Contact Form',
 
     // Contact form
     'Name': 'Name',
@@ -59,6 +77,22 @@ export const ui = {
     'Songs': 'Teksty',
     'Oskar live': 'Oskar live',
 
+    // Homepage
+    'hero.welcome': 'Witaj na stronie Oskara!',
+    'hero.subtitle': 'Programista | Mentor | Builder',
+    'hero.visitors': 'Odwiedziny',
+    'hero.myLinks': 'Moje Linki',
+
+    // Button texts
+    'btn.songs': 'Piosenki',
+    'btn.discord': 'Spolecznosc Discord',
+    'btn.youtube': 'Kanal Youtube',
+    'btn.courses': 'Kursy',
+    'btn.mentoring': 'Mentoring',
+    'btn.blog': 'Blog',
+    'btn.github': 'Github',
+    'btn.linkedin': 'LinkedIn',
+
     // About page
     'As a software development expert with 7 years of experience, I\'ve built a unique skill set that spans Python, JavaScript, Java, Bash, SQL, and C#. Also, I\'ve developed a strong foundation in DevOps practices, leveraging tools like Docker and Kubernetes to create efficient and scalable applications. 💪': 'Jako programista z 7-letnim doświadczeniem 🌱, zgromadziłem bogaty zestaw umiejętności, w tym Python, JavaScript, Java, Bash, SQL i C#. Ponadto, zagłębiłem się w praktyki DevOps, korzystając znarzędzi takich jak Docker i Kubernetes, by tworzyć efektywne i łatwo skalowalne aplikacje 💪.',
     'Throughout my journey, I\'ve devoted myself to inspiring growth in others 🌱, sharing my knowledge as an experienced teacher and mentor. Being a part of numerous successful projects 🏆 has helped me understand what works best when collaborating with diverse teams.': 'Przez całą moją karierę konsekwentnie dążyłem do inspirowania innych, dzieląc się swoją wiedzą w roli nauczyciela i mentora. Uczestniczenie w wielu udanych projektach 🏆 nauczyło mnie, jak skutecznie współpracować z różnorodnymi zespołami.',
@@ -74,6 +108,8 @@ export const ui = {
     'Kubernetes': 'Kubernetes',
     'React': 'React',
     'Mentoring sessions are up to 1 hour long.': 'Sesje trwają do 1 godziny.',
+    'mentoring.scheduleMeeting': 'Umow spotkanie',
+    'mentoring.contactForm': 'Formularz kontaktowy',
 
     // Contact form
     'Name': 'Imię',

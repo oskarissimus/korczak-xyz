@@ -1,0 +1,73 @@
+---
+import { Image } from 'astro:assets';
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import oskarImage from '../assets/images/oskar-korczak.jpg';
+import { useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('About')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('About')}>
+    <div class="about-content">
+      <div class="about-image">
+        <Image
+          src={oskarImage}
+          alt="Oskar Korczak"
+          width={300}
+        />
+      </div>
+      <div class="about-text">
+        <p>
+          {t("As a software development expert with 7 years of experience, I've built a unique skill set that spans Python, JavaScript, Java, Bash, SQL, and C#. Also, I've developed a strong foundation in DevOps practices, leveraging tools like Docker and Kubernetes to create efficient and scalable applications.")}
+        </p>
+        <p>
+          {t("Throughout my journey, I've devoted myself to inspiring growth in others, sharing my knowledge as an experienced teacher and mentor. Being a part of numerous successful projects has helped me understand what works best when collaborating with diverse teams.")}
+        </p>
+        <p>
+          {t("Let's join forces as we continue honing our skills and pushing the boundaries of software development. Connect with me, and together we'll harness the power of code to create lasting impact!")}
+        </p>
+      </div>
+    </div>
+  </PageContent>
+</Layout>
+
+<style>
+  .about-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  @media (min-width: 768px) {
+    .about-content {
+      flex-direction: row;
+    }
+  }
+
+  .about-image {
+    flex-shrink: 0;
+  }
+
+  .about-image img {
+    border: 3px inset var(--retro-dark-gray);
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .about-text {
+    flex-grow: 1;
+  }
+
+  .about-text p {
+    margin-bottom: 15px;
+    text-align: justify;
+    color: var(--retro-white);
+  }
+</style>

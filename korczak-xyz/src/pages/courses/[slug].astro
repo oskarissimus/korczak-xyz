@@ -1,9 +1,6 @@
 ---
-import { getCollection, render } from 'astro:content';
-import { Image } from 'astro:assets';
-import Layout from '../../layouts/Layout.astro';
-import PageContent from '../../components/PageContent.astro';
-import '../../styles/course.css';
+import { getCollection } from 'astro:content';
+import CoursePostPage from '../../templates/CoursePostPage.astro';
 
 export async function getStaticPaths() {
   const courses = await getCollection('courses-en', ({ data }) =>
@@ -12,34 +9,10 @@ export async function getStaticPaths() {
 
   return courses.map((course) => ({
     params: { slug: course.data.slug },
-    props: { course },
   }));
 }
 
-const { course } = Astro.props;
-const { Content } = await render(course);
+const { slug } = Astro.params;
 ---
 
-<Layout title={`${course.data.title} | korczak.xyz`} lang="en">
-  <PageContent title={course.data.title}>
-    {course.data.featuredImageColor && (
-      <Image
-        src={course.data.featuredImageColor}
-        alt={course.data.title}
-        width={800}
-        class="course-image-color block dark:hidden"
-      />
-    )}
-    {course.data.featuredImageBW && (
-      <Image
-        src={course.data.featuredImageBW}
-        alt={course.data.title}
-        width={800}
-        class="course-image-bw hidden dark:block"
-      />
-    )}
-    <section class="course" itemprop="articleBody">
-      <Content />
-    </section>
-  </PageContent>
-</Layout>
+<CoursePostPage lang="en" slug={slug} />
