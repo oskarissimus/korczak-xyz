@@ -1,6 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
-import SongPostPage from '../../../templates/SongPostPage.astro';
+import SongPostPage from '../../templates/SongPostPage.astro';
 
 export async function getStaticPaths() {
   const songs = await getCollection('songs', ({ data }) =>
@@ -15,4 +15,4 @@ export async function getStaticPaths() {
 const { slug } = Astro.params;
 ---
 
-<SongPostPage lang="pl" slug={slug} />
+<SongPostPage lang="en" slug={slug} />

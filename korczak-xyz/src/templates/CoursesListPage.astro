@@ -1,0 +1,36 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import CourseSection from '../components/CourseSection.astro';
+import { useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+
+const collectionName = `courses-${lang}` as 'courses-en' | 'courses-pl';
+const courses = await getCollection(collectionName, ({ data }) =>
+  data.published
+);
+---
+
+<Layout title={`${t('Courses')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('Courses')}>
+    <div class="flex flex-col gap-20">
+      {courses.map(course => (
+        <CourseSection
+          slug={course.data.slug}
+          title={course.data.title}
+          excerpt={course.data.excerpt}
+          featuredImageColor={course.data.featuredImageColor}
+          featuredImageBW={course.data.featuredImageBW}
+          lang={lang}
+        />
+      ))}
+    </div>
+  </PageContent>
+</Layout>

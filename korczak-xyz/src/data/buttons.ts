@@ -1,3 +1,5 @@
+import { type Lang, getLocalizedPath } from '../i18n';
+
 interface Button {
   icon: string;
   text: string;
@@ -5,104 +7,70 @@ interface Button {
   to: string;
 }
 
-export const buttons: Button[] = [
+interface ButtonConfig {
+  icon: string;
+  textKey: string;
+  backgroundColor: string;
+  path?: string;
+  externalUrl?: string;
+}
+
+const buttonConfigs: ButtonConfig[] = [
   {
     icon: 'music',
-    text: 'Songs',
+    textKey: 'btn.songs',
     backgroundColor: 'bg-[#1db954]',
-    to: '/songs/'
+    path: '/songs/'
   },
   {
     icon: 'discord',
-    text: 'Discord community',
+    textKey: 'btn.discord',
     backgroundColor: 'bg-[#7289d9]',
-    to: 'https://discord.gg/DwbvwjJM7N'
+    externalUrl: 'https://discord.gg/DwbvwjJM7N'
   },
   {
     icon: 'youtube',
-    text: 'Youtube channel',
+    textKey: 'btn.youtube',
     backgroundColor: 'bg-[#ff0000]',
-    to: 'https://www.youtube.com/@korczakxyz'
+    externalUrl: 'https://www.youtube.com/@korczakxyz'
   },
   {
     icon: 'laptop-code',
-    text: 'Courses',
+    textKey: 'btn.courses',
     backgroundColor: 'bg-[#a4036f]',
-    to: '/courses/'
+    path: '/courses/'
   },
   {
     icon: 'lightbulb',
-    text: 'Mentoring',
+    textKey: 'btn.mentoring',
     backgroundColor: 'bg-[#048ba8]',
-    to: '/mentoring/'
+    path: '/mentoring/'
   },
   {
     icon: 'list-alt',
-    text: 'Blog',
+    textKey: 'btn.blog',
     backgroundColor: 'bg-[#87420D]',
-    to: '/blog/'
+    path: '/blog/'
   },
   {
     icon: 'github',
-    text: 'Github',
+    textKey: 'btn.github',
     backgroundColor: 'bg-[#333]',
-    to: 'https://github.com/oskarissimus'
+    externalUrl: 'https://github.com/oskarissimus'
   },
   {
     icon: 'linkedin',
-    text: 'LinkedIn',
+    textKey: 'btn.linkedin',
     backgroundColor: 'bg-[#0077b5]',
-    to: 'https://www.linkedin.com/in/oskar-korczak/'
+    externalUrl: 'https://www.linkedin.com/in/oskar-korczak/'
   },
 ];
 
-export const buttonsPl: Button[] = [
-  {
-    icon: 'music',
-    text: 'Piosenki',
-    backgroundColor: 'bg-[#1db954]',
-    to: '/pl/songs/'
-  },
-  {
-    icon: 'discord',
-    text: 'Spolecznosc Discord',
-    backgroundColor: 'bg-[#7289d9]',
-    to: 'https://discord.gg/DwbvwjJM7N'
-  },
-  {
-    icon: 'youtube',
-    text: 'Kanal Youtube',
-    backgroundColor: 'bg-[#ff0000]',
-    to: 'https://www.youtube.com/@korczakxyz'
-  },
-  {
-    icon: 'laptop-code',
-    text: 'Kursy',
-    backgroundColor: 'bg-[#a4036f]',
-    to: '/pl/courses/'
-  },
-  {
-    icon: 'lightbulb',
-    text: 'Mentoring',
-    backgroundColor: 'bg-[#048ba8]',
-    to: '/pl/mentoring/'
-  },
-  {
-    icon: 'list-alt',
-    text: 'Blog',
-    backgroundColor: 'bg-[#87420D]',
-    to: '/pl/blog/'
-  },
-  {
-    icon: 'github',
-    text: 'Github',
-    backgroundColor: 'bg-[#333]',
-    to: 'https://github.com/oskarissimus'
-  },
-  {
-    icon: 'linkedin',
-    text: 'LinkedIn',
-    backgroundColor: 'bg-[#0077b5]',
-    to: 'https://www.linkedin.com/in/oskar-korczak/'
-  },
-];
+export function getButtons(lang: Lang, t: (key: string) => string): Button[] {
+  return buttonConfigs.map(config => ({
+    icon: config.icon,
+    text: t(config.textKey),
+    backgroundColor: config.backgroundColor,
+    to: config.externalUrl || getLocalizedPath(config.path!, lang),
+  }));
+}

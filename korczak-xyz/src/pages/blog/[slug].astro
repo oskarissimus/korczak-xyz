@@ -1,8 +1,6 @@
 ---
-import { getCollection, render } from 'astro:content';
-import Layout from '../../layouts/Layout.astro';
-import PageContent from '../../components/PageContent.astro';
-import '../../styles/blog-post.css';
+import { getCollection } from 'astro:content';
+import BlogPostPage from '../../templates/BlogPostPage.astro';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog-en', ({ data }) =>
@@ -11,18 +9,10 @@ export async function getStaticPaths() {
 
   return posts.map((post) => ({
     params: { slug: post.data.slug },
-    props: { post },
   }));
 }
 
-const { post } = Astro.props;
-const { Content } = await render(post);
+const { slug } = Astro.params;
 ---
 
-<Layout title={`${post.data.title} | korczak.xyz`} lang="en">
-  <PageContent title={post.data.title}>
-    <section class="blog_post" itemprop="articleBody">
-      <Content />
-    </section>
-  </PageContent>
-</Layout>
+<BlogPostPage lang="en" slug={slug} />

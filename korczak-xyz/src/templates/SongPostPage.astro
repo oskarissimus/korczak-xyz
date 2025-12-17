@@ -1,0 +1,34 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import '../styles/song.css';
+import { type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  slug: string;
+}
+
+const { lang, slug } = Astro.props;
+
+// Songs are only in Polish collection
+const songs = await getCollection('songs', ({ data }) =>
+  data.published && data.language === 'pl' && data.slug === slug
+);
+
+if (songs.length === 0) {
+  return Astro.redirect('/404');
+}
+
+const song = songs[0];
+const { Content } = await render(song);
+---
+
+<Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
+  <PageContent title={song.data.title}>
+    <section class="blog_post" itemprop="articleBody">
+      <Content />
+    </section>
+  </PageContent>
+</Layout>
