@@ -1,0 +1,289 @@
+---
+import DesignSwitcher from '../../components/DesignSwitcher.astro';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Retro 90s - korczak.xyz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      body {
+        font-family: 'VT323', monospace;
+        min-height: 100vh;
+        background: #000080;
+        color: #ffff00;
+        padding: 20px;
+        padding-bottom: 100px;
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='8' fill='%23ff00ff'/%3E%3C/svg%3E"), auto;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .window {
+        background: #c0c0c0;
+        border: 3px outset #fff;
+        margin-bottom: 20px;
+      }
+
+      .title-bar {
+        background: linear-gradient(90deg, #000080, #1084d0);
+        color: white;
+        padding: 4px 8px;
+        font-family: 'Press Start 2P', cursive;
+        font-size: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .title-buttons {
+        display: flex;
+        gap: 4px;
+      }
+
+      .title-btn {
+        width: 16px;
+        height: 16px;
+        background: #c0c0c0;
+        border: 2px outset #fff;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .window-content {
+        padding: 20px;
+        background: #008080;
+        color: #fff;
+      }
+
+      .hero-content {
+        text-align: center;
+      }
+
+      .hero-content h1 {
+        font-family: 'Press Start 2P', cursive;
+        font-size: clamp(1rem, 4vw, 1.5rem);
+        color: #ffff00;
+        text-shadow: 3px 3px #ff00ff;
+        margin-bottom: 10px;
+        animation: rainbow 3s infinite;
+      }
+
+      @keyframes rainbow {
+        0% { color: #ff0000; }
+        16% { color: #ff8800; }
+        33% { color: #ffff00; }
+        50% { color: #00ff00; }
+        66% { color: #0088ff; }
+        83% { color: #ff00ff; }
+        100% { color: #ff0000; }
+      }
+
+      .hero-content p {
+        font-size: 1.5rem;
+        color: #00ffff;
+      }
+
+      .visitor-counter {
+        margin-top: 15px;
+        background: #000;
+        display: inline-block;
+        padding: 5px 15px;
+        border: 2px inset #808080;
+      }
+
+      .visitor-counter span {
+        font-family: 'VT323', monospace;
+        color: #00ff00;
+        font-size: 1.2rem;
+      }
+
+      .links-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 15px;
+        background: #008080;
+      }
+
+      .retro-link {
+        background: #c0c0c0;
+        border: 3px outset #fff;
+        padding: 15px;
+        text-decoration: none;
+        color: #000;
+        font-size: 1.3rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.1s;
+      }
+
+      .retro-link:hover {
+        border-style: inset;
+        background: #a0a0a0;
+      }
+
+      .retro-link:active {
+        border: 3px inset #808080;
+      }
+
+      .retro-link .icon {
+        font-size: 1.5rem;
+      }
+
+      .marquee-container {
+        background: #000;
+        padding: 10px;
+        overflow: hidden;
+        border: 2px inset #808080;
+        margin-top: 20px;
+      }
+
+      .marquee-text {
+        white-space: nowrap;
+        animation: marquee 15s linear infinite;
+        font-size: 1.5rem;
+        color: #00ff00;
+      }
+
+      @keyframes marquee {
+        0% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
+      }
+
+      .guestbook {
+        text-align: center;
+        margin-top: 20px;
+        padding: 15px;
+        background: #c0c0c0;
+        border: 3px outset #fff;
+      }
+
+      .guestbook img {
+        max-width: 100px;
+        image-rendering: pixelated;
+      }
+
+      .under-construction {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .construction-gif {
+        width: 40px;
+        height: 40px;
+        background: repeating-linear-gradient(
+          45deg,
+          #ffff00,
+          #ffff00 10px,
+          #000 10px,
+          #000 20px
+        );
+        animation: spin 2s linear infinite;
+      }
+
+      @keyframes spin {
+        100% { transform: rotate(360deg); }
+      }
+
+      .blink {
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+
+      @media (max-width: 600px) {
+        .links-grid { grid-template-columns: 1fr; }
+        .hero-content h1 { font-size: 0.9rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="window">
+        <div class="title-bar">
+          <span>Welcome to Oskar's Homepage!</span>
+          <div class="title-buttons">
+            <div class="title-btn">_</div>
+            <div class="title-btn">[]</div>
+            <div class="title-btn">X</div>
+          </div>
+        </div>
+        <div class="window-content hero-content">
+          <h1>* OSKAR KORCZAK *</h1>
+          <p>Software Engineer | Mentor | Builder</p>
+          <div class="visitor-counter">
+            <span>Visitors: 1337420</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="window">
+        <div class="title-bar">
+          <span>My Links</span>
+          <div class="title-buttons">
+            <div class="title-btn">X</div>
+          </div>
+        </div>
+        <div class="links-grid">
+          <a href="/songs/" class="retro-link">
+            <span class="icon">*</span> Songs
+          </a>
+          <a href="https://discord.gg/DwbvwjJM7N" target="_blank" rel="noopener noreferrer" class="retro-link">
+            <span class="icon">@</span> Discord <span class="blink">NEW!</span>
+          </a>
+          <a href="https://www.youtube.com/@korczakxyz" target="_blank" rel="noopener noreferrer" class="retro-link">
+            <span class="icon">></span> YouTube
+          </a>
+          <a href="/courses/" class="retro-link">
+            <span class="icon">&lt;/&gt;</span> Courses
+          </a>
+          <a href="/mentoring/" class="retro-link">
+            <span class="icon">?</span> Mentoring <span class="blink">HOT!</span>
+          </a>
+          <a href="/blog/" class="retro-link">
+            <span class="icon">#</span> Blog
+          </a>
+          <a href="https://github.com/oskarissimus" target="_blank" rel="noopener noreferrer" class="retro-link">
+            <span class="icon">{`{}`}</span> GitHub
+          </a>
+          <a href="https://www.linkedin.com/in/oskar-korczak/" target="_blank" rel="noopener noreferrer" class="retro-link">
+            <span class="icon">in</span> LinkedIn
+          </a>
+        </div>
+      </div>
+
+      <div class="marquee-container">
+        <div class="marquee-text">
+          *** Welcome to my homepage! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! ***
+        </div>
+      </div>
+
+      <div class="under-construction">
+        <div class="construction-gif"></div>
+        <span style="color: #ffff00; font-size: 1.2rem;">Under Construction - Best viewed in Netscape Navigator 4.0</span>
+        <div class="construction-gif"></div>
+      </div>
+    </div>
+
+    <DesignSwitcher current="Retro" />
+  </body>
+</html>

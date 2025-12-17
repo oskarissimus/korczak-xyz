@@ -5,6 +5,7 @@ import mdx from '@astrojs/mdx';
 import tailwind from '@astrojs/tailwind';
 
 export default defineConfig({
+  devToolbar: { enabled: false },
   site: 'https://korczak.xyz',
   trailingSlash: 'always',
   i18n: {

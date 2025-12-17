@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
 import BigButton from '../components/BigButton.astro';
+import DesignSwitcher from '../components/DesignSwitcher.astro';
 import { buttons } from '../data/buttons';
 import { useTranslations } from '../i18n';
 
@@ -18,4 +19,5 @@ const t = useTranslations('en');
       ))}
     </ul>
   </PageContent>
+  <DesignSwitcher current="Original" />
 </Layout>

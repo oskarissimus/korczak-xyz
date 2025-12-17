@@ -1,0 +1,231 @@
+---
+import DesignSwitcher from '../../components/DesignSwitcher.astro';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terminal - korczak.xyz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'JetBrains Mono', monospace;
+        background-color: #0a0a0a;
+        color: #00ff00;
+        min-height: 100vh;
+        padding: 20px;
+        padding-bottom: 80px;
+      }
+
+      .terminal {
+        max-width: 800px;
+        margin: 0 auto;
+        background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+        border: 1px solid #333;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 255, 0, 0.1);
+      }
+
+      .terminal-header {
+        background: #2a2a2a;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #333;
+      }
+
+      .terminal-btn {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .btn-red { background: #ff5f56; }
+      .btn-yellow { background: #ffbd2e; }
+      .btn-green { background: #27ca40; }
+
+      .terminal-title {
+        flex: 1;
+        text-align: center;
+        color: #888;
+        font-size: 13px;
+      }
+
+      .terminal-body {
+        padding: 20px;
+        min-height: 400px;
+      }
+
+      .line {
+        margin-bottom: 8px;
+        line-height: 1.6;
+      }
+
+      .prompt {
+        color: #00aaff;
+      }
+
+      .command {
+        color: #ffffff;
+      }
+
+      .output {
+        color: #00ff00;
+        padding-left: 0;
+      }
+
+      .directory {
+        color: #5fd7ff;
+      }
+
+      .file {
+        color: #aaaaaa;
+      }
+
+      .link {
+        color: #00ff00;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .link:hover {
+        color: #00ffaa;
+        text-shadow: 0 0 10px #00ff00;
+      }
+
+      .permissions {
+        color: #888;
+        margin-right: 8px;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 10px;
+        height: 18px;
+        background: #00ff00;
+        animation: blink 1s infinite;
+        vertical-align: middle;
+        margin-left: 4px;
+      }
+
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+
+      .scanline {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.1) 0px,
+          rgba(0, 0, 0, 0.1) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+        z-index: 100;
+      }
+
+      .typed-line {
+        opacity: 0;
+        animation: fadeIn 0.3s forwards;
+      }
+
+      @keyframes fadeIn {
+        to { opacity: 1; }
+      }
+
+      .typed-line:nth-child(1) { animation-delay: 0.1s; }
+      .typed-line:nth-child(2) { animation-delay: 0.4s; }
+      .typed-line:nth-child(3) { animation-delay: 0.7s; }
+      .typed-line:nth-child(4) { animation-delay: 1.0s; }
+      .typed-line:nth-child(5) { animation-delay: 1.3s; }
+      .typed-line:nth-child(6) { animation-delay: 1.4s; }
+      .typed-line:nth-child(7) { animation-delay: 1.5s; }
+      .typed-line:nth-child(8) { animation-delay: 1.6s; }
+      .typed-line:nth-child(9) { animation-delay: 1.7s; }
+      .typed-line:nth-child(10) { animation-delay: 1.8s; }
+      .typed-line:nth-child(11) { animation-delay: 1.9s; }
+      .typed-line:nth-child(12) { animation-delay: 2.0s; }
+      .typed-line:nth-child(13) { animation-delay: 2.1s; }
+      .typed-line:nth-child(14) { animation-delay: 2.4s; }
+
+      @media (max-width: 640px) {
+        body { padding: 10px; padding-bottom: 80px; }
+        .terminal-body { padding: 12px; font-size: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scanline"></div>
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="terminal-btn btn-red"></div>
+        <div class="terminal-btn btn-yellow"></div>
+        <div class="terminal-btn btn-green"></div>
+        <span class="terminal-title">oskar@korczak.xyz: ~</span>
+      </div>
+      <div class="terminal-body">
+        <div class="line typed-line">
+          <span class="prompt">oskar@korczak.xyz</span>:<span class="directory">~</span>$ <span class="command">whoami</span>
+        </div>
+        <div class="line typed-line output">
+          software engineer, mentor, builder
+        </div>
+        <div class="line typed-line output" style="margin-bottom: 20px;">
+          7 years building software that matters
+        </div>
+
+        <div class="line typed-line">
+          <span class="prompt">oskar@korczak.xyz</span>:<span class="directory">~</span>$ <span class="command">ls -la</span>
+        </div>
+
+        <div class="line typed-line">
+          <span class="permissions">drwxr-xr-x</span> <a href="/songs/" class="link directory">songs/</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">drwxr-xr-x</span> <a href="/courses/" class="link directory">courses/</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">drwxr-xr-x</span> <a href="/mentoring/" class="link directory">mentoring/</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">drwxr-xr-x</span> <a href="/blog/" class="link directory">blog/</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">-rw-r--r--</span> <a href="https://discord.gg/DwbvwjJM7N" target="_blank" rel="noopener noreferrer" class="link file">discord.link</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">-rw-r--r--</span> <a href="https://www.youtube.com/@korczakxyz" target="_blank" rel="noopener noreferrer" class="link file">youtube.link</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">-rw-r--r--</span> <a href="https://github.com/oskarissimus" target="_blank" rel="noopener noreferrer" class="link file">github.link</a>
+        </div>
+        <div class="line typed-line">
+          <span class="permissions">-rw-r--r--</span> <a href="https://www.linkedin.com/in/oskar-korczak/" target="_blank" rel="noopener noreferrer" class="link file">linkedin.link</a>
+        </div>
+
+        <div class="line typed-line" style="margin-top: 20px;">
+          <span class="prompt">oskar@korczak.xyz</span>:<span class="directory">~</span>$ <span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+    <DesignSwitcher current="Terminal" />
+  </body>
+</html>
