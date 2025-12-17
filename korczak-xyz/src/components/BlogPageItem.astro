@@ -24,36 +24,46 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
 ---
 
 <li class="blog-item">
-  <div class="blog-item-header">
-    <span class="blog-icon">#</span>
-    <h2 class="blog-title">
-      <a href={href}>{title}</a>
-    </h2>
-    {isRecent && <span class="blink new-badge">NEW!</span>}
-  </div>
-  <div class="blog-item-content">
-    {featuredImage && (
-      <Image
-        src={featuredImage}
-        alt={title || "Post's featured image"}
-        width={120}
-        height={80}
-        class="blog-image"
-      />
-    )}
-    <div class="blog-text">
-      {excerpt && <p class="blog-excerpt">{excerpt}</p>}
-      <span class="blog-date">[{formatDate(date)}]</span>
+  <a href={href} class="blog-link">
+    <div class="blog-item-header">
+      <span class="blog-icon">#</span>
+      <h2 class="blog-title">{title}</h2>
+      {isRecent && <span class="blink new-badge">NEW!</span>}
     </div>
-  </div>
+    <div class="blog-item-content">
+      {featuredImage && (
+        <Image
+          src={featuredImage}
+          alt={title || "Post's featured image"}
+          width={120}
+          height={80}
+          class="blog-image"
+        />
+      )}
+      <div class="blog-text">
+        {excerpt && <p class="blog-excerpt">{excerpt}</p>}
+        <span class="blog-date">[{formatDate(date)}]</span>
+      </div>
+    </div>
+  </a>
 </li>
 
 <style>
   .blog-item {
+    list-style: none;
+  }
+
+  .blog-link {
+    display: block;
     background: var(--retro-gray);
     border: 3px outset var(--retro-white);
     padding: 15px;
-    list-style: none;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .blog-link:hover {
+    background: #a0a0a0;
   }
 
   .blog-item-header {
@@ -75,15 +85,10 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
     font-family: 'VT323', monospace;
     font-size: 1.4rem;
     flex-grow: 1;
-  }
-
-  .blog-title a {
     color: var(--retro-navy);
-    text-decoration: none;
   }
 
-  .blog-title a:hover {
-    color: var(--retro-teal);
+  .blog-link:hover .blog-title {
     text-decoration: underline;
   }
 
