@@ -1,31 +1,130 @@
+/* Retro Course Styling */
+.course {
+    font-family: 'VT323', monospace;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--retro-white);
+}
+
 .course h2 {
-    font-size: 2rem;
-    margin: 20px 0;
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.7rem, 2.5vw, 1rem);
+    color: var(--retro-cyan);
+    margin: 30px 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px dashed var(--retro-yellow);
 }
 
 .course h3 {
-    font-size: 1.5rem;
-    margin: 15px 0;
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.6rem, 2vw, 0.85rem);
+    color: var(--retro-green);
+    margin: 25px 0 12px 0;
+}
+
+.course h4 {
+    font-family: 'VT323', monospace;
+    font-size: 1.4rem;
+    color: var(--retro-yellow);
+    margin: 20px 0 10px 0;
 }
 
 .course p {
-    margin: 40px 0;
+    margin: 20px 0;
 }
 
-.course .gatsby-resp-image-wrapper {
+.course a {
+    color: var(--retro-cyan);
+    text-decoration: underline;
+}
+
+.course a:hover {
+    color: var(--retro-yellow);
+}
+
+.course img {
+    border: 3px inset var(--retro-dark-gray);
+    margin: 20px 0;
+}
+
+.course .gatsby-resp-image-wrapper,
+.course .astro-image {
     margin: 30px 0;
 }
 
 .course .embedVideo-container {
     margin: 30px 0;
+    border: 3px inset var(--retro-dark-gray);
 }
 
 .course ul {
-    list-style: disc;
-    padding-left: 2rem;
+    list-style: none;
+    padding-left: 0;
+    margin: 20px 0;
+}
+
+.course ul li {
+    padding-left: 25px;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.course ul li::before {
+    content: '>';
+    position: absolute;
+    left: 0;
+    color: var(--retro-cyan);
+    font-weight: bold;
 }
 
 .course ol {
     list-style: decimal;
     padding-left: 2rem;
+    margin: 20px 0;
+}
+
+.course ol li {
+    margin-bottom: 10px;
+    padding-left: 10px;
+}
+
+.course ol li::marker {
+    color: var(--retro-cyan);
+}
+
+.course blockquote {
+    background: var(--retro-navy);
+    border-left: 4px solid var(--retro-yellow);
+    padding: 15px 20px;
+    margin: 20px 0;
+    color: var(--retro-cyan);
+    font-style: italic;
+}
+
+.course pre {
+    background: var(--retro-black);
+    border: 2px inset var(--retro-dark-gray);
+    padding: 15px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.course code {
+    background: var(--retro-black);
+    color: var(--retro-green);
+    padding: 2px 6px;
+    font-family: 'VT323', monospace;
+}
+
+.course pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.course strong {
+    color: var(--retro-yellow);
+}
+
+.course em {
+    color: var(--retro-cyan);
 }

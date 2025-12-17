@@ -1,6 +1,38 @@
-html.dark pre[class*='language-'] {
-  background: none;
+/* Retro Song Styling */
+.blog_post.song,
+.blog_post {
+    font-family: 'VT323', monospace;
+    font-size: 1.3rem;
+    line-height: 1.8;
+    color: var(--retro-white);
 }
-html pre[class*='language-'] {
-  background: none;
+
+/* Song lyrics specific styling */
+.blog_post p {
+    white-space: pre-wrap;
+    margin: 15px 0;
+}
+
+/* Verse sections */
+.blog_post h2 {
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.6rem, 2vw, 0.8rem);
+    color: var(--retro-magenta);
+    margin: 25px 0 10px 0;
+    padding: 5px 10px;
+    background: var(--retro-navy);
+    display: inline-block;
+}
+
+.blog_post h3 {
+    font-family: 'VT323', monospace;
+    font-size: 1.3rem;
+    color: var(--retro-cyan);
+    margin: 20px 0 8px 0;
+}
+
+/* Code blocks for rendering */
+pre[class*='language-'] {
+    background: var(--retro-black) !important;
+    border: 2px inset var(--retro-dark-gray);
 }

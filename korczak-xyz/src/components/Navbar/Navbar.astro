@@ -1,7 +1,4 @@
 ---
-import { Image } from 'astro:assets';
-import logoImage from '../../assets/images/logo.png';
-import ThemeToggle from './ThemeToggle.astro';
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
 
 interface Props {
@@ -13,12 +10,12 @@ const { lang, currentPath } = Astro.props;
 const t = useTranslations(lang);
 
 const navigation = [
-  { name: t('Home'), to: lang === 'en' ? '/' : '/pl/' },
-  { name: t('About'), to: lang === 'en' ? '/about/' : '/pl/about/' },
-  { name: t('Mentoring'), to: lang === 'en' ? '/mentoring/' : '/pl/mentoring/' },
-  { name: t('Courses'), to: lang === 'en' ? '/courses/' : '/pl/courses/' },
-  { name: t('Blog'), to: lang === 'en' ? '/blog/' : '/pl/blog/' },
-  { name: t('Songs'), to: lang === 'en' ? '/songs/' : '/pl/songs/' },
+  { name: t('Home'), to: lang === 'en' ? '/' : '/pl/', icon: '~' },
+  { name: t('About'), to: lang === 'en' ? '/about/' : '/pl/about/', icon: '?' },
+  { name: t('Mentoring'), to: lang === 'en' ? '/mentoring/' : '/pl/mentoring/', icon: '@' },
+  { name: t('Courses'), to: lang === 'en' ? '/courses/' : '/pl/courses/', icon: '</>' },
+  { name: t('Blog'), to: lang === 'en' ? '/blog/' : '/pl/blog/', icon: '#' },
+  { name: t('Songs'), to: lang === 'en' ? '/songs/' : '/pl/songs/', icon: '*' },
 ];
 
 // Get alternate language path for language switcher
@@ -26,54 +23,179 @@ const enPath = lang === 'en' ? currentPath : getAlternateLangPath(currentPath, l
 const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, lang, 'pl');
 ---
 
-<div class="flex flex-col sticky top-0 left-0 w-full z-30 md:max-w-6xl bg-white dark:bg-black md:mr-10 md:ml-4 lg:text-base">
-  <!-- Mobile header -->
-  <div class="flex items-center justify-end px-4">
-    <div class="flex gap-3 md:hidden">
-      <Image src={logoImage} alt="logo" width={30} />
-      <a href={lang === 'en' ? '/' : '/pl/'}>korczak.xyz</a>
+<div class="window navbar-window">
+  <div class="title-bar">
+    <span class="site-title">korczak.xyz - Navigator</span>
+    <div class="title-buttons">
+      <div class="title-btn">_</div>
+      <div class="title-btn">[]</div>
+      <div class="title-btn">X</div>
     </div>
-    <div class="grow md:hidden"></div>
-    <div class="block md:hidden"><ThemeToggle /></div>
-    <button
-      class="flex md:hidden ml-4"
-      aria-label="Menu"
-      id="menu-button"
-    >
-      <svg class="block md:hidden cursor-pointer text-3xl my-6 w-8 h-8" fill="currentColor" viewBox="0 0 512 512">
-        <path d="M61.1 224C45 224 32 211 32 194.9c0-1.9 .2-3.7 .6-5.6C37.9 168.3 78.8 32 256 32s218.1 136.3 223.4 157.3c.5 1.9 .6 3.7 .6 5.6c0 16.1-13 29.1-29.1 29.1L61.1 224zM144 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm240 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32zM272 96a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zM16 304c0-26.5 21.5-48 48-48l384 0c26.5 0 48 21.5 48 48s-21.5 48-48 48L64 352c-26.5 0-48-21.5-48-48zm16 96c0-8.8 7.2-16 16-16l416 0c8.8 0 16 7.2 16 16l0 16c0 35.3-28.7 64-64 64L96 480c-35.3 0-64-28.7-64-64l0-16z"/>
-      </svg>
-    </button>
   </div>
 
-  <!-- Desktop nav / Mobile dropdown -->
-  <nav id="main-nav" class="items-end md:items-center gap-4 ml-6 mr-6 md:mr-0 md:mt-4 mb-6 flex-col md:flex md:flex-row hidden md:flex">
-    <div class="flex gap-3 md:flex hidden">
-      <Image src={logoImage} alt="logo" width={30} />
-      <a href={lang === 'en' ? '/' : '/pl/'}>korczak.xyz</a>
-    </div>
-    <div class="grow hidden md:block"></div>
-    {navigation.map(item => (
-      <a href={item.to}>{item.name}</a>
-    ))}
-    <div class="hidden md:block"><ThemeToggle /></div>
-    <div class="flex gap-3">
-      <a href={enPath}>
-        <span role="img" aria-label="en" class="text-2xl">🇬🇧</span>
-      </a>
-      <a href={plPath}>
-        <span role="img" aria-label="pl" class="text-2xl">🇵🇱</span>
-      </a>
-    </div>
-  </nav>
+  <div class="navbar-content">
+    <!-- Mobile menu button -->
+    <button class="menu-btn" id="menu-button" aria-label="Menu">
+      [MENU]
+    </button>
+
+    <!-- Navigation links -->
+    <nav id="main-nav" class="nav-links">
+      {navigation.map(item => (
+        <a href={item.to} class="nav-link">
+          <span class="nav-icon">{item.icon}</span>
+          <span class="nav-text">{item.name}</span>
+        </a>
+      ))}
+
+      <!-- Language switcher -->
+      <div class="lang-switcher">
+        <a href={enPath} class={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</a>
+        <span class="lang-divider">|</span>
+        <a href={plPath} class={`lang-btn ${lang === 'pl' ? 'active' : ''}`}>PL</a>
+      </div>
+    </nav>
+  </div>
 </div>
+
+<style>
+  .navbar-window {
+    margin-bottom: 20px;
+  }
+
+  .site-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .navbar-content {
+    background: var(--retro-gray);
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .menu-btn {
+    display: none;
+    background: var(--retro-gray);
+    border: 2px outset var(--retro-white);
+    padding: 5px 10px;
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--retro-black);
+  }
+
+  .menu-btn:active {
+    border-style: inset;
+  }
+
+  .nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .nav-link {
+    background: var(--retro-gray);
+    border: 2px outset var(--retro-white);
+    padding: 6px 12px;
+    text-decoration: none;
+    color: var(--retro-black);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: none;
+  }
+
+  .nav-link:hover {
+    background: #a0a0a0;
+    color: var(--retro-black);
+  }
+
+  .nav-link:active {
+    border-style: inset;
+  }
+
+  .nav-icon {
+    color: var(--retro-navy);
+    font-weight: bold;
+  }
+
+  .nav-text {
+    color: var(--retro-black);
+  }
+
+  .lang-switcher {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--retro-teal);
+    padding: 5px 10px;
+    border: 2px inset var(--retro-dark-gray);
+  }
+
+  .lang-btn {
+    color: var(--retro-yellow);
+    text-decoration: none;
+    font-weight: bold;
+    padding: 2px 5px;
+  }
+
+  .lang-btn:hover {
+    color: var(--retro-white);
+  }
+
+  .lang-btn.active {
+    background: var(--retro-navy);
+    color: var(--retro-white);
+  }
+
+  .lang-divider {
+    color: var(--retro-yellow);
+  }
+
+  /* Mobile styles */
+  @media (max-width: 768px) {
+    .menu-btn {
+      display: block;
+    }
+
+    .nav-links {
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .nav-links.show {
+      display: flex;
+    }
+
+    .nav-link {
+      justify-content: flex-start;
+    }
+
+    .lang-switcher {
+      margin-left: 0;
+      justify-content: center;
+    }
+  }
+</style>
 
 <script>
   const menuButton = document.getElementById('menu-button');
   const mainNav = document.getElementById('main-nav');
 
   menuButton?.addEventListener('click', () => {
-    mainNav?.classList.toggle('hidden');
-    mainNav?.classList.toggle('flex');
+    mainNav?.classList.toggle('show');
   });
 </script>
