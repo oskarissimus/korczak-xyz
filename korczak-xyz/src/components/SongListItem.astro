@@ -13,28 +13,33 @@ const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
 ---
 
 <li class="song-item">
-  <span class="song-icon">*</span>
-  <div class="song-info">
-    <h2 class="song-title">
-      <a href={songUrl}>{title}</a>
-    </h2>
-    <span class="song-author">[{author}]</span>
-  </div>
+  <a href={songUrl} class="song-link">
+    <span class="song-icon">*</span>
+    <div class="song-info">
+      <h2 class="song-title">{title}</h2>
+      <span class="song-author">[{author}]</span>
+    </div>
+  </a>
 </li>
 
 <style>
   .song-item {
-    background: var(--retro-gray);
-    border: 3px outset var(--retro-white);
-    padding: 12px 15px;
     list-style: none;
+  }
+
+  .song-link {
     display: flex;
     align-items: center;
     gap: 15px;
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    padding: 12px 15px;
+    text-decoration: none;
+    color: inherit;
   }
 
-  .song-item:hover {
-    background: #b0b0b0;
+  .song-link:hover {
+    background: #a0a0a0;
   }
 
   .song-icon {
@@ -56,15 +61,10 @@ const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
     font-family: 'VT323', monospace;
     font-size: 1.3rem;
     margin: 0;
-  }
-
-  .song-title a {
     color: var(--retro-navy);
-    text-decoration: none;
   }
 
-  .song-title a:hover {
-    color: var(--retro-teal);
+  .song-link:hover .song-title {
     text-decoration: underline;
   }
 
@@ -74,7 +74,7 @@ const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
   }
 
   @media (max-width: 600px) {
-    .song-item {
+    .song-link {
       padding: 10px 12px;
     }
 
