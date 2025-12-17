@@ -2,7 +2,10 @@
 import { Image } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
-import mentoringColor from '../assets/images/mentoring-color.png';
+import pythonIcon from '../assets/images/python-pixel.png';
+import tuxIcon from '../assets/images/tux-pixel.png';
+import dockerIcon from '../assets/images/docker-pixel.png';
+import k8sIcon from '../assets/images/k8s-pixel.png';
 import Calendar from '../components/Calendar';
 import ContactFormWrapper from '../components/ContactForm/ContactFormWrapper';
 import { useTranslations, type Lang } from '../i18n';
@@ -17,16 +20,36 @@ const t = useTranslations(lang);
 
 <Layout title={`${t('Mentoring')} | korczak.xyz`} lang={lang}>
   <PageContent title={t('Mentoring')}>
-    <div class="mentoring-image">
-      <Image
-        src={mentoringColor}
-        alt="Mentoring"
-        width={800}
-      />
-    </div>
-    <p>
-      {t("I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free")}
+    <p class="intro-text">
+      {t("I am a programmer with lots of experience in commercial projects. I have a desire to educate future developers. I have experience with teaching and mentoring. I can educate, and guide you in exchange for feedback about needs, problems and expectations of a beginner. Please use calendar below to schedule meeting, or contact me using form on the bottom of this page. First meeting is free 😉")}
     </p>
+
+    <div class="tech-icons">
+      <button type="button" class="tech-icon" tabindex="0">
+        <div class="icon-image-container">
+          <Image src={pythonIcon} alt="Python" width={48} />
+        </div>
+        <span class="icon-label">Python</span>
+      </button>
+      <button type="button" class="tech-icon" tabindex="0">
+        <div class="icon-image-container">
+          <Image src={tuxIcon} alt="Linux" width={48} />
+        </div>
+        <span class="icon-label">Linux</span>
+      </button>
+      <button type="button" class="tech-icon" tabindex="0">
+        <div class="icon-image-container">
+          <Image src={dockerIcon} alt="Docker" width={48} />
+        </div>
+        <span class="icon-label">Docker</span>
+      </button>
+      <button type="button" class="tech-icon" tabindex="0">
+        <div class="icon-image-container">
+          <Image src={k8sIcon} alt="Kubernetes" width={48} />
+        </div>
+        <span class="icon-label">Kubernetes</span>
+      </button>
+    </div>
 
     <div class="calendar-section">
       <h2>> {t('mentoring.scheduleMeeting')}</h2>
@@ -57,16 +80,122 @@ const t = useTranslations(lang);
 </Layout>
 
 <style>
-  .mentoring-image {
-    margin-bottom: 20px;
+  .tech-icons {
+    display: flex;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
   }
 
-  .mentoring-image img {
+  .tech-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 75px;
+    padding: 4px;
+    cursor: default;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+  }
+
+  .tech-icon:focus {
+    outline: none;
+  }
+
+  /* Fixed-size container for icon images - Win95 style */
+  .icon-image-container {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+  }
+
+  .tech-icon img {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: none;
+    box-shadow: none;
+    filter: none;
+    max-width: 48px;
+    max-height: 48px;
+    object-fit: contain;
+  }
+
+  .icon-label {
+    font-family: 'VT323', monospace;
+    font-size: 0.9rem;
+    color: var(--retro-white);
+    text-align: center;
+    text-shadow: 1px 1px 0 var(--retro-navy);
+    padding: 1px 3px;
+    max-width: 100%;
+    word-wrap: break-word;
+    line-height: 1.1;
+  }
+
+  /* Win95 hover state - highlight label with dotted border */
+  .tech-icon:hover .icon-label {
+    background: var(--retro-navy);
+    text-shadow: none;
+    outline: 1px dotted var(--retro-white);
+    outline-offset: 0px;
+  }
+
+  /* Win95 selected/focus state - persists after click */
+  .tech-icon:focus .icon-label,
+  .tech-icon.selected .icon-label {
+    background: var(--retro-navy);
+    text-shadow: none;
+    outline: 1px dotted var(--retro-white);
+    outline-offset: 0px;
+  }
+
+  /* Win95 active/mousedown state */
+  .tech-icon:active .icon-label {
+    background: var(--retro-navy);
+    text-shadow: none;
+    outline: 1px dotted var(--retro-white);
+  }
+
+  .icon-image-container {
+    position: relative;
+  }
+
+  /* Win95 dithered overlay pattern for selected icons */
+  .tech-icon:focus .icon-image-container::after,
+  .tech-icon.selected .icon-image-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Win95 checkerboard dither pattern */
+    background-image: url("data:image/svg+xml,%3Csvg width='2' height='2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000080' fill-opacity='0.5'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000080' fill-opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 2px 2px;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* Also show dithered overlay on hover */
+  .tech-icon:hover .icon-image-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='2' height='2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000080' fill-opacity='0.5'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000080' fill-opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 2px 2px;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  .calendar-section {
+    margin: 0 0 30px 0;
+    padding: 20px;
+    background: var(--retro-navy);
     border: 3px inset var(--retro-dark-gray);
-    width: 100%;
   }
 
-  .calendar-section,
   .skills-section,
   .contact-section {
     margin: 30px 0;
@@ -103,5 +232,9 @@ const t = useTranslations(lang);
     color: var(--retro-yellow);
     text-align: center;
     font-size: 1.2rem;
+  }
+
+  .intro-text {
+    margin-bottom: 0;
   }
 </style>
