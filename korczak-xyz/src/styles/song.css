@@ -31,8 +31,38 @@
     margin: 20px 0 8px 0;
 }
 
-/* Code blocks for rendering */
-pre[class*='language-'] {
-    background: var(--retro-black) !important;
-    border: 2px inset var(--retro-dark-gray);
+/* Code blocks for song lyrics - Win95 style */
+.blog_post pre[class*='language-'],
+.blog_post pre {
+    background: var(--retro-navy) !important;
+    border: 3px inset var(--retro-dark-gray);
+    padding: 15px;
+    margin: 15px 0;
+    overflow-x: auto;
+}
+
+.blog_post code[class*='language-'],
+.blog_post pre code {
+    background: transparent !important;
+    color: var(--retro-green) !important;
+    font-family: 'VT323', monospace;
+    font-size: 1.3rem;
+    line-height: 1.6;
+    text-shadow: none;
+}
+
+/* Style chord lines differently - they start with spaces or contain chord letters */
+.blog_post code .token,
+.blog_post pre code span {
+    background: transparent !important;
+    color: var(--retro-green) !important;
+}
+
+/* Remove any prism highlighting backgrounds */
+.blog_post .token.punctuation,
+.blog_post .token.operator,
+.blog_post .token.string,
+.blog_post .token.comment,
+.blog_post .token.keyword {
+    background: transparent !important;
 }
