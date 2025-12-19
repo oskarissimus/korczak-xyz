@@ -2,6 +2,12 @@
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import { useTranslations, type Lang } from '../i18n';
+import TechIconsGrid from './TechIconsGrid.astro';
+
+interface TechIcon {
+  icon: ImageMetadata;
+  label: string;
+}
 
 interface Props {
   slug: string;
@@ -9,10 +15,11 @@ interface Props {
   excerpt?: string;
   featuredImageColor?: ImageMetadata;
   featuredImageBW?: ImageMetadata;
+  techIcons?: TechIcon[];
   lang: Lang;
 }
 
-const { slug, title, excerpt, featuredImageColor, featuredImageBW, lang } = Astro.props;
+const { slug, title, excerpt, featuredImageColor, featuredImageBW, techIcons, lang } = Astro.props;
 const t = useTranslations(lang);
 
 const href = lang === 'en' ? `/courses/${slug}/` : `/pl/courses/${slug}/`;
@@ -26,7 +33,11 @@ const image = featuredImageColor || featuredImageBW;
     <span class="course-icon">&lt;/&gt;</span>
     <h3 class="course-title">{title}</h3>
   </div>
-  {image && (
+  {techIcons && techIcons.length > 0 ? (
+    <div class="course-icons-wrapper">
+      <TechIconsGrid icons={techIcons} />
+    </div>
+  ) : image && (
     <div class="course-image-wrapper">
       <Image
         src={image}
@@ -72,6 +83,12 @@ const image = featuredImageColor || featuredImageBW;
     font-size: 1.6rem;
     color: var(--retro-navy);
     margin: 0;
+  }
+
+  .course-icons-wrapper {
+    border: 3px inset var(--retro-dark-gray);
+    background: var(--retro-teal);
+    padding: 15px;
   }
 
   .course-image-wrapper {
