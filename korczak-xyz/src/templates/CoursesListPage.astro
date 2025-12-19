@@ -1,9 +1,23 @@
 ---
 import { getCollection } from 'astro:content';
+import type { ImageMetadata } from 'astro';
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
 import CourseSection from '../components/CourseSection.astro';
 import { useTranslations, type Lang } from '../i18n';
+
+// Import tech icons
+import jsIcon from '../assets/images/js-pixel.png';
+import tsIcon from '../assets/images/ts-pixel.png';
+import nodejsIcon from '../assets/images/nodejs-pixel.png';
+import globeIcon from '../assets/images/globe-pixel.png';
+import lockIcon from '../assets/images/lock-pixel.png';
+import serverIcon from '../assets/images/server-pixel.png';
+import cableIcon from '../assets/images/cable-pixel.png';
+import postmanIcon from '../assets/images/postman-pixel.png';
+import pythonIcon from '../assets/images/python-pixel.png';
+import chromeIcon from '../assets/images/chrome-pixel.png';
+import seleniumIcon from '../assets/images/selenium-pixel.png';
 
 interface Props {
   lang: Lang;
@@ -11,6 +25,27 @@ interface Props {
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
+
+// Define tech icons for each course by slug
+const courseIcons: Record<string, Array<{ icon: ImageMetadata; label: string }>> = {
+  'backend-javascript': [
+    { icon: jsIcon, label: 'JavaScript' },
+    { icon: tsIcon, label: 'TypeScript' },
+    { icon: nodejsIcon, label: 'Node.js' },
+  ],
+  'selected-network-aspects': [
+    { icon: globeIcon, label: 'Internet' },
+    { icon: lockIcon, label: 'Security' },
+    { icon: serverIcon, label: 'Server' },
+    { icon: cableIcon, label: 'Network' },
+  ],
+  'advanced-web-testing-tools': [
+    { icon: postmanIcon, label: 'Postman' },
+    { icon: pythonIcon, label: 'Python' },
+    { icon: chromeIcon, label: 'Chrome' },
+    { icon: seleniumIcon, label: 'Selenium' },
+  ],
+};
 
 const collectionName = `courses-${lang}` as 'courses-en' | 'courses-pl';
 const courses = await getCollection(collectionName, ({ data }) =>
@@ -28,6 +63,7 @@ const courses = await getCollection(collectionName, ({ data }) =>
           excerpt={course.data.excerpt}
           featuredImageColor={course.data.featuredImageColor}
           featuredImageBW={course.data.featuredImageBW}
+          techIcons={courseIcons[course.data.slug]}
           lang={lang}
         />
       ))}
