@@ -75,6 +75,9 @@ const currentPath = Astro.url.pathname;
       <slot />
       <Footer lang={lang} />
     </div>
+    <div class="taskbar">
+      <div class="taskbar-items"></div>
+    </div>
   </body>
 </html>
 
@@ -414,16 +417,174 @@ const currentPath = Astro.url.pathname;
       font-size: 0.7rem;
     }
   }
+
+  /* Taskbar */
+  .taskbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: var(--retro-gray);
+    border-top: 3px outset var(--retro-white);
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    z-index: 9999;
+  }
+
+  .taskbar-items {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .taskbar-item {
+    background: var(--retro-gray);
+    border: 2px outset var(--retro-white);
+    padding: 4px 12px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--retro-black);
+  }
+
+  .taskbar-item:hover {
+    background: #a0a0a0;
+  }
+
+  .taskbar-item:active {
+    border-style: inset;
+  }
+
+  .taskbar:empty,
+  .taskbar-items:empty {
+    display: none;
+  }
 </style>
 
 <script>
+  // Track minimized windows
+  const minimizedWindows = new Map<string, HTMLElement>();
+  let windowIdCounter = 0;
+
+  // Get or create unique ID for a window
+  function getWindowId(win: HTMLElement): string {
+    if (!win.dataset.windowId) {
+      win.dataset.windowId = `window-${windowIdCounter++}`;
+    }
+    return win.dataset.windowId;
+  }
+
+  // Get window title from title bar
+  function getWindowTitle(win: HTMLElement): string {
+    const titleBar = win.querySelector('.title-bar');
+    const titleSpan = titleBar?.querySelector('span');
+    return titleSpan?.textContent || 'Window';
+  }
+
+  // Minimize a window
+  function minimizeWindow(win: HTMLElement) {
+    const windowId = getWindowId(win);
+    const title = getWindowTitle(win);
+
+    // Hide the window but preserve space
+    win.style.visibility = 'hidden';
+    win.style.pointerEvents = 'none';
+
+    // Store reference
+    minimizedWindows.set(windowId, win);
+
+    // Add to taskbar
+    const taskbarItems = document.querySelector('.taskbar-items');
+    if (taskbarItems) {
+      const item = document.createElement('div');
+      item.className = 'taskbar-item';
+      item.dataset.windowId = windowId;
+      item.textContent = title;
+      item.title = title;
+      taskbarItems.appendChild(item);
+    }
+
+    // Show taskbar if it has items
+    updateTaskbarVisibility();
+  }
+
+  // Restore a window from taskbar
+  function restoreWindow(windowId: string) {
+    const win = minimizedWindows.get(windowId);
+    if (win) {
+      // Show the window
+      win.style.visibility = '';
+      win.style.pointerEvents = '';
+      bringToFront(win);
+
+      // Remove from tracking
+      minimizedWindows.delete(windowId);
+
+      // Remove from taskbar
+      const taskbarItem = document.querySelector(`.taskbar-item[data-window-id="${windowId}"]`);
+      taskbarItem?.remove();
+
+      // Update taskbar visibility
+      updateTaskbarVisibility();
+    }
+  }
+
+  // Update taskbar visibility based on items
+  function updateTaskbarVisibility() {
+    const taskbar = document.querySelector('.taskbar') as HTMLElement;
+    const taskbarItems = document.querySelector('.taskbar-items');
+    if (taskbar && taskbarItems) {
+      taskbar.style.display = taskbarItems.children.length > 0 ? 'flex' : 'none';
+    }
+  }
+
+  // Initialize taskbar visibility
+  updateTaskbarVisibility();
+
   // Close button functionality
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (target.classList.contains('close-btn')) {
-      const window = target.closest('.window');
-      if (window) {
-        (window as HTMLElement).style.display = 'none';
+      const win = target.closest('.window');
+      if (win) {
+        const windowId = getWindowId(win as HTMLElement);
+        // Remove from minimized if it was minimized
+        minimizedWindows.delete(windowId);
+        const taskbarItem = document.querySelector(`.taskbar-item[data-window-id="${windowId}"]`);
+        taskbarItem?.remove();
+        updateTaskbarVisibility();
+        // Hide but preserve space
+        (win as HTMLElement).style.visibility = 'hidden';
+        (win as HTMLElement).style.pointerEvents = 'none';
+      }
+    }
+  });
+
+  // Minimize button functionality
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('minimize-btn')) {
+      const win = target.closest('.window') as HTMLElement;
+      if (win) {
+        minimizeWindow(win);
+      }
+    }
+  });
+
+  // Taskbar item click to restore window
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('taskbar-item')) {
+      const windowId = target.dataset.windowId;
+      if (windowId) {
+        restoreWindow(windowId);
       }
     }
   });
