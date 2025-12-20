@@ -137,6 +137,19 @@
     background: var(--retro-black) !important;
     border: 2px inset var(--retro-dark-gray);
     padding: 15px;
+
+    /* Astro/Shiki syntax highlighting colors */
+    --astro-code-foreground: #00ff00;
+    --astro-code-background: var(--retro-black);
+    --astro-code-token-constant: #ff6600;
+    --astro-code-token-string: #ffff00;
+    --astro-code-token-comment: #808080;
+    --astro-code-token-keyword: #ff00ff;
+    --astro-code-token-parameter: #00ffff;
+    --astro-code-token-function: #00ffff;
+    --astro-code-token-string-expression: #ffff00;
+    --astro-code-token-punctuation: #ffffff;
+    --astro-code-token-link: #00ffff;
 }
 
 .blog_post code {
