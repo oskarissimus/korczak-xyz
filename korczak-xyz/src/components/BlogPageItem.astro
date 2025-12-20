@@ -13,8 +13,12 @@ interface Props {
 
 const { slug, title, date, excerpt, featuredImage, lang } = Astro.props;
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString();
+function formatDate(date: Date, locale: string): string {
+  const localeMap: Record<string, string> = {
+    'en': 'en-US',
+    'pl': 'pl-PL'
+  };
+  return date.toLocaleDateString(localeMap[locale] || locale);
 }
 
 const href = lang === 'en' ? `/blog/${slug}/` : `/pl/blog/${slug}/`;
@@ -44,7 +48,7 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
       )}
       <div class="blog-text">
         {excerpt && <p class="blog-excerpt">{excerpt}</p>}
-        <span class="blog-date">[{formatDate(date)}]</span>
+        <span class="blog-date">[{formatDate(date, lang)}]</span>
       </div>
     </div>
   </a>
