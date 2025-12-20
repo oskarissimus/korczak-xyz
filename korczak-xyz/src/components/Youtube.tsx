@@ -1,6 +1,12 @@
 export default function Youtube({ videoId }: { videoId: string }) {
   return (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '2rem' }}>
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      aspectRatio: '16/9',
+      marginBottom: '2rem',
+      border: '3px inset #808080'
+    }}>
       <iframe
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         src={`https://www.youtube.com/embed/${videoId}`}
