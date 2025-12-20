@@ -4,6 +4,7 @@ slug: i-love-you
 author: T. Love
 published: true
 language: pl
+dateAdded: 2025-06-25
 ---
 
 ```plaintext

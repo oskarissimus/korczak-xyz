@@ -66,6 +66,9 @@ export const ui = {
 
     // Courses
     'Read more': 'Read more',
+
+    // Songs
+    'Date added': 'Date added',
   },
   pl: {
     // Navigation
@@ -125,6 +128,9 @@ export const ui = {
 
     // Courses
     'Read more': 'Czytaj więcej',
+
+    // Songs
+    'Date added': 'Dodano',
   },
 } as const;
 

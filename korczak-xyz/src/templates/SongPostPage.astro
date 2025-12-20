@@ -3,7 +3,7 @@ import { getCollection, render } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
 import '../styles/song.css';
-import { type Lang } from '../i18n';
+import { type Lang, useTranslations } from '../i18n';
 
 interface Props {
   lang: Lang;
@@ -11,6 +11,7 @@ interface Props {
 }
 
 const { lang, slug } = Astro.props;
+const t = useTranslations(lang);
 
 // Songs are only in Polish collection
 const songs = await getCollection('songs', ({ data }) =>
@@ -23,12 +24,43 @@ if (songs.length === 0) {
 
 const song = songs[0];
 const { Content } = await render(song);
+
+function formatDate(date: Date, locale: string): string {
+  const localeMap: Record<string, string> = {
+    'en': 'en-US',
+    'pl': 'pl-PL'
+  };
+  return date.toLocaleDateString(localeMap[locale] || locale);
+}
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
   <PageContent title={song.data.title}>
+    <div class="song-meta">
+      <span class="song-author">[{song.data.author}]</span>
+      <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
+    </div>
     <section class="blog_post" itemprop="articleBody">
       <Content />
     </section>
   </PageContent>
 </Layout>
+
+<style>
+  .song-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+
+  .song-author {
+    color: var(--retro-teal);
+    font-size: 1.1rem;
+  }
+
+  .song-date {
+    color: var(--retro-dark-gray);
+    font-size: 1rem;
+  }
+</style>

@@ -4,6 +4,7 @@ slug: zapada-zmrok
 author: Religijne
 published: true
 language: pl
+dateAdded: 2025-12-20
 ---
 ```plaintext
           A                     E

@@ -62,6 +62,7 @@ const songsCollection = defineCollection({
     author: z.string(),
     published: z.boolean(),
     language: z.literal('pl'),
+    dateAdded: z.coerce.date(),
   }),
 });
 

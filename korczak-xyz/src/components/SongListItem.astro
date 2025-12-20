@@ -5,11 +5,20 @@ interface Props {
   slug: string;
   title: string;
   author: string;
+  dateAdded: Date;
   lang?: Lang;
 }
 
-const { slug, title, author, lang = 'pl' } = Astro.props;
+const { slug, title, author, dateAdded, lang = 'pl' } = Astro.props;
 const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
+
+function formatDate(date: Date, locale: string): string {
+  const localeMap: Record<string, string> = {
+    'en': 'en-US',
+    'pl': 'pl-PL'
+  };
+  return date.toLocaleDateString(localeMap[locale] || locale);
+}
 ---
 
 <li class="song-item">
@@ -17,7 +26,10 @@ const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
     <span class="song-icon">*</span>
     <div class="song-info">
       <h2 class="song-title">{title}</h2>
-      <span class="song-author">[{author}]</span>
+      <div class="song-meta">
+        <span class="song-date">{formatDate(dateAdded, lang)}</span>
+        <span class="song-author">[{author}]</span>
+      </div>
     </div>
   </a>
 </li>
@@ -72,9 +84,20 @@ const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
     text-decoration: underline;
   }
 
+  .song-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
   .song-author {
     color: var(--retro-teal);
     font-size: 1rem;
+  }
+
+  .song-date {
+    color: var(--retro-navy);
+    font-size: 0.9rem;
   }
 
   @media (max-width: 600px) {

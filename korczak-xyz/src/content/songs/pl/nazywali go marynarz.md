@@ -4,6 +4,7 @@ slug: nazywali-go-marynarz
 author: Artur Andrus
 published: true
 language: pl
+dateAdded: 2025-01-22
 ---
 ```plaintext
     d    C    d
