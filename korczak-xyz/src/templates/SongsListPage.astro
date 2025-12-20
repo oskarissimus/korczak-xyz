@@ -27,7 +27,7 @@ songs.sort((a, b) => {
 
 <Layout title={`${t('Songs')} | korczak.xyz`} lang={lang}>
   <PageContent title={t('Songs')}>
-    <ul class="flex flex-col gap-10">
+    <ul class="flex flex-col gap-6">
       {songs.map(song => (
         <SongListItem
           slug={song.data.slug}

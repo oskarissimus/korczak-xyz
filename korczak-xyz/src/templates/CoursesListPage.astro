@@ -55,7 +55,7 @@ const courses = await getCollection(collectionName, ({ data }) =>
 
 <Layout title={`${t('Courses')} | korczak.xyz`} lang={lang}>
   <PageContent title={t('Courses')}>
-    <div class="flex flex-col gap-20">
+    <div class="flex flex-col gap-12">
       {courses.map(course => (
         <CourseSection
           slug={course.data.slug}
