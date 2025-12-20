@@ -32,13 +32,15 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
     </div>
     <div class="blog-item-content">
       {featuredImage && (
-        <Image
-          src={featuredImage}
-          alt={title || "Post's featured image"}
-          width={120}
-          height={80}
-          class="blog-image"
-        />
+        <div class="blog-image-frame">
+          <Image
+            src={featuredImage}
+            alt={title || "Post's featured image"}
+            width={120}
+            height={80}
+            class="blog-image"
+          />
+        </div>
       )}
       <div class="blog-text">
         {excerpt && <p class="blog-excerpt">{excerpt}</p>}
@@ -110,12 +112,20 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
     align-items: flex-start;
   }
 
-  .blog-image {
-    border: 2px inset var(--retro-dark-gray);
+  .blog-image-frame {
     flex-shrink: 0;
     width: 120px;
     height: 80px;
+    overflow: hidden;
+    border: 3px inset var(--retro-dark-gray);
+  }
+
+  .blog-image-frame img {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
+    max-width: none;
+    border: none;
   }
 
   .blog-text {
@@ -138,10 +148,10 @@ const isRecent = (new Date().getTime() - date.getTime()) < (30 * 24 * 60 * 60 * 
       flex-direction: column;
     }
 
-    .blog-image {
+    .blog-image-frame {
       width: 100%;
       height: auto;
-      max-height: 150px;
+      aspect-ratio: 120 / 80;
     }
   }
 </style>

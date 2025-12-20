@@ -1,0 +1,28 @@
+---
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={["image-frame", className]}>
+  <slot />
+</div>
+
+<style>
+  .image-frame {
+    display: block;
+    border: 3px inset var(--retro-dark-gray);
+    overflow: hidden;
+  }
+
+  .image-frame :global(img) {
+    display: block;
+    border: none;
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>

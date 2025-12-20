@@ -1,5 +1,6 @@
 ---
 import { Image } from 'astro:assets';
+import ImageFrame from './ImageFrame.astro';
 
 export interface Props {
   names: string[];
@@ -42,15 +43,17 @@ const images = names.map((name) => {
 }).filter(Boolean);
 ---
 
-<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+<div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
   {images.map((item) => item && (
-    <div style="flex-grow: 1;">
-      <Image
-        src={item.image}
-        alt={item.alt}
-        width={300}
-        style="display: block; width: 100%; height: auto;"
-      />
+    <div style="flex: 1 1 200px; min-width: 150px;">
+      <ImageFrame>
+        <Image
+          src={item.image}
+          alt={item.alt}
+          width={300}
+          style="display: block; width: 100%; height: auto;"
+        />
+      </ImageFrame>
       {item.alt}
     </div>
   ))}

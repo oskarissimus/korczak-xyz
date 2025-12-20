@@ -42,14 +42,35 @@
     color: var(--retro-yellow);
 }
 
-.course img {
+/* Image wrapper from rehype plugin - border on wrapper to avoid dither filter */
+/* Use span.image-frame to target only markdown images wrapped by rehype plugin */
+/* div.image-frame from Gallery component should NOT have width: fit-content */
+.course span.image-frame {
+    display: block;
+    width: fit-content;
     border: 3px inset var(--retro-dark-gray);
     margin: 20px 0;
 }
 
+.course span.image-frame img {
+    display: block;
+    border: none;
+}
+
+.course img {
+    border: none;
+}
+
 .course .gatsby-resp-image-wrapper,
 .course .astro-image {
+    display: inline-block;
+    border: 3px inset var(--retro-dark-gray);
     margin: 30px 0;
+}
+
+.course .gatsby-resp-image-wrapper img,
+.course .astro-image img {
+    border: none;
 }
 
 .course .embedVideo-container {

@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
 import tailwind from '@astrojs/tailwind';
+import rehypeWrapImages from './src/plugins/rehype-wrap-images.mjs';
 
 export default defineConfig({
   devToolbar: { enabled: false },
@@ -25,5 +26,6 @@ export default defineConfig({
       theme: 'css-variables',
       wrap: true,
     },
+    rehypePlugins: [rehypeWrapImages],
   },
 });
