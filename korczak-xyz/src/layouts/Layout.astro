@@ -466,12 +466,75 @@ const currentPath = Astro.url.pathname;
   .taskbar-items:empty {
     display: none;
   }
+
+  /* Maximized window */
+  .window.maximized {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: 9998 !important;
+    max-width: none !important;
+  }
+
+  /* Adjust for taskbar when visible */
+  body.taskbar-visible .window.maximized {
+    bottom: 40px !important;
+    height: calc(100vh - 40px) !important;
+  }
+
+  .window.maximized .window-content {
+    height: calc(100% - 28px);
+    overflow: auto;
+  }
+
+  /* Restore button icon (two overlapping squares) */
+  .maximize-btn.restore {
+    position: relative;
+    font-size: 0;
+  }
+
+  .maximize-btn.restore::before,
+  .maximize-btn.restore::after {
+    content: '';
+    position: absolute;
+    border: 1px solid var(--retro-black);
+    background: var(--retro-gray);
+  }
+
+  .maximize-btn.restore::before {
+    width: 6px;
+    height: 6px;
+    top: 2px;
+    right: 3px;
+  }
+
+  .maximize-btn.restore::after {
+    width: 6px;
+    height: 6px;
+    bottom: 2px;
+    left: 3px;
+  }
 </style>
 
 <script>
   // Track minimized windows
   const minimizedWindows = new Map<string, HTMLElement>();
   let windowIdCounter = 0;
+
+  // Track maximized windows and their previous state
+  interface WindowState {
+    transform: string;
+    width: string;
+    height: string;
+    position: string;
+  }
+  const maximizedWindows = new Map<string, WindowState>();
 
   // Get or create unique ID for a window
   function getWindowId(win: HTMLElement): string {
@@ -543,7 +606,58 @@ const currentPath = Astro.url.pathname;
     const taskbar = document.querySelector('.taskbar') as HTMLElement;
     const taskbarItems = document.querySelector('.taskbar-items');
     if (taskbar && taskbarItems) {
-      taskbar.style.display = taskbarItems.children.length > 0 ? 'flex' : 'none';
+      const hasItems = taskbarItems.children.length > 0;
+      taskbar.style.display = hasItems ? 'flex' : 'none';
+      document.body.classList.toggle('taskbar-visible', hasItems);
+    }
+  }
+
+  // Maximize a window
+  function maximizeWindow(win: HTMLElement) {
+    const windowId = getWindowId(win);
+    const maximizeBtn = win.querySelector('.maximize-btn');
+
+    // Store current state before maximizing
+    maximizedWindows.set(windowId, {
+      transform: win.style.transform || '',
+      width: win.style.width || '',
+      height: win.style.height || '',
+      position: win.style.position || ''
+    });
+
+    // Apply maximized class (CSS handles the rest)
+    win.classList.add('maximized');
+    bringToFront(win);
+
+    // Update button to show restore icon
+    if (maximizeBtn) {
+      maximizeBtn.classList.add('restore');
+    }
+  }
+
+  // Restore a maximized window
+  function restoreFromMaximize(win: HTMLElement) {
+    const windowId = getWindowId(win);
+    const maximizeBtn = win.querySelector('.maximize-btn');
+    const previousState = maximizedWindows.get(windowId);
+
+    // Remove maximized class
+    win.classList.remove('maximized');
+
+    // Restore previous state
+    if (previousState) {
+      win.style.transform = previousState.transform;
+      win.style.width = previousState.width;
+      win.style.height = previousState.height;
+      win.style.position = previousState.position;
+    }
+
+    // Remove from tracking
+    maximizedWindows.delete(windowId);
+
+    // Update button to show maximize icon
+    if (maximizeBtn) {
+      maximizeBtn.classList.remove('restore');
     }
   }
 
@@ -577,6 +691,22 @@ const currentPath = Astro.url.pathname;
       const win = target.closest('.window') as HTMLElement;
       if (win) {
         minimizeWindow(win);
+      }
+    }
+  });
+
+  // Maximize button functionality
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('maximize-btn')) {
+      const win = target.closest('.window') as HTMLElement;
+      if (win) {
+        const windowId = getWindowId(win);
+        if (maximizedWindows.has(windowId)) {
+          restoreFromMaximize(win);
+        } else {
+          maximizeWindow(win);
+        }
       }
     }
   });
