@@ -496,6 +496,7 @@ const currentPath = Astro.url.pathname;
     // Hide the window but preserve space
     win.style.visibility = 'hidden';
     win.style.pointerEvents = 'none';
+    win.style.opacity = '0';
 
     // Store reference
     minimizedWindows.set(windowId, win);
@@ -522,6 +523,7 @@ const currentPath = Astro.url.pathname;
       // Show the window
       win.style.visibility = '';
       win.style.pointerEvents = '';
+      win.style.opacity = '';
       bringToFront(win);
 
       // Remove from tracking
@@ -563,6 +565,7 @@ const currentPath = Astro.url.pathname;
         // Hide but preserve space
         (win as HTMLElement).style.visibility = 'hidden';
         (win as HTMLElement).style.pointerEvents = 'none';
+        (win as HTMLElement).style.opacity = '0';
       }
     }
   });
