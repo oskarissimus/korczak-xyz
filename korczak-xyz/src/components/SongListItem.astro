@@ -6,10 +6,14 @@ interface Props {
   title: string;
   author: string;
   dateAdded: Date;
+  videoUploadDate?: Date;
   lang?: Lang;
 }
 
-const { slug, title, author, dateAdded, lang = 'pl' } = Astro.props;
+const { slug, title, author, dateAdded, videoUploadDate, lang = 'pl' } = Astro.props;
+
+// Use the earlier of the two dates
+const displayDate = videoUploadDate && videoUploadDate < dateAdded ? videoUploadDate : dateAdded;
 const songUrl = getLocalizedPath(`/songs/${slug}/`, lang);
 
 function formatDate(date: Date, locale: string): string {
@@ -27,7 +31,7 @@ function formatDate(date: Date, locale: string): string {
     <div class="song-info">
       <h2 class="song-title">{title}</h2>
       <div class="song-meta">
-        <span class="song-date">{formatDate(dateAdded, lang)}</span>
+        <span class="song-date">{formatDate(displayDate, lang)}</span>
         <span class="song-author">[{author}]</span>
       </div>
     </div>

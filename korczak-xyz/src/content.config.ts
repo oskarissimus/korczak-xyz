@@ -63,6 +63,7 @@ const songsCollection = defineCollection({
     published: z.boolean(),
     language: z.literal('pl'),
     dateAdded: z.coerce.date(),
+    videoUploadDate: z.coerce.date().optional(),
   }),
 });
 
