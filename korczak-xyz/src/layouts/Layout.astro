@@ -404,3 +404,15 @@ const currentPath = Astro.url.pathname;
     }
   }
 </style>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('close-btn')) {
+      const window = target.closest('.window');
+      if (window) {
+        (window as HTMLElement).style.display = 'none';
+      }
+    }
+  });
+</script>
