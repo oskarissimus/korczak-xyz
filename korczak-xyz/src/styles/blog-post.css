@@ -132,6 +132,13 @@
     margin: 20px 0;
 }
 
+/* Astro/Shiki code blocks */
+.blog_post pre.astro-code {
+    background: var(--retro-black) !important;
+    border: 2px inset var(--retro-dark-gray);
+    padding: 15px;
+}
+
 .blog_post code {
     background: var(--retro-black);
     color: var(--retro-green);
