@@ -120,6 +120,11 @@ const currentPath = Astro.url.pathname;
     background: var(--retro-gray);
     border: 3px outset var(--retro-white);
     margin-bottom: 20px;
+    position: relative;
+  }
+
+  .window.dragging {
+    opacity: 0.95;
   }
 
   .title-bar {
@@ -131,6 +136,12 @@ const currentPath = Astro.url.pathname;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .title-bar:active {
+    cursor: grabbing;
   }
 
   .title-buttons {
@@ -406,6 +417,7 @@ const currentPath = Astro.url.pathname;
 </style>
 
 <script>
+  // Close button functionality
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (target.classList.contains('close-btn')) {
@@ -413,6 +425,72 @@ const currentPath = Astro.url.pathname;
       if (window) {
         (window as HTMLElement).style.display = 'none';
       }
+    }
+  });
+
+  // Draggable windows
+  let draggedWindow: HTMLElement | null = null;
+  let startX = 0;
+  let startY = 0;
+  let currentTranslateX = 0;
+  let currentTranslateY = 0;
+  let highestZIndex = 100;
+
+  function getTranslateValues(element: HTMLElement) {
+    const transform = element.style.transform;
+    if (!transform || transform === 'none') {
+      return { x: 0, y: 0 };
+    }
+    const match = transform.match(/translate\((-?\d+(?:\.\d+)?px),\s*(-?\d+(?:\.\d+)?px)\)/);
+    if (match) {
+      return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function bringToFront(win: HTMLElement) {
+    highestZIndex++;
+    win.style.zIndex = String(highestZIndex);
+  }
+
+  document.addEventListener('mousedown', (e) => {
+    const target = e.target as HTMLElement;
+
+    // Only start drag if clicking on title-bar (not buttons)
+    if (target.classList.contains('title-bar') ||
+        (target.closest('.title-bar') && !target.closest('.title-buttons'))) {
+      const titleBar = target.classList.contains('title-bar') ? target : target.closest('.title-bar');
+      const win = titleBar?.closest('.window') as HTMLElement;
+
+      if (win) {
+        draggedWindow = win;
+        draggedWindow.classList.add('dragging');
+        bringToFront(win);
+
+        const translate = getTranslateValues(win);
+        currentTranslateX = translate.x;
+        currentTranslateY = translate.y;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        e.preventDefault();
+      }
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (draggedWindow) {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      draggedWindow.style.transform = `translate(${currentTranslateX + deltaX}px, ${currentTranslateY + deltaY}px)`;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (draggedWindow) {
+      draggedWindow.classList.remove('dragging');
+      draggedWindow = null;
     }
   });
 </script>
