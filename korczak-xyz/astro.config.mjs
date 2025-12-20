@@ -7,7 +7,7 @@ import tailwind from '@astrojs/tailwind';
 export default defineConfig({
   devToolbar: { enabled: false },
   site: 'https://korczak.xyz',
-  trailingSlash: 'always',
+  trailingSlash: 'ignore',
   i18n: {
     defaultLocale: 'en',
     locales: ['en', 'pl'],

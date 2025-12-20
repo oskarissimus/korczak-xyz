@@ -21,6 +21,16 @@ const navigation = [
 // Get alternate language path for language switcher
 const enPath = lang === 'en' ? currentPath : getAlternateLangPath(currentPath, lang, 'en');
 const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, lang, 'pl');
+
+// Check if a nav item is active (current page)
+function isActive(itemPath: string): boolean {
+  // Exact match for home page
+  if (itemPath === '/' || itemPath === '/pl/') {
+    return currentPath === itemPath;
+  }
+  // For other pages, check if currentPath starts with the item path
+  return currentPath.startsWith(itemPath);
+}
 ---
 
 <div class="window navbar-window">
@@ -42,7 +52,7 @@ const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, l
     <!-- Navigation links -->
     <nav id="main-nav" class="nav-links">
       {navigation.map(item => (
-        <a href={item.to} class="nav-link">
+        <a href={item.to} class={`nav-link ${isActive(item.to) ? 'active' : ''}`}>
           <span class="nav-icon">{item.icon}</span>
           <span class="nav-text">{item.name}</span>
         </a>
@@ -119,8 +129,10 @@ const plPath = lang === 'pl' ? currentPath : getAlternateLangPath(currentPath, l
     color: var(--retro-black);
   }
 
-  .nav-link:active {
+  .nav-link:active,
+  .nav-link.active {
     border-style: inset;
+    background: #a0a0a0;
   }
 
   .nav-icon {
