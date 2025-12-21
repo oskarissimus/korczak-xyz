@@ -96,13 +96,6 @@
         display: none;
     }
 
-    /* Make header window sticky */
-    .song-header-window {
-        position: sticky;
-        top: 0;
-        z-index: 101;
-    }
-
     .song-page .song-window {
         border: none;
         background: transparent;
