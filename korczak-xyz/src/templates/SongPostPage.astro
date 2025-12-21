@@ -51,6 +51,7 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
         <div class="song-controls-buttons">
+          <button id="light-mode-toggle" title="Toggle light mode">☀</button>
           <button id="font-decrease" title="Decrease font size">-</button>
           <button id="font-increase" title="Increase font size">+</button>
         </div>
@@ -75,11 +76,14 @@ function formatDate(date: Date, locale: string): string {
   const content = document.getElementById('song-content');
   const decreaseBtn = document.getElementById('font-decrease');
   const increaseBtn = document.getElementById('font-increase');
+  const lightModeBtn = document.getElementById('light-mode-toggle');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const STORAGE_KEY = 'song-font-size-index';
+  const LIGHT_MODE_KEY = 'song-light-mode';
 
   let currentIndex = parseInt(localStorage.getItem(STORAGE_KEY) || '2', 10);
+  let lightMode = localStorage.getItem(LIGHT_MODE_KEY) === 'true';
 
   function applyFontSize() {
     if (content) {
@@ -92,8 +96,21 @@ function formatDate(date: Date, locale: string): string {
     }
   }
 
+  function applyLightMode() {
+    if (content) {
+      content.classList.toggle('light-mode', lightMode);
+      if (lightModeBtn) {
+        lightModeBtn.textContent = lightMode ? '☾' : '☀';
+      }
+    }
+  }
+
   function saveFontSize() {
     localStorage.setItem(STORAGE_KEY, String(currentIndex));
+  }
+
+  function saveLightMode() {
+    localStorage.setItem(LIGHT_MODE_KEY, String(lightMode));
   }
 
   decreaseBtn?.addEventListener('click', () => {
@@ -112,7 +129,14 @@ function formatDate(date: Date, locale: string): string {
     }
   });
 
+  lightModeBtn?.addEventListener('click', () => {
+    lightMode = !lightMode;
+    applyLightMode();
+    saveLightMode();
+  });
+
   applyFontSize();
+  applyLightMode();
 </script>
 
 <style>
