@@ -205,6 +205,24 @@
     .song-desktop-only {
         display: block;
     }
+
+    .song-page .song-desktop-only .window-content {
+        background: var(--retro-gray);
+    }
+
+    /* Contrasting colors for light gray background */
+    .song-page .song-desktop-only .blog_post {
+        color: var(--retro-black);
+    }
+
+    .song-page .song-desktop-only .song-desktop-meta .song-author {
+        color: var(--retro-navy);
+        font-weight: bold;
+    }
+
+    .song-page .song-desktop-only .song-desktop-meta .song-date {
+        color: var(--retro-black);
+    }
 }
 
 /* Mobile - hide desktop window, show mobile window */
