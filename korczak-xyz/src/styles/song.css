@@ -66,3 +66,95 @@
 .blog_post .token.keyword {
     background: transparent !important;
 }
+
+/* Mobile song page - full width */
+@media (max-width: 600px) {
+    /* Remove body padding for song pages */
+    body:has(.song-page) {
+        padding: 0;
+        padding-bottom: 50px;
+    }
+
+    /* Remove container max-width */
+    body:has(.song-page) .container {
+        max-width: 100%;
+        margin: 0;
+    }
+
+    /* Remove window decorations */
+    .song-page .window {
+        border: none;
+        margin: 0;
+    }
+
+    .song-page .title-bar {
+        display: none;
+    }
+
+    .song-page .window-content {
+        padding: 10px 8px;
+    }
+
+    /* Minimal page title */
+    .song-page .page-title {
+        font-size: 0.6rem;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+    }
+
+    /* Song meta - compact */
+    .song-page .song-meta {
+        gap: 8px;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+
+    /* Disable line breaks in song lyrics */
+    .song-page .blog_post pre,
+    .song-page .blog_post pre code {
+        white-space: pre;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .song-page .blog_post {
+        overflow-x: auto;
+    }
+}
+
+/* Sticky font size controls */
+.song-controls {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--retro-gray);
+    border: 2px outset var(--retro-white);
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.song-controls-label {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 8px;
+    color: var(--retro-black);
+}
+
+.song-controls button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Desktop - hide controls */
+@media (min-width: 601px) {
+    .song-controls {
+        display: none;
+    }
+}

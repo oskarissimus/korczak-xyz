@@ -35,16 +35,67 @@ function formatDate(date: Date, locale: string): string {
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
-  <PageContent title={song.data.title}>
-    <div class="song-meta">
-      <span class="song-author">[{song.data.author}]</span>
-      <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
-    </div>
-    <section class="blog_post" itemprop="articleBody">
-      <Content />
-    </section>
-  </PageContent>
+  <div class="song-page">
+    <PageContent title={song.data.title}>
+      <div class="song-controls">
+        <span class="song-controls-label">A</span>
+        <button id="font-decrease" title="Decrease font size">-</button>
+        <button id="font-increase" title="Increase font size">+</button>
+      </div>
+      <div class="song-meta">
+        <span class="song-author">[{song.data.author}]</span>
+        <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
+      </div>
+      <section class="blog_post" id="song-content" itemprop="articleBody">
+        <Content />
+      </section>
+    </PageContent>
+  </div>
 </Layout>
+
+<script>
+  const content = document.getElementById('song-content');
+  const decreaseBtn = document.getElementById('font-decrease');
+  const increaseBtn = document.getElementById('font-increase');
+
+  const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
+  const STORAGE_KEY = 'song-font-size-index';
+
+  let currentIndex = parseInt(localStorage.getItem(STORAGE_KEY) || '2', 10);
+
+  function applyFontSize() {
+    if (content) {
+      const size = FONT_SIZES[currentIndex];
+      content.style.fontSize = `${size}rem`;
+      const codeElements = content.querySelectorAll('pre code');
+      codeElements.forEach((el) => {
+        (el as HTMLElement).style.fontSize = `${size}rem`;
+      });
+    }
+  }
+
+  function saveFontSize() {
+    localStorage.setItem(STORAGE_KEY, String(currentIndex));
+  }
+
+  decreaseBtn?.addEventListener('click', () => {
+    if (currentIndex > 0) {
+      currentIndex--;
+      applyFontSize();
+      saveFontSize();
+    }
+  });
+
+  increaseBtn?.addEventListener('click', () => {
+    if (currentIndex < FONT_SIZES.length - 1) {
+      currentIndex++;
+      applyFontSize();
+      saveFontSize();
+    }
+  });
+
+  applyFontSize();
+</script>
 
 <style>
   .song-meta {
