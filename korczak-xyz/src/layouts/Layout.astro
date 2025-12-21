@@ -716,6 +716,25 @@ const currentPath = Astro.url.pathname;
     }
   });
 
+  // Double-click on title bar to maximize/restore
+  document.addEventListener('dblclick', (e) => {
+    const target = e.target as HTMLElement;
+    // Only trigger on title-bar itself or its text span (not buttons)
+    if (target.classList.contains('title-bar') ||
+        (target.closest('.title-bar') && !target.closest('.title-buttons'))) {
+      const titleBar = target.classList.contains('title-bar') ? target : target.closest('.title-bar');
+      const win = titleBar?.closest('.window') as HTMLElement;
+      if (win) {
+        const windowId = getWindowId(win);
+        if (maximizedWindows.has(windowId)) {
+          restoreFromMaximize(win);
+        } else {
+          maximizeWindow(win);
+        }
+      }
+    }
+  });
+
   // Draggable windows
   let draggedWindow: HTMLElement | null = null;
   let startX = 0;
