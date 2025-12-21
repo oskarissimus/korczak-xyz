@@ -36,35 +36,49 @@ function formatDate(date: Date, locale: string): string {
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
   <div class="song-page">
-    <div class="song-header-window">
-      <div class="song-title-bar">
-        <span class="song-title-text">{song.data.title}</span>
+    <div class="window song-header-window">
+      <div class="song-header-bar">
+        <div class="title-bar song-title-bar">
+          <span class="song-title-text">{song.data.title}</span>
+          <div class="title-buttons">
+            <div class="title-btn minimize-btn"></div>
+            <div class="title-btn maximize-btn"></div>
+            <div class="title-btn close-btn"></div>
+          </div>
+        </div>
+        <div class="song-controls">
+          <div class="song-meta">
+            <span class="song-author">[{song.data.author}]</span>
+            <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
+          </div>
+          <div class="song-controls-buttons">
+            <button id="light-mode-toggle" title="Toggle light mode">☀</button>
+            <button id="font-decrease" title="Decrease font size">-</button>
+            <button id="font-increase" title="Increase font size">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="window-content song-content-wrapper">
+        <section class="blog_post" id="song-content" itemprop="articleBody">
+          <Content />
+        </section>
+      </div>
+    </div>
+    <div class="window song-window song-desktop-only">
+      <div class="title-bar">
+        <span>{song.data.title}</span>
         <div class="title-buttons">
           <div class="title-btn minimize-btn"></div>
           <div class="title-btn maximize-btn"></div>
           <div class="title-btn close-btn"></div>
         </div>
       </div>
-      <div class="song-controls">
-        <div class="song-meta">
-          <span class="song-author">[{song.data.author}]</span>
-          <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
-        </div>
-        <div class="song-controls-buttons">
-          <button id="light-mode-toggle" title="Toggle light mode">☀</button>
-          <button id="font-decrease" title="Decrease font size">-</button>
-          <button id="font-increase" title="Increase font size">+</button>
-        </div>
-      </div>
-    </div>
-    <div class="window song-window">
       <div class="window-content song-content-wrapper">
-        <h1 class="song-desktop-title">{song.data.title}</h1>
         <div class="song-desktop-meta">
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <section class="blog_post" id="song-content" itemprop="articleBody">
+        <section class="blog_post" id="song-content-desktop" itemprop="articleBody">
           <Content />
         </section>
       </div>
@@ -73,7 +87,8 @@ function formatDate(date: Date, locale: string): string {
 </Layout>
 
 <script>
-  const content = document.getElementById('song-content');
+  const contentMobile = document.getElementById('song-content');
+  const contentDesktop = document.getElementById('song-content-desktop');
   const decreaseBtn = document.getElementById('font-decrease');
   const increaseBtn = document.getElementById('font-increase');
   const lightModeBtn = document.getElementById('light-mode-toggle');
@@ -86,22 +101,26 @@ function formatDate(date: Date, locale: string): string {
   let lightMode = localStorage.getItem(LIGHT_MODE_KEY) === 'true';
 
   function applyFontSize() {
-    if (content) {
-      const size = FONT_SIZES[currentIndex];
-      content.style.fontSize = `${size}rem`;
-      const codeElements = content.querySelectorAll('pre code');
-      codeElements.forEach((el) => {
-        (el as HTMLElement).style.fontSize = `${size}rem`;
-      });
-    }
+    [contentMobile, contentDesktop].forEach(content => {
+      if (content) {
+        const size = FONT_SIZES[currentIndex];
+        content.style.fontSize = `${size}rem`;
+        const codeElements = content.querySelectorAll('pre code');
+        codeElements.forEach((el) => {
+          (el as HTMLElement).style.fontSize = `${size}rem`;
+        });
+      }
+    });
   }
 
   function applyLightMode() {
-    if (content) {
-      content.classList.toggle('light-mode', lightMode);
-      if (lightModeBtn) {
-        lightModeBtn.textContent = lightMode ? '☾' : '☀';
+    [contentMobile, contentDesktop].forEach(content => {
+      if (content) {
+        content.classList.toggle('light-mode', lightMode);
       }
+    });
+    if (lightModeBtn) {
+      lightModeBtn.textContent = lightMode ? '☾' : '☀';
     }
   }
 

@@ -81,27 +81,15 @@
         margin: 0;
     }
 
-    /* Remove regular window decorations but keep song window border */
-    .song-page .window:not(.song-window) {
-        border: none;
+    /* Song header window takes full width on mobile */
+    .song-page .song-header-window {
         margin: 0;
-        background: transparent;
+        border-left: none;
+        border-right: none;
+        border-top: none;
     }
 
-    .song-page .song-window {
-        margin: 0;
-    }
-
-    .song-page .title-bar {
-        display: none;
-    }
-
-    .song-page .song-window {
-        border: none;
-        background: transparent;
-    }
-
-    .song-page .window-content {
+    .song-page .song-header-window .window-content {
         padding: 8px 4px;
         background: var(--retro-navy);
     }
@@ -114,7 +102,6 @@
         border-bottom: none;
         text-shadow: none;
     }
-
 
     /* Disable line breaks in song lyrics */
     .song-page .blog_post pre,
@@ -132,11 +119,10 @@
     }
 }
 
-/* Song header window - title bar and controls */
+/* Song header window - inherits from .window class */
 .song-header-window {
-    background: var(--retro-gray);
-    border: 3px outset var(--retro-white);
     margin-bottom: 0;
+    border-bottom: none;
 }
 
 /* Song content window */
@@ -144,22 +130,15 @@
     margin-bottom: 20px;
 }
 
-/* Song title bar - Windows style */
-.song-title-bar {
-    background: linear-gradient(90deg, var(--retro-navy), #1084d0);
-    color: white;
-    padding: 4px 8px;
-    font-family: 'Press Start 2P', cursive;
-    font-size: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
 .song-title-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Song header bar - wraps title bar and controls */
+.song-header-bar {
+    border: 3px outset var(--retro-white);
 }
 
 /* Song controls bar */
@@ -217,17 +196,24 @@
     flex-wrap: wrap;
 }
 
-/* Desktop - hide mobile controls, show regular window */
+/* Desktop - hide mobile window, show desktop window */
 @media (min-width: 601px) {
     .song-header-window {
         display: none;
     }
+
+    .song-desktop-only {
+        display: block;
+    }
 }
 
-/* Mobile - hide desktop title */
+/* Mobile - hide desktop window, show mobile window */
 @media (max-width: 600px) {
-    .song-desktop-title,
-    .song-desktop-meta {
+    .song-header-window {
+        display: block;
+    }
+
+    .song-desktop-only {
         display: none;
     }
 }
