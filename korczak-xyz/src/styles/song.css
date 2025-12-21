@@ -81,9 +81,14 @@
         margin: 0;
     }
 
-    /* Remove window decorations */
-    .song-page .window {
+    /* Remove regular window decorations but keep song window border */
+    .song-page .window:not(.song-window) {
         border: none;
+        margin: 0;
+        background: transparent;
+    }
+
+    .song-page .song-window {
         margin: 0;
     }
 
@@ -91,23 +96,32 @@
         display: none;
     }
 
-    .song-page .window-content {
-        padding: 10px 8px;
+    /* Make header window sticky */
+    .song-header-window {
+        position: sticky;
+        top: 0;
+        z-index: 101;
     }
 
-    /* Minimal page title */
+    .song-page .song-window {
+        border: none;
+        background: transparent;
+    }
+
+    .song-page .window-content {
+        padding: 8px 4px;
+        background: var(--retro-navy);
+    }
+
+    /* Remove page title decoration */
     .song-page .page-title {
         font-size: 0.6rem;
         margin-bottom: 10px;
         padding-bottom: 8px;
+        border-bottom: none;
+        text-shadow: none;
     }
 
-    /* Song meta - compact */
-    .song-page .song-meta {
-        gap: 8px;
-        margin-bottom: 10px;
-        font-size: 0.9rem;
-    }
 
     /* Disable line breaks in song lyrics */
     .song-page .blog_post pre,
@@ -115,6 +129,9 @@
         white-space: pre;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        border: none;
+        padding: 4px 2px;
+        margin: 0;
     }
 
     .song-page .blog_post {
@@ -122,24 +139,66 @@
     }
 }
 
-/* Sticky font size controls */
-.song-controls {
-    position: sticky;
-    top: 0;
-    z-index: 100;
+/* Song header window - title bar and controls */
+.song-header-window {
     background: var(--retro-gray);
-    border: 2px outset var(--retro-white);
-    padding: 6px 10px;
-    margin-bottom: 10px;
+    border: 3px outset var(--retro-white);
+    margin-bottom: 0;
+}
+
+/* Song content window */
+.song-window {
+    margin-bottom: 20px;
+}
+
+/* Song title bar - Windows style */
+.song-title-bar {
+    background: linear-gradient(90deg, var(--retro-navy), #1084d0);
+    color: white;
+    padding: 4px 8px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.song-title-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Song controls bar */
+.song-controls {
+    background: var(--retro-gray);
+    padding: 6px 8px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
 }
 
-.song-controls-label {
-    font-family: 'Press Start 2P', cursive;
-    font-size: 8px;
+.song-controls .song-meta {
+    margin: 0;
+    display: flex;
+    gap: 10px;
+}
+
+.song-controls .song-author {
+    color: var(--retro-navy);
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.song-controls .song-date {
     color: var(--retro-black);
+    font-size: 0.9rem;
+}
+
+.song-controls-buttons {
+    display: flex;
+    gap: 4px;
 }
 
 .song-controls button {
@@ -152,9 +211,30 @@
     justify-content: center;
 }
 
-/* Desktop - hide controls */
+/* Desktop title and meta */
+.song-desktop-title {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.song-desktop-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+/* Desktop - hide mobile controls, show regular window */
 @media (min-width: 601px) {
-    .song-controls {
+    .song-header-window {
+        display: none;
+    }
+}
+
+/* Mobile - hide desktop title */
+@media (max-width: 600px) {
+    .song-desktop-title,
+    .song-desktop-meta {
         display: none;
     }
 }
