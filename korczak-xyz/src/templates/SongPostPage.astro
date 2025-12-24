@@ -52,6 +52,7 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
           <div class="song-controls-buttons">
+            <button id="chords-toggle" title="Toggle chords">♪</button>
             <button id="light-mode-toggle" title="Toggle light mode">☀</button>
             <button id="font-decrease" title="Decrease font size">-</button>
             <button id="font-increase" title="Increase font size">+</button>
@@ -92,13 +93,16 @@ function formatDate(date: Date, locale: string): string {
   const decreaseBtn = document.getElementById('font-decrease');
   const increaseBtn = document.getElementById('font-increase');
   const lightModeBtn = document.getElementById('light-mode-toggle');
+  const chordsBtn = document.getElementById('chords-toggle');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const STORAGE_KEY = 'song-font-size-index';
   const LIGHT_MODE_KEY = 'song-light-mode';
+  const CHORDS_KEY = 'song-show-chords';
 
   let currentIndex = parseInt(localStorage.getItem(STORAGE_KEY) || '2', 10);
   let lightMode = localStorage.getItem(LIGHT_MODE_KEY) === 'true';
+  let showChords = localStorage.getItem(CHORDS_KEY) !== 'false';
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -132,6 +136,67 @@ function formatDate(date: Date, locale: string): string {
     localStorage.setItem(LIGHT_MODE_KEY, String(lightMode));
   }
 
+  function isChordLine(line: string): boolean {
+    if (line.trim() === '') return false;
+    // Chord pattern: optional whitespace, then chord symbols separated by spaces
+    // Chords: A-H (or a-h for minor), optionally followed by #/b, then modifiers like m, 7, maj7, sus4, etc.
+    const chordPattern = /^[A-Ha-h][#b]?(m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*$/;
+    const tokens = line.trim().split(/\s+/);
+    // A line is a chord line if all non-empty tokens match the chord pattern
+    // and there's at least one token
+    if (tokens.length === 0) return false;
+    return tokens.every(token => {
+      if (token === '') return true;
+      // Also match verse numbers like "1." or "Ref." at start of lyrics
+      if (/^\d+\.$/.test(token) || /^Ref\.?:?$/.test(token)) return false;
+      return chordPattern.test(token);
+    });
+  }
+
+  // Store original content for each code element
+  const originalContent = new Map<Element, string>();
+
+  function storeOriginalContent() {
+    [contentMobile, contentDesktop].forEach(content => {
+      if (!content) return;
+      const codeElements = content.querySelectorAll('pre code');
+      codeElements.forEach(codeEl => {
+        if (!originalContent.has(codeEl)) {
+          originalContent.set(codeEl, codeEl.textContent || '');
+        }
+      });
+    });
+  }
+
+  function applyChordVisibility() {
+    [contentMobile, contentDesktop].forEach(content => {
+      if (!content) return;
+      const codeElements = content.querySelectorAll('pre code');
+      codeElements.forEach(codeEl => {
+        const original = originalContent.get(codeEl);
+        if (!original) return;
+
+        if (showChords) {
+          // Show all lines
+          codeEl.textContent = original;
+        } else {
+          // Filter out chord lines
+          const lines = original.split('\n');
+          const filtered = lines.filter(line => !isChordLine(line));
+          codeEl.textContent = filtered.join('\n');
+        }
+      });
+    });
+    if (chordsBtn) {
+      chordsBtn.textContent = showChords ? '♪' : 'T';
+      chordsBtn.title = showChords ? 'Hide chords (show text only)' : 'Show chords';
+    }
+  }
+
+  function saveChordPreference() {
+    localStorage.setItem(CHORDS_KEY, String(showChords));
+  }
+
   decreaseBtn?.addEventListener('click', () => {
     if (currentIndex > 0) {
       currentIndex--;
@@ -154,8 +219,16 @@ function formatDate(date: Date, locale: string): string {
     saveLightMode();
   });
 
+  chordsBtn?.addEventListener('click', () => {
+    showChords = !showChords;
+    applyChordVisibility();
+    saveChordPreference();
+  });
+
   applyFontSize();
   applyLightMode();
+  storeOriginalContent();
+  applyChordVisibility();
 </script>
 
 <style>
