@@ -69,6 +69,8 @@ export const ui = {
 
     // Songs
     'Date added': 'Date added',
+    'Search songs...': 'Search songs...',
+    'No songs found': 'No songs found',
   },
   pl: {
     // Navigation
@@ -131,6 +133,8 @@ export const ui = {
 
     // Songs
     'Date added': 'Dodano',
+    'Search songs...': 'Szukaj...',
+    'No songs found': 'Nie znaleziono piosenek',
   },
 } as const;
 

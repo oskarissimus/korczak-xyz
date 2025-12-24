@@ -27,7 +27,15 @@ songs.sort((a, b) => {
 
 <Layout title={`${t('Songs')} | korczak.xyz`} lang={lang}>
   <PageContent title={t('Songs')}>
-    <ul class="flex flex-col gap-6">
+    <div class="search-container">
+      <input
+        type="text"
+        id="song-search"
+        placeholder={t('Search songs...')}
+        class="song-search-input"
+      />
+    </div>
+    <ul id="songs-list" class="flex flex-col gap-6">
       {songs.map(song => (
         <SongListItem
           slug={song.data.slug}
@@ -36,8 +44,65 @@ songs.sort((a, b) => {
           dateAdded={song.data.dateAdded}
           videoUploadDate={song.data.videoUploadDate}
           lang={lang}
+          data-title={song.data.title.toLowerCase()}
+          data-author={song.data.author.toLowerCase()}
         />
       ))}
     </ul>
+    <p id="no-results" class="no-results" style="display: none;">{t('No songs found')}</p>
   </PageContent>
 </Layout>
+
+<style>
+  .search-container {
+    margin-bottom: 20px;
+    margin-left: 20px;
+  }
+
+  .song-search-input {
+    width: 100%;
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem;
+    background: var(--retro-white);
+    border: 2px inset var(--retro-dark-gray);
+    padding: 8px 15px;
+    color: var(--retro-black);
+  }
+
+  .song-search-input:focus {
+    outline: 2px solid var(--retro-cyan);
+  }
+
+  .no-results {
+    color: var(--retro-white);
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 20px;
+  }
+</style>
+
+<script>
+  const searchInput = document.getElementById('song-search') as HTMLInputElement;
+  const songsList = document.getElementById('songs-list');
+  const noResults = document.getElementById('no-results');
+  const songs = songsList?.querySelectorAll('.song-item') || [];
+
+  searchInput?.addEventListener('input', (e) => {
+    const target = e.target as HTMLInputElement;
+    const query = target.value.toLowerCase().trim();
+    let visibleCount = 0;
+
+    songs.forEach((song) => {
+      const songEl = song as HTMLElement;
+      const title = songEl.dataset.title || '';
+      const author = songEl.dataset.author || '';
+      const matches = title.includes(query) || author.includes(query);
+      songEl.style.display = matches ? '' : 'none';
+      if (matches) visibleCount++;
+    });
+
+    if (noResults) {
+      noResults.style.display = visibleCount === 0 && query !== '' ? '' : 'none';
+    }
+  });
+</script>

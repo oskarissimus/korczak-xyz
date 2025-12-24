@@ -8,9 +8,11 @@ interface Props {
   dateAdded: Date;
   videoUploadDate?: Date;
   lang?: Lang;
+  'data-title'?: string;
+  'data-author'?: string;
 }
 
-const { slug, title, author, dateAdded, videoUploadDate, lang = 'pl' } = Astro.props;
+const { slug, title, author, dateAdded, videoUploadDate, lang = 'pl', 'data-title': dataTitle, 'data-author': dataAuthor } = Astro.props;
 
 // Use the earlier of the two dates
 const displayDate = videoUploadDate && videoUploadDate < dateAdded ? videoUploadDate : dateAdded;
@@ -25,7 +27,7 @@ function formatDate(date: Date, locale: string): string {
 }
 ---
 
-<li class="song-item">
+<li class="song-item" data-title={dataTitle} data-author={dataAuthor}>
   <a href={songUrl} class="song-link">
     <span class="song-icon">*</span>
     <div class="song-info">
