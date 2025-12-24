@@ -66,26 +66,24 @@ function formatDate(date: Date, locale: string): string {
       </div>
     </div>
     <div class="window song-window song-desktop-only">
-      <div class="song-header-bar">
-        <div class="title-bar">
-          <span>{song.data.title}</span>
-          <div class="title-buttons">
-            <div class="title-btn minimize-btn"></div>
-            <div class="title-btn maximize-btn"></div>
-            <div class="title-btn close-btn"></div>
-          </div>
+      <div class="title-bar">
+        <span>{song.data.title}</span>
+        <div class="title-buttons">
+          <div class="title-btn minimize-btn"></div>
+          <div class="title-btn maximize-btn"></div>
+          <div class="title-btn close-btn"></div>
         </div>
-        <div class="song-controls">
-          <div class="song-meta">
-            <span class="song-author">[{song.data.author}]</span>
-            <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
-          </div>
-          <div class="song-controls-buttons">
-            <button class="chords-toggle" title="Toggle chords">♪</button>
-            <button class="light-mode-toggle" title="Toggle light mode">☀</button>
-            <button class="font-decrease" title="Decrease font size">-</button>
-            <button class="font-increase" title="Increase font size">+</button>
-          </div>
+      </div>
+      <div class="song-controls song-controls-desktop">
+        <div class="song-meta">
+          <span class="song-author">[{song.data.author}]</span>
+          <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
+        </div>
+        <div class="song-controls-buttons">
+          <button class="chords-toggle" title="Toggle chords">♪</button>
+          <button class="light-mode-toggle" title="Toggle light mode">☀</button>
+          <button class="font-decrease" title="Decrease font size">-</button>
+          <button class="font-increase" title="Increase font size">+</button>
         </div>
       </div>
       <div class="window-content song-content-wrapper">
