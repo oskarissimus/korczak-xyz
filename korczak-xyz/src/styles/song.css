@@ -109,7 +109,7 @@
         white-space: pre;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        border: none;
+        border: none !important;
         padding: 4px 2px;
         margin: 0;
     }
