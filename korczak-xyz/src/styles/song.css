@@ -236,9 +236,8 @@
     }
 }
 
-/* Light mode - black text on white background */
+/* Light mode - black text on white background (only affects pre/code blocks) */
 .blog_post.light-mode {
-    background: #fff !important;
     color: #000 !important;
 }
 
@@ -257,11 +256,4 @@
 .blog_post.light-mode .token,
 .blog_post.light-mode pre code span {
     color: #000 !important;
-}
-
-/* Light mode on desktop - also change the window content background */
-@media (min-width: 601px) {
-    .song-page .song-desktop-only .window-content:has(.blog_post.light-mode) {
-        background: #fff !important;
-    }
 }
