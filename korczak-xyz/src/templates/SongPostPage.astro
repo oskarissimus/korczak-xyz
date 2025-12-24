@@ -52,10 +52,10 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
           <div class="song-controls-buttons">
-            <button id="chords-toggle" title="Toggle chords">♪</button>
-            <button id="light-mode-toggle" title="Toggle light mode">☀</button>
-            <button id="font-decrease" title="Decrease font size">-</button>
-            <button id="font-increase" title="Increase font size">+</button>
+            <button class="chords-toggle" title="Toggle chords">♪</button>
+            <button class="light-mode-toggle" title="Toggle light mode">☀</button>
+            <button class="font-decrease" title="Decrease font size">-</button>
+            <button class="font-increase" title="Increase font size">+</button>
           </div>
         </div>
       </div>
@@ -66,19 +66,29 @@ function formatDate(date: Date, locale: string): string {
       </div>
     </div>
     <div class="window song-window song-desktop-only">
-      <div class="title-bar">
-        <span>{song.data.title}</span>
-        <div class="title-buttons">
-          <div class="title-btn minimize-btn"></div>
-          <div class="title-btn maximize-btn"></div>
-          <div class="title-btn close-btn"></div>
+      <div class="song-header-bar">
+        <div class="title-bar">
+          <span>{song.data.title}</span>
+          <div class="title-buttons">
+            <div class="title-btn minimize-btn"></div>
+            <div class="title-btn maximize-btn"></div>
+            <div class="title-btn close-btn"></div>
+          </div>
+        </div>
+        <div class="song-controls">
+          <div class="song-meta">
+            <span class="song-author">[{song.data.author}]</span>
+            <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
+          </div>
+          <div class="song-controls-buttons">
+            <button class="chords-toggle" title="Toggle chords">♪</button>
+            <button class="light-mode-toggle" title="Toggle light mode">☀</button>
+            <button class="font-decrease" title="Decrease font size">-</button>
+            <button class="font-increase" title="Increase font size">+</button>
+          </div>
         </div>
       </div>
       <div class="window-content song-content-wrapper">
-        <div class="song-desktop-meta">
-          <span class="song-author">[{song.data.author}]</span>
-          <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
-        </div>
         <section class="blog_post" id="song-content-desktop" itemprop="articleBody">
           <Content />
         </section>
@@ -90,10 +100,10 @@ function formatDate(date: Date, locale: string): string {
 <script>
   const contentMobile = document.getElementById('song-content');
   const contentDesktop = document.getElementById('song-content-desktop');
-  const decreaseBtn = document.getElementById('font-decrease');
-  const increaseBtn = document.getElementById('font-increase');
-  const lightModeBtn = document.getElementById('light-mode-toggle');
-  const chordsBtn = document.getElementById('chords-toggle');
+  const decreaseBtns = document.querySelectorAll('.font-decrease');
+  const increaseBtns = document.querySelectorAll('.font-increase');
+  const lightModeBtns = document.querySelectorAll('.light-mode-toggle');
+  const chordsBtns = document.querySelectorAll('.chords-toggle');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const STORAGE_KEY = 'song-font-size-index';
@@ -123,9 +133,9 @@ function formatDate(date: Date, locale: string): string {
         content.classList.toggle('light-mode', lightMode);
       }
     });
-    if (lightModeBtn) {
-      lightModeBtn.textContent = lightMode ? '☾' : '☀';
-    }
+    lightModeBtns.forEach(btn => {
+      btn.textContent = lightMode ? '☾' : '☀';
+    });
   }
 
   function saveFontSize() {
@@ -187,42 +197,50 @@ function formatDate(date: Date, locale: string): string {
         }
       });
     });
-    if (chordsBtn) {
-      chordsBtn.textContent = showChords ? '♪' : 'T';
-      chordsBtn.title = showChords ? 'Hide chords (show text only)' : 'Show chords';
-    }
+    chordsBtns.forEach(btn => {
+      btn.textContent = showChords ? '♪' : 'T';
+      btn.setAttribute('title', showChords ? 'Hide chords (show text only)' : 'Show chords');
+    });
   }
 
   function saveChordPreference() {
     localStorage.setItem(CHORDS_KEY, String(showChords));
   }
 
-  decreaseBtn?.addEventListener('click', () => {
-    if (currentIndex > 0) {
-      currentIndex--;
-      applyFontSize();
-      saveFontSize();
-    }
+  decreaseBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        applyFontSize();
+        saveFontSize();
+      }
+    });
   });
 
-  increaseBtn?.addEventListener('click', () => {
-    if (currentIndex < FONT_SIZES.length - 1) {
-      currentIndex++;
-      applyFontSize();
-      saveFontSize();
-    }
+  increaseBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentIndex < FONT_SIZES.length - 1) {
+        currentIndex++;
+        applyFontSize();
+        saveFontSize();
+      }
+    });
   });
 
-  lightModeBtn?.addEventListener('click', () => {
-    lightMode = !lightMode;
-    applyLightMode();
-    saveLightMode();
+  lightModeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      lightMode = !lightMode;
+      applyLightMode();
+      saveLightMode();
+    });
   });
 
-  chordsBtn?.addEventListener('click', () => {
-    showChords = !showChords;
-    applyChordVisibility();
-    saveChordPreference();
+  chordsBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      showChords = !showChords;
+      applyChordVisibility();
+      saveChordPreference();
+    });
   });
 
   applyFontSize();
