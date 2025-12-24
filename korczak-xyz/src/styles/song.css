@@ -257,3 +257,18 @@
 .blog_post.light-mode pre code span {
     color: #000 !important;
 }
+
+/* Light mode - change wrapper background only on mobile */
+@media (max-width: 600px) {
+    .blog_post.light-mode {
+        background: #fff !important;
+    }
+
+    .song-content-wrapper:has(.blog_post.light-mode) {
+        background: #fff !important;
+    }
+
+    .song-page .window-content:has(.blog_post.light-mode) {
+        background: #fff !important;
+    }
+}
