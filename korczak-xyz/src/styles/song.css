@@ -259,11 +259,9 @@
     color: #000 !important;
 }
 
-/* Light mode - also change parent wrapper background */
-.song-content-wrapper:has(.blog_post.light-mode) {
-    background: #fff !important;
-}
-
-.song-page .window-content:has(.blog_post.light-mode) {
-    background: #fff !important;
+/* Light mode on desktop - also change the window content background */
+@media (min-width: 601px) {
+    .song-page .song-desktop-only .window-content:has(.blog_post.light-mode) {
+        background: #fff !important;
+    }
 }
