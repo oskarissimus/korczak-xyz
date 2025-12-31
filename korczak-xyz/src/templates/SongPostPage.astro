@@ -56,6 +56,11 @@ function formatDate(date: Date, locale: string): string {
             <button class="light-mode-toggle" title="Toggle light mode">☀</button>
             <button class="font-decrease" title="Decrease font size">-</button>
             <button class="font-increase" title="Increase font size">+</button>
+            <span class="column-controls">
+              <button class="column-decrease" title="Fewer columns">◀</button>
+              <span class="column-count">1</span>
+              <button class="column-increase" title="More columns">▶</button>
+            </span>
           </div>
         </div>
       </div>
@@ -84,6 +89,11 @@ function formatDate(date: Date, locale: string): string {
           <button class="light-mode-toggle" title="Toggle light mode">☀</button>
           <button class="font-decrease" title="Decrease font size">-</button>
           <button class="font-increase" title="Increase font size">+</button>
+          <span class="column-controls">
+            <button class="column-decrease" title="Fewer columns">◀</button>
+            <span class="column-count">1</span>
+            <button class="column-increase" title="More columns">▶</button>
+          </span>
         </div>
       </div>
       <div class="window-content song-content-wrapper">
@@ -102,15 +112,21 @@ function formatDate(date: Date, locale: string): string {
   const increaseBtns = document.querySelectorAll('.font-increase');
   const lightModeBtns = document.querySelectorAll('.light-mode-toggle');
   const chordsBtns = document.querySelectorAll('.chords-toggle');
+  const columnDecreaseBtns = document.querySelectorAll('.column-decrease');
+  const columnIncreaseBtns = document.querySelectorAll('.column-increase');
+  const columnCountDisplays = document.querySelectorAll('.column-count');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
+  const COLUMNS = [1, 2, 3, 4];
   const STORAGE_KEY = 'song-font-size-index';
   const LIGHT_MODE_KEY = 'song-light-mode';
   const CHORDS_KEY = 'song-show-chords';
+  const COLUMNS_KEY = 'song-columns';
 
   let currentIndex = parseInt(localStorage.getItem(STORAGE_KEY) || '2', 10);
   let lightMode = localStorage.getItem(LIGHT_MODE_KEY) === 'true';
   let showChords = localStorage.getItem(CHORDS_KEY) !== 'false';
+  let currentColumnIndex = parseInt(localStorage.getItem(COLUMNS_KEY) || '0', 10);
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -205,6 +221,25 @@ function formatDate(date: Date, locale: string): string {
     localStorage.setItem(CHORDS_KEY, String(showChords));
   }
 
+  function applyColumns() {
+    const columns = COLUMNS[currentColumnIndex];
+    [contentMobile, contentDesktop].forEach(content => {
+      if (content) {
+        const preElements = content.querySelectorAll('pre');
+        preElements.forEach((el) => {
+          (el as HTMLElement).style.columnCount = String(columns);
+        });
+      }
+    });
+    columnCountDisplays.forEach(display => {
+      display.textContent = String(columns);
+    });
+  }
+
+  function saveColumns() {
+    localStorage.setItem(COLUMNS_KEY, String(currentColumnIndex));
+  }
+
   decreaseBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       if (currentIndex > 0) {
@@ -241,10 +276,31 @@ function formatDate(date: Date, locale: string): string {
     });
   });
 
+  columnDecreaseBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentColumnIndex > 0) {
+        currentColumnIndex--;
+        applyColumns();
+        saveColumns();
+      }
+    });
+  });
+
+  columnIncreaseBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentColumnIndex < COLUMNS.length - 1) {
+        currentColumnIndex++;
+        applyColumns();
+        saveColumns();
+      }
+    });
+  });
+
   applyFontSize();
   applyLightMode();
   storeOriginalContent();
   applyChordVisibility();
+  applyColumns();
 </script>
 
 <style>
