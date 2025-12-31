@@ -53,6 +53,11 @@ function formatDate(date: Date, locale: string): string {
           </div>
           <div class="song-controls-buttons">
             <button class="chords-toggle" title="Toggle chords">♪</button>
+            <span class="transpose-controls">
+              <button class="transpose-down" title="Transpose down">♭</button>
+              <span class="transpose-value">0</span>
+              <button class="transpose-up" title="Transpose up">♯</button>
+            </span>
             <button class="light-mode-toggle" title="Toggle light mode">☀</button>
             <button class="font-decrease" title="Decrease font size">-</button>
             <button class="font-increase" title="Increase font size">+</button>
@@ -86,6 +91,11 @@ function formatDate(date: Date, locale: string): string {
         </div>
         <div class="song-controls-buttons">
           <button class="chords-toggle" title="Toggle chords">♪</button>
+          <span class="transpose-controls">
+            <button class="transpose-down" title="Transpose down">♭</button>
+            <span class="transpose-value">0</span>
+            <button class="transpose-up" title="Transpose up">♯</button>
+          </span>
           <button class="light-mode-toggle" title="Toggle light mode">☀</button>
           <button class="font-decrease" title="Decrease font size">-</button>
           <button class="font-increase" title="Increase font size">+</button>
@@ -115,6 +125,9 @@ function formatDate(date: Date, locale: string): string {
   const columnDecreaseBtns = document.querySelectorAll('.column-decrease');
   const columnIncreaseBtns = document.querySelectorAll('.column-increase');
   const columnCountDisplays = document.querySelectorAll('.column-count');
+  const transposeDownBtns = document.querySelectorAll('.transpose-down');
+  const transposeUpBtns = document.querySelectorAll('.transpose-up');
+  const transposeValueDisplays = document.querySelectorAll('.transpose-value');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
@@ -122,11 +135,16 @@ function formatDate(date: Date, locale: string): string {
   const LIGHT_MODE_KEY = 'song-light-mode';
   const CHORDS_KEY = 'song-show-chords';
   const COLUMNS_KEY = 'song-columns';
+  const TRANSPOSE_KEY = 'song-transpose';
+
+  // German notation chromatic scale: H = B natural, B = Bb
+  const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
 
   let currentIndex = parseInt(localStorage.getItem(STORAGE_KEY) || '2', 10);
   let lightMode = localStorage.getItem(LIGHT_MODE_KEY) === 'true';
   let showChords = localStorage.getItem(CHORDS_KEY) !== 'false';
   let currentColumnIndex = parseInt(localStorage.getItem(COLUMNS_KEY) || '0', 10);
+  let transposeValue = parseInt(localStorage.getItem(TRANSPOSE_KEY) || '0', 10);
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -177,6 +195,51 @@ function formatDate(date: Date, locale: string): string {
     });
   }
 
+  function transposeChord(chord: string, semitones: number): string {
+    if (semitones === 0) return chord;
+
+    // Match: root note (A-H), optional accidental (#/b), and modifiers
+    const match = chord.match(/^([A-Ha-h])([#b]?)(.*)$/);
+    if (!match) return chord;
+
+    const [, root, accidental, modifiers] = match;
+    const isLowerCase = root === root.toLowerCase();
+    const upperRoot = root.toUpperCase();
+
+    // Find the base note index
+    let noteIndex = CHROMATIC.indexOf(upperRoot);
+    if (noteIndex === -1) return chord;
+
+    // Apply accidental
+    if (accidental === '#') {
+      noteIndex = (noteIndex + 1) % 12;
+    } else if (accidental === 'b') {
+      noteIndex = (noteIndex - 1 + 12) % 12;
+    }
+
+    // Transpose
+    noteIndex = (noteIndex + semitones % 12 + 12) % 12;
+
+    // Get the new note
+    let newNote = CHROMATIC[noteIndex];
+
+    // Preserve case for minor chord indication
+    if (isLowerCase) {
+      newNote = newNote.toLowerCase();
+    }
+
+    return newNote + modifiers;
+  }
+
+  function transposeLine(line: string, semitones: number): string {
+    if (!isChordLine(line) || semitones === 0) return line;
+
+    // Transpose each chord while preserving spacing
+    return line.replace(/([A-Ha-h][#b]?(?:m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*)/g,
+      (match) => transposeChord(match, semitones)
+    );
+  }
+
   // Store original content for each code element
   const originalContent = new Map<Element, string>();
 
@@ -200,25 +263,40 @@ function formatDate(date: Date, locale: string): string {
         const original = originalContent.get(codeEl);
         if (!original) return;
 
+        const lines = original.split('\n');
+        let processedLines: string[];
+
         if (showChords) {
-          // Show all lines
-          codeEl.textContent = original;
+          // Transpose chord lines
+          processedLines = lines.map(line => transposeLine(line, transposeValue));
         } else {
-          // Filter out chord lines
-          const lines = original.split('\n');
-          const filtered = lines.filter(line => !isChordLine(line));
-          codeEl.textContent = filtered.join('\n');
+          // Filter out chord lines (no need to transpose if hidden)
+          processedLines = lines.filter(line => !isChordLine(line));
         }
+
+        codeEl.textContent = processedLines.join('\n');
       });
     });
     chordsBtns.forEach(btn => {
       btn.textContent = showChords ? '♪' : 'T';
       btn.setAttribute('title', showChords ? 'Hide chords (show text only)' : 'Show chords');
     });
+    updateTransposeDisplay();
+  }
+
+  function updateTransposeDisplay() {
+    const displayValue = transposeValue === 0 ? '0' : (transposeValue > 0 ? `+${transposeValue}` : `${transposeValue}`);
+    transposeValueDisplays.forEach(display => {
+      display.textContent = displayValue;
+    });
   }
 
   function saveChordPreference() {
     localStorage.setItem(CHORDS_KEY, String(showChords));
+  }
+
+  function saveTranspose() {
+    localStorage.setItem(TRANSPOSE_KEY, String(transposeValue));
   }
 
   function applyColumns() {
@@ -293,6 +371,22 @@ function formatDate(date: Date, locale: string): string {
         applyColumns();
         saveColumns();
       }
+    });
+  });
+
+  transposeDownBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      transposeValue--;
+      applyChordVisibility();
+      saveTranspose();
+    });
+  });
+
+  transposeUpBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      transposeValue++;
+      applyChordVisibility();
+      saveTranspose();
     });
   });
 
