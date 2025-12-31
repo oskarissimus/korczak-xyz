@@ -1,0 +1,77 @@
+---
+title: Hej kolęda, kolęda
+slug: hej-koleda-koleda
+author: Kolęda
+published: true
+language: pl
+dateAdded: 2025-12-31
+---
+```plaintext
+      D
+1. Hej, w dzień narodzenia
+      A7             D
+   Syna Jedynego
+      D
+   Ojca przedwiecznego
+      A7             D
+   Boga prawdziwego
+
+Ref:
+      G              D
+   Wesoło śpiewajmy
+      A
+   Chwałę Bogu dajmy
+      D        A  D
+   Hej kolęda, kolęda
+
+      D
+2. Panna porodziła
+      A7             D
+   Niebieskie Dzieciątko
+      D
+   W żłobie położyła
+      A7             D
+   Małe pacholątko
+
+Ref:
+      G              D
+   Pasterze śpiewają
+      A
+   Na multankach grają
+      D        A  D
+   Hej kolęda, kolęda
+
+      D
+3. Kuba nieboraczek
+      A7             D
+   Nierychło przybieżał
+      D
+   Śpieszno, ni tak, ni siak
+      A7             D
+   Wszystkiego odbieżał
+
+Ref:
+      G              D
+   Panu nie miał co dać
+      A
+   Kazali mu śpiewać
+      D        A  D
+   Hej kolęda, kolęda
+
+      D
+4. I tak wszyscy społem
+      A7             D
+   Wokoło stanęli
+      D
+   Panu maleńkiemu
+      A7             D
+   Wesoło krzyknęli
+
+Ref:
+      G              D
+   Funda, funda, funda
+      A
+   Tota tiribunda
+      D        A  D
+   Hej kolęda, kolęda
+```
