@@ -71,6 +71,15 @@ export const ui = {
     'Date added': 'Date added',
     'Search songs...': 'Search songs...',
     'No songs found': 'No songs found',
+
+    // Song controls
+    'song.chords': 'Chords',
+    'song.text': 'Text',
+    'song.transpose': 'Transpose',
+    'song.light': 'Light',
+    'song.dark': 'Dark',
+    'song.font': 'Font',
+    'song.columns': 'Columns',
   },
   pl: {
     // Navigation
@@ -135,6 +144,15 @@ export const ui = {
     'Date added': 'Dodano',
     'Search songs...': 'Szukaj...',
     'No songs found': 'Nie znaleziono piosenek',
+
+    // Song controls
+    'song.chords': 'Akordy',
+    'song.text': 'Tekst',
+    'song.transpose': 'Transpozycja',
+    'song.light': 'Jasny',
+    'song.dark': 'Ciemny',
+    'song.font': 'Czcionka',
+    'song.columns': 'Kolumny',
   },
 } as const;
 
