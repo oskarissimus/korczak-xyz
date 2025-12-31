@@ -1,5 +1,6 @@
 ---
 import type { Lang } from '../i18n';
+import { execSync } from 'child_process';
 
 interface Props {
   lang?: Lang;
@@ -7,6 +8,16 @@ interface Props {
 
 const { lang = 'en' } = Astro.props;
 const homeLink = lang === 'en' ? '/' : '/pl/';
+
+// Build-time info (runs at build, not in browser)
+const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+const buildTime = new Date().toLocaleDateString('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 ---
 
 <footer class="retro-footer">
@@ -26,6 +37,10 @@ const homeLink = lang === 'en' ? '/' : '/pl/';
     <div class="visitor-counter">
       <span>Visitors: 1337420</span>
     </div>
+  </div>
+
+  <div class="build-info">
+    <span><a href={`https://github.com/oskarkorczak/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a> | {buildTime}</span>
   </div>
 </footer>
 
@@ -51,5 +66,16 @@ const homeLink = lang === 'en' ? '/' : '/pl/';
     display: flex;
     justify-content: center;
     margin-top: 10px;
+  }
+
+  .build-info {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--retro-gray, #666);
+    margin-top: 5px;
+  }
+
+  .build-info a {
+    color: var(--retro-cyan);
   }
 </style>
