@@ -117,6 +117,27 @@
     .song-page .blog_post {
         overflow-x: auto;
     }
+
+    /* Two-row button layout on mobile */
+    .song-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .song-controls .song-meta {
+        justify-content: center;
+    }
+
+    .song-controls-buttons {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .song-controls-row {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
 }
 
 /* Song header window - inherits from .window class */
@@ -170,32 +191,68 @@
 
 .song-controls-buttons {
     display: flex;
-    gap: 4px;
+    gap: 8px;
+}
+
+.song-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .song-controls button {
-    width: 28px;
     height: 28px;
-    padding: 0;
-    font-size: 1.2rem;
+    padding: 0 8px;
+    font-size: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
-/* Column controls */
+.song-controls button .btn-icon {
+    font-size: 1.1rem;
+}
+
+.song-controls button .btn-label {
+    font-family: 'VT323', monospace;
+    font-size: 0.95rem;
+}
+
+/* Control groups with labels */
+.transpose-controls,
+.font-controls,
 .column-controls {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 2px;
-    margin-left: 8px;
-    border-left: 1px solid var(--retro-dark-gray);
-    padding-left: 8px;
+}
+
+.control-label {
+    font-family: 'VT323', monospace;
+    font-size: 0.9rem;
+    color: var(--retro-navy);
+    margin-right: 4px;
+}
+
+.transpose-controls button,
+.font-controls button {
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    font-size: 1rem;
+}
+
+/* Column controls - hidden by default, shown on wide screens */
+.column-controls {
+    display: none !important;
 }
 
 .column-controls button {
     width: 24px;
     height: 24px;
+    padding: 0;
     font-size: 0.8rem;
 }
 
@@ -222,7 +279,7 @@
 /* Show column controls on wider screens */
 @media (min-width: 900px) {
     .column-controls {
-        display: flex;
+        display: flex !important;
     }
 }
 

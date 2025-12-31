@@ -52,20 +52,29 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
           <div class="song-controls-buttons">
-            <button class="chords-toggle" title="Toggle chords">♪</button>
-            <span class="transpose-controls">
-              <button class="transpose-down" title="Transpose down">♭</button>
-              <span class="transpose-value">0</span>
-              <button class="transpose-up" title="Transpose up">♯</button>
-            </span>
-            <button class="light-mode-toggle" title="Toggle light mode">☀</button>
-            <button class="font-decrease" title="Decrease font size">-</button>
-            <button class="font-increase" title="Increase font size">+</button>
-            <span class="column-controls">
-              <button class="column-decrease" title="Fewer columns">◀</button>
-              <span class="column-count">1</span>
-              <button class="column-increase" title="More columns">▶</button>
-            </span>
+            <div class="song-controls-row">
+              <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">Chords</span></button>
+              <span class="transpose-controls">
+                <span class="control-label">Transpose</span>
+                <button class="transpose-down" title="Transpose down">♭</button>
+                <span class="transpose-value">0</span>
+                <button class="transpose-up" title="Transpose up">♯</button>
+              </span>
+            </div>
+            <div class="song-controls-row">
+              <button class="light-mode-toggle" title="Toggle light mode"><span class="btn-icon">☀</span><span class="btn-label">Light</span></button>
+              <span class="font-controls">
+                <span class="control-label">Font</span>
+                <button class="font-decrease" title="Decrease font size">A-</button>
+                <button class="font-increase" title="Increase font size">A+</button>
+              </span>
+              <span class="column-controls">
+                <span class="control-label">Columns</span>
+                <button class="column-decrease" title="Fewer columns">◀</button>
+                <span class="column-count">1</span>
+                <button class="column-increase" title="More columns">▶</button>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -90,20 +99,29 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
         <div class="song-controls-buttons">
-          <button class="chords-toggle" title="Toggle chords">♪</button>
-          <span class="transpose-controls">
-            <button class="transpose-down" title="Transpose down">♭</button>
-            <span class="transpose-value">0</span>
-            <button class="transpose-up" title="Transpose up">♯</button>
-          </span>
-          <button class="light-mode-toggle" title="Toggle light mode">☀</button>
-          <button class="font-decrease" title="Decrease font size">-</button>
-          <button class="font-increase" title="Increase font size">+</button>
-          <span class="column-controls">
-            <button class="column-decrease" title="Fewer columns">◀</button>
-            <span class="column-count">1</span>
-            <button class="column-increase" title="More columns">▶</button>
-          </span>
+          <div class="song-controls-row">
+            <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">Chords</span></button>
+            <span class="transpose-controls">
+              <span class="control-label">Transpose</span>
+              <button class="transpose-down" title="Transpose down">♭</button>
+              <span class="transpose-value">0</span>
+              <button class="transpose-up" title="Transpose up">♯</button>
+            </span>
+          </div>
+          <div class="song-controls-row">
+            <button class="light-mode-toggle" title="Toggle light mode"><span class="btn-icon">☀</span><span class="btn-label">Light</span></button>
+            <span class="font-controls">
+              <span class="control-label">Font</span>
+              <button class="font-decrease" title="Decrease font size">A-</button>
+              <button class="font-increase" title="Increase font size">A+</button>
+            </span>
+            <span class="column-controls">
+              <span class="control-label">Columns</span>
+              <button class="column-decrease" title="Fewer columns">◀</button>
+              <span class="column-count">1</span>
+              <button class="column-increase" title="More columns">▶</button>
+            </span>
+          </div>
         </div>
       </div>
       <div class="window-content song-content-wrapper">
@@ -166,7 +184,10 @@ function formatDate(date: Date, locale: string): string {
       }
     });
     lightModeBtns.forEach(btn => {
-      btn.textContent = lightMode ? '☾' : '☀';
+      const icon = btn.querySelector('.btn-icon');
+      const label = btn.querySelector('.btn-label');
+      if (icon) icon.textContent = lightMode ? '☾' : '☀';
+      if (label) label.textContent = lightMode ? 'Dark' : 'Light';
     });
   }
 
@@ -316,7 +337,10 @@ function formatDate(date: Date, locale: string): string {
       });
     });
     chordsBtns.forEach(btn => {
-      btn.textContent = showChords ? '♪' : 'T';
+      const icon = btn.querySelector('.btn-icon');
+      const label = btn.querySelector('.btn-label');
+      if (icon) icon.textContent = showChords ? '♪' : 'T';
+      if (label) label.textContent = showChords ? 'Chords' : 'Text';
       btn.setAttribute('title', showChords ? 'Hide chords (show text only)' : 'Show chords');
     });
     updateTransposeDisplay();
