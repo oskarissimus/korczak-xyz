@@ -212,6 +212,13 @@
     column-gap: 30px;
 }
 
+/* Keep chord + lyrics together in multi-column layout */
+.blog_post pre code .lyrics-group {
+    display: inline-block;
+    width: 100%;
+    break-inside: avoid;
+}
+
 /* Show column controls on wider screens */
 @media (min-width: 900px) {
     .column-controls {

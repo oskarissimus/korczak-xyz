@@ -240,6 +240,40 @@ function formatDate(date: Date, locale: string): string {
     );
   }
 
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function groupChordAndLyrics(lines: string[]): string[] {
+    const groups: string[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (isChordLine(line)) {
+        // Start a group with this chord line
+        let group = line;
+        i++;
+        // Include the next non-empty, non-chord line (the lyrics)
+        if (i < lines.length && !isChordLine(lines[i]) && lines[i].trim() !== '') {
+          group += '\n' + lines[i];
+          i++;
+        }
+        groups.push(group);
+      } else {
+        // Non-chord line (lyrics without chords, or empty line)
+        groups.push(line);
+        i++;
+      }
+    }
+
+    return groups;
+  }
+
   // Store original content for each code element
   const originalContent = new Map<Element, string>();
 
@@ -274,7 +308,11 @@ function formatDate(date: Date, locale: string): string {
           processedLines = lines.filter(line => !isChordLine(line));
         }
 
-        codeEl.textContent = processedLines.join('\n');
+        // Group chord+lyrics pairs and wrap in spans to prevent column breaks
+        const groups = groupChordAndLyrics(processedLines);
+        codeEl.innerHTML = groups.map(group =>
+          `<span class="lyrics-group">${escapeHtml(group)}</span>`
+        ).join('\n');
       });
     });
     chordsBtns.forEach(btn => {
