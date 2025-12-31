@@ -1,0 +1,47 @@
+---
+title: Do szopy hej pasterze
+slug: do-szopy-hej-pasterze
+author: Kolęda
+published: true
+language: pl
+dateAdded: 2025-12-31
+---
+```plaintext
+      D              A
+1. Do szopy, hej pasterze
+      A7             D
+   Do szopy, bo tam cud!
+      D              A
+   Syn Boży w żłobie leży
+      A7             D
+   By zbawić ludzki ród
+
+Ref:
+      D              A
+   Śpiewajcie Aniołowie
+      G              D
+   Pasterze, grajcie Mu
+      D              e
+   Kłaniajcie się Królowie
+      A7             D
+   Nie zbudźcie Go ze snu
+
+      D              A
+2. Padnijmy na kolana
+      A7             D
+   To Dziecię to nasz Bóg
+      D              A
+   Witajmy swego Pana
+      A7             D
+   Wdzięczności złóżmy dług
+
+Ref:
+      D              A
+   Śpiewajcie Aniołowie
+      G              D
+   Pasterze, grajcie Mu
+      D              e
+   Kłaniajcie się Królowie
+      A7             D
+   Nie zbudźcie Go ze snu
+```
