@@ -47,7 +47,7 @@
     color: var(--retro-green) !important;
     font-family: 'VT323', monospace;
     font-size: 1.3rem;
-    line-height: 1.3;
+    line-height: 1.0;
     text-shadow: none;
 }
 
