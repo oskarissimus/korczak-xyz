@@ -489,6 +489,13 @@
   background: transparent;
 }
 
+.win-animation-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
 .cascade-card {
   position: absolute;
   width: 70px;

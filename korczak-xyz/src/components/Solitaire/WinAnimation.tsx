@@ -17,11 +17,12 @@ interface AnimatedCard {
   launched: boolean;
 }
 
-interface TrailCard {
-  card: Card;
+// Trail stored as simple data, not React components
+interface TrailData {
   x: number;
   y: number;
-  id: string;
+  suit: string;
+  color: string;
 }
 
 // Physics constants
@@ -33,7 +34,29 @@ const CARD_WIDTH = 70;
 const CARD_HEIGHT = 100;
 const MAX_FRAMES = 800; // Safety limit: ~13 seconds at 60fps
 
-function CascadeCard({ card, x, y, opacity = 1 }: { card: Card; x: number; y: number; opacity?: number }) {
+// Helper to draw rounded rectangle on canvas
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function CascadeCard({ card, x, y }: { card: Card; x: number; y: number }) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const suitColor = SUIT_COLORS[card.suit];
 
@@ -43,7 +66,6 @@ function CascadeCard({ card, x, y, opacity = 1 }: { card: Card; x: number; y: nu
       style={{
         left: x,
         top: y,
-        opacity,
       }}
     >
       <div className="card-corner top-left">
@@ -63,12 +85,12 @@ function CascadeCard({ card, x, y, opacity = 1 }: { card: Card; x: number; y: nu
 
 export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
   const [animatedCards, setAnimatedCards] = useState<AnimatedCard[]>([]);
-  const [trailCards, setTrailCards] = useState<TrailCard[]>([]);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const trailsRef = useRef<TrailData[]>([]); // Trails stored in ref, not state!
   const frameRef = useRef(0);
-  const trailIdRef = useRef(0);
   const animationRef = useRef<number | null>(null);
   const completedRef = useRef(false);
-  const pendingTrailCards = useRef<TrailCard[]>([]);
 
   // Get responsive card dimensions
   const getCardDimensions = useCallback(() => {
@@ -80,6 +102,44 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
     }
     return { width: CARD_WIDTH, height: CARD_HEIGHT };
   }, []);
+
+  // Initialize canvas size
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      setCanvasSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, []);
+
+  // Draw trails on canvas
+  const drawTrails = useCallback((ctx: CanvasRenderingContext2D) => {
+    const trails = trailsRef.current;
+    const { width: cardW, height: cardH } = getCardDimensions();
+
+    for (const trail of trails) {
+      // Draw card background with border
+      ctx.fillStyle = '#ffffff';
+      roundRect(ctx, trail.x, trail.y, cardW, cardH, 4);
+      ctx.fill();
+
+      // Draw border (outset effect)
+      ctx.strokeStyle = '#dfdfdf';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw suit symbol in center
+      ctx.fillStyle = trail.color === 'red' ? '#c00000' : '#000000';
+      ctx.font = `bold ${Math.floor(cardH * 0.35)}px VT323, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(trail.suit, trail.x + cardW / 2, trail.y + cardH / 2);
+    }
+  }, [getCardDimensions]);
 
   // Initialize cards from foundations
   useEffect(() => {
@@ -124,14 +184,22 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
 
   // Animation loop
   useEffect(() => {
-    if (animatedCards.length === 0) return;
+    if (animatedCards.length === 0 || canvasSize.width === 0) return;
 
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
+    const screenWidth = canvasSize.width;
+    const screenHeight = canvasSize.height;
     const { width: cardWidth, height: cardHeight } = getCardDimensions();
 
     const animate = () => {
       frameRef.current++;
+
+      // Get canvas context and clear/redraw trails
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawTrails(ctx);
+      }
 
       setAnimatedCards(prevCards => {
         const newCards = prevCards.map((card, index) => {
@@ -145,13 +213,13 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
 
           if (!card.active) return card;
 
-          // Add to persistent trail every few frames
+          // Add to persistent trail every few frames (stored in ref, no re-render!)
           if (frameRef.current % TRAIL_INTERVAL === 0) {
-            pendingTrailCards.current.push({
-              card: card.card,
+            trailsRef.current.push({
               x: card.x,
               y: card.y,
-              id: `trail-${trailIdRef.current++}`,
+              suit: SUIT_SYMBOLS[card.card.suit],
+              color: SUIT_COLORS[card.card.suit],
             });
           }
 
@@ -204,13 +272,6 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         return newCards;
       });
 
-      // Add pending trail cards to state (outside of setAnimatedCards)
-      if (pendingTrailCards.current.length > 0) {
-        const cardsToAdd = [...pendingTrailCards.current];
-        pendingTrailCards.current = [];
-        setTrailCards(prev => [...prev, ...cardsToAdd]);
-      }
-
       animationRef.current = requestAnimationFrame(animate);
     };
 
@@ -221,20 +282,18 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [animatedCards.length, getCardDimensions, onComplete]);
+  }, [animatedCards.length, canvasSize, getCardDimensions, drawTrails, onComplete]);
 
   return (
     <div className="win-animation-overlay">
-      {/* Render persistent trail cards */}
-      {trailCards.map((trailCard) => (
-        <CascadeCard
-          key={trailCard.id}
-          card={trailCard.card}
-          x={trailCard.x}
-          y={trailCard.y}
-        />
-      ))}
-      {/* Render active moving cards on top */}
+      {/* Canvas for trail cards (performant!) */}
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        className="win-animation-canvas"
+      />
+      {/* Render only active moving cards as React components */}
       {animatedCards.map((animCard) => {
         if (!animCard.launched || !animCard.active) return null;
 
