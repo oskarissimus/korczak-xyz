@@ -293,10 +293,10 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
           card.vx = -Math.abs(card.vx) * 0.9;
         }
 
-        // Check if card energy is depleted
-        const totalEnergy = Math.abs(card.vx) + Math.abs(card.vy);
+        // Check if card energy is depleted (low vertical velocity at bottom)
         const atBottom = card.y >= screenHeight - cardHeight - 10;
-        if (totalEnergy < 2 && atBottom) {
+        const lowVerticalEnergy = Math.abs(card.vy) < 1;
+        if (lowVerticalEnergy && atBottom) {
           card.active = false;
           needsRerender = true;
         }
