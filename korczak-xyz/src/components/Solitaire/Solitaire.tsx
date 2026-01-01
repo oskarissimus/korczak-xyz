@@ -66,6 +66,30 @@ export default function Solitaire({ lang }: SolitaireProps) {
     setShowWinDialog(true);
   }, []);
 
+  // Test win animation with keyboard shortcut (Ctrl+Shift+W)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'W') {
+        e.preventDefault();
+        const suits: Array<'hearts' | 'diamonds' | 'clubs' | 'spades'> = ['hearts', 'diamonds', 'clubs', 'spades'];
+        const ranks: Array<'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K'> = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const foundations = suits.map(suit =>
+          ranks.map(rank => ({ id: `${suit}-${rank}`, suit, rank, faceUp: true }))
+        ) as GameState['foundations'];
+        setGameState(prev => ({
+          ...prev,
+          foundations,
+          tableau: [[], [], [], [], [], [], []] as GameState['tableau'],
+          stock: [],
+          waste: [],
+          gameWon: true,
+        }));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const startGameIfNeeded = useCallback((state: GameState): GameState => {
     if (!state.startTime) {
       return { ...state, startTime: Date.now() };
