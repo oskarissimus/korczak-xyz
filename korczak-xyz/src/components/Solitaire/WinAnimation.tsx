@@ -13,6 +13,7 @@ interface AnimatedCard {
   y: number;
   vx: number;
   vy: number;
+  bounceDampen: number; // Per-card bounce dampening for varied heights
   active: boolean;
   launched: boolean;
 }
@@ -28,7 +29,6 @@ interface TrailData {
 
 // Physics constants
 const GRAVITY = 0.3;
-const BOUNCE_DAMPEN = 0.85;
 const TRAIL_INTERVAL = 2;
 const LAUNCH_INTERVAL = 4;
 const CARD_WIDTH = 70;
@@ -197,6 +197,8 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
       const baseVx = 1 + Math.random() * 5;
       // More varied initial upward velocity (-0.5 to -4)
       const baseVy = -0.5 - Math.random() * 3.5;
+      // Per-card bounce dampening (0.7-0.95) - creates varied bounce heights
+      const bounceDampen = 0.7 + Math.random() * 0.25;
 
       return {
         card,
@@ -204,6 +206,7 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         y: startY,
         vx: goRight ? baseVx : -baseVx,
         vy: baseVy,
+        bounceDampen,
         active: true,
         launched: false,
       };
@@ -275,10 +278,10 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         card.x += card.vx;
         card.y += card.vy;
 
-        // Bounce off bottom
+        // Bounce off bottom - use per-card dampening for varied heights
         if (card.y > screenHeight - cardHeight) {
           card.y = screenHeight - cardHeight;
-          card.vy = -Math.abs(card.vy) * BOUNCE_DAMPEN;
+          card.vy = -Math.abs(card.vy) * card.bounceDampen;
         }
 
         // Bounce off sides
