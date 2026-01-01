@@ -80,6 +80,19 @@ export const ui = {
     'song.dark': 'Dark',
     'song.font': 'Font',
     'song.columns': 'Columns',
+
+    // Games
+    'Games': 'Games',
+    'Solitaire': 'Solitaire',
+    'solitaire.newGame': 'New Game',
+    'solitaire.undo': 'Undo',
+    'solitaire.draw1': 'Draw 1',
+    'solitaire.draw3': 'Draw 3',
+    'solitaire.score': 'Score',
+    'solitaire.moves': 'Moves',
+    'solitaire.youWin': 'You Win!',
+    'solitaire.playAgain': 'Play Again',
+    'solitaire.time': 'Time',
   },
   pl: {
     // Navigation
@@ -153,6 +166,19 @@ export const ui = {
     'song.dark': 'Ciemny',
     'song.font': 'Czcionka',
     'song.columns': 'Kolumny',
+
+    // Games
+    'Games': 'Gry',
+    'Solitaire': 'Pasjans',
+    'solitaire.newGame': 'Nowa Gra',
+    'solitaire.undo': 'Cofnij',
+    'solitaire.draw1': 'Dobierz 1',
+    'solitaire.draw3': 'Dobierz 3',
+    'solitaire.score': 'Wynik',
+    'solitaire.moves': 'Ruchy',
+    'solitaire.youWin': 'Wygrales!',
+    'solitaire.playAgain': 'Zagraj Ponownie',
+    'solitaire.time': 'Czas',
   },
 } as const;
 

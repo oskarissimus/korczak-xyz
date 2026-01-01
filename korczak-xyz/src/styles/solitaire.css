@@ -1,0 +1,477 @@
+/* Solitaire Game Styles - Windows 95 Aesthetic */
+
+.solitaire-game {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Game Controls */
+.game-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: var(--retro-gray);
+  border-bottom: 2px solid var(--retro-dark-gray);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.controls-left {
+  display: flex;
+  gap: 8px;
+}
+
+.controls-right {
+  display: flex;
+  gap: 15px;
+}
+
+.stat-box {
+  display: flex;
+  gap: 5px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 4px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+}
+
+.stat-label {
+  color: var(--retro-dark-gray);
+}
+
+.stat-value {
+  color: var(--retro-black);
+  font-weight: bold;
+}
+
+/* Solitaire Board */
+.solitaire-board {
+  background: var(--retro-teal);
+  padding: 15px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Top Row: Stock, Waste, and Foundations */
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stock-waste-area {
+  display: flex;
+  gap: 10px;
+}
+
+.stock-pile,
+.waste-pile {
+  position: relative;
+  width: 70px;
+  height: 100px;
+}
+
+.stock-pile {
+  cursor: pointer;
+}
+
+.stock-count {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  background: var(--retro-navy);
+  color: var(--retro-white);
+  font-family: 'VT323', monospace;
+  font-size: 0.9rem;
+  padding: 2px 5px;
+  border: 2px outset var(--retro-gray);
+}
+
+.stock-refresh {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: var(--retro-cyan);
+  pointer-events: none;
+}
+
+/* Foundation Area */
+.foundation-area {
+  display: flex;
+  gap: 10px;
+}
+
+.foundation-pile {
+  width: 70px;
+  height: 100px;
+}
+
+/* Tableau Area */
+.tableau-area {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tableau-column {
+  min-width: 70px;
+  min-height: 150px;
+}
+
+/* Cards */
+.solitaire-card {
+  width: 70px;
+  height: 100px;
+  border: 3px outset var(--retro-white);
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.solitaire-card:active {
+  border-style: inset;
+}
+
+.solitaire-card.face-up {
+  background: var(--retro-white);
+}
+
+.solitaire-card.face-down {
+  background: var(--retro-gray);
+  cursor: default;
+}
+
+.card-back-pattern {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      var(--retro-navy) 0px,
+      var(--retro-navy) 2px,
+      transparent 2px,
+      transparent 6px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--retro-navy) 0px,
+      var(--retro-navy) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+  border: 2px solid var(--retro-navy);
+}
+
+.solitaire-card.selected {
+  box-shadow: 0 0 0 3px var(--retro-yellow);
+}
+
+.solitaire-card.red {
+  color: #c00000;
+}
+
+.solitaire-card.black {
+  color: var(--retro-black);
+}
+
+/* Card corners */
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.card-corner.top-left {
+  top: 3px;
+  left: 4px;
+}
+
+.card-corner.bottom-right {
+  bottom: 3px;
+  right: 4px;
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.card-suit {
+  font-size: 1rem;
+}
+
+.card-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.card-suit-large {
+  font-size: 2rem;
+}
+
+/* Card Placeholder */
+.card-placeholder {
+  width: 70px;
+  height: 100px;
+  border: 3px inset var(--retro-dark-gray);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.card-placeholder.highlight {
+  border-color: var(--retro-cyan);
+  box-shadow: 0 0 5px var(--retro-cyan);
+}
+
+.placeholder-suit {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Card Stack */
+.card-stack {
+  position: relative;
+}
+
+.card-stack.highlight > .card-placeholder {
+  border-color: var(--retro-cyan);
+  box-shadow: 0 0 5px var(--retro-cyan);
+}
+
+/* Win Dialog */
+.win-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 128, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.win-dialog.window {
+  width: 300px;
+  animation: bounceIn 0.5s ease-out;
+}
+
+.win-content {
+  padding: 20px;
+  text-align: center;
+  background: var(--retro-gray);
+}
+
+.win-celebration {
+  font-size: 4rem;
+  margin-bottom: 15px;
+}
+
+.win-stats {
+  margin-bottom: 20px;
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+}
+
+.win-stats p {
+  margin: 5px 0;
+}
+
+.play-again-btn {
+  font-size: 1.2rem;
+  padding: 10px 20px;
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Responsive Styles */
+@media (max-width: 900px) {
+  .solitaire-card,
+  .card-placeholder {
+    width: 55px;
+    height: 80px;
+  }
+
+  .card-rank {
+    font-size: 1rem;
+  }
+
+  .card-suit {
+    font-size: 0.8rem;
+  }
+
+  .card-suit-large {
+    font-size: 1.5rem;
+  }
+
+  .card-corner.top-left {
+    top: 2px;
+    left: 3px;
+  }
+
+  .card-corner.bottom-right {
+    bottom: 2px;
+    right: 3px;
+  }
+
+  .stock-pile,
+  .waste-pile,
+  .foundation-pile,
+  .tableau-column {
+    min-width: 55px;
+  }
+
+  .stock-pile,
+  .waste-pile {
+    width: 55px;
+    height: 80px;
+  }
+
+  .placeholder-suit {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .solitaire-card,
+  .card-placeholder {
+    width: 42px;
+    height: 60px;
+  }
+
+  .card-rank {
+    font-size: 0.8rem;
+  }
+
+  .card-suit {
+    font-size: 0.7rem;
+  }
+
+  .card-suit-large {
+    font-size: 1.2rem;
+  }
+
+  .card-corner.top-left {
+    top: 1px;
+    left: 2px;
+  }
+
+  .card-corner.bottom-right {
+    bottom: 1px;
+    right: 2px;
+  }
+
+  .stock-pile,
+  .waste-pile,
+  .foundation-pile,
+  .tableau-column {
+    min-width: 42px;
+  }
+
+  .stock-pile,
+  .waste-pile {
+    width: 42px;
+    height: 60px;
+  }
+
+  .placeholder-suit {
+    font-size: 1rem;
+  }
+
+  .solitaire-board {
+    padding: 8px;
+    gap: 15px;
+  }
+
+  .top-row {
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .stock-waste-area {
+    gap: 5px;
+  }
+
+  .foundation-area {
+    gap: 5px;
+  }
+
+  .tableau-area {
+    gap: 5px;
+  }
+
+  .game-controls {
+    padding: 8px;
+  }
+
+  .controls-left .retro-btn {
+    padding: 4px 8px;
+    font-size: 0.9rem;
+  }
+
+  .stat-box {
+    font-size: 0.9rem;
+    padding: 3px 6px;
+  }
+
+  .card-back-pattern {
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+  }
+}
+
+/* Dragging states */
+.solitaire-card[draggable="true"] {
+  cursor: grab;
+}
+
+.solitaire-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Highlight valid drop targets */
+.tableau-column.highlight,
+.foundation-pile.highlight {
+  background: rgba(0, 255, 255, 0.1);
+  border-radius: 4px;
+}

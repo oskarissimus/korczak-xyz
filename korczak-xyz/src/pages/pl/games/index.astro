@@ -1,0 +1,84 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageContent from '../../../components/PageContent.astro';
+import { useTranslations } from '../../../i18n';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Games')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('Games')}>
+    <ul class="games-list">
+      <li>
+        <a href="/pl/games/solitaire/" class="game-link">
+          <span class="game-icon">♠</span>
+          <span class="game-info">
+            <span class="game-title">{t('Solitaire')}</span>
+            <span class="game-desc">Klondike</span>
+          </span>
+        </a>
+      </li>
+    </ul>
+  </PageContent>
+</Layout>
+
+<style>
+  .games-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .game-link {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    text-decoration: none;
+    color: var(--retro-black);
+    font-family: 'VT323', monospace;
+    transition: none;
+  }
+
+  .game-link:hover {
+    background: #a0a0a0;
+  }
+
+  .game-link:active {
+    border-style: inset;
+  }
+
+  .game-icon {
+    font-size: 2.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--retro-teal);
+    border: 2px inset var(--retro-dark-gray);
+    color: var(--retro-white);
+  }
+
+  .game-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .game-title {
+    font-size: 1.4rem;
+    color: var(--retro-black);
+  }
+
+  .game-desc {
+    font-size: 1rem;
+    color: var(--retro-dark-gray);
+  }
+</style>

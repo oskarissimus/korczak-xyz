@@ -1,0 +1,43 @@
+import React from 'react';
+import { Card, CardPlaceholder } from './Card';
+import type { Card as CardType } from '../../utils/solitaire/types';
+
+interface WasteProps {
+  cards: CardType[];
+  onCardClick: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  selectedCard: boolean;
+}
+
+export function Waste({
+  cards,
+  onCardClick,
+  onDragStart,
+  onDragEnd,
+  selectedCard,
+}: WasteProps) {
+  if (cards.length === 0) {
+    return (
+      <div className="waste-pile">
+        <CardPlaceholder />
+      </div>
+    );
+  }
+
+  // Show only the top card (or up to 3 in draw-3 mode, but we'll keep it simple)
+  const topCard = cards[cards.length - 1];
+
+  return (
+    <div className="waste-pile">
+      <Card
+        card={{ ...topCard, faceUp: true }}
+        onClick={onCardClick}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        selected={selectedCard}
+        draggable={true}
+      />
+    </div>
+  );
+}
