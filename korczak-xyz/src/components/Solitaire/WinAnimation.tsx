@@ -22,6 +22,7 @@ interface TrailData {
   x: number;
   y: number;
   suit: string;
+  rank: string;
   color: string;
 }
 
@@ -120,6 +121,7 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
   const drawTrails = useCallback((ctx: CanvasRenderingContext2D) => {
     const trails = trailsRef.current;
     const { width: cardW, height: cardH } = getCardDimensions();
+    const textColor = (color: string) => color === 'red' ? '#c00000' : '#000000';
 
     for (const trail of trails) {
       // Draw card background with border
@@ -132,8 +134,27 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
       ctx.lineWidth = 2;
       ctx.stroke();
 
+      ctx.fillStyle = textColor(trail.color);
+
+      // Draw top-left corner (rank + suit)
+      const cornerFontSize = Math.floor(cardH * 0.18);
+      ctx.font = `bold ${cornerFontSize}px VT323, monospace`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(trail.rank, trail.x + 4, trail.y + 3);
+      ctx.fillText(trail.suit, trail.x + 4, trail.y + 3 + cornerFontSize);
+
+      // Draw bottom-right corner (rotated 180°)
+      ctx.save();
+      ctx.translate(trail.x + cardW - 4, trail.y + cardH - 3);
+      ctx.rotate(Math.PI);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(trail.rank, 0, 0);
+      ctx.fillText(trail.suit, 0, cornerFontSize);
+      ctx.restore();
+
       // Draw suit symbol in center
-      ctx.fillStyle = trail.color === 'red' ? '#c00000' : '#000000';
       ctx.font = `bold ${Math.floor(cardH * 0.35)}px VT323, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -219,6 +240,7 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
               x: card.x,
               y: card.y,
               suit: SUIT_SYMBOLS[card.card.suit],
+              rank: card.card.rank,
               color: SUIT_COLORS[card.card.suit],
             });
           }
