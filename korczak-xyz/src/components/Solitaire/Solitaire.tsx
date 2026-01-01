@@ -5,6 +5,7 @@ import { Waste } from './Waste';
 import { Foundation } from './Foundation';
 import { Tableau } from './Tableau';
 import { WinDialog } from './WinDialog';
+import { WinAnimation } from './WinAnimation';
 import { dealCards } from '../../utils/solitaire/deck';
 import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit } from '../../utils/solitaire/rules';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
@@ -40,6 +41,8 @@ export default function Solitaire({ lang }: SolitaireProps) {
   const [dragSource, setDragSource] = useState<Location | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [history, setHistory] = useState<GameState[]>([]);
+  const [showWinAnimation, setShowWinAnimation] = useState(false);
+  const [showWinDialog, setShowWinDialog] = useState(false);
 
   // Timer effect
   useEffect(() => {
@@ -50,6 +53,18 @@ export default function Solitaire({ lang }: SolitaireProps) {
       return () => clearInterval(interval);
     }
   }, [gameState.startTime, gameState.gameWon]);
+
+  // Trigger win animation when game is won
+  useEffect(() => {
+    if (gameState.gameWon && !showWinAnimation && !showWinDialog) {
+      setShowWinAnimation(true);
+    }
+  }, [gameState.gameWon, showWinAnimation, showWinDialog]);
+
+  const handleWinAnimationComplete = useCallback(() => {
+    setShowWinAnimation(false);
+    setShowWinDialog(true);
+  }, []);
 
   const startGameIfNeeded = useCallback((state: GameState): GameState => {
     if (!state.startTime) {
@@ -67,6 +82,8 @@ export default function Solitaire({ lang }: SolitaireProps) {
     setSelectedLocation(null);
     setElapsedTime(0);
     setHistory([]);
+    setShowWinAnimation(false);
+    setShowWinDialog(false);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -398,7 +415,14 @@ export default function Solitaire({ lang }: SolitaireProps) {
         />
       </div>
 
-      {gameState.gameWon && (
+      {showWinAnimation && (
+        <WinAnimation
+          foundations={gameState.foundations}
+          onComplete={handleWinAnimationComplete}
+        />
+      )}
+
+      {showWinDialog && (
         <WinDialog
           moveCount={gameState.moveCount}
           elapsedTime={elapsedTime}
