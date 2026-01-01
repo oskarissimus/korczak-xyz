@@ -282,6 +282,8 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         if (card.y > screenHeight - cardHeight) {
           card.y = screenHeight - cardHeight;
           card.vy = -Math.abs(card.vy) * card.bounceDampen;
+          // Apply friction when touching ground - stops sliding quickly
+          card.vx *= 0.85;
         }
 
         // Bounce off sides
@@ -293,10 +295,10 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
           card.vx = -Math.abs(card.vx) * 0.9;
         }
 
-        // Check if card energy is depleted (low vertical velocity at bottom)
+        // Check if card energy is depleted
+        const totalEnergy = Math.abs(card.vx) + Math.abs(card.vy);
         const atBottom = card.y >= screenHeight - cardHeight - 10;
-        const lowVerticalEnergy = Math.abs(card.vy) < 1;
-        if (lowVerticalEnergy && atBottom) {
+        if (totalEnergy < 2 && atBottom) {
           card.active = false;
           needsRerender = true;
         }
