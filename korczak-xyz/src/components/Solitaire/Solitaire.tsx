@@ -62,7 +62,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
   }, [gameState.gameWon, showWinAnimation, showWinDialog]);
 
   const handleWinAnimationComplete = useCallback(() => {
-    setShowWinAnimation(false);
+    // Keep animation visible (trails persist), just show dialog on top
     setShowWinDialog(true);
   }, []);
 

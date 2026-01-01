@@ -13,18 +13,25 @@ interface AnimatedCard {
   y: number;
   vx: number;
   vy: number;
-  trail: { x: number; y: number }[];
   active: boolean;
   launched: boolean;
 }
 
+interface TrailCard {
+  card: Card;
+  x: number;
+  y: number;
+  id: string;
+}
+
 // Physics constants
-const GRAVITY = 0.4;
-const BOUNCE_DAMPEN = 0.75;
-const MAX_TRAIL = 10;
-const LAUNCH_INTERVAL = 3; // frames between card launches
+const GRAVITY = 0.3;
+const BOUNCE_DAMPEN = 0.85; // Higher = more bounces
+const TRAIL_INTERVAL = 2; // Add trail card every N frames (more frequent = denser trails)
+const LAUNCH_INTERVAL = 4; // frames between card launches
 const CARD_WIDTH = 70;
 const CARD_HEIGHT = 100;
+const MAX_FRAMES = 800; // Safety limit: ~13 seconds at 60fps
 
 function CascadeCard({ card, x, y, opacity = 1 }: { card: Card; x: number; y: number; opacity?: number }) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
@@ -56,9 +63,12 @@ function CascadeCard({ card, x, y, opacity = 1 }: { card: Card; x: number; y: nu
 
 export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
   const [animatedCards, setAnimatedCards] = useState<AnimatedCard[]>([]);
+  const [trailCards, setTrailCards] = useState<TrailCard[]>([]);
   const frameRef = useRef(0);
+  const trailIdRef = useRef(0);
   const animationRef = useRef<number | null>(null);
   const completedRef = useRef(false);
+  const pendingTrailCards = useRef<TrailCard[]>([]);
 
   // Get responsive card dimensions
   const getCardDimensions = useCallback(() => {
@@ -96,15 +106,14 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
     const cards: AnimatedCard[] = allCards.map(({ card, foundationIndex }, index) => {
       // Alternate direction and randomize velocity
       const goRight = index % 2 === 0;
-      const baseVx = 4 + Math.random() * 4; // 4-8 px/frame
+      const baseVx = 2 + Math.random() * 3; // 2-5 px/frame (slower = more visible trails)
 
       return {
         card,
         x: startX + foundationIndex * (cardWidth + 10),
         y: startY,
         vx: goRight ? baseVx : -baseVx,
-        vy: -2 - Math.random() * 3, // Initial upward velocity
-        trail: [],
+        vy: -1 - Math.random() * 2, // Gentler initial upward velocity
         active: true,
         launched: false,
       };
@@ -136,6 +145,16 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
 
           if (!card.active) return card;
 
+          // Add to persistent trail every few frames
+          if (frameRef.current % TRAIL_INTERVAL === 0) {
+            pendingTrailCards.current.push({
+              card: card.card,
+              x: card.x,
+              y: card.y,
+              id: `trail-${trailIdRef.current++}`,
+            });
+          }
+
           // Update physics
           let newVy = card.vy + GRAVITY;
           let newX = card.x + card.vx;
@@ -147,30 +166,35 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
             newVy = -Math.abs(newVy) * BOUNCE_DAMPEN;
           }
 
-          // Add to trail
-          const newTrail = [...card.trail, { x: card.x, y: card.y }];
-          if (newTrail.length > MAX_TRAIL) {
-            newTrail.shift();
+          // Bounce off sides (keeps cards on screen longer, creating more visible trails)
+          if (newX < 0) {
+            newX = 0;
+            card.vx = Math.abs(card.vx) * 0.9;
+          } else if (newX > screenWidth - cardWidth) {
+            newX = screenWidth - cardWidth;
+            card.vx = -Math.abs(card.vx) * 0.9;
           }
 
-          // Check if card is off-screen
-          const isOffScreen = newX < -cardWidth - 20 || newX > screenWidth + cardWidth + 20;
+          // Check if card energy is depleted (very slow movement at bottom)
+          const totalEnergy = Math.abs(card.vx) + Math.abs(newVy);
+          const atBottom = newY >= screenHeight - cardHeight - 10;
+          const isExhausted = totalEnergy < 2 && atBottom;
 
           return {
             ...card,
             x: newX,
             y: newY,
             vy: newVy,
-            trail: newTrail,
-            active: !isOffScreen,
+            active: !isExhausted,
           };
         });
 
         // Check if animation is complete
         const allLaunched = newCards.every(c => c.launched);
         const allInactive = newCards.every(c => !c.active);
+        const maxFramesReached = frameRef.current >= MAX_FRAMES;
 
-        if (allLaunched && allInactive && !completedRef.current) {
+        if ((allLaunched && allInactive || maxFramesReached) && !completedRef.current) {
           completedRef.current = true;
           setTimeout(() => {
             onComplete();
@@ -179,6 +203,13 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
 
         return newCards;
       });
+
+      // Add pending trail cards to state (outside of setAnimatedCards)
+      if (pendingTrailCards.current.length > 0) {
+        const cardsToAdd = [...pendingTrailCards.current];
+        pendingTrailCards.current = [];
+        setTrailCards(prev => [...prev, ...cardsToAdd]);
+      }
 
       animationRef.current = requestAnimationFrame(animate);
     };
@@ -194,31 +225,26 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
 
   return (
     <div className="win-animation-overlay">
-      {animatedCards.map((animCard, cardIndex) => {
-        if (!animCard.launched) return null;
+      {/* Render persistent trail cards */}
+      {trailCards.map((trailCard) => (
+        <CascadeCard
+          key={trailCard.id}
+          card={trailCard.card}
+          x={trailCard.x}
+          y={trailCard.y}
+        />
+      ))}
+      {/* Render active moving cards on top */}
+      {animatedCards.map((animCard) => {
+        if (!animCard.launched || !animCard.active) return null;
 
         return (
-          <React.Fragment key={animCard.card.id}>
-            {/* Render trail cards (older = more transparent) */}
-            {animCard.trail.map((pos, trailIndex) => (
-              <CascadeCard
-                key={`${animCard.card.id}-trail-${trailIndex}`}
-                card={animCard.card}
-                x={pos.x}
-                y={pos.y}
-                opacity={0.1 + (trailIndex / MAX_TRAIL) * 0.5}
-              />
-            ))}
-            {/* Render main card */}
-            {animCard.active && (
-              <CascadeCard
-                card={animCard.card}
-                x={animCard.x}
-                y={animCard.y}
-                opacity={1}
-              />
-            )}
-          </React.Fragment>
+          <CascadeCard
+            key={`active-${animCard.card.id}`}
+            card={animCard.card}
+            x={animCard.x}
+            y={animCard.y}
+          />
         );
       })}
     </div>
