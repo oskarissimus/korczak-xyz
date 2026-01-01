@@ -189,17 +189,21 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
       }
     }
 
-    // Create animated card objects
+    // Create animated card objects with randomized energy for chaotic effect
     animatedCardsRef.current = allCards.map(({ card, foundationIndex }, index) => {
-      const goRight = index % 2 === 0;
-      const baseVx = 2 + Math.random() * 3;
+      // Randomize direction (not just alternating)
+      const goRight = Math.random() > 0.5;
+      // More varied horizontal velocity (1-6 px/frame)
+      const baseVx = 1 + Math.random() * 5;
+      // More varied initial upward velocity (-0.5 to -4)
+      const baseVy = -0.5 - Math.random() * 3.5;
 
       return {
         card,
         x: startX + foundationIndex * (cardWidth + 10),
         y: startY,
         vx: goRight ? baseVx : -baseVx,
-        vy: -1 - Math.random() * 2,
+        vy: baseVy,
         active: true,
         launched: false,
       };
