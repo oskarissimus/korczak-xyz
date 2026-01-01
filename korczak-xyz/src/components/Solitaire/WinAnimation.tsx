@@ -17,7 +17,7 @@ interface AnimatedCard {
   launched: boolean;
 }
 
-// Trail stored as simple data, not React components
+// Trail stored as simple data
 interface TrailData {
   x: number;
   y: number;
@@ -28,12 +28,12 @@ interface TrailData {
 
 // Physics constants
 const GRAVITY = 0.3;
-const BOUNCE_DAMPEN = 0.85; // Higher = more bounces
-const TRAIL_INTERVAL = 2; // Add trail card every N frames (more frequent = denser trails)
-const LAUNCH_INTERVAL = 4; // frames between card launches
+const BOUNCE_DAMPEN = 0.85;
+const TRAIL_INTERVAL = 2;
+const LAUNCH_INTERVAL = 4;
 const CARD_WIDTH = 70;
 const CARD_HEIGHT = 100;
-const MAX_FRAMES = 800; // Safety limit: ~13 seconds at 60fps
+const MAX_FRAMES = 800;
 
 // Helper to draw rounded rectangle on canvas
 function roundRect(
@@ -57,115 +57,121 @@ function roundRect(
   ctx.closePath();
 }
 
-function CascadeCard({ card, x, y }: { card: Card; x: number; y: number }) {
-  const suitSymbol = SUIT_SYMBOLS[card.suit];
-  const suitColor = SUIT_COLORS[card.suit];
-
-  return (
-    <div
-      className={`cascade-card ${suitColor}`}
-      style={{
-        left: x,
-        top: y,
-      }}
-    >
-      <div className="card-corner top-left">
-        <span className="card-rank">{card.rank}</span>
-        <span className="card-suit">{suitSymbol}</span>
-      </div>
-      <div className="card-center">
-        <span className="card-suit-large">{suitSymbol}</span>
-      </div>
-      <div className="card-corner bottom-right">
-        <span className="card-rank">{card.rank}</span>
-        <span className="card-suit">{suitSymbol}</span>
-      </div>
-    </div>
-  );
-}
-
 export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
-  const [animatedCards, setAnimatedCards] = useState<AnimatedCard[]>([]);
+  // Canvas size state (only thing that needs React re-render)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+
+  // All animation data in refs - NO setState during animation!
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const trailsRef = useRef<TrailData[]>([]); // Trails stored in ref, not state!
+  const bufferCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animatedCardsRef = useRef<AnimatedCard[]>([]);
+  const trailsRef = useRef<TrailData[]>([]);
+  const lastTrailCountRef = useRef(0);
   const frameRef = useRef(0);
   const animationRef = useRef<number | null>(null);
   const completedRef = useRef(false);
+  const cardDimensionsRef = useRef({ width: CARD_WIDTH, height: CARD_HEIGHT });
+
+  // Force re-render trigger for active cards display
+  const [renderTick, setRenderTick] = useState(0);
 
   // Get responsive card dimensions
-  const getCardDimensions = useCallback(() => {
+  const updateCardDimensions = useCallback(() => {
     const width = window.innerWidth;
     if (width <= 600) {
-      return { width: 42, height: 60 };
+      cardDimensionsRef.current = { width: 42, height: 60 };
     } else if (width <= 900) {
-      return { width: 55, height: 80 };
+      cardDimensionsRef.current = { width: 55, height: 80 };
+    } else {
+      cardDimensionsRef.current = { width: CARD_WIDTH, height: CARD_HEIGHT };
     }
-    return { width: CARD_WIDTH, height: CARD_HEIGHT };
   }, []);
 
-  // Initialize canvas size
+  // Initialize canvas size and buffer canvas
   useEffect(() => {
     const updateCanvasSize = () => {
-      setCanvasSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight;
+
+      setCanvasSize({ width: newWidth, height: newHeight });
+      updateCardDimensions();
+
+      // Create/resize buffer canvas
+      if (!bufferCanvasRef.current) {
+        bufferCanvasRef.current = document.createElement('canvas');
+      }
+      bufferCanvasRef.current.width = newWidth;
+      bufferCanvasRef.current.height = newHeight;
     };
+
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
     return () => window.removeEventListener('resize', updateCanvasSize);
+  }, [updateCardDimensions]);
+
+  // Draw a single trail card to canvas
+  const drawSingleTrail = useCallback((ctx: CanvasRenderingContext2D, trail: TrailData) => {
+    const { width: cardW, height: cardH } = cardDimensionsRef.current;
+    const textColor = trail.color === 'red' ? '#c00000' : '#000000';
+
+    // Draw card background with border
+    ctx.fillStyle = '#ffffff';
+    roundRect(ctx, trail.x, trail.y, cardW, cardH, 4);
+    ctx.fill();
+
+    ctx.strokeStyle = '#dfdfdf';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = textColor;
+
+    // Draw top-left corner (rank + suit)
+    const cornerFontSize = Math.floor(cardH * 0.18);
+    ctx.font = `bold ${cornerFontSize}px VT323, monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(trail.rank, trail.x + 4, trail.y + 3);
+    ctx.fillText(trail.suit, trail.x + 4, trail.y + 3 + cornerFontSize);
+
+    // Draw bottom-right corner (rotated 180°)
+    ctx.save();
+    ctx.translate(trail.x + cardW - 4, trail.y + cardH - 3);
+    ctx.rotate(Math.PI);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(trail.rank, 0, 0);
+    ctx.fillText(trail.suit, 0, cornerFontSize);
+    ctx.restore();
+
+    // Draw suit symbol in center
+    ctx.font = `bold ${Math.floor(cardH * 0.35)}px VT323, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(trail.suit, trail.x + cardW / 2, trail.y + cardH / 2);
   }, []);
 
-  // Draw trails on canvas
-  const drawTrails = useCallback((ctx: CanvasRenderingContext2D) => {
+  // Draw only NEW trails to buffer (incremental!)
+  const drawNewTrailsToBuffer = useCallback(() => {
+    const bufferCtx = bufferCanvasRef.current?.getContext('2d');
+    if (!bufferCtx) return;
+
     const trails = trailsRef.current;
-    const { width: cardW, height: cardH } = getCardDimensions();
-    const textColor = (color: string) => color === 'red' ? '#c00000' : '#000000';
+    const startIdx = lastTrailCountRef.current;
 
-    for (const trail of trails) {
-      // Draw card background with border
-      ctx.fillStyle = '#ffffff';
-      roundRect(ctx, trail.x, trail.y, cardW, cardH, 4);
-      ctx.fill();
-
-      // Draw border (outset effect)
-      ctx.strokeStyle = '#dfdfdf';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = textColor(trail.color);
-
-      // Draw top-left corner (rank + suit)
-      const cornerFontSize = Math.floor(cardH * 0.18);
-      ctx.font = `bold ${cornerFontSize}px VT323, monospace`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(trail.rank, trail.x + 4, trail.y + 3);
-      ctx.fillText(trail.suit, trail.x + 4, trail.y + 3 + cornerFontSize);
-
-      // Draw bottom-right corner (rotated 180°)
-      ctx.save();
-      ctx.translate(trail.x + cardW - 4, trail.y + cardH - 3);
-      ctx.rotate(Math.PI);
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(trail.rank, 0, 0);
-      ctx.fillText(trail.suit, 0, cornerFontSize);
-      ctx.restore();
-
-      // Draw suit symbol in center
-      ctx.font = `bold ${Math.floor(cardH * 0.35)}px VT323, monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(trail.suit, trail.x + cardW / 2, trail.y + cardH / 2);
+    // Only draw trails added since last frame
+    for (let i = startIdx; i < trails.length; i++) {
+      drawSingleTrail(bufferCtx, trails[i]);
     }
-  }, [getCardDimensions]);
+
+    lastTrailCountRef.current = trails.length;
+  }, [drawSingleTrail]);
 
   // Initialize cards from foundations
   useEffect(() => {
-    const screenWidth = window.innerWidth;
-    const { width: cardWidth } = getCardDimensions();
+    if (canvasSize.width === 0) return;
+
+    const screenWidth = canvasSize.width;
+    const { width: cardWidth } = cardDimensionsRef.current;
 
     // Starting position - top right area where foundations are
     const startX = screenWidth - cardWidth * 4 - 60;
@@ -184,115 +190,182 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
     }
 
     // Create animated card objects
-    const cards: AnimatedCard[] = allCards.map(({ card, foundationIndex }, index) => {
-      // Alternate direction and randomize velocity
+    animatedCardsRef.current = allCards.map(({ card, foundationIndex }, index) => {
       const goRight = index % 2 === 0;
-      const baseVx = 2 + Math.random() * 3; // 2-5 px/frame (slower = more visible trails)
+      const baseVx = 2 + Math.random() * 3;
 
       return {
         card,
         x: startX + foundationIndex * (cardWidth + 10),
         y: startY,
         vx: goRight ? baseVx : -baseVx,
-        vy: -1 - Math.random() * 2, // Gentler initial upward velocity
+        vy: -1 - Math.random() * 2,
         active: true,
         launched: false,
       };
     });
 
-    setAnimatedCards(cards);
-  }, [foundations, getCardDimensions]);
+    // Reset animation state
+    trailsRef.current = [];
+    lastTrailCountRef.current = 0;
+    frameRef.current = 0;
+    completedRef.current = false;
 
-  // Animation loop
+    // Clear buffer canvas
+    const bufferCtx = bufferCanvasRef.current?.getContext('2d');
+    if (bufferCtx && bufferCanvasRef.current) {
+      bufferCtx.clearRect(0, 0, bufferCanvasRef.current.width, bufferCanvasRef.current.height);
+    }
+
+    // Trigger initial render
+    setRenderTick(1);
+  }, [foundations, canvasSize.width]);
+
+  // Animation loop - runs entirely in refs, minimal React involvement
   useEffect(() => {
-    if (animatedCards.length === 0 || canvasSize.width === 0) return;
+    if (animatedCardsRef.current.length === 0 || canvasSize.width === 0) return;
 
     const screenWidth = canvasSize.width;
     const screenHeight = canvasSize.height;
-    const { width: cardWidth, height: cardHeight } = getCardDimensions();
+    const { width: cardWidth, height: cardHeight } = cardDimensionsRef.current;
+
+    let lastRenderTick = 0;
 
     const animate = () => {
       frameRef.current++;
 
-      // Get canvas context and clear/redraw trails
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (ctx && canvas) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawTrails(ctx);
-      }
+      const cards = animatedCardsRef.current;
+      let hasActiveCards = false;
+      let needsRerender = false;
 
-      setAnimatedCards(prevCards => {
-        const newCards = prevCards.map((card, index) => {
-          // Launch cards one at a time
-          if (!card.launched) {
-            if (frameRef.current >= index * LAUNCH_INTERVAL) {
-              return { ...card, launched: true };
-            }
-            return card;
+      // Update physics for all cards (in ref, no setState!)
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+
+        // Launch cards one at a time
+        if (!card.launched) {
+          if (frameRef.current >= i * LAUNCH_INTERVAL) {
+            card.launched = true;
+            needsRerender = true;
           }
-
-          if (!card.active) return card;
-
-          // Add to persistent trail every few frames (stored in ref, no re-render!)
-          if (frameRef.current % TRAIL_INTERVAL === 0) {
-            trailsRef.current.push({
-              x: card.x,
-              y: card.y,
-              suit: SUIT_SYMBOLS[card.card.suit],
-              rank: card.card.rank,
-              color: SUIT_COLORS[card.card.suit],
-            });
-          }
-
-          // Update physics
-          let newVy = card.vy + GRAVITY;
-          let newX = card.x + card.vx;
-          let newY = card.y + newVy;
-
-          // Bounce off bottom
-          if (newY > screenHeight - cardHeight) {
-            newY = screenHeight - cardHeight;
-            newVy = -Math.abs(newVy) * BOUNCE_DAMPEN;
-          }
-
-          // Bounce off sides (keeps cards on screen longer, creating more visible trails)
-          if (newX < 0) {
-            newX = 0;
-            card.vx = Math.abs(card.vx) * 0.9;
-          } else if (newX > screenWidth - cardWidth) {
-            newX = screenWidth - cardWidth;
-            card.vx = -Math.abs(card.vx) * 0.9;
-          }
-
-          // Check if card energy is depleted (very slow movement at bottom)
-          const totalEnergy = Math.abs(card.vx) + Math.abs(newVy);
-          const atBottom = newY >= screenHeight - cardHeight - 10;
-          const isExhausted = totalEnergy < 2 && atBottom;
-
-          return {
-            ...card,
-            x: newX,
-            y: newY,
-            vy: newVy,
-            active: !isExhausted,
-          };
-        });
-
-        // Check if animation is complete
-        const allLaunched = newCards.every(c => c.launched);
-        const allInactive = newCards.every(c => !c.active);
-        const maxFramesReached = frameRef.current >= MAX_FRAMES;
-
-        if ((allLaunched && allInactive || maxFramesReached) && !completedRef.current) {
-          completedRef.current = true;
-          setTimeout(() => {
-            onComplete();
-          }, 300);
+          continue;
         }
 
-        return newCards;
-      });
+        if (!card.active) continue;
+
+        hasActiveCards = true;
+
+        // Add to persistent trail every few frames
+        if (frameRef.current % TRAIL_INTERVAL === 0) {
+          trailsRef.current.push({
+            x: card.x,
+            y: card.y,
+            suit: SUIT_SYMBOLS[card.card.suit],
+            rank: card.card.rank,
+            color: SUIT_COLORS[card.card.suit],
+          });
+        }
+
+        // Update physics
+        card.vy += GRAVITY;
+        card.x += card.vx;
+        card.y += card.vy;
+
+        // Bounce off bottom
+        if (card.y > screenHeight - cardHeight) {
+          card.y = screenHeight - cardHeight;
+          card.vy = -Math.abs(card.vy) * BOUNCE_DAMPEN;
+        }
+
+        // Bounce off sides
+        if (card.x < 0) {
+          card.x = 0;
+          card.vx = Math.abs(card.vx) * 0.9;
+        } else if (card.x > screenWidth - cardWidth) {
+          card.x = screenWidth - cardWidth;
+          card.vx = -Math.abs(card.vx) * 0.9;
+        }
+
+        // Check if card energy is depleted
+        const totalEnergy = Math.abs(card.vx) + Math.abs(card.vy);
+        const atBottom = card.y >= screenHeight - cardHeight - 10;
+        if (totalEnergy < 2 && atBottom) {
+          card.active = false;
+          needsRerender = true;
+        }
+      }
+
+      // Draw new trails to buffer (incremental - only new ones!)
+      drawNewTrailsToBuffer();
+
+      // Copy buffer to visible canvas + draw active cards
+      const ctx = canvasRef.current?.getContext('2d');
+      if (ctx && bufferCanvasRef.current) {
+        // Clear and copy buffer (single drawImage is fast!)
+        ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+        ctx.drawImage(bufferCanvasRef.current, 0, 0);
+
+        // Draw active cards directly on main canvas (skip React for moving cards)
+        for (const card of cards) {
+          if (!card.launched || !card.active) continue;
+
+          const { width: cardW, height: cardH } = cardDimensionsRef.current;
+          const suitSymbol = SUIT_SYMBOLS[card.card.suit];
+          const textColor = SUIT_COLORS[card.card.suit] === 'red' ? '#c00000' : '#000000';
+
+          // Draw card background
+          ctx.fillStyle = '#ffffff';
+          roundRect(ctx, card.x, card.y, cardW, cardH, 4);
+          ctx.fill();
+
+          // Draw border (outset effect)
+          ctx.strokeStyle = '#dfdfdf';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.fillStyle = textColor;
+
+          // Draw corners
+          const cornerFontSize = Math.floor(cardH * 0.18);
+          ctx.font = `bold ${cornerFontSize}px VT323, monospace`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(card.card.rank, card.x + 4, card.y + 3);
+          ctx.fillText(suitSymbol, card.x + 4, card.y + 3 + cornerFontSize);
+
+          // Bottom-right corner
+          ctx.save();
+          ctx.translate(card.x + cardW - 4, card.y + cardH - 3);
+          ctx.rotate(Math.PI);
+          ctx.fillText(card.card.rank, 0, 0);
+          ctx.fillText(suitSymbol, 0, cornerFontSize);
+          ctx.restore();
+
+          // Center suit
+          ctx.font = `bold ${Math.floor(cardH * 0.35)}px VT323, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(suitSymbol, card.x + cardW / 2, card.y + cardH / 2);
+        }
+      }
+
+      // Check if animation is complete
+      const allLaunched = cards.every(c => c.launched);
+      const allInactive = !hasActiveCards && allLaunched;
+      const maxFramesReached = frameRef.current >= MAX_FRAMES;
+
+      if ((allInactive || maxFramesReached) && !completedRef.current) {
+        completedRef.current = true;
+        setTimeout(() => {
+          onComplete();
+        }, 300);
+      }
+
+      // Only trigger React re-render occasionally (for cleanup/completion)
+      if (needsRerender && frameRef.current - lastRenderTick > 10) {
+        lastRenderTick = frameRef.current;
+        setRenderTick(t => t + 1);
+      }
 
       animationRef.current = requestAnimationFrame(animate);
     };
@@ -304,30 +377,16 @@ export function WinAnimation({ foundations, onComplete }: WinAnimationProps) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [animatedCards.length, canvasSize, getCardDimensions, drawTrails, onComplete]);
+  }, [canvasSize, drawNewTrailsToBuffer, onComplete]);
 
   return (
     <div className="win-animation-overlay">
-      {/* Canvas for trail cards (performant!) */}
       <canvas
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
         className="win-animation-canvas"
       />
-      {/* Render only active moving cards as React components */}
-      {animatedCards.map((animCard) => {
-        if (!animCard.launched || !animCard.active) return null;
-
-        return (
-          <CascadeCard
-            key={`active-${animCard.card.id}`}
-            card={animCard.card}
-            x={animCard.x}
-            y={animCard.y}
-          />
-        );
-      })}
     </div>
   );
 }
