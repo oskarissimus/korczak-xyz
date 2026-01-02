@@ -66,7 +66,6 @@
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  flex-wrap: wrap;
 }
 
 .stock-waste-area {
@@ -123,7 +122,6 @@
   display: flex;
   gap: 10px;
   justify-content: center;
-  flex-wrap: wrap;
 }
 
 .tableau-column {
@@ -327,23 +325,43 @@
 }
 
 /* Responsive Styles */
-@media (max-width: 900px) {
+@media (max-width: 580px) {
+  .solitaire-game {
+    container-type: inline-size;
+  }
+
+  .solitaire-board {
+    /* Use container query units (cqw) to calculate based on .solitaire-game width */
+    /* At 580px: card=70px, gap=10px. Scale proportionally below. */
+    /* Formula: 7 cards + 6 gaps + 8px padding = 100cqw */
+    /* card_width = (100cqw - 8px) / 7.857 where 7.857 = 7 + 6*(10/70) */
+    --card-width: calc((100cqw - 8px) / 7.857);
+    --card-height: calc(var(--card-width) * 100 / 70);
+    --gap: calc(var(--card-width) * 10 / 70);
+    /* Font sizes: desktop is 1.2rem/1rem/2rem at 70px card. Scale proportionally. */
+    /* 1.2rem = 19.2px at 70px card, so ratio = 19.2/70 = 0.274 */
+    --font-rank: calc(var(--card-width) * 0.274);
+    --font-suit: calc(var(--card-width) * 0.229);
+    --font-suit-large: calc(var(--card-width) * 0.457);
+  }
+
+
   .solitaire-card,
   .card-placeholder {
-    width: 55px;
-    height: 80px;
+    width: var(--card-width);
+    height: var(--card-height);
   }
 
   .card-rank {
-    font-size: 1rem;
+    font-size: var(--font-rank);
   }
 
   .card-suit {
-    font-size: 0.8rem;
+    font-size: var(--font-suit);
   }
 
   .card-suit-large {
-    font-size: 1.5rem;
+    font-size: var(--font-suit-large);
   }
 
   .card-corner.top-left {
@@ -360,72 +378,25 @@
   .waste-pile,
   .foundation-pile,
   .tableau-column {
-    min-width: 55px;
-  }
-
-  .stock-pile,
-  .waste-pile {
-    width: 55px;
-    height: 80px;
-  }
-
-  .placeholder-suit {
-    font-size: 1.5rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .solitaire-card,
-  .card-placeholder {
-    width: clamp(42px, 10px + 8vw, 60px);
-    height: clamp(60px, 12px + 12vw, 86px);
-  }
-
-  .card-rank {
-    font-size: 0.85rem;
-  }
-
-  .card-suit {
-    font-size: 0.75rem;
-  }
-
-  .card-suit-large {
-    font-size: 1.3rem;
-  }
-
-  .card-corner.top-left {
-    top: 2px;
-    left: 3px;
-  }
-
-  .card-corner.bottom-right {
-    bottom: 2px;
-    right: 3px;
-  }
-
-  .stock-pile,
-  .waste-pile,
-  .foundation-pile,
-  .tableau-column {
-    min-width: clamp(42px, 10px + 8vw, 60px);
+    min-width: var(--card-width);
   }
 
   .stock-pile,
   .waste-pile,
   .foundation-pile {
-    width: clamp(42px, 10px + 8vw, 60px);
-    height: clamp(60px, 12px + 12vw, 86px);
+    width: var(--card-width);
+    height: var(--card-height);
   }
 
   .placeholder-suit {
-    font-size: 1.1rem;
+    font-size: var(--font-suit-large);
   }
 
   .solitaire-board {
     padding: 6px 4px;
-    gap: clamp(5px, -5px + 2.7vw, 12px);
+    gap: var(--gap);
     display: grid;
-    grid-template-columns: repeat(7, clamp(42px, 10px + 8vw, 60px));
+    grid-template-columns: repeat(7, var(--card-width));
     grid-template-rows: auto auto;
     align-items: start;
     justify-content: center;
@@ -445,16 +416,16 @@
     grid-column: 1 / 3;
     grid-row: 1;
     display: grid;
-    grid-template-columns: repeat(2, clamp(42px, 10px + 8vw, 60px));
-    gap: clamp(5px, -5px + 2.7vw, 12px);
+    grid-template-columns: repeat(2, var(--card-width));
+    gap: var(--gap);
   }
 
   .foundation-area {
     grid-column: 4 / 8;
     grid-row: 1;
     display: grid;
-    grid-template-columns: repeat(4, clamp(42px, 10px + 8vw, 60px));
-    gap: clamp(5px, -5px + 2.7vw, 12px);
+    grid-template-columns: repeat(4, var(--card-width));
+    gap: var(--gap);
     justify-self: end;
   }
 
@@ -462,8 +433,8 @@
     grid-column: 1 / -1;
     grid-row: 2;
     display: grid;
-    grid-template-columns: repeat(7, clamp(42px, 10px + 8vw, 60px));
-    gap: clamp(5px, -5px + 2.7vw, 12px);
+    grid-template-columns: repeat(7, var(--card-width));
+    gap: var(--gap);
     justify-content: center;
   }
 
@@ -591,51 +562,22 @@
 }
 
 /* Responsive cascade cards */
-@media (max-width: 900px) {
+@media (max-width: 580px) {
   .cascade-card {
-    width: 55px;
-    height: 80px;
+    width: var(--card-width);
+    height: var(--card-height);
   }
 
   .cascade-card .card-rank {
-    font-size: 1rem;
+    font-size: var(--font-rank);
   }
 
   .cascade-card .card-suit {
-    font-size: 0.8rem;
+    font-size: var(--font-suit);
   }
 
   .cascade-card .card-suit-large {
-    font-size: 1.5rem;
-  }
-
-  .cascade-card .card-corner.top-left {
-    top: 2px;
-    left: 3px;
-  }
-
-  .cascade-card .card-corner.bottom-right {
-    bottom: 2px;
-    right: 3px;
-  }
-}
-
-@media (max-width: 600px) {
-  .cascade-card {
-    width: clamp(42px, 10px + 8vw, 60px);
-    height: clamp(60px, 12px + 12vw, 86px);
-  }
-
-  .cascade-card .card-rank {
-    font-size: 0.85rem;
-  }
-
-  .cascade-card .card-suit {
-    font-size: 0.75rem;
-  }
-
-  .cascade-card .card-suit-large {
-    font-size: 1.3rem;
+    font-size: var(--font-suit-large);
   }
 
   .cascade-card .card-corner.top-left {
