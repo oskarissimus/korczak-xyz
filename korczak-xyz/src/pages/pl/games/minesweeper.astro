@@ -1,0 +1,36 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Minesweeper from '../../../components/Minesweeper/Minesweeper';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/minesweeper.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Minesweeper')} | korczak.xyz`} lang={lang}>
+  <div class="window minesweeper-window">
+    <div class="title-bar">
+      <span>{t('Minesweeper')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content minesweeper-content">
+      <Minesweeper client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .minesweeper-window {
+    margin-bottom: 20px;
+  }
+
+  .minesweeper-content {
+    padding: 0;
+    background: var(--retro-gray);
+  }
+</style>

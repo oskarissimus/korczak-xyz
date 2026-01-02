@@ -93,6 +93,18 @@ export const ui = {
     'solitaire.youWin': 'You Win!',
     'solitaire.playAgain': 'Play Again',
     'solitaire.time': 'Time',
+
+    // Minesweeper
+    'Minesweeper': 'Minesweeper',
+    'minesweeper.classicPuzzle': 'Classic Puzzle',
+    'minesweeper.newGame': 'New Game',
+    'minesweeper.beginner': 'Beginner',
+    'minesweeper.intermediate': 'Intermediate',
+    'minesweeper.expert': 'Expert',
+    'minesweeper.mines': 'Mines',
+    'minesweeper.time': 'Time',
+    'minesweeper.youWin': 'You Win!',
+    'minesweeper.gameOver': 'Game Over!',
   },
   pl: {
     // Navigation
@@ -179,6 +191,18 @@ export const ui = {
     'solitaire.youWin': 'Wygrales!',
     'solitaire.playAgain': 'Zagraj Ponownie',
     'solitaire.time': 'Czas',
+
+    // Minesweeper
+    'Minesweeper': 'Saper',
+    'minesweeper.classicPuzzle': 'Klasyczna Zagadka',
+    'minesweeper.newGame': 'Nowa Gra',
+    'minesweeper.beginner': 'Poczatkujacy',
+    'minesweeper.intermediate': 'Sredni',
+    'minesweeper.expert': 'Ekspert',
+    'minesweeper.mines': 'Miny',
+    'minesweeper.time': 'Czas',
+    'minesweeper.youWin': 'Wygrales!',
+    'minesweeper.gameOver': 'Koniec Gry!',
   },
 } as const;
 
