@@ -426,20 +426,20 @@
   }
 
   .top-row {
-    gap: 8px;
+    gap: 4px;
     justify-content: space-between;
   }
 
   .stock-waste-area {
-    gap: 4px;
+    gap: 2px;
   }
 
   .foundation-area {
-    gap: 3px;
+    gap: 2px;
   }
 
   .tableau-area {
-    gap: 3px;
+    gap: 2px;
   }
 
   .game-controls {
