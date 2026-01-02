@@ -337,7 +337,7 @@
     /* card_width = (100cqw - 8px) / 7.857 where 7.857 = 7 + 6*(10/70) */
     --card-width: calc((100cqw - 8px) / 7.857);
     --card-height: calc(var(--card-width) * 100 / 70);
-    --gap: calc(var(--card-width) * 10 / 70);
+    --gap: calc(4px + (100cqw - 320px) * 6 / 260);
     /* Font sizes: desktop is 1.2rem/1rem/2rem at 70px card. Scale proportionally. */
     /* 1.2rem = 19.2px at 70px card, so ratio = 19.2/70 = 0.274 */
     --font-rank: calc(var(--card-width) * 0.274);
