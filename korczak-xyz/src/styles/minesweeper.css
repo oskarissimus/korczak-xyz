@@ -1,0 +1,245 @@
+/* Minesweeper Game Styles - Windows 95 Theme */
+
+.minesweeper-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  background: var(--retro-gray);
+  min-height: 400px;
+}
+
+/* Controls Section */
+.minesweeper-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.minesweeper-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.stat-box {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--retro-black);
+  color: var(--retro-red);
+  padding: 5px 10px;
+  border: 2px inset var(--retro-dark-gray);
+  font-family: 'VT323', monospace;
+  font-size: 1.5rem;
+  min-width: 80px;
+}
+
+.stat-icon {
+  font-size: 1.2rem;
+}
+
+.stat-value {
+  font-family: 'VT323', monospace;
+  letter-spacing: 2px;
+}
+
+.smiley-btn {
+  font-size: 2rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+  padding: 0;
+}
+
+.smiley-btn:hover {
+  background: #a0a0a0;
+}
+
+.smiley-btn:active {
+  border-style: inset;
+}
+
+/* Difficulty Selector */
+.difficulty-selector {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.difficulty-btn {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  padding: 5px 15px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.difficulty-btn:hover {
+  background: #a0a0a0;
+}
+
+.difficulty-btn.active {
+  border-style: inset;
+  background: #a0a0a0;
+}
+
+/* Board Container */
+.minesweeper-board-container {
+  border: 3px inset var(--retro-dark-gray);
+  background: var(--retro-gray);
+  padding: 5px;
+  overflow: auto;
+  max-width: 100%;
+}
+
+/* Board Grid */
+.minesweeper-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.minesweeper-row {
+  display: flex;
+  gap: 0;
+}
+
+/* Individual Cells */
+.minesweeper-cell {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.minesweeper-cell.hidden {
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+}
+
+.minesweeper-cell.hidden:hover {
+  background: #b0b0b0;
+}
+
+.minesweeper-cell.hidden:active {
+  border-style: inset;
+}
+
+.minesweeper-cell.revealed {
+  background: #c0c0c0;
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.minesweeper-cell.exploded {
+  background: var(--retro-red);
+}
+
+.minesweeper-cell:disabled {
+  cursor: default;
+}
+
+/* Game Messages */
+.game-message {
+  margin-top: 15px;
+  padding: 10px 20px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 1rem;
+  text-align: center;
+  border: 3px outset var(--retro-white);
+}
+
+.win-message {
+  background: var(--retro-green);
+  color: var(--retro-black);
+}
+
+.lose-message {
+  background: var(--retro-red);
+  color: var(--retro-white);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .minesweeper-cell {
+    width: 24px;
+    height: 24px;
+    font-size: 1rem;
+  }
+
+  .stat-box {
+    font-size: 1.2rem;
+    padding: 4px 8px;
+    min-width: 60px;
+  }
+
+  .smiley-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+
+  .difficulty-btn {
+    font-size: 0.9rem;
+    padding: 4px 10px;
+  }
+
+  .game-message {
+    font-size: 0.8rem;
+    padding: 8px 15px;
+  }
+}
+
+@media (max-width: 400px) {
+  .minesweeper-cell {
+    width: 20px;
+    height: 20px;
+    font-size: 0.9rem;
+    border-width: 2px;
+  }
+
+  .minesweeper-stats {
+    gap: 10px;
+  }
+
+  .stat-box {
+    font-size: 1rem;
+    padding: 3px 6px;
+    min-width: 50px;
+  }
+
+  .smiley-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 1.3rem;
+  }
+
+  .difficulty-selector {
+    gap: 3px;
+  }
+
+  .difficulty-btn {
+    font-size: 0.8rem;
+    padding: 3px 8px;
+  }
+}
