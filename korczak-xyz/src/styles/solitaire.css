@@ -464,6 +464,66 @@
   }
 }
 
+/* Extra small screens (iPhone SE, etc.) */
+@media (max-width: 400px) {
+  .solitaire-card,
+  .card-placeholder {
+    width: 42px;
+    height: 60px;
+  }
+
+  .stock-pile,
+  .waste-pile {
+    width: 42px;
+    height: 60px;
+  }
+
+  .stock-pile,
+  .waste-pile,
+  .foundation-pile,
+  .tableau-column {
+    min-width: 42px;
+  }
+
+  .solitaire-board {
+    padding: 4px 2px;
+  }
+
+  .top-row {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .stock-waste-area {
+    gap: 2px;
+  }
+
+  .foundation-area {
+    gap: 2px;
+  }
+
+  .tableau-area {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .card-rank {
+    font-size: 0.75rem;
+  }
+
+  .card-suit {
+    font-size: 0.65rem;
+  }
+
+  .card-suit-large {
+    font-size: 1.1rem;
+  }
+
+  .placeholder-suit {
+    font-size: 0.9rem;
+  }
+}
+
 /* Dragging states */
 .solitaire-card[draggable="true"] {
   cursor: grab;
