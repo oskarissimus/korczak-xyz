@@ -343,6 +343,7 @@
     --font-rank: calc(var(--card-width) * 0.274);
     --font-suit: calc(var(--card-width) * 0.229);
     --font-suit-large: calc(var(--card-width) * 0.457);
+    --border-width: calc(var(--card-width) * 3 / 70);
   }
 
 
@@ -350,6 +351,11 @@
   .card-placeholder {
     width: var(--card-width);
     height: var(--card-height);
+    border-width: var(--border-width);
+  }
+
+  .solitaire-card.selected {
+    box-shadow: 0 0 0 var(--border-width) var(--retro-yellow);
   }
 
   .card-rank {
@@ -462,6 +468,7 @@
     left: 2px;
     right: 2px;
     bottom: 2px;
+    border-width: calc(var(--card-width) * 2 / 70);
   }
 }
 
