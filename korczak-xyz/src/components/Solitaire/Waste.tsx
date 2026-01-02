@@ -7,7 +7,9 @@ interface WasteProps {
   onCardClick: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: (e: React.DragEvent) => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
   selectedCard: boolean;
+  isTouchDragging?: boolean;
 }
 
 export function Waste({
@@ -15,7 +17,9 @@ export function Waste({
   onCardClick,
   onDragStart,
   onDragEnd,
+  onTouchStart,
   selectedCard,
+  isTouchDragging,
 }: WasteProps) {
   if (cards.length === 0) {
     return (
@@ -35,8 +39,10 @@ export function Waste({
         onClick={onCardClick}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
+        onTouchStart={onTouchStart}
         selected={selectedCard}
         draggable={true}
+        isTouchDragging={isTouchDragging}
       />
     </div>
   );

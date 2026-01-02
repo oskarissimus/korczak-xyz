@@ -12,10 +12,12 @@ interface CardStackProps {
   onDragEnd?: (e: React.DragEvent) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
+  onTouchStart?: (e: React.TouchEvent, cardIndex: number) => void;
   selectedCardIndex?: number;
   draggableFromIndex?: number;
   placeholderSuit?: string;
   highlight?: boolean;
+  touchDraggingIndex?: number;
 }
 
 export function CardStack({
@@ -28,10 +30,12 @@ export function CardStack({
   onDragEnd,
   onDragOver,
   onDrop,
+  onTouchStart,
   selectedCardIndex,
   draggableFromIndex,
   placeholderSuit,
   highlight = false,
+  touchDraggingIndex,
 }: CardStackProps) {
   if (cards.length === 0) {
     return (
@@ -89,6 +93,8 @@ export function CardStack({
           draggableFromIndex !== undefined &&
           index >= draggableFromIndex;
 
+        const isTouchDragging = touchDraggingIndex !== undefined && index >= touchDraggingIndex;
+
         return (
           <Card
             key={card.id}
@@ -96,8 +102,10 @@ export function CardStack({
             onClick={() => onCardClick?.(index)}
             onDragStart={(e) => onDragStart?.(e, index)}
             onDragEnd={onDragEnd}
+            onTouchStart={isDraggable ? (e) => onTouchStart?.(e, index) : undefined}
             selected={selectedCardIndex !== undefined && index >= selectedCardIndex}
             draggable={isDraggable}
+            isTouchDragging={isTouchDragging}
             style={style}
           />
         );

@@ -7,8 +7,10 @@ interface CardProps {
   onClick?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
   selected?: boolean;
   draggable?: boolean;
+  isTouchDragging?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -17,8 +19,10 @@ export function Card({
   onClick,
   onDragStart,
   onDragEnd,
+  onTouchStart,
   selected = false,
   draggable = false,
+  isTouchDragging = false,
   style,
 }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
@@ -38,11 +42,12 @@ export function Card({
 
   return (
     <div
-      className={`solitaire-card face-up ${suitColor} ${selected ? 'selected' : ''}`}
+      className={`solitaire-card face-up ${suitColor} ${selected ? 'selected' : ''} ${isTouchDragging ? 'touch-dragging' : ''}`}
       onClick={onClick}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onTouchStart={onTouchStart}
       style={style}
     >
       <div className="card-corner top-left">

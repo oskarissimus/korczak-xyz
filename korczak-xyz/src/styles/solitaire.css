@@ -4,6 +4,9 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Game Controls */
@@ -55,6 +58,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  touch-action: pan-y;
 }
 
 /* Top Row: Stock, Waste, and Foundations */
@@ -373,73 +377,73 @@
 @media (max-width: 600px) {
   .solitaire-card,
   .card-placeholder {
-    width: 42px;
-    height: 60px;
+    width: 46px;
+    height: 66px;
   }
 
   .card-rank {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .card-suit {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
   }
 
   .card-suit-large {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
   }
 
   .card-corner.top-left {
-    top: 1px;
-    left: 2px;
+    top: 2px;
+    left: 3px;
   }
 
   .card-corner.bottom-right {
-    bottom: 1px;
-    right: 2px;
+    bottom: 2px;
+    right: 3px;
   }
 
   .stock-pile,
   .waste-pile,
   .foundation-pile,
   .tableau-column {
-    min-width: 42px;
+    min-width: 46px;
   }
 
   .stock-pile,
   .waste-pile {
-    width: 42px;
-    height: 60px;
+    width: 46px;
+    height: 66px;
   }
 
   .placeholder-suit {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
 
   .solitaire-board {
-    padding: 8px;
-    gap: 15px;
+    padding: 6px 4px;
+    gap: 12px;
   }
 
   .top-row {
-    gap: 10px;
-    justify-content: center;
+    gap: 8px;
+    justify-content: space-between;
   }
 
   .stock-waste-area {
-    gap: 5px;
+    gap: 4px;
   }
 
   .foundation-area {
-    gap: 5px;
+    gap: 3px;
   }
 
   .tableau-area {
-    gap: 5px;
+    gap: 3px;
   }
 
   .game-controls {
-    padding: 8px;
+    padding: 6px;
   }
 
   .controls-left .retro-btn {
@@ -588,29 +592,58 @@
 
 @media (max-width: 600px) {
   .cascade-card {
-    width: 42px;
-    height: 60px;
+    width: 46px;
+    height: 66px;
   }
 
   .cascade-card .card-rank {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .cascade-card .card-suit {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
   }
 
   .cascade-card .card-suit-large {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
   }
 
   .cascade-card .card-corner.top-left {
-    top: 1px;
-    left: 2px;
+    top: 2px;
+    left: 3px;
   }
 
   .cascade-card .card-corner.bottom-right {
-    bottom: 1px;
-    right: 2px;
+    bottom: 2px;
+    right: 3px;
   }
+}
+
+/* Touch drag styles */
+.solitaire-card.touch-dragging {
+  opacity: 0.4;
+}
+
+.drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  touch-action: none;
+}
+
+.drag-preview .solitaire-card {
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Valid drop target highlight */
+.tableau-column.valid-drop-target,
+.foundation-pile.valid-drop-target {
+  background: rgba(0, 255, 255, 0.15);
+  box-shadow: inset 0 0 0 3px var(--retro-cyan);
+  border-radius: 4px;
+}
+
+.card-stack.valid-drop-target > .card-placeholder {
+  border-color: var(--retro-cyan);
+  box-shadow: 0 0 8px var(--retro-cyan);
 }

@@ -9,9 +9,12 @@ interface TableauProps {
   onDragEnd: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (columnIndex: number) => void;
+  onTouchStart?: (e: React.TouchEvent, columnIndex: number, cardIndex: number) => void;
   selectedColumn?: number;
   selectedCardIndex?: number;
   highlightColumn?: number;
+  touchDraggingColumn?: number;
+  touchDraggingCardIndex?: number;
 }
 
 export function Tableau({
@@ -21,9 +24,12 @@ export function Tableau({
   onDragEnd,
   onDragOver,
   onDrop,
+  onTouchStart,
   selectedColumn,
   selectedCardIndex,
   highlightColumn,
+  touchDraggingColumn,
+  touchDraggingCardIndex,
 }: TableauProps) {
   return (
     <div className="tableau-area">
@@ -35,6 +41,8 @@ export function Tableau({
           <div
             key={columnIndex}
             className={`tableau-column ${highlightColumn === columnIndex ? 'highlight' : ''}`}
+            data-drop-zone="tableau"
+            data-column-index={columnIndex}
             onDragOver={onDragOver}
             onDrop={(e) => {
               e.preventDefault();
@@ -49,9 +57,11 @@ export function Tableau({
               onCardClick={(cardIndex) => onCardClick(columnIndex, cardIndex)}
               onDragStart={(e, cardIndex) => onDragStart(e, columnIndex, cardIndex)}
               onDragEnd={onDragEnd}
+              onTouchStart={(e, cardIndex) => onTouchStart?.(e, columnIndex, cardIndex)}
               selectedCardIndex={selectedColumn === columnIndex ? selectedCardIndex : undefined}
               draggableFromIndex={firstFaceUpIndex >= 0 ? firstFaceUpIndex : undefined}
               highlight={highlightColumn === columnIndex}
+              touchDraggingIndex={touchDraggingColumn === columnIndex ? touchDraggingCardIndex : undefined}
             />
           </div>
         );

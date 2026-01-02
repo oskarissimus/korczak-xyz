@@ -23,6 +23,8 @@ export function Foundation({ piles, onDrop, onDragOver, highlightIndex }: Founda
           <div
             key={index}
             className={`foundation-pile ${highlightIndex === index ? 'highlight' : ''}`}
+            data-drop-zone="foundation"
+            data-foundation-index={index}
             onDragOver={onDragOver}
             onDrop={(e) => {
               e.preventDefault();

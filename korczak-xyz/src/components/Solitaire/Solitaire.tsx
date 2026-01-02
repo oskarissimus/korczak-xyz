@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameControls } from './GameControls';
 import { Stock } from './Stock';
 import { Waste } from './Waste';
@@ -6,9 +6,21 @@ import { Foundation } from './Foundation';
 import { Tableau } from './Tableau';
 import { WinDialog } from './WinDialog';
 import { WinAnimation } from './WinAnimation';
+import { DragPreview } from './DragPreview';
 import { dealCards } from '../../utils/solitaire/deck';
 import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit } from '../../utils/solitaire/rules';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
+
+interface TouchDragState {
+  sourceLocation: Location;
+  cards: Card[];
+  startPosition: { x: number; y: number };
+  currentPosition: { x: number; y: number };
+  offset: { x: number; y: number };
+  isDragging: boolean;
+}
+
+const DRAG_THRESHOLD = 10; // pixels to move before considered a drag
 
 interface SolitaireProps {
   lang: 'en' | 'pl';
@@ -43,6 +55,9 @@ export default function Solitaire({ lang }: SolitaireProps) {
   const [history, setHistory] = useState<GameState[]>([]);
   const [showWinAnimation, setShowWinAnimation] = useState(false);
   const [showWinDialog, setShowWinDialog] = useState(false);
+  const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
+  const [highlightedDropTarget, setHighlightedDropTarget] = useState<Location | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   // Timer effect
   useEffect(() => {
@@ -308,6 +323,159 @@ export default function Solitaire({ lang }: SolitaireProps) {
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Touch event handlers
+  const getCardsFromLocation = useCallback((location: Location): Card[] => {
+    if (location.zone === 'waste') {
+      if (gameState.waste.length === 0) return [];
+      return [gameState.waste[gameState.waste.length - 1]];
+    }
+    if (location.zone === 'tableau' && location.index !== undefined && location.cardIndex !== undefined) {
+      const column = gameState.tableau[location.index];
+      return column.slice(location.cardIndex);
+    }
+    return [];
+  }, [gameState]);
+
+  const findDropTarget = useCallback((x: number, y: number): Location | null => {
+    const element = document.elementFromPoint(x, y);
+    if (!element) return null;
+
+    const dropZone = element.closest('[data-drop-zone]');
+    if (!dropZone) return null;
+
+    const zone = dropZone.getAttribute('data-drop-zone');
+
+    if (zone === 'tableau') {
+      const indexStr = dropZone.getAttribute('data-column-index');
+      const index = indexStr ? parseInt(indexStr, 10) : NaN;
+      if (!isNaN(index)) {
+        return { zone: 'tableau', index };
+      }
+    }
+
+    if (zone === 'foundation') {
+      const indexStr = dropZone.getAttribute('data-foundation-index');
+      const index = indexStr ? parseInt(indexStr, 10) : NaN;
+      if (!isNaN(index)) {
+        return { zone: 'foundation', index };
+      }
+    }
+
+    return null;
+  }, []);
+
+  const isValidDropTarget = useCallback((cards: Card[], target: Location): boolean => {
+    if (target.zone === 'tableau' && target.index !== undefined) {
+      return canPlaceOnTableau(cards, gameState.tableau[target.index]);
+    }
+    if (target.zone === 'foundation' && target.index !== undefined && cards.length === 1) {
+      return canPlaceOnFoundation(cards[0], gameState.foundations[target.index], target.index);
+    }
+    return false;
+  }, [gameState]);
+
+  const handleTouchStartWaste = useCallback((e: React.TouchEvent) => {
+    if (gameState.waste.length === 0) return;
+
+    const touch = e.touches[0];
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const cards = [gameState.waste[gameState.waste.length - 1]];
+
+    setTouchDrag({
+      sourceLocation: { zone: 'waste' },
+      cards,
+      startPosition: { x: touch.clientX, y: touch.clientY },
+      currentPosition: { x: touch.clientX, y: touch.clientY },
+      offset: { x: touch.clientX - rect.left, y: touch.clientY - rect.top },
+      isDragging: false,
+    });
+  }, [gameState.waste]);
+
+  const handleTouchStartTableau = useCallback((e: React.TouchEvent, columnIndex: number, cardIndex: number) => {
+    const column = gameState.tableau[columnIndex];
+    const card = column[cardIndex];
+    if (!card.faceUp) return;
+
+    const touch = e.touches[0];
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const cards = column.slice(cardIndex);
+
+    setTouchDrag({
+      sourceLocation: { zone: 'tableau', index: columnIndex, cardIndex },
+      cards,
+      startPosition: { x: touch.clientX, y: touch.clientY },
+      currentPosition: { x: touch.clientX, y: touch.clientY },
+      offset: { x: touch.clientX - rect.left, y: touch.clientY - rect.top },
+      isDragging: false,
+    });
+  }, [gameState.tableau]);
+
+  // Global touch move/end handlers
+  useEffect(() => {
+    if (!touchDrag) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchDrag.startPosition.x;
+      const dy = touch.clientY - touchDrag.startPosition.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      const newDragState = {
+        ...touchDrag,
+        currentPosition: { x: touch.clientX, y: touch.clientY },
+        isDragging: touchDrag.isDragging || distance >= DRAG_THRESHOLD,
+      };
+      setTouchDrag(newDragState);
+
+      // Only prevent scroll and update highlight if we're dragging
+      if (newDragState.isDragging) {
+        e.preventDefault();
+        const target = findDropTarget(touch.clientX, touch.clientY);
+        if (target && isValidDropTarget(touchDrag.cards, target)) {
+          setHighlightedDropTarget(target);
+        } else {
+          setHighlightedDropTarget(null);
+        }
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const touch = e.changedTouches[0];
+
+      if (touchDrag.isDragging) {
+        // This was a drag - try to drop
+        e.preventDefault();
+        const target = findDropTarget(touch.clientX, touch.clientY);
+
+        if (target && isValidDropTarget(touchDrag.cards, target)) {
+          saveToHistory(gameState);
+          setGameState(prev => {
+            let state = startGameIfNeeded(prev);
+            state = moveCards(state, touchDrag.sourceLocation, target);
+            if (target.zone === 'foundation' && checkWin(state.foundations)) {
+              state.gameWon = true;
+            }
+            return state;
+          });
+        }
+
+        setSelectedLocation(null);
+      }
+      // If not dragging, let the click handler handle it
+
+      setTouchDrag(null);
+      setHighlightedDropTarget(null);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [touchDrag, findDropTarget, isValidDropTarget, gameState, saveToHistory, startGameIfNeeded]);
+
   const getSelectedCards = useCallback((): Card[] | null => {
     if (!selectedLocation) return null;
 
@@ -405,7 +573,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
         translations={t}
       />
 
-      <div className="solitaire-board">
+      <div className="solitaire-board" ref={boardRef}>
         <div className="top-row">
           <div className="stock-waste-area">
             <Stock cards={gameState.stock} onClick={handleStockClick} />
@@ -414,7 +582,9 @@ export default function Solitaire({ lang }: SolitaireProps) {
               onCardClick={handleWasteClick}
               onDragStart={(e) => handleDragStart(e, { zone: 'waste' })}
               onDragEnd={handleDragEnd}
+              onTouchStart={handleTouchStartWaste}
               selectedCard={selectedLocation?.zone === 'waste'}
+              isTouchDragging={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'waste'}
             />
           </div>
 
@@ -422,6 +592,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
             piles={gameState.foundations}
             onDrop={handleFoundationDrop}
             onDragOver={handleDragOver}
+            highlightIndex={highlightedDropTarget?.zone === 'foundation' ? highlightedDropTarget.index : undefined}
           />
         </div>
 
@@ -434,10 +605,22 @@ export default function Solitaire({ lang }: SolitaireProps) {
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
           onDrop={handleTableauDrop}
+          onTouchStart={handleTouchStartTableau}
           selectedColumn={selectedLocation?.zone === 'tableau' ? selectedLocation.index : undefined}
           selectedCardIndex={selectedLocation?.zone === 'tableau' ? selectedLocation.cardIndex : undefined}
+          highlightColumn={highlightedDropTarget?.zone === 'tableau' ? highlightedDropTarget.index : undefined}
+          touchDraggingColumn={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'tableau' ? touchDrag.sourceLocation.index : undefined}
+          touchDraggingCardIndex={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'tableau' ? touchDrag.sourceLocation.cardIndex : undefined}
         />
       </div>
+
+      {touchDrag?.isDragging && (
+        <DragPreview
+          cards={touchDrag.cards}
+          position={touchDrag.currentPosition}
+          offset={touchDrag.offset}
+        />
+      )}
 
       {showWinAnimation && (
         <WinAnimation
