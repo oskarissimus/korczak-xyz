@@ -105,6 +105,8 @@ export const ui = {
     'minesweeper.time': 'Time',
     'minesweeper.youWin': 'You Win!',
     'minesweeper.gameOver': 'Game Over!',
+    'minesweeper.flagMode': 'Flag Mode',
+    'minesweeper.digMode': 'Dig Mode',
   },
   pl: {
     // Navigation
@@ -203,6 +205,8 @@ export const ui = {
     'minesweeper.time': 'Czas',
     'minesweeper.youWin': 'Wygrales!',
     'minesweeper.gameOver': 'Koniec Gry!',
+    'minesweeper.flagMode': 'Tryb Flagi',
+    'minesweeper.digMode': 'Tryb Kopania',
   },
 } as const;
 

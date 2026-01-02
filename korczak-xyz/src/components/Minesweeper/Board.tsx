@@ -6,9 +6,10 @@ interface BoardProps {
   gameOver: boolean;
   onReveal: (row: number, col: number) => void;
   onFlag: (row: number, col: number) => void;
+  flagMode: boolean;
 }
 
-export default function Board({ board, gameOver, onReveal, onFlag }: BoardProps) {
+export default function Board({ board, gameOver, onReveal, onFlag, flagMode }: BoardProps) {
   return (
     <div className="minesweeper-board">
       {board.map((row, rowIndex) => (
@@ -20,6 +21,7 @@ export default function Board({ board, gameOver, onReveal, onFlag }: BoardProps)
               gameOver={gameOver}
               onReveal={onReveal}
               onFlag={onFlag}
+              flagMode={flagMode}
             />
           ))}
         </div>

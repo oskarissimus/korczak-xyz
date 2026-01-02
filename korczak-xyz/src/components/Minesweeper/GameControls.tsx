@@ -7,6 +7,8 @@ interface GameControlsProps {
   elapsedTime: number;
   onNewGame: () => void;
   onChangeDifficulty: (difficulty: Difficulty) => void;
+  flagMode: boolean;
+  onToggleFlagMode: () => void;
   t: (key: string) => string;
 }
 
@@ -23,6 +25,8 @@ export default function GameControls({
   elapsedTime,
   onNewGame,
   onChangeDifficulty,
+  flagMode,
+  onToggleFlagMode,
   t,
 }: GameControlsProps) {
   const getSmiley = () => {
@@ -46,6 +50,14 @@ export default function GameControls({
 
         <button className="smiley-btn" onClick={onNewGame} title={t('minesweeper.newGame')}>
           {getSmiley()}
+        </button>
+
+        <button
+          className={`flag-mode-btn ${flagMode ? 'active' : ''}`}
+          onClick={onToggleFlagMode}
+          title={flagMode ? t('minesweeper.digMode') : t('minesweeper.flagMode')}
+        >
+          {flagMode ? '\u{1F6A9}' : '\u{26CF}'}
         </button>
 
         <div className="stat-box timer">

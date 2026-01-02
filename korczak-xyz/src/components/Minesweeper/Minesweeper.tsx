@@ -22,6 +22,7 @@ interface MinesweeperProps {
 export default function Minesweeper({ lang }: MinesweeperProps) {
   const t = useTranslations(lang);
 
+  const [flagMode, setFlagMode] = useState(false);
   const [gameState, setGameState] = useState<GameState>(() => {
     const { board } = initializeGame('beginner');
     return {
@@ -147,6 +148,8 @@ export default function Minesweeper({ lang }: MinesweeperProps) {
         elapsedTime={gameState.elapsedTime}
         onNewGame={() => startNewGame()}
         onChangeDifficulty={handleChangeDifficulty}
+        flagMode={flagMode}
+        onToggleFlagMode={() => setFlagMode(f => !f)}
         t={t}
       />
 
@@ -156,6 +159,7 @@ export default function Minesweeper({ lang }: MinesweeperProps) {
           gameOver={gameOver}
           onReveal={handleReveal}
           onFlag={handleFlag}
+          flagMode={flagMode}
         />
       </div>
 

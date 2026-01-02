@@ -5,6 +5,7 @@ interface CellProps {
   gameOver: boolean;
   onReveal: (row: number, col: number) => void;
   onFlag: (row: number, col: number) => void;
+  flagMode: boolean;
 }
 
 const NUMBER_COLORS: Record<number, string> = {
@@ -18,9 +19,16 @@ const NUMBER_COLORS: Record<number, string> = {
   8: '#808080', // gray
 };
 
-export default function Cell({ cell, gameOver, onReveal, onFlag }: CellProps) {
+export default function Cell({ cell, gameOver, onReveal, onFlag, flagMode }: CellProps) {
   const handleClick = () => {
-    if (gameOver || cell.state === 'flagged') return;
+    if (gameOver) return;
+    if (flagMode) {
+      if (cell.state !== 'revealed') {
+        onFlag(cell.row, cell.col);
+      }
+      return;
+    }
+    if (cell.state === 'flagged') return;
     onReveal(cell.row, cell.col);
   };
 
