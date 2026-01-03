@@ -5,6 +5,7 @@ import type { Card as CardType } from '../../utils/solitaire/types';
 interface TableauProps {
   columns: [CardType[], CardType[], CardType[], CardType[], CardType[], CardType[], CardType[]];
   onCardClick: (columnIndex: number, cardIndex: number) => void;
+  onEmptyClick?: (columnIndex: number) => void;
   onDragStart: (e: React.DragEvent, columnIndex: number, cardIndex: number) => void;
   onDragEnd: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -20,6 +21,7 @@ interface TableauProps {
 export function Tableau({
   columns,
   onCardClick,
+  onEmptyClick,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -48,6 +50,7 @@ export function Tableau({
               e.preventDefault();
               onDrop(columnIndex);
             }}
+            onClick={() => column.length === 0 && onEmptyClick?.(columnIndex)}
           >
             <CardStack
               cards={column}

@@ -544,7 +544,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
     return newState;
   };
 
-  // Handle clicking on empty tableau column or foundation
+  // Handle clicking on empty tableau column
   const handleEmptyTableauClick = useCallback((columnIndex: number) => {
     if (!selectedLocation) return;
 
@@ -557,6 +557,28 @@ export default function Solitaire({ lang }: SolitaireProps) {
       setGameState(prev => {
         const state = startGameIfNeeded(prev);
         return moveCards(state, selectedLocation, { zone: 'tableau', index: columnIndex });
+      });
+      setSelectedLocation(null);
+    }
+  }, [selectedLocation, getSelectedCards, gameState, startGameIfNeeded, saveToHistory]);
+
+  // Handle clicking on foundation pile to move selected card there
+  const handleFoundationClick = useCallback((foundationIndex: number) => {
+    if (!selectedLocation) return;
+
+    const cardsToMove = getSelectedCards();
+    if (!cardsToMove || cardsToMove.length !== 1) return;
+
+    const card = cardsToMove[0];
+    if (canPlaceOnFoundation(card, gameState.foundations[foundationIndex], foundationIndex)) {
+      saveToHistory(gameState);
+      setGameState(prev => {
+        let state = startGameIfNeeded(prev);
+        state = moveCards(state, selectedLocation, { zone: 'foundation', index: foundationIndex });
+        if (checkWin(state.foundations)) {
+          state.gameWon = true;
+        }
+        return state;
       });
       setSelectedLocation(null);
     }
@@ -592,6 +614,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
             piles={gameState.foundations}
             onDrop={handleFoundationDrop}
             onDragOver={handleDragOver}
+            onClick={handleFoundationClick}
             highlightIndex={highlightedDropTarget?.zone === 'foundation' ? highlightedDropTarget.index : undefined}
           />
         </div>
@@ -599,6 +622,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
         <Tableau
           columns={gameState.tableau}
           onCardClick={handleTableauCardClick}
+          onEmptyClick={handleEmptyTableauClick}
           onDragStart={(e, columnIndex, cardIndex) =>
             handleDragStart(e, { zone: 'tableau', index: columnIndex, cardIndex })
           }

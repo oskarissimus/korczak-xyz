@@ -7,12 +7,13 @@ interface FoundationProps {
   piles: [CardType[], CardType[], CardType[], CardType[]];
   onDrop: (foundationIndex: number) => void;
   onDragOver: (e: React.DragEvent) => void;
+  onClick?: (foundationIndex: number) => void;
   highlightIndex?: number;
 }
 
 const FOUNDATION_SUITS = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
 
-export function Foundation({ piles, onDrop, onDragOver, highlightIndex }: FoundationProps) {
+export function Foundation({ piles, onDrop, onDragOver, onClick, highlightIndex }: FoundationProps) {
   return (
     <div className="foundation-area">
       {piles.map((pile, index) => {
@@ -30,6 +31,7 @@ export function Foundation({ piles, onDrop, onDragOver, highlightIndex }: Founda
               e.preventDefault();
               onDrop(index);
             }}
+            onClick={() => onClick?.(index)}
           >
             {topCard ? (
               <Card card={{ ...topCard, faceUp: true }} />
