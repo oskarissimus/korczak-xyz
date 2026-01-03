@@ -344,6 +344,7 @@
     --font-suit: calc(var(--card-width) * 0.229);
     --font-suit-large: calc(var(--card-width) * 0.457);
     --border-width: calc(var(--card-width) * 3 / 70);
+    --border-radius: calc(var(--card-width) * 4 / 70);
   }
 
 
@@ -352,6 +353,7 @@
     width: var(--card-width);
     height: var(--card-height);
     border-width: var(--border-width);
+    border-radius: var(--border-radius);
   }
 
   .solitaire-card.selected {
@@ -485,7 +487,7 @@
 .tableau-column.highlight,
 .foundation-pile.highlight {
   background: rgba(0, 255, 255, 0.1);
-  border-radius: 4px;
+  border-radius: var(--border-radius, 4px);
 }
 
 /* Win Animation - Card Cascade */
@@ -573,6 +575,7 @@
   .cascade-card {
     width: var(--card-width);
     height: var(--card-height);
+    border-radius: var(--border-radius);
   }
 
   .cascade-card .card-rank {
@@ -619,7 +622,7 @@
 .foundation-pile.valid-drop-target {
   background: rgba(0, 255, 255, 0.15);
   box-shadow: inset 0 0 0 3px var(--retro-cyan);
-  border-radius: 4px;
+  border-radius: var(--border-radius, 4px);
 }
 
 .card-stack.valid-drop-target > .card-placeholder {
