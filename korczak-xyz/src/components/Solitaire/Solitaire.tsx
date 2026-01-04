@@ -9,6 +9,8 @@ import { WinAnimation } from './WinAnimation';
 import { DragPreview } from './DragPreview';
 import { dealCards } from '../../utils/solitaire/deck';
 import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit } from '../../utils/solitaire/rules';
+import { encodeGameState, decodeGameState } from '../../utils/solitaire/serialization';
+import { useSolvabilityAnalysis } from '../../hooks/useSolvabilityAnalysis';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
 
 interface TouchDragState {
@@ -30,44 +32,153 @@ const translations = {
   en: {
     newGame: 'New Game',
     undo: 'Undo',
+    copy: 'Copy',
+    paste: 'Paste',
     moves: 'Moves',
     time: 'Time',
     youWin: 'You Win!',
     playAgain: 'Play Again',
+    analyzing: 'Analyzing...',
+    winnable: 'Winnable',
+    stuck: 'Stuck',
+    unknown: 'Unknown',
+    confirmNewGame: 'Start a new game?',
+    confirmNewGameMessage: 'Your current progress will be lost.',
+    confirm: 'Yes',
+    cancel: 'No',
+    copied: 'Game copied to clipboard',
+    loaded: 'Game loaded from clipboard',
+    invalidPaste: 'Invalid game data',
   },
   pl: {
     newGame: 'Nowa Gra',
     undo: 'Cofnij',
+    copy: 'Kopiuj',
+    paste: 'Wklej',
     moves: 'Ruchy',
     time: 'Czas',
     youWin: 'Wygrales!',
     playAgain: 'Zagraj Ponownie',
+    analyzing: 'Analizuje...',
+    winnable: 'Do wygrania',
+    stuck: 'Zablokowana',
+    unknown: 'Nieznane',
+    confirmNewGame: 'Rozpoczac nowa gre?',
+    confirmNewGameMessage: 'Obecny postep zostanie utracony.',
+    confirm: 'Tak',
+    cancel: 'Nie',
+    copied: 'Gra skopiowana',
+    loaded: 'Gra wczytana',
+    invalidPaste: 'Nieprawidlowe dane gry',
   },
 };
+
+// localStorage persistence
+const STORAGE_KEY = 'solitaire-game-state';
+
+interface PersistedState {
+  gameState: GameState;
+  history: GameState[];
+  savedAt: number;
+}
+
+function saveGameState(gameState: GameState, history: GameState[]): void {
+  try {
+    const data: PersistedState = {
+      gameState,
+      history,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors (private browsing, quota exceeded)
+  }
+}
+
+function loadGameState(): PersistedState | null {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return null;
+    return JSON.parse(data) as PersistedState;
+  } catch {
+    return null;
+  }
+}
+
+function clearGameState(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function initializeState(): { gameState: GameState; history: GameState[]; initialElapsedTime: number } {
+  const saved = loadGameState();
+
+  if (saved && !saved.gameState.gameWon) {
+    // Calculate elapsed time including time since last save
+    let initialElapsedTime = 0;
+    if (saved.gameState.startTime) {
+      const elapsedBeforeSave = saved.savedAt - saved.gameState.startTime;
+      const elapsedSinceSave = Date.now() - saved.savedAt;
+      initialElapsedTime = Math.floor((elapsedBeforeSave + elapsedSinceSave) / 1000);
+    }
+
+    return {
+      gameState: saved.gameState,
+      history: saved.history,
+      initialElapsedTime,
+    };
+  }
+
+  return {
+    gameState: dealCards(),
+    history: [],
+    initialElapsedTime: 0,
+  };
+}
 
 export default function Solitaire({ lang }: SolitaireProps) {
   const t = translations[lang];
 
-  const [gameState, setGameState] = useState<GameState>(() => dealCards());
+  // Initialize from localStorage or start new game
+  const [initialData] = useState(() => initializeState());
+  const [gameState, setGameState] = useState<GameState>(initialData.gameState);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [dragSource, setDragSource] = useState<Location | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [history, setHistory] = useState<GameState[]>([]);
+  const [elapsedTime, setElapsedTime] = useState(initialData.initialElapsedTime);
+  const [history, setHistory] = useState<GameState[]>(initialData.history);
   const [showWinAnimation, setShowWinAnimation] = useState(false);
   const [showWinDialog, setShowWinDialog] = useState(false);
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
   const [highlightedDropTarget, setHighlightedDropTarget] = useState<Location | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+
+  // Solvability analysis
+  const solvabilityResult = useSolvabilityAnalysis(
+    gameState,
+    !gameState.gameWon // Disable analysis when game is won
+  );
 
   // Timer effect
   useEffect(() => {
     if (gameState.startTime && !gameState.gameWon) {
       const interval = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - gameState.startTime!) / 1000));
+        setElapsedTime(prev => prev + 1);
       }, 1000);
       return () => clearInterval(interval);
     }
   }, [gameState.startTime, gameState.gameWon]);
+
+  // Save game state to localStorage
+  useEffect(() => {
+    if (!gameState.gameWon) {
+      saveGameState(gameState, history);
+    }
+  }, [gameState, history]);
 
   // Trigger win animation when game is won
   useEffect(() => {
@@ -75,6 +186,14 @@ export default function Solitaire({ lang }: SolitaireProps) {
       setShowWinAnimation(true);
     }
   }, [gameState.gameWon, showWinAnimation, showWinDialog]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleWinAnimationComplete = useCallback(() => {
     // Keep animation visible (trails persist), just show dialog on top
@@ -116,13 +235,35 @@ export default function Solitaire({ lang }: SolitaireProps) {
     setHistory(prev => [...prev, state]);
   }, []);
 
-  const handleNewGame = useCallback(() => {
+  const handleNewGameRequest = useCallback(() => {
+    // If game hasn't started or is won, start new game immediately
+    if (!gameState.startTime || gameState.gameWon) {
+      clearGameState();
+      setGameState(dealCards());
+      setSelectedLocation(null);
+      setElapsedTime(0);
+      setHistory([]);
+      setShowWinAnimation(false);
+      setShowWinDialog(false);
+    } else {
+      // Show confirmation dialog
+      setShowNewGameConfirm(true);
+    }
+  }, [gameState.startTime, gameState.gameWon]);
+
+  const handleNewGameConfirm = useCallback(() => {
+    clearGameState();
     setGameState(dealCards());
     setSelectedLocation(null);
     setElapsedTime(0);
     setHistory([]);
     setShowWinAnimation(false);
     setShowWinDialog(false);
+    setShowNewGameConfirm(false);
+  }, []);
+
+  const handleNewGameCancel = useCallback(() => {
+    setShowNewGameConfirm(false);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -133,6 +274,52 @@ export default function Solitaire({ lang }: SolitaireProps) {
       setSelectedLocation(null);
     }
   }, [history]);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      const encoded = encodeGameState(gameState);
+      await navigator.clipboard.writeText(encoded);
+      setToast({ message: t.copied, type: 'success' });
+    } catch {
+      setToast({ message: t.invalidPaste, type: 'error' });
+    }
+  }, [gameState, t]);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const decoded = decodeGameState(text);
+      if (decoded) {
+        saveToHistory(gameState);
+        setGameState(decoded);
+        setElapsedTime(0);
+        setHistory([]);
+        setSelectedLocation(null);
+        setToast({ message: t.loaded, type: 'success' });
+      } else {
+        setToast({ message: t.invalidPaste, type: 'error' });
+      }
+    } catch {
+      setToast({ message: t.invalidPaste, type: 'error' });
+    }
+  }, [gameState, saveToHistory, t]);
+
+  // Copy/paste keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        if (e.key === 'c') {
+          e.preventDefault();
+          handleCopy();
+        } else if (e.key === 'v') {
+          e.preventDefault();
+          handlePaste();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCopy, handlePaste]);
 
   const handleStockClick = useCallback(() => {
     setGameState(prev => {
@@ -587,11 +774,14 @@ export default function Solitaire({ lang }: SolitaireProps) {
   return (
     <div className="solitaire-game">
       <GameControls
-        onNewGame={handleNewGame}
+        onNewGame={handleNewGameRequest}
         onUndo={handleUndo}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
         canUndo={history.length > 0}
         moveCount={gameState.moveCount}
         elapsedTime={elapsedTime}
+        solvabilityResult={solvabilityResult}
         translations={t}
       />
 
@@ -657,9 +847,36 @@ export default function Solitaire({ lang }: SolitaireProps) {
         <WinDialog
           moveCount={gameState.moveCount}
           elapsedTime={elapsedTime}
-          onPlayAgain={handleNewGame}
+          onPlayAgain={handleNewGameConfirm}
           translations={t}
         />
+      )}
+
+      {showNewGameConfirm && (
+        <div className="win-overlay">
+          <div className="win-dialog window">
+            <div className="title-bar">
+              <span>{t.confirmNewGame}</span>
+            </div>
+            <div className="win-content">
+              <p className="confirm-message">{t.confirmNewGameMessage}</p>
+              <div className="confirm-buttons">
+                <button className="retro-btn" onClick={handleNewGameConfirm}>
+                  {t.confirm}
+                </button>
+                <button className="retro-btn" onClick={handleNewGameCancel}>
+                  {t.cancel}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.message}
+        </div>
       )}
     </div>
   );

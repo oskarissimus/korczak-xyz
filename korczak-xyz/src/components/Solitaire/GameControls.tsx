@@ -1,16 +1,27 @@
 import React from 'react';
+import { SolvabilityIndicator } from './SolvabilityIndicator';
+import type { SolvabilityResult } from '../../hooks/useSolvabilityAnalysis';
 
 interface GameControlsProps {
   onNewGame: () => void;
   onUndo: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
   canUndo: boolean;
   moveCount: number;
   elapsedTime: number;
+  solvabilityResult?: SolvabilityResult;
   translations: {
     newGame: string;
     undo: string;
+    copy: string;
+    paste: string;
     moves: string;
     time: string;
+    analyzing?: string;
+    winnable?: string;
+    stuck?: string;
+    unknown?: string;
   };
 }
 
@@ -23,9 +34,12 @@ function formatTime(seconds: number): string {
 export function GameControls({
   onNewGame,
   onUndo,
+  onCopy,
+  onPaste,
   canUndo,
   moveCount,
   elapsedTime,
+  solvabilityResult,
   translations,
 }: GameControlsProps) {
   return (
@@ -41,6 +55,12 @@ export function GameControls({
         >
           {translations.undo}
         </button>
+        <button className="retro-btn" onClick={onCopy}>
+          {translations.copy}
+        </button>
+        <button className="retro-btn" onClick={onPaste}>
+          {translations.paste}
+        </button>
       </div>
       <div className="controls-right">
         <div className="stat-box">
@@ -51,6 +71,19 @@ export function GameControls({
           <span className="stat-label">{translations.time}:</span>
           <span className="stat-value">{formatTime(elapsedTime)}</span>
         </div>
+        {solvabilityResult && (
+          <SolvabilityIndicator
+            status={solvabilityResult.status}
+            statesExplored={solvabilityResult.statesExplored}
+            timeMs={solvabilityResult.timeMs}
+            translations={{
+              analyzing: translations.analyzing || 'Analyzing...',
+              winnable: translations.winnable || 'Winnable',
+              stuck: translations.stuck || 'Stuck',
+              unknown: translations.unknown || 'Unknown',
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -629,3 +629,104 @@
   border-color: var(--retro-cyan);
   box-shadow: 0 0 8px var(--retro-cyan);
 }
+
+/* Solvability Indicator */
+.solvability-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.solvability-text {
+  font-weight: bold;
+}
+
+.solvability-analyzing {
+  background: var(--retro-white);
+  color: var(--retro-dark-gray);
+}
+
+.solvability-analyzing .solvability-text {
+  animation: blink 1s infinite;
+}
+
+.solvability-winnable {
+  background: #c8ffc8;
+  color: #006400;
+}
+
+.solvability-stuck {
+  background: #ffc8c8;
+  color: #8b0000;
+}
+
+.solvability-unknown {
+  background: #ffffc8;
+  color: #8b8b00;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Confirmation Dialog */
+.confirm-message {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  text-align: center;
+  margin: 10px 0 20px;
+  color: var(--retro-black);
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.confirm-buttons .retro-btn {
+  min-width: 80px;
+}
+
+/* Toast notifications */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-family: 'Perfect DOS VGA 437', monospace;
+  font-size: 0.9rem;
+  z-index: 1000;
+  animation: toast-fade-in 0.2s ease-out;
+  box-shadow: 2px 2px 0 var(--retro-black);
+}
+
+.toast-success {
+  background: var(--retro-white);
+  color: var(--retro-black);
+  border: 2px solid var(--retro-black);
+}
+
+.toast-error {
+  background: #c00;
+  color: var(--retro-white);
+  border: 2px solid var(--retro-black);
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
