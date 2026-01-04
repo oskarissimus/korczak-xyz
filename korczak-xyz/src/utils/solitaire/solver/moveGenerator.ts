@@ -41,22 +41,37 @@ export function autoPlaySafeMoves(state: GameState): GameState {
   while (changed) {
     changed = false;
 
-    // Check waste for safe foundation move
-    if (current.waste.length > 0) {
-      const card = current.waste[current.waste.length - 1];
+    // Check pool (stock + waste) for safe foundation moves
+    const poolCards = [...current.stock, ...current.waste];
+    for (const card of poolCards) {
       const foundationIdx = getFoundationIndexForSuit(card.suit);
       if (canPlaceOnFoundation(card, current.foundations[foundationIdx], foundationIdx) &&
           isSafeFoundationMove(card, current)) {
+        // Find and remove card from pool
+        const stockIdx = current.stock.findIndex(c => c.id === card.id);
+        let newStock = current.stock;
+        let newWaste = current.waste;
+
+        if (stockIdx !== -1) {
+          newStock = [...current.stock.slice(0, stockIdx), ...current.stock.slice(stockIdx + 1)];
+        } else {
+          const wasteIdx = current.waste.findIndex(c => c.id === card.id);
+          if (wasteIdx !== -1) {
+            newWaste = [...current.waste.slice(0, wasteIdx), ...current.waste.slice(wasteIdx + 1)];
+          }
+        }
+
         // Apply the move
         const newFoundations = [...current.foundations] as GameState['foundations'];
         newFoundations[foundationIdx] = [...newFoundations[foundationIdx], { ...card, faceUp: true }];
         current = {
           ...current,
-          waste: current.waste.slice(0, -1),
+          stock: newStock,
+          waste: newWaste,
           foundations: newFoundations,
         };
         changed = true;
-        continue;
+        break; // Restart loop to check for more safe moves
       }
     }
 
@@ -108,7 +123,6 @@ export function generateAllMoves(state: GameState): SolverMove[] {
   const revealingMoves: Array<{ move: SolverMove; faceDownCount: number }> = [];
   const wasteToTableauMoves: Array<{ move: SolverMove; toEmpty: boolean }> = [];
   const otherTableauMoves: SolverMove[] = [];
-  const stockMoves: SolverMove[] = [];
 
   // Find first empty column for symmetry reduction (all empty columns are equivalent)
   let firstEmptyColumn = -1;
@@ -120,14 +134,14 @@ export function generateAllMoves(state: GameState): SolverMove[] {
   }
 
   // Priority 1: Moves to foundation (always beneficial)
-  // From waste
-  if (state.waste.length > 0) {
-    const card = state.waste[state.waste.length - 1];
+  // From pool (stock + waste) - any card is playable since player can cycle infinitely
+  const allPoolCards = [...state.stock, ...state.waste];
+  for (const card of allPoolCards) {
     for (let i = 0; i < 4; i++) {
       if (canPlaceOnFoundation(card, state.foundations[i], i)) {
         foundationMoves.push({
-          type: 'waste-to-foundation',
-          from: { zone: 'waste' },
+          type: 'pool-to-foundation',
+          from: { zone: 'waste', cardId: card.id },
           to: { zone: 'foundation', index: i },
         });
       }
@@ -188,9 +202,10 @@ export function generateAllMoves(state: GameState): SolverMove[] {
     }
   }
 
-  // Priority 3: Waste to tableau
-  if (state.waste.length > 0) {
-    const card = state.waste[state.waste.length - 1];
+  // Priority 3: Pool (stock + waste) to tableau
+  // Since player can cycle through stock infinitely, any card in pool is playable
+  const poolCards = [...state.stock, ...state.waste];
+  for (const card of poolCards) {
     for (let toCol = 0; toCol < 7; toCol++) {
       // Symmetry reduction: for King moves to empty columns, only use first empty
       if (state.tableau[toCol].length === 0 && card.rank === 'K') {
@@ -200,8 +215,8 @@ export function generateAllMoves(state: GameState): SolverMove[] {
       if (canPlaceOnTableau([card], state.tableau[toCol])) {
         wasteToTableauMoves.push({
           move: {
-            type: 'waste-to-tableau',
-            from: { zone: 'waste' },
+            type: 'pool-to-tableau',
+            from: { zone: 'waste', cardId: card.id },
             to: { zone: 'tableau', index: toCol },
           },
           toEmpty: state.tableau[toCol].length === 0,
@@ -247,12 +262,8 @@ export function generateAllMoves(state: GameState): SolverMove[] {
     }
   }
 
-  // Priority 5: Stock operations
-  if (state.stock.length > 0) {
-    stockMoves.push({ type: 'stock-to-waste' });
-  } else if (state.waste.length > 0) {
-    stockMoves.push({ type: 'recycle-waste' });
-  }
+  // Note: Stock operations (stock-to-waste, recycle-waste) are no longer needed
+  // since we treat stock+waste as a pool where any card is directly playable
 
   // Sort revealing moves: prefer columns with more face-down cards
   revealingMoves.sort((a, b) => b.faceDownCount - a.faceDownCount);
@@ -266,7 +277,6 @@ export function generateAllMoves(state: GameState): SolverMove[] {
     ...revealingMoves.map(r => r.move),
     ...wasteToTableauMoves.map(w => w.move),
     ...otherTableauMoves,
-    ...stockMoves,
   ];
 }
 
@@ -276,47 +286,70 @@ export function generateAllMoves(state: GameState): SolverMove[] {
  */
 export function applyMove(state: GameState, move: SolverMove): GameState {
   switch (move.type) {
-    case 'stock-to-waste': {
-      if (state.stock.length === 0) return state;
-      const card = state.stock[state.stock.length - 1];
-      return {
-        ...state,
-        stock: state.stock.slice(0, -1),
-        waste: [...state.waste, { ...card, faceUp: true }],
-      };
-    }
-
-    case 'recycle-waste': {
-      if (state.waste.length === 0) return state;
-      return {
-        ...state,
-        stock: [...state.waste].reverse().map(c => ({ ...c, faceUp: false })),
-        waste: [],
-      };
-    }
-
-    case 'waste-to-foundation': {
-      if (state.waste.length === 0 || !move.to) return state;
-      const card = state.waste[state.waste.length - 1];
+    case 'pool-to-foundation': {
+      if (!move.from?.cardId || !move.to) return state;
+      const cardId = move.from.cardId;
       const foundationIdx = move.to.index!;
+
+      // Find and remove card from pool (either stock or waste)
+      let card: Card | undefined;
+      let newStock = state.stock;
+      let newWaste = state.waste;
+
+      const stockIdx = state.stock.findIndex(c => c.id === cardId);
+      if (stockIdx !== -1) {
+        card = state.stock[stockIdx];
+        newStock = [...state.stock.slice(0, stockIdx), ...state.stock.slice(stockIdx + 1)];
+      } else {
+        const wasteIdx = state.waste.findIndex(c => c.id === cardId);
+        if (wasteIdx !== -1) {
+          card = state.waste[wasteIdx];
+          newWaste = [...state.waste.slice(0, wasteIdx), ...state.waste.slice(wasteIdx + 1)];
+        }
+      }
+
+      if (!card) return state;
+
       const newFoundations = [...state.foundations] as GameState['foundations'];
       newFoundations[foundationIdx] = [...newFoundations[foundationIdx], { ...card, faceUp: true }];
       return {
         ...state,
-        waste: state.waste.slice(0, -1),
+        stock: newStock,
+        waste: newWaste,
         foundations: newFoundations,
       };
     }
 
-    case 'waste-to-tableau': {
-      if (state.waste.length === 0 || !move.to) return state;
-      const card = state.waste[state.waste.length - 1];
+    case 'pool-to-tableau': {
+      if (!move.from?.cardId || !move.to) return state;
+      const cardId = move.from.cardId;
       const toColIdx = move.to.index!;
+
+      // Find and remove card from pool (either stock or waste)
+      let card: Card | undefined;
+      let newStock = state.stock;
+      let newWaste = state.waste;
+
+      const stockIdx = state.stock.findIndex(c => c.id === cardId);
+      if (stockIdx !== -1) {
+        card = state.stock[stockIdx];
+        newStock = [...state.stock.slice(0, stockIdx), ...state.stock.slice(stockIdx + 1)];
+      } else {
+        const wasteIdx = state.waste.findIndex(c => c.id === cardId);
+        if (wasteIdx !== -1) {
+          card = state.waste[wasteIdx];
+          newWaste = [...state.waste.slice(0, wasteIdx), ...state.waste.slice(wasteIdx + 1)];
+        }
+      }
+
+      if (!card) return state;
+
       const newTableau = [...state.tableau] as GameState['tableau'];
       newTableau[toColIdx] = [...newTableau[toColIdx], { ...card, faceUp: true }];
       return {
         ...state,
-        waste: state.waste.slice(0, -1),
+        stock: newStock,
+        waste: newWaste,
         tableau: newTableau,
       };
     }
@@ -388,24 +421,17 @@ export function checkWin(state: GameState): boolean {
  * Quick check if the game is definitely stuck (no legal moves possible).
  */
 export function isDefinitelyStuck(state: GameState): boolean {
-  // If there are stock cards, we can always draw
-  if (state.stock.length > 0) return false;
-
-  // If waste has cards and stock is empty, we can recycle (unless waste also empty)
-  if (state.waste.length > 0) return false;
-
-  // Stock and waste both empty - check if any tableau/foundation moves exist
+  // Check if any legal moves exist (includes pool moves)
   const moves = generateAllMoves(state);
   return moves.length === 0;
 }
 
 /**
  * Quick check if game is definitely winnable (all cards are accessible).
- * This is true when all face-down cards are revealed and stock/waste are empty.
+ * This is true when all face-down cards are revealed.
+ * Note: Pool cards (stock+waste) are always accessible since we can cycle infinitely.
  */
 export function isDefinitelyWinnable(state: GameState): boolean {
-  if (state.stock.length > 0 || state.waste.length > 0) return false;
-
   // All tableau cards must be face-up
   for (const column of state.tableau) {
     for (const card of column) {

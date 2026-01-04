@@ -28,11 +28,6 @@ function isReversibleMove(move: SolverMove, lastMove: SolverMove | undefined): b
     }
   }
 
-  // Don't immediately recycle waste after drawing from stock
-  if (move.type === 'recycle-waste' && lastMove.type === 'stock-to-waste') {
-    return true;
-  }
-
   return false;
 }
 

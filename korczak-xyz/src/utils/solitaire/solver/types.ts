@@ -20,8 +20,8 @@ export type SolvabilityStatus =
   | 'unknown';
 
 export interface SolverMove {
-  type: 'stock-to-waste' | 'recycle-waste' | 'waste-to-foundation' | 'waste-to-tableau' | 'tableau-to-foundation' | 'tableau-to-tableau';
-  from?: Location;
+  type: 'pool-to-foundation' | 'pool-to-tableau' | 'tableau-to-foundation' | 'tableau-to-tableau';
+  from?: Location & { cardId?: string };
   to?: Location;
   cardCount?: number;
 }

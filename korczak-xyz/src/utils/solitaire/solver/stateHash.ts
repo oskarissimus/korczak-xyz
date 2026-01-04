@@ -4,9 +4,9 @@ import type { GameState } from '../types';
  * Creates a canonical string representation of the game state for memoization.
  * Two states with the same hash are equivalent for solver purposes.
  *
- * The waste top card matters (it's the only playable card from stock/waste),
- * but the remaining stock+waste cards can be treated as an unordered set
- * since you'll cycle through all of them eventually.
+ * Stock and waste are treated as a single unordered pool since the player
+ * can cycle through the stock infinitely, making any card in the pool
+ * effectively playable at any time.
  */
 export function serializeState(state: GameState): string {
   // Foundation: just counts per pile (order within pile is always A->K)
@@ -17,16 +17,13 @@ export function serializeState(state: GameState): string {
     col.map(c => `${c.id}:${c.faceUp ? 1 : 0}`).join('|')
   ).join(';');
 
-  // Waste top card matters (it's the playable card)
-  const wasteTop = state.waste.length > 0 ? state.waste[state.waste.length - 1].id : '';
-
-  // Remaining stock + waste (excluding top) can be treated as unordered set
-  const remainingCards = [
+  // Stock + waste treated as unordered pool (any card is effectively playable)
+  const stockWastePool = [
     ...state.stock.map(c => c.id),
-    ...state.waste.slice(0, -1).map(c => c.id)
+    ...state.waste.map(c => c.id)
   ].sort().join(',');
 
-  return `${foundations}#${tableau}#${wasteTop}#${remainingCards}`;
+  return `${foundations}#${tableau}#${stockWastePool}`;
 }
 
 /**
