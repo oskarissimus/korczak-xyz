@@ -18,6 +18,8 @@ interface CardStackProps {
   placeholderSuit?: string;
   highlight?: boolean;
   touchDraggingIndex?: number;
+  hintSourceIndex?: number;
+  hintTarget?: boolean;
 }
 
 export function CardStack({
@@ -36,6 +38,8 @@ export function CardStack({
   placeholderSuit,
   highlight = false,
   touchDraggingIndex,
+  hintSourceIndex,
+  hintTarget,
 }: CardStackProps) {
   if (cards.length === 0) {
     return (
@@ -44,6 +48,7 @@ export function CardStack({
         onDrop={onDrop}
         suit={placeholderSuit}
         highlight={highlight}
+        hintHighlight={hintTarget ? 'target' : undefined}
       />
     );
   }
@@ -95,6 +100,14 @@ export function CardStack({
 
         const isTouchDragging = touchDraggingIndex !== undefined && index >= touchDraggingIndex;
 
+        // Determine hint highlight: source cards from hintSourceIndex, target is top card when hintTarget
+        let hintHighlight: 'source' | 'target' | undefined;
+        if (hintSourceIndex !== undefined && index >= hintSourceIndex) {
+          hintHighlight = 'source';
+        } else if (hintTarget && index === cards.length - 1) {
+          hintHighlight = 'target';
+        }
+
         return (
           <Card
             key={card.id}
@@ -106,6 +119,7 @@ export function CardStack({
             selected={selectedCardIndex !== undefined && index >= selectedCardIndex}
             draggable={isDraggable}
             isTouchDragging={isTouchDragging}
+            hintHighlight={hintHighlight}
             style={style}
           />
         );

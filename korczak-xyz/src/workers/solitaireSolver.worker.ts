@@ -1,6 +1,7 @@
 import { solve } from '../utils/solitaire/solver';
 import type { SolverConfig, SolverResult } from '../utils/solitaire/solver';
 import type { GameState } from '../utils/solitaire/types';
+import { serializeState } from '../utils/solitaire/solver/stateHash';
 
 interface SolveMessage {
   type: 'solve';
@@ -33,6 +34,11 @@ type WorkerResponse = ResultMessage | ProgressMessage;
 let cancelFlag = false;
 let currentRequestId = '';
 
+// Result cache: serialized state -> solver result
+// Prevents re-solving when cycling through stock (same logical state)
+const resultCache = new Map<string, SolverResult>();
+const MAX_CACHE_SIZE = 1000;
+
 export function shouldCancel(): boolean {
   return cancelFlag;
 }
@@ -60,12 +66,36 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   if (message.type === 'solve') {
     const { requestId, gameState, config } = message;
 
+    // Check cache first - stock/waste cycling produces same serialized state
+    const stateKey = serializeState(gameState);
+    const cachedResult = resultCache.get(stateKey);
+    if (cachedResult) {
+      const response: ResultMessage = {
+        type: 'result',
+        requestId,
+        result: cachedResult,
+      };
+      self.postMessage(response);
+      return;
+    }
+
     // Reset cancellation flag for new solve
     cancelFlag = false;
     currentRequestId = requestId;
 
     try {
       const result = solve(gameState, config, shouldCancel, reportProgress);
+
+      // Cache result if solve completed (not cancelled)
+      if (!cancelFlag) {
+        if (resultCache.size >= MAX_CACHE_SIZE) {
+          const firstKey = resultCache.keys().next().value;
+          if (firstKey !== undefined) {
+            resultCache.delete(firstKey);
+          }
+        }
+        resultCache.set(stateKey, result);
+      }
 
       const response: ResultMessage = {
         type: 'result',

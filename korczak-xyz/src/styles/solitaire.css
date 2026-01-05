@@ -730,3 +730,40 @@
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* Hint highlight styles */
+@keyframes hint-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px var(--hint-color);
+  }
+  50% {
+    box-shadow: 0 0 12px 5px var(--hint-color);
+  }
+}
+
+.solitaire-card.hint-source {
+  --hint-color: #ffd700;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+  z-index: 10;
+}
+
+.solitaire-card.hint-target {
+  --hint-color: #00ff00;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+  z-index: 10;
+}
+
+.card-placeholder.hint-source {
+  --hint-color: #ffd700;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+}
+
+.card-placeholder.hint-target {
+  --hint-color: #00ff00;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+}
+
+.foundation-pile.hint-target {
+  background: rgba(0, 255, 0, 0.1);
+  border-radius: var(--border-radius, 4px);
+}

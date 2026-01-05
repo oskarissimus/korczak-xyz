@@ -10,8 +10,10 @@ import { DragPreview } from './DragPreview';
 import { dealCards } from '../../utils/solitaire/deck';
 import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit } from '../../utils/solitaire/rules';
 import { encodeGameState, decodeGameState } from '../../utils/solitaire/serialization';
+import { generateAllMoves } from '../../utils/solitaire/solver/moveGenerator';
 import { useSolvabilityAnalysis } from '../../hooks/useSolvabilityAnalysis';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
+import type { SolverMove } from '../../utils/solitaire/solver/types';
 
 interface TouchDragState {
   sourceLocation: Location;
@@ -32,6 +34,7 @@ const translations = {
   en: {
     newGame: 'New Game',
     undo: 'Undo',
+    hint: 'Hint',
     copy: 'Copy',
     paste: 'Paste',
     moves: 'Moves',
@@ -53,6 +56,7 @@ const translations = {
   pl: {
     newGame: 'Nowa Gra',
     undo: 'Cofnij',
+    hint: 'Podpowiedz',
     copy: 'Kopiuj',
     paste: 'Wklej',
     moves: 'Ruchy',
@@ -155,7 +159,9 @@ export default function Solitaire({ lang }: SolitaireProps) {
   const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
   const [highlightedDropTarget, setHighlightedDropTarget] = useState<Location | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [hintMove, setHintMove] = useState<SolverMove | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Solvability analysis
   const solvabilityResult = useSolvabilityAnalysis(
@@ -303,6 +309,44 @@ export default function Solitaire({ lang }: SolitaireProps) {
       setToast({ message: t.invalidPaste, type: 'error' });
     }
   }, [gameState, saveToHistory, t]);
+
+  const clearHint = useCallback(() => {
+    if (hintTimeoutRef.current) {
+      clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = null;
+    }
+    setHintMove(null);
+  }, []);
+
+  const handleHint = useCallback(() => {
+    // Clear any existing hint
+    clearHint();
+
+    // Get all available moves
+    const moves = generateAllMoves(gameState);
+    if (moves.length > 0) {
+      // Take the first (highest priority) move
+      setHintMove(moves[0]);
+      // Auto-clear hint after 3 seconds
+      hintTimeoutRef.current = setTimeout(() => {
+        setHintMove(null);
+      }, 3000);
+    }
+  }, [gameState, clearHint]);
+
+  // Clear hint when game state changes (user made a move)
+  useEffect(() => {
+    clearHint();
+  }, [gameState, clearHint]);
+
+  // Cleanup hint timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Copy/paste keyboard shortcuts
   useEffect(() => {
@@ -771,14 +815,52 @@ export default function Solitaire({ lang }: SolitaireProps) {
     }
   }, [selectedLocation, getSelectedCards, gameState, startGameIfNeeded, saveToHistory]);
 
+  // Compute hint highlight locations from hintMove
+  const hintHighlight = (() => {
+    if (!hintMove) return null;
+
+    const result: {
+      wasteSource?: boolean;
+      foundationTarget?: number;
+      tableauSourceColumn?: number;
+      tableauSourceCardIndex?: number;
+      tableauTargetColumn?: number;
+    } = {};
+
+    // Determine source
+    if (hintMove.type === 'pool-to-foundation' || hintMove.type === 'pool-to-tableau') {
+      result.wasteSource = true;
+    } else if (hintMove.type === 'tableau-to-foundation' || hintMove.type === 'tableau-to-tableau') {
+      if (hintMove.from?.zone === 'tableau' && hintMove.from.index !== undefined) {
+        result.tableauSourceColumn = hintMove.from.index;
+        result.tableauSourceCardIndex = hintMove.from.cardIndex;
+      }
+    }
+
+    // Determine target
+    if (hintMove.type === 'pool-to-foundation' || hintMove.type === 'tableau-to-foundation') {
+      if (hintMove.to?.zone === 'foundation' && hintMove.to.index !== undefined) {
+        result.foundationTarget = hintMove.to.index;
+      }
+    } else if (hintMove.type === 'pool-to-tableau' || hintMove.type === 'tableau-to-tableau') {
+      if (hintMove.to?.zone === 'tableau' && hintMove.to.index !== undefined) {
+        result.tableauTargetColumn = hintMove.to.index;
+      }
+    }
+
+    return result;
+  })();
+
   return (
     <div className="solitaire-game">
       <GameControls
         onNewGame={handleNewGameRequest}
         onUndo={handleUndo}
+        onHint={handleHint}
         onCopy={handleCopy}
         onPaste={handlePaste}
         canUndo={history.length > 0}
+        hintAvailable={!gameState.gameWon && generateAllMoves(gameState).length > 0}
         moveCount={gameState.moveCount}
         elapsedTime={elapsedTime}
         solvabilityResult={solvabilityResult}
@@ -797,6 +879,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
               onTouchStart={handleTouchStartWaste}
               selectedCard={selectedLocation?.zone === 'waste'}
               isTouchDragging={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'waste'}
+              hintHighlight={hintHighlight?.wasteSource ? 'source' : undefined}
             />
           </div>
 
@@ -806,6 +889,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
             onDragOver={handleDragOver}
             onClick={handleFoundationClick}
             highlightIndex={highlightedDropTarget?.zone === 'foundation' ? highlightedDropTarget.index : undefined}
+            hintTargetIndex={hintHighlight?.foundationTarget}
           />
         </div>
 
@@ -825,6 +909,9 @@ export default function Solitaire({ lang }: SolitaireProps) {
           highlightColumn={highlightedDropTarget?.zone === 'tableau' ? highlightedDropTarget.index : undefined}
           touchDraggingColumn={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'tableau' ? touchDrag.sourceLocation.index : undefined}
           touchDraggingCardIndex={touchDrag?.isDragging && touchDrag?.sourceLocation.zone === 'tableau' ? touchDrag.sourceLocation.cardIndex : undefined}
+          hintSourceColumn={hintHighlight?.tableauSourceColumn}
+          hintSourceCardIndex={hintHighlight?.tableauSourceCardIndex}
+          hintTargetColumn={hintHighlight?.tableauTargetColumn}
         />
       </div>
 

@@ -10,6 +10,7 @@ interface WasteProps {
   onTouchStart?: (e: React.TouchEvent) => void;
   selectedCard: boolean;
   isTouchDragging?: boolean;
+  hintHighlight?: 'source' | 'target';
 }
 
 export function Waste({
@@ -20,6 +21,7 @@ export function Waste({
   onTouchStart,
   selectedCard,
   isTouchDragging,
+  hintHighlight,
 }: WasteProps) {
   if (cards.length === 0) {
     return (
@@ -43,6 +45,7 @@ export function Waste({
         selected={selectedCard}
         draggable={true}
         isTouchDragging={isTouchDragging}
+        hintHighlight={hintHighlight}
       />
     </div>
   );

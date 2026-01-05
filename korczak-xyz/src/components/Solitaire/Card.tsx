@@ -11,6 +11,7 @@ interface CardProps {
   selected?: boolean;
   draggable?: boolean;
   isTouchDragging?: boolean;
+  hintHighlight?: 'source' | 'target';
   style?: React.CSSProperties;
 }
 
@@ -23,6 +24,7 @@ export function Card({
   selected = false,
   draggable = false,
   isTouchDragging = false,
+  hintHighlight,
   style,
 }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
@@ -40,9 +42,11 @@ export function Card({
     );
   }
 
+  const hintClass = hintHighlight ? `hint-${hintHighlight}` : '';
+
   return (
     <div
-      className={`solitaire-card face-up ${suitColor} ${selected ? 'selected' : ''} ${isTouchDragging ? 'touch-dragging' : ''}`}
+      className={`solitaire-card face-up ${suitColor} ${selected ? 'selected' : ''} ${isTouchDragging ? 'touch-dragging' : ''} ${hintClass}`}
       onClick={onClick}
       draggable={draggable}
       onDragStart={onDragStart}
@@ -71,6 +75,7 @@ interface CardPlaceholderProps {
   onDrop?: (e: React.DragEvent) => void;
   suit?: string;
   highlight?: boolean;
+  hintHighlight?: 'source' | 'target';
 }
 
 export function CardPlaceholder({
@@ -79,10 +84,13 @@ export function CardPlaceholder({
   onDrop,
   suit,
   highlight = false,
+  hintHighlight,
 }: CardPlaceholderProps) {
+  const hintClass = hintHighlight ? `hint-${hintHighlight}` : '';
+
   return (
     <div
-      className={`card-placeholder ${highlight ? 'highlight' : ''}`}
+      className={`card-placeholder ${highlight ? 'highlight' : ''} ${hintClass}`}
       onClick={onClick}
       onDragOver={onDragOver}
       onDrop={onDrop}

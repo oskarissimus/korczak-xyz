@@ -16,6 +16,9 @@ interface TableauProps {
   highlightColumn?: number;
   touchDraggingColumn?: number;
   touchDraggingCardIndex?: number;
+  hintSourceColumn?: number;
+  hintSourceCardIndex?: number;
+  hintTargetColumn?: number;
 }
 
 export function Tableau({
@@ -32,6 +35,9 @@ export function Tableau({
   highlightColumn,
   touchDraggingColumn,
   touchDraggingCardIndex,
+  hintSourceColumn,
+  hintSourceCardIndex,
+  hintTargetColumn,
 }: TableauProps) {
   return (
     <div className="tableau-area">
@@ -65,6 +71,8 @@ export function Tableau({
               draggableFromIndex={firstFaceUpIndex >= 0 ? firstFaceUpIndex : undefined}
               highlight={highlightColumn === columnIndex}
               touchDraggingIndex={touchDraggingColumn === columnIndex ? touchDraggingCardIndex : undefined}
+              hintSourceIndex={hintSourceColumn === columnIndex ? hintSourceCardIndex : undefined}
+              hintTarget={hintTargetColumn === columnIndex}
             />
           </div>
         );

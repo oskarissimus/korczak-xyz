@@ -5,15 +5,18 @@ import type { SolvabilityResult } from '../../hooks/useSolvabilityAnalysis';
 interface GameControlsProps {
   onNewGame: () => void;
   onUndo: () => void;
+  onHint: () => void;
   onCopy: () => void;
   onPaste: () => void;
   canUndo: boolean;
+  hintAvailable: boolean;
   moveCount: number;
   elapsedTime: number;
   solvabilityResult?: SolvabilityResult;
   translations: {
     newGame: string;
     undo: string;
+    hint: string;
     copy: string;
     paste: string;
     moves: string;
@@ -34,9 +37,11 @@ function formatTime(seconds: number): string {
 export function GameControls({
   onNewGame,
   onUndo,
+  onHint,
   onCopy,
   onPaste,
   canUndo,
+  hintAvailable,
   moveCount,
   elapsedTime,
   solvabilityResult,
@@ -54,6 +59,13 @@ export function GameControls({
           disabled={!canUndo}
         >
           {translations.undo}
+        </button>
+        <button
+          className="retro-btn"
+          onClick={onHint}
+          disabled={!hintAvailable}
+        >
+          {translations.hint}
         </button>
         <button className="retro-btn" onClick={onCopy}>
           {translations.copy}
