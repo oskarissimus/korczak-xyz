@@ -90,3 +90,49 @@ export class TranspositionTable {
     this.count = 0;
   }
 }
+
+/**
+ * Persistent cache of states known to be on winning paths.
+ * Used across solver calls to accelerate future solves.
+ */
+export class WinnableStateCache {
+  private hashes: Uint32Array;
+  private lookup: Set<number>;
+  private writeIndex: number;
+  private count: number;
+
+  constructor(maxSize: number = 100000) {
+    this.hashes = new Uint32Array(maxSize);
+    this.lookup = new Set();
+    this.writeIndex = 0;
+    this.count = 0;
+  }
+
+  has(hash: number): boolean {
+    return this.lookup.has(hash);
+  }
+
+  /**
+   * Add multiple hashes at once (for batch adding a winning path).
+   */
+  addAll(hashes: number[]): void {
+    for (const hash of hashes) {
+      if (this.lookup.has(hash)) continue;
+
+      if (this.count >= this.hashes.length) {
+        const oldHash = this.hashes[this.writeIndex];
+        this.lookup.delete(oldHash);
+      } else {
+        this.count++;
+      }
+
+      this.hashes[this.writeIndex] = hash;
+      this.lookup.add(hash);
+      this.writeIndex = (this.writeIndex + 1) % this.hashes.length;
+    }
+  }
+
+  get size(): number {
+    return this.count;
+  }
+}

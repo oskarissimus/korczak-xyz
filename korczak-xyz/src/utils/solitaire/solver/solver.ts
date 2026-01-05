@@ -1,7 +1,7 @@
 import type { GameState } from '../types';
 import type { SolverConfig, SolverResult, SolverMove } from './types';
 import { DEFAULT_SOLVER_CONFIG } from './types';
-import { hashState, TranspositionTable } from './stateHash';
+import { hashState, TranspositionTable, WinnableStateCache } from './stateHash';
 import { generateAllMoves, applyMove, checkWin, isDefinitelyStuck, isDefinitelyWinnable, autoPlaySafeMoves } from './moveGenerator';
 
 interface SolverContext {
@@ -9,6 +9,9 @@ interface SolverContext {
   statesExplored: number;
   config: SolverConfig;
   visited: TranspositionTable;
+  winnableCache?: WinnableStateCache;
+  pathStack: number[];
+  pathDepth: number;
   shouldCancel?: () => boolean;
   onProgress?: (statesExplored: number, timeMs: number) => void;
   lastProgressTime: number;
@@ -38,13 +41,25 @@ export function solve(
   state: GameState,
   config: Partial<SolverConfig> = {},
   shouldCancel?: () => boolean,
-  onProgress?: (statesExplored: number, timeMs: number) => void
+  onProgress?: (statesExplored: number, timeMs: number) => void,
+  winnableCache?: WinnableStateCache
 ): SolverResult {
   const fullConfig: SolverConfig = { ...DEFAULT_SOLVER_CONFIG, ...config };
   const startTime = performance.now();
 
   // Auto-play safe foundation moves first
   const initialState = autoPlaySafeMoves(state);
+  const initialHash = hashState(initialState);
+
+  // Check if state is already known to be winnable
+  if (winnableCache?.has(initialHash)) {
+    return {
+      winnable: true,
+      timedOut: false,
+      statesExplored: 0,
+      timeMs: performance.now() - startTime,
+    };
+  }
 
   // Quick win check
   if (checkWin(initialState)) {
@@ -83,10 +98,17 @@ export function solve(
     statesExplored: 0,
     config: fullConfig,
     visited: new TranspositionTable(),
+    winnableCache,
+    pathStack: new Array(10000),
+    pathDepth: 0,
     shouldCancel,
     onProgress,
     lastProgressTime: startTime,
   };
+
+  // Start DFS with the initial state hash already on the path
+  context.pathStack[0] = initialHash;
+  context.pathDepth = 1;
 
   const result = dfs(initialState, context, undefined);
 
@@ -146,21 +168,34 @@ function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | un
 
     // Auto-play safe foundation moves after each move
     const newState = autoPlaySafeMoves(rawNewState);
+    const newHash = hashState(newState);
+
+    // Check if this state is already known to be winnable
+    if (context.winnableCache?.has(newHash)) {
+      // Mark all states on the current path as winnable
+      context.winnableCache.addAll(context.pathStack.slice(0, context.pathDepth));
+      return true;
+    }
 
     // Check for win
-    if (checkWin(newState)) {
+    if (checkWin(newState) || isDefinitelyWinnable(newState)) {
+      // Mark all states on the current path as winnable
+      context.pathStack[context.pathDepth] = newHash;
+      context.winnableCache?.addAll(context.pathStack.slice(0, context.pathDepth + 1));
       return true;
     }
 
-    // Quick win check for new state
-    if (isDefinitelyWinnable(newState)) {
-      return true;
-    }
+    // Push new state onto path and recurse
+    context.pathStack[context.pathDepth] = newHash;
+    context.pathDepth++;
 
-    // Recurse with this move as the last move
     if (dfs(newState, context, move)) {
+      context.pathDepth--;
       return true;
     }
+
+    // Pop state from path
+    context.pathDepth--;
 
     // Check limits after recursion
     if (shouldStop(context)) {

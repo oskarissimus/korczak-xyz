@@ -1,7 +1,7 @@
 import { solve } from '../utils/solitaire/solver';
 import type { SolverConfig, SolverResult } from '../utils/solitaire/solver';
 import type { GameState } from '../utils/solitaire/types';
-import { serializeState } from '../utils/solitaire/solver/stateHash';
+import { serializeState, WinnableStateCache } from '../utils/solitaire/solver/stateHash';
 
 interface SolveMessage {
   type: 'solve';
@@ -38,6 +38,10 @@ let currentRequestId = '';
 // Prevents re-solving when cycling through stock (same logical state)
 const resultCache = new Map<string, SolverResult>();
 const MAX_CACHE_SIZE = 1000;
+
+// Persistent cache of states known to be on winning paths
+// This survives across solve calls to accelerate future solves
+const winnableCache = new WinnableStateCache(100000);
 
 export function shouldCancel(): boolean {
   return cancelFlag;
@@ -84,7 +88,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     currentRequestId = requestId;
 
     try {
-      const result = solve(gameState, config, shouldCancel, reportProgress);
+      const result = solve(gameState, config, shouldCancel, reportProgress, winnableCache);
 
       // Cache result if solve completed (not cancelled)
       if (!cancelFlag) {
