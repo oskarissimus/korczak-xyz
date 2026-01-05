@@ -1,4 +1,5 @@
 import type { Difficulty, GameStatus } from '../../utils/minesweeper/types';
+import type { TranslateFunction } from '../../i18n';
 
 interface GameControlsProps {
   difficulty: Difficulty;
@@ -9,7 +10,7 @@ interface GameControlsProps {
   onChangeDifficulty: (difficulty: Difficulty) => void;
   flagMode: boolean;
   onToggleFlagMode: () => void;
-  t: (key: string) => string;
+  t: TranslateFunction;
 }
 
 function formatTime(seconds: number): string {

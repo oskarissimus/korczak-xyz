@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Difficulty, GameState } from '../../utils/minesweeper/types';
+import type { Difficulty, GameState, GameStatus } from '../../utils/minesweeper/types';
 import { DIFFICULTIES } from '../../utils/minesweeper/types';
 import {
   initializeGame,
@@ -72,7 +72,7 @@ export default function Minesweeper({ lang }: MinesweeperProps) {
       }
 
       let newBoard = prev.board;
-      let newStatus = prev.status;
+      let newStatus: GameStatus = prev.status;
       let startTime = prev.startTime;
       let firstClickDone = prev.firstClickDone;
 
