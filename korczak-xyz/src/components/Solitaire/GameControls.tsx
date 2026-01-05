@@ -8,8 +8,10 @@ interface GameControlsProps {
   onHint: () => void;
   onCopy: () => void;
   onPaste: () => void;
+  onAutosolve: () => void;
   canUndo: boolean;
   hintAvailable: boolean;
+  autosolveAvailable: boolean;
   moveCount: number;
   elapsedTime: number;
   solvabilityResult?: SolvabilityResult;
@@ -19,6 +21,7 @@ interface GameControlsProps {
     hint: string;
     copy: string;
     paste: string;
+    autosolve: string;
     moves: string;
     time: string;
     analyzing?: string;
@@ -40,8 +43,10 @@ export function GameControls({
   onHint,
   onCopy,
   onPaste,
+  onAutosolve,
   canUndo,
   hintAvailable,
+  autosolveAvailable,
   moveCount,
   elapsedTime,
   solvabilityResult,
@@ -73,6 +78,11 @@ export function GameControls({
         <button className="retro-btn" onClick={onPaste}>
           {translations.paste}
         </button>
+        {autosolveAvailable && (
+          <button className="retro-btn autosolve-btn" onClick={onAutosolve}>
+            {translations.autosolve}
+          </button>
+        )}
       </div>
       <div className="controls-right">
         <div className="stat-box">

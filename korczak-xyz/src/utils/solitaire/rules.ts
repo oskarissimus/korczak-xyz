@@ -1,4 +1,4 @@
-import type { Card, Suit } from './types';
+import type { Card, Suit, GameState } from './types';
 import { getRankValue, isRed, isBlack } from './types';
 
 /**
@@ -94,4 +94,22 @@ export function getFirstFaceUpIndex(column: Card[]): number {
 export function getFoundationIndexForSuit(suit: Suit): number {
   const suitOrder: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
   return suitOrder.indexOf(suit);
+}
+
+/**
+ * Check if all cards in the game are face-up (stock and waste empty, all tableau cards face-up).
+ * This is used to determine when the autosolve button should be available.
+ */
+export function areAllCardsFaceUp(state: GameState): boolean {
+  // Stock must be empty
+  if (state.stock.length > 0) return false;
+  // Waste must be empty
+  if (state.waste.length > 0) return false;
+  // All tableau cards must be face-up
+  for (const column of state.tableau) {
+    for (const card of column) {
+      if (!card.faceUp) return false;
+    }
+  }
+  return true;
 }

@@ -7,8 +7,9 @@ import { Tableau } from './Tableau';
 import { WinDialog } from './WinDialog';
 import { WinAnimation } from './WinAnimation';
 import { DragPreview } from './DragPreview';
+import { AutosolveAnimation } from './AutosolveAnimation';
 import { dealCards } from '../../utils/solitaire/deck';
-import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit } from '../../utils/solitaire/rules';
+import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit, areAllCardsFaceUp } from '../../utils/solitaire/rules';
 import { encodeGameState, decodeGameState } from '../../utils/solitaire/serialization';
 import { generateAllMoves } from '../../utils/solitaire/solver/moveGenerator';
 import { useSolvabilityAnalysis } from '../../hooks/useSolvabilityAnalysis';
@@ -37,6 +38,7 @@ const translations = {
     hint: 'Hint',
     copy: 'Copy',
     paste: 'Paste',
+    autosolve: 'Autosolve',
     moves: 'Moves',
     time: 'Time',
     youWin: 'You Win!',
@@ -59,6 +61,7 @@ const translations = {
     hint: 'Podpowiedz',
     copy: 'Kopiuj',
     paste: 'Wklej',
+    autosolve: 'Rozwiaz',
     moves: 'Ruchy',
     time: 'Czas',
     youWin: 'Wygrales!',
@@ -160,6 +163,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
   const [highlightedDropTarget, setHighlightedDropTarget] = useState<Location | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [hintMove, setHintMove] = useState<SolverMove | null>(null);
+  const [isAutosolving, setIsAutosolving] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -333,6 +337,26 @@ export default function Solitaire({ lang }: SolitaireProps) {
       }, 3000);
     }
   }, [gameState, clearHint]);
+
+  const handleAutosolve = useCallback(() => {
+    if (!areAllCardsFaceUp(gameState) || gameState.gameWon || isAutosolving) return;
+    saveToHistory(gameState);
+    setIsAutosolving(true);
+    setSelectedLocation(null);
+  }, [gameState, isAutosolving, saveToHistory]);
+
+  const handleAutosolveStateUpdate = useCallback((newState: GameState) => {
+    setGameState(newState);
+  }, []);
+
+  const handleAutosolveComplete = useCallback((finalState: GameState) => {
+    setIsAutosolving(false);
+    // Trigger win
+    setGameState(prev => ({
+      ...finalState,
+      gameWon: true,
+    }));
+  }, []);
 
   // Clear hint when game state changes (user made a move)
   useEffect(() => {
@@ -859,8 +883,10 @@ export default function Solitaire({ lang }: SolitaireProps) {
         onHint={handleHint}
         onCopy={handleCopy}
         onPaste={handlePaste}
+        onAutosolve={handleAutosolve}
         canUndo={history.length > 0}
-        hintAvailable={!gameState.gameWon && generateAllMoves(gameState).length > 0}
+        hintAvailable={!gameState.gameWon && !isAutosolving && generateAllMoves(gameState).length > 0}
+        autosolveAvailable={!gameState.gameWon && !isAutosolving && areAllCardsFaceUp(gameState)}
         moveCount={gameState.moveCount}
         elapsedTime={elapsedTime}
         solvabilityResult={solvabilityResult}
@@ -920,6 +946,14 @@ export default function Solitaire({ lang }: SolitaireProps) {
           cards={touchDrag.cards}
           position={touchDrag.currentPosition}
           offset={touchDrag.offset}
+        />
+      )}
+
+      {isAutosolving && (
+        <AutosolveAnimation
+          initialState={gameState}
+          onComplete={handleAutosolveComplete}
+          onStateUpdate={handleAutosolveStateUpdate}
         />
       )}
 
