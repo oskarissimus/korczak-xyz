@@ -844,6 +844,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
     if (!hintMove) return null;
 
     const result: {
+      stockSource?: boolean;
       wasteSource?: boolean;
       foundationTarget?: number;
       tableauSourceColumn?: number;
@@ -853,7 +854,17 @@ export default function Solitaire({ lang }: SolitaireProps) {
 
     // Determine source
     if (hintMove.type === 'pool-to-foundation' || hintMove.type === 'pool-to-tableau') {
-      result.wasteSource = true;
+      // Check if the hint card is at the top of the waste pile
+      const hintCardId = hintMove.from?.cardId;
+      const topWasteCard = gameState.waste.length > 0 ? gameState.waste[gameState.waste.length - 1] : null;
+
+      if (topWasteCard && topWasteCard.id === hintCardId) {
+        // Card is at top of waste, highlight waste
+        result.wasteSource = true;
+      } else {
+        // Card is not at top of waste, highlight stock to indicate user needs to cycle
+        result.stockSource = true;
+      }
     } else if (hintMove.type === 'tableau-to-foundation' || hintMove.type === 'tableau-to-tableau') {
       if (hintMove.from?.zone === 'tableau' && hintMove.from.index !== undefined) {
         result.tableauSourceColumn = hintMove.from.index;
@@ -896,7 +907,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
       <div className="solitaire-board" ref={boardRef}>
         <div className="top-row">
           <div className="stock-waste-area">
-            <Stock cards={gameState.stock} onClick={handleStockClick} />
+            <Stock cards={gameState.stock} onClick={handleStockClick} hintHighlight={hintHighlight?.stockSource} />
             <Waste
               cards={gameState.waste}
               onCardClick={handleWasteClick}
