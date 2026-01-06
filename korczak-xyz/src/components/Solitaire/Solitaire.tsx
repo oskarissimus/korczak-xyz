@@ -13,6 +13,7 @@ import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexFo
 import { encodeGameWithHistory, decodeGameWithHistory } from '../../utils/solitaire/serialization';
 import { generateAllMoves } from '../../utils/solitaire/solver/moveGenerator';
 import { useSolvabilityAnalysis } from '../../hooks/useSolvabilityAnalysis';
+import { useSolitaireDebug } from '../../hooks/useSolitaireDebug';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
 import type { SolverMove } from '../../utils/solitaire/solver/types';
 
@@ -397,6 +398,19 @@ export default function Solitaire({ lang }: SolitaireProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCopy, handlePaste]);
+
+  // Debug console API
+  useSolitaireDebug({
+    gameState,
+    setGameState,
+    history,
+    setHistory,
+    setElapsedTime,
+    setSelectedLocation,
+    solvabilityResult,
+    handleUndo,
+    handleNewGame: handleNewGameConfirm,
+  });
 
   const handleStockClick = useCallback(() => {
     setGameState(prev => {

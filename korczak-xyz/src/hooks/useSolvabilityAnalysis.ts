@@ -71,6 +71,7 @@ export function useSolvabilityAnalysis(
             status,
             statesExplored: solverResult.statesExplored,
             timeMs: solverResult.timeMs,
+            firstWinningMove: solverResult.firstWinningMove,
           });
         }
       };
