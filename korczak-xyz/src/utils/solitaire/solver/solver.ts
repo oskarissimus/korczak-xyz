@@ -17,6 +17,7 @@ interface SolverContext {
   lastProgressTime: number;
   firstWinningMove?: SolverMove;
   moveStack: Array<SolverMove | undefined>; // Track moves at each depth
+  originalState: GameState; // Original state before autoplay, for valid firstWinningMove
 }
 
 /**
@@ -56,10 +57,12 @@ export function solve(
   // Check if state is already known to be winnable
   // Still need to find the first winning move even if we know it's winnable
   if (winnableCache?.has(initialHash)) {
-    // Find the first move that leads to a known winnable state
-    const moves = generateAllMoves(initialState);
+    // Find the first move from ORIGINAL state that leads to a known winnable state
+    // We must use the original state so the move is valid for what the user sees
+    const moves = generateAllMoves(state);
     for (const move of moves) {
-      const newState = autoPlaySafeMoves(applyMove(initialState, move));
+      // Apply move to original state, then autoplay safe moves
+      const newState = autoPlaySafeMoves(applyMove(state, move));
       const newHash = hashState(newState);
       if (winnableCache.has(newHash) || checkWin(newState) || isDefinitelyWinnable(newState)) {
         return {
@@ -125,13 +128,14 @@ export function solve(
     onProgress,
     lastProgressTime: startTime,
     moveStack: new Array(10000),
+    originalState: state, // Keep original for valid firstWinningMove
   };
 
   // Start DFS with the initial state hash already on the path
   context.pathStack[0] = initialHash;
   context.pathDepth = 1;
 
-  const result = dfs(initialState, context, undefined);
+  const result = dfs(initialState, context, undefined, true);
 
   return {
     winnable: result,
@@ -156,10 +160,17 @@ function shouldStop(context: SolverContext): boolean {
 /**
  * Depth-first search with memoization.
  * Returns true if a winning path was found.
+ *
+ * @param isFirstLevel - true only for the first call, to generate moves from original state
  */
 const PROGRESS_INTERVAL_MS = 1000; // Report progress every second
 
-function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | undefined): boolean {
+function dfs(
+  state: GameState,
+  context: SolverContext,
+  lastMove: SolverMove | undefined,
+  isFirstLevel: boolean = false
+): boolean {
   // Check limits
   if (shouldStop(context)) {
     return false;
@@ -181,12 +192,15 @@ function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | un
   }
   context.visited.add(hash);
 
-  // Generate and try all moves, filtering reversible moves
-  const allMoves = generateAllMoves(state);
+  // At first level, generate moves from ORIGINAL state so firstWinningMove is valid
+  // for what the user sees. At deeper levels, use the current (auto-played) state.
+  const stateForMoves = isFirstLevel ? context.originalState : state;
+  const allMoves = generateAllMoves(stateForMoves);
   const moves = allMoves.filter(move => !isReversibleMove(move, lastMove));
 
   for (const move of moves) {
-    const rawNewState = applyMove(state, move);
+    // Apply move to the appropriate state
+    const rawNewState = applyMove(stateForMoves, move);
 
     // Auto-play safe foundation moves after each move
     const newState = autoPlaySafeMoves(rawNewState);
@@ -218,7 +232,8 @@ function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | un
     context.pathStack[context.pathDepth] = newHash;
     context.pathDepth++;
 
-    if (dfs(newState, context, move)) {
+    // Subsequent levels always use false for isFirstLevel
+    if (dfs(newState, context, move, false)) {
       context.pathDepth--;
       return true;
     }
