@@ -1,6 +1,22 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { Card, CardPlaceholder } from './Card';
 import type { Card as CardType } from '../../utils/solitaire/types';
+
+// Mobile detection for responsive spread amounts
+const MOBILE_BREAKPOINT = 580;
+
+function subscribeToResize(callback: () => void) {
+  window.addEventListener('resize', callback);
+  return () => window.removeEventListener('resize', callback);
+}
+
+function getIsMobile() {
+  return typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+function useIsMobile() {
+  return useSyncExternalStore(subscribeToResize, getIsMobile, () => false);
+}
 
 interface CardStackProps {
   cards: CardType[];
@@ -22,6 +38,10 @@ interface CardStackProps {
   hintTarget?: boolean;
 }
 
+// Mobile spread values (smaller for tighter stacking)
+const MOBILE_SPREAD_FACEUP = 18;
+const MOBILE_SPREAD_FACEDOWN = 7;
+
 export function CardStack({
   cards,
   spread = 'none',
@@ -41,6 +61,12 @@ export function CardStack({
   hintSourceIndex,
   hintTarget,
 }: CardStackProps) {
+  const isMobile = useIsMobile();
+
+  // Use smaller spread amounts on mobile for tighter card stacking
+  const effectiveSpreadAmount = isMobile ? MOBILE_SPREAD_FACEUP : spreadAmount;
+  const effectiveFaceDownSpread = isMobile ? MOBILE_SPREAD_FACEDOWN : faceDownSpread;
+
   if (cards.length === 0) {
     return (
       <CardPlaceholder
@@ -57,7 +83,7 @@ export function CardStack({
     if (spread === 'none') return 0;
 
     // Use smaller spread for face-down cards
-    const offset = card.faceUp ? spreadAmount : faceDownSpread;
+    const offset = card.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread;
 
     if (spread === 'vertical') {
       return index * offset;
@@ -73,16 +99,16 @@ export function CardStack({
       style={{
         position: 'relative',
         height: spread === 'vertical'
-          ? `calc(100px + ${cards.reduce((acc, card, i) => acc + (card.faceUp ? spreadAmount : faceDownSpread), 0) - (cards[0]?.faceUp ? spreadAmount : faceDownSpread)}px)`
+          ? `calc(100px + ${cards.reduce((acc, card, i) => acc + (card.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread), 0) - (cards[0]?.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread)}px)`
           : '100px',
         width: spread === 'horizontal'
-          ? `calc(70px + ${(cards.length - 1) * spreadAmount}px)`
+          ? `calc(70px + ${(cards.length - 1) * effectiveSpreadAmount}px)`
           : '70px',
       }}
     >
       {cards.map((card, index) => {
         const offset = cards.slice(0, index).reduce(
-          (acc, c) => acc + (c.faceUp ? spreadAmount : faceDownSpread),
+          (acc, c) => acc + (c.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread),
           0
         );
 
