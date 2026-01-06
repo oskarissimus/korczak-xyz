@@ -38,9 +38,8 @@ interface CardStackProps {
   hintTarget?: boolean;
 }
 
-// Mobile spread values (smaller for tighter stacking)
+// Mobile spread value for face-up cards (smaller for tighter stacking)
 const MOBILE_SPREAD_FACEUP = 18;
-const MOBILE_SPREAD_FACEDOWN = 7;
 
 export function CardStack({
   cards,
@@ -63,9 +62,8 @@ export function CardStack({
 }: CardStackProps) {
   const isMobile = useIsMobile();
 
-  // Use smaller spread amounts on mobile for tighter card stacking
+  // Use smaller spread for face-up cards on mobile for tighter stacking
   const effectiveSpreadAmount = isMobile ? MOBILE_SPREAD_FACEUP : spreadAmount;
-  const effectiveFaceDownSpread = isMobile ? MOBILE_SPREAD_FACEDOWN : faceDownSpread;
 
   if (cards.length === 0) {
     return (
@@ -83,7 +81,7 @@ export function CardStack({
     if (spread === 'none') return 0;
 
     // Use smaller spread for face-down cards
-    const offset = card.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread;
+    const offset = card.faceUp ? effectiveSpreadAmount : faceDownSpread;
 
     if (spread === 'vertical') {
       return index * offset;
@@ -99,7 +97,7 @@ export function CardStack({
       style={{
         position: 'relative',
         height: spread === 'vertical'
-          ? `calc(100px + ${cards.reduce((acc, card, i) => acc + (card.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread), 0) - (cards[0]?.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread)}px)`
+          ? `calc(100px + ${cards.reduce((acc, card, i) => acc + (card.faceUp ? effectiveSpreadAmount : faceDownSpread), 0) - (cards[0]?.faceUp ? effectiveSpreadAmount : faceDownSpread)}px)`
           : '100px',
         width: spread === 'horizontal'
           ? `calc(70px + ${(cards.length - 1) * effectiveSpreadAmount}px)`
@@ -108,7 +106,7 @@ export function CardStack({
     >
       {cards.map((card, index) => {
         const offset = cards.slice(0, index).reduce(
-          (acc, c) => acc + (c.faceUp ? effectiveSpreadAmount : effectiveFaceDownSpread),
+          (acc, c) => acc + (c.faceUp ? effectiveSpreadAmount : faceDownSpread),
           0
         );
 
