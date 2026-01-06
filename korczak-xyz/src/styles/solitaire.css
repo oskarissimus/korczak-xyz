@@ -838,3 +838,9 @@
   background: rgba(0, 255, 0, 0.1);
   border-radius: var(--border-radius, 4px);
 }
+
+.stock-pile.hint-source {
+  --hint-color: #ffd700;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+  border-radius: var(--border-radius, 4px);
+}
