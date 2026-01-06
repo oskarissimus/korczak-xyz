@@ -26,7 +26,8 @@ type WorkerMessage = WorkerResultMessage | WorkerProgressMessage;
 
 export function useSolvabilityAnalysis(
   gameState: GameState,
-  enabled: boolean = true
+  enabled: boolean = true,
+  previousState?: GameState
 ): SolvabilityResult {
   const [result, setResult] = useState<SolvabilityResult>({ status: 'idle' });
   const workerRef = useRef<Worker | null>(null);
@@ -114,12 +115,13 @@ export function useSolvabilityAnalysis(
       workerRef.current?.postMessage({
         type: 'solve',
         gameState,
+        previousState,
         requestId,
       });
     }, 150); // 150ms debounce to avoid rapid re-analysis
 
     return () => clearTimeout(debounceRef.current);
-  }, [gameState, enabled]);
+  }, [gameState, enabled, previousState]);
 
   return result;
 }

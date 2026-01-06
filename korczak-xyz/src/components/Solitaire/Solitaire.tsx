@@ -168,10 +168,12 @@ export default function Solitaire({ lang }: SolitaireProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Solvability analysis
+  // Solvability analysis - pass previous state to avoid suggesting reverse moves
+  const previousState = history.length > 0 ? history[history.length - 1] : undefined;
   const solvabilityResult = useSolvabilityAnalysis(
     gameState,
-    !gameState.gameWon // Disable analysis when game is won
+    !gameState.gameWon, // Disable analysis when game is won
+    previousState
   );
 
   // Timer effect

@@ -18,6 +18,7 @@ interface SolverContext {
   firstWinningMove?: SolverMove;
   moveStack: Array<SolverMove | undefined>; // Track moves at each depth
   originalState: GameState; // Original state before autoplay, for valid firstWinningMove
+  previousStateHash?: number; // Hash of previous state to avoid suggesting reverse moves
 }
 
 /**
@@ -45,7 +46,8 @@ export function solve(
   config: Partial<SolverConfig> = {},
   shouldCancel?: () => boolean,
   onProgress?: (statesExplored: number, timeMs: number) => void,
-  winnableCache?: WinnableStateCache
+  winnableCache?: WinnableStateCache,
+  previousState?: GameState
 ): SolverResult {
   const fullConfig: SolverConfig = { ...DEFAULT_SOLVER_CONFIG, ...config };
   const startTime = performance.now();
@@ -53,6 +55,9 @@ export function solve(
   // Auto-play safe foundation moves first
   const initialState = autoPlaySafeMoves(state);
   const initialHash = hashState(initialState);
+
+  // Compute hash of previous state to avoid suggesting moves that undo the last action
+  const previousStateHash = previousState ? hashState(autoPlaySafeMoves(previousState)) : undefined;
 
   // Check if state is already known to be winnable
   // Still need to find the first winning move even if we know it's winnable
@@ -64,6 +69,10 @@ export function solve(
       // Apply move to original state, then autoplay safe moves
       const newState = autoPlaySafeMoves(applyMove(state, move));
       const newHash = hashState(newState);
+      // Skip moves that would return to the previous state (avoid cycling hints)
+      if (previousStateHash !== undefined && newHash === previousStateHash) {
+        continue;
+      }
       if (winnableCache.has(newHash) || checkWin(newState) || isDefinitelyWinnable(newState)) {
         return {
           winnable: true,
@@ -129,6 +138,7 @@ export function solve(
     lastProgressTime: startTime,
     moveStack: new Array(10000),
     originalState: state, // Keep original for valid firstWinningMove
+    previousStateHash, // Avoid suggesting moves that return to previous state
   };
 
   // Start DFS with the initial state hash already on the path
@@ -205,6 +215,11 @@ function dfs(
     // Auto-play safe foundation moves after each move
     const newState = autoPlaySafeMoves(rawNewState);
     const newHash = hashState(newState);
+
+    // At first level, skip moves that would return to the previous state (avoid cycling hints)
+    if (isFirstLevel && context.previousStateHash !== undefined && newHash === context.previousStateHash) {
+      continue;
+    }
 
     // Track this move at current depth
     context.moveStack[context.pathDepth - 1] = move;

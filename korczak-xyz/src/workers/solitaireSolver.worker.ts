@@ -7,6 +7,7 @@ interface SolveMessage {
   type: 'solve';
   requestId: string;
   gameState: GameState;
+  previousState?: GameState;
   config?: Partial<SolverConfig>;
 }
 
@@ -68,10 +69,12 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   }
 
   if (message.type === 'solve') {
-    const { requestId, gameState, config } = message;
+    const { requestId, gameState, previousState, config } = message;
 
     // Check cache first - stock/waste cycling produces same serialized state
-    const stateKey = serializeState(gameState);
+    // Include previousState in cache key to avoid suggesting reverse moves
+    const previousStateKey = previousState ? serializeState(previousState) : '';
+    const stateKey = serializeState(gameState) + '|' + previousStateKey;
     const cachedResult = resultCache.get(stateKey);
     if (cachedResult) {
       const response: ResultMessage = {
@@ -88,7 +91,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     currentRequestId = requestId;
 
     try {
-      const result = solve(gameState, config, shouldCancel, reportProgress, winnableCache);
+      const result = solve(gameState, config, shouldCancel, reportProgress, winnableCache, previousState);
 
       // Cache result if solve completed (not cancelled)
       if (!cancelFlag) {
