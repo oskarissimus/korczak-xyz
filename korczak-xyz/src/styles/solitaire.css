@@ -601,6 +601,44 @@
   }
 }
 
+/* Flying card (autosolve animation) - needs explicit styling since it's position: fixed outside container */
+.flying-card {
+  background: var(--retro-white) !important;
+  width: 70px !important;
+  height: 100px !important;
+}
+
+@media (max-width: 580px) {
+  .flying-card {
+    /* Calculate card size based on viewport width, matching the solitaire-board formula */
+    /* Formula: (100vw - 8px) / 7.857 where 7.857 = 7 cards + 6 gaps scaled */
+    width: calc((min(580px, 100vw) - 8px) / 7.857) !important;
+    height: calc(((min(580px, 100vw) - 8px) / 7.857) * 100 / 70) !important;
+  }
+
+  .flying-card .card-rank {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.274);
+  }
+
+  .flying-card .card-suit {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.229);
+  }
+
+  .flying-card .card-suit-large {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.457);
+  }
+
+  .flying-card .card-corner.top-left {
+    top: 2px;
+    left: 3px;
+  }
+
+  .flying-card .card-corner.bottom-right {
+    bottom: 2px;
+    right: 3px;
+  }
+}
+
 /* Touch drag styles */
 .solitaire-card.touch-dragging {
   opacity: 0.4;
@@ -615,6 +653,39 @@
 
 .drag-preview .solitaire-card {
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.3);
+  /* Explicit styling for fixed-positioned cards outside container context */
+  background: var(--retro-white);
+  width: 70px;
+  height: 100px;
+}
+
+@media (max-width: 580px) {
+  .drag-preview .solitaire-card {
+    width: calc((min(580px, 100vw) - 8px) / 7.857);
+    height: calc(((min(580px, 100vw) - 8px) / 7.857) * 100 / 70);
+  }
+
+  .drag-preview .solitaire-card .card-rank {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.274);
+  }
+
+  .drag-preview .solitaire-card .card-suit {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.229);
+  }
+
+  .drag-preview .solitaire-card .card-suit-large {
+    font-size: calc((min(580px, 100vw) - 8px) / 7.857 * 0.457);
+  }
+
+  .drag-preview .solitaire-card .card-corner.top-left {
+    top: 2px;
+    left: 3px;
+  }
+
+  .drag-preview .solitaire-card .card-corner.bottom-right {
+    bottom: 2px;
+    right: 3px;
+  }
 }
 
 /* Valid drop target highlight */
