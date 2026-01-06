@@ -10,7 +10,7 @@ import { DragPreview } from './DragPreview';
 import { AutosolveAnimation } from './AutosolveAnimation';
 import { dealCards } from '../../utils/solitaire/deck';
 import { canPlaceOnFoundation, canPlaceOnTableau, checkWin, getFoundationIndexForSuit, areAllCardsFaceUp } from '../../utils/solitaire/rules';
-import { encodeGameState, decodeGameState } from '../../utils/solitaire/serialization';
+import { encodeGameWithHistory, decodeGameWithHistory } from '../../utils/solitaire/serialization';
 import { generateAllMoves } from '../../utils/solitaire/solver/moveGenerator';
 import { useSolvabilityAnalysis } from '../../hooks/useSolvabilityAnalysis';
 import type { GameState, Card, Location, Move } from '../../utils/solitaire/types';
@@ -287,23 +287,22 @@ export default function Solitaire({ lang }: SolitaireProps) {
 
   const handleCopy = useCallback(async () => {
     try {
-      const encoded = encodeGameState(gameState);
+      const encoded = encodeGameWithHistory(gameState, history);
       await navigator.clipboard.writeText(encoded);
       setToast({ message: t.copied, type: 'success' });
     } catch {
       setToast({ message: t.invalidPaste, type: 'error' });
     }
-  }, [gameState, t]);
+  }, [gameState, history, t]);
 
   const handlePaste = useCallback(async () => {
     try {
       const text = await navigator.clipboard.readText();
-      const decoded = decodeGameState(text);
+      const decoded = decodeGameWithHistory(text);
       if (decoded) {
-        saveToHistory(gameState);
-        setGameState(decoded);
+        setGameState(decoded.state);
         setElapsedTime(0);
-        setHistory([]);
+        setHistory(decoded.history);
         setSelectedLocation(null);
         setToast({ message: t.loaded, type: 'success' });
       } else {
@@ -312,7 +311,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
     } catch {
       setToast({ message: t.invalidPaste, type: 'error' });
     }
-  }, [gameState, saveToHistory, t]);
+  }, [t]);
 
   const clearHint = useCallback(() => {
     if (hintTimeoutRef.current) {
@@ -326,7 +325,17 @@ export default function Solitaire({ lang }: SolitaireProps) {
     // Clear any existing hint
     clearHint();
 
-    // Get all available moves
+    // Use the solver's winning move if available (ensures hint leads to a win)
+    if (solvabilityResult.firstWinningMove) {
+      setHintMove(solvabilityResult.firstWinningMove);
+      // Auto-clear hint after 3 seconds
+      hintTimeoutRef.current = setTimeout(() => {
+        setHintMove(null);
+      }, 3000);
+      return;
+    }
+
+    // Fallback to generateAllMoves if solver hasn't completed or game is in unknown state
     const moves = generateAllMoves(gameState);
     if (moves.length > 0) {
       // Take the first (highest priority) move
@@ -336,7 +345,7 @@ export default function Solitaire({ lang }: SolitaireProps) {
         setHintMove(null);
       }, 3000);
     }
-  }, [gameState, clearHint]);
+  }, [gameState, clearHint, solvabilityResult.firstWinningMove]);
 
   const handleAutosolve = useCallback(() => {
     if (!areAllCardsFaceUp(gameState) || gameState.gameWon || isAutosolving) return;

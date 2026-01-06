@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import type { GameState } from '../utils/solitaire/types';
-import type { SolvabilityStatus, SolverResult } from '../utils/solitaire/solver';
+import type { SolvabilityStatus, SolverResult, SolverMove } from '../utils/solitaire/solver';
 
 export interface SolvabilityResult {
   status: SolvabilityStatus;
   statesExplored?: number;
   timeMs?: number;
+  firstWinningMove?: SolverMove;
 }
 
 interface WorkerResultMessage {

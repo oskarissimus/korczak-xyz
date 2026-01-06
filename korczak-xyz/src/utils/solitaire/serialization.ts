@@ -130,3 +130,41 @@ export function decodeGameState(encoded: string): GameState | null {
     return null;
   }
 }
+
+// Encode game state with full history for undo support
+export function encodeGameWithHistory(state: GameState, history: GameState[]): string {
+  const currentEncoded = encodeGameState(state);
+  if (history.length === 0) {
+    return currentEncoded;
+  }
+  const historyEncoded = history.map(h => encodeGameState(h));
+  return [currentEncoded, ...historyEncoded].join('#');
+}
+
+// Decode game state with history, backwards compatible with old format
+export function decodeGameWithHistory(encoded: string): { state: GameState; history: GameState[] } | null {
+  try {
+    // Check if it contains history (# separator)
+    if (encoded.includes('#')) {
+      const parts = encoded.split('#');
+      const state = decodeGameState(parts[0]);
+      if (!state) return null;
+
+      const history: GameState[] = [];
+      for (let i = 1; i < parts.length; i++) {
+        const historyState = decodeGameState(parts[i]);
+        if (historyState) {
+          history.push(historyState);
+        }
+      }
+      return { state, history };
+    }
+
+    // Legacy format: just game state, no history
+    const state = decodeGameState(encoded);
+    if (!state) return null;
+    return { state, history: [] };
+  } catch {
+    return null;
+  }
+}

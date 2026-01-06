@@ -10,6 +10,7 @@ export interface SolverResult {
   timedOut: boolean;
   statesExplored: number;
   timeMs: number;
+  firstWinningMove?: SolverMove;
 }
 
 export type SolvabilityStatus =

@@ -15,6 +15,7 @@ interface SolverContext {
   shouldCancel?: () => boolean;
   onProgress?: (statesExplored: number, timeMs: number) => void;
   lastProgressTime: number;
+  firstWinningMove?: SolverMove;
 }
 
 /**
