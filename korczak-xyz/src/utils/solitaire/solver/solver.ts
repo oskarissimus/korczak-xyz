@@ -18,7 +18,7 @@ interface SolverContext {
   firstWinningMove?: SolverMove;
   moveStack: Array<SolverMove | undefined>; // Track moves at each depth
   originalState: GameState; // Original state before autoplay, for valid firstWinningMove
-  previousStateHash?: number; // Hash of previous state to avoid suggesting reverse moves
+  historyHashes?: Set<number>; // Hashes of all history states to avoid cycles
 }
 
 /**
@@ -47,7 +47,7 @@ export function solve(
   shouldCancel?: () => boolean,
   onProgress?: (statesExplored: number, timeMs: number) => void,
   winnableCache?: WinnableStateCache,
-  previousState?: GameState
+  history?: GameState[]
 ): SolverResult {
   const fullConfig: SolverConfig = { ...DEFAULT_SOLVER_CONFIG, ...config };
   const startTime = performance.now();
@@ -56,8 +56,13 @@ export function solve(
   const initialState = autoPlaySafeMoves(state);
   const initialHash = hashState(initialState);
 
-  // Compute hash of previous state to avoid suggesting moves that undo the last action
-  const previousStateHash = previousState ? hashState(autoPlaySafeMoves(previousState)) : undefined;
+  // Build set of hashes from all history states to avoid suggesting cycles
+  const historyHashes = new Set<number>();
+  if (history) {
+    for (const historyState of history) {
+      historyHashes.add(hashState(autoPlaySafeMoves(historyState)));
+    }
+  }
 
   // Check if state is already known to be winnable
   // Still need to find the first winning move even if we know it's winnable
@@ -69,8 +74,8 @@ export function solve(
       // Apply move to original state, then autoplay safe moves
       const newState = autoPlaySafeMoves(applyMove(state, move));
       const newHash = hashState(newState);
-      // Skip moves that would return to the previous state (avoid cycling hints)
-      if (previousStateHash !== undefined && newHash === previousStateHash) {
+      // Skip moves that would return to any state in the history (avoid cycling hints)
+      if (historyHashes.has(newHash)) {
         continue;
       }
       if (winnableCache.has(newHash) || checkWin(newState) || isDefinitelyWinnable(newState)) {
@@ -138,7 +143,7 @@ export function solve(
     lastProgressTime: startTime,
     moveStack: new Array(10000),
     originalState: state, // Keep original for valid firstWinningMove
-    previousStateHash, // Avoid suggesting moves that return to previous state
+    historyHashes: historyHashes.size > 0 ? historyHashes : undefined, // Avoid cycles
   };
 
   // Start DFS with the initial state hash already on the path
@@ -216,8 +221,8 @@ function dfs(
     const newState = autoPlaySafeMoves(rawNewState);
     const newHash = hashState(newState);
 
-    // At first level, skip moves that would return to the previous state (avoid cycling hints)
-    if (isFirstLevel && context.previousStateHash !== undefined && newHash === context.previousStateHash) {
+    // At first level, skip moves that would return to any state in history (avoid cycling hints)
+    if (isFirstLevel && context.historyHashes?.has(newHash)) {
       continue;
     }
 
