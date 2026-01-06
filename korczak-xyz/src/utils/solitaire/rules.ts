@@ -97,15 +97,11 @@ export function getFoundationIndexForSuit(suit: Suit): number {
 }
 
 /**
- * Check if all cards in the game are face-up (stock and waste empty, all tableau cards face-up).
+ * Check if all tableau cards are face-up.
  * This is used to determine when the autosolve button should be available.
+ * Stock/waste cards don't need to be empty - autosolve will cycle through them.
  */
 export function areAllCardsFaceUp(state: GameState): boolean {
-  // Stock must be empty
-  if (state.stock.length > 0) return false;
-  // Waste must be empty
-  if (state.waste.length > 0) return false;
-  // All tableau cards must be face-up
   for (const column of state.tableau) {
     for (const card of column) {
       if (!card.faceUp) return false;

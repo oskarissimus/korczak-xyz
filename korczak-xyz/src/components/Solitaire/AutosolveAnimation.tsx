@@ -16,7 +16,14 @@ interface FlyingCard {
   toX: number;
   toY: number;
   progress: number; // 0 to 1
+  isFlipping?: boolean; // For stock draw animation
 }
+
+type AutosolveMove =
+  | { type: 'tableau-to-foundation'; card: Card; columnIndex: number; cardIndex: number; foundationIndex: number }
+  | { type: 'waste-to-foundation'; card: Card; foundationIndex: number }
+  | { type: 'draw-stock'; card: Card }
+  | { type: 'reset-stock' };
 
 const ANIMATION_DURATION = 200; // ms per card
 
@@ -29,9 +36,31 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
   const startTimeRef = useRef<number>(0);
   const isProcessingRef = useRef(false);
 
-  // Find the next card that can be moved to foundation
-  const findNextMove = useCallback((state: GameState): { card: Card; columnIndex: number; cardIndex: number; foundationIndex: number } | null => {
-    // Priority: find lowest rank cards first (Aces, then 2s, etc.)
+  // Track stock cycles to prevent infinite loops
+  const stockCycleCountRef = useRef(0);
+  const lastFoundationMoveCountRef = useRef(initialState.moveCount);
+
+  // Sync state updates to parent - use effect to avoid updating during render
+  const prevGameStateRef = useRef(gameState);
+  useEffect(() => {
+    if (prevGameStateRef.current !== gameState) {
+      prevGameStateRef.current = gameState;
+      onStateUpdate(gameState);
+    }
+  }, [gameState, onStateUpdate]);
+
+  // Find the next move to make
+  const findNextMove = useCallback((state: GameState): AutosolveMove | null => {
+    // 1. Check if top waste card can go to any foundation
+    if (state.waste.length > 0) {
+      const wasteCard = state.waste[state.waste.length - 1];
+      const foundationIndex = getFoundationIndexForSuit(wasteCard.suit);
+      if (canPlaceOnFoundation(wasteCard, state.foundations[foundationIndex], foundationIndex)) {
+        return { type: 'waste-to-foundation', card: wasteCard, foundationIndex };
+      }
+    }
+
+    // 2. Check tableau cards - find lowest rank cards first (Aces, then 2s, etc.)
     for (let rank = 1; rank <= 13; rank++) {
       for (let colIdx = 0; colIdx < 7; colIdx++) {
         const column = state.tableau[colIdx];
@@ -45,11 +74,24 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
         if (getRankValue(card.rank) === rank) {
           const foundationIndex = getFoundationIndexForSuit(card.suit);
           if (canPlaceOnFoundation(card, state.foundations[foundationIndex], foundationIndex)) {
-            return { card, columnIndex: colIdx, cardIndex: cardIdx, foundationIndex };
+            return { type: 'tableau-to-foundation', card, columnIndex: colIdx, cardIndex: cardIdx, foundationIndex };
           }
         }
       }
     }
+
+    // 3. If stock has cards, draw from stock
+    if (state.stock.length > 0) {
+      const card = state.stock[state.stock.length - 1];
+      return { type: 'draw-stock', card };
+    }
+
+    // 4. If stock empty but waste has cards, reset stock from waste
+    if (state.waste.length > 0) {
+      return { type: 'reset-stock' };
+    }
+
+    // 5. No more moves - done
     return null;
   }, []);
 
@@ -60,6 +102,101 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
     const rect = element.getBoundingClientRect();
     return { x: rect.left, y: rect.top };
   }, []);
+
+  // Execute tableau to foundation move
+  const executeTableauToFoundation = useCallback((move: Extract<AutosolveMove, { type: 'tableau-to-foundation' }>) => {
+    setGameState(prev => {
+      const newTableau = [...prev.tableau] as GameState['tableau'];
+      const column = [...newTableau[move.columnIndex]];
+      column.pop();
+      newTableau[move.columnIndex] = column;
+
+      const newFoundations = [...prev.foundations] as GameState['foundations'];
+      newFoundations[move.foundationIndex] = [...newFoundations[move.foundationIndex], { ...move.card, faceUp: true }];
+
+      // Track foundation move for cycle detection
+      lastFoundationMoveCountRef.current = prev.moveCount + 1;
+      stockCycleCountRef.current = 0;
+
+      return {
+        ...prev,
+        tableau: newTableau,
+        foundations: newFoundations,
+        moveCount: prev.moveCount + 1,
+      };
+    });
+
+    setFlyingCard(null);
+    isProcessingRef.current = false;
+  }, []);
+
+  // Execute waste to foundation move
+  const executeWasteToFoundation = useCallback((move: Extract<AutosolveMove, { type: 'waste-to-foundation' }>) => {
+    setGameState(prev => {
+      const newWaste = prev.waste.slice(0, -1);
+
+      const newFoundations = [...prev.foundations] as GameState['foundations'];
+      newFoundations[move.foundationIndex] = [...newFoundations[move.foundationIndex], { ...move.card, faceUp: true }];
+
+      // Track foundation move for cycle detection
+      lastFoundationMoveCountRef.current = prev.moveCount + 1;
+      stockCycleCountRef.current = 0;
+
+      return {
+        ...prev,
+        waste: newWaste,
+        foundations: newFoundations,
+        moveCount: prev.moveCount + 1,
+      };
+    });
+
+    setFlyingCard(null);
+    isProcessingRef.current = false;
+  }, []);
+
+  // Execute draw from stock
+  const executeDrawStock = useCallback((move: Extract<AutosolveMove, { type: 'draw-stock' }>) => {
+    setGameState(prev => {
+      const newStock = prev.stock.slice(0, -1);
+      const newWaste = [...prev.waste, { ...move.card, faceUp: true }];
+
+      return {
+        ...prev,
+        stock: newStock,
+        waste: newWaste,
+      };
+    });
+
+    setFlyingCard(null);
+    isProcessingRef.current = false;
+  }, []);
+
+  // Execute reset stock from waste
+  const executeResetStock = useCallback(() => {
+    setGameState(prev => {
+      // Increment cycle count
+      stockCycleCountRef.current += 1;
+
+      // Check if we've cycled without making progress - game is stuck
+      if (stockCycleCountRef.current > 1) {
+        // We've gone through the entire stock twice without a foundation move
+        // This means no more moves are possible
+        setTimeout(() => onComplete(prev), 50);
+        return prev;
+      }
+
+      const newStock = [...prev.waste].reverse().map(c => ({ ...c, faceUp: false }));
+
+      return {
+        ...prev,
+        stock: newStock,
+        waste: [],
+      };
+    });
+
+    setFlyingCard(null);
+    isProcessingRef.current = false;
+  }, [onComplete]);
 
   // Process next move
   const processNextMove = useCallback(() => {
@@ -74,70 +211,120 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
 
     isProcessingRef.current = true;
 
-    // Get positions for animation
-    const fromPos = getElementPosition(`[data-column-index="${move.columnIndex}"] .solitaire-card:last-child`);
-    const toPos = getElementPosition(`[data-foundation-index="${move.foundationIndex}"]`);
+    // Handle different move types
+    if (move.type === 'tableau-to-foundation') {
+      const fromPos = getElementPosition(`[data-column-index="${move.columnIndex}"] .solitaire-card:last-child`);
+      const toPos = getElementPosition(`[data-foundation-index="${move.foundationIndex}"]`);
 
-    if (!fromPos || !toPos) {
-      // Fallback: skip animation for this card
-      moveCardImmediately(move);
-      return;
-    }
-
-    // Start flying animation
-    setFlyingCard({
-      card: move.card,
-      fromX: fromPos.x,
-      fromY: fromPos.y,
-      toX: toPos.x,
-      toY: toPos.y,
-      progress: 0,
-    });
-
-    startTimeRef.current = performance.now();
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTimeRef.current;
-      const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
-
-      setFlyingCard(prev => prev ? { ...prev, progress } : null);
-
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        // Animation complete - update game state
-        moveCardImmediately(move);
+      if (!fromPos || !toPos) {
+        executeTableauToFoundation(move);
+        return;
       }
-    };
 
-    animationRef.current = requestAnimationFrame(animate);
-  }, [gameState, findNextMove, getElementPosition, onComplete]);
+      setFlyingCard({
+        card: move.card,
+        fromX: fromPos.x,
+        fromY: fromPos.y,
+        toX: toPos.x,
+        toY: toPos.y,
+        progress: 0,
+      });
 
-  // Move card without animation (or after animation completes)
-  const moveCardImmediately = useCallback((move: { card: Card; columnIndex: number; cardIndex: number; foundationIndex: number }) => {
-    setGameState(prev => {
-      const newTableau = [...prev.tableau] as GameState['tableau'];
-      const column = [...newTableau[move.columnIndex]];
-      column.pop(); // Remove top card
-      newTableau[move.columnIndex] = column;
+      startTimeRef.current = performance.now();
+      const animateMove = move;
 
-      const newFoundations = [...prev.foundations] as GameState['foundations'];
-      newFoundations[move.foundationIndex] = [...newFoundations[move.foundationIndex], { ...move.card, faceUp: true }];
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
 
-      const newState: GameState = {
-        ...prev,
-        tableau: newTableau,
-        foundations: newFoundations,
-        moveCount: prev.moveCount + 1,
+        setFlyingCard(prev => prev ? { ...prev, progress } : null);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          executeTableauToFoundation(animateMove);
+        }
       };
 
-      onStateUpdate(newState);
-      return newState;
-    });
+      animationRef.current = requestAnimationFrame(animate);
+    } else if (move.type === 'waste-to-foundation') {
+      const fromPos = getElementPosition('.waste-pile .solitaire-card:last-child');
+      const toPos = getElementPosition(`[data-foundation-index="${move.foundationIndex}"]`);
 
-    setFlyingCard(null);
-    isProcessingRef.current = false;
-  }, [onStateUpdate]);
+      if (!fromPos || !toPos) {
+        executeWasteToFoundation(move);
+        return;
+      }
+
+      setFlyingCard({
+        card: move.card,
+        fromX: fromPos.x,
+        fromY: fromPos.y,
+        toX: toPos.x,
+        toY: toPos.y,
+        progress: 0,
+      });
+
+      startTimeRef.current = performance.now();
+      const animateMove = move;
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+
+        setFlyingCard(prev => prev ? { ...prev, progress } : null);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          executeWasteToFoundation(animateMove);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    } else if (move.type === 'draw-stock') {
+      const fromPos = getElementPosition('.stock-pile');
+      const toPos = getElementPosition('.waste-pile');
+
+      if (!fromPos || !toPos) {
+        executeDrawStock(move);
+        return;
+      }
+
+      setFlyingCard({
+        card: move.card,
+        fromX: fromPos.x,
+        fromY: fromPos.y,
+        toX: toPos.x,
+        toY: toPos.y,
+        progress: 0,
+        isFlipping: true,
+      });
+
+      startTimeRef.current = performance.now();
+      const animateMove = move;
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+
+        setFlyingCard(prev => prev ? { ...prev, progress } : null);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          executeDrawStock(animateMove);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    } else if (move.type === 'reset-stock') {
+      // For reset, just execute immediately with a brief delay
+      setTimeout(() => {
+        executeResetStock();
+      }, 100);
+    }
+  }, [gameState, findNextMove, getElementPosition, onComplete, executeTableauToFoundation, executeWasteToFoundation, executeDrawStock, executeResetStock]);
 
   // Start processing moves
   useEffect(() => {
@@ -167,6 +354,29 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
   const currentX = flyingCard.fromX + (flyingCard.toX - flyingCard.fromX) * easedProgress;
   const currentY = flyingCard.fromY + (flyingCard.toY - flyingCard.fromY) * easedProgress;
 
+  // For stock draw, show card back at start, face at end
+  const showFace = flyingCard.isFlipping ? flyingCard.progress > 0.5 : true;
+
+  if (!showFace) {
+    // Show card back during first half of flip animation
+    return (
+      <div
+        className="solitaire-card face-down flying-card"
+        style={{
+          position: 'fixed',
+          left: currentX,
+          top: currentY,
+          zIndex: 1000,
+          pointerEvents: 'none',
+          transition: 'none',
+          transform: `rotateY(${flyingCard.progress * 180}deg)`,
+        }}
+      >
+        <div className="card-back"></div>
+      </div>
+    );
+  }
+
   const suitSymbol = SUIT_SYMBOLS[flyingCard.card.suit];
   const suitColor = SUIT_COLORS[flyingCard.card.suit];
 
@@ -180,6 +390,7 @@ export function AutosolveAnimation({ initialState, onComplete, onStateUpdate }: 
         zIndex: 1000,
         pointerEvents: 'none',
         transition: 'none',
+        transform: flyingCard.isFlipping ? `rotateY(${180 - (flyingCard.progress - 0.5) * 2 * 180}deg)` : undefined,
       }}
     >
       <div className="card-corner top-left">
