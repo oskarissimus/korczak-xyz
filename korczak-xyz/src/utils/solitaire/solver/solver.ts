@@ -16,6 +16,7 @@ interface SolverContext {
   onProgress?: (statesExplored: number, timeMs: number) => void;
   lastProgressTime: number;
   firstWinningMove?: SolverMove;
+  moveStack: Array<SolverMove | undefined>; // Track moves at each depth
 }
 
 /**
@@ -53,7 +54,25 @@ export function solve(
   const initialHash = hashState(initialState);
 
   // Check if state is already known to be winnable
+  // Still need to find the first winning move even if we know it's winnable
   if (winnableCache?.has(initialHash)) {
+    // Find the first move that leads to a known winnable state
+    const moves = generateAllMoves(initialState);
+    for (const move of moves) {
+      const newState = autoPlaySafeMoves(applyMove(initialState, move));
+      const newHash = hashState(newState);
+      if (winnableCache.has(newHash) || checkWin(newState) || isDefinitelyWinnable(newState)) {
+        return {
+          winnable: true,
+          timedOut: false,
+          statesExplored: 0,
+          timeMs: performance.now() - startTime,
+          firstWinningMove: move,
+        };
+      }
+    }
+    // Fallback: we know it's winnable but couldn't find the move in cache
+    // This shouldn't happen if cache is consistent, but return winnable anyway
     return {
       winnable: true,
       timedOut: false,
@@ -105,6 +124,7 @@ export function solve(
     shouldCancel,
     onProgress,
     lastProgressTime: startTime,
+    moveStack: new Array(10000),
   };
 
   // Start DFS with the initial state hash already on the path
@@ -118,6 +138,7 @@ export function solve(
     timedOut: !result && shouldStop(context),
     statesExplored: context.statesExplored,
     timeMs: performance.now() - startTime,
+    firstWinningMove: context.firstWinningMove,
   };
 }
 
@@ -171,10 +192,15 @@ function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | un
     const newState = autoPlaySafeMoves(rawNewState);
     const newHash = hashState(newState);
 
+    // Track this move at current depth
+    context.moveStack[context.pathDepth - 1] = move;
+
     // Check if this state is already known to be winnable
     if (context.winnableCache?.has(newHash)) {
       // Mark all states on the current path as winnable
       context.winnableCache.addAll(context.pathStack.slice(0, context.pathDepth));
+      // Capture the first move of the winning path
+      context.firstWinningMove = context.moveStack[0];
       return true;
     }
 
@@ -183,6 +209,8 @@ function dfs(state: GameState, context: SolverContext, lastMove: SolverMove | un
       // Mark all states on the current path as winnable
       context.pathStack[context.pathDepth] = newHash;
       context.winnableCache?.addAll(context.pathStack.slice(0, context.pathDepth + 1));
+      // Capture the first move of the winning path
+      context.firstWinningMove = context.moveStack[0];
       return true;
     }
 
