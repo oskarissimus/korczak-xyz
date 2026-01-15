@@ -109,6 +109,9 @@ export const ui = {
     'minesweeper.gameOver': 'Game Over!',
     'minesweeper.flagMode': 'Flag Mode',
     'minesweeper.digMode': 'Dig Mode',
+
+    // Status bar
+    'statusBar.lastUpdated': 'Last updated:',
   },
   pl: {
     // Navigation
@@ -209,6 +212,9 @@ export const ui = {
     'minesweeper.gameOver': 'Koniec Gry!',
     'minesweeper.flagMode': 'Tryb Flagi',
     'minesweeper.digMode': 'Tryb Kopania',
+
+    // Status bar
+    'statusBar.lastUpdated': 'Aktualizacja:',
   },
 } as const;
 

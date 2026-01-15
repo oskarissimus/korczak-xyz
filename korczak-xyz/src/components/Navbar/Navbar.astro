@@ -80,7 +80,7 @@ function isActive(itemPath: string): boolean {
       <a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a>
     </div>
     <div class="status-panel">
-      Last updated: <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
+      {t('statusBar.lastUpdated')} <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
     </div>
   </div>
 </div>
