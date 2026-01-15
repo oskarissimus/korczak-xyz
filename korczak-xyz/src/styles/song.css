@@ -60,7 +60,7 @@
 
 /* Chord line styling - highlighted and bold */
 .blog_post .chord-line {
-    color: var(--retro-cyan) !important;
+    color: var(--retro-yellow) !important;
     font-weight: bold;
 }
 
