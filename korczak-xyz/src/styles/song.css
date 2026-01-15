@@ -366,7 +366,7 @@
 
 /* Light mode chord styling */
 .blog_post.light-mode .chord-line {
-    color: #0066cc !important;
+    color: var(--retro-red) !important;
 }
 
 /* Light mode - change wrapper background only on mobile */
