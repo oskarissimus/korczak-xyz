@@ -1,5 +1,6 @@
 ---
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
+import { execSync } from 'child_process';
 
 interface Props {
   lang: Lang;
@@ -7,6 +8,10 @@ interface Props {
 }
 
 const { lang, currentPath } = Astro.props;
+
+// Build-time info (runs at build, not in browser)
+const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+const buildTimestamp = new Date().toISOString();
 const t = useTranslations(lang);
 
 const navigation = [
@@ -66,6 +71,13 @@ function isActive(itemPath: string): boolean {
         <a href={plPath} class={`lang-btn ${lang === 'pl' ? 'active' : ''}`}>PL</a>
       </div>
     </nav>
+
+    <!-- Build info -->
+    <div class="navbar-build-info">
+      <a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a>
+      <span class="build-divider">|</span>
+      <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
+    </div>
   </div>
 </div>
 
@@ -175,6 +187,30 @@ function isActive(itemPath: string): boolean {
     color: var(--retro-yellow);
   }
 
+  .navbar-build-info {
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--retro-gray);
+    padding-top: 8px;
+    border-top: 1px solid var(--retro-dark-gray);
+    margin-top: 5px;
+  }
+
+  .navbar-build-info a {
+    color: var(--retro-cyan);
+    text-decoration: none;
+  }
+
+  .navbar-build-info a:hover {
+    text-decoration: underline;
+  }
+
+  .build-divider {
+    color: var(--retro-dark-gray);
+    margin: 0 5px;
+  }
+
   /* Mobile styles */
   @media (max-width: 768px) {
     .menu-btn {
@@ -211,4 +247,22 @@ function isActive(itemPath: string): boolean {
   menuButton?.addEventListener('click', () => {
     mainNav?.classList.toggle('show');
   });
+
+  // Format build timestamp based on locale
+  const buildTimeEl = document.getElementById('navbar-build-time');
+  if (buildTimeEl) {
+    const timestamp = buildTimeEl.dataset.timestamp;
+    if (timestamp) {
+      const date = new Date(timestamp);
+      const lang = document.documentElement.lang || 'en';
+      const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
+      buildTimeEl.textContent = date.toLocaleString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  }
 </script>
