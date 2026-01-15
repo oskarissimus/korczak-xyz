@@ -58,6 +58,12 @@
     color: var(--retro-green) !important;
 }
 
+/* Chord line styling - highlighted and bold */
+.blog_post .chord-line {
+    color: var(--retro-cyan) !important;
+    font-weight: bold;
+}
+
 /* Remove any prism highlighting backgrounds */
 .blog_post .token.punctuation,
 .blog_post .token.operator,
@@ -356,6 +362,11 @@
 .blog_post.light-mode .token,
 .blog_post.light-mode pre code span {
     color: #000 !important;
+}
+
+/* Light mode chord styling */
+.blog_post.light-mode .chord-line {
+    color: #0066cc !important;
 }
 
 /* Light mode - change wrapper background only on mobile */

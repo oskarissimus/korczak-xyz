@@ -333,10 +333,21 @@ function formatDate(date: Date, locale: string): string {
           processedLines = lines.filter(line => !isChordLine(line));
         }
 
+        // Helper function to render a group with chord lines highlighted
+        function renderGroup(group: string): string {
+          const groupLines = group.split('\n');
+          return groupLines.map(line => {
+            if (isChordLine(line)) {
+              return `<span class="chord-line">${escapeHtml(line)}</span>`;
+            }
+            return escapeHtml(line);
+          }).join('\n');
+        }
+
         // Group chord+lyrics pairs and wrap in spans to prevent column breaks
         const groups = groupChordAndLyrics(processedLines);
         codeEl.innerHTML = groups.map(group =>
-          `<span class="lyrics-group">${escapeHtml(group)}</span>`
+          `<span class="lyrics-group">${renderGroup(group)}</span>`
         ).join('\n');
       });
     });
