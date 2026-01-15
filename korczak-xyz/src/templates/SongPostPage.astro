@@ -205,8 +205,9 @@ function formatDate(date: Date, locale: string): string {
   function isChordLine(line: string): boolean {
     if (line.trim() === '') return false;
     // Chord pattern: optional whitespace, then chord symbols separated by spaces
-    // Chords: A-H (or a-h for minor), optionally followed by #/b, then modifiers like m, 7, maj7, sus4, etc.
-    const chordPattern = /^[A-Ha-h][#b]?(m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*$/;
+    // Chords: A-H (or a-h for minor), optionally followed by #/b or German notation (is/es), then modifiers like m, 7, maj7, sus4, etc.
+    // German notation: "is" = sharp (fis = F#, cis = C#), "es" = flat (es = Eb, as = Ab)
+    const chordPattern = /^[A-Ha-h]([#b]|is|es)?(m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*$/;
     const tokens = line.trim().split(/\s+/);
     // A line is a chord line if all non-empty tokens match the chord pattern
     // and there's at least one token
@@ -222,8 +223,8 @@ function formatDate(date: Date, locale: string): string {
   function transposeChord(chord: string, semitones: number): string {
     if (semitones === 0) return chord;
 
-    // Match: root note (A-H), optional accidental (#/b), and modifiers
-    const match = chord.match(/^([A-Ha-h])([#b]?)(.*)$/);
+    // Match: root note (A-H), optional accidental (#/b or German is/es), and modifiers
+    const match = chord.match(/^([A-Ha-h])([#b]|is|es)?(.*)$/);
     if (!match) return chord;
 
     const [, root, accidental, modifiers] = match;
@@ -234,10 +235,10 @@ function formatDate(date: Date, locale: string): string {
     let noteIndex = CHROMATIC.indexOf(upperRoot);
     if (noteIndex === -1) return chord;
 
-    // Apply accidental
-    if (accidental === '#') {
+    // Apply accidental (including German notation: is = sharp, es = flat)
+    if (accidental === '#' || accidental === 'is') {
       noteIndex = (noteIndex + 1) % 12;
-    } else if (accidental === 'b') {
+    } else if (accidental === 'b' || accidental === 'es') {
       noteIndex = (noteIndex - 1 + 12) % 12;
     }
 
@@ -258,8 +259,8 @@ function formatDate(date: Date, locale: string): string {
   function transposeLine(line: string, semitones: number): string {
     if (!isChordLine(line) || semitones === 0) return line;
 
-    // Transpose each chord while preserving spacing
-    return line.replace(/([A-Ha-h][#b]?(?:m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*)/g,
+    // Transpose each chord while preserving spacing (including German is/es notation)
+    return line.replace(/([A-Ha-h](?:[#b]|is|es)?(?:m|maj|min|dim|aug|sus|add|7|9|11|13|6|4|2)*)/g,
       (match) => transposeChord(match, semitones)
     );
   }
