@@ -1,6 +1,5 @@
 ---
 import type { Lang } from '../i18n';
-import { execSync } from 'child_process';
 
 interface Props {
   lang?: Lang;
@@ -8,10 +7,6 @@ interface Props {
 
 const { lang = 'en' } = Astro.props;
 const homeLink = lang === 'en' ? '/' : '/pl/';
-
-// Build-time info (runs at build, not in browser)
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
-const buildTimestamp = new Date().toISOString();
 ---
 
 <footer class="retro-footer">
@@ -32,30 +27,7 @@ const buildTimestamp = new Date().toISOString();
       <span>Visitors: 1337420</span>
     </div>
   </div>
-
-  <div class="build-info">
-    <span><a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a> | <span id="build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span></span>
-  </div>
 </footer>
-
-<script>
-  const buildTimeEl = document.getElementById('build-time');
-  if (buildTimeEl) {
-    const timestamp = buildTimeEl.dataset.timestamp;
-    if (timestamp) {
-      const date = new Date(timestamp);
-      const lang = document.documentElement.lang || 'en';
-      const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
-      buildTimeEl.textContent = date.toLocaleString(locale, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-  }
-</script>
 
 <style>
   .retro-footer {
@@ -79,16 +51,5 @@ const buildTimestamp = new Date().toISOString();
     display: flex;
     justify-content: center;
     margin-top: 10px;
-  }
-
-  .build-info {
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--retro-gray, #666);
-    margin-top: 5px;
-  }
-
-  .build-info a {
-    color: var(--retro-cyan);
   }
 </style>

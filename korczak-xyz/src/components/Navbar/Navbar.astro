@@ -72,11 +72,15 @@ function isActive(itemPath: string): boolean {
       </div>
     </nav>
 
-    <!-- Build info -->
-    <div class="navbar-build-info">
+  </div>
+
+  <!-- Status bar (Windows 95 style) -->
+  <div class="status-bar">
+    <div class="status-panel">
       <a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a>
-      <span class="build-divider">|</span>
-      <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
+    </div>
+    <div class="status-panel">
+      Last updated: <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
     </div>
   </div>
 </div>
@@ -94,7 +98,7 @@ function isActive(itemPath: string): boolean {
 
   .navbar-content {
     background: var(--retro-gray);
-    padding: 10px;
+    padding: 6px 10px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -187,28 +191,37 @@ function isActive(itemPath: string): boolean {
     color: var(--retro-yellow);
   }
 
-  .navbar-build-info {
-    width: 100%;
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--retro-gray);
-    padding-top: 8px;
-    border-top: 1px solid var(--retro-dark-gray);
-    margin-top: 5px;
+  .status-bar {
+    display: flex;
+    background: var(--retro-gray);
+    padding: 2px;
+    gap: 2px;
   }
 
-  .navbar-build-info a {
-    color: var(--retro-cyan);
+  .status-panel {
+    background: var(--retro-gray);
+    border: 1px solid;
+    border-color: var(--retro-dark-gray) var(--retro-white) var(--retro-white) var(--retro-dark-gray);
+    padding: 1px 4px;
+    font-size: 0.8rem;
+    color: var(--retro-black);
+  }
+
+  .status-panel:first-child {
+    flex: 0 0 auto;
+  }
+
+  .status-panel:last-child {
+    flex: 1;
+  }
+
+  .status-panel a {
+    color: var(--retro-black);
     text-decoration: none;
   }
 
-  .navbar-build-info a:hover {
+  .status-panel a:hover {
     text-decoration: underline;
-  }
-
-  .build-divider {
-    color: var(--retro-dark-gray);
-    margin: 0 5px;
   }
 
   /* Mobile styles */
