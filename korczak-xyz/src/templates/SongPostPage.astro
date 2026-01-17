@@ -51,9 +51,10 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-author">[{song.data.author}]</span>
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
-          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')}>
+          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')}>
             <div class="song-controls-row">
               <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
+              <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
               <span class="transpose-controls">
                 <span class="control-label">{t('song.transpose')}</span>
                 <button class="transpose-down" title="Transpose down">♭</button>
@@ -98,9 +99,10 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')}>
+        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')}>
           <div class="song-controls-row">
             <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
+            <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
             <span class="transpose-controls">
               <span class="control-label">{t('song.transpose')}</span>
               <button class="transpose-down" title="Transpose down">♭</button>
@@ -140,6 +142,7 @@ function formatDate(date: Date, locale: string): string {
   const increaseBtns = document.querySelectorAll('.font-increase');
   const lightModeBtns = document.querySelectorAll('.light-mode-toggle');
   const chordsBtns = document.querySelectorAll('.chords-toggle');
+  const layoutToggleBtns = document.querySelectorAll('.layout-toggle');
   const columnDecreaseBtns = document.querySelectorAll('.column-decrease');
   const columnIncreaseBtns = document.querySelectorAll('.column-increase');
   const columnCountDisplays = document.querySelectorAll('.column-count');
@@ -154,6 +157,7 @@ function formatDate(date: Date, locale: string): string {
   const CHORDS_KEY = 'song-show-chords';
   const COLUMNS_KEY = 'song-columns';
   const TRANSPOSE_KEY = 'song-transpose';
+  const LAYOUT_KEY = 'song-chord-layout';
 
   // German notation chromatic scale: H = B natural, B = Bb
   const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
@@ -163,6 +167,7 @@ function formatDate(date: Date, locale: string): string {
   let showChords = localStorage.getItem(CHORDS_KEY) !== 'false';
   let currentColumnIndex = parseInt(localStorage.getItem(COLUMNS_KEY) || '0', 10);
   let transposeValue = parseInt(localStorage.getItem(TRANSPOSE_KEY) || '0', 10);
+  let sideLayout = localStorage.getItem(LAYOUT_KEY) === 'true';
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -272,6 +277,48 @@ function formatDate(date: Date, locale: string): string {
       .replace(/>/g, '&gt;');
   }
 
+  function extractChordsFromLine(line: string): string {
+    // Extract chord names from a chord line, removing positioning spaces
+    const tokens = line.trim().split(/\s+/).filter(t => t !== '');
+    return tokens.join(' ');
+  }
+
+  function renderSideLayout(lines: string[]): string {
+    const rows: string[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (isChordLine(line)) {
+        // Get the transposed chords
+        const transposedLine = transposeLine(line, transposeValue);
+        const chords = extractChordsFromLine(transposedLine);
+        i++;
+
+        // Get the next line as lyrics (if it exists and is not a chord line)
+        let lyrics = '';
+        if (i < lines.length && !isChordLine(lines[i])) {
+          lyrics = lines[i].trimEnd();
+          i++;
+        }
+
+        rows.push(`<span class="side-row"><span class="lyrics-text">${escapeHtml(lyrics)}</span><span class="chord-col">${escapeHtml(chords)}</span></span>`);
+      } else {
+        // Non-chord line (lyrics without chords, or empty line)
+        const text = line.trimEnd();
+        if (text === '') {
+          rows.push(`<span class="side-row"><span class="lyrics-text">&nbsp;</span><span class="chord-col"></span></span>`);
+        } else {
+          rows.push(`<span class="side-row"><span class="lyrics-text">${escapeHtml(text)}</span><span class="chord-col"></span></span>`);
+        }
+        i++;
+      }
+    }
+
+    return rows.join('\n');
+  }
+
   function groupChordAndLyrics(lines: string[]): string[] {
     const groups: string[] = [];
     let i = 0;
@@ -317,38 +364,61 @@ function formatDate(date: Date, locale: string): string {
   function applyChordVisibility() {
     [contentMobile, contentDesktop].forEach(content => {
       if (!content) return;
+
+      // Toggle side layout class
+      content.classList.toggle('side-chord-layout', sideLayout && showChords);
+
       const codeElements = content.querySelectorAll('pre code');
       codeElements.forEach(codeEl => {
         const original = originalContent.get(codeEl);
         if (!original) return;
 
         const lines = original.split('\n');
-        let processedLines: string[];
 
-        if (showChords) {
+        if (sideLayout && showChords) {
+          // Use side layout rendering
+          codeEl.innerHTML = renderSideLayout(lines);
+        } else if (showChords) {
           // Transpose chord lines
-          processedLines = lines.map(line => transposeLine(line, transposeValue));
+          const processedLines = lines.map(line => transposeLine(line, transposeValue));
+
+          // Helper function to render a group with chord lines highlighted
+          function renderGroup(group: string): string {
+            const groupLines = group.split('\n');
+            return groupLines.map(line => {
+              if (isChordLine(line)) {
+                return `<span class="chord-line">${escapeHtml(line)}</span>`;
+              }
+              return escapeHtml(line);
+            }).join('\n');
+          }
+
+          // Group chord+lyrics pairs and wrap in spans to prevent column breaks
+          const groups = groupChordAndLyrics(processedLines);
+          codeEl.innerHTML = groups.map(group =>
+            `<span class="lyrics-group">${renderGroup(group)}</span>`
+          ).join('\n');
         } else {
           // Filter out chord lines (no need to transpose if hidden)
-          processedLines = lines.filter(line => !isChordLine(line));
-        }
+          const processedLines = lines.filter(line => !isChordLine(line));
 
-        // Helper function to render a group with chord lines highlighted
-        function renderGroup(group: string): string {
-          const groupLines = group.split('\n');
-          return groupLines.map(line => {
-            if (isChordLine(line)) {
-              return `<span class="chord-line">${escapeHtml(line)}</span>`;
-            }
-            return escapeHtml(line);
-          }).join('\n');
-        }
+          // Helper function to render a group with chord lines highlighted
+          function renderGroup(group: string): string {
+            const groupLines = group.split('\n');
+            return groupLines.map(line => {
+              if (isChordLine(line)) {
+                return `<span class="chord-line">${escapeHtml(line)}</span>`;
+              }
+              return escapeHtml(line);
+            }).join('\n');
+          }
 
-        // Group chord+lyrics pairs and wrap in spans to prevent column breaks
-        const groups = groupChordAndLyrics(processedLines);
-        codeEl.innerHTML = groups.map(group =>
-          `<span class="lyrics-group">${renderGroup(group)}</span>`
-        ).join('\n');
+          // Group chord+lyrics pairs and wrap in spans to prevent column breaks
+          const groups = groupChordAndLyrics(processedLines);
+          codeEl.innerHTML = groups.map(group =>
+            `<span class="lyrics-group">${renderGroup(group)}</span>`
+          ).join('\n');
+        }
       });
     });
     chordsBtns.forEach(btn => {
@@ -361,7 +431,24 @@ function formatDate(date: Date, locale: string): string {
       if (label) label.textContent = showChords ? chordsLabel : textLabel;
       btn.setAttribute('title', showChords ? 'Hide chords (show text only)' : 'Show chords');
     });
+    updateLayoutToggle();
     updateTransposeDisplay();
+  }
+
+  function updateLayoutToggle() {
+    layoutToggleBtns.forEach(btn => {
+      const icon = btn.querySelector('.btn-icon');
+      const container = btn.closest('.song-controls-buttons');
+      const sideLabel = container?.getAttribute('data-layout-side-label') || 'Side';
+      if (icon) icon.textContent = sideLayout ? '⫴' : '⫶';
+      btn.setAttribute('title', sideLayout ? 'Show chords inline' : 'Show chords on the side');
+      // Toggle active state
+      btn.classList.toggle('active', sideLayout);
+    });
+  }
+
+  function saveLayoutPreference() {
+    localStorage.setItem(LAYOUT_KEY, String(sideLayout));
   }
 
   function updateTransposeDisplay() {
@@ -431,6 +518,14 @@ function formatDate(date: Date, locale: string): string {
       showChords = !showChords;
       applyChordVisibility();
       saveChordPreference();
+    });
+  });
+
+  layoutToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      sideLayout = !sideLayout;
+      applyChordVisibility();
+      saveLayoutPreference();
     });
   });
 

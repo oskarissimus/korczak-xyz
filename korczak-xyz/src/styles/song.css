@@ -383,3 +383,53 @@
         background: #fff !important;
     }
 }
+
+/* Side chord column layout */
+.blog_post.side-chord-layout pre code {
+    display: flex;
+    flex-direction: column;
+}
+
+.blog_post.side-chord-layout .side-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    break-inside: avoid;
+}
+
+.blog_post.side-chord-layout .lyrics-text {
+    flex: 1;
+}
+
+.blog_post.side-chord-layout .chord-col {
+    min-width: 60px;
+    max-width: 120px;
+    text-align: right;
+    padding-left: 15px;
+    color: var(--retro-yellow);
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* Light mode chord color for side layout */
+.blog_post.light-mode.side-chord-layout .chord-col {
+    color: var(--retro-red);
+}
+
+/* Mobile: reduce chord column width */
+@media (max-width: 600px) {
+    .blog_post.side-chord-layout .chord-col {
+        min-width: 50px;
+        max-width: 80px;
+        padding-left: 10px;
+        font-size: 0.9em;
+    }
+}
+
+/* Active state for layout toggle button */
+.song-controls button.layout-toggle.active {
+    background: var(--retro-navy);
+    color: var(--retro-white);
+    border-style: inset;
+}

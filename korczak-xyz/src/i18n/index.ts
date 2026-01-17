@@ -82,6 +82,7 @@ export const ui = {
     'song.dark': 'Dark',
     'song.font': 'Font',
     'song.columns': 'Columns',
+    'song.layoutSide': 'Side',
 
     // Games
     'Games': 'Games',
@@ -185,6 +186,7 @@ export const ui = {
     'song.dark': 'Ciemny',
     'song.font': 'Czcionka',
     'song.columns': 'Kolumny',
+    'song.layoutSide': 'Z boku',
 
     // Games
     'Games': 'Gry',
