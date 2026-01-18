@@ -111,6 +111,15 @@ export const ui = {
     'minesweeper.flagMode': 'Flag Mode',
     'minesweeper.digMode': 'Dig Mode',
 
+    // Pipes
+    'Pipes': '3D Pipes',
+    'pipes.title': '3D Pipes',
+    'pipes.screensaver': 'Screensaver',
+    'pipes.pause': 'Pause',
+    'pipes.play': 'Play',
+    'pipes.reset': 'Reset',
+    'pipes.fullscreen': 'Fullscreen',
+
     // Status bar
     'statusBar.lastUpdated': 'Last updated:',
   },
@@ -214,6 +223,15 @@ export const ui = {
     'minesweeper.gameOver': 'Koniec Gry!',
     'minesweeper.flagMode': 'Tryb Flagi',
     'minesweeper.digMode': 'Tryb Kopania',
+
+    // Pipes
+    'Pipes': 'Rury 3D',
+    'pipes.title': 'Rury 3D',
+    'pipes.screensaver': 'Wygaszacz ekranu',
+    'pipes.pause': 'Pauza',
+    'pipes.play': 'Graj',
+    'pipes.reset': 'Reset',
+    'pipes.fullscreen': 'Pelny ekran',
 
     // Status bar
     'statusBar.lastUpdated': 'Aktualizacja:',
