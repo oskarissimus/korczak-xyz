@@ -1,0 +1,55 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import AnesthesiaQuiz from '../../../components/AnesthesiaQuiz/AnesthesiaQuiz';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/anesthesia-quiz.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('anesthesia.title')} | korczak.xyz`} lang={lang}>
+  <div class="window anesthesia-window">
+    <div class="title-bar">
+      <span>{t('anesthesia.title')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content anesthesia-content">
+      <AnesthesiaQuiz client:only="react" lang={lang} />
+    </div>
+  </div>
+  <div class="admin-link-container">
+    <a href="/pl/games/anesthesia/admin" class="admin-link">{t('anesthesia.admin')}</a>
+  </div>
+</Layout>
+
+<style>
+  .anesthesia-window {
+    margin-bottom: 20px;
+  }
+
+  .anesthesia-content {
+    padding: 0;
+    background: var(--retro-gray);
+  }
+
+  .admin-link-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .admin-link {
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
+    color: var(--retro-blue, #0000EE);
+    text-decoration: underline;
+  }
+
+  .admin-link:hover {
+    color: var(--retro-purple, #800080);
+  }
+</style>

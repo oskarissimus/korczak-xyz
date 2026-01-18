@@ -1,0 +1,37 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import AdminPanel from '../../../components/AnesthesiaQuiz/AdminPanel';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/anesthesia-quiz.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('anesthesia.admin')} | korczak.xyz`} lang={lang}>
+  <div class="window admin-window">
+    <div class="title-bar">
+      <span>{t('anesthesia.admin')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content admin-content">
+      <AdminPanel client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .admin-window {
+    margin-bottom: 20px;
+    min-height: 500px;
+  }
+
+  .admin-content {
+    padding: 0;
+    background: var(--retro-gray);
+  }
+</style>
