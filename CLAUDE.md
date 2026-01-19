@@ -116,3 +116,7 @@ const t = useTranslations(lang);
 
 - Use dot notation for namespaced keys: `statusBar.lastUpdated`, `song.chords`
 - Group related translations with comments in the i18n file
+
+## Workflow
+
+When work is finished, commit and push the changes to the repository.
