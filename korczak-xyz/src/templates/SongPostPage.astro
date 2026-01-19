@@ -296,14 +296,23 @@ function formatDate(date: Date, locale: string): string {
         const chords = extractChordsFromLine(transposedLine);
         i++;
 
-        // Get the next line as lyrics (if it exists and is not a chord line)
-        let lyrics = '';
-        if (i < lines.length && !isChordLine(lines[i])) {
-          lyrics = lines[i].trimEnd();
-          i++;
-        }
+        // Check if next line is empty or also a chord line (intro/interlude)
+        const nextLine = i < lines.length ? lines[i] : '';
+        const isStandaloneChords = nextLine.trim() === '' || isChordLine(nextLine);
 
-        rows.push(`<span class="side-row"><span class="lyrics-text">${escapeHtml(lyrics)}</span><span class="chord-col">${escapeHtml(chords)}</span></span>`);
+        if (isStandaloneChords) {
+          // Render chord-only line as full-width
+          rows.push(`<span class="side-row chord-only"><span class="lyrics-text">${escapeHtml(chords)}</span><span class="chord-col"></span></span>`);
+          // Skip the empty line if present
+          if (i < lines.length && lines[i].trim() === '') {
+            i++;
+          }
+        } else {
+          // Normal: chord + lyrics side by side
+          const lyrics = lines[i].trimEnd();
+          i++;
+          rows.push(`<span class="side-row"><span class="lyrics-text">${escapeHtml(lyrics)}</span><span class="chord-col">${escapeHtml(chords)}</span></span>`);
+        }
       } else {
         // Non-chord line (lyrics without chords, or empty line)
         const text = line.trimEnd();

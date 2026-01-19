@@ -417,6 +417,16 @@
     color: var(--retro-red);
 }
 
+/* Chord-only rows (intro/interlude) - display full width */
+.blog_post.side-chord-layout .side-row.chord-only .lyrics-text {
+    color: var(--retro-yellow);
+    font-weight: bold;
+}
+
+.blog_post.light-mode.side-chord-layout .side-row.chord-only .lyrics-text {
+    color: var(--retro-red);
+}
+
 /* Mobile: reduce chord column width */
 @media (max-width: 600px) {
     .blog_post.side-chord-layout .chord-col {
