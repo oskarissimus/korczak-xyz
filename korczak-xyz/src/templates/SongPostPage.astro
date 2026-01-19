@@ -301,8 +301,8 @@ function formatDate(date: Date, locale: string): string {
         const isStandaloneChords = nextLine.trim() === '' || isChordLine(nextLine);
 
         if (isStandaloneChords) {
-          // Render chord-only line as full-width
-          rows.push(`<span class="side-row chord-only"><span class="lyrics-text">${escapeHtml(chords)}</span><span class="chord-col"></span></span>`);
+          // Render chord-only line with chords in the chord column (right-aligned)
+          rows.push(`<span class="side-row chord-only"><span class="lyrics-text"></span><span class="chord-col">${escapeHtml(chords)}</span></span>`);
           // Skip the empty line if present
           if (i < lines.length && lines[i].trim() === '') {
             i++;

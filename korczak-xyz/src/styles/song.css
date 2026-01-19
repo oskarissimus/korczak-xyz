@@ -417,15 +417,10 @@
     color: var(--retro-red);
 }
 
-/* Chord-only rows (intro/interlude) - display full width */
-.blog_post.side-chord-layout .side-row.chord-only .lyrics-text {
-    color: var(--retro-yellow);
-    font-weight: bold;
-    text-align: right;
-}
-
-.blog_post.light-mode.side-chord-layout .side-row.chord-only .lyrics-text {
-    color: var(--retro-red);
+/* Chord-only rows (intro/interlude) - allow chord column to expand */
+.blog_post.side-chord-layout .side-row.chord-only .chord-col {
+    max-width: none;
+    white-space: normal;
 }
 
 /* Mobile: reduce chord column width */
