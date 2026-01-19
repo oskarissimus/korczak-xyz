@@ -51,7 +51,7 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-author">[{song.data.author}]</span>
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
-          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')}>
+          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')}>
             <div class="song-controls-row">
               <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
               <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -99,7 +99,7 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')}>
+        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')}>
           <div class="song-controls-row">
             <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
             <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -447,12 +447,13 @@ function formatDate(date: Date, locale: string): string {
   function updateLayoutToggle() {
     layoutToggleBtns.forEach(btn => {
       const icon = btn.querySelector('.btn-icon');
+      const label = btn.querySelector('.btn-label');
       const container = btn.closest('.song-controls-buttons');
       const sideLabel = container?.getAttribute('data-layout-side-label') || 'Side';
+      const topLabel = container?.getAttribute('data-layout-top-label') || 'Top';
       if (icon) icon.textContent = sideLayout ? '⫴' : '⫶';
+      if (label) label.textContent = sideLayout ? topLabel : sideLabel;
       btn.setAttribute('title', sideLayout ? 'Show chords inline' : 'Show chords on the side');
-      // Toggle active state
-      btn.classList.toggle('active', sideLayout);
     });
   }
 

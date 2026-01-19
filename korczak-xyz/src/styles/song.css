@@ -433,9 +433,3 @@
     }
 }
 
-/* Active state for layout toggle button */
-.song-controls button.layout-toggle.active {
-    background: var(--retro-navy);
-    color: var(--retro-white);
-    border-style: inset;
-}
