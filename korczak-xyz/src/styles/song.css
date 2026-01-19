@@ -421,6 +421,7 @@
 .blog_post.side-chord-layout .side-row.chord-only .lyrics-text {
     color: var(--retro-yellow);
     font-weight: bold;
+    text-align: right;
 }
 
 .blog_post.light-mode.side-chord-layout .side-row.chord-only .lyrics-text {
