@@ -282,6 +282,12 @@
     break-inside: avoid;
 }
 
+/* Use flex column for consistent line spacing across all modes */
+.blog_post pre code {
+    display: flex;
+    flex-direction: column;
+}
+
 /* Show column controls on wider screens */
 @media (min-width: 900px) {
     .column-controls {
