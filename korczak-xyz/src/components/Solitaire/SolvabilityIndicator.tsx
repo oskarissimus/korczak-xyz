@@ -13,11 +13,20 @@ interface SolvabilityIndicatorProps {
   };
 }
 
+function formatNumber(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) {
+    const k = n / 1000;
+    return k >= 10 ? `${Math.round(k)}k` : `${k.toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  const m = n / 1_000_000;
+  return m >= 10 ? `${Math.round(m)}M` : `${m.toFixed(1).replace(/\.0$/, '')}M`;
+}
+
 function formatStats(statesExplored?: number, timeMs?: number): string {
   if (statesExplored === undefined || timeMs === undefined) return '';
-  const statesK = Math.round(statesExplored / 1000);
   const seconds = Math.round(timeMs / 1000);
-  return ` (${statesK}k / ${seconds}s)`;
+  return ` (${formatNumber(statesExplored)} / ${seconds}s)`;
 }
 
 export function SolvabilityIndicator({ status, statesExplored, timeMs, translations }: SolvabilityIndicatorProps) {

@@ -4,6 +4,7 @@ import type { SolverMove } from '../utils/solitaire/solver/types';
 import type { SolvabilityResult } from './useSolvabilityAnalysis';
 import { encodeGameWithHistory, decodeGameWithHistory } from '../utils/solitaire/serialization';
 import { generateAllMoves, autoPlaySafeMoves } from '../utils/solitaire/solver/moveGenerator';
+import { solve } from '../utils/solitaire/solver';
 import {
   parseLocationSpec,
   parseCardSpec,
@@ -50,6 +51,7 @@ export interface SolitaireDebugAPI {
   hint: () => SolverMove | null;
   moves: () => SolverMove[];
   solvability: () => SolvabilityResult;
+  debugSolve: () => string[];
 
   // Serialization
   copy: () => Promise<string>;
@@ -134,6 +136,15 @@ function createDebugAPI(paramsRef: React.MutableRefObject<DebugHookParams>): Sol
     },
 
     solvability: () => p().solvabilityResult,
+
+    debugSolve: () => {
+      const { gameState, history } = p();
+      const result = solve(gameState, {}, undefined, undefined, undefined, history, true);
+      const log = result.debugLog || [];
+      console.log(`=== Solver Debug (${result.statesExplored} states, ${result.winnable ? 'winnable' : 'not winnable'}) ===`);
+      log.forEach(line => console.log(line));
+      return log;
+    },
 
     // Serialization
     copy: async () => {

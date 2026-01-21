@@ -19,6 +19,7 @@ interface SolverContext {
   moveStack: Array<SolverMove | undefined>; // Track moves at each depth
   originalState: GameState; // Original state before autoplay, for valid firstWinningMove
   historyHashes?: Set<number>; // Hashes of all history states to avoid cycles
+  debugLog?: string[]; // Debug trace of explored states
 }
 
 /**
@@ -47,8 +48,9 @@ export function solve(
   shouldCancel?: () => boolean,
   onProgress?: (statesExplored: number, timeMs: number) => void,
   winnableCache?: WinnableStateCache,
-  history?: GameState[]
-): SolverResult {
+  history?: GameState[],
+  debug?: boolean
+): SolverResult & { debugLog?: string[] } {
   const fullConfig: SolverConfig = { ...DEFAULT_SOLVER_CONFIG, ...config };
   const startTime = performance.now();
 
@@ -144,11 +146,16 @@ export function solve(
     moveStack: new Array(10000),
     originalState: state, // Keep original for valid firstWinningMove
     historyHashes: historyHashes.size > 0 ? historyHashes : undefined, // Avoid cycles
+    debugLog: debug ? [] : undefined,
   };
 
   // Start DFS with the initial state hash already on the path
   context.pathStack[0] = initialHash;
   context.pathDepth = 1;
+
+  if (debug) {
+    context.debugLog!.push(`State 1: initial (depth 0)`);
+  }
 
   const result = dfs(initialState, context, undefined, true);
 
@@ -158,7 +165,24 @@ export function solve(
     statesExplored: context.statesExplored,
     timeMs: performance.now() - startTime,
     firstWinningMove: context.firstWinningMove,
+    debugLog: context.debugLog,
   };
+}
+
+/**
+ * Format a move for debug logging.
+ */
+function formatMove(move: SolverMove): string {
+  if (move.type === 'tableau-to-tableau') {
+    return `t${move.from?.index}:${move.from?.cardIndex}→t${move.to?.index} (${move.cardCount} cards)`;
+  } else if (move.type === 'pool-to-tableau') {
+    return `pool→t${move.to?.index}`;
+  } else if (move.type === 'pool-to-foundation') {
+    return `pool→f${move.to?.index}`;
+  } else if (move.type === 'tableau-to-foundation') {
+    return `t${move.from?.index}→f${move.to?.index}`;
+  }
+  return move.type;
 }
 
 /**
@@ -203,9 +227,22 @@ function dfs(
   // Check if already visited
   const hash = hashState(state);
   if (context.visited.has(hash)) {
+    if (context.debugLog) {
+      const path = context.moveStack.slice(0, context.pathDepth - 1)
+        .filter((m): m is SolverMove => m !== undefined)
+        .map(formatMove).join(' → ');
+      context.debugLog.push(`  [SKIP] Already visited (depth ${context.pathDepth - 1}, path: ${path || 'root'})`);
+    }
     return false;
   }
   context.visited.add(hash);
+
+  if (context.debugLog && lastMove) {
+    const path = context.moveStack.slice(0, context.pathDepth - 1)
+      .filter((m): m is SolverMove => m !== undefined)
+      .map(formatMove).join(' → ');
+    context.debugLog.push(`State ${context.statesExplored}: depth ${context.pathDepth - 1}, path: ${path || 'root'}`);
+  }
 
   // At first level, generate moves from ORIGINAL state so firstWinningMove is valid
   // for what the user sees. At deeper levels, use the current (auto-played) state.
