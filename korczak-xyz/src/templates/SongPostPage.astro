@@ -398,6 +398,10 @@ function formatDate(date: Date, locale: string): string {
               if (isChordLine(line)) {
                 return `<span class="chord-line">${escapeHtml(line)}</span>`;
               }
+              // Handle empty lines with visible spacing
+              if (line.trim() === '') {
+                return `<span class="empty-line">&nbsp;</span>`;
+              }
               return escapeHtml(line);
             }).join('\n');
           }
@@ -417,6 +421,10 @@ function formatDate(date: Date, locale: string): string {
             return groupLines.map(line => {
               if (isChordLine(line)) {
                 return `<span class="chord-line">${escapeHtml(line)}</span>`;
+              }
+              // Handle empty lines with visible spacing
+              if (line.trim() === '') {
+                return `<span class="empty-line">&nbsp;</span>`;
               }
               return escapeHtml(line);
             }).join('\n');

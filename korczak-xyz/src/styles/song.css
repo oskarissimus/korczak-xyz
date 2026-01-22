@@ -282,6 +282,13 @@
     break-inside: avoid;
 }
 
+/* Empty line spacing in top layout */
+.blog_post pre code .empty-line {
+    display: inline-block;
+    width: 100%;
+    line-height: 1.0;
+}
+
 /* Use flex column for consistent line spacing across all modes */
 .blog_post pre code {
     display: flex;
