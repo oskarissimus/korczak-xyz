@@ -109,5 +109,14 @@ Każda z dwudziestu siedmiu matek
     B     A       d
 Dzieciątku śpiewa do snu:
 
-Ref 2x
+Ref. 2x:
+  d    A       d
+Caryco mokrego śniegu
+  d                           g
+Ratrakiem płynę do Ciebie pod prąd.
+Hej!
+g                    d
+Dobrze, że stoisz na brzegu,
+       B      A          d
+Bo ja właśnie schodzę na ląd.
 ```
