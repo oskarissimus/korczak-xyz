@@ -617,32 +617,25 @@ function formatDate(date: Date, locale: string): string {
   });
 
   // Autoscroll functions
-  function getScrollContainer(): Element | null {
-    // On mobile (<= 600px), use mobile content wrapper; on desktop, use desktop content wrapper
-    const isMobile = window.innerWidth <= 600;
-    const content = isMobile ? contentMobile : contentDesktop;
-    return content?.closest('.song-content-wrapper') || null;
-  }
-
   function startAutoscroll() {
     if (isAutoscrolling) return;
     isAutoscrolling = true;
 
-    const scrollContainer = getScrollContainer();
-    if (!scrollContainer) return;
-
     function scroll() {
-      const container = getScrollContainer();
-      if (!container || !isAutoscrolling) {
+      if (!isAutoscrolling) {
         stopAutoscroll();
         return;
       }
 
       const speed = SCROLL_SPEEDS[autoscrollSpeedIndex];
-      container.scrollTop += speed;
+      window.scrollBy(0, speed);
 
       // Check if we've reached the bottom
-      if (container.scrollTop + container.clientHeight >= container.scrollHeight) {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = window.innerHeight;
+
+      if (scrollTop + clientHeight >= scrollHeight - 1) {
         stopAutoscroll();
         return;
       }
@@ -726,13 +719,8 @@ function formatDate(date: Date, locale: string): string {
     }
   }
 
-  [contentMobile, contentDesktop].forEach(content => {
-    const wrapper = content?.closest('.song-content-wrapper');
-    if (wrapper) {
-      wrapper.addEventListener('wheel', handleManualScroll, { passive: true });
-      wrapper.addEventListener('touchstart', handleManualScroll, { passive: true });
-    }
-  });
+  window.addEventListener('wheel', handleManualScroll, { passive: true });
+  window.addEventListener('touchstart', handleManualScroll, { passive: true });
 
   // Pause on tab hidden
   document.addEventListener('visibilitychange', () => {
