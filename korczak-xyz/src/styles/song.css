@@ -446,3 +446,41 @@
     }
 }
 
+/* Autoscroll controls */
+.autoscroll-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.autoscroll-speed {
+    font-family: 'VT323', monospace;
+    font-size: 1rem;
+    min-width: 16px;
+    text-align: center;
+    color: var(--retro-navy);
+}
+
+.autoscroll-toggle.active {
+    background: var(--retro-green);
+    color: var(--retro-white);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.autoscroll-toggle.active .btn-icon,
+.autoscroll-toggle.active .btn-label {
+    color: var(--retro-white);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.autoscroll-controls button {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 0.8rem;
+}
+

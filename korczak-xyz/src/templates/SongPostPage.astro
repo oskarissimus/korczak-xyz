@@ -51,7 +51,7 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-author">[{song.data.author}]</span>
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
-          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')}>
+          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')}>
             <div class="song-controls-row">
               <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
               <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -74,6 +74,18 @@ function formatDate(date: Date, locale: string): string {
                 <button class="column-decrease" title="Fewer columns">◀</button>
                 <span class="column-count">1</span>
                 <button class="column-increase" title="More columns">▶</button>
+              </span>
+            </div>
+            <div class="song-controls-row">
+              <button class="autoscroll-toggle" title="Start/stop autoscroll">
+                <span class="btn-icon">▶</span>
+                <span class="btn-label">{t('song.scroll')}</span>
+              </button>
+              <span class="autoscroll-controls">
+                <span class="control-label">{t('song.speed')}</span>
+                <button class="autoscroll-slower" title="Slower">◀</button>
+                <span class="autoscroll-speed">3</span>
+                <button class="autoscroll-faster" title="Faster">▶</button>
               </span>
             </div>
           </div>
@@ -99,7 +111,7 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')}>
+        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')}>
           <div class="song-controls-row">
             <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
             <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -122,6 +134,18 @@ function formatDate(date: Date, locale: string): string {
               <button class="column-decrease" title="Fewer columns">◀</button>
               <span class="column-count">1</span>
               <button class="column-increase" title="More columns">▶</button>
+            </span>
+          </div>
+          <div class="song-controls-row">
+            <button class="autoscroll-toggle" title="Start/stop autoscroll">
+              <span class="btn-icon">▶</span>
+              <span class="btn-label">{t('song.scroll')}</span>
+            </button>
+            <span class="autoscroll-controls">
+              <span class="control-label">{t('song.speed')}</span>
+              <button class="autoscroll-slower" title="Slower">◀</button>
+              <span class="autoscroll-speed">3</span>
+              <button class="autoscroll-faster" title="Faster">▶</button>
             </span>
           </div>
         </div>
@@ -149,15 +173,21 @@ function formatDate(date: Date, locale: string): string {
   const transposeDownBtns = document.querySelectorAll('.transpose-down');
   const transposeUpBtns = document.querySelectorAll('.transpose-up');
   const transposeValueDisplays = document.querySelectorAll('.transpose-value');
+  const autoscrollToggleBtns = document.querySelectorAll('.autoscroll-toggle');
+  const autoscrollSlowerBtns = document.querySelectorAll('.autoscroll-slower');
+  const autoscrollFasterBtns = document.querySelectorAll('.autoscroll-faster');
+  const autoscrollSpeedDisplays = document.querySelectorAll('.autoscroll-speed');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
+  const SCROLL_SPEEDS = [0.5, 1, 1.5, 2, 3]; // pixels per frame (~30-180 px/sec at 60fps)
   const STORAGE_KEY = 'song-font-size-index';
   const LIGHT_MODE_KEY = 'song-light-mode';
   const CHORDS_KEY = 'song-show-chords';
   const COLUMNS_KEY = 'song-columns';
   const TRANSPOSE_KEY = 'song-transpose';
   const LAYOUT_KEY = 'song-chord-layout';
+  const AUTOSCROLL_KEY = 'song-autoscroll-speed';
 
   // German notation chromatic scale: H = B natural, B = Bb
   const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
@@ -168,6 +198,9 @@ function formatDate(date: Date, locale: string): string {
   let currentColumnIndex = parseInt(localStorage.getItem(COLUMNS_KEY) || '0', 10);
   let transposeValue = parseInt(localStorage.getItem(TRANSPOSE_KEY) || '0', 10);
   let sideLayout = localStorage.getItem(LAYOUT_KEY) === 'true';
+  let autoscrollSpeedIndex = parseInt(localStorage.getItem(AUTOSCROLL_KEY) || '2', 10);
+  let isAutoscrolling = false;
+  let autoscrollAnimationId: number | null = null;
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -583,11 +616,178 @@ function formatDate(date: Date, locale: string): string {
     });
   });
 
+  // Autoscroll functions
+  function getScrollContainer(): Element | null {
+    // On mobile (<= 600px), use mobile content wrapper; on desktop, use desktop content wrapper
+    const isMobile = window.innerWidth <= 600;
+    const content = isMobile ? contentMobile : contentDesktop;
+    return content?.closest('.song-content-wrapper') || null;
+  }
+
+  function startAutoscroll() {
+    if (isAutoscrolling) return;
+    isAutoscrolling = true;
+
+    const scrollContainer = getScrollContainer();
+    if (!scrollContainer) return;
+
+    function scroll() {
+      const container = getScrollContainer();
+      if (!container || !isAutoscrolling) {
+        stopAutoscroll();
+        return;
+      }
+
+      const speed = SCROLL_SPEEDS[autoscrollSpeedIndex];
+      container.scrollTop += speed;
+
+      // Check if we've reached the bottom
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight) {
+        stopAutoscroll();
+        return;
+      }
+
+      autoscrollAnimationId = requestAnimationFrame(scroll);
+    }
+
+    autoscrollAnimationId = requestAnimationFrame(scroll);
+    updateAutoscrollUI();
+  }
+
+  function stopAutoscroll() {
+    isAutoscrolling = false;
+    if (autoscrollAnimationId !== null) {
+      cancelAnimationFrame(autoscrollAnimationId);
+      autoscrollAnimationId = null;
+    }
+    updateAutoscrollUI();
+  }
+
+  function toggleAutoscroll() {
+    if (isAutoscrolling) {
+      stopAutoscroll();
+    } else {
+      startAutoscroll();
+    }
+  }
+
+  function updateAutoscrollUI() {
+    autoscrollToggleBtns.forEach(btn => {
+      const icon = btn.querySelector('.btn-icon');
+      const label = btn.querySelector('.btn-label');
+      const container = btn.closest('.song-controls-buttons');
+      const scrollLabel = container?.getAttribute('data-scroll-label') || 'Scroll';
+      const pauseLabel = container?.getAttribute('data-scroll-pause-label') || 'Pause';
+
+      if (icon) icon.textContent = isAutoscrolling ? '⏸' : '▶';
+      if (label) label.textContent = isAutoscrolling ? pauseLabel : scrollLabel;
+      btn.classList.toggle('active', isAutoscrolling);
+    });
+
+    // Update speed display (show 1-5 instead of array index)
+    autoscrollSpeedDisplays.forEach(display => {
+      display.textContent = String(autoscrollSpeedIndex + 1);
+    });
+  }
+
+  function saveAutoscrollSpeed() {
+    localStorage.setItem(AUTOSCROLL_KEY, String(autoscrollSpeedIndex));
+  }
+
+  // Autoscroll event listeners
+  autoscrollToggleBtns.forEach(btn => {
+    btn.addEventListener('click', toggleAutoscroll);
+  });
+
+  autoscrollSlowerBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (autoscrollSpeedIndex > 0) {
+        autoscrollSpeedIndex--;
+        updateAutoscrollUI();
+        saveAutoscrollSpeed();
+      }
+    });
+  });
+
+  autoscrollFasterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (autoscrollSpeedIndex < SCROLL_SPEEDS.length - 1) {
+        autoscrollSpeedIndex++;
+        updateAutoscrollUI();
+        saveAutoscrollSpeed();
+      }
+    });
+  });
+
+  // Stop autoscroll on manual scroll
+  function handleManualScroll() {
+    if (isAutoscrolling) {
+      stopAutoscroll();
+    }
+  }
+
+  [contentMobile, contentDesktop].forEach(content => {
+    const wrapper = content?.closest('.song-content-wrapper');
+    if (wrapper) {
+      wrapper.addEventListener('wheel', handleManualScroll, { passive: true });
+      wrapper.addEventListener('touchstart', handleManualScroll, { passive: true });
+    }
+  });
+
+  // Pause on tab hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && isAutoscrolling) {
+      stopAutoscroll();
+    }
+  });
+
+  // Stop on window resize (container may change)
+  window.addEventListener('resize', () => {
+    if (isAutoscrolling) {
+      stopAutoscroll();
+    }
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Don't trigger if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Spacebar: toggle autoscroll
+    if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      toggleAutoscroll();
+    }
+
+    // Shift+ArrowUp: increase speed
+    if (e.shiftKey && e.code === 'ArrowUp') {
+      e.preventDefault();
+      if (autoscrollSpeedIndex < SCROLL_SPEEDS.length - 1) {
+        autoscrollSpeedIndex++;
+        updateAutoscrollUI();
+        saveAutoscrollSpeed();
+      }
+    }
+
+    // Shift+ArrowDown: decrease speed
+    if (e.shiftKey && e.code === 'ArrowDown') {
+      e.preventDefault();
+      if (autoscrollSpeedIndex > 0) {
+        autoscrollSpeedIndex--;
+        updateAutoscrollUI();
+        saveAutoscrollSpeed();
+      }
+    }
+  });
+
   applyFontSize();
   applyLightMode();
   storeOriginalContent();
   applyChordVisibility();
   applyColumns();
+  updateAutoscrollUI();
 </script>
 
 <style>

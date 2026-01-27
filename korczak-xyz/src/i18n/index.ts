@@ -84,6 +84,9 @@ export const ui = {
     'song.columns': 'Columns',
     'song.layoutSide': 'Side',
     'song.layoutTop': 'Top',
+    'song.scroll': 'Scroll',
+    'song.scrollPause': 'Pause',
+    'song.speed': 'Speed',
 
     // Games
     'Games': 'Games',
@@ -299,6 +302,9 @@ export const ui = {
     'song.columns': 'Kolumny',
     'song.layoutSide': 'Z boku',
     'song.layoutTop': 'U góry',
+    'song.scroll': 'Przewijaj',
+    'song.scrollPause': 'Pauza',
+    'song.speed': 'Tempo',
 
     // Games
     'Games': 'Gry',
