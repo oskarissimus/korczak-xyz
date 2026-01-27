@@ -180,7 +180,7 @@ function formatDate(date: Date, locale: string): string {
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
-  const SCROLL_SPEEDS = [0.025, 0.05, 0.1, 0.2, 0.4]; // pixels per frame (~30-180 px/sec at 60fps)
+  const SCROLL_SPEEDS = [0.025, 0.05, 0.1, 0.2, 0.4]; // pixels per frame
   const STORAGE_KEY = 'song-font-size-index';
   const LIGHT_MODE_KEY = 'song-light-mode';
   const CHORDS_KEY = 'song-show-chords';
@@ -201,6 +201,7 @@ function formatDate(date: Date, locale: string): string {
   let autoscrollSpeedIndex = parseInt(localStorage.getItem(AUTOSCROLL_KEY) || '2', 10);
   let isAutoscrolling = false;
   let autoscrollAnimationId: number | null = null;
+  let accumulatedScroll = 0;
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -620,6 +621,7 @@ function formatDate(date: Date, locale: string): string {
   function startAutoscroll() {
     if (isAutoscrolling) return;
     isAutoscrolling = true;
+    accumulatedScroll = 0;
 
     function scroll() {
       if (!isAutoscrolling) {
@@ -628,7 +630,14 @@ function formatDate(date: Date, locale: string): string {
       }
 
       const speed = SCROLL_SPEEDS[autoscrollSpeedIndex];
-      window.scrollBy(0, speed);
+      accumulatedScroll += speed;
+
+      // Only scroll when we've accumulated at least 1 pixel
+      if (accumulatedScroll >= 1) {
+        const pixelsToScroll = Math.floor(accumulatedScroll);
+        window.scrollBy({ top: pixelsToScroll, behavior: 'smooth' });
+        accumulatedScroll -= pixelsToScroll;
+      }
 
       // Check if we've reached the bottom
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
@@ -649,6 +658,7 @@ function formatDate(date: Date, locale: string): string {
 
   function stopAutoscroll() {
     isAutoscrolling = false;
+    accumulatedScroll = 0;
     if (autoscrollAnimationId !== null) {
       cancelAnimationFrame(autoscrollAnimationId);
       autoscrollAnimationId = null;
