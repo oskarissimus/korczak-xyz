@@ -180,7 +180,7 @@ function formatDate(date: Date, locale: string): string {
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
-  const SCROLL_SPEEDS = [0.5, 1, 1.5, 2, 3]; // pixels per frame (~30-180 px/sec at 60fps)
+  const SCROLL_SPEEDS = [0.025, 0.05, 0.1, 0.2, 0.4]; // pixels per frame (~30-180 px/sec at 60fps)
   const STORAGE_KEY = 'song-font-size-index';
   const LIGHT_MODE_KEY = 'song-light-mode';
   const CHORDS_KEY = 'song-show-chords';
