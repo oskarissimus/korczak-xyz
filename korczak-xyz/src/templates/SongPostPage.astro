@@ -71,21 +71,21 @@ function formatDate(date: Date, locale: string): string {
               </span>
               <span class="column-controls">
                 <span class="control-label">{t('song.columns')}</span>
-                <button class="column-decrease" title="Fewer columns">◀</button>
+                <button class="column-decrease" title="Fewer columns">◀︎</button>
                 <span class="column-count">1</span>
-                <button class="column-increase" title="More columns">▶</button>
+                <button class="column-increase" title="More columns">▶︎</button>
               </span>
             </div>
             <div class="song-controls-row">
               <button class="autoscroll-toggle" title="Start/stop autoscroll">
-                <span class="btn-icon">▶</span>
+                <span class="btn-icon">▶︎</span>
                 <span class="btn-label">{t('song.scroll')}</span>
               </button>
               <span class="autoscroll-controls">
                 <span class="control-label">{t('song.speed')}</span>
-                <button class="autoscroll-slower" title="Slower">◀</button>
+                <button class="autoscroll-slower" title="Slower">◀︎</button>
                 <span class="autoscroll-speed">3</span>
-                <button class="autoscroll-faster" title="Faster">▶</button>
+                <button class="autoscroll-faster" title="Faster">▶︎</button>
               </span>
             </div>
           </div>
@@ -131,21 +131,21 @@ function formatDate(date: Date, locale: string): string {
             </span>
             <span class="column-controls">
               <span class="control-label">{t('song.columns')}</span>
-              <button class="column-decrease" title="Fewer columns">◀</button>
+              <button class="column-decrease" title="Fewer columns">◀︎</button>
               <span class="column-count">1</span>
-              <button class="column-increase" title="More columns">▶</button>
+              <button class="column-increase" title="More columns">▶︎</button>
             </span>
           </div>
           <div class="song-controls-row">
             <button class="autoscroll-toggle" title="Start/stop autoscroll">
-              <span class="btn-icon">▶</span>
+              <span class="btn-icon">▶︎</span>
               <span class="btn-label">{t('song.scroll')}</span>
             </button>
             <span class="autoscroll-controls">
               <span class="control-label">{t('song.speed')}</span>
-              <button class="autoscroll-slower" title="Slower">◀</button>
+              <button class="autoscroll-slower" title="Slower">◀︎</button>
               <span class="autoscroll-speed">3</span>
-              <button class="autoscroll-faster" title="Faster">▶</button>
+              <button class="autoscroll-faster" title="Faster">▶︎</button>
             </span>
           </div>
         </div>
@@ -682,7 +682,7 @@ function formatDate(date: Date, locale: string): string {
       const scrollLabel = container?.getAttribute('data-scroll-label') || 'Scroll';
       const pauseLabel = container?.getAttribute('data-scroll-pause-label') || 'Pause';
 
-      if (icon) icon.textContent = isAutoscrolling ? '⏸' : '▶';
+      if (icon) icon.textContent = isAutoscrolling ? '⏸\uFE0E' : '▶\uFE0E';
       if (label) label.textContent = isAutoscrolling ? pauseLabel : scrollLabel;
       btn.classList.toggle('active', isAutoscrolling);
     });
