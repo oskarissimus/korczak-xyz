@@ -635,7 +635,7 @@ function formatDate(date: Date, locale: string): string {
       // Only scroll when we've accumulated at least 1 pixel
       if (accumulatedScroll >= 1) {
         const pixelsToScroll = Math.floor(accumulatedScroll);
-        window.scrollBy({ top: pixelsToScroll, behavior: 'smooth' });
+        window.scrollBy(0, pixelsToScroll);
         accumulatedScroll -= pixelsToScroll;
       }
 
@@ -730,7 +730,14 @@ function formatDate(date: Date, locale: string): string {
   }
 
   window.addEventListener('wheel', handleManualScroll, { passive: true });
-  window.addEventListener('touchstart', handleManualScroll, { passive: true });
+  window.addEventListener('touchstart', (e) => {
+    // Don't stop autoscroll if touching the autoscroll buttons
+    if (e.target instanceof Element &&
+        (e.target.closest('.autoscroll-toggle') || e.target.closest('.autoscroll-controls'))) {
+      return;
+    }
+    handleManualScroll();
+  }, { passive: true });
 
   // Pause on tab hidden
   document.addEventListener('visibilitychange', () => {
