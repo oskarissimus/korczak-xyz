@@ -484,3 +484,8 @@
     font-size: 0.8rem;
 }
 
+/* Hide video toggle */
+.blog_post.hide-video > div[style*="aspect-ratio"] {
+    display: none;
+}
+

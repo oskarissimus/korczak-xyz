@@ -51,7 +51,7 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-author">[{song.data.author}]</span>
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
-          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')}>
+          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')}>
             <div class="song-controls-row">
               <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
               <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -87,6 +87,10 @@ function formatDate(date: Date, locale: string): string {
                 <span class="autoscroll-speed">3</span>
                 <button class="autoscroll-faster" title="Faster">▶︎</button>
               </span>
+              <button class="video-toggle" title="Toggle video">
+                <span class="btn-icon">📺</span>
+                <span class="btn-label">{t('song.video')}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -111,7 +115,7 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')}>
+        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')}>
           <div class="song-controls-row">
             <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
             <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
@@ -147,6 +151,10 @@ function formatDate(date: Date, locale: string): string {
               <span class="autoscroll-speed">3</span>
               <button class="autoscroll-faster" title="Faster">▶︎</button>
             </span>
+            <button class="video-toggle" title="Toggle video">
+              <span class="btn-icon">📺</span>
+              <span class="btn-label">{t('song.video')}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -177,6 +185,7 @@ function formatDate(date: Date, locale: string): string {
   const autoscrollSlowerBtns = document.querySelectorAll('.autoscroll-slower');
   const autoscrollFasterBtns = document.querySelectorAll('.autoscroll-faster');
   const autoscrollSpeedDisplays = document.querySelectorAll('.autoscroll-speed');
+  const videoToggleBtns = document.querySelectorAll('.video-toggle');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
@@ -188,6 +197,7 @@ function formatDate(date: Date, locale: string): string {
   const TRANSPOSE_KEY = 'song-transpose';
   const LAYOUT_KEY = 'song-chord-layout';
   const AUTOSCROLL_KEY = 'song-autoscroll-speed';
+  const VIDEO_KEY = 'song-show-video';
 
   // German notation chromatic scale: H = B natural, B = Bb
   const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
@@ -202,6 +212,7 @@ function formatDate(date: Date, locale: string): string {
   let isAutoscrolling = false;
   let autoscrollAnimationId: number | null = null;
   let accumulatedScroll = 0;
+  let showVideo = localStorage.getItem(VIDEO_KEY) !== 'false';
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -787,12 +798,41 @@ function formatDate(date: Date, locale: string): string {
     }
   });
 
+  // Video toggle functions
+  function applyVideoVisibility() {
+    [contentMobile, contentDesktop].forEach(content => {
+      if (content) {
+        content.classList.toggle('hide-video', !showVideo);
+      }
+    });
+    videoToggleBtns.forEach(btn => {
+      const label = btn.querySelector('.btn-label');
+      const container = btn.closest('.song-controls-buttons');
+      const videoLabel = container?.getAttribute('data-video-label') || 'Video';
+      const videoHideLabel = container?.getAttribute('data-video-hide-label') || 'Hide Video';
+      if (label) label.textContent = showVideo ? videoHideLabel : videoLabel;
+    });
+  }
+
+  function saveVideoPreference() {
+    localStorage.setItem(VIDEO_KEY, String(showVideo));
+  }
+
+  videoToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      showVideo = !showVideo;
+      applyVideoVisibility();
+      saveVideoPreference();
+    });
+  });
+
   applyFontSize();
   applyLightMode();
   storeOriginalContent();
   applyChordVisibility();
   applyColumns();
   updateAutoscrollUI();
+  applyVideoVisibility();
 </script>
 
 <style>

@@ -87,6 +87,8 @@ export const ui = {
     'song.scroll': 'Scroll',
     'song.scrollPause': 'Pause',
     'song.speed': 'Speed',
+    'song.video': 'Video',
+    'song.videoHide': 'Hide Video',
 
     // Games
     'Games': 'Games',
@@ -305,6 +307,8 @@ export const ui = {
     'song.scroll': 'Przewijaj',
     'song.scrollPause': 'Pauza',
     'song.speed': 'Tempo',
+    'song.video': 'Wideo',
+    'song.videoHide': 'Ukryj Wideo',
 
     // Games
     'Games': 'Gry',
