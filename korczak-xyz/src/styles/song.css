@@ -329,6 +329,16 @@
         background: var(--retro-gray);
     }
 
+    /* 2-row button layout on desktop */
+    .song-controls-buttons {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .song-controls-row {
+        justify-content: flex-start;
+    }
+
     /* Contrasting colors for light gray background */
     .song-page .song-desktop-only .blog_post {
         color: var(--retro-black);
