@@ -250,9 +250,9 @@
     font-size: 1rem;
 }
 
-/* Column controls - hidden by default, shown on wide screens */
+/* Column controls */
 .column-controls {
-    display: none !important;
+    display: flex;
 }
 
 .column-controls button {
@@ -295,12 +295,6 @@
     flex-direction: column;
 }
 
-/* Show column controls on wider screens */
-@media (min-width: 900px) {
-    .column-controls {
-        display: flex !important;
-    }
-}
 
 /* Desktop title and meta */
 .song-desktop-title {
