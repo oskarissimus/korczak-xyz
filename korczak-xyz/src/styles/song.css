@@ -109,9 +109,9 @@
         text-shadow: none;
     }
 
-    /* Disable line breaks in song lyrics */
+    /* Enable line wrapping in song lyrics (matches desktop behavior) */
     .song-page .blog_post pre {
-        white-space: pre;
+        white-space: pre-wrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         border: none !important;
@@ -120,7 +120,7 @@
     }
 
     .song-page .blog_post pre code {
-        white-space: pre;
+        white-space: pre-wrap;
     }
 
     .song-page .blog_post {
