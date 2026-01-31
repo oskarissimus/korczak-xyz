@@ -110,14 +110,17 @@
     }
 
     /* Disable line breaks in song lyrics */
-    .song-page .blog_post pre,
-    .song-page .blog_post pre code {
+    .song-page .blog_post pre {
         white-space: pre;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         border: none !important;
         padding: 4px 2px;
         margin: 0;
+    }
+
+    .song-page .blog_post pre code {
+        white-space: pre;
     }
 
     .song-page .blog_post {
