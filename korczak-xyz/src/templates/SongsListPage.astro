@@ -23,6 +23,13 @@ songs.sort((a, b) => {
   if (authorCompare !== 0) return authorCompare;
   return a.data.title.localeCompare(b.data.title);
 });
+
+// Calculate stats
+const songCount = songs.length;
+const dates = songs.map(s => new Date(s.data.dateAdded)).filter(d => !isNaN(d.getTime()));
+const oldestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+const now = new Date();
+const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)));
 ---
 
 <Layout title={`${t('Songs')} | korczak.xyz`} lang={lang}>
@@ -36,6 +43,9 @@ songs.sort((a, b) => {
       />
       <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">×</button>
     </div>
+    <p class="songs-summary">
+      {songCount} {t('songs added over')} {years} {years === 1 ? t('year') : t('years')}
+    </p>
     <ul id="songs-list" class="flex flex-col gap-6">
       {songs.map(song => (
         <SongListItem
@@ -87,6 +97,14 @@ songs.sort((a, b) => {
 
   .search-clear:hover {
     color: var(--retro-black);
+  }
+
+  .songs-summary {
+    color: var(--retro-white);
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    margin-left: 20px;
+    opacity: 0.8;
   }
 
   .song-search-input:focus {

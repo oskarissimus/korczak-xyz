@@ -73,6 +73,9 @@ export const ui = {
     'Date added': 'Date added',
     'Search songs...': 'Search songs...',
     'No songs found': 'No songs found',
+    'songs added over': 'songs added over',
+    'year': 'year',
+    'years': 'years',
 
     // Song controls
     'song.chords': 'Chords',
@@ -293,6 +296,9 @@ export const ui = {
     'Date added': 'Dodano',
     'Search songs...': 'Szukaj...',
     'No songs found': 'Nie znaleziono piosenek',
+    'songs added over': 'piosenek dodanych przez',
+    'year': 'rok',
+    'years': 'lata',
 
     // Song controls
     'song.chords': 'Akordy',
