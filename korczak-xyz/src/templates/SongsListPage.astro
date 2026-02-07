@@ -34,6 +34,7 @@ songs.sort((a, b) => {
         placeholder={t('Search songs...')}
         class="song-search-input"
       />
+      <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">×</button>
     </div>
     <ul id="songs-list" class="flex flex-col gap-6">
       {songs.map(song => (
@@ -55,6 +56,7 @@ songs.sort((a, b) => {
 
 <style>
   .search-container {
+    position: relative;
     margin-bottom: 20px;
     margin-left: 20px;
   }
@@ -65,7 +67,25 @@ songs.sort((a, b) => {
     font-size: 1.1rem;
     background: var(--retro-white);
     border: 2px inset var(--retro-dark-gray);
-    padding: 8px 15px;
+    padding: 8px 30px 8px 15px;
+    color: var(--retro-black);
+  }
+
+  .search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--retro-dark-gray);
+    cursor: pointer;
+    padding: 0 4px;
+    display: none;
+  }
+
+  .search-clear:hover {
     color: var(--retro-black);
   }
 
@@ -83,6 +103,7 @@ songs.sort((a, b) => {
 
 <script>
   const searchInput = document.getElementById('song-search') as HTMLInputElement;
+  const clearBtn = document.getElementById('search-clear');
   const songsList = document.getElementById('songs-list');
   const noResults = document.getElementById('no-results');
   const songs = songsList?.querySelectorAll('.song-item') || [];
@@ -103,6 +124,18 @@ songs.sort((a, b) => {
 
     if (noResults) {
       noResults.style.display = visibleCount === 0 && query !== '' ? '' : 'none';
+    }
+
+    if (clearBtn) {
+      clearBtn.style.display = query ? 'block' : 'none';
+    }
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.dispatchEvent(new Event('input'));
+      searchInput.focus();
     }
   });
 </script>
