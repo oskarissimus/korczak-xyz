@@ -126,18 +126,26 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
   const noResults = document.getElementById('no-results');
   const songs = songsList?.querySelectorAll('.song-item') || [];
 
-  const removeDiacritics = (str: string) =>
-    str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const toAscii = (str: string) => {
+    const charMap: Record<string, string> = {
+      'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D',
+      'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
+    };
+    return str
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[łŁøØđĐßæÆœŒ]/g, c => charMap[c] || c);
+  };
 
   searchInput?.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement;
-    const query = removeDiacritics(target.value.toLowerCase().trim());
+    const query = toAscii(target.value.toLowerCase().trim());
     let visibleCount = 0;
 
     songs.forEach((song) => {
       const songEl = song as HTMLElement;
-      const title = removeDiacritics(songEl.dataset.title || '');
-      const author = removeDiacritics(songEl.dataset.author || '');
+      const title = toAscii(songEl.dataset.title || '');
+      const author = toAscii(songEl.dataset.author || '');
       const matches = title.includes(query) || author.includes(query);
       songEl.style.display = matches ? '' : 'none';
       if (matches) visibleCount++;
