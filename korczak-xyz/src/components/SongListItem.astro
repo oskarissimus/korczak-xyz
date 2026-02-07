@@ -7,12 +7,13 @@ interface Props {
   author: string;
   dateAdded: Date;
   videoUploadDate?: Date;
+  hasVideo?: boolean;
   lang?: Lang;
   'data-title'?: string;
   'data-author'?: string;
 }
 
-const { slug, title, author, dateAdded, videoUploadDate, lang = 'pl', 'data-title': dataTitle, 'data-author': dataAuthor } = Astro.props;
+const { slug, title, author, dateAdded, videoUploadDate, hasVideo = false, lang = 'pl', 'data-title': dataTitle, 'data-author': dataAuthor } = Astro.props;
 
 // Use the earlier of the two dates
 const displayDate = videoUploadDate && videoUploadDate < dateAdded ? videoUploadDate : dateAdded;
@@ -35,6 +36,7 @@ function formatDate(date: Date, locale: string): string {
       <div class="song-meta">
         <span class="song-date">{formatDate(displayDate, lang)}</span>
         <span class="song-author">[{author}]</span>
+        {hasVideo && <span class="song-video-icon" title="Video">&#x1F4FA;</span>}
       </div>
     </div>
   </a>
@@ -104,6 +106,10 @@ function formatDate(date: Date, locale: string): string {
   .song-date {
     color: var(--retro-navy);
     font-size: 0.9rem;
+  }
+
+  .song-video-icon {
+    font-size: 0.85rem;
   }
 
   @media (max-width: 600px) {
