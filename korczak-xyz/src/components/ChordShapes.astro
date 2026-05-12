@@ -10,15 +10,33 @@ interface Props {
 const { chords, lang } = Astro.props;
 const t = useTranslations(lang);
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightMarks(ascii: string): string {
+  const lines = ascii.split('\n');
+  return lines.map((line, i) => {
+    const escaped = escapeHtml(line);
+    if (i < 2) return escaped;
+    return escaped
+      .replace(/^([eBGDAE]) ([oxO])/, (_m, letter, mark) => {
+        const cls = mark === 'O' ? 'press' : mark === 'x' ? 'muted' : 'open';
+        return `${letter} <span class="chord-dot chord-${cls}">${mark}</span>`;
+      })
+      .replace(/-O-/g, '-<span class="chord-dot chord-press">O</span>-');
+  }).join('\n');
+}
+
 const diagrams = Object.entries(chords).map(([name, spec]) => ({
   name,
-  ascii: renderHorizontalDiagram(name, spec),
+  html: highlightMarks(renderHorizontalDiagram(name, spec)),
 }));
 ---
 
 <details class="chord-shapes">
   <summary>{t('song.chordShapes')}</summary>
   <div class="chord-shapes-grid">
-    {diagrams.map(d => <pre class="chord-diagram">{d.ascii}</pre>)}
+    {diagrams.map(d => <pre class="chord-diagram" set:html={d.html}></pre>)}
   </div>
 </details>

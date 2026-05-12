@@ -529,6 +529,22 @@
     white-space: pre;
 }
 
+.chord-dot {
+    font-weight: bold;
+}
+
+.chord-open {
+    color: var(--retro-cyan);
+}
+
+.chord-muted {
+    color: var(--retro-magenta);
+}
+
+.chord-press {
+    color: var(--retro-yellow);
+}
+
 .chord-shapes.light-mode > summary {
     color: #555;
 }
@@ -537,5 +553,17 @@
     background: #fff;
     border-color: #999;
     color: #000;
+}
+
+.chord-shapes.light-mode .chord-open {
+    color: #0066cc;
+}
+
+.chord-shapes.light-mode .chord-muted {
+    color: #aa0033;
+}
+
+.chord-shapes.light-mode .chord-press {
+    color: #cc6600;
 }
 
