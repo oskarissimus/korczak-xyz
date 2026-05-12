@@ -1,0 +1,24 @@
+---
+import { renderHorizontalDiagram } from '../utils/chordDiagram';
+import { type Lang, useTranslations } from '../i18n';
+
+interface Props {
+  chords: Record<string, string>;
+  lang: Lang;
+}
+
+const { chords, lang } = Astro.props;
+const t = useTranslations(lang);
+
+const diagrams = Object.entries(chords).map(([name, spec]) => ({
+  name,
+  ascii: renderHorizontalDiagram(name, spec),
+}));
+---
+
+<details class="chord-shapes">
+  <summary>{t('song.chordShapes')}</summary>
+  <div class="chord-shapes-grid">
+    {diagrams.map(d => <pre class="chord-diagram">{d.ascii}</pre>)}
+  </div>
+</details>

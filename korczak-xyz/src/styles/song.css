@@ -496,3 +496,46 @@
     display: none;
 }
 
+/* Chord-shape diagrams (collapsible block above lyrics) */
+.chord-shapes {
+    margin: 15px 0;
+    font-family: 'VT323', monospace;
+}
+
+.chord-shapes > summary {
+    color: var(--retro-yellow);
+    cursor: pointer;
+    font-size: 1.3rem;
+    padding: 4px 0;
+    user-select: none;
+}
+
+.chord-shapes-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-top: 10px;
+}
+
+.chord-diagram {
+    background: var(--retro-navy);
+    border: 3px inset var(--retro-dark-gray);
+    color: var(--retro-green);
+    font-family: 'VT323', monospace;
+    font-size: 1.3rem;
+    line-height: 1.0;
+    margin: 0;
+    padding: 10px 12px;
+    white-space: pre;
+}
+
+.chord-shapes.light-mode > summary {
+    color: #555;
+}
+
+.chord-shapes.light-mode .chord-diagram {
+    background: #fff;
+    border-color: #999;
+    color: #000;
+}
+

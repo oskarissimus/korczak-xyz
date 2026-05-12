@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import PageContent from '../components/PageContent.astro';
+import ChordShapes from '../components/ChordShapes.astro';
 import '../styles/song.css';
 import { type Lang, useTranslations } from '../i18n';
 
@@ -94,6 +95,7 @@ function formatDate(date: Date, locale: string): string {
         </div>
       </div>
       <div class="window-content song-content-wrapper">
+        {song.data.chords && <ChordShapes chords={song.data.chords} lang={lang} />}
         <section class="blog_post" id="song-content" itemprop="articleBody">
           <Content />
         </section>
@@ -155,6 +157,7 @@ function formatDate(date: Date, locale: string): string {
         </div>
       </div>
       <div class="window-content song-content-wrapper">
+        {song.data.chords && <ChordShapes chords={song.data.chords} lang={lang} />}
         <section class="blog_post" id="song-content-desktop" itemprop="articleBody">
           <Content />
         </section>
@@ -182,6 +185,7 @@ function formatDate(date: Date, locale: string): string {
   const autoscrollFasterBtns = document.querySelectorAll('.autoscroll-faster');
   const autoscrollSpeedDisplays = document.querySelectorAll('.autoscroll-speed');
   const videoToggleBtns = document.querySelectorAll('.video-toggle');
+  const chordShapeBlocks = document.querySelectorAll('.chord-shapes');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
   const COLUMNS = [1, 2, 3, 4];
@@ -229,6 +233,7 @@ function formatDate(date: Date, locale: string): string {
         content.classList.toggle('light-mode', lightMode);
       }
     });
+    chordShapeBlocks.forEach(block => block.classList.toggle('light-mode', lightMode));
     lightModeBtns.forEach(btn => {
       const icon = btn.querySelector('.btn-icon');
       const label = btn.querySelector('.btn-label');

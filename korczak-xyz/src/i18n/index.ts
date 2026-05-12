@@ -92,6 +92,7 @@ export const ui = {
     'song.speed': 'Speed',
     'song.video': 'Video',
     'song.videoHide': 'Hide Video',
+    'song.chordShapes': 'Chord shapes',
 
     // Games
     'Games': 'Games',
@@ -315,6 +316,7 @@ export const ui = {
     'song.speed': 'Tempo',
     'song.video': 'Wideo',
     'song.videoHide': 'Ukryj Wideo',
+    'song.chordShapes': 'Układy akordów',
 
     // Games
     'Games': 'Gry',
