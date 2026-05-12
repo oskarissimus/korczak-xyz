@@ -64,6 +64,7 @@ const songsCollection = defineCollection({
     language: z.literal('pl'),
     dateAdded: z.coerce.date(),
     videoUploadDate: z.coerce.date().optional(),
+    chords: z.record(z.string(), z.string()).optional(),
   }),
 });
 
