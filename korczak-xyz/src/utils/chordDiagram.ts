@@ -64,12 +64,12 @@ export function renderHorizontalDiagram(name: string, spec: string): string {
     const stringIdx = 5 - dispIdx;
     const val = shape.strings[stringIdx];
     const letter = STRING_LETTERS_HIGH_TO_LOW[dispIdx];
-    const indicator = val === 'x' ? 'x' : val === 0 ? 'o' : ' ';
+    const indicator = val === 'x' ? '✕' : val === 0 ? '○' : ' ';
 
     let body = '';
     for (let i = 0; i < numCols; i++) {
       const fret = window.lo + i;
-      const press = typeof val === 'number' && val > 0 && val === fret ? 'O' : '+';
+      const press = typeof val === 'number' && val > 0 && val === fret ? '●' : '+';
       body += '---' + press;
     }
     body += '---';

@@ -20,11 +20,11 @@ function highlightMarks(ascii: string): string {
     const escaped = escapeHtml(line);
     if (i < 2) return escaped;
     return escaped
-      .replace(/^([eBGDAE]) ([oxO])/, (_m, letter, mark) => {
-        const cls = mark === 'O' ? 'press' : mark === 'x' ? 'muted' : 'open';
+      .replace(/^([eBGDAE]) ([○✕])/u, (_m, letter, mark) => {
+        const cls = mark === '✕' ? 'muted' : 'open';
         return `${letter} <span class="chord-dot chord-${cls}">${mark}</span>`;
       })
-      .replace(/-O-/g, '-<span class="chord-dot chord-press">O</span>-');
+      .replace(/-●-/gu, '-<span class="chord-dot chord-press">●</span>-');
   }).join('\n');
 }
 
