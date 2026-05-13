@@ -7,7 +7,7 @@ language: pl
 dateAdded: 2026-05-12
 chords:
   Asus2: "x 0 2 2 0 0"
-  "c#": "x 4 6 6 6 4"
+  "c#": "x 4 6 6 5 4"
   H: "x 2 4 4 4 2"
   E: "0 2 2 1 0 0"
   A: "x 0 2 2 2 0"
