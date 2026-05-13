@@ -52,10 +52,11 @@ function formatDate(date: Date, locale: string): string {
             <span class="song-author">[{song.data.author}]</span>
             <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
           </div>
-          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')}>
+          <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')} data-chord-shapes-label={t('song.chordShapes')}>
             <div class="song-controls-row">
               <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
               <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
+              {song.data.chords && <button class="chord-shapes-toggle" title="Toggle chord shapes"><span class="btn-icon">▦</span><span class="btn-label">{t('song.chordShapes')}</span></button>}
               <span class="transpose-controls">
                 <span class="control-label">{t('song.transpose')}</span>
                 <button class="transpose-down" title="Transpose down">♭</button>
@@ -95,7 +96,7 @@ function formatDate(date: Date, locale: string): string {
         </div>
       </div>
       <div class="window-content song-content-wrapper">
-        {song.data.chords && <ChordShapes chords={song.data.chords} lang={lang} />}
+        {song.data.chords && <ChordShapes chords={song.data.chords} />}
         <section class="blog_post" id="song-content" itemprop="articleBody">
           <Content />
         </section>
@@ -115,10 +116,11 @@ function formatDate(date: Date, locale: string): string {
           <span class="song-author">[{song.data.author}]</span>
           <span class="song-date">{t('Date added')}: {formatDate(song.data.dateAdded, lang)}</span>
         </div>
-        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')}>
+        <div class="song-controls-buttons" data-chords-label={t('song.chords')} data-text-label={t('song.text')} data-light-label={t('song.light')} data-dark-label={t('song.dark')} data-layout-side-label={t('song.layoutSide')} data-layout-top-label={t('song.layoutTop')} data-scroll-label={t('song.scroll')} data-scroll-pause-label={t('song.scrollPause')} data-video-label={t('song.video')} data-video-hide-label={t('song.videoHide')} data-chord-shapes-label={t('song.chordShapes')}>
           <div class="song-controls-row">
             <button class="chords-toggle" title="Toggle chords"><span class="btn-icon">♪</span><span class="btn-label">{t('song.chords')}</span></button>
             <button class="layout-toggle" title="Toggle chord layout"><span class="btn-icon">⫶</span><span class="btn-label">{t('song.layoutSide')}</span></button>
+            {song.data.chords && <button class="chord-shapes-toggle" title="Toggle chord shapes"><span class="btn-icon">▦</span><span class="btn-label">{t('song.chordShapes')}</span></button>}
             <span class="transpose-controls">
               <span class="control-label">{t('song.transpose')}</span>
               <button class="transpose-down" title="Transpose down">♭</button>
@@ -157,7 +159,7 @@ function formatDate(date: Date, locale: string): string {
         </div>
       </div>
       <div class="window-content song-content-wrapper">
-        {song.data.chords && <ChordShapes chords={song.data.chords} lang={lang} />}
+        {song.data.chords && <ChordShapes chords={song.data.chords} />}
         <section class="blog_post" id="song-content-desktop" itemprop="articleBody">
           <Content />
         </section>
@@ -185,6 +187,7 @@ function formatDate(date: Date, locale: string): string {
   const autoscrollFasterBtns = document.querySelectorAll('.autoscroll-faster');
   const autoscrollSpeedDisplays = document.querySelectorAll('.autoscroll-speed');
   const videoToggleBtns = document.querySelectorAll('.video-toggle');
+  const chordShapesToggleBtns = document.querySelectorAll('.chord-shapes-toggle');
   const chordShapeBlocks = document.querySelectorAll('.chord-shapes');
 
   const FONT_SIZES = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.4];
@@ -198,6 +201,7 @@ function formatDate(date: Date, locale: string): string {
   const LAYOUT_KEY = 'song-chord-layout';
   const AUTOSCROLL_KEY = 'song-autoscroll-speed';
   const VIDEO_KEY = 'song-show-video';
+  const CHORD_SHAPES_KEY = 'song-show-chord-shapes';
 
   // German notation chromatic scale: H = B natural, B = Bb
   const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
@@ -213,6 +217,7 @@ function formatDate(date: Date, locale: string): string {
   let autoscrollAnimationId: number | null = null;
   let accumulatedScroll = 0;
   let showVideo = localStorage.getItem(VIDEO_KEY) !== 'false';
+  let showChordShapes = localStorage.getItem(CHORD_SHAPES_KEY) !== 'false';
 
   function applyFontSize() {
     [contentMobile, contentDesktop].forEach(content => {
@@ -827,6 +832,25 @@ function formatDate(date: Date, locale: string): string {
     });
   });
 
+  function applyChordShapesVisibility() {
+    chordShapeBlocks.forEach(block => block.classList.toggle('hidden', !showChordShapes));
+    chordShapesToggleBtns.forEach(btn => {
+      btn.classList.toggle('active', showChordShapes);
+    });
+  }
+
+  function saveChordShapesPreference() {
+    localStorage.setItem(CHORD_SHAPES_KEY, String(showChordShapes));
+  }
+
+  chordShapesToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      showChordShapes = !showChordShapes;
+      applyChordShapesVisibility();
+      saveChordShapesPreference();
+    });
+  });
+
   applyFontSize();
   applyLightMode();
   storeOriginalContent();
@@ -834,6 +858,7 @@ function formatDate(date: Date, locale: string): string {
   applyColumns();
   updateAutoscrollUI();
   applyVideoVisibility();
+  applyChordShapesVisibility();
 </script>
 
 <style>

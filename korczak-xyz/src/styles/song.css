@@ -474,6 +474,16 @@
     animation: pulse 1.5s ease-in-out infinite;
 }
 
+.chord-shapes-toggle.active {
+    background: var(--retro-teal);
+    color: var(--retro-white);
+}
+
+.chord-shapes-toggle.active .btn-icon,
+.chord-shapes-toggle.active .btn-label {
+    color: var(--retro-white);
+}
+
 .autoscroll-toggle.active .btn-icon,
 .autoscroll-toggle.active .btn-label {
     color: var(--retro-white);
@@ -496,18 +506,14 @@
     display: none;
 }
 
-/* Chord-shape diagrams (collapsible block above lyrics) */
+/* Chord-shape diagrams (toggled via .chord-shapes-toggle button) */
 .chord-shapes {
     margin: 15px 0;
     font-family: 'VT323', monospace;
 }
 
-.chord-shapes > summary {
-    color: var(--retro-yellow);
-    cursor: pointer;
-    font-size: 1.3rem;
-    padding: 4px 0;
-    user-select: none;
+.chord-shapes.hidden {
+    display: none;
 }
 
 .chord-shapes-grid {
@@ -543,10 +549,6 @@
 
 .chord-press {
     color: var(--retro-yellow);
-}
-
-.chord-shapes.light-mode > summary {
-    color: #555;
 }
 
 .chord-shapes.light-mode .chord-diagram {
