@@ -635,6 +635,11 @@ function formatDate(date: Date, locale: string): string {
   });
 
   // Autoscroll functions
+  function getVisibleContent() {
+    // hidden container (display:none) has offsetParent === null
+    return contentMobile?.offsetParent ? contentMobile : contentDesktop;
+  }
+
   function startAutoscroll() {
     if (isAutoscrolling) return;
     isAutoscrolling = true;
@@ -656,12 +661,19 @@ function formatDate(date: Date, locale: string): string {
         accumulatedScroll -= pixelsToScroll;
       }
 
-      // Check if we've reached the bottom
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = window.innerHeight;
+      // Stop once the bottom of the lyrics container is in view
+      const content = getVisibleContent();
+      if (content) {
+        const contentBottom = content.getBoundingClientRect().bottom; // viewport coords
+        if (contentBottom <= window.innerHeight + 1) {
+          stopAutoscroll();
+          return;
+        }
+      }
 
-      if (scrollTop + clientHeight >= scrollHeight - 1) {
+      // Safety net: never scroll past the actual page bottom
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      if (scrollTop + window.innerHeight >= document.documentElement.scrollHeight - 1) {
         stopAutoscroll();
         return;
       }
