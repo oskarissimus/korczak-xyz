@@ -21,6 +21,7 @@
     "@nanostores/react": "^1.0.0",
     "@types/three": "^0.182.0",
     "astro": "^5.16.5",
+    "firebase": "^12.15.0",
     "nanostores": "^1.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

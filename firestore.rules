@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Typing trainer data is private to each account. Since only one account
+// exists (sign-up is disabled at the Identity Platform level), this means the
+// data is readable/writable only by the owner.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

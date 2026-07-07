@@ -183,6 +183,57 @@
   margin: 0;
 }
 
+/* Auth bar */
+
+.typing-auth {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 8px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-black);
+}
+
+.typing-auth--muted {
+  color: var(--retro-dark-gray);
+}
+
+.typing-auth-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typing-auth-synced {
+  color: var(--retro-navy);
+  font-size: 1.2rem;
+}
+
+.typing-auth-input {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  padding: 4px 8px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  color: var(--retro-black);
+  min-width: 140px;
+}
+
+.typing-auth-btn {
+  font-size: 0.7rem;
+}
+
+.typing-auth-error {
+  color: var(--retro-red);
+  flex-basis: 100%;
+  text-align: center;
+}
+
 /* Controls */
 
 .typing-controls {

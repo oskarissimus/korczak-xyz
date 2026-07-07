@@ -5,16 +5,21 @@ import {
   archiveCurrentSession,
   exportLogToJSON,
   importLogFromJSON,
+  isNonTrivialProgress,
+  loadAllSessions,
   loadProgress,
   resetProgress as resetProgressStorage,
   saveCurrentSession,
   saveProgress,
 } from '../utils/typing/storage';
+import { loadCloudProgress, saveCloudProgress, saveCloudSession } from '../utils/typing/cloudStorage';
+import type { AuthUser } from './useAuth';
 import type { Book, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
 
 export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
 const SESSION_SAVE_DEBOUNCE_MS = 800;
+const CLOUD_SAVE_DEBOUNCE_MS = 2000;
 
 function newSession(bookId: string, progress: TypingProgress): TypingSession {
   return {
@@ -47,7 +52,7 @@ export interface TypingSessionApi {
   importLog: (json: string) => { success: boolean; sessionCount: number; error?: string };
 }
 
-export function useTypingSession(): TypingSessionApi {
+export function useTypingSession(user: AuthUser | null): TypingSessionApi {
   const book = BOOK;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -57,6 +62,32 @@ export function useTypingSession(): TypingSessionApi {
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
   const sessionRef = useRef<TypingSession | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Latest user, read inside debounced callbacks without re-subscribing.
+  const userRef = useRef<AuthUser | null>(user);
+  userRef.current = user;
+  const cloudSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloudProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // When signed in, mirror the live session to the cloud (debounced/coalesced).
+  const scheduleCloudSession = useCallback(() => {
+    if (!userRef.current || cloudSessionTimerRef.current) return;
+    cloudSessionTimerRef.current = setTimeout(() => {
+      cloudSessionTimerRef.current = null;
+      const u = userRef.current;
+      if (u && sessionRef.current) void saveCloudSession(u.uid, sessionRef.current);
+    }, CLOUD_SAVE_DEBOUNCE_MS);
+  }, []);
+
+  const scheduleCloudProgress = useCallback((p: TypingProgress) => {
+    if (!userRef.current) return;
+    if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
+    cloudProgressTimerRef.current = setTimeout(() => {
+      cloudProgressTimerRef.current = null;
+      const u = userRef.current;
+      if (u) void saveCloudProgress(u.uid, p);
+    }, CLOUD_SAVE_DEBOUNCE_MS);
+  }, []);
 
   // Start a fresh session on mount, archiving any previous one.
   useEffect(() => {
@@ -73,16 +104,21 @@ export function useTypingSession(): TypingSessionApi {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    if (sessionRef.current) saveCurrentSession(sessionRef.current);
+    if (sessionRef.current) {
+      saveCurrentSession(sessionRef.current);
+      const u = userRef.current;
+      if (u) void saveCloudSession(u.uid, sessionRef.current);
+    }
   }, []);
 
   const scheduleSessionSave = useCallback(() => {
+    scheduleCloudSession();
     if (saveTimerRef.current) return; // already scheduled
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       if (sessionRef.current) saveCurrentSession(sessionRef.current);
     }, SESSION_SAVE_DEBOUNCE_MS);
-  }, []);
+  }, [scheduleCloudSession]);
 
   const pushEvent = useCallback(
     (event: TypingEvent) => {
@@ -93,10 +129,59 @@ export function useTypingSession(): TypingSessionApi {
     [scheduleSessionSave]
   );
 
-  // Persist progress whenever it changes.
+  // Persist progress whenever it changes (localStorage always; cloud if signed in).
   useEffect(() => {
     saveProgress(progress);
-  }, [progress]);
+    scheduleCloudProgress(progress);
+  }, [progress, scheduleCloudProgress]);
+
+  // On sign-in, reconcile local and cloud once. If the cloud already has
+  // progress, adopt it; otherwise upload local progress + logs (a fresh cloud).
+  const syncedUidRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) {
+      syncedUidRef.current = null;
+      return;
+    }
+    if (syncedUidRef.current === user.uid) return;
+    syncedUidRef.current = user.uid;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const cloud = await loadCloudProgress(user.uid, book.id);
+        if (cancelled) return;
+        if (cloud) {
+          // Cloud is the source of truth on this device from now on.
+          saveProgress(cloud);
+          setProgress(cloud);
+        } else {
+          // Fresh cloud: migrate whatever is stored locally, once.
+          const local = loadProgress(book.id);
+          if (isNonTrivialProgress(local)) {
+            await saveCloudProgress(user.uid, local);
+            for (const s of loadAllSessions()) {
+              if (cancelled) return;
+              await saveCloudSession(user.uid, s);
+            }
+          }
+        }
+      } catch {
+        // Network/permission errors: keep working locally.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, book.id]);
+
+  // Clear cloud debounce timers on unmount.
+  useEffect(() => {
+    return () => {
+      if (cloudSessionTimerRef.current) clearTimeout(cloudSessionTimerRef.current);
+      if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
+    };
+  }, []);
 
   // Flush the session log if the tab is hidden or closed.
   useEffect(() => {

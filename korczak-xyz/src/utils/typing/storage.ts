@@ -147,6 +147,22 @@ export function importLogFromJSON(
   }
 }
 
+// All locally-stored sessions (archive plus the live one), for one-time upload
+// to the cloud on first sign-in.
+export function loadAllSessions(): TypingSession[] {
+  const sessions = [...loadArchivedSessions()];
+  const current = loadCurrentSession();
+  if (current && current.events.length > 0) sessions.push(current);
+  return sessions;
+}
+
+// Whether the local progress holds anything worth migrating to the cloud.
+export function isNonTrivialProgress(progress: TypingProgress): boolean {
+  return (
+    progress.passageIndex > 0 || progress.typed.length > 0 || progress.totalKeystrokes > 0
+  );
+}
+
 export function clearAllData(): void {
   if (typeof window === 'undefined') return;
   try {
