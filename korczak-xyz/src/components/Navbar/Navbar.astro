@@ -1,5 +1,6 @@
 ---
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
+import NavAuth from '../Auth/NavAuth';
 import { execSync } from 'child_process';
 
 interface Props {
@@ -64,11 +65,16 @@ function isActive(itemPath: string): boolean {
         </a>
       ))}
 
-      <!-- Language switcher -->
-      <div class="lang-switcher">
-        <a href={enPath} class={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</a>
-        <span class="lang-divider">|</span>
-        <a href={plPath} class={`lang-btn ${lang === 'pl' ? 'active' : ''}`}>PL</a>
+      <!-- Right-aligned group: auth control + language switcher -->
+      <div class="nav-right">
+        <NavAuth client:only="react" lang={lang} />
+
+        <!-- Language switcher -->
+        <div class="lang-switcher">
+          <a href={enPath} class={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</a>
+          <span class="lang-divider">|</span>
+          <a href={plPath} class={`lang-btn ${lang === 'pl' ? 'active' : ''}`}>PL</a>
+        </div>
       </div>
     </nav>
 
@@ -161,8 +167,14 @@ function isActive(itemPath: string): boolean {
     color: var(--retro-black);
   }
 
-  .lang-switcher {
+  .nav-right {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lang-switcher {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -244,6 +256,14 @@ function isActive(itemPath: string): boolean {
 
     .nav-link {
       justify-content: flex-start;
+    }
+
+    .nav-right {
+      margin-left: 0;
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 5px;
     }
 
     .lang-switcher {

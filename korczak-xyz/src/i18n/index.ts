@@ -94,6 +94,10 @@ export const ui = {
     'song.videoHide': 'Hide Video',
     'song.chordShapes': 'Chord shapes',
 
+    // Auth
+    'Login': 'Login',
+    'Logout': 'Logout',
+
     // Games
     'Games': 'Games',
     'Typing': 'Typing Trainer',
@@ -319,6 +323,10 @@ export const ui = {
     'song.video': 'Wideo',
     'song.videoHide': 'Ukryj Wideo',
     'song.chordShapes': 'Układy akordów',
+
+    // Auth
+    'Login': 'Logowanie',
+    'Logout': 'Wyloguj',
 
     // Games
     'Games': 'Gry',

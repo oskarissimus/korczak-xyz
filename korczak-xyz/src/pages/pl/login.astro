@@ -1,0 +1,15 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageContent from '../../components/PageContent.astro';
+import LoginForm from '../../components/Auth/LoginForm';
+import { useTranslations } from '../../i18n';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Login')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('Login')}>
+    <LoginForm client:only="react" lang={lang} />
+  </PageContent>
+</Layout>

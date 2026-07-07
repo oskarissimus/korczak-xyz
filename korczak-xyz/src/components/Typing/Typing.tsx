@@ -3,7 +3,7 @@ import { useTypingSession } from '../../hooks/useTypingSession';
 import { useAuth } from '../../hooks/useAuth';
 import { StatsBar } from './StatsBar';
 import { PassageView } from './PassageView';
-import { AuthBar } from './AuthBar';
+import SyncStatus from './SyncStatus';
 
 interface TypingProps {
   lang: 'en' | 'pl';
@@ -26,13 +26,6 @@ const translations = {
     hint: 'Click the text and start typing.',
     importOk: 'Imported log.',
     importFail: 'Could not import that file.',
-    signIn: 'Sign in',
-    signOut: 'Sign out',
-    email: 'Email',
-    password: 'Password',
-    signedInAs: 'Signed in as',
-    synced: 'Progress syncs to the cloud',
-    signInPrompt: 'Sign in to sync',
   },
   pl: {
     wpm: 'WPM',
@@ -50,13 +43,6 @@ const translations = {
     hint: 'Kliknij tekst i zacznij pisać.',
     importOk: 'Zaimportowano log.',
     importFail: 'Nie udało się zaimportować pliku.',
-    signIn: 'Zaloguj się',
-    signOut: 'Wyloguj',
-    email: 'E-mail',
-    password: 'Hasło',
-    signedInAs: 'Zalogowano jako',
-    synced: 'Postęp synchronizuje się z chmurą',
-    signInPrompt: 'Zaloguj się, aby synchronizować',
   },
 };
 
@@ -113,18 +99,7 @@ export default function Typing({ lang }: TypingProps) {
         {book.title} — {book.author}
       </div>
 
-      <AuthBar
-        auth={auth}
-        labels={{
-          signIn: t.signIn,
-          signOut: t.signOut,
-          email: t.email,
-          password: t.password,
-          signedInAs: t.signedInAs,
-          synced: t.synced,
-          signInPrompt: t.signInPrompt,
-        }}
-      />
+      <SyncStatus auth={auth} lang={lang} />
 
       <StatsBar
         wpm={wpm}

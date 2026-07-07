@@ -1,0 +1,160 @@
+/* Auth UI: navbar control, login page, typing sync status */
+
+/* --- Navbar auth control --- */
+.nav-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+}
+
+.nav-auth-login {
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 6px 12px;
+  text-decoration: none;
+  color: var(--retro-black);
+}
+
+.nav-auth-login:hover {
+  background: #a0a0a0;
+}
+
+.nav-auth-login:active {
+  border-style: inset;
+}
+
+.nav-auth--in {
+  background: var(--retro-teal);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 4px 8px;
+  color: var(--retro-white);
+}
+
+.nav-auth-email {
+  color: var(--retro-yellow);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-auth-btn {
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 3px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.nav-auth-btn:hover {
+  background: #a0a0a0;
+}
+
+.nav-auth-btn:active {
+  border-style: inset;
+}
+
+/* --- Login page --- */
+.auth-card {
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: 'VT323', monospace;
+}
+
+.auth-subtitle {
+  font-size: 1.2rem;
+  color: var(--retro-black);
+  margin: 0;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 1.2rem;
+  color: var(--retro-black);
+}
+
+.auth-field input {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  padding: 8px 10px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  color: var(--retro-black);
+}
+
+.auth-submit {
+  align-self: flex-start;
+}
+
+.auth-error {
+  color: var(--retro-red);
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.auth-note {
+  text-align: center;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  color: var(--retro-dark-gray);
+}
+
+.auth-signedin {
+  font-size: 1.3rem;
+  color: var(--retro-black);
+  margin: 0;
+  text-align: center;
+}
+
+.auth-cloud {
+  color: var(--retro-navy);
+}
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* --- Typing app sync status --- */
+.typing-sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-white);
+  text-align: center;
+}
+
+.typing-sync-cloud {
+  color: var(--retro-cyan);
+  font-size: 1.3rem;
+}
+
+.typing-sync-link {
+  color: var(--retro-yellow);
+  text-decoration: none;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 6px 12px;
+}
+
+.typing-sync-link:hover {
+  background: #a0a0a0;
+}
+
+.typing-sync-link:active {
+  border-style: inset;
+}
