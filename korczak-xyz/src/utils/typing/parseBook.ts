@@ -35,6 +35,7 @@ function normalizeParagraph(paragraph: string): string {
   return paragraph
     .replace(/\*/g, '') // *emphasis* markers
     .replace(/[—–]/g, '-') // normalize em/en dashes to a plain hyphen
+    .replace(/[„”“«»‟]/g, '"') // normalize double quotes to a straight quote
     .replace(/\s+/g, ' ') // collapse intra-paragraph line wraps
     .trim();
 }
