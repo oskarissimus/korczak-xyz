@@ -1,0 +1,210 @@
+/* Touch-Typing Trainer — retro theme */
+
+.typing-window {
+  margin-bottom: 20px;
+}
+
+.typing-content {
+  background: var(--retro-teal);
+  padding: 16px;
+}
+
+.typing-game {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.typing-book-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.7rem;
+  color: var(--retro-white);
+  text-align: center;
+  text-shadow: 1px 1px 0 var(--retro-black);
+}
+
+/* Stats bar */
+
+.typing-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 10px;
+}
+
+.typing-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 4px 10px;
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.typing-stat-value {
+  font-family: 'VT323', monospace;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--retro-green);
+}
+
+.typing-stat-label {
+  font-family: 'VT323', monospace;
+  font-size: 0.85rem;
+  color: var(--retro-cyan);
+  text-transform: uppercase;
+}
+
+.typing-progress {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.typing-progress-track {
+  height: 16px;
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.typing-progress-fill {
+  height: 100%;
+  background: var(--retro-green);
+  transition: width 0.2s ease;
+}
+
+/* Passage */
+
+.typing-passage {
+  background: var(--retro-white);
+  border: 3px inset var(--retro-gray);
+  padding: 20px;
+  cursor: text;
+  position: relative;
+}
+
+.typing-text {
+  font-family: 'VT323', monospace;
+  font-size: 1.7rem;
+  line-height: 1.7;
+  color: var(--retro-dark-gray);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  letter-spacing: 0.5px;
+}
+
+.typing-char {
+  border-radius: 2px;
+}
+
+.typing-char--pending {
+  color: #7a7a7a;
+}
+
+.typing-char--correct {
+  color: var(--retro-black);
+}
+
+.typing-char--incorrect {
+  color: var(--retro-white);
+  background: var(--retro-red);
+}
+
+.typing-char--current {
+  color: var(--retro-black);
+  background: var(--retro-yellow);
+  animation: typing-caret 1s steps(1) infinite;
+}
+
+@keyframes typing-caret {
+  0%,
+  50% {
+    box-shadow: inset 2px 0 0 var(--retro-black);
+  }
+  50.01%,
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* The hidden input still needs to be focusable, so keep it in the layout but
+   visually collapsed rather than display:none. */
+.typing-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  left: 0;
+  top: 0;
+}
+
+.typing-hint {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-white);
+  text-align: center;
+  margin: 0;
+}
+
+/* Finished state */
+
+.typing-finished {
+  background: var(--retro-navy);
+  border: 3px outset var(--retro-white);
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.typing-finished-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1rem;
+  color: var(--retro-yellow);
+  margin: 0 0 10px;
+}
+
+.typing-finished-hint {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  color: var(--retro-white);
+  margin: 0;
+}
+
+/* Controls */
+
+.typing-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.typing-message {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-yellow);
+  text-align: center;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .typing-text {
+    font-size: 1.4rem;
+  }
+  .typing-stat-value {
+    font-size: 1.4rem;
+  }
+}

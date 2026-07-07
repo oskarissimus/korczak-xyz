@@ -11,6 +11,15 @@ const t = useTranslations(lang);
   <PageContent title={t('Games')}>
     <ul class="games-list">
       <li>
+        <a href="/games/typing/" class="game-link">
+          <span class="game-icon">{'⌨'}</span>
+          <span class="game-info">
+            <span class="game-title">{t('Typing')}</span>
+            <span class="game-desc">{t('typing.desc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
         <a href="/games/solitaire/" class="game-link">
           <span class="game-icon">♠</span>
           <span class="game-info">

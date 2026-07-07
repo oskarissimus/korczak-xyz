@@ -96,6 +96,8 @@ export const ui = {
 
     // Games
     'Games': 'Games',
+    'Typing': 'Typing Trainer',
+    'typing.desc': 'Type through a book',
     'Solitaire': 'Solitaire',
     'solitaire.newGame': 'New Game',
     'solitaire.undo': 'Undo',
@@ -320,6 +322,8 @@ export const ui = {
 
     // Games
     'Games': 'Gry',
+    'Typing': 'Trening Pisania',
+    'typing.desc': 'Przepisuj książkę',
     'Solitaire': 'Pasjans',
     'solitaire.newGame': 'Nowa Gra',
     'solitaire.undo': 'Cofnij',
