@@ -89,6 +89,10 @@
   min-width: 160px;
 }
 
+.typing-progress .typing-stat-label {
+  color: var(--retro-black);
+}
+
 .typing-progress-track {
   height: 16px;
   background: var(--retro-black);
