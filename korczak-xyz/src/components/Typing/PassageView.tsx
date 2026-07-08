@@ -28,6 +28,7 @@ export function PassageView({
   const innerRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLParagraphElement | null>(null);
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
+  const prevOffsetRef = useRef<number | null>(null);
 
   const start = Math.max(0, passageIndex - HISTORY_PASSAGES);
   const end = Math.min(passages.length - 1, passageIndex + LOOKAHEAD_PASSAGES);
@@ -41,6 +42,7 @@ export function PassageView({
     if (!inner) return;
     if (!cur) {
       inner.style.transform = 'translateY(0px)';
+      prevOffsetRef.current = 0;
       return;
     }
     // Measure the line height on the text element (the inner div's own
@@ -48,7 +50,23 @@ export function PassageView({
     const text = textRef.current ?? inner;
     const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 0;
     const offset = Math.max(0, cur.offsetTop - LINES_ABOVE * lineHeight);
-    inner.style.transform = `translateY(${-offset}px)`;
+
+    // Only animate genuine one-line scrolls. Any larger jump is a structural
+    // re-anchor — the rendered window shifting a whole passage in/out, or a
+    // skip — where every char's offsetTop shifts at once. Animating that slides
+    // the whole text (the glitch), so snap those without the CSS transition.
+    const prevOffset = prevOffsetRef.current;
+    const isStructuralJump =
+      prevOffset === null || Math.abs(offset - prevOffset) > 1.5 * lineHeight;
+    if (isStructuralJump) {
+      inner.style.transition = 'none';
+      inner.style.transform = `translateY(${-offset}px)`;
+      void inner.offsetHeight; // commit the snap before restoring the transition
+      inner.style.transition = '';
+    } else {
+      inner.style.transform = `translateY(${-offset}px)`;
+    }
+    prevOffsetRef.current = offset;
   });
 
   const windowPassages: React.ReactNode[] = [];
