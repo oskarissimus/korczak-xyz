@@ -1,0 +1,42 @@
+export type Lang = 'en' | 'pl';
+
+export const translations = {
+  en: {
+    book: 'Book',
+    wpm: 'WPM',
+    accuracy: 'Accuracy',
+    best: 'Best',
+    passage: 'Passage',
+    progress: 'Progress',
+    reset: 'Reset progress',
+    skip: 'Skip',
+    export: 'Export log',
+    import: 'Import log',
+    confirmReset: 'Reset all progress for this book? Your keystroke log is exported first.',
+    finished: 'You finished the book!',
+    finishedHint: 'Reset progress to start again.',
+    hint: 'Click the text and start typing.',
+    importOk: 'Imported log.',
+    importFail: 'Could not import that file.',
+  },
+  pl: {
+    book: 'Książka',
+    wpm: 'WPM',
+    accuracy: 'Celność',
+    best: 'Rekord',
+    passage: 'Fragment',
+    progress: 'Postęp',
+    reset: 'Zresetuj postęp',
+    skip: 'Pomiń',
+    export: 'Eksportuj log',
+    import: 'Importuj log',
+    confirmReset: 'Zresetować cały postęp tej książki? Log klawiszy zostanie najpierw wyeksportowany.',
+    finished: 'Ukończyłeś książkę!',
+    finishedHint: 'Zresetuj postęp, aby zacząć od nowa.',
+    hint: 'Kliknij tekst i zacznij pisać.',
+    importOk: 'Zaimportowano log.',
+    importFail: 'Nie udało się zaimportować pliku.',
+  },
+} as const;
+
+export type TypingTranslations = (typeof translations)[Lang];

@@ -17,12 +17,30 @@
   margin: 0 auto;
 }
 
-.typing-book-title {
+.typing-book-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.typing-book-label {
   font-family: 'Press Start 2P', monospace;
   font-size: 0.7rem;
   color: var(--retro-white);
-  text-align: center;
   text-shadow: 1px 1px 0 var(--retro-black);
+}
+
+.typing-book-select {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+  color: var(--retro-black);
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 6px 8px;
+  max-width: 100%;
+  cursor: pointer;
 }
 
 /* Stats bar */

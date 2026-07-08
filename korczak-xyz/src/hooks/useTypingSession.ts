@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BOOK } from '../utils/typing/book';
 import { computeAccuracy, computeWpm } from '../utils/typing/metrics';
 import {
   archiveCurrentSession,
@@ -52,8 +51,7 @@ export interface TypingSessionApi {
   importLog: (json: string) => { success: boolean; sessionCount: number; error?: string };
 }
 
-export function useTypingSession(user: AuthUser | null): TypingSessionApi {
-  const book = BOOK;
+export function useTypingSession(user: AuthUser | null, book: Book): TypingSessionApi {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
@@ -307,7 +305,7 @@ export function useTypingSession(user: AuthUser | null): TypingSessionApi {
 
   const exportLog = useCallback(() => {
     flushSession();
-    const json = exportLogToJSON();
+    const json = exportLogToJSON(book.id);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
