@@ -19,6 +19,10 @@ export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
 const SESSION_SAVE_DEBOUNCE_MS = 800;
 const CLOUD_SAVE_DEBOUNCE_MS = 2000;
+// Idle this long with no keystroke and the session auto-pauses (abandoned).
+const IDLE_PAUSE_MS = 20000;
+
+export type PauseReason = 'manual' | 'idle';
 
 function newSession(bookId: string, progress: TypingProgress): TypingSession {
   return {
@@ -43,6 +47,10 @@ export interface TypingSessionApi {
   accuracy: number;
   progressPercent: number;
   isFinished: boolean;
+  isPaused: boolean;
+  pauseReason: PauseReason | null;
+  pause: () => void;
+  resume: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   focusInput: () => void;
   resetProgress: () => void;
@@ -56,10 +64,19 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
 
+  // Pause state (manual button or auto-idle). Mirrored to a ref so the input
+  // handlers can read it without re-subscribing.
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState<PauseReason | null>(null);
+  const isPausedRef = useRef(false);
+  isPausedRef.current = isPaused;
+
   // The live session log lives in a ref: it mutates on every keystroke and we
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
   const sessionRef = useRef<TypingSession | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Auto-pause countdown, reset on every keystroke.
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Latest user, read inside debounced callbacks without re-subscribing.
   const userRef = useRef<AuthUser | null>(user);
@@ -118,13 +135,51 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     }, SESSION_SAVE_DEBOUNCE_MS);
   }, [scheduleCloudSession]);
 
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
+
+  const pauseSession = useCallback(
+    (reason: PauseReason) => {
+      clearIdleTimer();
+      setIsPaused(true);
+      setPauseReason(reason);
+      flushSession();
+      inputRef.current?.blur();
+    },
+    [clearIdleTimer, flushSession]
+  );
+
+  // Public pause is always a manual pause (buttons pass a click event, so it
+  // takes no meaningful args).
+  const pause = useCallback(() => pauseSession('manual'), [pauseSession]);
+
+  const resume = useCallback(() => {
+    setIsPaused(false);
+    setPauseReason(null);
+    inputRef.current?.focus();
+  }, []);
+
+  // Restart the auto-pause countdown after activity.
+  const bumpIdleTimer = useCallback(() => {
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(() => {
+      idleTimerRef.current = null;
+      pauseSession('idle');
+    }, IDLE_PAUSE_MS);
+  }, [clearIdleTimer, pauseSession]);
+
   const pushEvent = useCallback(
     (event: TypingEvent) => {
       if (!sessionRef.current) return;
       sessionRef.current.events.push(event);
       scheduleSessionSave();
+      bumpIdleTimer();
     },
-    [scheduleSessionSave]
+    [scheduleSessionSave, bumpIdleTimer]
   );
 
   // Persist progress whenever it changes (localStorage always; cloud if signed in).
@@ -173,11 +228,12 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     };
   }, [user, book.id]);
 
-  // Clear cloud debounce timers on unmount.
+  // Clear cloud debounce and idle timers on unmount.
   useEffect(() => {
     return () => {
       if (cloudSessionTimerRef.current) clearTimeout(cloudSessionTimerRef.current);
       if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, []);
 
@@ -204,6 +260,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const handleChar = useCallback(
     (ch: string) => {
+      if (isPausedRef.current) return;
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
         const current = passages[prev.passageIndex];
@@ -241,6 +298,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   );
 
   const handleBackspace = useCallback(() => {
+    if (isPausedRef.current) return;
     setProgress((prev) => {
       if (prev.typed.length === 0) return prev;
       pushEvent({ t: now(), kind: 'backspace' });
@@ -350,6 +408,10 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     accuracy,
     progressPercent,
     isFinished,
+    isPaused,
+    pauseReason,
+    pause,
+    resume,
     inputRef,
     focusInput,
     resetProgress,

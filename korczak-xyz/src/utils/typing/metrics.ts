@@ -4,8 +4,24 @@ import type { TypingEvent } from './types';
 // Standard "word" = 5 characters.
 const CHARS_PER_WORD = 5;
 
+// Inter-keystroke gaps longer than this are treated as idle time (thinking,
+// glancing at the text, walking away) and capped, so pauses don't inflate the
+// elapsed time used for WPM. Natural short pauses under the cap count in full.
+const IDLE_GAP_CAP_MS = 3000;
+
 export function charEvents(events: TypingEvent[]): TypingEvent[] {
   return events.filter((e) => e.kind === 'char');
+}
+
+// Active typing time in ms: the sum of consecutive char-event gaps, each capped
+// at IDLE_GAP_CAP_MS so idle stretches contribute at most the cap.
+export function activeTypingMs(events: TypingEvent[]): number {
+  const chars = charEvents(events);
+  let active = 0;
+  for (let i = 1; i < chars.length; i++) {
+    active += Math.min(chars[i].t - chars[i - 1].t, IDLE_GAP_CAP_MS);
+  }
+  return active;
 }
 
 // Accuracy over all typed characters, as a percentage (0-100).
@@ -16,12 +32,12 @@ export function computeAccuracy(events: TypingEvent[]): number {
   return (correct / chars.length) * 100;
 }
 
-// Net words-per-minute: correct characters / 5 over the elapsed typing time.
-// Events are appended chronologically, so the span is last - first char time.
+// Net words-per-minute: correct characters / 5 over the active typing time.
+// Active time excludes idle gaps (see activeTypingMs) so pausing doesn't tank WPM.
 export function computeWpm(events: TypingEvent[]): number {
   const chars = charEvents(events);
   if (chars.length < 2) return 0;
-  const span = chars[chars.length - 1].t - chars[0].t;
+  const span = activeTypingMs(events);
   if (span <= 0) return 0;
   const minutes = span / 60000;
   const correct = chars.filter((e) => e.correct).length;

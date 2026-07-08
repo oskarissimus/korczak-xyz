@@ -28,6 +28,10 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     accuracy,
     progressPercent,
     isFinished,
+    isPaused,
+    pauseReason,
+    pause,
+    resume,
     inputRef,
     focusInput,
     resetProgress,
@@ -85,12 +89,24 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
         </div>
       ) : (
         <>
-          <PassageView
-            passage={passage}
-            charStatuses={charStatuses}
-            inputRef={inputRef}
-            onFocus={focusInput}
-          />
+          <div className="typing-passage-wrap">
+            <PassageView
+              passage={passage}
+              charStatuses={charStatuses}
+              inputRef={inputRef}
+              onFocus={focusInput}
+            />
+            {isPaused && (
+              <div className="typing-paused-overlay" onClick={resume}>
+                <p className="typing-paused-message">
+                  {pauseReason === 'idle' ? t.pausedIdle : t.pausedManual}
+                </p>
+                <button className="retro-btn" onClick={resume}>
+                  {t.resume}
+                </button>
+              </div>
+            )}
+          </div>
           <p className="typing-hint">{t.hint}</p>
         </>
       )}
@@ -99,6 +115,11 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
         {!isFinished && (
           <button className="retro-btn" onClick={skipPassage}>
             {t.skip}
+          </button>
+        )}
+        {!isFinished && (
+          <button className="retro-btn" onClick={isPaused ? resume : pause}>
+            {isPaused ? t.resume : t.pause}
           </button>
         )}
         <button className="retro-btn" onClick={exportLog}>

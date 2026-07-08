@@ -107,6 +107,35 @@
 
 /* Passage */
 
+.typing-passage-wrap {
+  position: relative;
+}
+
+.typing-paused-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 3px inset var(--retro-gray);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.typing-paused-message {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--retro-yellow);
+  text-align: center;
+  text-shadow: 2px 2px 0 var(--retro-black);
+  margin: 0;
+  padding: 0 16px;
+}
+
 .typing-passage {
   background: var(--retro-white);
   border: 3px inset var(--retro-gray);
