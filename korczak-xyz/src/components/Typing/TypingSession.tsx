@@ -21,7 +21,6 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
   const [message, setMessage] = useState<string | null>(null);
 
   const {
-    passage,
     charStatuses,
     progress,
     wpm,
@@ -91,7 +90,8 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
         <>
           <div className="typing-passage-wrap">
             <PassageView
-              passage={passage}
+              passages={book.passages}
+              passageIndex={progress.passageIndex}
               charStatuses={charStatuses}
               inputRef={inputRef}
               onFocus={focusInput}

@@ -144,6 +144,18 @@
   position: relative;
 }
 
+/* Fixed 5-line viewport: 3 typed lines above, current line, 1 upcoming line.
+   Height = font-size (1.7rem) * line-height (1.7) * 5 lines. */
+.typing-scroll-viewport {
+  height: calc(1.7rem * 1.7 * 5);
+  overflow: hidden;
+}
+
+.typing-scroll-inner {
+  position: relative;
+  transition: transform 0.15s ease-out;
+}
+
 .typing-text {
   font-family: 'VT323', monospace;
   font-size: 1.7rem;
@@ -254,6 +266,9 @@
 @media (max-width: 600px) {
   .typing-text {
     font-size: 1.4rem;
+  }
+  .typing-scroll-viewport {
+    height: calc(1.4rem * 1.7 * 5);
   }
   .typing-stat-value {
     font-size: 1.4rem;
