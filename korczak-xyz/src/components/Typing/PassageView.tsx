@@ -13,8 +13,9 @@ interface PassageViewProps {
 // Enough to guarantee at least 3 wrapped lines of context above the caret,
 // regardless of how short individual passages are.
 const HISTORY_PASSAGES = 3;
-// The current passage plus this many upcoming passages (for the "line below").
-const LOOKAHEAD_PASSAGES = 1;
+// The current passage plus this many upcoming passages. More than the single
+// visible line below so the next text is always laid out and never pops in.
+const LOOKAHEAD_PASSAGES = 2;
 // Keep the current line as the 4th visible line: 3 typed lines above it.
 const LINES_ABOVE = 3;
 
@@ -26,7 +27,7 @@ export function PassageView({
   onFocus,
 }: PassageViewProps) {
   const innerRef = useRef<HTMLDivElement | null>(null);
-  const textRef = useRef<HTMLParagraphElement | null>(null);
+  const lineRef = useRef<HTMLParagraphElement | null>(null);
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
   const prevOffsetRef = useRef<number | null>(null);
 
@@ -45,9 +46,9 @@ export function PassageView({
       prevOffsetRef.current = 0;
       return;
     }
-    // Measure the line height on the text element (the inner div's own
-    // computed line-height derives from the default font, not the 1.7rem text).
-    const text = textRef.current ?? inner;
+    // Measure line height on a rendered text block (the inner div's own computed
+    // line-height derives from the default font, not the 1.7rem text).
+    const text = lineRef.current ?? inner;
     const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 0;
     const offset = Math.max(0, cur.offsetTop - LINES_ABOVE * lineHeight);
 
@@ -69,16 +70,17 @@ export function PassageView({
     prevOffsetRef.current = offset;
   });
 
-  const windowPassages: React.ReactNode[] = [];
+  // Each passage is its own block so its line wrapping is independent of the
+  // others. If everything shared one wrapped paragraph, dropping a passage off
+  // the top of the window would re-wrap every following line (words jumping
+  // between lines). Separate blocks stack with no gap for a continuous look.
+  const lines: React.ReactNode[] = [];
   for (let j = start; j <= end; j++) {
     const passage = passages[j];
     if (passage === undefined) continue;
     const isCurrent = j === passageIndex;
-    // Join consecutive passages with a single space for continuous flow.
-    const prefix = j > start ? ' ' : '';
-    windowPassages.push(
-      <React.Fragment key={j}>
-        {prefix}
+    lines.push(
+      <p className="typing-text" key={j} ref={isCurrent ? lineRef : undefined}>
         {passage.split('').map((ch, i) => {
           const status: CharStatus = isCurrent
             ? charStatuses[i]
@@ -95,7 +97,7 @@ export function PassageView({
             </span>
           );
         })}
-      </React.Fragment>,
+      </p>,
     );
   }
 
@@ -103,7 +105,7 @@ export function PassageView({
     <div className="typing-passage" onClick={onFocus} role="textbox" tabIndex={-1}>
       <div className="typing-scroll-viewport">
         <div className="typing-scroll-inner" ref={innerRef}>
-          <p className="typing-text" ref={textRef}>{windowPassages}</p>
+          {lines}
         </div>
       </div>
       {/* Hidden, focus-managed input that captures keystrokes (incl. mobile keyboards). */}
