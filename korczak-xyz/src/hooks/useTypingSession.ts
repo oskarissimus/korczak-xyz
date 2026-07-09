@@ -13,7 +13,7 @@ import {
 } from '../utils/typing/storage';
 import { loadCloudProgress, saveCloudProgress, saveCloudSession } from '../utils/typing/cloudStorage';
 import type { AuthUser } from './useAuth';
-import { createDefaultProgress } from '../utils/typing/types';
+import { createDefaultProgress, normalizeProgress } from '../utils/typing/types';
 import type { Book, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
 
 export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
@@ -207,7 +207,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         if (cloud) {
           // Cloud is the source of truth on this device from now on. Merge over
           // defaults so pre-existing docs without `typedHistory` don't arrive undefined.
-          const normalized = { ...createDefaultProgress(book.id), ...cloud };
+          const normalized = normalizeProgress({ ...createDefaultProgress(book.id), ...cloud });
           saveProgress(normalized);
           setProgress(normalized);
         } else {
@@ -289,13 +289,17 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
             // Wrong key on the newline slot: count the mistake but stay put.
             return { ...prev, totalKeystrokes, correctKeystrokes, lastPlayedAt };
           }
-          // Section complete: advance, retaining what was typed so its errors persist.
+          // Section complete: advance, retaining what was typed so its errors
+          // persist. Assign by index (not push) so it lands at the right slot
+          // even when resuming deep in a book with a sparse/empty history.
           const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
+          const typedHistory = prev.typedHistory.slice();
+          typedHistory[prev.passageIndex] = prev.typed;
           return {
             ...prev,
             passageIndex: prev.passageIndex + 1,
             typed: '',
-            typedHistory: [...prev.typedHistory, prev.typed],
+            typedHistory,
             completedPassages: prev.completedPassages + 1,
             totalKeystrokes,
             correctKeystrokes,

@@ -42,6 +42,19 @@ export interface TypingProgress {
   lastPlayedAt: number | null;
 }
 
+// `typedHistory` must stay index-aligned with the passages (entry j = what was
+// typed for completed passage j), so its length always equals `passageIndex`.
+// Any other length means the array predates this invariant — legacy progress
+// with no history, or an early build that appended instead of index-assigning
+// (which mis-filed entries when resuming deep in a book). Drop it in that case;
+// it re-aligns from the current position on the next completed section.
+export function normalizeProgress(progress: TypingProgress): TypingProgress {
+  if (!Array.isArray(progress.typedHistory) || progress.typedHistory.length !== progress.passageIndex) {
+    return { ...progress, typedHistory: [] };
+  }
+  return progress;
+}
+
 export function createDefaultProgress(bookId: string): TypingProgress {
   return {
     bookId,

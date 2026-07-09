@@ -64,9 +64,10 @@ export function PassageView({
       const passage = passages[j];
       if (passage === undefined) continue;
       const typed = typedHistory[j];
-      // Fast path: nothing typed on record (legacy progress) or a flawless pass
-      // renders as plain text — only error-containing sections pay per-char cost.
-      if (typed === undefined || typed === passage) {
+      // Fast path: nothing typed on record (legacy/sparse history — undefined or
+      // a JSON-serialized null hole) or a flawless pass renders as plain text;
+      // only error-containing sections pay the per-char cost.
+      if (typed == null || typed === passage) {
         nodes.push(
           <p className="typing-text typing-text--done" key={j}>
             {passage}
@@ -243,9 +244,14 @@ export function PassageView({
               {(() => {
                 // The trailing newline (Enter) slot, typed like any other char.
                 const status: CharStatus = charStatuses[currentPassage.length] ?? 'pending';
+                // Anchor auto-follow here whenever the caret is on this slot, even
+                // when a boundary mis-hit paints it 'incorrect' (red) rather than
+                // 'current' — otherwise no span carries the ref and the view snaps
+                // to the top of the book.
+                const isCaret = cursorIndex === currentPassage.length;
                 return (
                   <span
-                    ref={status === 'current' ? currentCharRef : undefined}
+                    ref={isCaret ? currentCharRef : undefined}
                     className={`typing-char typing-char--${status} typing-char--newline`}
                   >
                     {NEWLINE_GLYPH}

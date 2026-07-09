@@ -1,6 +1,6 @@
 // LocalStorage operations for the Touch-Typing Trainer.
 import type { TypingProgress, TypingSession } from './types';
-import { createDefaultProgress } from './types';
+import { createDefaultProgress, normalizeProgress } from './types';
 
 const STORAGE_KEYS = {
   progressPrefix: 'typing-progress:', // per-book: `typing-progress:${bookId}`
@@ -22,7 +22,7 @@ export function loadProgress(bookId: string): TypingProgress {
     const stored = localStorage.getItem(progressKey(bookId));
     if (stored) {
       const parsed = JSON.parse(stored) as TypingProgress;
-      return { ...createDefaultProgress(bookId), ...parsed };
+      return normalizeProgress({ ...createDefaultProgress(bookId), ...parsed });
     }
     // One-time migration from the pre-multi-book single slot.
     const legacy = localStorage.getItem(STORAGE_KEYS.legacyProgress);
@@ -30,7 +30,7 @@ export function loadProgress(bookId: string): TypingProgress {
       const parsed = JSON.parse(legacy) as TypingProgress;
       if (parsed.bookId === bookId) {
         localStorage.removeItem(STORAGE_KEYS.legacyProgress);
-        const migrated = { ...createDefaultProgress(bookId), ...parsed };
+        const migrated = normalizeProgress({ ...createDefaultProgress(bookId), ...parsed });
         saveProgress(migrated);
         return migrated;
       }
