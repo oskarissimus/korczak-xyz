@@ -54,7 +54,6 @@ export interface TypingSessionApi {
   inputRef: React.RefObject<HTMLInputElement | null>;
   focusInput: () => void;
   resetProgress: () => void;
-  skipPassage: () => void;
   exportLog: () => void;
   importLog: (json: string) => { success: boolean; sessionCount: number; error?: string };
 }
@@ -353,14 +352,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     focusInput();
   }, [book.id, flushSession, focusInput]);
 
-  const skipPassage = useCallback(() => {
-    setProgress((prev) => {
-      if (prev.passageIndex >= passages.length) return prev;
-      return { ...prev, passageIndex: prev.passageIndex + 1, typed: '' };
-    });
-    focusInput();
-  }, [passages.length, focusInput]);
-
   const exportLog = useCallback(() => {
     flushSession();
     const json = exportLogToJSON(book.id);
@@ -415,7 +406,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     inputRef,
     focusInput,
     resetProgress,
-    skipPassage,
     exportLog,
     importLog,
   };

@@ -35,7 +35,6 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     inputRef,
     focusInput,
     resetProgress,
-    skipPassage,
     exportLog,
     importLog,
   } = useTypingSession(user, book);
@@ -116,11 +115,6 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
       )}
 
       <div className="typing-controls">
-        {!isFinished && (
-          <button className="retro-btn" onClick={skipPassage}>
-            {t.skip}
-          </button>
-        )}
         {!isFinished && (
           <button className="retro-btn" onClick={isPaused ? resume : pause}>
             {isPaused ? t.resume : t.pause}
