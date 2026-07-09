@@ -29,7 +29,6 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     progressPercent,
     isFinished,
     isPaused,
-    pauseReason,
     pause,
     resume,
     inputRef,
@@ -96,19 +95,10 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
               charStatuses={charStatuses}
               inputRef={inputRef}
               onFocus={focusInput}
+              onBrowse={pause}
               browsingLabel={t.browsing}
               returnLabel={t.returnToTyping}
             />
-            {isPaused && (
-              <div className="typing-paused-overlay" onClick={resume}>
-                <p className="typing-paused-message">
-                  {pauseReason === 'idle' ? t.pausedIdle : t.pausedManual}
-                </p>
-                <button className="retro-btn" onClick={resume}>
-                  {t.resume}
-                </button>
-              </div>
-            )}
           </div>
           <p className="typing-hint">{t.hint}</p>
         </>

@@ -22,8 +22,6 @@ const CLOUD_SAVE_DEBOUNCE_MS = 2000;
 // Idle this long with no keystroke and the session auto-pauses (abandoned).
 const IDLE_PAUSE_MS = 20000;
 
-export type PauseReason = 'manual' | 'idle';
-
 function newSession(bookId: string, progress: TypingProgress): TypingSession {
   return {
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
@@ -48,7 +46,6 @@ export interface TypingSessionApi {
   progressPercent: number;
   isFinished: boolean;
   isPaused: boolean;
-  pauseReason: PauseReason | null;
   pause: () => void;
   resume: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -63,10 +60,9 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
 
-  // Pause state (manual button or auto-idle). Mirrored to a ref so the input
-  // handlers can read it without re-subscribing.
+  // Pause state (manual button, auto-idle, or browsing). Mirrored to a ref so
+  // the input handlers can read it without re-subscribing.
   const [isPaused, setIsPaused] = useState(false);
-  const [pauseReason, setPauseReason] = useState<PauseReason | null>(null);
   const isPausedRef = useRef(false);
   isPausedRef.current = isPaused;
 
@@ -141,24 +137,19 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     }
   }, []);
 
-  const pauseSession = useCallback(
-    (reason: PauseReason) => {
-      clearIdleTimer();
-      setIsPaused(true);
-      setPauseReason(reason);
-      flushSession();
-      inputRef.current?.blur();
-    },
-    [clearIdleTimer, flushSession]
-  );
+  const pauseSession = useCallback(() => {
+    if (isPausedRef.current) return; // already paused; keep it idempotent
+    clearIdleTimer();
+    setIsPaused(true);
+    flushSession();
+    // Note: the input keeps focus while paused so the next keystroke can
+    // auto-resume the session (see handleChar / handleBackspace).
+  }, [clearIdleTimer, flushSession]);
 
-  // Public pause is always a manual pause (buttons pass a click event, so it
-  // takes no meaningful args).
-  const pause = useCallback(() => pauseSession('manual'), [pauseSession]);
+  const pause = useCallback(() => pauseSession(), [pauseSession]);
 
   const resume = useCallback(() => {
     setIsPaused(false);
-    setPauseReason(null);
     inputRef.current?.focus();
   }, []);
 
@@ -167,7 +158,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     clearIdleTimer();
     idleTimerRef.current = setTimeout(() => {
       idleTimerRef.current = null;
-      pauseSession('idle');
+      pauseSession();
     }, IDLE_PAUSE_MS);
   }, [clearIdleTimer, pauseSession]);
 
@@ -259,7 +250,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const handleChar = useCallback(
     (ch: string) => {
-      if (isPausedRef.current) return;
+      if (isPausedRef.current) setIsPaused(false); // typing resumes the session
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
         const current = passages[prev.passageIndex];
@@ -297,7 +288,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   );
 
   const handleBackspace = useCallback(() => {
-    if (isPausedRef.current) return;
+    if (isPausedRef.current) setIsPaused(false); // typing resumes the session
     setProgress((prev) => {
       if (prev.typed.length === 0) return prev;
       pushEvent({ t: now(), kind: 'backspace' });
@@ -400,7 +391,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     progressPercent,
     isFinished,
     isPaused,
-    pauseReason,
     pause,
     resume,
     inputRef,

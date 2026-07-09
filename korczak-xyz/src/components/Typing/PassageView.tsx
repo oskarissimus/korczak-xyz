@@ -8,6 +8,7 @@ interface PassageViewProps {
   charStatuses: CharStatus[];
   inputRef: React.RefObject<HTMLInputElement | null>;
   onFocus: () => void;
+  onBrowse: () => void;
   browsingLabel: string;
   returnLabel: string;
 }
@@ -22,6 +23,7 @@ export function PassageView({
   charStatuses,
   inputRef,
   onFocus,
+  onBrowse,
   browsingLabel,
   returnLabel,
 }: PassageViewProps) {
@@ -36,6 +38,15 @@ export function PassageView({
   const programmaticScrollRef = useRef(false);
 
   const [browsing, setBrowsing] = useState(false);
+
+  // Latest onBrowse, read from the scroll listener (subscribed once) without
+  // re-subscribing. Entering browse also pauses the session.
+  const onBrowseRef = useRef(onBrowse);
+  onBrowseRef.current = onBrowse;
+  const startBrowsing = () => {
+    setBrowsing(true);
+    onBrowseRef.current();
+  };
 
   // The whole book is rendered so browsing can reach any passage. Only the
   // current passage needs per-character spans; everything else is plain text
@@ -112,7 +123,7 @@ export function PassageView({
         programmaticScrollRef.current = false;
         return;
       }
-      setBrowsing(true);
+      startBrowsing();
     };
     viewport.addEventListener('scroll', onScroll, { passive: true });
     return () => viewport.removeEventListener('scroll', onScroll);
@@ -146,12 +157,12 @@ export function PassageView({
           break;
         case 'Home':
           e.preventDefault();
-          setBrowsing(true);
+          startBrowsing();
           viewport.scrollTo({ top: 0, behavior: 'auto' });
           return;
         case 'End':
           e.preventDefault();
-          setBrowsing(true);
+          startBrowsing();
           viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'auto' });
           return;
         case 'Escape':
@@ -165,7 +176,7 @@ export function PassageView({
           return;
       }
       e.preventDefault();
-      setBrowsing(true);
+      startBrowsing();
       viewport.scrollBy({ top: delta, behavior: 'auto' });
     };
     el.addEventListener('keydown', onKeyDown);
