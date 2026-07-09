@@ -245,12 +245,12 @@
 /* Browse mode: shown only while the user has scrolled away from the caret. */
 .typing-browse-bar {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 6px;
+  bottom: 6px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 3px 5px;
   background: var(--retro-navy);
   border: 2px outset var(--retro-white);
   z-index: 2;
@@ -258,8 +258,13 @@
 
 .typing-browse-label {
   font-family: 'VT323', monospace;
-  font-size: 1rem;
+  font-size: 0.8rem;
   color: var(--retro-yellow);
+}
+
+.typing-browse-bar .retro-btn {
+  font-size: 0.75rem;
+  padding: 2px 6px;
 }
 
 .typing-hint {
