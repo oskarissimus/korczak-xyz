@@ -152,20 +152,34 @@
   height: calc(1.7rem * 1.7 * 5);
   overflow-y: auto;
   overflow-x: hidden;
+  /* Reserve the scrollbar's space at all times so revealing it never reflows
+     the text, but keep it invisible while typing — otherwise the thumb jumps
+     line-by-line as auto-follow scrolls and breaks immersion. */
   scrollbar-width: thin;
-  scrollbar-color: var(--retro-navy) var(--retro-gray);
+  scrollbar-color: transparent transparent;
 }
 
 .typing-scroll-viewport::-webkit-scrollbar {
   width: 14px;
 }
 
-.typing-scroll-viewport::-webkit-scrollbar-track {
+.typing-scroll-viewport::-webkit-scrollbar-track,
+.typing-scroll-viewport::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 0;
+}
+
+/* Browsing: paint the (already space-reserved) scrollbar so it can be dragged. */
+.typing-scroll-viewport--browsing {
+  scrollbar-color: var(--retro-navy) var(--retro-gray);
+}
+
+.typing-scroll-viewport--browsing::-webkit-scrollbar-track {
   background: var(--retro-gray);
   border-left: 2px solid var(--retro-dark-gray);
 }
 
-.typing-scroll-viewport::-webkit-scrollbar-thumb {
+.typing-scroll-viewport--browsing::-webkit-scrollbar-thumb {
   background: var(--retro-navy);
   border: 2px outset var(--retro-white);
 }

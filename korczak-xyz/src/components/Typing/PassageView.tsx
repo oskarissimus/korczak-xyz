@@ -184,7 +184,10 @@ export function PassageView({
 
   return (
     <div className="typing-passage" onClick={exitBrowse} role="textbox" tabIndex={-1}>
-      <div className="typing-scroll-viewport" ref={viewportRef}>
+      <div
+        className={`typing-scroll-viewport${browsing ? ' typing-scroll-viewport--browsing' : ''}`}
+        ref={viewportRef}
+      >
         <div className="typing-scroll-inner" ref={innerRef}>
           {donePassages}
           {currentPassage !== undefined && (
