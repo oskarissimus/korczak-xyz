@@ -19,9 +19,11 @@ export const translations = {
     confirmReset: 'Reset all progress for this book? Your keystroke log is exported first.',
     finished: 'You finished the book!',
     finishedHint: 'Reset progress to start again.',
-    hint: 'Click the text and start typing.',
+    hint: 'Click the text and start typing. Scroll or use arrow keys to browse the book.',
     importOk: 'Imported log.',
     importFail: 'Could not import that file.',
+    browsing: 'Browsing — type or press Esc to return',
+    returnToTyping: 'Return to typing',
   },
   pl: {
     book: 'Książka',
@@ -41,9 +43,11 @@ export const translations = {
     confirmReset: 'Zresetować cały postęp tej książki? Log klawiszy zostanie najpierw wyeksportowany.',
     finished: 'Ukończyłeś książkę!',
     finishedHint: 'Zresetuj postęp, aby zacząć od nowa.',
-    hint: 'Kliknij tekst i zacznij pisać.',
+    hint: 'Kliknij tekst i zacznij pisać. Przewiń lub użyj strzałek, aby przeglądać książkę.',
     importOk: 'Zaimportowano log.',
     importFail: 'Nie udało się zaimportować pliku.',
+    browsing: 'Przeglądanie — pisz lub naciśnij Esc, aby wrócić',
+    returnToTyping: 'Wróć do pisania',
   },
 } as const;
 

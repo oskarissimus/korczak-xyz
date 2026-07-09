@@ -22,6 +22,7 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
 
   const {
     charStatuses,
+    cursorIndex,
     progress,
     wpm,
     accuracy,
@@ -92,9 +93,12 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
             <PassageView
               passages={book.passages}
               passageIndex={progress.passageIndex}
+              cursorIndex={cursorIndex}
               charStatuses={charStatuses}
               inputRef={inputRef}
               onFocus={focusInput}
+              browsingLabel={t.browsing}
+              returnLabel={t.returnToTyping}
             />
             {isPaused && (
               <div className="typing-paused-overlay" onClick={resume}>

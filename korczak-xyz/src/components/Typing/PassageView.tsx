@@ -1,113 +1,225 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CharStatus } from '../../hooks/useTypingSession';
 
 interface PassageViewProps {
   passages: string[];
   passageIndex: number;
+  cursorIndex: number;
   charStatuses: CharStatus[];
   inputRef: React.RefObject<HTMLInputElement | null>;
   onFocus: () => void;
+  browsingLabel: string;
+  returnLabel: string;
 }
 
-// How many passages of already-typed history to render above the current one.
-// Enough to guarantee at least 3 wrapped lines of context above the caret,
-// regardless of how short individual passages are.
-const HISTORY_PASSAGES = 3;
-// The current passage plus this many upcoming passages. More than the single
-// visible line below so the next text is always laid out and never pops in.
-const LOOKAHEAD_PASSAGES = 2;
 // Keep the current line as the 4th visible line: 3 typed lines above it.
 const LINES_ABOVE = 3;
 
 export function PassageView({
   passages,
   passageIndex,
+  cursorIndex,
   charStatuses,
   inputRef,
   onFocus,
+  browsingLabel,
+  returnLabel,
 }: PassageViewProps) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const lineRef = useRef<HTMLParagraphElement | null>(null);
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
-  const prevOffsetRef = useRef<number | null>(null);
+  // True while we are writing scrollTop ourselves, so the scroll listener can
+  // tell our auto-follow apart from a user gesture (wheel / drag / keys). Set
+  // only when the write actually moves scrollTop, so exactly one scroll event
+  // clears it (a no-op write fires no event and would leave the flag stuck).
+  const programmaticScrollRef = useRef(false);
 
-  const start = Math.max(0, passageIndex - HISTORY_PASSAGES);
-  const end = Math.min(passages.length - 1, passageIndex + LOOKAHEAD_PASSAGES);
+  const [browsing, setBrowsing] = useState(false);
 
-  // Scroll the content so the line holding the caret sits at LINES_ABOVE from
-  // the top. offsetTop only changes when the caret wraps to a new visual line,
-  // so the view scrolls exactly one line at a time.
+  // The whole book is rendered so browsing can reach any passage. Only the
+  // current passage needs per-character spans; everything else is plain text
+  // (a color class per block), so ~1000 paragraphs stay cheap. The done/pending
+  // chunks are memoized on passageIndex so a keystroke only re-renders the
+  // current passage.
+  const donePassages = useMemo(() => {
+    const nodes: React.ReactNode[] = [];
+    for (let j = 0; j < passageIndex; j++) {
+      const passage = passages[j];
+      if (passage === undefined) continue;
+      nodes.push(
+        <p className="typing-text typing-text--done" key={j}>
+          {passage}
+        </p>,
+      );
+    }
+    return nodes;
+  }, [passages, passageIndex]);
+
+  const pendingPassages = useMemo(() => {
+    const nodes: React.ReactNode[] = [];
+    for (let j = passageIndex + 1; j < passages.length; j++) {
+      const passage = passages[j];
+      if (passage === undefined) continue;
+      nodes.push(
+        <p className="typing-text typing-text--pending" key={j}>
+          {passage}
+        </p>,
+      );
+    }
+    return nodes;
+  }, [passages, passageIndex]);
+
+  const currentPassage = passages[passageIndex];
+
+  // Auto-follow: keep the caret on the LINES_ABOVE-th line by driving the
+  // viewport's native scrollTop. Suspended while browsing so the user's scroll
+  // position is left untouched.
   useLayoutEffect(() => {
-    const inner = innerRef.current;
+    if (browsing) return;
+    const viewport = viewportRef.current;
     const cur = currentCharRef.current;
-    if (!inner) return;
-    if (!cur) {
-      inner.style.transform = 'translateY(0px)';
-      prevOffsetRef.current = 0;
-      return;
-    }
-    // Measure line height on a rendered text block (the inner div's own computed
-    // line-height derives from the default font, not the 1.7rem text).
-    const text = lineRef.current ?? inner;
+    if (!viewport) return;
+    const text = lineRef.current ?? innerRef.current ?? viewport;
     const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 0;
-    const offset = Math.max(0, cur.offsetTop - LINES_ABOVE * lineHeight);
 
-    // Only animate genuine one-line scrolls. Any larger jump is a structural
-    // re-anchor — the rendered window shifting a whole passage in/out, or a
-    // skip — where every char's offsetTop shifts at once. Animating that slides
-    // the whole text (the glitch), so snap those without the CSS transition.
-    const prevOffset = prevOffsetRef.current;
-    const isStructuralJump =
-      prevOffset === null || Math.abs(offset - prevOffset) > 1.5 * lineHeight;
-    if (isStructuralJump) {
-      inner.style.transition = 'none';
-      inner.style.transform = `translateY(${-offset}px)`;
-      void inner.offsetHeight; // commit the snap before restoring the transition
-      inner.style.transition = '';
+    let target: number;
+    if (!cur) {
+      target = 0;
     } else {
-      inner.style.transform = `translateY(${-offset}px)`;
+      const viewportRect = viewport.getBoundingClientRect();
+      const caretRect = cur.getBoundingClientRect();
+      const raw =
+        viewport.scrollTop + (caretRect.top - viewportRect.top) - LINES_ABOVE * lineHeight;
+      const max = viewport.scrollHeight - viewport.clientHeight;
+      target = Math.max(0, Math.min(raw, max));
     }
-    prevOffsetRef.current = offset;
+
+    // Instant (not smooth) so each write fires exactly one scroll event for the
+    // programmatic-flag to consume; skip no-op writes so the flag never sticks.
+    if (Math.abs(target - viewport.scrollTop) < 1) return;
+    programmaticScrollRef.current = true;
+    viewport.scrollTop = target;
   });
 
-  // Each passage is its own block so its line wrapping is independent of the
-  // others. If everything shared one wrapped paragraph, dropping a passage off
-  // the top of the window would re-wrap every following line (words jumping
-  // between lines). Separate blocks stack with no gap for a continuous look.
-  const lines: React.ReactNode[] = [];
-  for (let j = start; j <= end; j++) {
-    const passage = passages[j];
-    if (passage === undefined) continue;
-    const isCurrent = j === passageIndex;
-    lines.push(
-      <p className="typing-text" key={j} ref={isCurrent ? lineRef : undefined}>
-        {passage.split('').map((ch, i) => {
-          const status: CharStatus = isCurrent
-            ? charStatuses[i]
-            : j < passageIndex
-              ? 'correct'
-              : 'pending';
-          return (
-            <span
-              key={i}
-              ref={isCurrent && status === 'current' ? currentCharRef : undefined}
-              className={`typing-char typing-char--${status}`}
-            >
-              {ch}
-            </span>
-          );
-        })}
-      </p>,
-    );
-  }
+  // Distinguish our own scrollTop writes from user gestures. Any scroll we did
+  // not initiate means the user is browsing.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onScroll = () => {
+      if (programmaticScrollRef.current) {
+        programmaticScrollRef.current = false;
+        return;
+      }
+      setBrowsing(true);
+    };
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Arrow / page / Home / End scroll the view (the hidden input keeps focus, so
+  // native key scrolling never reaches the container); Escape returns to typing.
+  // Backspace and character keys are left for the session hook's own handlers.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const text = lineRef.current ?? innerRef.current ?? viewport;
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
+      const page = viewport.clientHeight - lineHeight;
+      let delta: number | null = null;
+      switch (e.key) {
+        case 'ArrowUp':
+          delta = -lineHeight;
+          break;
+        case 'ArrowDown':
+          delta = lineHeight;
+          break;
+        case 'PageUp':
+          delta = -page;
+          break;
+        case 'PageDown':
+          delta = page;
+          break;
+        case 'Home':
+          e.preventDefault();
+          setBrowsing(true);
+          viewport.scrollTo({ top: 0, behavior: 'auto' });
+          return;
+        case 'End':
+          e.preventDefault();
+          setBrowsing(true);
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'auto' });
+          return;
+        case 'Escape':
+          if (browsing) {
+            e.preventDefault();
+            setBrowsing(false);
+            onFocus();
+          }
+          return;
+        default:
+          return;
+      }
+      e.preventDefault();
+      setBrowsing(true);
+      viewport.scrollBy({ top: delta, behavior: 'auto' });
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
+  }, [browsing, inputRef, onFocus]);
+
+  // Typing or backspacing changes the caret position — return to the caret.
+  useEffect(() => {
+    setBrowsing(false);
+  }, [passageIndex, cursorIndex]);
+
+  const exitBrowse = () => {
+    setBrowsing(false);
+    onFocus();
+  };
 
   return (
-    <div className="typing-passage" onClick={onFocus} role="textbox" tabIndex={-1}>
-      <div className="typing-scroll-viewport">
+    <div className="typing-passage" onClick={exitBrowse} role="textbox" tabIndex={-1}>
+      <div className="typing-scroll-viewport" ref={viewportRef}>
         <div className="typing-scroll-inner" ref={innerRef}>
-          {lines}
+          {donePassages}
+          {currentPassage !== undefined && (
+            <p className="typing-text" key={passageIndex} ref={lineRef}>
+              {currentPassage.split('').map((ch, i) => {
+                const status: CharStatus = charStatuses[i] ?? 'pending';
+                return (
+                  <span
+                    key={i}
+                    ref={status === 'current' ? currentCharRef : undefined}
+                    className={`typing-char typing-char--${status}`}
+                  >
+                    {ch}
+                  </span>
+                );
+              })}
+            </p>
+          )}
+          {pendingPassages}
         </div>
       </div>
+      {browsing && (
+        <div className="typing-browse-bar">
+          <span className="typing-browse-label">{browsingLabel}</span>
+          <button
+            className="retro-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              exitBrowse();
+            }}
+          >
+            ↓ {returnLabel}
+          </button>
+        </div>
+      )}
       {/* Hidden, focus-managed input that captures keystrokes (incl. mobile keyboards). */}
       <input
         ref={inputRef}

@@ -145,15 +145,33 @@
 }
 
 /* Fixed 5-line viewport: 3 typed lines above, current line, 1 upcoming line.
-   Height = font-size (1.7rem) * line-height (1.7) * 5 lines. */
+   Height = font-size (1.7rem) * line-height (1.7) * 5 lines. Native scroll so
+   the whole book can be browsed (wheel / drag / keys); auto-follow drives
+   scrollTop to keep the caret on the 4th line while typing. */
 .typing-scroll-viewport {
   height: calc(1.7rem * 1.7 * 5);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--retro-navy) var(--retro-gray);
+}
+
+.typing-scroll-viewport::-webkit-scrollbar {
+  width: 14px;
+}
+
+.typing-scroll-viewport::-webkit-scrollbar-track {
+  background: var(--retro-gray);
+  border-left: 2px solid var(--retro-dark-gray);
+}
+
+.typing-scroll-viewport::-webkit-scrollbar-thumb {
+  background: var(--retro-navy);
+  border: 2px outset var(--retro-white);
 }
 
 .typing-scroll-inner {
   position: relative;
-  transition: transform 0.15s ease-out;
 }
 
 .typing-text {
@@ -165,6 +183,15 @@
   white-space: pre-wrap;
   word-break: break-word;
   letter-spacing: 0.5px;
+}
+
+/* Whole-passage color for the plain-text (non-current) blocks. */
+.typing-text--done {
+  color: var(--retro-black);
+}
+
+.typing-text--pending {
+  color: #7a7a7a;
 }
 
 .typing-char {
@@ -213,6 +240,26 @@
   margin: 0;
   left: 0;
   top: 0;
+}
+
+/* Browse mode: shown only while the user has scrolled away from the caret. */
+.typing-browse-bar {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--retro-navy);
+  border: 2px outset var(--retro-white);
+  z-index: 2;
+}
+
+.typing-browse-label {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-yellow);
 }
 
 .typing-hint {
