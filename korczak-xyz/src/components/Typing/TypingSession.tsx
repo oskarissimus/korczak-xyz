@@ -93,6 +93,7 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
               passageIndex={progress.passageIndex}
               cursorIndex={cursorIndex}
               charStatuses={charStatuses}
+              typedHistory={progress.typedHistory}
               inputRef={inputRef}
               onFocus={focusInput}
               onBrowse={pause}

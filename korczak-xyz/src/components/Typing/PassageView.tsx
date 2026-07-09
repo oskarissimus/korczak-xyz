@@ -6,6 +6,7 @@ interface PassageViewProps {
   passageIndex: number;
   cursorIndex: number;
   charStatuses: CharStatus[];
+  typedHistory: string[];
   inputRef: React.RefObject<HTMLInputElement | null>;
   onFocus: () => void;
   onBrowse: () => void;
@@ -16,11 +17,15 @@ interface PassageViewProps {
 // Keep the current line as the 4th visible line: 3 typed lines above it.
 const LINES_ABOVE = 3;
 
+// Visible glyph for the section-ending newline the user types (Enter) to advance.
+const NEWLINE_GLYPH = '↵';
+
 export function PassageView({
   passages,
   passageIndex,
   cursorIndex,
   charStatuses,
+  typedHistory,
   inputRef,
   onFocus,
   onBrowse,
@@ -58,14 +63,34 @@ export function PassageView({
     for (let j = 0; j < passageIndex; j++) {
       const passage = passages[j];
       if (passage === undefined) continue;
+      const typed = typedHistory[j];
+      // Fast path: nothing typed on record (legacy progress) or a flawless pass
+      // renders as plain text — only error-containing sections pay per-char cost.
+      if (typed === undefined || typed === passage) {
+        nodes.push(
+          <p className="typing-text typing-text--done" key={j}>
+            {passage}
+            <span className="typing-char typing-char--correct typing-char--newline">{NEWLINE_GLYPH}</span>
+          </p>,
+        );
+        continue;
+      }
       nodes.push(
         <p className="typing-text typing-text--done" key={j}>
-          {passage}
+          {passage.split('').map((ch, i) => (
+            <span
+              key={i}
+              className={`typing-char typing-char--${typed[i] === ch ? 'correct' : 'incorrect'}`}
+            >
+              {ch}
+            </span>
+          ))}
+          <span className="typing-char typing-char--correct typing-char--newline">{NEWLINE_GLYPH}</span>
         </p>,
       );
     }
     return nodes;
-  }, [passages, passageIndex]);
+  }, [passages, passageIndex, typedHistory]);
 
   const pendingPassages = useMemo(() => {
     const nodes: React.ReactNode[] = [];
@@ -215,6 +240,18 @@ export function PassageView({
                   </span>
                 );
               })}
+              {(() => {
+                // The trailing newline (Enter) slot, typed like any other char.
+                const status: CharStatus = charStatuses[currentPassage.length] ?? 'pending';
+                return (
+                  <span
+                    ref={status === 'current' ? currentCharRef : undefined}
+                    className={`typing-char typing-char--${status} typing-char--newline`}
+                  >
+                    {NEWLINE_GLYPH}
+                  </span>
+                );
+              })()}
             </p>
           )}
           {pendingPassages}

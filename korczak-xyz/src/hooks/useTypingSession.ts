@@ -13,6 +13,7 @@ import {
 } from '../utils/typing/storage';
 import { loadCloudProgress, saveCloudProgress, saveCloudSession } from '../utils/typing/cloudStorage';
 import type { AuthUser } from './useAuth';
+import { createDefaultProgress } from '../utils/typing/types';
 import type { Book, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
 
 export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
@@ -59,12 +60,21 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
+  // Latest committed progress, read from the input handlers without re-subscribing.
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
 
   // Pause state (manual button, auto-idle, or browsing). Mirrored to a ref so
   // the input handlers can read it without re-subscribing.
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   isPausedRef.current = isPaused;
+
+  // A wrong key pressed while parked on the section-ending newline slot flashes
+  // the ↵ red (it dings accuracy but does not advance). Cleared on any progress.
+  const [boundaryError, setBoundaryError] = useState(false);
+  const boundaryErrorRef = useRef(false);
+  boundaryErrorRef.current = boundaryError;
 
   // The live session log lives in a ref: it mutates on every keystroke and we
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
@@ -195,9 +205,11 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         const cloud = await loadCloudProgress(user.uid, book.id);
         if (cancelled) return;
         if (cloud) {
-          // Cloud is the source of truth on this device from now on.
-          saveProgress(cloud);
-          setProgress(cloud);
+          // Cloud is the source of truth on this device from now on. Merge over
+          // defaults so pre-existing docs without `typedHistory` don't arrive undefined.
+          const normalized = { ...createDefaultProgress(book.id), ...cloud };
+          saveProgress(normalized);
+          setProgress(normalized);
         } else {
           // Fresh cloud: migrate whatever is stored locally, once.
           const local = loadProgress(book.id);
@@ -251,28 +263,39 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const handleChar = useCallback(
     (ch: string) => {
       if (isPausedRef.current) setIsPaused(false); // typing resumes the session
+      // Flash the ↵ red when a non-Enter key lands on the newline slot; clear it
+      // once the user makes any real progress. Derived from committed progress.
+      const lp = progressRef.current;
+      if (lp.passageIndex < passages.length) {
+        const atNewline = lp.typed.length === passages[lp.passageIndex].length;
+        if (atNewline && ch !== '\n') setBoundaryError(true);
+        else if (boundaryErrorRef.current) setBoundaryError(false);
+      }
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
         const current = passages[prev.passageIndex];
         const pos = prev.typed.length;
-        if (pos >= current.length) return prev;
+        if (pos > current.length) return prev;
 
-        const expected = current[pos];
-        const correct = ch === expected;
-        pushEvent({ t: now(), kind: 'char', data: ch, correct });
-
-        const nextTyped = prev.typed + ch;
-        const totalKeystrokes = prev.totalKeystrokes + 1;
-        const correctKeystrokes = prev.correctKeystrokes + (correct ? 1 : 0);
         const lastPlayedAt = Date.now();
 
-        if (nextTyped.length === current.length) {
-          // Passage complete: advance and record best WPM.
+        if (pos === current.length) {
+          // Caret is on the trailing newline slot: only Enter advances.
+          const correct = ch === '\n';
+          pushEvent({ t: now(), kind: 'char', data: ch, correct });
+          const totalKeystrokes = prev.totalKeystrokes + 1;
+          const correctKeystrokes = prev.correctKeystrokes + (correct ? 1 : 0);
+          if (!correct) {
+            // Wrong key on the newline slot: count the mistake but stay put.
+            return { ...prev, totalKeystrokes, correctKeystrokes, lastPlayedAt };
+          }
+          // Section complete: advance, retaining what was typed so its errors persist.
           const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
           return {
             ...prev,
             passageIndex: prev.passageIndex + 1,
             typed: '',
+            typedHistory: [...prev.typedHistory, prev.typed],
             completedPassages: prev.completedPassages + 1,
             totalKeystrokes,
             correctKeystrokes,
@@ -281,7 +304,15 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
           };
         }
 
-        return { ...prev, typed: nextTyped, totalKeystrokes, correctKeystrokes, lastPlayedAt };
+        // Normal character slot.
+        const expected = current[pos];
+        const correct = ch === expected;
+        pushEvent({ t: now(), kind: 'char', data: ch, correct });
+        const totalKeystrokes = prev.totalKeystrokes + 1;
+        const correctKeystrokes = prev.correctKeystrokes + (correct ? 1 : 0);
+        // Typing the last real char just parks the caret on the newline slot; it
+        // does NOT auto-advance — the user must press Enter (see above).
+        return { ...prev, typed: prev.typed + ch, totalKeystrokes, correctKeystrokes, lastPlayedAt };
       });
     },
     [passages, now, pushEvent]
@@ -289,12 +320,29 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const handleBackspace = useCallback(() => {
     if (isPausedRef.current) setIsPaused(false); // typing resumes the session
+    if (boundaryErrorRef.current) setBoundaryError(false);
     setProgress((prev) => {
-      if (prev.typed.length === 0) return prev;
+      if (prev.typed.length > 0) {
+        pushEvent({ t: now(), kind: 'backspace' });
+        return { ...prev, typed: prev.typed.slice(0, -1) };
+      }
+      // At the start of a section: backspace crosses into the previous one.
+      if (prev.passageIndex === 0) return prev;
+      const prevIndex = prev.passageIndex - 1;
+      // Restore exactly what was typed there (falls back to the source text for
+      // legacy progress that predates typedHistory), so its errors reappear and
+      // the caret lands on that section's trailing newline slot.
+      const restored = prev.typedHistory[prevIndex] ?? passages[prevIndex];
       pushEvent({ t: now(), kind: 'backspace' });
-      return { ...prev, typed: prev.typed.slice(0, -1) };
+      return {
+        ...prev,
+        passageIndex: prevIndex,
+        typed: restored,
+        typedHistory: prev.typedHistory.slice(0, prevIndex),
+        completedPassages: Math.max(0, prev.completedPassages - 1),
+      };
     });
-  }, [now, pushEvent]);
+  }, [passages, now, pushEvent]);
 
   // Input capture: characters via `beforeinput` (composed diacritics arrive as a
   // single insertText), Backspace via `keydown` (fires even on an empty input).
@@ -314,6 +362,11 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       if (e.key === 'Backspace') {
         e.preventDefault();
         handleBackspace();
+      } else if (e.key === 'Enter') {
+        // A `type="text"` input never emits a usable insertLineBreak, so the
+        // section-ending newline is captured here and fed in as a normal char.
+        e.preventDefault();
+        handleChar('\n');
       }
     };
 
@@ -340,6 +393,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     const fresh = resetProgressStorage(book.id);
     sessionRef.current = newSession(book.id, fresh);
     setProgress(fresh);
+    setBoundaryError(false);
     focusInput();
   }, [book.id, flushSession, focusInput]);
 
@@ -364,18 +418,23 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const accuracy = sessionRef.current ? computeAccuracy(sessionRef.current.events) : 100;
 
   const charStatuses = useMemo<CharStatus[]>(() => {
+    // One extra slot past the passage for the trailing newline (Enter) the user
+    // must type to advance; compare against `passage + '\n'`.
+    const expected = passage + '\n';
     const statuses: CharStatus[] = [];
-    for (let i = 0; i < passage.length; i++) {
+    for (let i = 0; i < expected.length; i++) {
       if (i < typed.length) {
-        statuses.push(typed[i] === passage[i] ? 'correct' : 'incorrect');
+        statuses.push(typed[i] === expected[i] ? 'correct' : 'incorrect');
       } else if (i === typed.length) {
-        statuses.push('current');
+        // The caret slot; if it's the newline slot and the user just mis-hit it,
+        // show it red instead of the plain caret.
+        statuses.push(boundaryError && i === passage.length ? 'incorrect' : 'current');
       } else {
         statuses.push('pending');
       }
     }
     return statuses;
-  }, [passage, typed]);
+  }, [passage, typed, boundaryError]);
 
   const progressPercent = passages.length === 0 ? 0 : (progress.passageIndex / passages.length) * 100;
 

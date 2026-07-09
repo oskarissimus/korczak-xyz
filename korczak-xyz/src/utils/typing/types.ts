@@ -34,6 +34,7 @@ export interface TypingProgress {
   bookId: string;
   passageIndex: number; // current passage
   typed: string; // partial text typed into the current passage (for exact resume)
+  typedHistory: string[]; // index-aligned with passages: exact chars typed for each completed passage (the implied trailing '\n' is NOT stored)
   completedPassages: number;
   totalKeystrokes: number;
   correctKeystrokes: number;
@@ -46,6 +47,7 @@ export function createDefaultProgress(bookId: string): TypingProgress {
     bookId,
     passageIndex: 0,
     typed: '',
+    typedHistory: [],
     completedPassages: 0,
     totalKeystrokes: 0,
     correctKeystrokes: 0,

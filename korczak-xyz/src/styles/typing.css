@@ -206,6 +206,12 @@
   animation: typing-caret 1s steps(1) infinite;
 }
 
+/* The section-ending newline (Enter) glyph: a dim control-char affordance,
+   layered on top of whatever status color it currently has. */
+.typing-char--newline {
+  opacity: 0.55;
+}
+
 @keyframes typing-caret {
   0%,
   50% {
