@@ -60,21 +60,12 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
-  // Latest committed progress, read from the input handlers without re-subscribing.
-  const progressRef = useRef(progress);
-  progressRef.current = progress;
 
   // Pause state (manual button, auto-idle, or browsing). Mirrored to a ref so
   // the input handlers can read it without re-subscribing.
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   isPausedRef.current = isPaused;
-
-  // A wrong key pressed while parked on the section-ending newline slot flashes
-  // the ↵ red (it dings accuracy but does not advance). Cleared on any progress.
-  const [boundaryError, setBoundaryError] = useState(false);
-  const boundaryErrorRef = useRef(false);
-  boundaryErrorRef.current = boundaryError;
 
   // The live session log lives in a ref: it mutates on every keystroke and we
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
@@ -263,14 +254,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const handleChar = useCallback(
     (ch: string) => {
       if (isPausedRef.current) setIsPaused(false); // typing resumes the session
-      // Flash the ↵ red when a non-Enter key lands on the newline slot; clear it
-      // once the user makes any real progress. Derived from committed progress.
-      const lp = progressRef.current;
-      if (lp.passageIndex < passages.length) {
-        const atNewline = lp.typed.length === passages[lp.passageIndex].length;
-        if (atNewline && ch !== '\n') setBoundaryError(true);
-        else if (boundaryErrorRef.current) setBoundaryError(false);
-      }
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
         const current = passages[prev.passageIndex];
@@ -280,21 +263,20 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         const lastPlayedAt = Date.now();
 
         if (pos === current.length) {
-          // Caret is on the trailing newline slot: only Enter advances.
+          // The trailing newline (Enter) slot. Like any other slot, any key
+          // advances the caret: Enter is correct, anything else records a red
+          // mistake there — then we move on to the next section.
           const correct = ch === '\n';
           pushEvent({ t: now(), kind: 'char', data: ch, correct });
           const totalKeystrokes = prev.totalKeystrokes + 1;
           const correctKeystrokes = prev.correctKeystrokes + (correct ? 1 : 0);
-          if (!correct) {
-            // Wrong key on the newline slot: count the mistake but stay put.
-            return { ...prev, totalKeystrokes, correctKeystrokes, lastPlayedAt };
-          }
-          // Section complete: advance, retaining what was typed so its errors
-          // persist. Assign by index (not push) so it lands at the right slot
-          // even when resuming deep in a book with a sparse/empty history.
+          // Section complete: advance, retaining what was typed (including this
+          // terminal char, so a wrong Enter shows red on the finished section).
+          // Assign by index (not push) so it lands at the right slot even when
+          // resuming deep in a book with a sparse/empty history.
           const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
           const typedHistory = prev.typedHistory.slice();
-          typedHistory[prev.passageIndex] = prev.typed;
+          typedHistory[prev.passageIndex] = prev.typed + ch;
           return {
             ...prev,
             passageIndex: prev.passageIndex + 1,
@@ -324,7 +306,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const handleBackspace = useCallback(() => {
     if (isPausedRef.current) setIsPaused(false); // typing resumes the session
-    if (boundaryErrorRef.current) setBoundaryError(false);
     setProgress((prev) => {
       if (prev.typed.length > 0) {
         pushEvent({ t: now(), kind: 'backspace' });
@@ -333,10 +314,12 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       // At the start of a section: backspace crosses into the previous one.
       if (prev.passageIndex === 0) return prev;
       const prevIndex = prev.passageIndex - 1;
-      // Restore exactly what was typed there (falls back to the source text for
-      // legacy progress that predates typedHistory), so its errors reappear and
-      // the caret lands on that section's trailing newline slot.
-      const restored = prev.typedHistory[prevIndex] ?? passages[prevIndex];
+      // Restore what was typed there (falls back to the source text for legacy
+      // progress), dropping the stored terminal newline char so the caret lands
+      // on that section's newline slot. Its body errors reappear.
+      const stored = prev.typedHistory[prevIndex];
+      const restored =
+        stored != null ? stored.slice(0, passages[prevIndex].length) : passages[prevIndex];
       pushEvent({ t: now(), kind: 'backspace' });
       return {
         ...prev,
@@ -397,7 +380,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     const fresh = resetProgressStorage(book.id);
     sessionRef.current = newSession(book.id, fresh);
     setProgress(fresh);
-    setBoundaryError(false);
     focusInput();
   }, [book.id, flushSession, focusInput]);
 
@@ -430,15 +412,13 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       if (i < typed.length) {
         statuses.push(typed[i] === expected[i] ? 'correct' : 'incorrect');
       } else if (i === typed.length) {
-        // The caret slot; if it's the newline slot and the user just mis-hit it,
-        // show it red instead of the plain caret.
-        statuses.push(boundaryError && i === passage.length ? 'incorrect' : 'current');
+        statuses.push('current');
       } else {
         statuses.push('pending');
       }
     }
     return statuses;
-  }, [passage, typed, boundaryError]);
+  }, [passage, typed]);
 
   const progressPercent = passages.length === 0 ? 0 : (progress.passageIndex / passages.length) * 100;
 

@@ -65,9 +65,10 @@ export function PassageView({
       if (passage === undefined) continue;
       const typed = typedHistory[j];
       // Fast path: nothing typed on record (legacy/sparse history — undefined or
-      // a JSON-serialized null hole) or a flawless pass renders as plain text;
-      // only error-containing sections pay the per-char cost.
-      if (typed == null || typed === passage) {
+      // a JSON-serialized null hole) or a flawless pass (with or without the
+      // stored terminal newline) renders as plain text; only error-containing
+      // sections pay the per-char cost.
+      if (typed == null || typed === passage || typed === passage + '\n') {
         nodes.push(
           <p className="typing-text typing-text--done" key={j}>
             {passage}
@@ -76,6 +77,9 @@ export function PassageView({
         );
         continue;
       }
+      // A terminal char stored past the passage body that isn't a newline means
+      // the section was ended with a wrong key — paint its ↵ red.
+      const newlineWrong = typed.length > passage.length && typed[passage.length] !== '\n';
       nodes.push(
         <p className="typing-text typing-text--done" key={j}>
           {passage.split('').map((ch, i) => (
@@ -86,7 +90,7 @@ export function PassageView({
               {ch}
             </span>
           ))}
-          <span className="typing-char typing-char--correct typing-char--newline">{NEWLINE_GLYPH}</span>
+          <span className={`typing-char typing-char--${newlineWrong ? 'incorrect' : 'correct'} typing-char--newline`}>{NEWLINE_GLYPH}</span>
         </p>,
       );
     }
@@ -244,10 +248,7 @@ export function PassageView({
               {(() => {
                 // The trailing newline (Enter) slot, typed like any other char.
                 const status: CharStatus = charStatuses[currentPassage.length] ?? 'pending';
-                // Anchor auto-follow here whenever the caret is on this slot, even
-                // when a boundary mis-hit paints it 'incorrect' (red) rather than
-                // 'current' — otherwise no span carries the ref and the view snaps
-                // to the top of the book.
+                // Anchor auto-follow here whenever the caret is on this slot.
                 const isCaret = cursorIndex === currentPassage.length;
                 return (
                   <span
