@@ -21,6 +21,12 @@ export const translations = {
     importFail: 'Could not import that file.',
     browsing: 'Browsing — type or press Esc to return',
     returnToTyping: 'Return to typing',
+    stats: 'Stats',
+    wpmOverTime: 'WPM over time',
+    accuracyOverTime: 'Accuracy over time',
+    noStats: 'No sessions yet — do some typing first.',
+    backToTyping: 'Back to typing',
+    sessions: 'Sessions',
   },
   pl: {
     book: 'Książka',
@@ -42,6 +48,12 @@ export const translations = {
     importFail: 'Nie udało się zaimportować pliku.',
     browsing: 'Przeglądanie — pisz lub naciśnij Esc, aby wrócić',
     returnToTyping: 'Wróć do pisania',
+    stats: 'Statystyki',
+    wpmOverTime: 'WPM w czasie',
+    accuracyOverTime: 'Celność w czasie',
+    noStats: 'Brak sesji — najpierw trochę popisz.',
+    backToTyping: 'Wróć do pisania',
+    sessions: 'Sesje',
   },
 } as const;
 

@@ -1,7 +1,7 @@
 // Firestore-backed persistence for the typing trainer, used when a user is
 // signed in. Documents are scoped under users/{uid} and secured by rules so
 // only the account owner can read/write them.
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { TypingProgress, TypingSession } from './types';
 
@@ -30,4 +30,10 @@ export async function saveCloudProgress(uid: string, progress: TypingProgress): 
 export async function saveCloudSession(uid: string, session: TypingSession): Promise<void> {
   if (!db) return;
   await setDoc(sessionDoc(uid, session.id), session);
+}
+
+export async function loadCloudSessions(uid: string): Promise<TypingSession[]> {
+  if (!db) return [];
+  const snap = await getDocs(collection(db, 'users', uid, 'sessions'));
+  return snap.docs.map((d) => d.data() as TypingSession);
 }
