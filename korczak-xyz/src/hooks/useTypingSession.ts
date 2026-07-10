@@ -20,6 +20,10 @@ export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
 const SESSION_SAVE_DEBOUNCE_MS = 800;
 const CLOUD_SAVE_DEBOUNCE_MS = 2000;
+// Cloud progress: trailing save after the user stops typing, but never let more
+// than this elapse during continuous typing without checkpointing to the cloud.
+const CLOUD_PROGRESS_DEBOUNCE_MS = 1500;
+const CLOUD_PROGRESS_MAX_WAIT_MS = 3000;
 // Idle this long with no keystroke and the session auto-pauses (abandoned).
 const IDLE_PAUSE_MS = 20000;
 
@@ -79,6 +83,14 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   userRef.current = user;
   const cloudSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest progress, read inside unload handlers without re-subscribing.
+  const progressRef = useRef<TypingProgress>(progress);
+  progressRef.current = progress;
+  // Gate: no cloud-progress write may happen until the initial reconcile has
+  // compared local vs cloud, so mount can't upload stale local over a newer cloud.
+  const cloudReadyRef = useRef(false);
+  // When the last cloud-progress write happened, to bound the checkpoint interval.
+  const lastCloudProgressAtRef = useRef(0);
 
   // When signed in, mirror the live session to the cloud (debounced/coalesced).
   const scheduleCloudSession = useCallback(() => {
@@ -91,13 +103,27 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   }, []);
 
   const scheduleCloudProgress = useCallback((p: TypingProgress) => {
-    if (!userRef.current) return;
-    if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
-    cloudProgressTimerRef.current = setTimeout(() => {
-      cloudProgressTimerRef.current = null;
+    // Hold off until reconcile has run, so we never clobber a newer cloud on mount.
+    if (!userRef.current || !cloudReadyRef.current) return;
+    const flush = () => {
+      if (cloudProgressTimerRef.current) {
+        clearTimeout(cloudProgressTimerRef.current);
+        cloudProgressTimerRef.current = null;
+      }
+      lastCloudProgressAtRef.current = Date.now();
       const u = userRef.current;
       if (u) void saveCloudProgress(u.uid, p);
-    }, CLOUD_SAVE_DEBOUNCE_MS);
+    };
+    // Checkpoint immediately if we've gone too long without a write (covers
+    // continuous typing, where a pure trailing debounce would never fire).
+    if (Date.now() - lastCloudProgressAtRef.current >= CLOUD_PROGRESS_MAX_WAIT_MS) {
+      flush();
+      return;
+    }
+    // Otherwise (re)arm the trailing save; it captures the latest `p` because the
+    // persist effect calls this on every progress change.
+    if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
+    cloudProgressTimerRef.current = setTimeout(flush, CLOUD_PROGRESS_DEBOUNCE_MS);
   }, []);
 
   // Start a fresh session on mount, archiving any previous one.
@@ -119,6 +145,18 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       saveCurrentSession(sessionRef.current);
       const u = userRef.current;
       if (u) void saveCloudSession(u.uid, sessionRef.current);
+    }
+    // Also push the latest progress to the cloud (best-effort) so a refresh/close
+    // doesn't leave the cloud stuck behind the pending trailing debounce. Gated
+    // on reconcile so we never upload stale local over a newer cloud.
+    const u = userRef.current;
+    if (u && cloudReadyRef.current) {
+      if (cloudProgressTimerRef.current) {
+        clearTimeout(cloudProgressTimerRef.current);
+        cloudProgressTimerRef.current = null;
+      }
+      lastCloudProgressAtRef.current = Date.now();
+      void saveCloudProgress(u.uid, progressRef.current);
     }
   }, []);
 
@@ -179,31 +217,48 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     scheduleCloudProgress(progress);
   }, [progress, scheduleCloudProgress]);
 
-  // On sign-in, reconcile local and cloud once. If the cloud already has
-  // progress, adopt it; otherwise upload local progress + logs (a fresh cloud).
+  // On sign-in, reconcile local and cloud once. The fresher of the two (by
+  // `lastPlayedAt`) wins: adopt cloud if it's newer, otherwise keep local and push
+  // it up. A stale cloud must never clobber fresher local progress on refresh.
   const syncedUidRef = useRef<string | null>(null);
   useEffect(() => {
     if (!user) {
       syncedUidRef.current = null;
+      cloudReadyRef.current = false;
       return;
     }
     if (syncedUidRef.current === user.uid) return;
     syncedUidRef.current = user.uid;
+    cloudReadyRef.current = false;
 
     let cancelled = false;
     (async () => {
       try {
         const cloud = await loadCloudProgress(user.uid, book.id);
         if (cancelled) return;
+        const local = loadProgress(book.id);
         if (cloud) {
-          // Cloud is the source of truth on this device from now on. Merge over
-          // defaults so pre-existing docs without `typedHistory` don't arrive undefined.
-          const normalized = normalizeProgress({ ...createDefaultProgress(book.id), ...cloud });
-          saveProgress(normalized);
-          setProgress(normalized);
+          // Merge over defaults so pre-existing docs without `typedHistory` don't
+          // arrive undefined.
+          const normalizedCloud = normalizeProgress({ ...createDefaultProgress(book.id), ...cloud });
+          const cloudTime = normalizedCloud.lastPlayedAt ?? 0;
+          const localTime = local.lastPlayedAt ?? 0;
+          // Tie-break equal timestamps by whichever holds more progress.
+          const cloudWins =
+            cloudTime > localTime ||
+            (cloudTime === localTime &&
+              (normalizedCloud.passageIndex > local.passageIndex ||
+                (normalizedCloud.passageIndex === local.passageIndex &&
+                  normalizedCloud.totalKeystrokes > local.totalKeystrokes)));
+          if (cloudWins) {
+            saveProgress(normalizedCloud);
+            setProgress(normalizedCloud);
+          } else if (isNonTrivialProgress(local)) {
+            // Local is fresher — keep it and bring the cloud up to date.
+            await saveCloudProgress(user.uid, local);
+          }
         } else {
           // Fresh cloud: migrate whatever is stored locally, once.
-          const local = loadProgress(book.id);
           if (isNonTrivialProgress(local)) {
             await saveCloudProgress(user.uid, local);
             for (const s of loadAllSessions()) {
@@ -214,6 +269,14 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         }
       } catch {
         // Network/permission errors: keep working locally.
+      } finally {
+        // Cloud-progress writes are unblocked once we've compared the two sides.
+        // Stamp the checkpoint clock so the next keystroke doesn't redundantly
+        // re-upload what reconcile just settled.
+        if (!cancelled) {
+          lastCloudProgressAtRef.current = Date.now();
+          cloudReadyRef.current = true;
+        }
       }
     })();
     return () => {
@@ -309,7 +372,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     setProgress((prev) => {
       if (prev.typed.length > 0) {
         pushEvent({ t: now(), kind: 'backspace' });
-        return { ...prev, typed: prev.typed.slice(0, -1) };
+        return { ...prev, typed: prev.typed.slice(0, -1), lastPlayedAt: Date.now() };
       }
       // At the start of a section: backspace crosses into the previous one.
       if (prev.passageIndex === 0) return prev;
@@ -327,6 +390,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         typed: restored,
         typedHistory: prev.typedHistory.slice(0, prevIndex),
         completedPassages: Math.max(0, prev.completedPassages - 1),
+        lastPlayedAt: Date.now(),
       };
     });
   }, [passages, now, pushEvent]);
