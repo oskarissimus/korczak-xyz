@@ -1,6 +1,8 @@
 // Minimal multi-series SVG line chart for the typing stats page. WPM and
-// accuracy share a single 0-100 y-axis (both happen to live in that range),
-// so this is never a misleading dual-axis chart.
+// accuracy share the left 0-100 y-axis (both happen to live in that range).
+// An optional right axis (time spent, in minutes) appears only while a series
+// is bound to it; its ticks are tinted the series color so the axis-to-series
+// binding stays unambiguous.
 
 export interface StatsPoint {
   t: number; // epoch ms
@@ -11,6 +13,7 @@ export interface StatsSeries {
   key: string;
   points: StatsPoint[]; // sorted ascending by t
   lineClass: string;
+  axis?: 'left' | 'right'; // which y-axis the values are scaled against
   formatValue: (v: number) => string; // for the point tooltip
   formatLabel: (v: number) => string; // compact direct label above the point
 }
@@ -18,6 +21,8 @@ export interface StatsSeries {
 interface StatsChartProps {
   series: StatsSeries[]; // only the visible series
   yDomain: [number, number];
+  yDomainRight?: [number, number];
+  formatRightTick?: (v: number) => string;
   formatDate: (t: number) => string;
   showLabels?: boolean; // direct value labels above each point (day mode)
 }
@@ -31,12 +36,17 @@ const MAX_MARKERS = 40;
 export default function StatsChart({
   series,
   yDomain,
+  yDomainRight,
+  formatRightTick,
   formatDate,
   showLabels = false,
 }: StatsChartProps) {
-  const plotW = WIDTH - MARGIN.left - MARGIN.right;
+  const hasRightAxis = yDomainRight != null && series.some((s) => s.axis === 'right');
+  const marginRight = hasRightAxis ? 46 : MARGIN.right; // room for "1h 05m" ticks
+  const plotW = WIDTH - MARGIN.left - marginRight;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
   const [yMin, yMax] = yDomain;
+  const [yrMin, yrMax] = yDomainRight ?? [0, 1];
 
   const allT = series.flatMap((s) => s.points.map((p) => p.t));
   const tMin = allT.length ? Math.min(...allT) : 0;
@@ -47,9 +57,13 @@ export default function StatsChart({
   const x = (t: number) =>
     singlePoint ? MARGIN.left + plotW / 2 : MARGIN.left + ((t - tMin) / tSpan) * plotW;
   const y = (v: number) => MARGIN.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  const yRight = (v: number) => MARGIN.top + (1 - (v - yrMin) / (yrMax - yrMin)) * plotH;
+  const yOf = (s: StatsSeries, v: number) => (s.axis === 'right' ? yRight(v) : y(v));
 
+  // Both axes tick at the same fractions so right ticks land on the gridlines.
+  const TICK_FRACTIONS = [0, 0.25, 0.5, 0.75, 1];
   const gridValues = [0.25, 0.5, 0.75].map((f) => yMin + f * (yMax - yMin));
-  const yTicks = [yMin, ...gridValues, yMax];
+  const yTicks = TICK_FRACTIONS.map((f) => yMin + f * (yMax - yMin));
 
   // X ticks come from whichever series has the most points (they share dates).
   const tickSource = series.reduce<StatsPoint[]>(
@@ -61,7 +75,7 @@ export default function StatsChart({
     const mid = tickSource[Math.floor(tickSource.length / 2)];
     const midX = x(mid.t);
     const clearance = 0.18 * plotW;
-    if (midX - MARGIN.left > clearance && WIDTH - MARGIN.right - midX > clearance) {
+    if (midX - MARGIN.left > clearance && WIDTH - marginRight - midX > clearance) {
       xTickPoints.splice(1, 0, mid);
     }
   }
@@ -74,7 +88,7 @@ export default function StatsChart({
             key={v}
             className="typing-chart-grid"
             x1={MARGIN.left}
-            x2={WIDTH - MARGIN.right}
+            x2={WIDTH - marginRight}
             y1={y(v)}
             y2={y(v)}
           />
@@ -82,7 +96,7 @@ export default function StatsChart({
         <line
           className="typing-chart-axis"
           x1={MARGIN.left}
-          x2={WIDTH - MARGIN.right}
+          x2={WIDTH - marginRight}
           y1={y(yMin)}
           y2={y(yMin)}
         />
@@ -97,6 +111,21 @@ export default function StatsChart({
             {Math.round(v)}
           </text>
         ))}
+        {hasRightAxis &&
+          TICK_FRACTIONS.map((f) => {
+            const v = yrMin + f * (yrMax - yrMin);
+            return (
+              <text
+                key={f}
+                className="typing-chart-tick typing-chart-tick--right"
+                x={WIDTH - marginRight + 6}
+                y={yRight(v) + 3}
+                textAnchor="start"
+              >
+                {formatRightTick ? formatRightTick(v) : Math.round(v)}
+              </text>
+            );
+          })}
         {xTickPoints.map((p, i) => (
           <text
             key={`${p.t}-${i}`}
@@ -113,7 +142,7 @@ export default function StatsChart({
             {s.points.length > 1 && (
               <polyline
                 className={s.lineClass}
-                points={s.points.map((p) => `${x(p.t)},${y(p.value)}`).join(' ')}
+                points={s.points.map((p) => `${x(p.t)},${yOf(s, p.value)}`).join(' ')}
                 fill="none"
                 strokeWidth={2}
               />
@@ -121,19 +150,27 @@ export default function StatsChart({
             {s.points.length <= MAX_MARKERS &&
               s.points.map((p, i) => (
                 <g key={`${p.t}-${i}`}>
-                  <circle className={s.lineClass} cx={x(p.t)} cy={y(p.value)} r={3} />
+                  <circle className={s.lineClass} cx={x(p.t)} cy={yOf(s, p.value)} r={3} />
                   {showLabels && (
                     <text
                       className="typing-chart-label"
                       x={x(p.t)}
-                      y={y(p.value) - 8}
-                      textAnchor="middle"
+                      y={yOf(s, p.value) - 8}
+                      // Edge points anchor inward so labels stay inside the
+                      // plot and clear of the right-axis tick gutter.
+                      textAnchor={
+                        x(p.t) - MARGIN.left < 16
+                          ? 'start'
+                          : WIDTH - marginRight - x(p.t) < 16
+                            ? 'end'
+                            : 'middle'
+                      }
                     >
                       {s.formatLabel(p.value)}
                     </text>
                   )}
                   {/* Oversized invisible hit target carrying the native tooltip. */}
-                  <circle cx={x(p.t)} cy={y(p.value)} r={10} fill="transparent">
+                  <circle cx={x(p.t)} cy={yOf(s, p.value)} r={10} fill="transparent">
                     <title>{`${formatDate(p.t)} — ${s.formatValue(p.value)}`}</title>
                   </circle>
                 </g>

@@ -388,6 +388,19 @@ circle.typing-chart-line--accuracy {
   stroke: none;
 }
 
+.typing-chart-line--time {
+  stroke: var(--retro-magenta);
+}
+
+circle.typing-chart-line--time {
+  fill: var(--retro-magenta);
+  stroke: none;
+}
+
+.typing-chart-tick--right {
+  fill: var(--retro-magenta);
+}
+
 /* Stats page controls */
 
 .typing-chart-controls {
@@ -452,4 +465,8 @@ circle.typing-chart-line--accuracy {
 
 .typing-legend-item--accuracy .typing-legend-swatch {
   background: var(--retro-cyan);
+}
+
+.typing-legend-item--time .typing-legend-swatch {
+  background: var(--retro-magenta);
 }

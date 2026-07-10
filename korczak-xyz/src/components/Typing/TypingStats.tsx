@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { loadCloudSessions } from '../../utils/typing/cloudStorage';
-import { charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
+import { activeTypingMs, charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
 import { loadAllSessions } from '../../utils/typing/storage';
 import type { TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
@@ -21,6 +21,7 @@ interface DataPoint {
   t: number;
   wpm: number;
   accuracy: number;
+  timeMs: number; // active typing time (idle gaps capped)
   weight: number; // typed-char count, used for day averaging
 }
 
@@ -32,12 +33,14 @@ function toSessionPoints(sessions: TypingSession[]): DataPoint[] {
       t: s.startedAt,
       wpm: computeWpm(s.events),
       accuracy: computeAccuracy(s.events),
+      timeMs: activeTypingMs(s.events),
       weight: charEvents(s.events).length,
     }));
 }
 
 // Collapse sessions into one point per calendar day, averaging WPM and accuracy
-// weighted by how much was typed that day, and anchoring the point at midnight.
+// weighted by how much was typed that day (time spent is summed instead), and
+// anchoring the point at midnight.
 function aggregateByDay(points: DataPoint[]): DataPoint[] {
   const byDay = new Map<number, DataPoint[]>();
   for (const p of points) {
@@ -57,9 +60,29 @@ function aggregateByDay(points: DataPoint[]): DataPoint[] {
         t: dayKey,
         wpm: wAvg((p) => p.wpm),
         accuracy: wAvg((p) => p.accuracy),
+        timeMs: day.reduce((sum, p) => sum + p.timeMs, 0),
         weight: totalWeight,
       };
     });
+}
+
+// Ladder of right-axis maxima (minutes) whose quarter-ticks are clean values;
+// beyond the ladder, fall back to whole hours. The 1-minute floor keeps the
+// axis readable for sub-minute sessions and guards an all-zero domain.
+const NICE_TIME_MAXES = [1, 2, 4, 8, 12, 16, 20, 32, 40, 60, 80, 120, 160, 240];
+function niceTimeMax(maxMinutes: number): number {
+  const target = Math.max(maxMinutes * 1.1, 1);
+  return NICE_TIME_MAXES.find((m) => m >= target) ?? Math.ceil(target / 60) * 60;
+}
+
+function formatDuration(minutes: number): string {
+  const totalSec = Math.round(minutes * 60);
+  if (totalSec < 60) return `${totalSec}s`;
+  const totalMin = Math.round(totalSec / 60); // rounding here avoids "1h 60m"
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m.toString().padStart(2, '0')}m`;
 }
 
 export default function TypingStats({ lang }: TypingStatsProps) {
@@ -70,6 +93,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   const [grouping, setGrouping] = useState<Grouping>('day');
   const [showWpm, setShowWpm] = useState(true);
   const [showAccuracy, setShowAccuracy] = useState(true);
+  const [showTime, setShowTime] = useState(true);
 
   const uid = auth.user?.uid;
   useEffect(() => {
@@ -94,9 +118,13 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   const sessionPoints = toSessionPoints(sessions);
   const points = grouping === 'day' ? aggregateByDay(sessionPoints) : sessionPoints;
 
-  // Shared 0-100 axis; extend only if WPM ever exceeds 100.
+  // Shared 0-100 left axis; extend only if WPM ever exceeds 100.
   const maxWpm = Math.max(...points.map((p) => p.wpm), 0);
   const yDomain: [number, number] = [0, Math.max(100, Math.ceil((maxWpm * 1.1) / 10) * 10)];
+
+  // Right axis for time spent, in minutes.
+  const maxTimeMin = Math.max(...points.map((p) => p.timeMs), 0) / 60000;
+  const yDomainRight: [number, number] = [0, niceTimeMax(maxTimeMin)];
 
   const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
   const formatDate = (ms: number) =>
@@ -119,6 +147,16 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       lineClass: 'typing-chart-line--accuracy',
       formatValue: (v) => `${Math.round(v)}%`,
       formatLabel: (v) => `${Math.round(v)}%`,
+    });
+  }
+  if (showTime) {
+    series.push({
+      key: 'time',
+      points: points.map((p) => ({ t: p.t, value: p.timeMs / 60000 })),
+      lineClass: 'typing-chart-line--time',
+      axis: 'right',
+      formatValue: formatDuration,
+      formatLabel: formatDuration,
     });
   }
 
@@ -168,11 +206,22 @@ export default function TypingStats({ lang }: TypingStatsProps) {
                 <span className="typing-legend-swatch" />
                 {t.accuracy}
               </button>
+              <button
+                type="button"
+                className="typing-legend-item typing-legend-item--time"
+                aria-pressed={showTime}
+                onClick={() => setShowTime((v) => !v)}
+              >
+                <span className="typing-legend-swatch" />
+                {t.timeSpent}
+              </button>
             </div>
           </div>
           <StatsChart
             series={series}
             yDomain={yDomain}
+            yDomainRight={yDomainRight}
+            formatRightTick={formatDuration}
             formatDate={formatDate}
             showLabels={grouping === 'day'}
           />
