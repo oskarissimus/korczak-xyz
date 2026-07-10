@@ -1,54 +1,57 @@
-// Minimal single-series SVG line chart for the typing stats page.
+// Minimal multi-series SVG line chart for the typing stats page. WPM and
+// accuracy share a single 0-100 y-axis (both happen to live in that range),
+// so this is never a misleading dual-axis chart.
 
 export interface StatsPoint {
   t: number; // epoch ms
   value: number;
 }
 
-interface StatsChartProps {
-  title: string;
+export interface StatsSeries {
+  key: string;
   points: StatsPoint[]; // sorted ascending by t
-  yDomain: [number, number];
-  formatValue: (v: number) => string;
-  formatDate: (t: number) => string;
   lineClass: string;
+  formatValue: (v: number) => string; // for the point tooltip
+}
+
+interface StatsChartProps {
+  series: StatsSeries[]; // only the visible series
+  yDomain: [number, number];
+  formatDate: (t: number) => string;
 }
 
 const WIDTH = 600;
-const HEIGHT = 200;
-const MARGIN = { top: 10, right: 12, bottom: 22, left: 44 };
-// Above this many sessions the per-point markers become clutter; draw line only.
+const HEIGHT = 240;
+const MARGIN = { top: 10, right: 12, bottom: 22, left: 40 };
+// Above this many points per series the markers become clutter; draw line only.
 const MAX_MARKERS = 40;
 
-export default function StatsChart({
-  title,
-  points,
-  yDomain,
-  formatValue,
-  formatDate,
-  lineClass,
-}: StatsChartProps) {
+export default function StatsChart({ series, yDomain, formatDate }: StatsChartProps) {
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
   const [yMin, yMax] = yDomain;
 
-  const tMin = points[0]?.t ?? 0;
-  const tMax = points[points.length - 1]?.t ?? 1;
+  const allT = series.flatMap((s) => s.points.map((p) => p.t));
+  const tMin = allT.length ? Math.min(...allT) : 0;
+  const tMax = allT.length ? Math.max(...allT) : 1;
   const tSpan = Math.max(tMax - tMin, 1);
+  const singlePoint = new Set(allT).size === 1;
 
   const x = (t: number) =>
-    points.length === 1 ? MARGIN.left + plotW / 2 : MARGIN.left + ((t - tMin) / tSpan) * plotW;
+    singlePoint ? MARGIN.left + plotW / 2 : MARGIN.left + ((t - tMin) / tSpan) * plotW;
   const y = (v: number) => MARGIN.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
 
-  // Horizontal gridlines at the domain quartiles, plus min/max tick labels.
   const gridValues = [0.25, 0.5, 0.75].map((f) => yMin + f * (yMax - yMin));
   const yTicks = [yMin, ...gridValues, yMax];
 
-  const xTickPoints = [...points.slice(0, 1), ...points.slice(-1)];
-  if (points.length >= 3) {
-    // Include a middle date only when it lands far enough from both edge
-    // labels to avoid overlapping them.
-    const mid = points[Math.floor(points.length / 2)];
+  // X ticks come from whichever series has the most points (they share dates).
+  const tickSource = series.reduce<StatsPoint[]>(
+    (best, s) => (s.points.length > best.length ? s.points : best),
+    []
+  );
+  const xTickPoints = [...tickSource.slice(0, 1), ...tickSource.slice(-1)];
+  if (tickSource.length >= 3) {
+    const mid = tickSource[Math.floor(tickSource.length / 2)];
     const midX = x(mid.t);
     const clearance = 0.18 * plotW;
     if (midX - MARGIN.left > clearance && WIDTH - MARGIN.right - midX > clearance) {
@@ -56,12 +59,9 @@ export default function StatsChart({
     }
   }
 
-  const polyline = points.map((p) => `${x(p.t)},${y(p.value)}`).join(' ');
-
   return (
     <div className="typing-chart-panel">
-      <h2 className="typing-chart-title">{title}</h2>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={title}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label="Typing stats">
         {gridValues.map((v) => (
           <line
             key={v}
@@ -87,7 +87,7 @@ export default function StatsChart({
             y={y(v) + 3}
             textAnchor="end"
           >
-            {formatValue(v)}
+            {Math.round(v)}
           </text>
         ))}
         {xTickPoints.map((p, i) => (
@@ -101,19 +101,28 @@ export default function StatsChart({
             {formatDate(p.t)}
           </text>
         ))}
-        {points.length > 1 && (
-          <polyline className={lineClass} points={polyline} fill="none" strokeWidth={2} />
-        )}
-        {points.length <= MAX_MARKERS &&
-          points.map((p, i) => (
-            <g key={`${p.t}-${i}`}>
-              <circle className={lineClass} cx={x(p.t)} cy={y(p.value)} r={3} />
-              {/* Oversized invisible hit target carrying the native tooltip. */}
-              <circle cx={x(p.t)} cy={y(p.value)} r={10} fill="transparent">
-                <title>{`${formatDate(p.t)} — ${formatValue(p.value)}`}</title>
-              </circle>
-            </g>
-          ))}
+        {series.map((s) => (
+          <g key={s.key}>
+            {s.points.length > 1 && (
+              <polyline
+                className={s.lineClass}
+                points={s.points.map((p) => `${x(p.t)},${y(p.value)}`).join(' ')}
+                fill="none"
+                strokeWidth={2}
+              />
+            )}
+            {s.points.length <= MAX_MARKERS &&
+              s.points.map((p, i) => (
+                <g key={`${p.t}-${i}`}>
+                  <circle className={s.lineClass} cx={x(p.t)} cy={y(p.value)} r={3} />
+                  {/* Oversized invisible hit target carrying the native tooltip. */}
+                  <circle cx={x(p.t)} cy={y(p.value)} r={10} fill="transparent">
+                    <title>{`${formatDate(p.t)} — ${s.formatValue(p.value)}`}</title>
+                  </circle>
+                </g>
+              ))}
+          </g>
+        ))}
       </svg>
     </div>
   );

@@ -381,3 +381,69 @@ circle.typing-chart-line--accuracy {
   fill: var(--retro-cyan);
   stroke: none;
 }
+
+/* Stats page controls */
+
+.typing-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.typing-toggle-group {
+  display: flex;
+}
+
+.typing-toggle {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-black);
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.typing-toggle[aria-pressed='true'] {
+  border-style: inset;
+  background: #a0a0a0;
+}
+
+.typing-legend {
+  display: flex;
+  gap: 8px;
+}
+
+.typing-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-black);
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.typing-legend-item[aria-pressed='false'] {
+  opacity: 0.5;
+  border-style: inset;
+}
+
+.typing-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--retro-black);
+}
+
+.typing-legend-item--wpm .typing-legend-swatch {
+  background: var(--retro-green);
+}
+
+.typing-legend-item--accuracy .typing-legend-swatch {
+  background: var(--retro-cyan);
+}

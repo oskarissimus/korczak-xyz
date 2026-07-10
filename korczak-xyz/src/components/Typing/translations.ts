@@ -27,6 +27,9 @@ export const translations = {
     noStats: 'No sessions yet — do some typing first.',
     backToTyping: 'Back to typing',
     sessions: 'Sessions',
+    groupBy: 'Group by',
+    perSession: 'Per session',
+    perDay: 'Per day',
   },
   pl: {
     book: 'Książka',
@@ -54,6 +57,9 @@ export const translations = {
     noStats: 'Brak sesji — najpierw trochę popisz.',
     backToTyping: 'Wróć do pisania',
     sessions: 'Sesje',
+    groupBy: 'Grupuj wg',
+    perSession: 'Na sesję',
+    perDay: 'Na dzień',
   },
 } as const;
 
