@@ -364,6 +364,12 @@
   font-size: 12px;
 }
 
+.typing-chart-label {
+  fill: var(--retro-white);
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+}
+
 .typing-chart-line--wpm {
   stroke: var(--retro-green);
 }

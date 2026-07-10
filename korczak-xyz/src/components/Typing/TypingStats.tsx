@@ -109,6 +109,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       points: points.map((p) => ({ t: p.t, value: p.wpm })),
       lineClass: 'typing-chart-line--wpm',
       formatValue: (v) => `${Math.round(v)} ${t.wpm}`,
+      formatLabel: (v) => String(Math.round(v)),
     });
   }
   if (showAccuracy) {
@@ -117,6 +118,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       points: points.map((p) => ({ t: p.t, value: p.accuracy })),
       lineClass: 'typing-chart-line--accuracy',
       formatValue: (v) => `${Math.round(v)}%`,
+      formatLabel: (v) => `${Math.round(v)}%`,
     });
   }
 
@@ -168,7 +170,12 @@ export default function TypingStats({ lang }: TypingStatsProps) {
               </button>
             </div>
           </div>
-          <StatsChart series={series} yDomain={yDomain} formatDate={formatDate} />
+          <StatsChart
+            series={series}
+            yDomain={yDomain}
+            formatDate={formatDate}
+            showLabels={grouping === 'day'}
+          />
           <p className="typing-message">
             {t.sessions}: {sessionPoints.length}
           </p>

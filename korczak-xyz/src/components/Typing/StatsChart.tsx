@@ -12,12 +12,14 @@ export interface StatsSeries {
   points: StatsPoint[]; // sorted ascending by t
   lineClass: string;
   formatValue: (v: number) => string; // for the point tooltip
+  formatLabel: (v: number) => string; // compact direct label above the point
 }
 
 interface StatsChartProps {
   series: StatsSeries[]; // only the visible series
   yDomain: [number, number];
   formatDate: (t: number) => string;
+  showLabels?: boolean; // direct value labels above each point (day mode)
 }
 
 const WIDTH = 600;
@@ -26,7 +28,12 @@ const MARGIN = { top: 10, right: 12, bottom: 22, left: 40 };
 // Above this many points per series the markers become clutter; draw line only.
 const MAX_MARKERS = 40;
 
-export default function StatsChart({ series, yDomain, formatDate }: StatsChartProps) {
+export default function StatsChart({
+  series,
+  yDomain,
+  formatDate,
+  showLabels = false,
+}: StatsChartProps) {
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
   const [yMin, yMax] = yDomain;
@@ -115,6 +122,16 @@ export default function StatsChart({ series, yDomain, formatDate }: StatsChartPr
               s.points.map((p, i) => (
                 <g key={`${p.t}-${i}`}>
                   <circle className={s.lineClass} cx={x(p.t)} cy={y(p.value)} r={3} />
+                  {showLabels && (
+                    <text
+                      className="typing-chart-label"
+                      x={x(p.t)}
+                      y={y(p.value) - 8}
+                      textAnchor="middle"
+                    >
+                      {s.formatLabel(p.value)}
+                    </text>
+                  )}
                   {/* Oversized invisible hit target carrying the native tooltip. */}
                   <circle cx={x(p.t)} cy={y(p.value)} r={10} fill="transparent">
                     <title>{`${formatDate(p.t)} — ${s.formatValue(p.value)}`}</title>
