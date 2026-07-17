@@ -1,10 +1,10 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
-import PageContent from '../components/PageContent.astro';
 import ChordShapes from '../components/ChordShapes.astro';
+import SongsListContent from '../components/SongsListContent.astro';
 import '../styles/song.css';
-import { type Lang, useTranslations } from '../i18n';
+import { type Lang, useTranslations, getLocalizedPath } from '../i18n';
 
 interface Props {
   lang: Lang;
@@ -33,10 +33,21 @@ function formatDate(date: Date, locale: string): string {
   };
   return date.toLocaleDateString(localeMap[locale] || locale);
 }
+
+const songsListUrl = getLocalizedPath('/songs/', lang);
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
-  <div class="song-page">
+  <div class="songs-stack">
+    <div class="songs-list-layer">
+      <SongsListContent lang={lang} />
+    </div>
+    <div
+      class="song-page"
+      data-songs-url={songsListUrl}
+      data-songs-title={`${t('Songs')} | korczak.xyz`}
+      data-song-title={`${song.data.title} | korczak.xyz`}
+    >
     <div class="window song-header-window">
       <div class="song-header-bar">
         <div class="title-bar song-title-bar">
@@ -165,10 +176,12 @@ function formatDate(date: Date, locale: string): string {
         </section>
       </div>
     </div>
+    </div>
   </div>
 </Layout>
 
 <script>
+  const songPage = document.querySelector('.song-page') as HTMLElement;
   const contentMobile = document.getElementById('song-content');
   const contentDesktop = document.getElementById('song-content-desktop');
   const decreaseBtns = document.querySelectorAll('.font-decrease');
@@ -789,6 +802,11 @@ function formatDate(date: Date, locale: string): string {
       return;
     }
 
+    // Song window closed - only the songs list is visible
+    if (songPage.classList.contains('song-closed')) {
+      return;
+    }
+
     // Spacebar: toggle autoscroll
     if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
@@ -871,6 +889,40 @@ function formatDate(date: Date, locale: string): string {
   updateAutoscrollUI();
   applyVideoVisibility();
   applyChordShapesVisibility();
+
+  // Closing the song window reveals the songs list underneath and
+  // rewrites the URL back to the list (back/forward re-open/close it).
+  const songsListUrl = songPage.dataset.songsUrl || '/songs/';
+
+  function setSongVisible(visible: boolean) {
+    songPage.classList.toggle('song-closed', !visible);
+    if (visible) {
+      // Undo the global close handler's inline hiding (Layout.astro)
+      songPage.querySelectorAll<HTMLElement>('.window').forEach(win => {
+        win.style.visibility = '';
+        win.style.pointerEvents = '';
+        win.style.opacity = '';
+      });
+    } else {
+      stopAutoscroll();
+    }
+    const title = visible ? songPage.dataset.songTitle : songPage.dataset.songsTitle;
+    if (title) document.title = title;
+  }
+
+  songPage.addEventListener('click', (e) => {
+    if (e.target instanceof HTMLElement && e.target.classList.contains('close-btn')) {
+      setSongVisible(false);
+      history.pushState({ songOpen: false }, '', songsListUrl);
+      window.scrollTo(0, 0);
+    }
+  });
+
+  history.replaceState({ songOpen: true }, '', location.href);
+  window.addEventListener('popstate', (e) => {
+    const state = e.state as { songOpen?: boolean } | null;
+    setSongVisible(state?.songOpen !== false);
+  });
 </script>
 
 <style>
