@@ -28,12 +28,6 @@
    scoped to whichever window is visible at each breakpoint so they don't
    override the show/hide display toggles below. */
 @media (min-width: 601px) {
-    /* Cascade offset so the list peeks out on the left; horizontal only,
-       so the song window keeps the full stack height. */
-    .songs-stack .song-page {
-        margin-left: 40px;
-    }
-
     .songs-stack .song-page > .song-desktop-only {
         flex: 1 1 auto;
         display: flex;
