@@ -15,17 +15,49 @@
 .songs-stack .song-page {
     position: relative;
     z-index: 2;
+    display: flex;
+    flex-direction: column;
 }
 
 .song-page.song-closed {
     display: none;
 }
 
-/* Cascade offset so the list window peeks out behind the song window */
+/* Song window stretches to the stack height so it is never shorter than the
+   list window behind it; its content area fills any extra space. The rules are
+   scoped to whichever window is visible at each breakpoint so they don't
+   override the show/hide display toggles below. */
 @media (min-width: 601px) {
+    /* Cascade offset so the list peeks out on the left; horizontal only,
+       so the song window keeps the full stack height. */
     .songs-stack .song-page {
-        margin-top: 40px;
         margin-left: 40px;
+    }
+
+    .songs-stack .song-page > .song-desktop-only {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin-bottom: 0;
+    }
+
+    .songs-stack .song-page > .song-desktop-only > .window-content {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 600px) {
+    .songs-stack .song-page > .song-header-window {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin-bottom: 0;
+    }
+
+    .songs-stack .song-page > .song-header-window > .window-content {
+        flex: 1 1 auto;
     }
 }
 
