@@ -1,0 +1,261 @@
+/* Pregnancy Calendar Styles - Windows 95 Theme */
+
+.pregnancy-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 15px;
+  background: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+.pc-intro {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+/* ---- Input panel ---- */
+.pc-input-panel {
+  border: 2px inset var(--retro-dark-gray);
+  padding: 12px;
+  background: var(--retro-gray);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pc-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pc-tab {
+  padding: 6px 12px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-black);
+}
+
+.pc-tab:hover {
+  background: #b0b0b0;
+}
+
+.pc-tab.active {
+  border-style: inset;
+  background: #a0a0a0;
+}
+
+.pc-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.pc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 1.05rem;
+}
+
+.pc-field input {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  padding: 5px 8px;
+  border: 2px inset var(--retro-dark-gray);
+  background: var(--retro-white);
+  color: var(--retro-black);
+}
+
+.pc-clear {
+  padding: 6px 14px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-black);
+}
+
+.pc-clear:active {
+  border-style: inset;
+}
+
+.pc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 8px 10px;
+  background: var(--retro-navy);
+  color: var(--retro-yellow);
+  font-size: 1.1rem;
+}
+
+.pc-summary strong {
+  color: var(--retro-white);
+}
+
+.pc-no-data {
+  margin: 0;
+  padding: 10px;
+  border: 2px dashed var(--retro-dark-gray);
+  font-size: 1.05rem;
+  text-align: center;
+}
+
+/* ---- Schedule ---- */
+.pc-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pc-trimester-title {
+  margin: 0 0 8px 0;
+  padding: 6px 10px;
+  font-size: 1.2rem;
+  background: var(--retro-teal);
+  color: var(--retro-white);
+  border: 2px outset var(--retro-white);
+}
+
+.pc-exam-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---- Exam item ---- */
+.exam-item {
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+.exam-item--now {
+  border: 2px solid var(--retro-red);
+  box-shadow: 0 0 0 2px var(--retro-yellow) inset;
+}
+
+.exam-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'VT323', monospace;
+  text-align: left;
+  color: var(--retro-black);
+}
+
+.exam-header:hover {
+  background: #b8b8b8;
+}
+
+.exam-toggle {
+  font-size: 0.8rem;
+  color: var(--retro-dark-gray);
+}
+
+.exam-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.exam-name {
+  font-size: 1.2rem;
+  line-height: 1.15;
+}
+
+.exam-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+}
+
+.exam-date {
+  color: var(--retro-navy);
+}
+
+.exam-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.exam-badge {
+  font-size: 0.85rem;
+  padding: 2px 6px;
+  border: 1px solid var(--retro-black);
+  white-space: nowrap;
+}
+
+.status-required {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.status-recommended {
+  background: var(--retro-yellow);
+  color: var(--retro-black);
+}
+
+.status-optional {
+  background: var(--retro-dark-gray);
+  color: var(--retro-white);
+}
+
+.exam-badge[class*='cat-'] {
+  background: var(--retro-white);
+  color: var(--retro-black);
+}
+
+.exam-details {
+  padding: 6px 12px 12px 32px;
+  border-top: 1px solid var(--retro-dark-gray);
+}
+
+.exam-details p {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+/* ---- Disclaimer ---- */
+.pc-disclaimer {
+  margin: 0;
+  padding: 10px;
+  border: 2px inset var(--retro-dark-gray);
+  background: #d8d8b0;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--retro-black);
+}
+
+@media (max-width: 520px) {
+  .exam-header {
+    flex-wrap: wrap;
+  }
+
+  .exam-badges {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    padding-left: 22px;
+  }
+}

@@ -143,6 +143,8 @@ export const ui = {
     // Anesthesia Quiz
     'AnesthesiaQuiz': 'Anesthesia Quiz',
     'anesthesia.quizDesc': 'Medical Knowledge Test',
+    'PregnancyCalendar': 'Pregnancy Calendar',
+    'pregnancy.desc': 'Prenatal examination schedule',
     'anesthesia.title': 'Anesthesia Quiz',
     'anesthesia.admin': 'Admin Panel',
     'anesthesia.selectCategories': 'Select Categories',
@@ -374,6 +376,8 @@ export const ui = {
     // Anesthesia Quiz
     'AnesthesiaQuiz': 'Quiz Anestezjologiczny',
     'anesthesia.quizDesc': 'Test Wiedzy Medycznej',
+    'PregnancyCalendar': 'Kalendarz ciąży',
+    'pregnancy.desc': 'Harmonogram badań prenatalnych',
     'anesthesia.title': 'Quiz Anestezjologiczny',
     'anesthesia.admin': 'Panel Administratora',
     'anesthesia.selectCategories': 'Wybierz Kategorie',
