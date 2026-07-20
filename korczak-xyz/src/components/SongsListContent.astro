@@ -39,7 +39,6 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
       placeholder={t('Search songs...')}
       class="song-search-input"
     />
-    <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">×</button>
     <button type="submit" id="search-submit" class="search-submit" aria-label={t('Search')}>🔍</button>
   </form>
   <p class="songs-summary">
@@ -76,7 +75,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
     font-size: 1.1rem;
     background: var(--retro-white);
     border: 2px inset var(--retro-dark-gray);
-    padding: 8px 62px 8px 15px;
+    padding: 8px 36px 8px 15px;
     color: var(--retro-black);
   }
 
@@ -95,24 +94,6 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
   }
 
   .search-submit:hover {
-    color: var(--retro-black);
-  }
-
-  .search-clear {
-    position: absolute;
-    right: 34px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    color: var(--retro-dark-gray);
-    cursor: pointer;
-    padding: 0 4px;
-    display: none;
-  }
-
-  .search-clear:hover {
     color: var(--retro-black);
   }
 
@@ -139,7 +120,6 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 <script>
   const searchForm = document.getElementById('song-search-form') as HTMLFormElement;
   const searchInput = document.getElementById('song-search') as HTMLInputElement;
-  const clearBtn = document.getElementById('search-clear');
   const songsList = document.getElementById('songs-list');
   const noResults = document.getElementById('no-results');
   const songs = songsList?.querySelectorAll('.song-item') || [];
@@ -171,18 +151,6 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 
     if (noResults) {
       noResults.style.display = visibleCount === 0 && query !== '' ? '' : 'none';
-    }
-
-    if (clearBtn) {
-      clearBtn.style.display = query ? 'block' : 'none';
-    }
-  });
-
-  clearBtn?.addEventListener('click', () => {
-    if (searchInput) {
-      searchInput.value = '';
-      searchInput.dispatchEvent(new Event('input'));
-      searchInput.focus();
     }
   });
 
