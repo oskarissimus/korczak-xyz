@@ -32,7 +32,8 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 ---
 
 <PageContent title={t('Songs')}>
-  <div class="search-container">
+  <form class="search-container" id="song-search-form">
+    <button type="submit" id="search-submit" class="search-submit" aria-label={t('Search')}>🔍</button>
     <input
       type="text"
       id="song-search"
@@ -40,7 +41,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
       class="song-search-input"
     />
     <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">×</button>
-  </div>
+  </form>
   <p class="songs-summary">
     {songCount} {t('songs added over')} {years} {years === 1 ? t('year') : t('years')}
   </p>
@@ -75,7 +76,25 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
     font-size: 1.1rem;
     background: var(--retro-white);
     border: 2px inset var(--retro-dark-gray);
-    padding: 8px 30px 8px 15px;
+    padding: 8px 30px 8px 40px;
+    color: var(--retro-black);
+  }
+
+  .search-submit {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--retro-dark-gray);
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  .search-submit:hover {
     color: var(--retro-black);
   }
 
@@ -118,6 +137,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 </style>
 
 <script>
+  const searchForm = document.getElementById('song-search-form') as HTMLFormElement;
   const searchInput = document.getElementById('song-search') as HTMLInputElement;
   const clearBtn = document.getElementById('search-clear');
   const songsList = document.getElementById('songs-list');
@@ -164,5 +184,10 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
       searchInput.dispatchEvent(new Event('input'));
       searchInput.focus();
     }
+  });
+
+  searchForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    searchInput?.blur();
   });
 </script>

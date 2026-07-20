@@ -72,6 +72,7 @@ export const ui = {
     // Songs
     'Date added': 'Date added',
     'Search songs...': 'Search songs...',
+    'Search': 'Search',
     'No songs found': 'No songs found',
     'songs added over': 'songs added over',
     'year': 'year',
@@ -305,6 +306,7 @@ export const ui = {
     // Songs
     'Date added': 'Dodano',
     'Search songs...': 'Szukaj...',
+    'Search': 'Szukaj',
     'No songs found': 'Nie znaleziono piosenek',
     'songs added over': 'piosenek dodanych przez',
     'year': 'rok',
