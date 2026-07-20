@@ -33,7 +33,6 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 
 <PageContent title={t('Songs')}>
   <form class="search-container" id="song-search-form">
-    <button type="submit" id="search-submit" class="search-submit" aria-label={t('Search')}>🔍</button>
     <input
       type="text"
       id="song-search"
@@ -41,6 +40,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
       class="song-search-input"
     />
     <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">×</button>
+    <button type="submit" id="search-submit" class="search-submit" aria-label={t('Search')}>🔍</button>
   </form>
   <p class="songs-summary">
     {songCount} {t('songs added over')} {years} {years === 1 ? t('year') : t('years')}
@@ -76,13 +76,13 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
     font-size: 1.1rem;
     background: var(--retro-white);
     border: 2px inset var(--retro-dark-gray);
-    padding: 8px 30px 8px 40px;
+    padding: 8px 62px 8px 15px;
     color: var(--retro-black);
   }
 
   .search-submit {
     position: absolute;
-    left: 8px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     background: none;
@@ -100,7 +100,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 
   .search-clear {
     position: absolute;
-    right: 8px;
+    right: 34px;
     top: 50%;
     transform: translateY(-50%);
     background: none;
