@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { loadCloudSessions } from '../../utils/typing/cloudStorage';
 import { activeTypingMs, charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
-import { loadAllSessions } from '../../utils/typing/storage';
+import { dedupeSessionsById, loadAllSessions } from '../../utils/typing/storage';
 import type { TypingEvent, TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
@@ -109,10 +109,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
     loadCloudSessions(uid)
       .then((cloud) => {
         if (cancelled || cloud.length === 0) return;
-        setSessions((local) => {
-          const seen = new Set(local.map((s) => s.id));
-          return [...local, ...cloud.filter((s) => !seen.has(s.id))];
-        });
+        setSessions((local) => dedupeSessionsById([...local, ...cloud]));
       })
       .catch(() => {
         // Cloud fetch is best-effort; local sessions are already shown.

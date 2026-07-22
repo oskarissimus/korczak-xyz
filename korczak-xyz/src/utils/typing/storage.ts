@@ -184,13 +184,27 @@ export function importLogFromJSON(
   }
 }
 
+// Collapse sessions sharing an id to a single entry, keeping the one with the
+// most events. The same session can legitimately appear more than once — e.g.
+// a second tab archives the live session while the first tab still holds it in
+// the current-session slot — and every consumer (stats, cloud upload) must count
+// each id exactly once, or a session's whole day gets double-counted.
+export function dedupeSessionsById(sessions: TypingSession[]): TypingSession[] {
+  const byId = new Map<string, TypingSession>();
+  for (const s of sessions) {
+    const prev = byId.get(s.id);
+    if (!prev || s.events.length > prev.events.length) byId.set(s.id, s);
+  }
+  return [...byId.values()];
+}
+
 // All locally-stored sessions (archive plus the live one), for one-time upload
 // to the cloud on first sign-in.
 export function loadAllSessions(): TypingSession[] {
   const sessions = [...loadArchivedSessions()];
   const current = loadCurrentSession();
   if (current && current.events.length > 0) sessions.push(current);
-  return sessions;
+  return dedupeSessionsById(sessions);
 }
 
 // Whether the local progress holds anything worth migrating to the cloud.
