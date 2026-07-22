@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { loadCloudSessions } from '../../utils/typing/cloudStorage';
 import { activeTypingMs, charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
 import { loadAllSessions } from '../../utils/typing/storage';
-import type { TypingSession } from '../../utils/typing/types';
+import type { TypingEvent, TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
 
@@ -38,30 +38,37 @@ function toSessionPoints(sessions: TypingSession[]): DataPoint[] {
     }));
 }
 
-// Collapse sessions into one point per calendar day, averaging WPM and accuracy
-// weighted by how much was typed that day (time spent is summed instead), and
-// anchoring the point at midnight.
-function aggregateByDay(points: DataPoint[]): DataPoint[] {
-  const byDay = new Map<number, DataPoint[]>();
-  for (const p of points) {
-    const d = new Date(p.t);
-    const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const bucket = byDay.get(dayKey);
-    if (bucket) bucket.push(p);
-    else byDay.set(dayKey, [p]);
+// Collapse sessions into one point per calendar day. Every char event is filed
+// under the local day of its wall-clock time (session.startedAt + event offset),
+// then that day's metrics are computed directly over its events — a true
+// aggregate (total correct chars over total active typing time), not an average
+// of per-session numbers. This attributes typing to the day it actually happened
+// and splits a session that spans midnight across both days. Points anchor at
+// midnight.
+function aggregateByDayFromEvents(sessions: TypingSession[]): DataPoint[] {
+  const byDay = new Map<number, TypingEvent[]>();
+  for (const s of sessions) {
+    for (const e of charEvents(s.events)) {
+      const wall = s.startedAt + e.t;
+      const d = new Date(wall);
+      const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const ev = { ...e, t: wall }; // wall-clock t so metric gaps are real elapsed time
+      const bucket = byDay.get(dayKey);
+      if (bucket) bucket.push(ev);
+      else byDay.set(dayKey, [ev]);
+    }
   }
   return [...byDay.entries()]
+    .filter(([, events]) => events.length >= MIN_CHAR_EVENTS)
     .sort((a, b) => a[0] - b[0])
-    .map(([dayKey, day]) => {
-      const totalWeight = day.reduce((sum, p) => sum + p.weight, 0) || 1;
-      const wAvg = (sel: (p: DataPoint) => number) =>
-        day.reduce((sum, p) => sum + sel(p) * p.weight, 0) / totalWeight;
+    .map(([dayKey, events]) => {
+      events.sort((a, b) => a.t - b.t);
       return {
         t: dayKey,
-        wpm: wAvg((p) => p.wpm),
-        accuracy: wAvg((p) => p.accuracy),
-        timeMs: day.reduce((sum, p) => sum + p.timeMs, 0),
-        weight: totalWeight,
+        wpm: computeWpm(events),
+        accuracy: computeAccuracy(events),
+        timeMs: activeTypingMs(events),
+        weight: events.length,
       };
     });
 }
@@ -116,7 +123,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   }, [uid]);
 
   const sessionPoints = toSessionPoints(sessions);
-  const points = grouping === 'day' ? aggregateByDay(sessionPoints) : sessionPoints;
+  const points = grouping === 'day' ? aggregateByDayFromEvents(sessions) : sessionPoints;
 
   // Shared 0-100 left axis; extend only if WPM ever exceeds 100.
   const maxWpm = Math.max(...points.map((p) => p.wpm), 0);
