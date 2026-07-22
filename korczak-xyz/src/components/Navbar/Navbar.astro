@@ -67,7 +67,7 @@ function isActive(itemPath: string): boolean {
 
       <!-- Right-aligned group: auth control + language switcher -->
       <div class="nav-right">
-        <NavAuth client:only="react" lang={lang} />
+        <NavAuth client:only="react" lang={lang} variant="control" />
 
         <!-- Language switcher -->
         <div class="lang-switcher">
@@ -85,8 +85,11 @@ function isActive(itemPath: string): boolean {
     <div class="status-panel">
       <a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a>
     </div>
-    <div class="status-panel">
+    <div class="status-panel status-panel--updated">
       {t('statusBar.lastUpdated')} <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
+    </div>
+    <div class="status-user">
+      <NavAuth client:only="react" lang={lang} variant="identity" />
     </div>
   </div>
 </div>
@@ -223,8 +226,19 @@ function isActive(itemPath: string): boolean {
     flex: 0 0 auto;
   }
 
-  .status-panel:last-child {
+  /* Middle panel fills the gap so the user panel hugs the right edge. */
+  .status-panel--updated {
     flex: 1;
+  }
+
+  /* Transparent wrapper: when logged out the identity island renders nothing,
+     so no empty inset box is shown. The panel border lives on the email span
+     (styled globally in auth.css, since React renders it outside Astro scoping). */
+  .status-user {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
   }
 
   .status-panel a {

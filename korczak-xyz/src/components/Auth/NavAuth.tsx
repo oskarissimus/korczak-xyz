@@ -3,6 +3,9 @@ import { useAuth } from '../../hooks/useAuth';
 
 interface NavAuthProps {
   lang: 'en' | 'pl';
+  // 'control': Login/Logout button in the nav row.
+  // 'identity': logged-in user's email, for the status bar.
+  variant?: 'control' | 'identity';
 }
 
 const translations = {
@@ -10,7 +13,7 @@ const translations = {
   pl: { login: 'Zaloguj', logout: 'Wyloguj' },
 };
 
-export default function NavAuth({ lang }: NavAuthProps) {
+export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
   const { enabled, user, loading, signOut } = useAuth();
   const t = translations[lang];
   const loginPath = lang === 'en' ? '/login/' : '/pl/login/';
@@ -18,20 +21,26 @@ export default function NavAuth({ lang }: NavAuthProps) {
   // Nothing to show until Firebase is configured and auth state resolves.
   if (!enabled || loading) return null;
 
+  // Identity variant: just the email (for the status bar); nothing when logged out.
+  if (variant === 'identity') {
+    if (!user) return null;
+    return (
+      <span className="nav-auth-email" title={user.email ?? undefined}>
+        {user.email}
+      </span>
+    );
+  }
+
+  // Control variant: Login link or Logout button in the nav row.
   if (user) {
     const handleLogout = async () => {
       await signOut();
       window.location.reload();
     };
     return (
-      <div className="nav-auth nav-auth--in">
-        <span className="nav-auth-email" title={user.email ?? undefined}>
-          {user.email}
-        </span>
-        <button className="nav-auth-btn" onClick={handleLogout}>
-          {t.logout}
-        </button>
-      </div>
+      <button className="nav-auth-btn" onClick={handleLogout}>
+        {t.logout}
+      </button>
     );
   }
 

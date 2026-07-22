@@ -40,6 +40,19 @@
   white-space: nowrap;
 }
 
+/* Logged-in email shown in the status bar: black text in a gray inset panel,
+   matching the other status-bar panels. Rendered by React, so styled globally. */
+.status-user .nav-auth-email {
+  display: block;
+  max-width: 40ch;
+  color: var(--retro-black);
+  background: var(--retro-gray);
+  border: 2px solid;
+  border-color: var(--retro-dark-gray) var(--retro-white) var(--retro-white) var(--retro-dark-gray);
+  padding: 1px 4px;
+  font-size: 0.8rem;
+}
+
 .nav-auth-btn {
   background: var(--retro-gray);
   border: 2px outset var(--retro-white);
