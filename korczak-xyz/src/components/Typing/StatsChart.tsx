@@ -25,6 +25,8 @@ interface StatsChartProps {
   formatRightTick?: (v: number) => string;
   formatDate: (t: number) => string;
   showLabels?: boolean; // direct value labels above each point (day mode)
+  loading?: boolean; // render an empty grid skeleton while data is being fetched
+  animate?: boolean; // play the one-shot line-draw animation on this render
 }
 
 const WIDTH = 600;
@@ -40,6 +42,8 @@ export default function StatsChart({
   formatRightTick,
   formatDate,
   showLabels = false,
+  loading = false,
+  animate = false,
 }: StatsChartProps) {
   const hasRightAxis = yDomainRight != null && series.some((s) => s.axis === 'right');
   const marginRight = hasRightAxis ? 46 : MARGIN.right; // room for "1h 05m" ticks
@@ -81,7 +85,7 @@ export default function StatsChart({
   }
 
   return (
-    <div className="typing-chart-panel">
+    <div className={`typing-chart-panel${loading ? ' typing-chart-panel--loading' : ''}`}>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label="Typing stats">
         {gridValues.map((v) => (
           <line
@@ -111,7 +115,8 @@ export default function StatsChart({
             {Math.round(v)}
           </text>
         ))}
-        {hasRightAxis &&
+        {!loading &&
+          hasRightAxis &&
           TICK_FRACTIONS.map((f) => {
             const v = yrMin + f * (yrMax - yrMin);
             return (
@@ -126,22 +131,25 @@ export default function StatsChart({
               </text>
             );
           })}
-        {xTickPoints.map((p, i) => (
-          <text
-            key={`${p.t}-${i}`}
-            className="typing-chart-tick"
-            x={x(p.t)}
-            y={HEIGHT - 6}
-            textAnchor={i === 0 ? 'start' : i === xTickPoints.length - 1 ? 'end' : 'middle'}
-          >
-            {formatDate(p.t)}
-          </text>
-        ))}
-        {series.map((s) => (
-          <g key={s.key}>
+        {!loading &&
+          xTickPoints.map((p, i) => (
+            <text
+              key={`${p.t}-${i}`}
+              className="typing-chart-tick"
+              x={x(p.t)}
+              y={HEIGHT - 6}
+              textAnchor={i === 0 ? 'start' : i === xTickPoints.length - 1 ? 'end' : 'middle'}
+            >
+              {formatDate(p.t)}
+            </text>
+          ))}
+        {!loading &&
+          series.map((s) => (
+          <g key={s.key} className={animate ? 'typing-chart-markers--in' : undefined}>
             {s.points.length > 1 && (
               <polyline
-                className={s.lineClass}
+                className={`${s.lineClass}${animate ? ' typing-chart-line--draw' : ''}`}
+                pathLength={1}
                 points={s.points.map((p) => `${x(p.t)},${yOf(s, p.value)}`).join(' ')}
                 fill="none"
                 strokeWidth={2}

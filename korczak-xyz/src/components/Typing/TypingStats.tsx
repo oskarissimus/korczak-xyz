@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { loadCloudSessions } from '../../utils/typing/cloudStorage';
 import { activeTypingMs, charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
@@ -102,22 +102,46 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   const [showAccuracy, setShowAccuracy] = useState(true);
   const [showTime, setShowTime] = useState(true);
 
+  // While a signed-in user's cloud sessions are still loading we show an empty
+  // grid rather than the local-only data, so the chart draws once with the
+  // authoritative merged dataset instead of visibly jumping when cloud lands.
+  const [cloudSettled, setCloudSettled] = useState(false);
   const uid = auth.user?.uid;
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
+    setCloudSettled(false);
     loadCloudSessions(uid)
       .then((cloud) => {
-        if (cancelled || cloud.length === 0) return;
-        setSessions((local) => dedupeSessionsById([...local, ...cloud]));
+        if (cancelled) return;
+        if (cloud.length > 0) {
+          setSessions((local) => dedupeSessionsById([...local, ...cloud]));
+        }
       })
       .catch(() => {
         // Cloud fetch is best-effort; local sessions are already shown.
+      })
+      .finally(() => {
+        if (!cancelled) setCloudSettled(true);
       });
     return () => {
       cancelled = true;
     };
   }, [uid]);
+
+  const loading = auth.loading || (!!uid && !cloudSettled);
+
+  // Play the line-draw animation once, on the first reveal after loading ends.
+  // Subsequent re-renders (series toggles, grouping switches) render instantly.
+  const [animate, setAnimate] = useState(false);
+  const hasAnimated = useRef(false);
+  useEffect(() => {
+    if (loading || hasAnimated.current) return;
+    hasAnimated.current = true;
+    setAnimate(true);
+    const id = window.setTimeout(() => setAnimate(false), 1000);
+    return () => window.clearTimeout(id);
+  }, [loading]);
 
   const sessionPoints = toSessionPoints(sessions);
   const points = grouping === 'day' ? aggregateByDayFromEvents(sessions) : sessionPoints;
@@ -166,9 +190,22 @@ export default function TypingStats({ lang }: TypingStatsProps) {
 
   const backHref = lang === 'pl' ? '/pl/games/typing/' : '/games/typing/';
 
+  // Placeholder domains for the empty loading grid so it stays stable and blank.
+  const LOADING_Y_DOMAIN: [number, number] = [0, 100];
+  const LOADING_YR_DOMAIN: [number, number] = [0, 1];
+
   return (
     <div className="typing-stats-page">
-      {points.length === 0 ? (
+      {loading ? (
+        <StatsChart
+          series={[]}
+          yDomain={LOADING_Y_DOMAIN}
+          yDomainRight={LOADING_YR_DOMAIN}
+          formatRightTick={formatDuration}
+          formatDate={formatDate}
+          loading
+        />
+      ) : points.length === 0 ? (
         <p className="typing-message">{t.noStats}</p>
       ) : (
         <>
@@ -228,6 +265,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
             formatRightTick={formatDuration}
             formatDate={formatDate}
             showLabels={grouping === 'day'}
+            animate={animate}
           />
           <p className="typing-message">
             {t.sessions}: {sessionPoints.length}
