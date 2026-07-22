@@ -26,6 +26,9 @@ const CLOUD_PROGRESS_DEBOUNCE_MS = 1500;
 const CLOUD_PROGRESS_MAX_WAIT_MS = 3000;
 // Idle this long with no keystroke and the session auto-pauses (abandoned).
 const IDLE_PAUSE_MS = 20000;
+// A gap longer than this since the last keystroke ends the current session; the
+// next keystroke starts a fresh one (a new sitting, not a continuation).
+const SESSION_ROTATE_GAP_MS = 15 * 60 * 1000;
 
 function newSession(bookId: string, progress: TypingProgress): TypingSession {
   return {
@@ -211,6 +214,20 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     [scheduleSessionSave, bumpIdleTimer]
   );
 
+  // If more than SESSION_ROTATE_GAP_MS has elapsed since the last keystroke, end
+  // the current session and start a fresh one, so a long absence is recorded as a
+  // separate sitting rather than folded into the old session. Called before the
+  // next event is timed, so that event lands at ~t=0 in the new session.
+  const maybeRotateSession = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s || s.events.length === 0) return;
+    const lastWall = s.startedAt + s.events[s.events.length - 1].t;
+    if (Date.now() - lastWall <= SESSION_ROTATE_GAP_MS) return;
+    flushSession();
+    archiveCurrentSession();
+    sessionRef.current = newSession(book.id, progressRef.current);
+  }, [flushSession, book.id]);
+
   // Persist progress whenever it changes (localStorage always; cloud if signed in).
   useEffect(() => {
     saveProgress(progress);
@@ -316,6 +333,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const handleChar = useCallback(
     (ch: string) => {
+      maybeRotateSession(); // a long absence starts a new session
       if (isPausedRef.current) setIsPaused(false); // typing resumes the session
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
@@ -364,10 +382,11 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         return { ...prev, typed: prev.typed + ch, totalKeystrokes, correctKeystrokes, lastPlayedAt };
       });
     },
-    [passages, now, pushEvent]
+    [passages, now, pushEvent, maybeRotateSession]
   );
 
   const handleBackspace = useCallback(() => {
+    maybeRotateSession(); // a long absence starts a new session
     if (isPausedRef.current) setIsPaused(false); // typing resumes the session
     setProgress((prev) => {
       if (prev.typed.length > 0) {
@@ -393,7 +412,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         lastPlayedAt: Date.now(),
       };
     });
-  }, [passages, now, pushEvent]);
+  }, [passages, now, pushEvent, maybeRotateSession]);
 
   // Input capture: characters via `beforeinput` (composed diacritics arrive as a
   // single insertText), Backspace via `keydown` (fires even on an empty input).
