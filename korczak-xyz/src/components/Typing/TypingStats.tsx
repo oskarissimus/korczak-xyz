@@ -196,16 +196,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
 
   return (
     <div className="typing-stats-page">
-      {loading ? (
-        <StatsChart
-          series={[]}
-          yDomain={LOADING_Y_DOMAIN}
-          yDomainRight={LOADING_YR_DOMAIN}
-          formatRightTick={formatDuration}
-          formatDate={formatDate}
-          loading
-        />
-      ) : points.length === 0 ? (
+      {!loading && points.length === 0 ? (
         <p className="typing-message">{t.noStats}</p>
       ) : (
         <>
@@ -259,16 +250,17 @@ export default function TypingStats({ lang }: TypingStatsProps) {
             </div>
           </div>
           <StatsChart
-            series={series}
-            yDomain={yDomain}
-            yDomainRight={yDomainRight}
+            series={loading ? [] : series}
+            yDomain={loading ? LOADING_Y_DOMAIN : yDomain}
+            yDomainRight={loading ? LOADING_YR_DOMAIN : yDomainRight}
             formatRightTick={formatDuration}
             formatDate={formatDate}
             showLabels={grouping === 'day'}
             animate={animate}
+            loading={loading}
           />
           <p className="typing-message">
-            {t.sessions}: {sessionPoints.length}
+            {t.sessions}: {loading ? '…' : sessionPoints.length}
           </p>
         </>
       )}
