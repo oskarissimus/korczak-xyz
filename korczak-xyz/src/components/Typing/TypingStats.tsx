@@ -15,7 +15,7 @@ interface TypingStatsProps {
 // meaningless WPM/accuracy figures and are excluded from the charts.
 const MIN_CHAR_EVENTS = 20;
 
-type Grouping = 'session' | 'day';
+type Grouping = 'session' | 'day' | 'week';
 
 interface DataPoint {
   t: number;
@@ -38,39 +38,57 @@ function toSessionPoints(sessions: TypingSession[]): DataPoint[] {
     }));
 }
 
-// Collapse sessions into one point per calendar day. Every char event is filed
-// under the local day of its wall-clock time (session.startedAt + event offset),
-// then that day's metrics are computed directly over its events — a true
+// Collapse sessions into one point per time bucket. Every char event is filed
+// under the bucket of its wall-clock time (session.startedAt + event offset),
+// then each bucket's metrics are computed directly over its events — a true
 // aggregate (total correct chars over total active typing time), not an average
-// of per-session numbers. This attributes typing to the day it actually happened
-// and splits a session that spans midnight across both days. Points anchor at
-// midnight.
-function aggregateByDayFromEvents(sessions: TypingSession[]): DataPoint[] {
-  const byDay = new Map<number, TypingEvent[]>();
+// of per-session numbers. This attributes typing to the bucket it actually
+// happened in and splits a session that spans a bucket boundary across both.
+// Points anchor at the bucket start returned by keyOf.
+function aggregateFromEvents(
+  sessions: TypingSession[],
+  keyOf: (wall: number) => number,
+): DataPoint[] {
+  const byBucket = new Map<number, TypingEvent[]>();
   for (const s of sessions) {
     for (const e of charEvents(s.events)) {
       const wall = s.startedAt + e.t;
-      const d = new Date(wall);
-      const dayKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const key = keyOf(wall);
       const ev = { ...e, t: wall }; // wall-clock t so metric gaps are real elapsed time
-      const bucket = byDay.get(dayKey);
+      const bucket = byBucket.get(key);
       if (bucket) bucket.push(ev);
-      else byDay.set(dayKey, [ev]);
+      else byBucket.set(key, [ev]);
     }
   }
-  return [...byDay.entries()]
+  return [...byBucket.entries()]
     .filter(([, events]) => events.length >= MIN_CHAR_EVENTS)
     .sort((a, b) => a[0] - b[0])
-    .map(([dayKey, events]) => {
+    .map(([key, events]) => {
       events.sort((a, b) => a.t - b.t);
       return {
-        t: dayKey,
+        t: key,
         wpm: computeWpm(events),
         accuracy: computeAccuracy(events),
         timeMs: activeTypingMs(events),
         weight: events.length,
       };
     });
+}
+
+function aggregateByDayFromEvents(sessions: TypingSession[]): DataPoint[] {
+  return aggregateFromEvents(sessions, (wall) => {
+    const d = new Date(wall);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  });
+}
+
+// Weeks start on local Monday midnight.
+function aggregateByWeekFromEvents(sessions: TypingSession[]): DataPoint[] {
+  return aggregateFromEvents(sessions, (wall) => {
+    const d = new Date(wall);
+    const mondayOffset = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - mondayOffset).getTime();
+  });
 }
 
 // Ladder of right-axis maxima (minutes) whose quarter-ticks are clean values;
@@ -144,7 +162,12 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   }, [loading]);
 
   const sessionPoints = toSessionPoints(sessions);
-  const points = grouping === 'day' ? aggregateByDayFromEvents(sessions) : sessionPoints;
+  const points =
+    grouping === 'day'
+      ? aggregateByDayFromEvents(sessions)
+      : grouping === 'week'
+        ? aggregateByWeekFromEvents(sessions)
+        : sessionPoints;
 
   // Shared 0-100 left axis; extend only if WPM ever exceeds 100.
   const maxWpm = Math.max(...points.map((p) => p.wpm), 0);
@@ -218,6 +241,14 @@ export default function TypingStats({ lang }: TypingStatsProps) {
               >
                 {t.perDay}
               </button>
+              <button
+                type="button"
+                className="typing-toggle"
+                aria-pressed={grouping === 'week'}
+                onClick={() => setGrouping('week')}
+              >
+                {t.perWeek}
+              </button>
             </div>
             <div className="typing-legend">
               <button
@@ -255,7 +286,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
             yDomainRight={loading ? LOADING_YR_DOMAIN : yDomainRight}
             formatRightTick={formatDuration}
             formatDate={formatDate}
-            showLabels={grouping === 'day'}
+            showLabels={grouping !== 'session'}
             animate={animate}
             loading={loading}
           />

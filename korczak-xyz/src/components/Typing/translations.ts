@@ -30,6 +30,7 @@ export const translations = {
     groupBy: 'Group by',
     perSession: 'Per session',
     perDay: 'Per day',
+    perWeek: 'Per week',
     timeSpent: 'Time spent',
   },
   pl: {
@@ -61,6 +62,7 @@ export const translations = {
     groupBy: 'Grupuj wg',
     perSession: 'Na sesję',
     perDay: 'Na dzień',
+    perWeek: 'Na tydzień',
     timeSpent: 'Czas pisania',
   },
 } as const;
