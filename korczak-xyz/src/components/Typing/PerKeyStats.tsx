@@ -8,6 +8,7 @@ import {
   MIN_KEY_SAMPLES,
   type KeyStat,
 } from '../../utils/typing/keyStats';
+import { formatDuration } from '../../utils/typing/metrics';
 import type { TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
@@ -298,7 +299,7 @@ function SpotlightCard({ label, stat, keyLabel, t, tone }: SpotlightProps) {
     stat == null
       ? '—'
       : tone === 'bottleneck'
-        ? `${Math.round(stat.bottleneckMs / 1000)} s`
+        ? formatDuration(stat.bottleneckMs / 60000) // time lost vs. typical speed
         : `${Math.round(stat.medianLatencyMs)} ${t.ms}`;
   return (
     <div className={`typing-key-spotlight typing-key-spotlight--${tone}`}>

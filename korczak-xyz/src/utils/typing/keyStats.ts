@@ -26,7 +26,11 @@ export interface KeyStat {
   accuracy: number; // 0–100, correct / count
   medianLatencyMs: number; // measured from correct presses only
   meanLatencyMs: number;
-  bottleneckMs: number; // medianLatencyMs * count — cumulative time cost
+  // Excess time lost on this key vs. a typical keystroke: max(0, median −
+  // typical) × samples. Fast keys (at/below typical) contribute ~0, so this
+  // surfaces slow *and* frequent keys — the ones worth drilling — rather than
+  // just the most-pressed key.
+  bottleneckMs: number;
   samples: number; // correct-press latency samples (excludes session-first + idle gaps)
 }
 
@@ -73,6 +77,14 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStat[] {
   const byKey = new Map<string, KeyAccumulator>();
   for (const s of sessions) accumulateSession(s, byKey);
 
+  // Typical keystroke speed = median of every correct-press gap pooled across
+  // all keys. It's the baseline the bottleneck metric measures excess against;
+  // being frequency-weighted, it reflects how fast the user types in general.
+  const allLatencies: number[] = [];
+  for (const acc of byKey.values()) for (const l of acc.latencies) allLatencies.push(l);
+  allLatencies.sort((a, b) => a - b);
+  const typical = median(allLatencies);
+
   const stats: KeyStat[] = [];
   for (const [key, acc] of byKey) {
     // Keys never typed correctly are accidental presses (stray Option-key combos
@@ -88,7 +100,7 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStat[] {
       accuracy: acc.count ? (acc.correct / acc.count) * 100 : 100,
       medianLatencyMs: med,
       meanLatencyMs: mean,
-      bottleneckMs: med * acc.count,
+      bottleneckMs: Math.max(0, med - typical) * sorted.length,
       samples: sorted.length,
     });
   }
