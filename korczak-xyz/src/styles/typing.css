@@ -536,3 +536,174 @@ circle.typing-chart-line--time {
 .typing-legend-item--time .typing-legend-swatch {
   background: var(--retro-magenta);
 }
+
+/* Per-key stats page */
+
+.typing-chart-line--latency {
+  stroke: var(--retro-yellow);
+}
+
+circle.typing-chart-line--latency {
+  fill: var(--retro-yellow);
+  stroke: none;
+}
+
+/* Let the sort buttons wrap on narrow screens (also harmless on the
+   over-time page's 3-button group). */
+.typing-stats-page .typing-toggle-group {
+  flex-wrap: wrap;
+}
+
+.typing-key-spotlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.typing-key-spotlight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+  border-top-width: 3px;
+  border-top-style: solid;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.typing-key-spotlight--slow {
+  border-top-color: var(--retro-red);
+}
+
+.typing-key-spotlight--fast {
+  border-top-color: var(--retro-green);
+}
+
+.typing-key-spotlight--bottleneck {
+  border-top-color: var(--retro-magenta);
+}
+
+.typing-key-spotlight-label {
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  color: var(--retro-gray);
+  text-transform: uppercase;
+}
+
+.typing-key-spotlight-glyph {
+  font-family: 'VT323', monospace;
+  font-size: 1.8rem;
+  color: var(--retro-white);
+  line-height: 1;
+}
+
+.typing-key-spotlight-value {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-yellow);
+}
+
+.typing-key-table {
+  display: flex;
+  flex-direction: column;
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.typing-key-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 4rem 4rem;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-white);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--retro-dark-gray);
+  text-align: left;
+  cursor: pointer;
+}
+
+.typing-key-row--head {
+  color: var(--retro-cyan);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  cursor: default;
+  position: sticky;
+  top: 0;
+}
+
+.typing-key-row:not(.typing-key-row--head):hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.typing-key-row--selected {
+  background: rgba(255, 255, 0, 0.12);
+}
+
+.typing-key-glyph {
+  color: var(--retro-yellow);
+  white-space: pre;
+}
+
+.typing-key-num {
+  text-align: right;
+}
+
+.typing-key-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.typing-key-bar-track {
+  flex: 1 1 auto;
+  height: 12px;
+  min-width: 40px;
+  background: var(--retro-dark-gray);
+  border: 1px solid var(--retro-black);
+}
+
+.typing-key-bar-fill {
+  display: block;
+  height: 100%;
+}
+
+.typing-key-bar-value {
+  flex: 0 0 auto;
+  width: 4.5rem;
+  text-align: right;
+  color: var(--retro-gray);
+  font-size: 1rem;
+}
+
+.typing-key-detail {
+  min-height: 60px;
+}
+
+.typing-key-detail-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-white);
+  text-align: center;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 600px) {
+  .typing-key-spotlights {
+    grid-template-columns: 1fr;
+  }
+  .typing-key-row {
+    grid-template-columns: 4rem 1fr 3rem 3rem;
+    font-size: 1rem;
+  }
+  .typing-key-bar-value {
+    display: none;
+  }
+}

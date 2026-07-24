@@ -295,6 +295,9 @@ export default function TypingStats({ lang }: TypingStatsProps) {
         <a className="retro-btn" href={backHref}>
           {t.backToTyping}
         </a>
+        <a className="retro-btn" href={lang === 'pl' ? '/pl/games/typing/keys/' : '/games/typing/keys/'}>
+          {t.byKey}
+        </a>
       </div>
     </div>
   );
