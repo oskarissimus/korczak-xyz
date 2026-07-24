@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { computeAccuracy, computeWpm } from '../utils/typing/metrics';
+import { activeTypingMs, computeAccuracy, computeWpm } from '../utils/typing/metrics';
 import {
   archiveCurrentSession,
   exportLogToJSON,
@@ -51,6 +51,7 @@ export interface TypingSessionApi {
   progress: TypingProgress;
   wpm: number;
   accuracy: number;
+  durationMs: number;
   progressPercent: number;
   isFinished: boolean;
   isPaused: boolean;
@@ -485,6 +486,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   // Derived, recomputed each render (i.e. each keystroke) from the live log.
   const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
   const accuracy = sessionRef.current ? computeAccuracy(sessionRef.current.events) : 100;
+  const durationMs = sessionRef.current ? activeTypingMs(sessionRef.current.events) : 0;
 
   const charStatuses = useMemo<CharStatus[]>(() => {
     // One extra slot past the passage for the trailing newline (Enter) the user
@@ -514,6 +516,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     progress,
     wpm,
     accuracy,
+    durationMs,
     progressPercent,
     isFinished,
     isPaused,

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { loadCloudSessions } from '../../utils/typing/cloudStorage';
-import { activeTypingMs, charEvents, computeAccuracy, computeWpm } from '../../utils/typing/metrics';
+import {
+  activeTypingMs,
+  charEvents,
+  computeAccuracy,
+  computeWpm,
+  formatDuration,
+} from '../../utils/typing/metrics';
 import { dedupeSessionsById, loadAllSessions } from '../../utils/typing/storage';
 import type { TypingEvent, TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
@@ -98,16 +104,6 @@ const NICE_TIME_MAXES = [1, 2, 4, 8, 12, 16, 20, 32, 40, 60, 80, 120, 160, 240];
 function niceTimeMax(maxMinutes: number): number {
   const target = Math.max(maxMinutes * 1.1, 1);
   return NICE_TIME_MAXES.find((m) => m >= target) ?? Math.ceil(target / 60) * 60;
-}
-
-function formatDuration(minutes: number): string {
-  const totalSec = Math.round(minutes * 60);
-  if (totalSec < 60) return `${totalSec}s`;
-  const totalMin = Math.round(totalSec / 60); // rounding here avoids "1h 60m"
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h === 0) return `${m}m`;
-  return m === 0 ? `${h}h` : `${h}h ${m.toString().padStart(2, '0')}m`;
 }
 
 export default function TypingStats({ lang }: TypingStatsProps) {

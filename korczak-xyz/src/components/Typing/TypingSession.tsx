@@ -26,6 +26,7 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     progress,
     wpm,
     accuracy,
+    durationMs,
     progressPercent,
     isFinished,
     isPaused,
@@ -67,16 +68,13 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
       <StatsBar
         wpm={wpm}
         accuracy={accuracy}
+        durationMs={durationMs}
         progressPercent={progressPercent}
-        passageIndex={progress.passageIndex}
-        passageCount={book.passages.length}
-        bestWpm={progress.bestWpm}
         labels={{
           wpm: t.wpm,
           accuracy: t.accuracy,
           progress: t.progress,
-          passage: t.passage,
-          best: t.best,
+          timeSpent: t.timeSpent,
         }}
       />
 

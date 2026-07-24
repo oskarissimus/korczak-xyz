@@ -1,18 +1,16 @@
 import React from 'react';
+import { formatDuration } from '../../utils/typing/metrics';
 
 interface StatsBarProps {
   wpm: number;
   accuracy: number;
+  durationMs: number;
   progressPercent: number;
-  passageIndex: number;
-  passageCount: number;
-  bestWpm: number;
   labels: {
     wpm: string;
     accuracy: string;
     progress: string;
-    passage: string;
-    best: string;
+    timeSpent: string;
   };
 }
 
@@ -28,21 +26,15 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function StatsBar({
   wpm,
   accuracy,
+  durationMs,
   progressPercent,
-  passageIndex,
-  passageCount,
-  bestWpm,
   labels,
 }: StatsBarProps) {
   return (
     <div className="typing-stats">
       <Stat label={labels.wpm} value={String(Math.round(wpm))} />
       <Stat label={labels.accuracy} value={`${Math.round(accuracy)}%`} />
-      <Stat label={labels.best} value={String(Math.round(bestWpm))} />
-      <Stat
-        label={labels.passage}
-        value={`${Math.min(passageIndex + 1, passageCount)}/${passageCount}`}
-      />
+      <Stat label={labels.timeSpent} value={formatDuration(durationMs / 60000)} />
       <div className="typing-progress">
         <div className="typing-progress-track">
           <div className="typing-progress-fill" style={{ width: `${progressPercent}%` }} />
