@@ -44,6 +44,18 @@ export function computeWpm(events: TypingEvent[]): number {
   return correct / CHARS_PER_WORD / minutes;
 }
 
+// Live stopwatch clock from a millisecond value: "0:07" / "3:05" / "1:02:30".
+// Always shows seconds so a ticking timer visibly advances every second.
+export function formatClock(ms: number): string {
+  const totalSec = Math.floor(Math.max(0, ms) / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const ss = s.toString().padStart(2, '0');
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${ss}`;
+  return `${m}:${ss}`;
+}
+
 // Human-readable duration from a minutes value: "45s" / "12m" / "1h 05m".
 export function formatDuration(minutes: number): string {
   const totalSec = Math.round(minutes * 60);

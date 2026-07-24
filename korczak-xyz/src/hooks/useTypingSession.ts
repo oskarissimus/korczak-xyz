@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { activeTypingMs, computeAccuracy, computeWpm } from '../utils/typing/metrics';
+import { computeAccuracy, computeWpm } from '../utils/typing/metrics';
 import {
   archiveCurrentSession,
   exportLogToJSON,
@@ -74,6 +74,16 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   isPausedRef.current = isPaused;
+
+  // Live session stopwatch: real elapsed wall time while the session is active,
+  // excluding paused stretches. `accumMs` holds completed active segments and
+  // `segmentStart` is the wall clock at which the current running segment began
+  // (null when stopped/paused). `isTiming` drives the 1s tick interval so the
+  // displayed clock advances even between keystrokes.
+  const durationAccumMsRef = useRef(0);
+  const segmentStartRef = useRef<number | null>(null);
+  const [isTiming, setIsTiming] = useState(false);
+  const [, setDurationTick] = useState(0);
 
   // The live session log lives in a ref: it mutates on every keystroke and we
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
@@ -180,14 +190,36 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     }
   }, []);
 
+  // Stopwatch: begin timing (no-op if already running), stop and bank the current
+  // segment, or reset entirely (a fresh sitting).
+  const startSegment = useCallback(() => {
+    if (segmentStartRef.current == null) {
+      segmentStartRef.current = Date.now();
+      setIsTiming(true);
+    }
+  }, []);
+  const stopSegment = useCallback(() => {
+    if (segmentStartRef.current != null) {
+      durationAccumMsRef.current += Date.now() - segmentStartRef.current;
+      segmentStartRef.current = null;
+      setIsTiming(false);
+    }
+  }, []);
+  const resetStopwatch = useCallback(() => {
+    durationAccumMsRef.current = 0;
+    segmentStartRef.current = null;
+    setIsTiming(false);
+  }, []);
+
   const pauseSession = useCallback(() => {
     if (isPausedRef.current) return; // already paused; keep it idempotent
     clearIdleTimer();
     setIsPaused(true);
+    stopSegment();
     flushSession();
     // Note: the input keeps focus while paused so the next keystroke can
     // auto-resume the session (see handleChar / handleBackspace).
-  }, [clearIdleTimer, flushSession]);
+  }, [clearIdleTimer, flushSession, stopSegment]);
 
   const pause = useCallback(() => pauseSession(), [pauseSession]);
 
@@ -209,10 +241,11 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     (event: TypingEvent) => {
       if (!sessionRef.current) return;
       sessionRef.current.events.push(event);
+      startSegment(); // keystroke (re)starts the live stopwatch
       scheduleSessionSave();
       bumpIdleTimer();
     },
-    [scheduleSessionSave, bumpIdleTimer]
+    [scheduleSessionSave, bumpIdleTimer, startSegment]
   );
 
   // If more than SESSION_ROTATE_GAP_MS has elapsed since the last keystroke, end
@@ -227,7 +260,8 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     flushSession();
     archiveCurrentSession();
     sessionRef.current = newSession(book.id, progressRef.current);
-  }, [flushSession, book.id]);
+    resetStopwatch(); // a new sitting starts its clock from zero
+  }, [flushSession, book.id, resetStopwatch]);
 
   // Persist progress whenever it changes (localStorage always; cloud if signed in).
   useEffect(() => {
@@ -301,6 +335,14 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       cancelled = true;
     };
   }, [user, book.id]);
+
+  // Tick once a second while the stopwatch is running so the displayed clock
+  // advances between keystrokes. Idle when paused/stopped (no interval churn).
+  useEffect(() => {
+    if (!isTiming) return;
+    const id = setInterval(() => setDurationTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [isTiming]);
 
   // Clear cloud debounce and idle timers on unmount.
   useEffect(() => {
@@ -463,9 +505,10 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     archiveCurrentSession();
     const fresh = resetProgressStorage(book.id);
     sessionRef.current = newSession(book.id, fresh);
+    resetStopwatch();
     setProgress(fresh);
     focusInput();
-  }, [book.id, flushSession, focusInput]);
+  }, [book.id, flushSession, focusInput, resetStopwatch]);
 
   const exportLog = useCallback(() => {
     flushSession();
@@ -486,7 +529,11 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   // Derived, recomputed each render (i.e. each keystroke) from the live log.
   const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
   const accuracy = sessionRef.current ? computeAccuracy(sessionRef.current.events) : 100;
-  const durationMs = sessionRef.current ? activeTypingMs(sessionRef.current.events) : 0;
+  // Live elapsed time: banked segments plus the currently-running one. Recomputed
+  // each render; the 1s tick effect above forces those renders while timing.
+  const durationMs =
+    durationAccumMsRef.current +
+    (segmentStartRef.current != null ? Date.now() - segmentStartRef.current : 0);
 
   const charStatuses = useMemo<CharStatus[]>(() => {
     // One extra slot past the passage for the trailing newline (Enter) the user

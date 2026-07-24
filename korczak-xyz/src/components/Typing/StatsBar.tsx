@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatDuration } from '../../utils/typing/metrics';
+import { formatClock } from '../../utils/typing/metrics';
 
 interface StatsBarProps {
   wpm: number;
@@ -34,7 +34,7 @@ export function StatsBar({
     <div className="typing-stats">
       <Stat label={labels.wpm} value={String(Math.round(wpm))} />
       <Stat label={labels.accuracy} value={`${Math.round(accuracy)}%`} />
-      <Stat label={labels.timeSpent} value={formatDuration(durationMs / 60000)} />
+      <Stat label={labels.timeSpent} value={formatClock(durationMs)} />
       <div className="typing-progress">
         <div className="typing-progress-track">
           <div className="typing-progress-fill" style={{ width: `${progressPercent}%` }} />
