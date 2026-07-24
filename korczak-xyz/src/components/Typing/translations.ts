@@ -53,6 +53,9 @@ export const translations = {
     noKeyData: 'No keystrokes yet — do some typing first.',
     backToOverTime: 'Over-time stats',
     notTrusted: 'Not trusted — too few correct presses',
+    avgWpmNote: 'your average',
+    slower: 'slower',
+    faster: 'faster',
   },
   pl: {
     book: 'Książka',
@@ -106,6 +109,9 @@ export const translations = {
     noKeyData: 'Brak naciśnięć — najpierw trochę popisz.',
     backToOverTime: 'Statystyki w czasie',
     notTrusted: 'Niepewne — za mało poprawnych naciśnięć',
+    avgWpmNote: 'Twoja średnia',
+    slower: 'wolniej',
+    faster: 'szybciej',
   },
 } as const;
 

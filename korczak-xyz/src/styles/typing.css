@@ -662,25 +662,80 @@ circle.typing-chart-line--latency {
   min-width: 0;
 }
 
-.typing-key-bar-track {
+/* Diverging speed bar: grows left (slower) or right (faster) from a center
+   line at the user's average WPM. */
+.typing-key-diverge-track {
+  position: relative;
   flex: 1 1 auto;
   height: 12px;
-  min-width: 40px;
+  min-width: 60px;
   background: var(--retro-dark-gray);
   border: 1px solid var(--retro-black);
+  overflow: hidden;
 }
 
-.typing-key-bar-fill {
-  display: block;
-  height: 100%;
+.typing-key-diverge-center {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+  background: var(--retro-white);
+  z-index: 2;
+}
+
+.typing-key-diverge-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.typing-key-diverge-fill--slow {
+  background: var(--retro-red);
+}
+
+.typing-key-diverge-fill--fast {
+  background: var(--retro-green);
 }
 
 .typing-key-bar-value {
   flex: 0 0 auto;
-  width: 4.5rem;
+  width: 5rem;
   text-align: right;
-  color: var(--retro-gray);
+  color: var(--retro-white);
   font-size: 1rem;
+}
+
+.typing-key-avg-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 0;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--retro-gray);
+}
+
+.typing-key-avg-note strong {
+  color: var(--retro-yellow);
+}
+
+.typing-key-avg-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--retro-black);
+}
+
+.typing-key-avg-swatch--slow {
+  background: var(--retro-red);
+}
+
+.typing-key-avg-swatch--fast {
+  background: var(--retro-green);
 }
 
 .typing-key-table--untrusted {

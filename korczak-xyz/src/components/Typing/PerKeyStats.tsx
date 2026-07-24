@@ -32,14 +32,6 @@ const comparators: Record<SortMode, (a: KeyStat, b: KeyStat) => number> = {
   bottleneck: (a, b) => b.bottleneckMs - a.bottleneckMs,
 };
 
-// Fast (low latency) → slow (high latency) color ramp, green through red.
-function latencyColor(ms: number, minMs: number, maxMs: number): string {
-  const span = Math.max(maxMs - minMs, 1);
-  const norm = Math.min(1, Math.max(0, (ms - minMs) / span));
-  const hue = 120 - norm * 120; // 120=green … 0=red
-  return `hsl(${hue}, 65%, 45%)`;
-}
-
 // A "nice" upper bound for the latency axis: round up to the next 50ms, min 100.
 function niceLatencyMax(maxMs: number): number {
   return Math.max(100, Math.ceil((maxMs * 1.1) / 50) * 50);
@@ -82,7 +74,7 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const loading = auth.loading || (!!uid && !cloudSettled);
 
-  const stats = useMemo(() => computeKeyStats(sessions), [sessions]);
+  const { keys: stats, averageWpm } = useMemo(() => computeKeyStats(sessions), [sessions]);
 
   // Two groups: trusted keys (enough correct samples) in the main table, the
   // noisy remainder in a dimmed section below. Both follow the active sort.
@@ -114,10 +106,10 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     [ranked]
   );
 
-  // Latency bar scaling uses the median range across qualified keys.
-  const medians = ranked.map((k) => k.medianLatencyMs);
-  const minMedian = medians.length ? Math.min(...medians) : 0;
-  const maxMedian = medians.length ? Math.max(...medians) : 1;
+  // Diverging-bar scale: the largest WPM gap from the average among trusted
+  // keys sets the half-width, so the biggest outlier fills its side.
+  const maxWpmDev =
+    ranked.reduce((m, k) => (k.samples > 0 ? Math.max(m, Math.abs(k.wpm - averageWpm)) : m), 0) || 1;
 
   const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
   const formatDate = (ms: number) =>
@@ -127,9 +119,12 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     key === ' ' ? t.keySpace : key === '\n' ? t.keyEnter : key;
 
   const renderKeyRow = (k: KeyStat, isUntrusted: boolean) => {
-    // Bars scale against the trusted range; untrusted outliers clamp at 100%.
-    const barPct = maxMedian > 0 ? Math.min(100, (k.medianLatencyMs / maxMedian) * 100) : 0;
     const isSelected = k.key === selectedKey;
+    const hasSpeed = k.samples > 0;
+    // Diverging bar: slower-than-average keys grow left (red), faster grow right
+    // (green), from the center line at the average. Outliers clamp to half-width.
+    const slower = k.wpm < averageWpm;
+    const devPct = hasSpeed ? Math.min(50, (Math.abs(k.wpm - averageWpm) / maxWpmDev) * 50) : 0;
     return (
       <button
         type="button"
@@ -144,18 +139,22 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
         <span className="typing-key-glyph" role="cell">
           {keyLabel(k.key)}
         </span>
-        <span className="typing-key-bar-cell" role="cell">
-          <span className="typing-key-bar-track">
-            <span
-              className="typing-key-bar-fill"
-              style={{
-                width: `${barPct}%`,
-                background: latencyColor(k.medianLatencyMs, minMedian, maxMedian),
-              }}
-            />
+        <span
+          className="typing-key-bar-cell"
+          role="cell"
+          title={hasSpeed ? `${Math.round(k.medianLatencyMs)} ${t.ms}` : undefined}
+        >
+          <span className="typing-key-diverge-track">
+            <span className="typing-key-diverge-center" />
+            {hasSpeed && (
+              <span
+                className={`typing-key-diverge-fill typing-key-diverge-fill--${slower ? 'slow' : 'fast'}`}
+                style={slower ? { right: '50%', width: `${devPct}%` } : { left: '50%', width: `${devPct}%` }}
+              />
+            )}
           </span>
           <span className="typing-key-bar-value">
-            {k.samples > 0 ? `${Math.round(k.medianLatencyMs)} ${t.ms}` : '—'}
+            {hasSpeed ? `${Math.round(k.wpm)} ${t.wpm}` : '—'}
           </span>
         </span>
         <span className="typing-key-num" role="cell">
@@ -232,6 +231,14 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
               </button>
             ))}
           </div>
+
+          <p className="typing-key-avg-note">
+            <span className="typing-key-avg-swatch typing-key-avg-swatch--slow" /> {t.slower}
+            {'  ·  '}
+            {t.avgWpmNote}: <strong>{Math.round(averageWpm)} {t.wpm}</strong>
+            {'  ·  '}
+            {t.faster} <span className="typing-key-avg-swatch typing-key-avg-swatch--fast" />
+          </p>
 
           <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
             <div className="typing-key-row typing-key-row--head" role="row">

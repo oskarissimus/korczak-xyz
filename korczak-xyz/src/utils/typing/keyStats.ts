@@ -19,12 +19,27 @@ const IDLE_GAP_CAP_MS = 3000;
 // threshold still appear in the full table with their count shown.
 export const MIN_KEY_SAMPLES = 8;
 
+// A "word" is 5 characters; per-key WPM is the steady rate implied by the
+// median gap between presses of that key. 60000 ms/min ÷ 5 chars/word = 12000.
+const WPM_FROM_MS = 12000;
+
+export function wpmFromLatency(medianMs: number): number {
+  return medianMs > 0 ? WPM_FROM_MS / medianMs : 0;
+}
+
+export interface KeyStatsResult {
+  keys: KeyStat[];
+  typicalLatencyMs: number; // median of all correct-press gaps pooled
+  averageWpm: number; // WPM implied by typicalLatencyMs — the per-key baseline
+}
+
 export interface KeyStat {
   key: string; // exact char: 'a', 'A', 'ą', ' ', '\n'
   count: number; // times typed (correct + mistakes)
   correct: number; // correct presses
   accuracy: number; // 0–100, correct / count
   medianLatencyMs: number; // measured from correct presses only
+  wpm: number; // per-key WPM from the median gap (0 when no samples)
   meanLatencyMs: number;
   // Excess time lost on this key vs. a typical keystroke: max(0, median −
   // typical) × samples. Fast keys (at/below typical) contribute ~0, so this
@@ -71,9 +86,10 @@ function accumulateSession(session: TypingSession, byKey: Map<string, KeyAccumul
   }
 }
 
-// Per-key aggregates across all sessions/books. Sorted slowest-first (highest
+// Per-key aggregates across all sessions/books, plus the typical keystroke
+// speed used as the comparison baseline. Keys are sorted slowest-first (highest
 // median latency) as a sensible default; the UI re-sorts as needed.
-export function computeKeyStats(sessions: TypingSession[]): KeyStat[] {
+export function computeKeyStats(sessions: TypingSession[]): KeyStatsResult {
   const byKey = new Map<string, KeyAccumulator>();
   for (const s of sessions) accumulateSession(s, byKey);
 
@@ -99,12 +115,14 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStat[] {
       correct: acc.correct,
       accuracy: acc.count ? (acc.correct / acc.count) * 100 : 100,
       medianLatencyMs: med,
+      wpm: wpmFromLatency(med),
       meanLatencyMs: mean,
       bottleneckMs: Math.max(0, med - typical) * sorted.length,
       samples: sorted.length,
     });
   }
-  return stats.sort((a, b) => b.medianLatencyMs - a.medianLatencyMs);
+  stats.sort((a, b) => b.medianLatencyMs - a.medianLatencyMs);
+  return { keys: stats, typicalLatencyMs: typical, averageWpm: wpmFromLatency(typical) };
 }
 
 // One point per local day (median latency that day) for a single key, so the
