@@ -18,22 +18,17 @@ interface PerKeyStatsProps {
 
 type SortMode = 'slowest' | 'fastest' | 'frequent' | 'leastAccurate' | 'bottleneck';
 
-// Whether a key has enough latency samples to be ranked/spotlighted.
-const qualified = (k: KeyStat) => k.samples >= MIN_KEY_SAMPLES;
+// A key is "trusted" once it has enough correct-press latency samples for its
+// median to mean something; below that it lives in a separate dimmed section.
+const trusted = (k: KeyStat) => k.samples >= MIN_KEY_SAMPLES;
 
-// Comparators: qualified keys always sort ahead of under-sampled ones for the
-// latency-derived modes, so noisy one-off keys never top the list.
+// Sort comparators for the (already-grouped) key rows.
 const comparators: Record<SortMode, (a: KeyStat, b: KeyStat) => number> = {
-  slowest: (a, b) =>
-    Number(qualified(b)) - Number(qualified(a)) || b.medianLatencyMs - a.medianLatencyMs,
-  fastest: (a, b) =>
-    Number(qualified(b)) - Number(qualified(a)) || a.medianLatencyMs - b.medianLatencyMs,
+  slowest: (a, b) => b.medianLatencyMs - a.medianLatencyMs,
+  fastest: (a, b) => a.medianLatencyMs - b.medianLatencyMs,
   frequent: (a, b) => b.count - a.count,
-  leastAccurate: (a, b) =>
-    Number(b.count >= MIN_KEY_SAMPLES) - Number(a.count >= MIN_KEY_SAMPLES) ||
-    a.accuracy - b.accuracy,
-  bottleneck: (a, b) =>
-    Number(qualified(b)) - Number(qualified(a)) || b.bottleneckMs - a.bottleneckMs,
+  leastAccurate: (a, b) => a.accuracy - b.accuracy,
+  bottleneck: (a, b) => b.bottleneckMs - a.bottleneckMs,
 };
 
 // Fast (low latency) → slow (high latency) color ramp, green through red.
@@ -87,10 +82,24 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   const loading = auth.loading || (!!uid && !cloudSettled);
 
   const stats = useMemo(() => computeKeyStats(sessions), [sessions]);
-  const sorted = useMemo(() => [...stats].sort(comparators[sortMode]), [stats, sortMode]);
 
-  // Spotlight cards, restricted to keys with enough samples to trust.
-  const ranked = useMemo(() => stats.filter(qualified), [stats]);
+  // Two groups: trusted keys (enough correct samples) in the main table, the
+  // noisy remainder in a dimmed section below. Both follow the active sort.
+  const ranked = useMemo(() => stats.filter(trusted), [stats]);
+  const sortedTrusted = useMemo(() => [...ranked].sort(comparators[sortMode]), [ranked, sortMode]);
+  const sortedUntrusted = useMemo(
+    () =>
+      stats
+        .filter((k) => !trusted(k))
+        // Keys with no measurable speed (samples 0) sink to the bottom; the rest
+        // are ranked slowest-first regardless of the active sort, since their
+        // sparse numbers aren't worth re-ordering.
+        .sort(
+          (a, b) =>
+            Number(a.samples === 0) - Number(b.samples === 0) || b.medianLatencyMs - a.medianLatencyMs
+        ),
+    [stats]
+  );
   const slowest = useMemo(
     () => ranked.reduce<KeyStat | null>((m, k) => (!m || k.medianLatencyMs > m.medianLatencyMs ? k : m), null),
     [ranked]
@@ -115,6 +124,48 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const keyLabel = (key: string) =>
     key === ' ' ? t.keySpace : key === '\n' ? t.keyEnter : key;
+
+  const renderKeyRow = (k: KeyStat, isUntrusted: boolean) => {
+    // Bars scale against the trusted range; untrusted outliers clamp at 100%.
+    const barPct = maxMedian > 0 ? Math.min(100, (k.medianLatencyMs / maxMedian) * 100) : 0;
+    const isSelected = k.key === selectedKey;
+    return (
+      <button
+        type="button"
+        key={k.key}
+        role="row"
+        className={`typing-key-row${isSelected ? ' typing-key-row--selected' : ''}${
+          isUntrusted ? ' typing-key-row--untrusted' : ''
+        }`}
+        aria-pressed={isSelected}
+        onClick={() => setSelectedKey(k.key)}
+      >
+        <span className="typing-key-glyph" role="cell">
+          {keyLabel(k.key)}
+        </span>
+        <span className="typing-key-bar-cell" role="cell">
+          <span className="typing-key-bar-track">
+            <span
+              className="typing-key-bar-fill"
+              style={{
+                width: `${barPct}%`,
+                background: latencyColor(k.medianLatencyMs, minMedian, maxMedian),
+              }}
+            />
+          </span>
+          <span className="typing-key-bar-value">
+            {k.samples > 0 ? `${Math.round(k.medianLatencyMs)} ${t.ms}` : '—'}
+          </span>
+        </span>
+        <span className="typing-key-num" role="cell">
+          {k.count}
+        </span>
+        <span className="typing-key-num" role="cell">
+          {Math.round(k.accuracy)}%
+        </span>
+      </button>
+    );
+  };
 
   // Detail mini-chart series for the selected key.
   const detailPoints = useMemo(
@@ -188,47 +239,15 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
               <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
               <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
             </div>
-            {loading
-              ? null
-              : sorted.map((k) => {
-                  const barPct = maxMedian > 0 ? (k.medianLatencyMs / maxMedian) * 100 : 0;
-                  const isSelected = k.key === selectedKey;
-                  return (
-                    <button
-                      type="button"
-                      key={k.key}
-                      role="row"
-                      className={`typing-key-row${isSelected ? ' typing-key-row--selected' : ''}`}
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedKey(k.key)}
-                    >
-                      <span className="typing-key-glyph" role="cell">
-                        {keyLabel(k.key)}
-                      </span>
-                      <span className="typing-key-bar-cell" role="cell">
-                        <span className="typing-key-bar-track">
-                          <span
-                            className="typing-key-bar-fill"
-                            style={{
-                              width: `${barPct}%`,
-                              background: latencyColor(k.medianLatencyMs, minMedian, maxMedian),
-                            }}
-                          />
-                        </span>
-                        <span className="typing-key-bar-value">
-                          {k.samples > 0 ? `${Math.round(k.medianLatencyMs)} ${t.ms}` : '—'}
-                        </span>
-                      </span>
-                      <span className="typing-key-num" role="cell">
-                        {k.count}
-                      </span>
-                      <span className="typing-key-num" role="cell">
-                        {Math.round(k.accuracy)}%
-                      </span>
-                    </button>
-                  );
-                })}
+            {loading ? null : sortedTrusted.map((k) => renderKeyRow(k, false))}
           </div>
+
+          {!loading && sortedUntrusted.length > 0 && (
+            <div className="typing-key-table typing-key-table--untrusted" role="table" aria-label={t.notTrusted}>
+              <p className="typing-key-untrusted-heading">{t.notTrusted}</p>
+              {sortedUntrusted.map((k) => renderKeyRow(k, true))}
+            </div>
+          )}
 
           <div className="typing-key-detail">
             {selectedStat == null ? (

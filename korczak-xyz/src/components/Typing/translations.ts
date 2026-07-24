@@ -52,6 +52,7 @@ export const translations = {
     keyProgressTitle: 'Progress for',
     noKeyData: 'No keystrokes yet — do some typing first.',
     backToOverTime: 'Over-time stats',
+    notTrusted: 'Not trusted — too few correct presses',
   },
   pl: {
     book: 'Książka',
@@ -104,6 +105,7 @@ export const translations = {
     keyProgressTitle: 'Postęp dla',
     noKeyData: 'Brak naciśnięć — najpierw trochę popisz.',
     backToOverTime: 'Statystyki w czasie',
+    notTrusted: 'Niepewne — za mało poprawnych naciśnięć',
   },
 } as const;
 

@@ -21,13 +21,13 @@ export const MIN_KEY_SAMPLES = 8;
 
 export interface KeyStat {
   key: string; // exact char: 'a', 'A', 'ą', ' ', '\n'
-  count: number; // times typed
-  correct: number;
-  accuracy: number; // 0–100
-  medianLatencyMs: number;
+  count: number; // times typed (correct + mistakes)
+  correct: number; // correct presses
+  accuracy: number; // 0–100, correct / count
+  medianLatencyMs: number; // measured from correct presses only
   meanLatencyMs: number;
   bottleneckMs: number; // medianLatencyMs * count — cumulative time cost
-  samples: number; // latency samples (excludes session-first + idle gaps)
+  samples: number; // correct-press latency samples (excludes session-first + idle gaps)
 }
 
 function median(sorted: number[]): number {
@@ -57,8 +57,10 @@ function accumulateSession(session: TypingSession, byKey: Map<string, KeyAccumul
     }
     acc.count += 1;
     if (ev.correct) acc.correct += 1;
-    // The first char of a session has no predecessor to measure against.
-    if (i > 0) {
+    // Speed is measured from correct keystrokes only — a fumbled key press
+    // (wrong key at that spot) doesn't reflect how fast you type that key. The
+    // first char of a session also has no predecessor to measure against.
+    if (i > 0 && ev.correct) {
       const gap = ev.t - chars[i - 1].t;
       if (gap > 0 && gap <= IDLE_GAP_CAP_MS) acc.latencies.push(gap);
     }
@@ -73,6 +75,9 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStat[] {
 
   const stats: KeyStat[] = [];
   for (const [key, acc] of byKey) {
+    // Keys never typed correctly are accidental presses (stray Option-key combos
+    // and the like), not keys the user practices — leave them out entirely.
+    if (acc.correct === 0) continue;
     const sorted = [...acc.latencies].sort((a, b) => a - b);
     const med = median(sorted);
     const mean = sorted.length ? sorted.reduce((sum, v) => sum + v, 0) / sorted.length : 0;
@@ -102,7 +107,7 @@ export function keyLatencyOverTime(
     const chars = charEvents(s.events);
     for (let i = 1; i < chars.length; i++) {
       const ev = chars[i];
-      if ((ev.data ?? '') !== key) continue;
+      if ((ev.data ?? '') !== key || !ev.correct) continue;
       const gap = ev.t - chars[i - 1].t;
       if (gap <= 0 || gap > IDLE_GAP_CAP_MS) continue;
       const wall = s.startedAt + ev.t;

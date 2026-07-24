@@ -683,6 +683,26 @@ circle.typing-chart-line--latency {
   font-size: 1rem;
 }
 
+.typing-key-table--untrusted {
+  opacity: 0.55;
+}
+
+.typing-key-untrusted-heading {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  color: var(--retro-gray);
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--retro-dark-gray);
+}
+
+.typing-key-row--untrusted .typing-key-glyph {
+  color: var(--retro-gray);
+}
+
 .typing-key-detail {
   min-height: 60px;
 }
