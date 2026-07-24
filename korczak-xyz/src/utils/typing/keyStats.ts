@@ -19,12 +19,14 @@ const IDLE_GAP_CAP_MS = 3000;
 // threshold still appear in the full table with their count shown.
 export const MIN_KEY_SAMPLES = 8;
 
-// A "word" is 5 characters; per-key WPM is the steady rate implied by the
-// median gap between presses of that key. 60000 ms/min ÷ 5 chars/word = 12000.
+// A "word" is 5 characters; per-key WPM is the sustained rate implied by the
+// mean gap between presses of that key. 60000 ms/min ÷ 5 chars/word = 12000.
+// Mean (not median) is used so these numbers line up with the sustained WPM on
+// the over-time stats page, which is total chars ÷ total time.
 const WPM_FROM_MS = 12000;
 
-export function wpmFromLatency(medianMs: number): number {
-  return medianMs > 0 ? WPM_FROM_MS / medianMs : 0;
+export function wpmFromLatency(meanMs: number): number {
+  return meanMs > 0 ? WPM_FROM_MS / meanMs : 0;
 }
 
 export interface KeyStatsResult {
@@ -39,8 +41,8 @@ export interface KeyStat {
   correct: number; // correct presses
   accuracy: number; // 0–100, correct / count
   medianLatencyMs: number; // measured from correct presses only
-  wpm: number; // per-key WPM from the median gap (0 when no samples)
-  meanLatencyMs: number;
+  meanLatencyMs: number; // mean of the same gaps — drives WPM (see wpmFromLatency)
+  wpm: number; // per-key WPM from the mean gap (0 when no samples)
   // Excess time lost on this key vs. a typical keystroke: max(0, median −
   // typical) × samples. Fast keys (at/below typical) contribute ~0, so this
   // surfaces slow *and* frequent keys — the ones worth drilling — rather than
@@ -93,13 +95,19 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStatsResult {
   const byKey = new Map<string, KeyAccumulator>();
   for (const s of sessions) accumulateSession(s, byKey);
 
-  // Typical keystroke speed = median of every correct-press gap pooled across
-  // all keys. It's the baseline the bottleneck metric measures excess against;
-  // being frequency-weighted, it reflects how fast the user types in general.
-  const allLatencies: number[] = [];
-  for (const acc of byKey.values()) for (const l of acc.latencies) allLatencies.push(l);
-  allLatencies.sort((a, b) => a - b);
-  const typical = median(allLatencies);
+  // Typical keystroke speed = MEAN of every correct-press gap pooled across all
+  // keys. Mean (not median) is used so the derived average WPM matches the
+  // sustained WPM on the over-time page (total chars ÷ total time, driven by the
+  // average gap). It's also the baseline the bottleneck metric measures excess
+  // time against.
+  let pooledSum = 0;
+  let pooledN = 0;
+  for (const acc of byKey.values())
+    for (const l of acc.latencies) {
+      pooledSum += l;
+      pooledN += 1;
+    }
+  const typical = pooledN ? pooledSum / pooledN : 0;
 
   const stats: KeyStat[] = [];
   for (const [key, acc] of byKey) {
@@ -115,13 +123,13 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStatsResult {
       correct: acc.correct,
       accuracy: acc.count ? (acc.correct / acc.count) * 100 : 100,
       medianLatencyMs: med,
-      wpm: wpmFromLatency(med),
       meanLatencyMs: mean,
-      bottleneckMs: Math.max(0, med - typical) * sorted.length,
+      wpm: wpmFromLatency(mean),
+      bottleneckMs: Math.max(0, mean - typical) * sorted.length,
       samples: sorted.length,
     });
   }
-  stats.sort((a, b) => b.medianLatencyMs - a.medianLatencyMs);
+  stats.sort((a, b) => b.meanLatencyMs - a.meanLatencyMs);
   return { keys: stats, typicalLatencyMs: typical, averageWpm: wpmFromLatency(typical) };
 }
 

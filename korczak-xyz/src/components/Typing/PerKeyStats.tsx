@@ -23,10 +23,10 @@ type SortMode = 'slowest' | 'fastest' | 'frequent' | 'leastAccurate' | 'bottlene
 // median to mean something; below that it lives in a separate dimmed section.
 const trusted = (k: KeyStat) => k.samples >= MIN_KEY_SAMPLES;
 
-// Sort comparators for the (already-grouped) key rows.
+// Sort comparators for the (already-grouped) key rows. Slowest = lowest WPM.
 const comparators: Record<SortMode, (a: KeyStat, b: KeyStat) => number> = {
-  slowest: (a, b) => b.medianLatencyMs - a.medianLatencyMs,
-  fastest: (a, b) => a.medianLatencyMs - b.medianLatencyMs,
+  slowest: (a, b) => a.wpm - b.wpm,
+  fastest: (a, b) => b.wpm - a.wpm,
   frequent: (a, b) => b.count - a.count,
   leastAccurate: (a, b) => a.accuracy - b.accuracy,
   bottleneck: (a, b) => b.bottleneckMs - a.bottleneckMs,
@@ -85,20 +85,17 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
       stats
         .filter((k) => !trusted(k))
         // Keys with no measurable speed (samples 0) sink to the bottom; the rest
-        // are ranked slowest-first regardless of the active sort, since their
-        // sparse numbers aren't worth re-ordering.
-        .sort(
-          (a, b) =>
-            Number(a.samples === 0) - Number(b.samples === 0) || b.medianLatencyMs - a.medianLatencyMs
-        ),
+        // are ranked slowest-first (lowest WPM) regardless of the active sort,
+        // since their sparse numbers aren't worth re-ordering.
+        .sort((a, b) => Number(a.samples === 0) - Number(b.samples === 0) || a.wpm - b.wpm),
     [stats]
   );
   const slowest = useMemo(
-    () => ranked.reduce<KeyStat | null>((m, k) => (!m || k.medianLatencyMs > m.medianLatencyMs ? k : m), null),
+    () => ranked.reduce<KeyStat | null>((m, k) => (!m || k.wpm < m.wpm ? k : m), null),
     [ranked]
   );
   const fastest = useMemo(
-    () => ranked.reduce<KeyStat | null>((m, k) => (!m || k.medianLatencyMs < m.medianLatencyMs ? k : m), null),
+    () => ranked.reduce<KeyStat | null>((m, k) => (!m || k.wpm > m.wpm ? k : m), null),
     [ranked]
   );
   const bottleneck = useMemo(
@@ -142,7 +139,7 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
         <span
           className="typing-key-bar-cell"
           role="cell"
-          title={hasSpeed ? `${Math.round(k.medianLatencyMs)} ${t.ms}` : undefined}
+          title={hasSpeed ? `${Math.round(k.meanLatencyMs)} ${t.ms}` : undefined}
         >
           <span className="typing-key-diverge-track">
             <span className="typing-key-diverge-center" />
