@@ -307,7 +307,7 @@ function SpotlightCard({ label, stat, keyLabel, t, tone }: SpotlightProps) {
       ? '—'
       : tone === 'bottleneck'
         ? formatDuration(stat.bottleneckMs / 60000) // time lost vs. typical speed
-        : `${Math.round(stat.medianLatencyMs)} ${t.ms}`;
+        : `${Math.round(stat.wpm)} ${t.wpm}`;
   return (
     <div className={`typing-key-spotlight typing-key-spotlight--${tone}`}>
       <span className="typing-key-spotlight-label">{label}</span>
