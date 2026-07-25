@@ -56,6 +56,10 @@ export const translations = {
     avgWpmNote: 'your average',
     slower: 'slower',
     faster: 'faster',
+    timeLostCol: 'Time lost',
+    // Split around the average gap so it can be highlighted inline.
+    bottleneckFormulaPre: 'time lost = max(0, your gap −',
+    bottleneckFormulaPost: 'avg) × presses',
   },
   pl: {
     book: 'Książka',
@@ -112,6 +116,10 @@ export const translations = {
     avgWpmNote: 'Twoja średnia',
     slower: 'wolniej',
     faster: 'szybciej',
+    timeLostCol: 'Stracony czas',
+    // Split around the average gap so it can be highlighted inline.
+    bottleneckFormulaPre: 'stracony czas = max(0; twoja przerwa −',
+    bottleneckFormulaPost: 'śr.) × naciśnięcia',
   },
 } as const;
 

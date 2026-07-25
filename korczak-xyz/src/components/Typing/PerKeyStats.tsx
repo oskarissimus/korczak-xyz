@@ -74,7 +74,15 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const loading = auth.loading || (!!uid && !cloudSettled);
 
-  const { keys: stats, averageWpm } = useMemo(() => computeKeyStats(sessions), [sessions]);
+  const { keys: stats, averageWpm, typicalLatencyMs } = useMemo(
+    () => computeKeyStats(sessions),
+    [sessions]
+  );
+
+  // The bottleneck sort ranks by time lost, not speed — so in that mode the rows
+  // show that duration instead of the WPM diverging bar, and the legend line
+  // spells out the formula behind it.
+  const showBottleneck = sortMode === 'bottleneck';
 
   // Two groups: trusted keys (enough correct samples) in the main table, the
   // noisy remainder in a dimmed section below. Both follow the active sort.
@@ -108,6 +116,9 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   const maxWpmDev =
     ranked.reduce((m, k) => (k.samples > 0 ? Math.max(m, Math.abs(k.wpm - averageWpm)) : m), 0) || 1;
 
+  // Bottleneck bars are single-direction and scaled to the worst trusted key.
+  const maxBottleneck = ranked.reduce((m, k) => Math.max(m, k.bottleneckMs), 0) || 1;
+
   const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
   const formatDate = (ms: number) =>
     new Date(ms).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
@@ -122,6 +133,11 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     // (green), from the center line at the average. Outliers clamp to half-width.
     const slower = k.wpm < averageWpm;
     const devPct = hasSpeed ? Math.min(50, (Math.abs(k.wpm - averageWpm) / maxWpmDev) * 50) : 0;
+    // Bottleneck mode: one magenta bar growing from the left, scaled to the
+    // worst trusted key (clamped, since an untrusted key can exceed that max).
+    const lostPct = hasSpeed ? Math.min(100, (k.bottleneckMs / maxBottleneck) * 100) : 0;
+    // Spell out the numbers behind the metric on hover: (gap − avg) ms × presses.
+    const lostTitle = `(${Math.round(k.meanLatencyMs)} − ${Math.round(typicalLatencyMs)}) ${t.ms} × ${k.samples}`;
     return (
       <button
         type="button"
@@ -139,19 +155,35 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
         <span
           className="typing-key-bar-cell"
           role="cell"
-          title={hasSpeed ? `${Math.round(k.meanLatencyMs)} ${t.ms}` : undefined}
+          title={
+            !hasSpeed ? undefined : showBottleneck ? lostTitle : `${Math.round(k.meanLatencyMs)} ${t.ms}`
+          }
         >
-          <span className="typing-key-diverge-track">
+          <span
+            className={`typing-key-diverge-track${
+              showBottleneck ? ' typing-key-diverge-track--single' : ''
+            }`}
+          >
             <span className="typing-key-diverge-center" />
-            {hasSpeed && (
-              <span
-                className={`typing-key-diverge-fill typing-key-diverge-fill--${slower ? 'slow' : 'fast'}`}
-                style={slower ? { right: '50%', width: `${devPct}%` } : { left: '50%', width: `${devPct}%` }}
-              />
-            )}
+            {hasSpeed &&
+              (showBottleneck ? (
+                <span
+                  className="typing-key-diverge-fill typing-key-diverge-fill--bottleneck"
+                  style={{ left: 0, width: `${lostPct}%` }}
+                />
+              ) : (
+                <span
+                  className={`typing-key-diverge-fill typing-key-diverge-fill--${slower ? 'slow' : 'fast'}`}
+                  style={slower ? { right: '50%', width: `${devPct}%` } : { left: '50%', width: `${devPct}%` }}
+                />
+              ))}
           </span>
-          <span className="typing-key-bar-value">
-            {hasSpeed ? `${Math.round(k.wpm)} ${t.wpm}` : '—'}
+          <span className={`typing-key-bar-value${showBottleneck ? ' typing-key-bar-value--lost' : ''}`}>
+            {!hasSpeed
+              ? '—'
+              : showBottleneck
+                ? formatDuration(k.bottleneckMs / 60000)
+                : `${Math.round(k.wpm)} ${t.wpm}`}
           </span>
         </span>
         <span className="typing-key-num" role="cell">
@@ -229,18 +261,25 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
             ))}
           </div>
 
-          <p className="typing-key-avg-note">
-            <span className="typing-key-avg-swatch typing-key-avg-swatch--slow" /> {t.slower}
-            {'  ·  '}
-            {t.avgWpmNote}: <strong>{Math.round(averageWpm)} {t.wpm}</strong>
-            {'  ·  '}
-            {t.faster} <span className="typing-key-avg-swatch typing-key-avg-swatch--fast" />
-          </p>
+          {showBottleneck ? (
+            <p className="typing-key-avg-note typing-key-avg-note--formula">
+              {t.bottleneckFormulaPre} <strong>{Math.round(typicalLatencyMs)} {t.ms}</strong>{' '}
+              {t.bottleneckFormulaPost}
+            </p>
+          ) : (
+            <p className="typing-key-avg-note">
+              <span className="typing-key-avg-swatch typing-key-avg-swatch--slow" /> {t.slower}
+              {'  ·  '}
+              {t.avgWpmNote}: <strong>{Math.round(averageWpm)} {t.wpm}</strong>
+              {'  ·  '}
+              {t.faster} <span className="typing-key-avg-swatch typing-key-avg-swatch--fast" />
+            </p>
+          )}
 
           <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
             <div className="typing-key-row typing-key-row--head" role="row">
               <span role="columnheader">{t.keyCol}</span>
-              <span role="columnheader">{t.medianLatency}</span>
+              <span role="columnheader">{showBottleneck ? t.timeLostCol : t.medianLatency}</span>
               <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
               <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
             </div>

@@ -700,6 +700,16 @@ circle.typing-chart-line--latency {
   background: var(--retro-green);
 }
 
+/* Bottleneck sort: time lost has no meaningful midpoint, so the bar grows from
+   the left edge and the average center line is hidden. */
+.typing-key-diverge-track--single .typing-key-diverge-center {
+  display: none;
+}
+
+.typing-key-diverge-fill--bottleneck {
+  background: var(--retro-magenta);
+}
+
 .typing-key-bar-value {
   flex: 0 0 auto;
   width: 5rem;
@@ -721,6 +731,14 @@ circle.typing-chart-line--latency {
 
 .typing-key-avg-note strong {
   color: var(--retro-yellow);
+}
+
+/* The bottleneck formula is math notation — keep its spacing tight and let it
+   wrap on narrow screens rather than overflowing the table. */
+.typing-key-avg-note--formula {
+  flex-wrap: wrap;
+  gap: 0 4px;
+  text-align: center;
 }
 
 .typing-key-avg-swatch {
@@ -780,5 +798,11 @@ circle.typing-chart-line--latency {
   }
   .typing-key-bar-value {
     display: none;
+  }
+  /* Time lost is the value being ranked in bottleneck mode, so keep it on
+     screen — it's short enough ("52s", "1h 05m") to fit beside the bar. */
+  .typing-key-bar-value--lost {
+    display: block;
+    width: 3.5rem;
   }
 }

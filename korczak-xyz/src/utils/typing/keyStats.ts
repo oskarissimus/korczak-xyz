@@ -31,7 +31,7 @@ export function wpmFromLatency(meanMs: number): number {
 
 export interface KeyStatsResult {
   keys: KeyStat[];
-  typicalLatencyMs: number; // median of all correct-press gaps pooled
+  typicalLatencyMs: number; // mean of all correct-press gaps pooled
   averageWpm: number; // WPM implied by typicalLatencyMs — the per-key baseline
 }
 
@@ -40,10 +40,10 @@ export interface KeyStat {
   count: number; // times typed (correct + mistakes)
   correct: number; // correct presses
   accuracy: number; // 0–100, correct / count
-  medianLatencyMs: number; // measured from correct presses only
+  medianLatencyMs: number; // measured from correct presses only; not displayed
   meanLatencyMs: number; // mean of the same gaps — drives WPM (see wpmFromLatency)
   wpm: number; // per-key WPM from the mean gap (0 when no samples)
-  // Excess time lost on this key vs. a typical keystroke: max(0, median −
+  // Excess time lost on this key vs. a typical keystroke: max(0, mean −
   // typical) × samples. Fast keys (at/below typical) contribute ~0, so this
   // surfaces slow *and* frequent keys — the ones worth drilling — rather than
   // just the most-pressed key.
@@ -90,7 +90,7 @@ function accumulateSession(session: TypingSession, byKey: Map<string, KeyAccumul
 
 // Per-key aggregates across all sessions/books, plus the typical keystroke
 // speed used as the comparison baseline. Keys are sorted slowest-first (highest
-// median latency) as a sensible default; the UI re-sorts as needed.
+// mean latency) as a sensible default; the UI re-sorts as needed.
 export function computeKeyStats(sessions: TypingSession[]): KeyStatsResult {
   const byKey = new Map<string, KeyAccumulator>();
   for (const s of sessions) accumulateSession(s, byKey);
