@@ -1,0 +1,69 @@
+---
+/**
+ * Server-rendered stand-in for <TypingStats client:only="react" />, mirroring
+ * TypingStats.tsx: grouping toggles + legend, chart panel, session count,
+ * controls. Astro swaps it for the real island the moment React hydrates.
+ */
+
+interface Props {
+  lang: 'en' | 'pl';
+}
+const { lang } = Astro.props;
+
+/* Bar widths are the real labels' rendered widths minus each control's own
+   chrome. Language-specific because Polish labels are longer, and at narrow
+   widths that decides whether a row of controls wraps. */
+const TOGGLES = { en: [77, 49, 56], pl: [56, 56, 70] }[lang];
+const LEGEND_WIDTHS = { en: [21, 56, 70], pl: [21, 49, 84] }[lang];
+const CONTROLS = { en: [108, 46], pl: [115, 84] }[lang];
+
+const LEGEND = ['typing-legend-item--wpm', 'typing-legend-item--accuracy', 'typing-legend-item--time'];
+
+/* Horizontal rules standing in for StatsChart's gridlines — the panel keeps the
+   chart's 600x240 aspect ratio, so the box is the height the SVG will be. */
+const GRIDLINES = [0, 1, 2, 3, 4];
+---
+
+<div class="typing-stats-page typing-skeleton" aria-hidden="true">
+  <div class="typing-chart-controls">
+    <div class="typing-toggle-group">
+      {
+        TOGGLES.map((w) => (
+          <span class="typing-toggle">
+            <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.1rem`} />
+          </span>
+        ))
+      }
+    </div>
+    <div class="typing-legend">
+      {
+        LEGEND.map((tone, i) => (
+          <span class:list={['typing-legend-item', tone]}>
+            <span class="typing-legend-swatch" />
+            <span class="typing-skel" style={`--skel-w: ${LEGEND_WIDTHS[i]}px; --skel-h: 1.1rem`} />
+          </span>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="typing-chart-panel">
+    <div class="typing-skel-chart">
+      {GRIDLINES.map(() => <span class="typing-skel typing-skel--on-dark" style="--skel-h: 1px" />)}
+    </div>
+  </div>
+
+  <p class="typing-message">
+    <span class="typing-skel typing-skel--on-teal" style="--skel-w: 7rem; --skel-h: 1.1rem; margin: 0 auto"></span>
+  </p>
+
+  <div class="typing-controls">
+    {
+      CONTROLS.map((w) => (
+        <span class="retro-btn">
+          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
+        </span>
+      ))
+    }
+  </div>
+</div>

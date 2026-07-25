@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import PerKeyStats from '../../../components/Typing/PerKeyStats';
+import KeysSkeleton from '../../../components/Typing/skeletons/KeysSkeleton.astro';
 import { useTranslations } from '../../../i18n';
 import '../../../styles/typing.css';
 
@@ -19,7 +20,9 @@ const t = useTranslations(lang);
       </div>
     </div>
     <div class="window-content typing-content">
-      <PerKeyStats client:only="react" lang={lang} />
+      <PerKeyStats client:only="react" lang={lang}>
+        <KeysSkeleton slot="fallback" lang={lang} />
+      </PerKeyStats>
     </div>
   </div>
 </Layout>

@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import TypingStats from '../../../components/Typing/TypingStats';
+import StatsSkeleton from '../../../components/Typing/skeletons/StatsSkeleton.astro';
 import { useTranslations } from '../../../i18n';
 import '../../../styles/typing.css';
 
@@ -19,7 +20,9 @@ const t = useTranslations(lang);
       </div>
     </div>
     <div class="window-content typing-content">
-      <TypingStats client:only="react" lang={lang} />
+      <TypingStats client:only="react" lang={lang}>
+        <StatsSkeleton slot="fallback" lang={lang} />
+      </TypingStats>
     </div>
   </div>
 </Layout>

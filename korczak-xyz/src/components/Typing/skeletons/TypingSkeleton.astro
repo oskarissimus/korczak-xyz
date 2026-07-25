@@ -1,0 +1,106 @@
+---
+/**
+ * Server-rendered stand-in for <Typing client:only="react" />, mirroring
+ * Typing.tsx → TypingSession.tsx: book picker, sync row, stats bar, five-line
+ * passage, controls. Astro swaps it for the real island once React hydrates.
+ */
+
+interface Props {
+  lang: 'en' | 'pl';
+}
+const { lang } = Astro.props;
+
+/* Ragged widths so the block reads as prose rather than a stack of rules. */
+const PASSAGE_LINES = ['100%', '96%', '99%', '88%', '62%'];
+
+/* Bar widths are the real labels' rendered widths minus each button's own
+   chrome (20px padding + 3px border per side). They are language-specific
+   because Polish labels are noticeably longer, and at narrow widths that
+   decides whether a row of buttons wraps — which is a whole row of shift. */
+const PICKER = { en: [38, 46], pl: [77, 84] }[lang];
+const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
+---
+
+<div class="typing-game typing-skeleton" aria-hidden="true">
+  <div class="typing-book-picker">
+    <span class="typing-skel typing-skel--on-teal" style="--skel-w: 3.5rem; --skel-h: 0.7rem"></span>
+    {/*
+      A real disabled <select> rather than a styled span: the control's height
+      comes from UA metrics that vary by browser, and this way the stand-in and
+      the real picker get the same ones instead of a hard-coded guess.
+    */}
+    <select class="typing-book-select typing-skel-select" disabled><option></option></select>
+    {
+      PICKER.map((w) => (
+        <span class="retro-btn">
+          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
+        </span>
+      ))
+    }
+  </div>
+
+  {/*
+    SyncStatus renders null while Firebase auth is loading but always renders a
+    row afterwards — the sign-in link when signed out, a status banner when
+    signed in. Reserving the link's height suits the signed-out first visit,
+    which is the case where a cold cache makes this skeleton visible at all.
+  */}
+  <span class="typing-sync typing-sync-link">
+    <span class="typing-skel" style="--skel-w: 12rem; --skel-h: 1.1rem"></span>
+  </span>
+
+  {/*
+    The widest bar in each tile sets that tile's width, and the tiles together
+    decide whether the progress bar still fits on the row. These match the real
+    tiles' measured widths (64 / 68 / 78px) so the row wraps at the same point.
+  */}
+  <div class="typing-stats">
+    {
+      [
+        [40, 32],
+        [40, 44],
+        [48, 54],
+      ].map(([value, label]) => (
+        <div class="typing-stat">
+          <span class="typing-skel typing-skel--on-dark" style={`--skel-w: ${value}px; --skel-h: 1.8rem`} />
+          <span class="typing-skel typing-skel--on-dark" style={`--skel-w: ${label}px; --skel-h: 0.85rem`} />
+        </div>
+      ))
+    }
+    <div class="typing-progress">
+      <div class="typing-progress-track"></div>
+      <span class="typing-skel" style="--skel-w: 6rem; --skel-h: 0.85rem"></span>
+    </div>
+  </div>
+
+  <div class="typing-passage-wrap">
+    <div class="typing-passage">
+      <div class="typing-scroll-viewport">
+        {
+          PASSAGE_LINES.map((width) => (
+            <div class="typing-skel-line">
+              <span
+                class="typing-skel typing-skel--on-paper"
+                style={`--skel-w: ${width}; --skel-h: 1.1rem`}
+              />
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+
+  <p class="typing-hint">
+    <span class="typing-skel typing-skel--on-teal" style="--skel-w: 14rem; --skel-h: 1rem; margin: 0 auto"></span>
+  </p>
+
+  <div class="typing-controls">
+    {
+      CONTROLS.map((w) => (
+        <span class="retro-btn">
+          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
+        </span>
+      ))
+    }
+  </div>
+</div>

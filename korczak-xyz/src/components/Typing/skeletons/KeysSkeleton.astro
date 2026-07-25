@@ -1,0 +1,94 @@
+---
+/**
+ * Server-rendered stand-in for <PerKeyStats client:only="react" />, mirroring
+ * PerKeyStats.tsx: three spotlight cards, sort toggles, legend note, key table,
+ * detail slot, controls. Astro swaps it for the real island once React hydrates.
+ */
+
+interface Props {
+  lang: 'en' | 'pl';
+}
+const { lang } = Astro.props;
+
+const SPOTLIGHTS = ['slow', 'fast', 'bottleneck'];
+
+/* Bar widths are the real labels' rendered widths minus each control's own
+   chrome. Language-specific because Polish labels are longer, and at narrow
+   widths that decides whether a row of controls wraps. */
+const SORT_MODES = { en: [49, 49, 70, 99, 70], pl: [92, 70, 77, 99, 92] }[lang];
+const CONTROLS = { en: [108, 115], pl: [115, 146] }[lang];
+
+/* One row per letter: a practised user's trusted table settles at ~26 rows, and
+   measuring the real page against this skeleton is how the count was picked.
+   Widths descend because every sort mode ranks its bar column. */
+const ROW_COUNT = 26;
+const ROW_BARS = Array.from(
+  { length: ROW_COUNT },
+  (_, i) => `${Math.round(92 - (i * 64) / (ROW_COUNT - 1))}%`,
+);
+---
+
+<div class="typing-stats-page typing-skeleton" aria-hidden="true">
+  <div class="typing-key-spotlights">
+    {
+      SPOTLIGHTS.map((tone) => (
+        <div class:list={['typing-key-spotlight', `typing-key-spotlight--${tone}`]}>
+          <span class="typing-skel typing-skel--on-dark" style="--skel-w: 5rem; --skel-h: 0.95rem" />
+          <span class="typing-skel typing-skel--on-dark" style="--skel-w: 2rem; --skel-h: 1.8rem" />
+          <span class="typing-skel typing-skel--on-dark" style="--skel-w: 3.5rem; --skel-h: 1.1rem" />
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="typing-toggle-group">
+    {
+      SORT_MODES.map((w) => (
+        <span class="typing-toggle">
+          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.1rem`} />
+        </span>
+      ))
+    }
+  </div>
+
+  <p class="typing-key-avg-note">
+    <span class="typing-skel typing-skel--on-teal" style="--skel-w: 18rem; --skel-h: 1rem"></span>
+  </p>
+
+  <div class="typing-key-table">
+    <div class="typing-key-row typing-key-row--head">
+      <span class="typing-skel typing-skel--on-dark" style="--skel-w: 2rem; --skel-h: 0.95rem"></span>
+      <span class="typing-skel typing-skel--on-dark" style="--skel-w: 6rem; --skel-h: 0.95rem"></span>
+      <span class="typing-skel typing-skel--on-dark typing-skel--end" style="--skel-w: 3rem; --skel-h: 0.95rem"></span>
+      <span class="typing-skel typing-skel--on-dark typing-skel--end" style="--skel-w: 2.5rem; --skel-h: 0.95rem"></span>
+    </div>
+    {
+      ROW_BARS.map((width) => (
+        <div class="typing-key-row">
+          <span class="typing-skel typing-skel--on-dark" style="--skel-w: 2.5rem; --skel-h: 1.1rem" />
+          <span class="typing-key-bar-cell">
+            <span class="typing-skel typing-skel--on-dark" style={`--skel-w: ${width}; --skel-h: 12px`} />
+          </span>
+          <span class="typing-skel typing-skel--on-dark typing-skel--end" style="--skel-w: 2rem; --skel-h: 1.1rem" />
+          <span class="typing-skel typing-skel--on-dark typing-skel--end" style="--skel-w: 2.5rem; --skel-h: 1.1rem" />
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="typing-key-detail">
+    <p class="typing-message">
+      <span class="typing-skel typing-skel--on-teal" style="--skel-w: 12rem; --skel-h: 1.1rem; margin: 0 auto"></span>
+    </p>
+  </div>
+
+  <div class="typing-controls">
+    {
+      CONTROLS.map((w) => (
+        <span class="retro-btn">
+          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
+        </span>
+      ))
+    }
+  </div>
+</div>

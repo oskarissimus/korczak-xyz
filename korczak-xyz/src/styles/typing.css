@@ -815,3 +815,174 @@ circle.typing-chart-line--latency {
     width: 3.5rem;
   }
 }
+
+/* Pre-hydration skeletons */
+
+/* All six typing routes mount with client:only="react", so the served HTML
+   contains nothing of the app. These rules style the fallback trees Astro
+   renders in its place (src/components/Typing/skeletons/). Those trees reuse
+   the real layout classes above — .typing-game, .typing-stats, .typing-key-row
+   and the rest — so box sizes, borders and the 600px overrides all apply for
+   free; only the text-bearing leaves become .typing-skel bars. */
+
+@keyframes typing-skel-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Fade in rather than appear: a fast hydration swaps the tree out within a
+   frame or two, and a skeleton that never reached full opacity reads as no
+   flash at all. Layout is reserved from the first paint either way. */
+@keyframes typing-skel-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.typing-skeleton {
+  animation: typing-skel-in 0.2s ease-out both;
+  /* Stand-ins reuse interactive classes (.retro-btn, .typing-key-row), so
+     suppress the hover/cursor affordances they carry — nothing here is real. */
+  pointer-events: none;
+}
+
+.typing-skel {
+  display: block;
+  width: var(--skel-w, 100%);
+  height: var(--skel-h, 1rem);
+  background: var(--retro-dark-gray);
+  animation: typing-skel-pulse 1.4s ease-in-out infinite;
+}
+
+/* One tone per surface the bars sit on, so they stay legible against the
+   chrome they stand in for without out-shouting it. */
+.typing-skel--on-dark {
+  background: #454545;
+}
+
+.typing-skel--on-paper {
+  background: #d5d5d5;
+}
+
+.typing-skel--on-teal {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Right-hand grid cells (.typing-key-num) align their text with text-align,
+   which a block-level bar ignores. */
+.typing-skel--end {
+  margin-left: auto;
+}
+
+/* The real picker sizes itself to its widest "Title — Author" option; an empty
+   stand-in would be far narrower and would stop the row wrapping where the real
+   one does. Re-measure if the book list gains a longer title. */
+.typing-skel-select {
+  width: 378px;
+  max-width: 100%;
+}
+
+/* The stand-ins hold bars instead of text, so nothing establishes the line box
+   the real label would create and every one of them lands ~8px short. VT323
+   lays out at roughly 1.4x its font-size; with border-box sizing, adding each
+   element's own padding and border back reproduces its post-hydration height. */
+.typing-skeleton .retro-btn,
+.typing-skeleton .typing-toggle,
+.typing-skeleton .typing-legend-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.typing-skeleton .retro-btn {
+  height: calc(1.4em + 26px); /* padding 10px, border 3px */
+}
+
+.typing-skeleton .typing-toggle,
+.typing-skeleton .typing-legend-item {
+  height: calc(1.4em + 14px); /* padding 4px, border 3px */
+}
+
+.typing-skeleton .typing-sync-link {
+  height: calc(1.4em + 16px); /* padding 6px, border 2px */
+}
+
+.typing-skeleton .typing-hint,
+.typing-skeleton .typing-message,
+.typing-skeleton .typing-key-avg-note {
+  min-height: 1.4em;
+}
+
+/* em resolves against each row's own font-size, so the smaller header row gets
+   the right height from the same rule. */
+.typing-skeleton .typing-key-row {
+  min-height: calc(1.4em + 11px); /* padding 5px, border-bottom 1px */
+}
+
+/* .typing-stat-value carries line-height: 1, so only the label below it needs
+   the 1.4x treatment. Spread the two bars rather than centring them together. */
+.typing-skeleton .typing-stat {
+  justify-content: space-evenly;
+  height: calc(1.8rem + 1.19rem + 12px); /* value + label + padding 4px, border 2px */
+}
+
+/* Label and value are ordinary text lines (1.4x their font-size); the glyph
+   between them carries line-height: 1, so it contributes its font-size exactly. */
+.typing-skeleton .typing-key-spotlight {
+  justify-content: space-evenly;
+  height: calc(1.33rem + 1.8rem + 1.54rem + 29px); /* + gap 4px, padding 8px, borders 3px/2px */
+}
+
+/* One .typing-text line box, so five of them fill .typing-scroll-viewport
+   exactly the way five lines of the real passage do. */
+.typing-skel-line {
+  display: flex;
+  align-items: center;
+  height: calc(1.7rem * 1.7);
+}
+
+/* StatsChart renders width="100%" with viewBox="0 0 600 240", so matching its
+   aspect ratio reproduces the rendered chart height at every width. Distributing
+   the rules with space-around keeps the outermost two off the panel's own edges,
+   where they would read as part of the border rather than as gridlines. */
+.typing-skel-chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  aspect-ratio: 600 / 240;
+}
+
+@media (max-width: 600px) {
+  .typing-skel-line {
+    height: calc(1.4rem * 1.7);
+  }
+}
+
+/* The typing hint is the one line long enough to wrap on narrow screens. It
+   turns over at ~520px in English and ~560px in Polish; reserving from the
+   earlier of the two keeps the skeleton from ever overshooting the real height,
+   since a placeholder that is too tall makes content jump upward on hydration.
+   Re-measure if the hint copy changes. */
+@media (max-width: 520px) {
+  .typing-skeleton .typing-hint {
+    min-height: 2.8em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-skel {
+    animation: none;
+  }
+  .typing-skeleton {
+    animation: none;
+    /* Without its fade-in running, the root would keep the 0 start value. */
+    opacity: 1;
+  }
+}
