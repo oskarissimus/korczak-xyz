@@ -14,6 +14,9 @@ export interface StatsSeries {
   points: StatsPoint[]; // sorted ascending by t
   lineClass: string;
   axis?: 'left' | 'right'; // which y-axis the values are scaled against
+  // Point markers, labels and tooltips. Off for annotation lines (a trend fit,
+  // say), whose endpoints aren't measurements anyone would want to read off.
+  markers?: boolean; // default true
   formatValue: (v: number) => string; // for the point tooltip
   formatLabel: (v: number) => string; // compact direct label above the point
 }
@@ -155,7 +158,8 @@ export default function StatsChart({
                 strokeWidth={2}
               />
             )}
-            {s.points.length <= MAX_MARKERS &&
+            {s.markers !== false &&
+              s.points.length <= MAX_MARKERS &&
               s.points.map((p, i) => (
                 <g key={`${p.t}-${i}`}>
                   <circle className={s.lineClass} cx={x(p.t)} cy={yOf(s, p.value)} r={3} />

@@ -57,6 +57,8 @@ export const translations = {
     slower: 'slower',
     faster: 'faster',
     timeLostCol: 'Time lost',
+    trend: 'Trend',
+    wpmPerWeek: 'WPM / week',
     // Split around the average gap so it can be highlighted inline.
     bottleneckFormulaPre: 'time lost = max(0, your gap −',
     bottleneckFormulaPost: 'avg) × presses',
@@ -117,6 +119,8 @@ export const translations = {
     slower: 'wolniej',
     faster: 'szybciej',
     timeLostCol: 'Stracony czas',
+    trend: 'Trend',
+    wpmPerWeek: 'WPM / tydz.',
     // Split around the average gap so it can be highlighted inline.
     bottleneckFormulaPre: 'stracony czas = max(0; twoja przerwa −',
     bottleneckFormulaPost: 'śr.) × naciśnięcia',

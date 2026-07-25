@@ -29,6 +29,11 @@ export function wpmFromLatency(meanMs: number): number {
   return meanMs > 0 ? WPM_FROM_MS / meanMs : 0;
 }
 
+// The inverse, for showing the gap behind a WPM figure.
+export function latencyFromWpm(wpm: number): number {
+  return wpm > 0 ? WPM_FROM_MS / wpm : 0;
+}
+
 export interface KeyStatsResult {
   keys: KeyStat[];
   typicalLatencyMs: number; // mean of all correct-press gaps pooled
@@ -133,13 +138,18 @@ export function computeKeyStats(sessions: TypingSession[]): KeyStatsResult {
   return { keys: stats, typicalLatencyMs: typical, averageWpm: wpmFromLatency(typical) };
 }
 
-// One point per local day (median latency that day) for a single key, so the
-// detail panel can chart whether that key is getting faster over time. Buckets
-// by wall-clock time (session.startedAt + event.t), matching the over-time page.
-export function keyLatencyOverTime(
-  sessions: TypingSession[],
-  key: string,
-): { t: number; value: number }[] {
+export interface KeyWpmPoint {
+  t: number; // start of the local day
+  value: number; // that day's WPM for the key
+}
+
+// One point per local day (that day's WPM for a single key), so the detail
+// panel can chart whether the key is getting faster over time. Buckets by
+// wall-clock time (session.startedAt + event.t), matching the over-time page.
+//
+// The day's WPM comes from the MEAN gap, not the median, so a point sits on the
+// same footing as the key's headline WPM in the table (see wpmFromLatency).
+export function keyWpmOverTime(sessions: TypingSession[], key: string): KeyWpmPoint[] {
   const byDay = new Map<number, number[]>();
   for (const s of sessions) {
     const chars = charEvents(s.events);
@@ -158,5 +168,8 @@ export function keyLatencyOverTime(
   }
   return [...byDay.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([t, gaps]) => ({ t, value: median(gaps.sort((x, y) => x - y)) }));
+    .map(([t, gaps]) => {
+      const mean = gaps.reduce((sum, v) => sum + v, 0) / gaps.length;
+      return { t, value: wpmFromLatency(mean) };
+    });
 }

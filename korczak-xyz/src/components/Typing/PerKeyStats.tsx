@@ -4,11 +4,13 @@ import { loadCloudSessions } from '../../utils/typing/cloudStorage';
 import { dedupeSessionsById, loadAllSessions } from '../../utils/typing/storage';
 import {
   computeKeyStats,
-  keyLatencyOverTime,
+  keyWpmOverTime,
+  latencyFromWpm,
   MIN_KEY_SAMPLES,
   type KeyStat,
 } from '../../utils/typing/keyStats';
 import { formatDuration } from '../../utils/typing/metrics';
+import { linearTrend } from '../../utils/typing/trend';
 import type { TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
@@ -32,10 +34,14 @@ const comparators: Record<SortMode, (a: KeyStat, b: KeyStat) => number> = {
   bottleneck: (a, b) => b.bottleneckMs - a.bottleneckMs,
 };
 
-// A "nice" upper bound for the latency axis: round up to the next 50ms, min 100.
-function niceLatencyMax(maxMs: number): number {
-  return Math.max(100, Math.ceil((maxMs * 1.1) / 50) * 50);
+// A "nice" upper bound for the WPM axis: round up to the next 10, min 40.
+function niceWpmMax(maxWpm: number): number {
+  return Math.max(40, Math.ceil((maxWpm * 1.1) / 10) * 10);
 }
+
+// Below this the weekly slope is noise dressed up as a verdict — show it, but
+// tinted neutral rather than green/red.
+const FLAT_WPM_PER_WEEK = 0.5;
 
 export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   const t = translations[lang];
@@ -196,25 +202,43 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     );
   };
 
-  // Detail mini-chart series for the selected key.
+  // Detail mini-chart series for the selected key: that key's WPM per day, plus
+  // a least-squares fit through it so the direction is readable at a glance.
   const detailPoints = useMemo(
-    () => (selectedKey == null ? [] : keyLatencyOverTime(sessions, selectedKey)),
+    () => (selectedKey == null ? [] : keyWpmOverTime(sessions, selectedKey)),
     [sessions, selectedKey]
   );
-  const detailSeries: StatsSeries[] =
-    detailPoints.length > 0
-      ? [
-          {
-            key: 'latency',
-            points: detailPoints,
-            lineClass: 'typing-chart-line--latency',
-            formatValue: (v) => `${Math.round(v)} ${t.ms}`,
-            formatLabel: (v) => String(Math.round(v)),
-          },
-        ]
-      : [];
-  const detailMax = detailPoints.reduce((m, p) => Math.max(m, p.value), 0);
-  const detailYDomain: [number, number] = [0, niceLatencyMax(detailMax)];
+  const trend = useMemo(() => linearTrend(detailPoints), [detailPoints]);
+  const detailSeries: StatsSeries[] = [];
+  if (detailPoints.length > 0) {
+    detailSeries.push({
+      key: 'keywpm',
+      points: detailPoints,
+      lineClass: 'typing-chart-line--keywpm',
+      // Spell out the gap behind the WPM — it's the number the rest of the page
+      // (bottleneck formula, row tooltips) is denominated in.
+      formatValue: (v) => `${Math.round(v)} ${t.wpm} (${Math.round(latencyFromWpm(v))} ${t.ms})`,
+      formatLabel: (v) => String(Math.round(v)),
+    });
+    if (trend) {
+      detailSeries.push({
+        key: 'trend',
+        points: trend.endpoints,
+        lineClass: 'typing-chart-line--trend',
+        markers: false, // an annotation, not measurements
+        formatValue: (v) => String(Math.round(v)),
+        formatLabel: (v) => String(Math.round(v)),
+      });
+    }
+  }
+  const detailMax = [...detailPoints, ...(trend?.endpoints ?? [])].reduce(
+    (m, p) => Math.max(m, p.value),
+    0
+  );
+  const detailYDomain: [number, number] = [0, niceWpmMax(detailMax)];
+  const trendPerWeek = trend ? trend.slopePerDay * 7 : 0;
+  const trendTone =
+    Math.abs(trendPerWeek) < FLAT_WPM_PER_WEEK ? 'flat' : trendPerWeek > 0 ? 'up' : 'down';
 
   const selectedStat = selectedKey == null ? null : stats.find((k) => k.key === selectedKey) ?? null;
 
@@ -230,7 +254,7 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   ];
 
   return (
-    <div className="typing-stats-page">
+    <div className="typing-stats-page typing-stats-page--keys">
       {!loading && stats.length === 0 ? (
         <p className="typing-message">{t.noKeyData}</p>
       ) : (
@@ -276,43 +300,62 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
             </p>
           )}
 
-          <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
-            <div className="typing-key-row typing-key-row--head" role="row">
-              <span role="columnheader">{t.keyCol}</span>
-              <span role="columnheader">{showBottleneck ? t.timeLostCol : t.medianLatency}</span>
-              <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
-              <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
-            </div>
-            {loading ? null : sortedTrusted.map((k) => renderKeyRow(k, false))}
-          </div>
+          {/* Two columns: the ranked list on the left, the selected key's chart
+              pinned alongside it on the right, so clicking a row doesn't send
+              the chart off-screen below 26 rows of table. */}
+          <div className="typing-key-layout">
+            <div className="typing-key-layout-list">
+              <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
+                <div className="typing-key-row typing-key-row--head" role="row">
+                  <span role="columnheader">{t.keyCol}</span>
+                  <span role="columnheader">{showBottleneck ? t.timeLostCol : t.medianLatency}</span>
+                  <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
+                  <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
+                </div>
+                {loading ? null : sortedTrusted.map((k) => renderKeyRow(k, false))}
+              </div>
 
-          {!loading && sortedUntrusted.length > 0 && (
-            <div className="typing-key-table typing-key-table--untrusted" role="table" aria-label={t.notTrusted}>
-              <p className="typing-key-untrusted-heading">{t.notTrusted}</p>
-              {sortedUntrusted.map((k) => renderKeyRow(k, true))}
+              {!loading && sortedUntrusted.length > 0 && (
+                <div className="typing-key-table typing-key-table--untrusted" role="table" aria-label={t.notTrusted}>
+                  <p className="typing-key-untrusted-heading">{t.notTrusted}</p>
+                  {sortedUntrusted.map((k) => renderKeyRow(k, true))}
+                </div>
+              )}
             </div>
-          )}
 
-          <div className="typing-key-detail">
-            {selectedStat == null ? (
-              <p className="typing-message">{t.selectKeyHint}</p>
-            ) : (
-              <>
-                <p className="typing-key-detail-title">
-                  {t.keyProgressTitle} <strong className="typing-key-glyph">{keyLabel(selectedStat.key)}</strong>
-                </p>
-                {detailSeries.length > 0 ? (
-                  <StatsChart
-                    series={detailSeries}
-                    yDomain={detailYDomain}
-                    formatDate={formatDate}
-                    showLabels={detailPoints.length <= 12}
-                  />
-                ) : (
-                  <p className="typing-message">{t.selectKeyHint}</p>
-                )}
-              </>
-            )}
+            <div className="typing-key-detail">
+              {selectedStat == null ? (
+                <p className="typing-message">{t.selectKeyHint}</p>
+              ) : (
+                <>
+                  <p className="typing-key-detail-title">
+                    {t.keyProgressTitle}{' '}
+                    <strong className="typing-key-glyph">{keyLabel(selectedStat.key)}</strong>
+                    {' — '}
+                    {t.wpm}
+                  </p>
+                  {detailSeries.length > 0 ? (
+                    <>
+                      {trend && (
+                        <p className={`typing-key-trend typing-key-trend--${trendTone}`}>
+                          <span className="typing-key-trend-swatch" /> {t.trend}:{' '}
+                          {trendPerWeek >= 0 ? '+' : '−'}
+                          {Math.abs(trendPerWeek).toFixed(1)} {t.wpmPerWeek}
+                        </p>
+                      )}
+                      <StatsChart
+                        series={detailSeries}
+                        yDomain={detailYDomain}
+                        formatDate={formatDate}
+                        showLabels={detailPoints.length <= 12}
+                      />
+                    </>
+                  ) : (
+                    <p className="typing-message">{t.selectKeyHint}</p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </>
       )}
