@@ -636,6 +636,11 @@ circle.typing-chart-line--latency {
   cursor: default;
   position: sticky;
   top: 0;
+  /* Rows scroll underneath, so the header needs its own opaque backdrop and a
+     lift out of the default stacking order — otherwise later-in-DOM rows paint
+     straight through it. */
+  z-index: 1;
+  background: var(--retro-black);
 }
 
 .typing-key-row:not(.typing-key-row--head):hover {
@@ -672,6 +677,10 @@ circle.typing-chart-line--latency {
   background: var(--retro-dark-gray);
   border: 1px solid var(--retro-black);
   overflow: hidden;
+  /* The fill/center-line z-indexes below only mean to order things *within* the
+     track. Without a stacking context they escape to the page root and outrank
+     the sticky header, so bars paint over it while scrolling. */
+  isolation: isolate;
 }
 
 .typing-key-diverge-center {
