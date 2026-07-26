@@ -30,6 +30,8 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     progressPercent,
     isFinished,
     isPaused,
+    isTiming,
+    getRecentChars,
     pause,
     resume,
     inputRef,
@@ -70,11 +72,15 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
         accuracy={accuracy}
         durationMs={durationMs}
         progressPercent={progressPercent}
+        isTiming={isTiming}
+        isPaused={isPaused}
+        getRecentChars={getRecentChars}
         labels={{
           wpm: t.wpm,
           accuracy: t.accuracy,
           progress: t.progress,
           timeSpent: t.timeSpent,
+          pulse: t.pulse,
         }}
       />
 

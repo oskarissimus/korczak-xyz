@@ -30,6 +30,7 @@ export const translations = {
     perDay: 'Per day',
     perWeek: 'Per week',
     timeSpent: 'Time spent',
+    pulse: 'Pulse',
     // Per-key stats page
     byKey: 'By key',
     overTime: 'Over time',
@@ -92,6 +93,7 @@ export const translations = {
     perDay: 'Na dzień',
     perWeek: 'Na tydzień',
     timeSpent: 'Czas pisania',
+    pulse: 'Puls',
     // Per-key stats page
     byKey: 'Wg klawiszy',
     overTime: 'W czasie',

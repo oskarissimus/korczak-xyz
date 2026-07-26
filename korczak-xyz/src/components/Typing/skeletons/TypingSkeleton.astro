@@ -53,6 +53,8 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
     The widest bar in each tile sets that tile's width, and the tiles together
     decide whether the progress bar still fits on the row. These match the real
     tiles' measured widths (64 / 68 / 78px) so the row wraps at the same point.
+    The pulse tile after them sizes itself from .typing-stat--pulse, exactly as
+    the real one does.
   */}
   <div class="typing-stats">
     {
@@ -67,6 +69,10 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
         </div>
       ))
     }
+    <div class="typing-stat typing-stat--pulse">
+      <span class="typing-skel typing-skel--on-dark" style="--skel-w: 100%; --skel-h: 1.8rem"></span>
+      <span class="typing-skel typing-skel--on-dark" style="--skel-w: 40px; --skel-h: 0.85rem"></span>
+    </div>
     <div class="typing-progress">
       <div class="typing-progress-track"></div>
       <span class="typing-skel" style="--skel-w: 6rem; --skel-h: 0.85rem"></span>

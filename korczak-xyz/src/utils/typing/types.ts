@@ -18,6 +18,13 @@ export interface TypingEvent {
   correct?: boolean; // whether it matched the expected char at the cursor
 }
 
+// A char keystroke pulled off the live log for real-time display, with its time
+// resolved to wall clock (unlike TypingEvent.t, which is session-relative).
+export interface RecentChar {
+  t: number; // epoch ms
+  correct: boolean;
+}
+
 // One practice sitting: an append-only event log plus where it began.
 export interface TypingSession {
   id: string; // crypto.randomUUID()

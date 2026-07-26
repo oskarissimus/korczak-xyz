@@ -80,6 +80,39 @@
   text-transform: uppercase;
 }
 
+/* Live momentary-WPM sparkline. Sized so the chart occupies exactly the slot a
+   .typing-stat-value would (which carries line-height: 1, so its font-size is
+   its height) and the tile stays flush with its siblings. */
+
+.typing-stat--pulse {
+  flex: 0 1 180px;
+  min-width: 140px;
+  padding: 4px 8px;
+}
+
+.typing-pulse-svg {
+  display: block;
+  width: 100%;
+  height: 1.8rem;
+}
+
+.typing-pulse-line {
+  fill: none;
+  stroke: var(--retro-green);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Session average, so above the line means faster than your own pace. Dashed
+   cyan matches the trend line on the per-key chart. */
+.typing-pulse-baseline {
+  stroke: var(--retro-cyan);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+}
+
 .typing-progress {
   flex: 1 1 160px;
   display: flex;
@@ -319,6 +352,9 @@
   }
   .typing-stat-value {
     font-size: 1.4rem;
+  }
+  .typing-pulse-svg {
+    height: 1.4rem;
   }
 }
 
