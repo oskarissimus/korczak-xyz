@@ -14,10 +14,15 @@ const { lang } = Astro.props;
    chrome. Language-specific because Polish labels are longer, and at narrow
    widths that decides whether a row of controls wraps. */
 const TOGGLES = { en: [77, 49, 56], pl: [56, 56, 70] }[lang];
-const LEGEND_WIDTHS = { en: [21, 56, 70], pl: [21, 49, 84] }[lang];
+const LEGEND_WIDTHS = { en: [21, 56, 70, 35], pl: [21, 49, 84, 35] }[lang];
 const CONTROLS = { en: [108, 46], pl: [115, 84] }[lang];
 
-const LEGEND = ['typing-legend-item--wpm', 'typing-legend-item--accuracy', 'typing-legend-item--time'];
+const LEGEND = [
+  'typing-legend-item--wpm',
+  'typing-legend-item--accuracy',
+  'typing-legend-item--time',
+  'typing-legend-item--trend',
+];
 
 /* Horizontal rules standing in for StatsChart's gridlines — the panel keeps the
    chart's 600x240 aspect ratio, so the box is the height the SVG will be. */

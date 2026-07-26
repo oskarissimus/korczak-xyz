@@ -9,6 +9,7 @@ import {
   formatDuration,
 } from '../../utils/typing/metrics';
 import { dedupeSessionsById, loadAllSessions } from '../../utils/typing/storage';
+import { linearTrend, trendTone, wpmPerWeek } from '../../utils/typing/trend';
 import type { TypingEvent, TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
@@ -115,6 +116,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   const [showWpm, setShowWpm] = useState(true);
   const [showAccuracy, setShowAccuracy] = useState(true);
   const [showTime, setShowTime] = useState(true);
+  const [showTrend, setShowTrend] = useState(true);
 
   // While a signed-in user's cloud sessions are still loading we show an empty
   // grid rather than the local-only data, so the chart draws once with the
@@ -165,8 +167,20 @@ export default function TypingStats({ lang }: TypingStatsProps) {
         ? aggregateByWeekFromEvents(sessions)
         : sessionPoints;
 
+  // Least-squares fit through the WPM points of whatever grouping is showing,
+  // so the direction is readable through the day-to-day noise. Null below three
+  // distinct timestamps, where the fit would just retrace the data line.
+  const wpmPoints = points.map((p) => ({ t: p.t, value: p.wpm }));
+  const trend = linearTrend(wpmPoints);
+  const trendVisible = showTrend && trend != null;
+  const perWeek = trend ? wpmPerWeek(trend) : 0;
+
   // Shared 0-100 left axis; extend only if WPM ever exceeds 100.
-  const maxWpm = Math.max(...points.map((p) => p.wpm), 0);
+  const maxWpm = Math.max(
+    ...points.map((p) => p.wpm),
+    ...(trendVisible ? trend.endpoints.map((p) => p.value) : []),
+    0
+  );
   const yDomain: [number, number] = [0, Math.max(100, Math.ceil((maxWpm * 1.1) / 10) * 10)];
 
   // Right axis for time spent, in minutes.
@@ -181,9 +195,20 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   if (showWpm) {
     series.push({
       key: 'wpm',
-      points: points.map((p) => ({ t: p.t, value: p.wpm })),
+      points: wpmPoints,
       lineClass: 'typing-chart-line--wpm',
       formatValue: (v) => `${Math.round(v)} ${t.wpm}`,
+      formatLabel: (v) => String(Math.round(v)),
+    });
+  }
+  // After the WPM series so the annotation draws over the data it fits.
+  if (trendVisible) {
+    series.push({
+      key: 'trend',
+      points: trend.endpoints,
+      lineClass: 'typing-chart-line--trend typing-chart-line--trend-wpm',
+      markers: false, // an annotation, not measurements
+      formatValue: (v) => String(Math.round(v)),
       formatLabel: (v) => String(Math.round(v)),
     });
   }
@@ -274,8 +299,24 @@ export default function TypingStats({ lang }: TypingStatsProps) {
                 <span className="typing-legend-swatch" />
                 {t.timeSpent}
               </button>
+              <button
+                type="button"
+                className="typing-legend-item typing-legend-item--trend"
+                aria-pressed={showTrend}
+                onClick={() => setShowTrend((v) => !v)}
+              >
+                <span className="typing-legend-swatch" />
+                {t.trend}
+              </button>
             </div>
           </div>
+          {!loading && trendVisible && (
+            <p className={`typing-trend-note typing-trend-note--${trendTone(perWeek)}`}>
+              <span className="typing-trend-swatch typing-trend-swatch--wpm" /> {t.trend}:{' '}
+              {perWeek >= 0 ? '+' : '−'}
+              {Math.abs(perWeek).toFixed(1)} {t.wpmPerWeek}
+            </p>
+          )}
           <StatsChart
             series={loading ? [] : series}
             yDomain={loading ? LOADING_Y_DOMAIN : yDomain}

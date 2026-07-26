@@ -16,6 +16,19 @@ export interface TrendFit {
   endpoints: [TrendPoint, TrendPoint]; // fitted value at the first and last t
 }
 
+// A week that moves the fit by less than this is noise, not a direction.
+export const FLAT_WPM_PER_WEEK = 0.5;
+
+// Days are too short a horizon to read a typing trend on; weeks are what the
+// readouts quote.
+export function wpmPerWeek(fit: TrendFit): number {
+  return fit.slopePerDay * 7;
+}
+
+export function trendTone(perWeek: number): 'up' | 'down' | 'flat' {
+  return Math.abs(perWeek) < FLAT_WPM_PER_WEEK ? 'flat' : perWeek > 0 ? 'up' : 'down';
+}
+
 /**
  * Fit `value = a + b·x` where x is days elapsed since the first point (raw epoch
  * ms would make the sums huge and the fit numerically mushy).

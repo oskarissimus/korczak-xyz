@@ -579,6 +579,10 @@ circle.typing-chart-line--time {
   background: var(--retro-magenta);
 }
 
+.typing-legend-item--trend .typing-legend-swatch {
+  background: var(--retro-yellow);
+}
+
 /* Per-key stats page */
 
 .typing-chart-line--keywpm {
@@ -596,6 +600,12 @@ circle.typing-chart-line--keywpm {
   stroke: var(--retro-cyan);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
+}
+
+/* On the over-time chart cyan is already the accuracy series; yellow is the one
+   palette slot none of the three data lines there uses. */
+.typing-chart-line--trend-wpm {
+  stroke: var(--retro-yellow);
 }
 
 /* Let the sort buttons wrap on narrow screens (also harmless on the
@@ -847,7 +857,9 @@ circle.typing-chart-line--keywpm {
   margin: 0 0 8px;
 }
 
-.typing-key-trend {
+/* Weekly-slope caption under a fitted chart — shared by the per-key detail
+   chart and the over-time WPM chart. */
+.typing-trend-note {
   font-family: 'VT323', monospace;
   font-size: 1rem;
   text-align: center;
@@ -857,18 +869,22 @@ circle.typing-chart-line--keywpm {
 
 /* Matches the dashed fit on the chart, so the caption names a line you can
    actually pick out (same idea as .typing-key-avg-swatch above). */
-.typing-key-trend-swatch {
+.typing-trend-swatch {
   display: inline-block;
   width: 16px;
   vertical-align: middle;
   border-top: 2px dashed var(--retro-cyan);
 }
 
-.typing-key-trend--up {
+.typing-trend-swatch--wpm {
+  border-top-color: var(--retro-yellow);
+}
+
+.typing-trend-note--up {
   color: var(--retro-green);
 }
 
-.typing-key-trend--down {
+.typing-trend-note--down {
   color: var(--retro-red);
 }
 

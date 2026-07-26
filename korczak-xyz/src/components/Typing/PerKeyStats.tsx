@@ -10,7 +10,7 @@ import {
   type KeyStat,
 } from '../../utils/typing/keyStats';
 import { formatDuration } from '../../utils/typing/metrics';
-import { linearTrend } from '../../utils/typing/trend';
+import { linearTrend, trendTone, wpmPerWeek } from '../../utils/typing/trend';
 import type { TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
 import { translations, type Lang } from './translations';
@@ -38,10 +38,6 @@ const comparators: Record<SortMode, (a: KeyStat, b: KeyStat) => number> = {
 function niceWpmMax(maxWpm: number): number {
   return Math.max(40, Math.ceil((maxWpm * 1.1) / 10) * 10);
 }
-
-// Below this the weekly slope is noise dressed up as a verdict — show it, but
-// tinted neutral rather than green/red.
-const FLAT_WPM_PER_WEEK = 0.5;
 
 export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   const t = translations[lang];
@@ -236,9 +232,8 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     0
   );
   const detailYDomain: [number, number] = [0, niceWpmMax(detailMax)];
-  const trendPerWeek = trend ? trend.slopePerDay * 7 : 0;
-  const trendTone =
-    Math.abs(trendPerWeek) < FLAT_WPM_PER_WEEK ? 'flat' : trendPerWeek > 0 ? 'up' : 'down';
+  const perWeek = trend ? wpmPerWeek(trend) : 0;
+  const tone = trendTone(perWeek);
 
   const selectedStat = selectedKey == null ? null : stats.find((k) => k.key === selectedKey) ?? null;
 
@@ -337,10 +332,10 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
                   {detailSeries.length > 0 ? (
                     <>
                       {trend && (
-                        <p className={`typing-key-trend typing-key-trend--${trendTone}`}>
-                          <span className="typing-key-trend-swatch" /> {t.trend}:{' '}
-                          {trendPerWeek >= 0 ? '+' : '−'}
-                          {Math.abs(trendPerWeek).toFixed(1)} {t.wpmPerWeek}
+                        <p className={`typing-trend-note typing-trend-note--${tone}`}>
+                          <span className="typing-trend-swatch" /> {t.trend}:{' '}
+                          {perWeek >= 0 ? '+' : '−'}
+                          {Math.abs(perWeek).toFixed(1)} {t.wpmPerWeek}
                         </p>
                       )}
                       <StatsChart
