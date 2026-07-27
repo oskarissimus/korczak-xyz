@@ -2,24 +2,24 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
-import tailwind from '@astrojs/tailwind';
 import rehypeWrapImages from './src/plugins/rehype-wrap-images.mjs';
 
 export default defineConfig({
   devToolbar: { enabled: false },
   site: 'https://korczak.xyz',
   trailingSlash: 'ignore',
+  compressHTML: true,
   i18n: {
     defaultLocale: 'en',
     locales: ['en', 'pl'],
     routing: {
       prefixDefaultLocale: false,
+      redirectToDefaultLocale: false,
     },
   },
   integrations: [
     react(),
     mdx(),
-    tailwind(),
   ],
   markdown: {
     shikiConfig: {
