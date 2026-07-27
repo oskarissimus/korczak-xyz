@@ -9,24 +9,45 @@
   padding: 16px;
 }
 
-/* View switcher — the same row in the same place on all three pages. */
+/* View switcher — a Win95 property-sheet tab strip, the same row in the same
+   place on all three pages. The strip is its own gray surface; the page below
+   stays teal. */
 
 .typing-tabs {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 2px;
+  background: var(--retro-gray);
+  /* The bottom padding is the shelf the current tab sits on. */
+  padding: 4px 4px 6px;
   margin-bottom: 16px;
 }
 
+/* Top edge of the panel, running the width of the strip. align-items: flex-end
+   lands every tab's bottom on this line, so the tabs it crosses read as being
+   behind the panel — and the one that covers it reads as being part of it. */
+.typing-tabs::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  height: 2px;
+  background: var(--retro-white);
+}
+
 .typing-tab {
+  position: relative;
   font-family: 'VT323', monospace;
   font-size: 1.2rem;
   background: var(--retro-gray);
-  border: 3px outset var(--retro-white);
-  padding: 10px 20px;
+  /* Per-side rather than `outset`: a tab has no bottom edge of its own. */
+  border: 2px solid;
+  border-color: var(--retro-white) var(--retro-dark-gray) transparent var(--retro-white);
+  border-radius: 3px 3px 0 0;
+  padding: 5px 14px 4px;
   text-decoration: none;
-  display: inline-block;
 }
 
 /* Out-specifies the global a:visited, which would otherwise paint whichever
@@ -38,24 +59,32 @@
   color: var(--retro-black);
 }
 
-.typing-tab:hover {
+.typing-tab:not([aria-current='page']):hover {
   background: #a0a0a0;
 }
 
-.typing-tab:active {
-  border-style: inset;
+/* No underline to fall back on, so keep the Win95 focus rectangle. */
+.typing-tab:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: -4px;
 }
 
-/* The current view stays pressed, and loses the pointer since it goes nowhere. */
+/* The current view stands taller and, via the negative margin, laps its opaque
+   body over the panel line — the whole tab illusion is that one overlap. */
 .typing-tab[aria-current='page'] {
-  border-style: inset;
-  background: #a0a0a0;
+  padding: 8px 16px 6px;
+  margin-bottom: -2px;
+  z-index: 1;
   cursor: default;
 }
 
 @media (max-width: 420px) {
   .typing-tab {
-    padding: 10px 12px;
+    padding: 5px 8px 4px;
+  }
+
+  .typing-tab[aria-current='page'] {
+    padding: 8px 10px 6px;
   }
 }
 
