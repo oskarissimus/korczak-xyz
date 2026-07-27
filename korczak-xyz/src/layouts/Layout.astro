@@ -1,7 +1,8 @@
 ---
 import Navbar from '../components/Navbar/Navbar.astro';
 import Footer from '../components/Footer.astro';
-import type { Lang } from '../i18n';
+import { useTranslations, type Lang } from '../i18n';
+import islandRecovery from '../scripts/island-recovery.js?raw';
 import '../styles/global.css';
 import '../styles/auth.css';
 
@@ -18,6 +19,13 @@ const {
 } = Astro.props;
 
 const currentPath = Astro.url.pathname;
+
+const t = useTranslations(lang);
+const recoveryStrings = {
+  title: t('hydrationError.title'),
+  message: t('hydrationError.message'),
+  reload: t('hydrationError.reload'),
+};
 ---
 
 <!DOCTYPE html>
@@ -32,6 +40,10 @@ const currentPath = Astro.url.pathname;
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script is:inline define:vars={{ recoveryStrings }}>
+      window.__islandRecoveryI18n = recoveryStrings;
+    </script>
+    <script is:inline set:html={islandRecovery}></script>
   </head>
   <body>
     <!-- SVG filter for Win95 dithered 16-color effect -->

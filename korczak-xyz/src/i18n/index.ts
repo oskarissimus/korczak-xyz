@@ -243,6 +243,11 @@ export const ui = {
     'anesthesia.errorReadingFile': 'Error reading file',
     'anesthesia.errorNoQuestions': 'No valid questions found in file',
     'anesthesia.errorCopyingClipboard': 'Error copying to clipboard',
+
+    // Island hydration failure dialog
+    'hydrationError.title': 'Loading Error',
+    'hydrationError.message': 'Parts of this page could not be loaded. Check your internet connection and try again.',
+    'hydrationError.reload': 'Reload',
     'anesthesia.andMoreErrors': 'and {count} more errors',
   },
   pl: {
@@ -479,6 +484,11 @@ export const ui = {
     'anesthesia.errorNoQuestions': 'Nie znaleziono prawidlowych pytan w pliku',
     'anesthesia.errorCopyingClipboard': 'Blad kopiowania do schowka',
     'anesthesia.andMoreErrors': 'i {count} wiecej bledow',
+
+    // Island hydration failure dialog
+    'hydrationError.title': 'Blad ladowania',
+    'hydrationError.message': 'Nie udalo sie zaladowac czesci tej strony. Sprawdz polaczenie z internetem i sprobuj ponownie.',
+    'hydrationError.reload': 'Odswiez',
   },
 } as const;
 
