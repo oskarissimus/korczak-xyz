@@ -40,18 +40,6 @@ export default function Typing({ lang }: TypingProps) {
             </option>
           ))}
         </select>
-        <a
-          className="retro-btn"
-          href={lang === 'pl' ? '/pl/games/typing/stats/' : '/games/typing/stats/'}
-        >
-          {t.stats}
-        </a>
-        <a
-          className="retro-btn"
-          href={lang === 'pl' ? '/pl/games/typing/keys/' : '/games/typing/keys/'}
-        >
-          {t.byKey}
-        </a>
       </div>
 
       <SyncStatus auth={auth} lang={lang} />

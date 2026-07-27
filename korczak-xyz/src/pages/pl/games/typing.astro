@@ -2,6 +2,7 @@
 import Layout from '../../../layouts/Layout.astro';
 import Typing from '../../../components/Typing/Typing';
 import TypingSkeleton from '../../../components/Typing/skeletons/TypingSkeleton.astro';
+import TypingTabs from '../../../components/Typing/TypingTabs.astro';
 import { useTranslations } from '../../../i18n';
 import '../../../styles/typing.css';
 
@@ -20,6 +21,7 @@ const t = useTranslations(lang);
       </div>
     </div>
     <div class="window-content typing-content">
+      <TypingTabs lang={lang} active="practice" />
       <Typing client:only="react" lang={lang}>
         <TypingSkeleton slot="fallback" lang={lang} />
       </Typing>

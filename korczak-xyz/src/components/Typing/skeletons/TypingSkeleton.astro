@@ -17,7 +17,6 @@ const PASSAGE_LINES = ['100%', '96%', '99%', '88%', '62%'];
    chrome (20px padding + 3px border per side). They are language-specific
    because Polish labels are noticeably longer, and at narrow widths that
    decides whether a row of buttons wraps — which is a whole row of shift. */
-const PICKER = { en: [38, 46], pl: [77, 84] }[lang];
 const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
 ---
 
@@ -30,13 +29,6 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
       the real picker get the same ones instead of a hard-coded guess.
     */}
     <select class="typing-book-select typing-skel-select" disabled><option></option></select>
-    {
-      PICKER.map((w) => (
-        <span class="retro-btn">
-          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
-        </span>
-      ))
-    }
   </div>
 
   {/*

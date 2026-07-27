@@ -237,9 +237,6 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const selectedStat = selectedKey == null ? null : stats.find((k) => k.key === selectedKey) ?? null;
 
-  const backHref = lang === 'pl' ? '/pl/games/typing/' : '/games/typing/';
-  const overTimeHref = lang === 'pl' ? '/pl/games/typing/stats/' : '/games/typing/stats/';
-
   const sortModes: { mode: SortMode; label: string }[] = [
     { mode: 'slowest', label: t.sortSlowest },
     { mode: 'fastest', label: t.sortFastest },
@@ -354,15 +351,6 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
           </div>
         </>
       )}
-
-      <div className="typing-controls">
-        <a className="retro-btn" href={backHref}>
-          {t.backToTyping}
-        </a>
-        <a className="retro-btn" href={overTimeHref}>
-          {t.backToOverTime}
-        </a>
-      </div>
     </div>
   );
 }

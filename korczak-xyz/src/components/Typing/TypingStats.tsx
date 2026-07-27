@@ -232,8 +232,6 @@ export default function TypingStats({ lang }: TypingStatsProps) {
     });
   }
 
-  const backHref = lang === 'pl' ? '/pl/games/typing/' : '/games/typing/';
-
   // Placeholder domains for the empty loading grid so it stays stable and blank.
   const LOADING_Y_DOMAIN: [number, number] = [0, 100];
   const LOADING_YR_DOMAIN: [number, number] = [0, 1];
@@ -332,14 +330,6 @@ export default function TypingStats({ lang }: TypingStatsProps) {
           </p>
         </>
       )}
-      <div className="typing-controls">
-        <a className="retro-btn" href={backHref}>
-          {t.backToTyping}
-        </a>
-        <a className="retro-btn" href={lang === 'pl' ? '/pl/games/typing/keys/' : '/games/typing/keys/'}>
-          {t.byKey}
-        </a>
-      </div>
     </div>
   );
 }

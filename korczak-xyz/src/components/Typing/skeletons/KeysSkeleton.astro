@@ -2,8 +2,9 @@
 /**
  * Server-rendered stand-in for <PerKeyStats client:only="react" />, mirroring
  * PerKeyStats.tsx: three spotlight cards, sort toggles, legend note, then the
- * two-column layout (key table left, chart panel right) and the controls. Astro
- * swaps it for the real island once React hydrates.
+ * two-column layout (key table left, chart panel right). Astro swaps it for the
+ * real island once React hydrates. The view tabs above are real markup on the
+ * page, not part of the island, so nothing stands in.
  */
 
 interface Props {
@@ -17,7 +18,6 @@ const SPOTLIGHTS = ['slow', 'fast', 'bottleneck'];
    chrome. Language-specific because Polish labels are longer, and at narrow
    widths that decides whether a row of controls wraps. */
 const SORT_MODES = { en: [49, 49, 70, 99, 70], pl: [92, 70, 77, 99, 92] }[lang];
-const CONTROLS = { en: [108, 115], pl: [115, 146] }[lang];
 
 /* One row per letter: a practised user's trusted table settles at ~26 rows, and
    measuring the real page against this skeleton is how the count was picked.
@@ -85,15 +85,5 @@ const ROW_BARS = Array.from(
         <span class="typing-skel typing-skel--on-teal" style="--skel-w: 12rem; --skel-h: 1.1rem; margin: 0 auto"></span>
       </p>
     </div>
-  </div>
-
-  <div class="typing-controls">
-    {
-      CONTROLS.map((w) => (
-        <span class="retro-btn">
-          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.2rem`} />
-        </span>
-      ))
-    }
   </div>
 </div>

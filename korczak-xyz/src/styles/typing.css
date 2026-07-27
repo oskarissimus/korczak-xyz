@@ -9,6 +9,56 @@
   padding: 16px;
 }
 
+/* View switcher — the same row in the same place on all three pages. */
+
+.typing-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.typing-tab {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 10px 20px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* Out-specifies the global a:visited, which would otherwise paint whichever
+   tabs you have already been to magenta — a row that changes colour with your
+   browsing history reads as three unrelated buttons rather than one control. */
+.typing-tabs .typing-tab,
+.typing-tabs .typing-tab:visited,
+.typing-tabs .typing-tab:hover {
+  color: var(--retro-black);
+}
+
+.typing-tab:hover {
+  background: #a0a0a0;
+}
+
+.typing-tab:active {
+  border-style: inset;
+}
+
+/* The current view stays pressed, and loses the pointer since it goes nowhere. */
+.typing-tab[aria-current='page'] {
+  border-style: inset;
+  background: #a0a0a0;
+  cursor: default;
+}
+
+@media (max-width: 420px) {
+  .typing-tab {
+    padding: 10px 12px;
+  }
+}
+
 .typing-game {
   display: flex;
   flex-direction: column;
