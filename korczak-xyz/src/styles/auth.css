@@ -140,6 +140,8 @@
 }
 
 /* --- Typing app sync status --- */
+/* Sits on the trainer's gray panel (.typing-content), not on the teal the rest
+   of this file's chrome assumes — hence the dialog-ink colours here. */
 .typing-sync {
   display: flex;
   align-items: center;
@@ -147,21 +149,29 @@
   gap: 6px;
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
-  color: var(--retro-white);
+  color: var(--retro-black);
   text-align: center;
 }
 
 .typing-sync-cloud {
-  color: var(--retro-cyan);
+  color: var(--retro-navy);
   font-size: 1.3rem;
 }
 
 .typing-sync-link {
-  color: var(--retro-yellow);
+  color: var(--retro-black);
   text-decoration: none;
   background: var(--retro-gray);
   border: 2px outset var(--retro-white);
   padding: 6px 12px;
+}
+
+/* The link is an <a>, so the global a:visited / a:hover out-specify a bare
+   class and would repaint a Win95 button's label magenta or yellow. */
+.typing-sync.typing-sync-link,
+.typing-sync.typing-sync-link:visited,
+.typing-sync.typing-sync-link:hover {
+  color: var(--retro-black);
 }
 
 .typing-sync-link:hover {

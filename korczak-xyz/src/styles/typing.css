@@ -4,23 +4,27 @@
   margin-bottom: 20px;
 }
 
+/* The trainer is a property sheet, not a page in a teal window: everything in
+   it is dialog chrome, so the content area is the panel face. .window-content
+   sets white-on-teal, so the ink has to be reset along with the surface. */
 .typing-content {
-  background: var(--retro-teal);
+  background: var(--retro-gray);
+  color: var(--retro-black);
   padding: 16px;
 }
 
 /* View switcher — a Win95 property-sheet tab strip, the same row in the same
-   place on all three pages. The strip is its own gray surface; the page below
-   stays teal. */
+   place on all three pages. Everything below it is the panel the tabs belong
+   to, so the two share a surface and only the edge line divides them. */
 
 .typing-tabs {
   position: relative;
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  background: var(--retro-gray);
-  /* The bottom padding is the shelf the current tab sits on. */
-  padding: 4px 4px 6px;
+  /* The bottom padding is the shelf the current tab sits on. No horizontal
+     padding: the first tab lines up with the panel's own left edge. */
+  padding: 4px 0 6px;
   margin-bottom: 16px;
 }
 
@@ -104,11 +108,11 @@
   gap: 8px;
 }
 
+/* Black, and no text-shadow: both were there to lift the label off teal. */
 .typing-book-label {
   font-family: 'Press Start 2P', monospace;
   font-size: 0.7rem;
-  color: var(--retro-white);
-  text-shadow: 1px 1px 0 var(--retro-black);
+  color: var(--retro-black);
 }
 
 .typing-book-select {
@@ -377,7 +381,7 @@
 .typing-hint {
   font-family: 'VT323', monospace;
   font-size: 1rem;
-  color: var(--retro-white);
+  color: var(--retro-black);
   text-align: center;
   margin: 0;
 }
@@ -414,10 +418,12 @@
   justify-content: center;
 }
 
+/* Transient import/export feedback. Navy rather than the panel's black so it
+   still reads as a notice — yellow only worked against teal. */
 .typing-message {
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
-  color: var(--retro-yellow);
+  color: var(--retro-navy);
   text-align: center;
   margin: 0;
 }
@@ -874,11 +880,11 @@ circle.typing-chart-line--keywpm {
   margin: 0;
   font-family: 'VT323', monospace;
   font-size: 1rem;
-  color: var(--retro-gray);
+  color: var(--retro-black);
 }
 
 .typing-key-avg-note strong {
-  color: var(--retro-yellow);
+  color: var(--retro-navy);
 }
 
 /* The bottleneck formula is math notation — keep its spacing tight and let it
@@ -931,7 +937,7 @@ circle.typing-chart-line--keywpm {
 .typing-key-detail-title {
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
-  color: var(--retro-white);
+  color: var(--retro-black);
   text-align: center;
   margin: 0 0 8px;
 }
@@ -942,16 +948,20 @@ circle.typing-chart-line--keywpm {
   font-family: 'VT323', monospace;
   font-size: 1rem;
   text-align: center;
-  color: var(--retro-gray);
+  color: var(--retro-black);
   margin: 0 0 6px;
 }
 
 /* Matches the dashed fit on the chart, so the caption names a line you can
-   actually pick out (same idea as .typing-key-avg-swatch above). */
+   actually pick out (same idea as .typing-key-avg-swatch above). The chart
+   draws that line on black, and cyan/yellow vanish against the gray panel, so
+   the swatch brings a scrap of the chart's backdrop with it. */
 .typing-trend-swatch {
   display: inline-block;
   width: 16px;
+  height: 9px;
   vertical-align: middle;
+  background: var(--retro-black);
   border-top: 2px dashed var(--retro-cyan);
 }
 
@@ -959,12 +969,15 @@ circle.typing-chart-line--keywpm {
   border-top-color: var(--retro-yellow);
 }
 
+/* The VGA-bright green and red are for the black chart panels; on gray they
+   need their dark siblings. Maroon clears 6:1 as-is, but VGA green (#008000)
+   only manages 2.8 against #c0c0c0, so this one goes a shade darker still. */
 .typing-trend-note--up {
-  color: var(--retro-green);
+  color: #006000;
 }
 
 .typing-trend-note--down {
-  color: var(--retro-red);
+  color: #800000;
 }
 
 /* Key list left, chart right. The chart column is sticky so it stays in view
@@ -1014,8 +1027,8 @@ circle.typing-chart-line--keywpm {
     order: -1;
     top: 0;
     z-index: 3;
-    /* Rows pass behind it, so it needs the page's own opaque backdrop. */
-    background: var(--retro-teal);
+    /* Rows pass behind it, so it needs the panel's own opaque backdrop. */
+    background: var(--retro-gray);
     padding-bottom: 6px;
   }
   /* Pinned to the top, the full-aspect chart would eat half a phone screen;
@@ -1105,10 +1118,6 @@ circle.typing-chart-line--keywpm {
 
 .typing-skel--on-paper {
   background: #d5d5d5;
-}
-
-.typing-skel--on-teal {
-  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Right-hand grid cells (.typing-key-num) align their text with text-align,
