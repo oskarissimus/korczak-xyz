@@ -1,0 +1,9 @@
+# Hashed build assets never change under a given name.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML must revalidate, or a cached page can outlive the chunks it references.
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
