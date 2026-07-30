@@ -53,6 +53,32 @@
   font-size: 0.8rem;
 }
 
+/* The folded form only shows on phones; see the media query below. */
+.nav-auth-email--short {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .status-user .nav-auth-email {
+    /* Matches the tightened status panels in Navbar.astro at this width. */
+    font-size: 0.7rem;
+    padding: 1px 2px;
+    /* Backstop for unusually long domains, which foldEmail cannot shorten. */
+    max-width: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-user .nav-auth-email--full {
+    display: none;
+  }
+
+  .status-user .nav-auth-email--short {
+    display: inline;
+  }
+}
+
 .nav-auth-btn {
   background: var(--retro-gray);
   border: 2px outset var(--retro-white);

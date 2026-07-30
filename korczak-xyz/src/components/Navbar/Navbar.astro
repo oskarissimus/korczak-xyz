@@ -85,8 +85,11 @@ function isActive(itemPath: string): boolean {
     <div class="status-panel">
       <a href={`https://github.com/oskarissimus/korczak-xyz/commit/${commitHash}`} target="_blank" rel="noopener">{commitHash}</a>
     </div>
-    <div class="status-panel status-panel--updated">
-      {t('statusBar.lastUpdated')} <span id="navbar-build-time" data-timestamp={buildTimestamp}>{buildTimestamp}</span>
+    <div class="status-panel status-panel--updated" id="navbar-updated" data-timestamp={buildTimestamp}>
+      <span class="status-label status-label--long">{t('statusBar.lastUpdated')}</span>
+      <span class="status-label status-label--short">{t('statusBar.updated')}</span>
+      <span class="build-time build-time--long">{buildTimestamp}</span>
+      <span class="build-time build-time--short">{buildTimestamp}</span>
     </div>
     <div class="status-user">
       <NavAuth client:only="react" lang={lang} variant="identity" />
@@ -224,11 +227,26 @@ function isActive(itemPath: string): boolean {
 
   .status-panel:first-child {
     flex: 0 0 auto;
+    white-space: nowrap;
   }
 
-  /* Middle panel fills the gap so the user panel hugs the right edge. */
+  /* Middle panel fills the gap so the user panel hugs the right edge. Never let it
+     wrap — a second line would double the height of the whole status bar. The basis is
+     `auto` rather than 0 so that when space runs out the panel shrinks in proportion to
+     the email beside it, instead of being the only one squeezed. */
   .status-panel--updated {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Long/short variants of the label and the timestamp; the media query below swaps
+     them so the bar still fits on one line on a phone. */
+  .status-label--short,
+  .build-time--short {
+    display: none;
   }
 
   /* Transparent wrapper: when logged out the identity island renders nothing,
@@ -285,6 +303,39 @@ function isActive(itemPath: string): boolean {
       justify-content: center;
     }
   }
+
+  /* Phones: swap in the terse label and the compact timestamp. Narrower than the nav
+     breakpoint above, because the status bar still fits on a small tablet. */
+  @media (max-width: 600px) {
+    .status-label--long,
+    .build-time--long {
+      display: none;
+    }
+
+    .status-label--short,
+    .build-time--short {
+      display: inline;
+    }
+
+    /* Same treatment the title bar already gets at this width — the extra few
+       characters it buys are what keep all three panels on one line. */
+    .status-panel {
+      font-size: 0.7rem;
+      padding: 1px 2px;
+    }
+
+    .status-bar {
+      padding: 1px;
+      gap: 1px;
+    }
+
+    /* Below ~390px not everything fits even shortened. Let the email give up
+       characters first: it is already an abbreviation and keeps a title tooltip,
+       whereas a clipped timestamp is just unreadable. */
+    .status-user {
+      flex-shrink: 6;
+    }
+  }
 </style>
 
 <script>
@@ -295,21 +346,34 @@ function isActive(itemPath: string): boolean {
     mainNav?.classList.toggle('show');
   });
 
-  // Format build timestamp based on locale
-  const buildTimeEl = document.getElementById('navbar-build-time');
-  if (buildTimeEl) {
-    const timestamp = buildTimeEl.dataset.timestamp;
-    if (timestamp) {
-      const date = new Date(timestamp);
-      const lang = document.documentElement.lang || 'en';
-      const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
-      buildTimeEl.textContent = date.toLocaleString(locale, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
+  // Format build timestamp. Two variants: the locale-aware long one for wide screens,
+  // and a compact ISO-style one for phones (CSS picks which is visible).
+  const updatedEl = document.getElementById('navbar-updated');
+  const timestamp = updatedEl?.dataset.timestamp;
+  if (updatedEl && timestamp) {
+    const date = new Date(timestamp);
+    const lang = document.documentElement.lang || 'en';
+    const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
+
+    const long = date.toLocaleString(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    // YYYY-MM-DD HH:MM in local time — 16 chars, unambiguous, and the same in every
+    // locale, so it needs no translation.
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+    const longEl = updatedEl.querySelector('.build-time--long');
+    const shortEl = updatedEl.querySelector('.build-time--short');
+    if (longEl) longEl.textContent = long;
+    if (shortEl) shortEl.textContent = short;
+
+    // Keeps the full date reachable when the compact form is showing.
+    updatedEl.title = long;
   }
 </script>

@@ -141,6 +141,8 @@ export const ui = {
 
     // Status bar
     'statusBar.lastUpdated': 'Last updated:',
+    // Narrow-screen variant, so the status bar stays on one line.
+    'statusBar.updated': 'Updated:',
 
     // Anesthesia Quiz
     'AnesthesiaQuiz': 'Anesthesia Quiz',
@@ -381,6 +383,7 @@ export const ui = {
 
     // Status bar
     'statusBar.lastUpdated': 'Aktualizacja:',
+    'statusBar.updated': 'Akt.:',
 
     // Anesthesia Quiz
     'AnesthesiaQuiz': 'Quiz Anestezjologiczny',
