@@ -119,4 +119,5 @@ const t = useTranslations(lang);
 
 ## Workflow
 
-When work is finished, commit and push the changes to the repository.
+When work is finished, commit and push directly to `main`. Don't create feature branches
+or pull requests for routine work unless I explicitly ask for one.
