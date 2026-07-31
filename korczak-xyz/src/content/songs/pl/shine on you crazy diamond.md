@@ -5,16 +5,26 @@ author: Pink Floyd
 published: true
 language: pl
 dateAdded: 2026-05-10
+chords:
+  g: "3 3 3 5 5 3"
+  "F#": "2 4 4 3 2 2"
+  "A#": "x 1 3 3 3 1"
 ---
 ```plaintext
-G                            F#                      A#
-Remember when you were young,    you shone like the sun.
+g                            
+Remember when you were young,
+F#                      A#
+you shone like the sun.
   D#  D#       C C   F
 Shine on you crazy diamond.
- G                             F#                             A#
-Now there's a look in your eyes,    like black holes in the sky.
+
+g                               
+Now there's a look in your eyes,
+F#                             A#
+like black holes in the sky.
   D#  D#       C C   F
 Shine on you crazy diamond.
+
                 G                     G                       G                  C
 You were caught on the cross fire of childhood and stardom, Blown on the steel breeze.
  D#                     E                 A#                        D           D            G
