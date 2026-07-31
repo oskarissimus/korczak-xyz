@@ -40,9 +40,8 @@ export default function Typing({ lang }: TypingProps) {
             </option>
           ))}
         </select>
+        <SyncStatus auth={auth} lang={lang} />
       </div>
-
-      <SyncStatus auth={auth} lang={lang} />
 
       <TypingSession key={book.id} book={book} user={auth.user} lang={lang} />
     </div>

@@ -155,23 +155,16 @@
   justify-content: center;
 }
 
-/* --- Typing app sync status --- */
-/* Sits on the trainer's gray panel (.typing-content), not on the teal the rest
-   of this file's chrome assumes — hence the dialog-ink colours here. */
+/* --- Typing app sign-in prompt --- */
+/* An item on the trainer's book-picker row, sitting on the gray panel
+   (.typing-content) rather than the teal the rest of this file's chrome
+   assumes — hence the dialog-ink colours here. */
 .typing-sync {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
   color: var(--retro-black);
-  text-align: center;
-}
-
-.typing-sync-cloud {
-  color: var(--retro-navy);
-  font-size: 1.3rem;
 }
 
 .typing-sync-link {
