@@ -41,21 +41,24 @@
 }
 
 /* Logged-in email shown in the status bar: black text in a gray inset panel,
-   matching the other status-bar panels. Rendered by React, so styled globally. */
+   matching the other status-bar panels. Rendered by React, so styled globally.
+   The clipping here is both the backstop for an address too long to fold any further
+   and the signal NavAuth measures to decide how much folding the line needs. */
 .status-user .nav-auth-email {
   display: block;
-  max-width: 40ch;
+  /* Drops the navbar variant's cap above: here the flex line is the only limit, and the
+     cap would fold the address even on a wide screen with room to spare. */
+  max-width: none;
+  min-width: 0;
   color: var(--retro-black);
   background: var(--retro-gray);
   border: 2px solid;
   border-color: var(--retro-dark-gray) var(--retro-white) var(--retro-white) var(--retro-dark-gray);
   padding: 1px 4px;
   font-size: 0.8rem;
-}
-
-/* The folded form only shows on phones; see the media query below. */
-.nav-auth-email--short {
-  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 600px) {
@@ -63,19 +66,6 @@
     /* Matches the tightened status panels in Navbar.astro at this width. */
     font-size: 0.7rem;
     padding: 1px 2px;
-    /* Backstop for unusually long domains, which foldEmail cannot shorten. */
-    max-width: 18ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .status-user .nav-auth-email--full {
-    display: none;
-  }
-
-  .status-user .nav-auth-email--short {
-    display: inline;
   }
 }
 

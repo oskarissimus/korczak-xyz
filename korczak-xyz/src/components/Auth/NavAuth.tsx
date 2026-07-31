@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface NavAuthProps {
@@ -29,6 +29,85 @@ export function foldEmail(email: string, maxLen: number): string {
   return `${email.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
+// Shorter than this the address says nothing useful; below it the CSS ellipsis takes over.
+const MIN_FOLD_LEN = 6;
+
+// The email shown in the status bar. Folds only as much as the line actually requires,
+// so a wide bar shows the whole address and a cramped one gives up characters one at a
+// time. Measured rather than guessed from a breakpoint, because how much room is left
+// depends on the commit hash and the timestamp beside it, which vary by locale.
+function StatusBarEmail({ email }: { email: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [text, setText] = useState(email);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // The span is nowrap + overflow:hidden and is the flex item that gives way first, so
+    // it is clipped exactly when the text does not fit. Candidates go straight into the
+    // DOM: React state cannot be read back synchronously, and every probe is followed by
+    // a write of the final string, so the two never disagree.
+    const fits = (candidate: string) => {
+      el.textContent = candidate;
+      return el.scrollWidth <= el.clientWidth;
+    };
+
+    const commit = (final: string) => {
+      el.textContent = final;
+      setText(final);
+    };
+
+    const fit = () => {
+      if (fits(email)) {
+        commit(email);
+        return;
+      }
+
+      // Largest maxLen that still fits. Folding is monotone in maxLen, so binary search
+      // lands on the answer in ~5 layout reads.
+      let lo = MIN_FOLD_LEN;
+      let hi = email.length;
+      let best = MIN_FOLD_LEN;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (fits(foldEmail(email, mid))) {
+          best = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      commit(foldEmail(email, best));
+    };
+
+    fit();
+
+    // Watch the bar, not the span: the span's size is what we are changing, and observing
+    // it would feed back into the measurement.
+    const bar = el.closest('.status-bar');
+    const observer = bar ? new ResizeObserver(fit) : null;
+    if (bar && observer) observer.observe(bar);
+
+    // VT323 loads late; the metrics it lands with are not the fallback's.
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) fit();
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+    };
+  }, [email]);
+
+  return (
+    <span className="nav-auth-email" ref={ref} title={email}>
+      {text}
+    </span>
+  );
+}
+
 export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
   const { enabled, user, loading, signOut } = useAuth();
   const t = translations[lang];
@@ -40,13 +119,7 @@ export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
   // Identity variant: just the email (for the status bar); nothing when logged out.
   if (variant === 'identity') {
     if (!user) return null;
-    const email = user.email ?? '';
-    return (
-      <span className="nav-auth-email" title={email}>
-        <span className="nav-auth-email--full">{email}</span>
-        <span className="nav-auth-email--short">{foldEmail(email, 15)}</span>
-      </span>
-    );
+    return <StatusBarEmail email={user.email ?? ''} />;
   }
 
   // Control variant: Login link or Logout button in the nav row.

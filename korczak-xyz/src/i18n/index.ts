@@ -383,7 +383,7 @@ export const ui = {
 
     // Status bar
     'statusBar.lastUpdated': 'Aktualizacja:',
-    'statusBar.updated': 'Akt.:',
+    'statusBar.updated': 'Aktualizacja:',
 
     // Anesthesia Quiz
     'AnesthesiaQuiz': 'Quiz Anestezjologiczny',

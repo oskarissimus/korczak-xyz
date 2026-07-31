@@ -230,12 +230,12 @@ function isActive(itemPath: string): boolean {
     white-space: nowrap;
   }
 
-  /* Middle panel fills the gap so the user panel hugs the right edge. Never let it
-     wrap — a second line would double the height of the whole status bar. The basis is
-     `auto` rather than 0 so that when space runs out the panel shrinks in proportion to
-     the email beside it, instead of being the only one squeezed. */
+  /* Sized to its text, so the inset border ends where the timestamp does and the bar's
+     own gray shows through the gap before the user panel. Never let it wrap — a second
+     line would double the height of the whole status bar. It may shrink, but only after
+     the email has folded as far as it can (see the shrink factor on .status-user). */
   .status-panel--updated {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -251,9 +251,13 @@ function isActive(itemPath: string): boolean {
 
   /* Transparent wrapper: when logged out the identity island renders nothing,
      so no empty inset box is shown. The panel border lives on the email span
-     (styled globally in auth.css, since React renders it outside Astro scoping). */
+     (styled globally in auth.css, since React renders it outside Astro scoping).
+     `margin-left: auto` keeps it against the right edge now that no panel stretches,
+     and the lopsided shrink factor means this — not the timestamp — is what gives way
+     when the bar runs out of room. */
   .status-user {
-    flex: 0 1 auto;
+    flex: 0 100 auto;
+    margin-left: auto;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -327,13 +331,6 @@ function isActive(itemPath: string): boolean {
     .status-bar {
       padding: 1px;
       gap: 1px;
-    }
-
-    /* Below ~390px not everything fits even shortened. Let the email give up
-       characters first: it is already an abbreviation and keeps a title tooltip,
-       whereas a clipped timestamp is just unreadable. */
-    .status-user {
-      flex-shrink: 6;
     }
   }
 </style>
