@@ -19,6 +19,10 @@ const SPOTLIGHTS = ['slow', 'fast', 'bottleneck'];
    widths that decides whether a row of controls wraps. */
 const SORT_MODES = { en: [49, 49, 70, 99, 70], pl: [92, 70, 77, 99, 92] }[lang];
 
+/* Period scope, right-aligned in the same controls row. Same 7px-per-character
+   VT323 measure as the sort labels above. */
+const PERIODS = { en: [56, 42, 28], pl: [63, 35, 56] }[lang];
+
 /* One row per letter: a practised user's trusted table settles at ~26 rows, and
    measuring the real page against this skeleton is how the count was picked.
    Widths descend because every sort mode ranks its bar column. */
@@ -42,14 +46,25 @@ const ROW_BARS = Array.from(
     }
   </div>
 
-  <div class="typing-toggle-group">
-    {
-      SORT_MODES.map((w) => (
-        <span class="typing-toggle">
-          <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.1rem`} />
-        </span>
-      ))
-    }
+  <div class="typing-chart-controls">
+    <div class="typing-toggle-group">
+      {
+        SORT_MODES.map((w) => (
+          <span class="typing-toggle">
+            <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.1rem`} />
+          </span>
+        ))
+      }
+    </div>
+    <div class="typing-toggle-group">
+      {
+        PERIODS.map((w) => (
+          <span class="typing-toggle">
+            <span class="typing-skel" style={`--skel-w: ${w}px; --skel-h: 1.1rem`} />
+          </span>
+        ))
+      }
+    </div>
   </div>
 
   <p class="typing-key-avg-note">

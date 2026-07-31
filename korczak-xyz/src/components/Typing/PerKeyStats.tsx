@@ -10,6 +10,7 @@ import {
   type KeyStat,
 } from '../../utils/typing/keyStats';
 import { formatDuration } from '../../utils/typing/metrics';
+import { filterSessionsSince, PERIOD_MS, type StatsPeriod } from '../../utils/typing/period';
 import { linearTrend, trendTone, wpmPerWeek } from '../../utils/typing/trend';
 import type { TypingSession } from '../../utils/typing/types';
 import StatsChart, { type StatsSeries } from './StatsChart';
@@ -45,6 +46,7 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const [sessions, setSessions] = useState<TypingSession[]>(() => loadAllSessions());
   const [sortMode, setSortMode] = useState<SortMode>('slowest');
+  const [period, setPeriod] = useState<StatsPeriod>('all');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // Mirror the over-time stats page: show local data immediately, then merge the
@@ -76,8 +78,22 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   const loading = auth.loading || (!!uid && !cloudSettled);
 
+  // The ranked table, the spotlights and the average baseline are all scoped to
+  // the chosen period; the detail chart below deliberately isn't (see there).
+  const scopedSessions = useMemo(
+    () => (period === 'all' ? sessions : filterSessionsSince(sessions, Date.now() - PERIOD_MS[period])),
+    [sessions, period]
+  );
+
   const { keys: stats, averageWpm, typicalLatencyMs } = useMemo(
-    () => computeKeyStats(sessions),
+    () => computeKeyStats(scopedSessions),
+    [scopedSessions]
+  );
+
+  // Gated on the *unfiltered* sessions: an empty period is a filtering result,
+  // not an empty page, and must keep the controls around to switch back.
+  const hasAnyKeystrokes = useMemo(
+    () => sessions.some((s) => s.events.some((e) => e.kind === 'char')),
     [sessions]
   );
 
@@ -200,6 +216,8 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
 
   // Detail mini-chart series for the selected key: that key's WPM per day, plus
   // a least-squares fit through it so the direction is readable at a glance.
+  // Always full history, whatever the period filter says — long-run progress is
+  // the whole point of this panel, and a 24-hour window would leave one dot.
   const detailPoints = useMemo(
     () => (selectedKey == null ? [] : keyWpmOverTime(sessions, selectedKey)),
     [sessions, selectedKey]
@@ -235,8 +253,6 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
   const perWeek = trend ? wpmPerWeek(trend) : 0;
   const tone = trendTone(perWeek);
 
-  const selectedStat = selectedKey == null ? null : stats.find((k) => k.key === selectedKey) ?? null;
-
   const sortModes: { mode: SortMode; label: string }[] = [
     { mode: 'slowest', label: t.sortSlowest },
     { mode: 'fastest', label: t.sortFastest },
@@ -245,9 +261,20 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
     { mode: 'bottleneck', label: t.sortBottleneck },
   ];
 
+  const periods: { value: StatsPeriod; label: string }[] = [
+    { value: 'all', label: t.periodAll },
+    { value: 'week', label: t.periodWeek },
+    { value: 'day', label: t.periodDay },
+  ];
+
+  // History exists, but none of it falls inside the chosen window: swap the
+  // table (and the average note, which would otherwise claim 0 WPM) for a
+  // message, keeping the controls so the period can be widened again.
+  const emptyPeriod = !loading && stats.length === 0;
+
   return (
     <div className="typing-stats-page typing-stats-page--keys">
-      {!loading && stats.length === 0 ? (
+      {!loading && !hasAnyKeystrokes ? (
         <p className="typing-message">{t.noKeyData}</p>
       ) : (
         <>
@@ -263,21 +290,36 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
             />
           </div>
 
-          <div className="typing-toggle-group" role="group" aria-label={t.keyStatsTitle}>
-            {sortModes.map(({ mode, label }) => (
-              <button
-                key={mode}
-                type="button"
-                className="typing-toggle"
-                aria-pressed={sortMode === mode}
-                onClick={() => setSortMode(mode)}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="typing-chart-controls">
+            <div className="typing-toggle-group" role="group" aria-label={t.keyStatsTitle}>
+              {sortModes.map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className="typing-toggle"
+                  aria-pressed={sortMode === mode}
+                  onClick={() => setSortMode(mode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="typing-toggle-group" role="group" aria-label={t.period}>
+              {periods.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className="typing-toggle"
+                  aria-pressed={period === value}
+                  onClick={() => setPeriod(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {showBottleneck ? (
+          {emptyPeriod ? null : showBottleneck ? (
             <p className="typing-key-avg-note typing-key-avg-note--formula">
               {t.bottleneckFormulaPre} <strong>{Math.round(typicalLatencyMs)} {t.ms}</strong>{' '}
               {t.bottleneckFormulaPost}
@@ -297,32 +339,38 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
               the chart off-screen below 26 rows of table. */}
           <div className="typing-key-layout">
             <div className="typing-key-layout-list">
-              <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
-                <div className="typing-key-row typing-key-row--head" role="row">
-                  <span role="columnheader">{t.keyCol}</span>
-                  <span role="columnheader">{showBottleneck ? t.timeLostCol : t.medianLatency}</span>
-                  <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
-                  <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
-                </div>
-                {loading ? null : sortedTrusted.map((k) => renderKeyRow(k, false))}
-              </div>
+              {emptyPeriod ? (
+                <p className="typing-message">{t.noKeyDataInPeriod}</p>
+              ) : (
+                <>
+                  <div className="typing-key-table" role="table" aria-label={t.keyStatsTitle}>
+                    <div className="typing-key-row typing-key-row--head" role="row">
+                      <span role="columnheader">{t.keyCol}</span>
+                      <span role="columnheader">{showBottleneck ? t.timeLostCol : t.medianLatency}</span>
+                      <span role="columnheader" className="typing-key-num">{t.timesTyped}</span>
+                      <span role="columnheader" className="typing-key-num">{t.accuracy}</span>
+                    </div>
+                    {loading ? null : sortedTrusted.map((k) => renderKeyRow(k, false))}
+                  </div>
 
-              {!loading && sortedUntrusted.length > 0 && (
-                <div className="typing-key-table typing-key-table--untrusted" role="table" aria-label={t.notTrusted}>
-                  <p className="typing-key-untrusted-heading">{t.notTrusted}</p>
-                  {sortedUntrusted.map((k) => renderKeyRow(k, true))}
-                </div>
+                  {!loading && sortedUntrusted.length > 0 && (
+                    <div className="typing-key-table typing-key-table--untrusted" role="table" aria-label={t.notTrusted}>
+                      <p className="typing-key-untrusted-heading">{t.notTrusted}</p>
+                      {sortedUntrusted.map((k) => renderKeyRow(k, true))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             <div className="typing-key-detail">
-              {selectedStat == null ? (
+              {selectedKey == null ? (
                 <p className="typing-message">{t.selectKeyHint}</p>
               ) : (
                 <>
                   <p className="typing-key-detail-title">
                     {t.keyProgressTitle}{' '}
-                    <strong className="typing-key-glyph">{keyLabel(selectedStat.key)}</strong>
+                    <strong className="typing-key-glyph">{keyLabel(selectedKey)}</strong>
                     {' — '}
                     {t.wpm}
                   </p>
