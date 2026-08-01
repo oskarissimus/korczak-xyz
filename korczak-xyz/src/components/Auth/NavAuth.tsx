@@ -37,7 +37,7 @@ const MIN_FOLD_LEN = 6;
 // time. Measured rather than guessed from a breakpoint, because how much room is left
 // depends on the commit hash and the timestamp beside it, which vary by locale.
 function StatusBarEmail({ email }: { email: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLAnchorElement>(null);
   const [text, setText] = useState(email);
 
   useLayoutEffect(() => {
@@ -101,10 +101,12 @@ function StatusBarEmail({ email }: { email: string }) {
     };
   }, [email]);
 
+  // A mailto link, so a tap opens the mail app with the address already filled in. The
+  // displayed text is the folded abbreviation; href always carries the full address.
   return (
-    <span className="nav-auth-email" ref={ref} title={email}>
+    <a className="nav-auth-email" ref={ref} href={`mailto:${email}`} title={email}>
       {text}
-    </span>
+    </a>
   );
 }
 

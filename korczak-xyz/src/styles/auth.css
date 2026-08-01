@@ -38,6 +38,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* It is a mailto link, but it should read as a label, not as body-copy link text. */
+  text-decoration: none;
 }
 
 /* Logged-in email shown in the status bar: black text in a gray inset panel,
@@ -59,6 +61,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Same affordance the commit-hash panel gets: flat until pointed at, then underlined. */
+.status-user .nav-auth-email:hover,
+.status-user .nav-auth-email:focus-visible {
+  color: var(--retro-black);
+  text-decoration: underline;
+}
+
+.status-user .nav-auth-email:active {
+  border-color: var(--retro-white) var(--retro-dark-gray) var(--retro-dark-gray) var(--retro-white);
 }
 
 @media (max-width: 600px) {
