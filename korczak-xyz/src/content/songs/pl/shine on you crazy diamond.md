@@ -18,7 +18,7 @@ chords:
   D: "x x 0 2 3 2"
   c: "x 3 5 5 4 3"
   F: "1 3 3 2 1 1"
-  E: "0 2 2 1 0 0"
+  Edim7: "x x 2 3 2 3"
 ---
 ```plaintext
 g
@@ -41,7 +41,7 @@ gMaj7
 of childhood and stardom,
 g7           g6
 Blown on the steel breeze.
- Eb                    E
+ Eb                    Edim7
 Come on you target for faraway laughter,
 Hb                    D
 Come on you stranger, you legend,
@@ -68,7 +68,7 @@ gMaj7
 with random precision,
 g7          g6
 Rode on the steel breeze.
- Eb                    E
+ Eb                    Edim7
 Come on you raver, you seer of visions,
 Hb                   D
 Come on you painter, you piper,
@@ -95,7 +95,7 @@ gMaj7
 of yesterday's triumph,
 g7              g6
 And sail on the steel breeze.
- Eb                       E
+ Eb                       Edim7
 Come on you boy child, you winner and loser,
 Hb                    D        D             g
 Come on you miner for truth and delusion, and shine!
