@@ -1,6 +1,8 @@
 ---
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
 import NavAuth from '../Auth/NavAuth';
+import NavAuthFallback from '../Auth/NavAuthFallback.astro';
+import { AUTH_CACHE_KEY } from '../../lib/authCache';
 import { execSync } from 'child_process';
 
 interface Props {
@@ -95,10 +97,49 @@ function isActive(itemPath: string): boolean {
       <span class="build-time build-time--short">{buildTimestamp}</span>
     </div>
     <div class="status-user">
-      <NavAuth client:only="react" transition:persist="nav-auth-identity" lang={lang} variant="identity" />
+      <NavAuth client:only="react" transition:persist="nav-auth-identity" lang={lang} variant="identity">
+        <NavAuthFallback slot="fallback" />
+      </NavAuth>
     </div>
   </div>
 </div>
+
+{/* Paints the email before anything else can. Inline and in the body, so it runs while the
+    parser is still here and the address is on screen in the first frame - a bundled script
+    would run after paint, and one in <head> would run before these spans exist. React then
+    hydrates from the same cache with the same string, so there is nothing to see. */}
+<script is:inline define:vars={{ cacheKey: AUTH_CACHE_KEY }}>
+  (function () {
+    // The fallback tree parsed just above. Absent once React has taken over the island,
+    // which is exactly when this has nothing left to do.
+    var el = document.querySelector('[data-nav-auth-email]');
+    if (!el) return;
+
+    var email;
+    try {
+      var cached = JSON.parse(window.localStorage.getItem(cacheKey) || 'null');
+      email = cached && typeof cached.email === 'string' ? cached.email : null;
+    } catch (e) {
+      email = null;
+    }
+    if (!email) return;
+
+    // Split at the last '@' exactly as splitEmail() does, so the three runs match what
+    // React will render and the '@' keeps its own element (see NavAuth.tsx on iOS data
+    // detectors). No folding here: the address is clipped by CSS until React measures the
+    // bar and abbreviates it properly.
+    var at = email.lastIndexOf('@');
+    var local = at > 0 ? email.slice(0, at) : email;
+    var domain = at > 0 ? email.slice(at + 1) : '';
+
+    el.querySelector('[data-part="local"]').textContent = local;
+    el.querySelector('[data-part="at"]').textContent = at > 0 ? '@' : '';
+    el.querySelector('[data-part="domain"]').textContent = domain;
+    el.title = email;
+    el.classList.add('nav-auth-email');
+    el.hidden = false;
+  })();
+</script>
 
 <style>
   .navbar-window {
