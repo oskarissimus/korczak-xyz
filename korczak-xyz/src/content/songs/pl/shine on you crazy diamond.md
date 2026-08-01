@@ -9,20 +9,24 @@ chords:
   g: "3 3 3 5 5 3"
   "F#": "2 4 4 3 2 2"
   "A#": "x 1 3 3 3 1"
+  "D#": "x 6 8 8 8 6"
+  d: "x 5 7 7 6 5"
+  c: "x 3 5 5 4 3"
+  F: "1 3 3 2 1 1"
 ---
 ```plaintext
 g                            
 Remember when you were young,
 F#                      A#
 you shone like the sun.
-  D#  D#       C C   F
+D#    d  c   A#   F
 Shine on you crazy diamond.
 
 g                               
 Now there's a look in your eyes,
 F#                             A#
 like black holes in the sky.
-  D#  D#       C C   F
+D#    d  c   A#   F
 Shine on you crazy diamond.
 
                 G                     G                       G                  C
