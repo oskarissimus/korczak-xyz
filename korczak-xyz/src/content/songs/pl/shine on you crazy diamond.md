@@ -7,93 +7,96 @@ language: pl
 dateAdded: 2026-05-10
 chords:
   g: "3 5 5 3 3 3"
+  "g*": "x x 5 3 3 3"
+  gMaj7: "x x 4 3 3 3"
+  g7: "x x 3 3 3 3"
+  g6: "x x 2 3 3 3"
   "F#": "2 4 4 3 2 2"
-  "A#": "x 1 3 3 3 1"
-  "D#": "x 6 8 8 8 6"
+  Hb: "x 1 3 3 3 1"
+  Eb: "x 6 8 8 8 6"
   d: "x 5 7 7 6 5"
   D: "x x 0 2 3 2"
   c: "x 3 5 5 4 3"
-  C: "x 3 2 0 1 0"
   F: "1 3 3 2 1 1"
   E: "0 2 2 1 0 0"
 ---
 ```plaintext
 g
 Remember when you were young,
-F#                      A#
+F#                      Hb
 you shone like the sun.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
 g
 Now there's a look in your eyes,
-F#                             A#
+F#                             Hb
 like black holes in the sky.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
-         g
+         g*
 You were caught on the cross fire
-g
+gMaj7
 of childhood and stardom,
-g            C
+g7           g6
 Blown on the steel breeze.
- D#                    E
+ Eb                    E
 Come on you target for faraway laughter,
-A#                    D
+Hb                    D
 Come on you stranger, you legend,
 D           g
 You martyr, and shine!
 
 g
 You reached for the secret too soon,
-F#                       A#
+F#                       Hb
 you cried for the moon.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
 g
 Threatened by shadows at night,
-F#                         A#
+F#                         Hb
 and exposed in the light.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
-         g
+         g*
 Well you wore out your welcome
-g
+gMaj7
 with random precision,
-g           C
+g7          g6
 Rode on the steel breeze.
- D#                    E
+ Eb                    E
 Come on you raver, you seer of visions,
-A#                   D
+Hb                   D
 Come on you painter, you piper,
 D             g
 You prisoner, and shine!
 
 g
 Nobody knows where you are,
-F#                    A#
+F#                    Hb
 how near or how far.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
 g
 Pile on many more layers
-F#                            A#
+F#                            Hb
 and I'll be joining you there.
-D#    d  c   A#   F
+Eb    d  c   Hb   F
 Shine on you crazy diamond.
 
-          g
+          g*
 And we'll bask in the shadow
-g
+gMaj7
 of yesterday's triumph,
-g               C
+g7              g6
 And sail on the steel breeze.
- D#                       E
+ Eb                       E
 Come on you boy child, you winner and loser,
-A#                    D        D             g
+Hb                    D        D             g
 Come on you miner for truth and delusion, and shine!
 ```
