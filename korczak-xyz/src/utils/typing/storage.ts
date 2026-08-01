@@ -1,4 +1,6 @@
 // LocalStorage operations for the Touch-Typing Trainer.
+import { bumpRevision } from './reconcile';
+import { clearAllBookmarks } from './syncBookmark';
 import type { TypingProgress, TypingSession } from './types';
 import { createDefaultProgress, normalizeProgress } from './types';
 
@@ -50,10 +52,18 @@ export function saveProgress(progress: TypingProgress): void {
   }
 }
 
-export function resetProgress(bookId: string): TypingProgress {
-  const defaults = createDefaultProgress(bookId);
-  saveProgress(defaults);
-  return defaults;
+// Reset carries the revision counter forward rather than restarting it. A reset that went
+// back to rev 0 would look to the cloud like an older revision than the progress it is meant
+// to replace, and the next reconcile would helpfully pull the deleted progress back. Emptying
+// the book is an edit like any other, so it gets the next revision number.
+export function resetProgress(bookId: string, writerId: string): TypingProgress {
+  const previous = loadProgress(bookId);
+  const fresh = bumpRevision(
+    { ...createDefaultProgress(bookId), rev: previous.rev, writerId },
+    writerId
+  );
+  saveProgress(fresh);
+  return fresh;
 }
 
 // Which book the picker last had selected.
@@ -227,6 +237,9 @@ export function clearAllData(): void {
     localStorage.removeItem(STORAGE_KEYS.selectedBook);
     localStorage.removeItem(STORAGE_KEYS.currentSession);
     localStorage.removeItem(STORAGE_KEYS.sessions);
+    // The bookmarks describe a relationship to progress that no longer exists; leaving them
+    // behind would have the next reconcile compare against a revision nothing holds.
+    clearAllBookmarks();
   } catch {
     // Ignore.
   }

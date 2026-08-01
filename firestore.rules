@@ -5,6 +5,14 @@ rules_version = '2';
 // data is readable/writable only by the owner.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Covers progress, sessions, and the frontend diagnostic log batches written to
+    // users/{uid}/logs.
+    //
+    // Note that the logs are writable, not append-only. Making them append-only would mean
+    // replacing this recursive wildcard with one rule per collection, because rules are a
+    // permissive union: a narrower `allow update, delete: if false` alongside this match
+    // grants nothing and denies nothing, it is simply ignored. Not worth trading the
+    // catch-all's "any future collection just works" for, on a single-account database.
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }

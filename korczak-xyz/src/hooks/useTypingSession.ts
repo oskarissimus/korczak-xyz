@@ -1,29 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getClientId } from '../lib/clientId';
+import { describeError, log } from '../lib/logger';
 import { computeAccuracy, computeWpm } from '../utils/typing/metrics';
 import {
   archiveCurrentSession,
   exportLogToJSON,
   importLogFromJSON,
-  isNonTrivialProgress,
   loadAllSessions,
   loadProgress,
   resetProgress as resetProgressStorage,
   saveCurrentSession,
   saveProgress,
 } from '../utils/typing/storage';
-import { loadCloudProgress, saveCloudProgress, saveCloudSession } from '../utils/typing/cloudStorage';
+import { saveCloudSession } from '../utils/typing/cloudStorage';
+import { downloadJSON } from '../utils/typing/download';
+import { bumpRevision } from '../utils/typing/reconcile';
+import {
+  ProgressSyncEngine,
+  summarize,
+  type SyncConflict,
+  type SyncState,
+} from '../utils/typing/syncEngine';
 import type { AuthUser } from './useAuth';
-import { createDefaultProgress, normalizeProgress } from '../utils/typing/types';
 import type { Book, RecentChar, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
 
 export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
 const SESSION_SAVE_DEBOUNCE_MS = 800;
 const CLOUD_SAVE_DEBOUNCE_MS = 2000;
-// Cloud progress: trailing save after the user stops typing, but never let more
-// than this elapse during continuous typing without checkpointing to the cloud.
-const CLOUD_PROGRESS_DEBOUNCE_MS = 1500;
-const CLOUD_PROGRESS_MAX_WAIT_MS = 3000;
 // Idle this long with no keystroke and the session auto-pauses (abandoned).
 const IDLE_PAUSE_MS = 20000;
 // A gap longer than this since the last keystroke ends the current session; the
@@ -67,12 +71,33 @@ export interface TypingSessionApi {
   resetProgress: () => void;
   exportLog: () => void;
   importLog: (json: string) => { success: boolean; sessionCount: number; error?: string };
+  // Cloud sync, for the status indicator and the conflict dialog.
+  sync: SyncState;
+  conflict: SyncConflict | null;
+  resolveConflict: (choice: 'local' | 'cloud') => void;
+  retrySync: () => void;
 }
+
+const NO_SYNC: SyncState = {
+  status: 'disabled',
+  lastSyncedAt: null,
+  error: null,
+  conflict: null,
+};
 
 export function useTypingSession(user: AuthUser | null, book: Book): TypingSessionApi {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [progress, setProgress] = useState<TypingProgress>(() => loadProgress(book.id));
+
+  // Identifies this browser profile as the author of the revisions it writes, so two devices'
+  // independent revision counters can never be mistaken for one another.
+  const writerId = useMemo(() => getClientId(), []);
+  // Stamp the next revision onto a progress value produced by a local edit.
+  const edited = useCallback(
+    (next: TypingProgress) => bumpRevision(next, writerId),
+    [writerId]
+  );
 
   // Pause state (manual button, auto-idle, or browsing). Mirrored to a ref so
   // the input handlers can read it without re-subscribing.
@@ -101,15 +126,17 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const userRef = useRef<AuthUser | null>(user);
   userRef.current = user;
   const cloudSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cloudProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Latest progress, read inside unload handlers without re-subscribing.
+  // Latest progress, read inside unload handlers and by the sync engine without
+  // re-subscribing. The engine reads it at write time rather than being handed a snapshot,
+  // so a coalesced write always carries the newest state.
   const progressRef = useRef<TypingProgress>(progress);
   progressRef.current = progress;
-  // Gate: no cloud-progress write may happen until the initial reconcile has
-  // compared local vs cloud, so mount can't upload stale local over a newer cloud.
-  const cloudReadyRef = useRef(false);
-  // When the last cloud-progress write happened, to bound the checkpoint interval.
-  const lastCloudProgressAtRef = useRef(0);
+
+  const engineRef = useRef<ProgressSyncEngine | null>(null);
+  const [syncState, setSyncState] = useState<SyncState>(NO_SYNC);
+  // Set to the exact object the engine asked us to adopt, so the persist effect can tell an
+  // intentional pull from the kind of backwards jump it is there to catch.
+  const remoteAppliedRef = useRef<TypingProgress | null>(null);
 
   // When signed in, mirror the live session to the cloud (debounced/coalesced).
   const scheduleCloudSession = useCallback(() => {
@@ -117,39 +144,21 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     cloudSessionTimerRef.current = setTimeout(() => {
       cloudSessionTimerRef.current = null;
       const u = userRef.current;
-      if (u && sessionRef.current) void saveCloudSession(u.uid, sessionRef.current);
-    }, CLOUD_SAVE_DEBOUNCE_MS);
-  }, []);
-
-  const scheduleCloudProgress = useCallback((p: TypingProgress) => {
-    // Hold off until reconcile has run, so we never clobber a newer cloud on mount.
-    if (!userRef.current || !cloudReadyRef.current) return;
-    const flush = () => {
-      if (cloudProgressTimerRef.current) {
-        clearTimeout(cloudProgressTimerRef.current);
-        cloudProgressTimerRef.current = null;
+      if (u && sessionRef.current) {
+        void saveCloudSession(u.uid, sessionRef.current).catch((e) =>
+          log.warn('sync.session.fail', { sessionId: sessionRef.current?.id, ...describeError(e) })
+        );
       }
-      lastCloudProgressAtRef.current = Date.now();
-      const u = userRef.current;
-      if (u) void saveCloudProgress(u.uid, p);
-    };
-    // Checkpoint immediately if we've gone too long without a write (covers
-    // continuous typing, where a pure trailing debounce would never fire).
-    if (Date.now() - lastCloudProgressAtRef.current >= CLOUD_PROGRESS_MAX_WAIT_MS) {
-      flush();
-      return;
-    }
-    // Otherwise (re)arm the trailing save; it captures the latest `p` because the
-    // persist effect calls this on every progress change.
-    if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
-    cloudProgressTimerRef.current = setTimeout(flush, CLOUD_PROGRESS_DEBOUNCE_MS);
+    }, CLOUD_SAVE_DEBOUNCE_MS);
   }, []);
 
   // Start a fresh session on mount, archiving any previous one.
   useEffect(() => {
     archiveCurrentSession();
     sessionRef.current = newSession(book.id, loadProgress(book.id));
+    log.info('session.mount', { bookId: book.id, ...summarize(progressRef.current) });
     return () => {
+      log.info('session.unmount', { bookId: book.id, ...summarize(progressRef.current) });
       flushSession();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,20 +172,15 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     if (sessionRef.current) {
       saveCurrentSession(sessionRef.current);
       const u = userRef.current;
-      if (u) void saveCloudSession(u.uid, sessionRef.current);
-    }
-    // Also push the latest progress to the cloud (best-effort) so a refresh/close
-    // doesn't leave the cloud stuck behind the pending trailing debounce. Gated
-    // on reconcile so we never upload stale local over a newer cloud.
-    const u = userRef.current;
-    if (u && cloudReadyRef.current) {
-      if (cloudProgressTimerRef.current) {
-        clearTimeout(cloudProgressTimerRef.current);
-        cloudProgressTimerRef.current = null;
+      if (u) {
+        void saveCloudSession(u.uid, sessionRef.current).catch((e) =>
+          log.warn('sync.session.fail', { sessionId: sessionRef.current?.id, ...describeError(e) })
+        );
       }
-      lastCloudProgressAtRef.current = Date.now();
-      void saveCloudProgress(u.uid, progressRef.current);
     }
+    // Push the latest progress now rather than waiting out the trailing debounce, so a
+    // refresh or a client-side navigation doesn't leave the cloud a few sections behind.
+    engineRef.current?.flush('session-flush');
   }, []);
 
   const scheduleSessionSave = useCallback(() => {
@@ -268,78 +272,102 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     resetStopwatch(); // a new sitting starts its clock from zero
   }, [flushSession, book.id, resetStopwatch]);
 
-  // Persist progress whenever it changes (localStorage always; cloud if signed in).
+  /*
+   * Persist progress whenever it changes, and check that the change made sense.
+   *
+   * The guard is the reason this effect is more than one line. Progress jumping backwards is
+   * the symptom that started all of this, and it was previously unobservable: whatever caused
+   * it, the app simply carried on from the wrong place. One decrement of `passageIndex` is
+   * legal (backspacing across a section boundary); a larger drop, or losing keystrokes, is
+   * not reachable by typing, so it is recorded with everything needed to explain it. Being an
+   * `error` entry, it also forces an immediate upload.
+   */
+  const previousProgressRef = useRef<TypingProgress | null>(null);
   useEffect(() => {
-    saveProgress(progress);
-    scheduleCloudProgress(progress);
-  }, [progress, scheduleCloudProgress]);
+    const previous = previousProgressRef.current;
+    previousProgressRef.current = progress;
+    const fromRemote = remoteAppliedRef.current === progress;
 
-  // On sign-in, reconcile local and cloud once. The fresher of the two (by
-  // `lastPlayedAt`) wins: adopt cloud if it's newer, otherwise keep local and push
-  // it up. A stale cloud must never clobber fresher local progress on refresh.
-  const syncedUidRef = useRef<string | null>(null);
+    if (previous && !fromRemote) {
+      const wentBackwards =
+        progress.passageIndex < previous.passageIndex - 1 ||
+        progress.totalKeystrokes < previous.totalKeystrokes;
+      if (wentBackwards) {
+        log.error('progress.revert.detected', {
+          bookId: book.id,
+          before: summarize(previous),
+          after: summarize(progress),
+          sync: syncState.status,
+        });
+      }
+    }
+
+    saveProgress(progress);
+    // A pull is already what the cloud holds; sending it straight back would be a pointless
+    // round trip (and would churn the revision the two sides just agreed on).
+    if (!fromRemote) engineRef.current?.notifyLocalChange();
+    // `syncState` is read for the log field only; re-running on it would double-save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress, book.id]);
+
+  /*
+   * The cloud sync engine, one per (account, book).
+   *
+   * Keyed on the uid *string*, not the user object. `useAuth` seeds its state from a cache
+   * and then re-sets it from Firebase as a new object with the same uid; the previous version
+   * of this effect depended on the object, so that second render tore down an in-flight
+   * reconcile - and left the flag that gated every cloud write stuck off for the rest of the
+   * visit. Depending on the identity that actually matters removes the race entirely.
+   */
+  const uid = user?.uid ?? null;
   useEffect(() => {
-    if (!user) {
-      syncedUidRef.current = null;
-      cloudReadyRef.current = false;
+    if (!uid) {
+      setSyncState(NO_SYNC);
       return;
     }
-    if (syncedUidRef.current === user.uid) return;
-    syncedUidRef.current = user.uid;
-    cloudReadyRef.current = false;
+    const engine = new ProgressSyncEngine({
+      uid,
+      bookId: book.id,
+      getLocal: () => progressRef.current,
+      applyRemote: (adopted) => {
+        remoteAppliedRef.current = adopted;
+        progressRef.current = adopted; // synchronous, so a write racing the render sees it
+        saveProgress(adopted);
+        setProgress(adopted);
+      },
+      onState: setSyncState,
+    });
+    engineRef.current = engine;
+    void engine.start();
+    return () => {
+      engine.stop();
+      if (engineRef.current === engine) engineRef.current = null;
+    };
+  }, [uid, book.id]);
 
-    let cancelled = false;
-    (async () => {
-      try {
-        const cloud = await loadCloudProgress(user.uid, book.id);
-        if (cancelled) return;
-        const local = loadProgress(book.id);
-        if (cloud) {
-          // Merge over defaults so pre-existing docs without `typedHistory` don't
-          // arrive undefined.
-          const normalizedCloud = normalizeProgress({ ...createDefaultProgress(book.id), ...cloud });
-          const cloudTime = normalizedCloud.lastPlayedAt ?? 0;
-          const localTime = local.lastPlayedAt ?? 0;
-          // Tie-break equal timestamps by whichever holds more progress.
-          const cloudWins =
-            cloudTime > localTime ||
-            (cloudTime === localTime &&
-              (normalizedCloud.passageIndex > local.passageIndex ||
-                (normalizedCloud.passageIndex === local.passageIndex &&
-                  normalizedCloud.totalKeystrokes > local.totalKeystrokes)));
-          if (cloudWins) {
-            saveProgress(normalizedCloud);
-            setProgress(normalizedCloud);
-          } else if (isNonTrivialProgress(local)) {
-            // Local is fresher — keep it and bring the cloud up to date.
-            await saveCloudProgress(user.uid, local);
-          }
-        } else {
-          // Fresh cloud: migrate whatever is stored locally, once.
-          if (isNonTrivialProgress(local)) {
-            await saveCloudProgress(user.uid, local);
-            for (const s of loadAllSessions()) {
-              if (cancelled) return;
-              await saveCloudSession(user.uid, s);
-            }
-          }
-        }
-      } catch {
-        // Network/permission errors: keep working locally.
-      } finally {
-        // Cloud-progress writes are unblocked once we've compared the two sides.
-        // Stamp the checkpoint clock so the next keystroke doesn't redundantly
-        // re-upload what reconcile just settled.
-        if (!cancelled) {
-          lastCloudProgressAtRef.current = Date.now();
-          cloudReadyRef.current = true;
+  // First sign-in on a device that already has local sessions: upload them once, so the
+  // stats page isn't missing everything typed before the account existed. Progress is the
+  // engine's business; this is only the append-only session archive.
+  const seededSessionsForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!uid || seededSessionsForRef.current === uid) return;
+    seededSessionsForRef.current = uid;
+    const sessions = loadAllSessions();
+    if (sessions.length === 0) return;
+    void (async () => {
+      let uploaded = 0;
+      for (const s of sessions) {
+        try {
+          await saveCloudSession(uid, s);
+          uploaded += 1;
+        } catch (e) {
+          log.warn('sync.sessions.seed.fail', { sessionId: s.id, ...describeError(e) });
+          return;
         }
       }
+      log.info('sync.sessions.seed.ok', { uploaded });
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, book.id]);
+  }, [uid]);
 
   // Tick once a second while the stopwatch is running so the displayed clock
   // advances between keystrokes. Idle when paused/stopped (no interval churn).
@@ -353,19 +381,27 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   useEffect(() => {
     return () => {
       if (cloudSessionTimerRef.current) clearTimeout(cloudSessionTimerRef.current);
-      if (cloudProgressTimerRef.current) clearTimeout(cloudProgressTimerRef.current);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, []);
 
-  // Flush the session log if the tab is hidden or closed.
+  // Flush when the page goes away. `visibilitychange` fires in both directions, and the
+  // previous version flushed on becoming visible too - a write of whatever progress happened
+  // to be in hand at the moment the user came back, which is not a state anyone asked to
+  // save. `pagehide` is here because it is the event that actually fires on mobile and on
+  // bfcache teardown, where `beforeunload` does not.
   useEffect(() => {
-    const onHide = () => flushSession();
-    window.addEventListener('visibilitychange', onHide);
-    window.addEventListener('beforeunload', onHide);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flushSession();
+    };
+    const onPageHide = () => flushSession();
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
     return () => {
-      window.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('beforeunload', onHide);
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
     };
   }, [flushSession]);
 
@@ -425,7 +461,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
           const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
           const typedHistory = prev.typedHistory.slice();
           typedHistory[prev.passageIndex] = prev.typed + ch;
-          return {
+          return edited({
             ...prev,
             passageIndex: prev.passageIndex + 1,
             typed: '',
@@ -435,7 +471,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
             correctKeystrokes,
             bestWpm: Math.max(prev.bestWpm, wpm),
             lastPlayedAt,
-          };
+          });
         }
 
         // Normal character slot.
@@ -446,10 +482,16 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
         const correctKeystrokes = prev.correctKeystrokes + (correct ? 1 : 0);
         // Typing the last real char just parks the caret on the newline slot; it
         // does NOT auto-advance — the user must press Enter (see above).
-        return { ...prev, typed: prev.typed + ch, totalKeystrokes, correctKeystrokes, lastPlayedAt };
+        return edited({
+          ...prev,
+          typed: prev.typed + ch,
+          totalKeystrokes,
+          correctKeystrokes,
+          lastPlayedAt,
+        });
       });
     },
-    [passages, now, pushEvent, maybeRotateSession]
+    [passages, now, pushEvent, maybeRotateSession, edited]
   );
 
   const handleBackspace = useCallback(() => {
@@ -458,7 +500,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     setProgress((prev) => {
       if (prev.typed.length > 0) {
         pushEvent({ t: now(), kind: 'backspace' });
-        return { ...prev, typed: prev.typed.slice(0, -1), lastPlayedAt: Date.now() };
+        return edited({ ...prev, typed: prev.typed.slice(0, -1), lastPlayedAt: Date.now() });
       }
       // At the start of a section: backspace crosses into the previous one.
       if (prev.passageIndex === 0) return prev;
@@ -470,16 +512,22 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       const restored =
         stored != null ? stored.slice(0, passages[prevIndex].length) : passages[prevIndex];
       pushEvent({ t: now(), kind: 'backspace' });
-      return {
+      return edited({
         ...prev,
         passageIndex: prevIndex,
         typed: restored,
         typedHistory: prev.typedHistory.slice(0, prevIndex),
         completedPassages: Math.max(0, prev.completedPassages - 1),
         lastPlayedAt: Date.now(),
-      };
+      });
     });
-  }, [passages, now, pushEvent, maybeRotateSession]);
+  }, [passages, now, pushEvent, maybeRotateSession, edited]);
+
+  // While a sync conflict is open, the passage on screen is one of two candidate states and
+  // may be about to be replaced. Keystrokes are dropped rather than added to a branch the
+  // user is in the middle of deciding to discard.
+  const inputBlockedRef = useRef(false);
+  inputBlockedRef.current = syncState.conflict != null;
 
   // Input capture: characters via `beforeinput` (composed diacritics arrive as a
   // single insertText), Backspace via `keydown` (fires even on an empty input).
@@ -490,12 +538,17 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     const onBeforeInput = (e: Event) => {
       const ie = e as InputEvent;
       e.preventDefault(); // keep the hidden input empty
+      if (inputBlockedRef.current) return;
       if (ie.inputType === 'insertText' || ie.inputType === 'insertFromPaste') {
         const data = ie.data ?? '';
         for (const ch of data) handleChar(ch);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
+      if (inputBlockedRef.current) {
+        e.preventDefault();
+        return;
+      }
       if (e.key === 'Backspace') {
         e.preventDefault();
         handleBackspace();
@@ -527,28 +580,32 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const resetProgress = useCallback(() => {
     flushSession();
     archiveCurrentSession();
-    const fresh = resetProgressStorage(book.id);
+    // Carries the revision counter forward (see storage.resetProgress), so the empty book is
+    // a newer revision than what the cloud holds rather than something reconcile would
+    // dutifully undo on the next load.
+    const fresh = resetProgressStorage(book.id, writerId);
+    log.info('progress.reset', { bookId: book.id, ...summarize(fresh) });
     sessionRef.current = newSession(book.id, fresh);
     resetStopwatch();
     setProgress(fresh);
+    engineRef.current?.flush('reset');
     focusInput();
-  }, [book.id, flushSession, focusInput, resetStopwatch]);
+  }, [book.id, flushSession, focusInput, resetStopwatch, writerId]);
 
   const exportLog = useCallback(() => {
     flushSession();
-    const json = exportLogToJSON(book.id);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `typing-log-${book.id}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadJSON(`typing-log-${book.id}-${Date.now()}.json`, exportLogToJSON(book.id));
   }, [book.id, flushSession]);
 
   const importLog = useCallback((json: string) => importLogFromJSON(json), []);
+
+  const resolveConflict = useCallback((choice: 'local' | 'cloud') => {
+    void engineRef.current?.resolveConflict(choice);
+  }, []);
+
+  const retrySync = useCallback(() => {
+    engineRef.current?.retry();
+  }, []);
 
   // Derived, recomputed each render (i.e. each keystroke) from the live log.
   const wpm = sessionRef.current ? computeWpm(sessionRef.current.events) : 0;
@@ -600,5 +657,9 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     resetProgress,
     exportLog,
     importLog,
+    sync: syncState,
+    conflict: syncState.conflict,
+    resolveConflict,
+    retrySync,
   };
 }

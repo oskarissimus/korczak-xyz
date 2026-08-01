@@ -1158,6 +1158,10 @@ circle.typing-chart-line--keywpm {
   height: calc(1.4em + 16px); /* padding 6px, border 2px */
 }
 
+.typing-skeleton .typing-sync-state {
+  height: calc(1.4em + 14px); /* padding 5px, border 2px */
+}
+
 .typing-skeleton .typing-hint,
 .typing-skeleton .typing-message,
 .typing-skeleton .typing-key-avg-note {
@@ -1229,4 +1233,120 @@ circle.typing-chart-line--keywpm {
     /* Without its fade-in running, the root would keep the 0 start value. */
     opacity: 1;
   }
+}
+
+/* Sync conflict dialog
+   ---------------------------------------------------------------------------
+   Shown when local and cloud progress have genuinely branched. Modal on purpose:
+   the passage behind it is one of the two candidates, so typing into it would be
+   adding keystrokes to a version that may be seconds from being discarded. */
+
+.typing-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* above .taskbar (9999) and any maximized .window (9998) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 32, 0.7);
+  overflow-y: auto;
+}
+
+.typing-modal {
+  width: 100%;
+  max-width: 620px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  color: var(--retro-black);
+}
+
+.typing-modal:focus {
+  outline: none;
+}
+
+.typing-modal-body {
+  padding: 16px;
+}
+
+.typing-modal-text {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+}
+
+.typing-conflict-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* One column below the width where two columns of figures stop being readable. */
+@media (max-width: 520px) {
+  .typing-conflict-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.typing-conflict-side {
+  display: block;
+  padding: 10px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+  cursor: pointer;
+}
+
+/* Selection is marked by the border as well as the radio, so the pre-selected
+   suggestion is visible without hunting for a filled dot. */
+.typing-conflict-side.is-selected {
+  border: 2px solid var(--retro-navy);
+  background: #f0f0ff;
+}
+
+.typing-conflict-side-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.typing-conflict-side-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+}
+
+.typing-conflict-badge {
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  padding: 1px 6px;
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.typing-conflict-facts {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+}
+
+.typing-conflict-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.typing-conflict-facts dt {
+  color: var(--retro-dark-gray);
+}
+
+.typing-conflict-facts dd {
+  text-align: right;
+}
+
+.typing-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }

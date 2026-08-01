@@ -2,16 +2,14 @@ import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { BOOKS, DEFAULT_BOOK_ID, getBookById } from '../../utils/typing/books';
 import { loadSelectedBookId, saveSelectedBookId } from '../../utils/typing/storage';
-import SyncStatus from './SyncStatus';
 import TypingSession from './TypingSession';
-import { translations, type Lang } from './translations';
+import { type Lang } from './translations';
 
 interface TypingProps {
   lang: Lang;
 }
 
 export default function Typing({ lang }: TypingProps) {
-  const t = translations[lang];
   const auth = useAuth();
 
   const [bookId, setBookId] = useState<string>(() => loadSelectedBookId() ?? DEFAULT_BOOK_ID);
@@ -22,28 +20,20 @@ export default function Typing({ lang }: TypingProps) {
     saveSelectedBookId(id);
   };
 
+  // The picker row lives inside TypingSession, alongside the sync indicator that shares it -
+  // the indicator's state comes from the session's sync engine, and threading it back out to
+  // a sibling only to render it here would put a callback in the middle of the typing path.
   return (
     <div className="typing-game">
-      <div className="typing-book-picker">
-        <label className="typing-book-label" htmlFor="typing-book-select">
-          {t.book}
-        </label>
-        <select
-          id="typing-book-select"
-          className="typing-book-select"
-          value={book.id}
-          onChange={(e) => handleBookChange(e.target.value)}
-        >
-          {BOOKS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.title} — {b.author}
-            </option>
-          ))}
-        </select>
-        <SyncStatus auth={auth} lang={lang} />
-      </div>
-
-      <TypingSession key={book.id} book={book} user={auth.user} lang={lang} />
+      <TypingSession
+        key={book.id}
+        book={book}
+        books={BOOKS}
+        onBookChange={handleBookChange}
+        user={auth.user}
+        auth={auth}
+        lang={lang}
+      />
     </div>
   );
 }

@@ -1,21 +1,33 @@
 import React, { useRef, useState } from 'react';
 import { useTypingSession } from '../../hooks/useTypingSession';
-import type { AuthUser } from '../../hooks/useAuth';
+import type { AuthApi, AuthUser } from '../../hooks/useAuth';
 import type { Book } from '../../utils/typing/types';
+import ConflictModal from './ConflictModal';
 import { StatsBar } from './StatsBar';
 import { PassageView } from './PassageView';
+import SyncStatus from './SyncStatus';
 import { translations, type Lang } from './translations';
 
 interface TypingSessionProps {
   book: Book;
+  books: readonly Book[];
+  onBookChange: (id: string) => void;
   user: AuthUser | null;
+  auth: AuthApi;
   lang: Lang;
 }
 
 // One book's practice session UI. Remounted (via `key={book.id}` in the parent)
 // whenever the picker changes book, so progress and the live session log reload
 // cleanly for the newly-selected book.
-export default function TypingSession({ book, user, lang }: TypingSessionProps) {
+export default function TypingSession({
+  book,
+  books,
+  onBookChange,
+  user,
+  auth,
+  lang,
+}: TypingSessionProps) {
   const t = translations[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -39,6 +51,10 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
     resetProgress,
     exportLog,
     importLog,
+    sync,
+    conflict,
+    resolveConflict,
+    retrySync,
   } = useTypingSession(user, book);
 
   const handleReset = () => {
@@ -67,6 +83,25 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
 
   return (
     <>
+      <div className="typing-book-picker">
+        <label className="typing-book-label" htmlFor="typing-book-select">
+          {t.book}
+        </label>
+        <select
+          id="typing-book-select"
+          className="typing-book-select"
+          value={book.id}
+          onChange={(e) => onBookChange(e.target.value)}
+        >
+          {books.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.title} — {b.author}
+            </option>
+          ))}
+        </select>
+        <SyncStatus auth={auth} sync={sync} lang={lang} onRetry={retrySync} />
+      </div>
+
       <StatsBar
         wpm={wpm}
         accuracy={accuracy}
@@ -134,6 +169,17 @@ export default function TypingSession({ book, user, lang }: TypingSessionProps) 
       </div>
 
       {message && <p className="typing-message">{message}</p>}
+
+      {/* Rendered last and over everything: while it is up, the passage underneath is not
+          the state the user is going to keep, so it must not be typed into. */}
+      {conflict && (
+        <ConflictModal
+          conflict={conflict}
+          passageCount={book.passages.length}
+          lang={lang}
+          onChoose={resolveConflict}
+        />
+      )}
     </>
   );
 }

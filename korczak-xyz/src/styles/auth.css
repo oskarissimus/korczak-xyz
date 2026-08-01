@@ -213,3 +213,73 @@
 .typing-sync-link:active {
   border-style: inset;
 }
+
+/* --- Typing app sync indicator --- */
+/* The signed-in counterpart to the prompt above: an inset readout in the same row, styled
+   like a 90s status field rather than a button, because most of its states are not
+   actionable. It is sized so that swapping between states does not reflow the row. */
+.typing-sync-state {
+  gap: 6px;
+  padding: 5px 10px;
+  border: 2px inset var(--retro-dark-gray);
+  background: var(--retro-gray);
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+/* The error state is the one you can act on, so it is the one that gets a button's affordances. */
+button.typing-sync-state {
+  cursor: pointer;
+  font-family: 'VT323', monospace;
+}
+
+button.typing-sync-state:active {
+  border-style: inset;
+}
+
+.typing-sync-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  background: var(--retro-dark-gray);
+}
+
+/* Colour carries the state at a glance, but never alone - every state is also spelled out in
+   words next to the dot, so the indicator still reads without it. */
+.typing-sync--ok .typing-sync-dot {
+  background: #00a000;
+}
+
+.typing-sync--busy .typing-sync-dot {
+  background: var(--retro-cyan);
+  animation: typing-sync-blink 1s steps(2, start) infinite;
+}
+
+.typing-sync--pending .typing-sync-dot {
+  background: #c0a000;
+}
+
+.typing-sync--warn .typing-sync-dot {
+  background: #c06000;
+}
+
+.typing-sync--error .typing-sync-dot {
+  background: var(--retro-red);
+}
+
+.typing-sync--error {
+  color: #900000;
+}
+
+@keyframes typing-sync-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-sync--busy .typing-sync-dot {
+    animation: none;
+  }
+}

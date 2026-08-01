@@ -7,6 +7,9 @@ import {
 } from 'firebase/auth';
 import { auth, firebaseEnabled } from '../lib/firebase';
 import { clearCachedUser, readCachedUser, writeCachedUser } from '../lib/authCache';
+import { installLogDebug } from '../lib/logDebug';
+import { onAuthResolved } from '../lib/logSink';
+import { describeError, log, setLogUid } from '../lib/logger';
 
 // Minimal user shape we pass around (subset of the Firebase User).
 export interface AuthUser {
@@ -28,23 +31,45 @@ export function useAuth(): AuthApi {
   // IndexedDB and takes a round-trip to read, and consumers that render nothing while
   // `loading` is true would show a hole for the whole of it. A returning user is therefore
   // signed in from the first paint, and `onAuthStateChanged` only ever confirms it.
-  const [cachedUser] = useState(readCachedUser);
+  const [cachedUser] = useState(() => {
+    const cached = readCachedUser();
+    // Seed the logger from the cache too, so entries recorded before Firebase resolves are
+    // still attributable - and uploadable - rather than stranded as anonymous.
+    if (cached) setLogUid(cached.uid);
+    return cached;
+  });
   const [user, setUser] = useState<AuthUser | null>(cachedUser);
   const [loading, setLoading] = useState<boolean>(firebaseEnabled && !cachedUser);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    installLogDebug();
     if (!firebaseEnabled || !auth) {
       setLoading(false);
+      log.info('auth.disabled', {});
       return;
     }
+    log.info('auth.state', { source: 'cache', uid: cachedUser?.uid ?? null });
     const unsubscribe = onAuthStateChanged(auth, (u: User | null) => {
       setUser(u ? { uid: u.uid, email: u.email } : null);
       setLoading(false);
-      if (u) writeCachedUser({ uid: u.uid, email: u.email });
-      else clearCachedUser();
+      setLogUid(u?.uid ?? null);
+      log.info('auth.state', {
+        source: 'firebase',
+        uid: u?.uid ?? null,
+        // The cached uid and the resolved one disagreeing is the interesting case; matching
+        // is the norm and only worth recording because "it matched" is itself evidence.
+        matchedCache: (cachedUser?.uid ?? null) === (u?.uid ?? null),
+      });
+      if (u) {
+        writeCachedUser({ uid: u.uid, email: u.email });
+        onAuthResolved(); // ship anything buffered while signed out
+      } else {
+        clearCachedUser();
+      }
     });
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -54,6 +79,7 @@ export function useAuth(): AuthApi {
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (e) {
       const code = (e as { code?: string })?.code;
+      log.warn('auth.signin.fail', describeError(e));
       setError(
         code === 'auth/invalid-credential' ||
           code === 'auth/wrong-password' ||
@@ -69,6 +95,7 @@ export function useAuth(): AuthApi {
 
   const signOut = useCallback(async () => {
     if (!firebaseEnabled || !auth) return;
+    log.info('auth.signout', {});
     await firebaseSignOut(auth);
     // Also cleared by the listener above, but not necessarily before the caller acts on
     // this promise - NavAuth reloads the page on the next line. Clearing it here removes
