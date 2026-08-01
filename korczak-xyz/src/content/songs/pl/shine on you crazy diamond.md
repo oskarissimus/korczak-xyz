@@ -6,7 +6,7 @@ published: true
 language: pl
 dateAdded: 2026-05-10
 chords:
-  g: "3 3 3 5 5 3"
+  g: "3 5 5 3 3 3"
   "F#": "2 4 4 3 2 2"
   "A#": "x 1 3 3 3 1"
   "D#": "x 6 8 8 8 6"
@@ -29,7 +29,7 @@ like black holes in the sky.
 D#    d  c   A#   F
 Shine on you crazy diamond.
 
-                G                     G                       G                  C
+         G                     G                       G                  C
 You were caught on the cross fire of childhood and stardom, Blown on the steel breeze.
  D#                     E                 A#                        D           D            G
 Come on you target for faraway laughter, come on you stranger, You legend, you martyr, and shine!
