@@ -110,8 +110,16 @@ is stale" from "the two have branched" — a distinction `lastPlayedAt` cannot m
 
 - `src/utils/typing/reconcile.ts` — the decision table (pure; unit-tested in `reconcile.test.ts`)
 - `src/utils/typing/syncEngine.ts` — state machine, single-flight write queue, retry/backoff
+- `src/utils/typing/syncPresentation.ts` — `SyncState` → what the indicator shows (pure; tested)
 - `src/components/Typing/SyncStatus.tsx` — the indicator on the book-picker row
 - `src/components/Typing/ConflictModal.tsx` — shown when the two have genuinely branched
+
+The indicator is two cells in one fixed-width slot: current sync (spinner in flight, square when
+queued, empty when idle) and last sync (✓/✕ plus a relative time). Two, because `SyncStatus` is a
+precedence ladder — `syncing` outranks `error`, so a single label showed a failing retry as
+"Saving…". That is also why `SyncState` carries `lastFailedAt` and `pendingWork`: neither is
+recoverable from `status`. The slot's width is fixed on purpose — it shares a centred flex row
+with the book `<select>`, and an indicator that resizes drags the picker sideways mid-sentence.
 
 ### Frontend logging
 
