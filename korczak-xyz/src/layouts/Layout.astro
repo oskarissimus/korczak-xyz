@@ -33,6 +33,9 @@ const recoveryStrings = {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <!-- Nothing on the site is meant to be dialled or mailed, so keep mobile browsers from
+         turning phone-number- or email-shaped text into links of their own accord. -->
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
     <meta name="description" content={description} />
     <meta name="image" content="https://korczak.xyz/logo.png" />
     <link rel="icon" href="/favicon-32x32.png" type="image/png" />

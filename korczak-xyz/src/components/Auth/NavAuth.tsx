@@ -32,30 +32,54 @@ export function foldEmail(email: string, maxLen: number): string {
 // Shorter than this the address says nothing useful; below it the CSS ellipsis takes over.
 const MIN_FOLD_LEN = 6;
 
+// Splits at the last '@' so the domain stays whole. A string without one — foldEmail's
+// last-resort truncation produces those, and user.email is only typed as a string — comes
+// back as all local part and no domain, which is exactly how it should be rendered.
+function splitEmail(value: string): { local: string; domain: string | null } {
+  const at = value.lastIndexOf('@');
+  if (at <= 0) return { local: value, domain: null };
+  return { local: value.slice(0, at), domain: value.slice(at + 1) };
+}
+
 // The email shown in the status bar. Folds only as much as the line actually requires,
 // so a wide bar shows the whole address and a cramped one gives up characters one at a
 // time. Measured rather than guessed from a breakpoint, because how much room is left
 // depends on the commit hash and the timestamp beside it, which vary by locale.
 function StatusBarEmail({ email }: { email: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [text, setText] = useState(email);
+  const localRef = useRef<HTMLSpanElement>(null);
+  const atRef = useRef<HTMLSpanElement>(null);
+  const domainRef = useRef<HTMLSpanElement>(null);
+  const [parts, setParts] = useState(() => splitEmail(email));
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const localEl = localRef.current;
+    const atEl = atRef.current;
+    const domainEl = domainRef.current;
+    if (!el || !localEl || !atEl || !domainEl) return;
 
-    // The span is nowrap + overflow:hidden and is the flex item that gives way first, so
-    // it is clipped exactly when the text does not fit. Candidates go straight into the
-    // DOM: React state cannot be read back synchronously, and every probe is followed by
-    // a write of the final string, so the two never disagree.
+    // The address is written into three separate runs rather than one string (see the
+    // render below for why). Nothing else about the measurement changes: the wrapper is
+    // still nowrap + overflow:hidden and still the flex item that gives way first.
+    const write = (candidate: string) => {
+      const { local, domain } = splitEmail(candidate);
+      localEl.textContent = local;
+      atEl.textContent = domain === null ? '' : '@';
+      domainEl.textContent = domain ?? '';
+    };
+
+    // Candidates go straight into the DOM: React state cannot be read back synchronously,
+    // and every probe is followed by a write of the final string, so the two never
+    // disagree.
     const fits = (candidate: string) => {
-      el.textContent = candidate;
+      write(candidate);
       return el.scrollWidth <= el.clientWidth;
     };
 
     const commit = (final: string) => {
-      el.textContent = final;
-      setText(final);
+      write(final);
+      setParts(splitEmail(final));
     };
 
     const fit = () => {
@@ -101,9 +125,19 @@ function StatusBarEmail({ email }: { email: string }) {
     };
   }, [email]);
 
+  // Three runs, not one string. The address is the *logged-in* user's, so there is never a
+  // reason to mail it, but iOS hands a plain email-shaped run of text to its data
+  // detectors and makes it tappable — an accidental tap then launches Mail with the user
+  // writing to themselves. A detector needs local@domain contiguous; the inline-block
+  // around the '@' ends the text run and defeats the match. On screen it is identical:
+  // VT323 is monospace and the spans are empty of styling otherwise.
   return (
     <span className="nav-auth-email" ref={ref} title={email}>
-      {text}
+      <span ref={localRef}>{parts.local}</span>
+      <span className="nav-auth-email-at" ref={atRef}>
+        {parts.domain === null ? '' : '@'}
+      </span>
+      <span ref={domainRef}>{parts.domain ?? ''}</span>
     </span>
   );
 }

@@ -59,6 +59,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* This is the signed-in user's own address — a label, not something to act on. No
+     long-press "New Mail Message" sheet, and nothing for a text selection to hand to
+     iOS's data detectors. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Ends the text run so local@domain is never contiguous and the detector cannot match it
+   (NavAuth renders the '@' into this span for exactly that reason). Zero-width when empty,
+   and in a monospace face it is indistinguishable from an inline '@'. */
+.nav-auth-email-at {
+  display: inline-block;
+}
+
+/* Belt and braces: if some future WebKit linkifies it anyway, it should at least neither
+   look nor behave like a link. */
+.status-user .nav-auth-email a[x-apple-data-detectors],
+.status-user .nav-auth-email a[href^="x-apple-data-detectors"],
+.status-user .nav-auth-email a[href^="mailto:"] {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: none;
 }
 
 @media (max-width: 600px) {
