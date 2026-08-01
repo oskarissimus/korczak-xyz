@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { AuthApi } from '../../hooks/useAuth';
 import type { SyncState } from '../../utils/typing/syncEngine';
+import { describeSync, type SyncDisplay } from '../../utils/typing/syncPresentation';
 import { translations, type Lang } from './translations';
 
 interface SyncStatusProps {
@@ -10,13 +11,15 @@ interface SyncStatusProps {
   onRetry: () => void;
 }
 
+type T = (typeof translations)[Lang];
+
 // How often the "2 min ago" text is recomputed. Deliberately not tied to renders of the
 // typing session: this component sits in the same tree as the passage, and the whole point
 // of a ticking clock here is that it must not cost anything per keystroke.
 const RELATIVE_TIME_TICK_MS = 30_000;
 
 // Re-render on a slow timer so "2 min ago" keeps up. No interval runs when there is no
-// timestamp to age, which is every state except the settled one.
+// timestamp to age, which is only before the first attempt settles.
 function useAgingLabel(timestamp: number | null): void {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -26,12 +29,31 @@ function useAgingLabel(timestamp: number | null): void {
   }, [timestamp]);
 }
 
-function formatAgo(timestamp: number, t: (typeof translations)[Lang]): string {
+function formatAgo(timestamp: number, t: T): string {
   const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
   if (seconds < 60) return t.syncJustNow;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} ${t.syncMinutesAgo}`;
-  return `${Math.round(minutes / 60)} ${t.syncHoursAgo}`;
+  const hours = Math.round(minutes / 60);
+  // Days, because the slot has a fixed width and "36 h ago" is where the label starts to grow
+  // faster than the box it lives in.
+  if (hours < 24) return `${hours} ${t.syncHoursAgo}`;
+  return `${Math.round(hours / 24)} ${t.syncDaysAgo}`;
+}
+
+// What cell one is saying, in words, for anyone not looking at the icon.
+function activityLabel(display: SyncDisplay, status: SyncState['status'], t: T): string {
+  if (display.activity === 'busy') {
+    if (display.outcome === 'fail') return t.syncRetrying;
+    return status === 'starting' ? t.syncChecking : t.syncSyncing;
+  }
+  return display.reason === 'offline' ? t.syncOffline : t.syncPending;
+}
+
+function outcomeLabel(display: SyncDisplay, t: T): string {
+  if (display.outcome === 'ok') return t.syncSynced;
+  if (display.outcome === 'none') return t.syncNever;
+  return display.reason === 'conflict' ? t.syncConflict : t.syncFailed;
 }
 
 /*
@@ -41,98 +63,102 @@ function formatAgo(timestamp: number, t: (typeof translations)[Lang]): string {
  * email already said "you are signed in". It does - but being signed in was never the same
  * thing as being saved, and when the two came apart there was nothing on the page that said
  * so. A whole session's progress could fail to upload without a single pixel changing.
+ *
+ * It then spent a while saying one thing at a time, which had the opposite problem: the label
+ * it chose was almost always "Saving…", so a failed write being retried looked identical to a
+ * healthy one, and a settled sync said nothing about when it had last happened. Now there are
+ * two cells - is a sync happening, and how did the last one end - and both are always readable.
+ *
+ * Every state renders into a fixed-width slot, including the empty ones. An indicator that
+ * changes width sits in a centred flex row and drags the book <select> sideways under the
+ * cursor, which is a real cost paid by someone who is not looking at the indicator at all.
  */
 export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProps) {
   const { enabled, user, loading } = auth;
   const t = translations[lang];
-  useAgingLabel(sync.status === 'synced' ? sync.lastSyncedAt : null);
+  const display = describeSync(sync);
+  useAgingLabel(display.at);
 
+  // Nothing here ever renders, so nothing here can move the row.
   if (!enabled) return null;
 
   if (!user) {
-    if (loading) return null;
+    // Still resolving: the slot is held open rather than filled, so the row does not jump
+    // when auth settles either way.
+    if (loading) return <div className="typing-sync-slot" aria-hidden="true" />;
     const loginPath =
       lang === 'en' ? '/login/?redirect=/games/typing/' : '/pl/login/?redirect=/pl/games/typing/';
     return (
-      <a className="typing-sync typing-sync-link" href={loginPath}>
-        {t.syncSignIn} →
-      </a>
+      <div className="typing-sync-slot">
+        <a className="typing-sync typing-sync-link" href={loginPath}>
+          {t.syncSignIn} →
+        </a>
+      </div>
     );
   }
 
-  switch (sync.status) {
-    case 'disabled':
-      return null;
+  const ago = display.at != null ? formatAgo(display.at, t) : null;
+  const exactTime = display.at != null ? new Date(display.at).toLocaleTimeString() : null;
+  const lastTitle =
+    exactTime == null
+      ? undefined
+      : display.outcome === 'fail'
+        ? `${t.syncTitleFailed} ${exactTime}${display.retryable ? ` · ${t.syncRetry}` : ''}`
+        : `${t.syncTitleSynced} ${exactTime}`;
 
-    case 'starting':
-      return (
-        <span className="typing-sync typing-sync-state typing-sync--busy">
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncChecking}
-        </span>
-      );
+  const lastLabel = `${t.syncLastSync}: ${outcomeLabel(display, t)}${ago ? ` · ${ago}` : ''}`;
 
-    case 'syncing':
-      return (
-        <span className="typing-sync typing-sync-state typing-sync--busy">
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncSyncing}
-        </span>
-      );
+  // The icon and the abbreviated age are for the eye; the sentence next to them, unstyled and
+  // off-screen, is what a screen reader gets. Reading "✕ 2 min ago" aloud says nothing.
+  const lastContent = (
+    <>
+      <span className="typing-sync-glyph" aria-hidden="true">
+        {display.outcome === 'ok' ? '✓' : display.outcome === 'fail' ? '✕' : '–'}
+      </span>
+      <span className="typing-sync-ago" aria-hidden="true">
+        {ago ?? t.syncNever}
+      </span>
+    </>
+  );
 
-    case 'pending':
-      return (
-        <span className="typing-sync typing-sync-state typing-sync--pending">
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncPending}
-        </span>
-      );
+  const lastClass = [
+    'typing-sync-cell',
+    'typing-sync-cell--last',
+    display.outcome === 'ok'
+      ? 'typing-sync--ok'
+      : display.outcome === 'fail'
+        ? 'typing-sync--error'
+        : 'typing-sync--none',
+  ].join(' ');
 
-    case 'offline':
-      return (
-        <span className="typing-sync typing-sync-state typing-sync--warn">
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncOffline}
-        </span>
-      );
+  const activity = display.activity === 'idle' ? null : activityLabel(display, sync.status, t);
 
-    case 'error':
-      return (
-        <button
-          type="button"
-          className="typing-sync typing-sync-state typing-sync--error"
-          onClick={onRetry}
-        >
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncFailed} · {t.syncRetry}
+  // Not a live region: with a debounce of 1.5s, these cells change several times a minute while
+  // someone types, and announcing each one would talk over the thing they are typing. The state
+  // is readable on demand instead, from the text each cell carries.
+  return (
+    <div className="typing-sync typing-sync-slot">
+      {/* Cell one: is a sync happening right now. Empty when nothing is - and still the same
+          width, which is the point of it being its own cell. */}
+      <span className="typing-sync-cell typing-sync-cell--now" title={activity ?? undefined}>
+        {display.activity === 'busy' && <span className="typing-sync-spinner" aria-hidden="true" />}
+        {display.activity === 'queued' && <span className="typing-sync-queued" aria-hidden="true" />}
+        {activity && <span className="typing-sync-sr">{activity}</span>}
+      </span>
+
+      {/* Cell two: how the last attempt ended, and when. A button only when clicking it would
+          do something - a conflict is resolved by the modal that is already on screen. */}
+      {display.retryable ? (
+        <button type="button" className={lastClass} title={lastTitle} onClick={onRetry}>
+          {lastContent}
+          <span className="typing-sync-sr">{`${lastLabel} · ${t.syncRetry}`}</span>
         </button>
-      );
-
-    // Not a button: the dialog that resolves this is already on screen and modal, so there
-    // is nothing here for a click to open.
-    case 'conflict':
-      return (
-        <span className="typing-sync typing-sync-state typing-sync--error">
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncConflict}
+      ) : (
+        <span className={lastClass} title={lastTitle}>
+          {lastContent}
+          <span className="typing-sync-sr">{lastLabel}</span>
         </span>
-      );
-
-    case 'synced':
-    default: {
-      const at = sync.lastSyncedAt;
-      return (
-        <span
-          className="typing-sync typing-sync-state typing-sync--ok"
-          // The exact time on hover: "2 min ago" is the right density for a glance, but when
-          // something has gone wrong the precise moment is what you need.
-          title={at ? `${t.syncTitleSynced} ${new Date(at).toLocaleTimeString()}` : undefined}
-        >
-          <span className="typing-sync-dot" aria-hidden="true" />
-          {t.syncSynced}
-          {at ? ` · ${formatAgo(at, t)}` : ''}
-        </span>
-      );
-    }
-  }
+      )}
+    </div>
+  );
 }

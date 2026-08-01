@@ -81,7 +81,9 @@ export interface TypingSessionApi {
 const NO_SYNC: SyncState = {
   status: 'disabled',
   lastSyncedAt: null,
+  lastFailedAt: null,
   error: null,
+  pendingWork: false,
   conflict: null,
 };
 

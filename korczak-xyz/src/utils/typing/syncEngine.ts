@@ -47,7 +47,14 @@ export interface SyncConflict {
 export interface SyncState {
   status: SyncStatus;
   lastSyncedAt: number | null;
+  /** When the most recent attempt failed. Paired with `error`, which says whether it is the
+   *  most recent attempt: `status` cannot say, because it is a precedence ladder in which a
+   *  retry in flight ('syncing') outranks the failure it is retrying. */
+  lastFailedAt: number | null;
   error: string | null;
+  /** Whether a write is queued, debouncing, or waiting on a retry - the same fact the ladder
+   *  reports as 'pending' only when nothing above it applies. */
+  pendingWork: boolean;
   conflict: SyncConflict | null;
 }
 
@@ -89,7 +96,9 @@ export class ProgressSyncEngine {
   private state: SyncState = {
     status: 'starting',
     lastSyncedAt: null,
+    lastFailedAt: null,
     error: null,
+    pendingWork: false,
     conflict: null,
   };
 
@@ -137,7 +146,9 @@ export class ProgressSyncEngine {
     if (
       next.status === this.state.status &&
       next.lastSyncedAt === this.state.lastSyncedAt &&
+      next.lastFailedAt === this.state.lastFailedAt &&
       next.error === this.state.error &&
+      next.pendingWork === this.state.pendingWork &&
       next.conflict === this.state.conflict
     ) {
       return;
@@ -146,8 +157,14 @@ export class ProgressSyncEngine {
     this.opts.onState(next);
   }
 
+  /** Record a failed attempt. The timestamp is what lets the indicator age a failure the way
+   *  it ages a success; `error` is cleared by the next write that lands. */
+  private fail(code: string): void {
+    this.setState({ error: code, lastFailedAt: Date.now() });
+  }
+
   private emit(): void {
-    this.setState({ status: this.deriveStatus() });
+    this.setState({ status: this.deriveStatus(), pendingWork: this.hasPendingWork() });
   }
 
   private deriveStatus(): SyncStatus {
@@ -192,7 +209,7 @@ export class ProgressSyncEngine {
       await this.applyDecision(decision, local, cloud);
     } catch (e) {
       log.error('sync.reconcile.fail', { bookId, ...describeError(e) });
-      this.setState({ error: 'reconcile-failed' });
+      this.fail('reconcile-failed');
     } finally {
       // Unconditional, and the whole point. There is no interleaving - cancellation, a
       // second effect run, a thrown error - that can leave this engine permanently unable
@@ -260,7 +277,13 @@ export class ProgressSyncEngine {
       cloud: summarize(cloud),
     });
     this.clearTimers();
-    this.setState({ conflict: { local, cloud, suggested }, status: 'conflict' });
+    // A conflict is an attempt that did not complete, so it dates the last-sync readout too.
+    this.setState({
+      conflict: { local, cloud, suggested },
+      status: 'conflict',
+      lastFailedAt: Date.now(),
+      pendingWork: false,
+    });
   }
 
   /**
@@ -296,7 +319,7 @@ export class ProgressSyncEngine {
       log.info('sync.conflict.write.ok', { bookId });
     } catch (e) {
       log.error('sync.conflict.write.fail', { bookId, ...describeError(e) });
-      this.setState({ error: 'write-failed' });
+      this.fail('write-failed');
       this.scheduleRetry();
     }
     this.emit();
@@ -326,9 +349,10 @@ export class ProgressSyncEngine {
     this.push(trigger);
   }
 
+  // `error` is deliberately left standing: it is what the indicator's last-sync cell reads, and
+  // a retry does not change how the previous attempt ended. The write that lands clears it.
   retry(): void {
     this.consecutiveFailures = 0;
-    this.setState({ error: null });
     this.push('manual-retry');
   }
 
@@ -436,7 +460,7 @@ export class ProgressSyncEngine {
         attempt: this.consecutiveFailures,
         ...describeError(e),
       });
-      this.setState({ error: 'write-failed' });
+      this.fail('write-failed');
       this.scheduleRetry();
     } finally {
       this.writeInFlight = false;

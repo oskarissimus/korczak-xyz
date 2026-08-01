@@ -72,22 +72,27 @@ export const translations = {
     // Split around the average gap so it can be highlighted inline.
     bottleneckFormulaPre: 'time lost = max(0, your gap −',
     bottleneckFormulaPost: 'avg) × presses',
-    // Cloud sync. Kept to a couple of words each: the indicator shares the book-picker row,
-    // and a long label there pushes the row into wrapping.
-    syncSignIn: 'Sign in to sync your progress',
+    // Cloud sync. Kept short by construction: the indicator sits in a fixed-width slot on the
+    // book-picker row, and anything that outgrows it is clipped rather than allowed to reflow
+    // the row. Most of these are now tooltips and screen-reader labels rather than visible text.
+    syncSignIn: 'Sign in to sync',
     syncChecking: 'Checking…',
     syncSyncing: 'Saving…',
+    syncRetrying: 'Retrying…',
     syncSynced: 'Synced',
     syncPending: 'Unsaved',
     syncOffline: 'Offline',
     syncFailed: 'Sync failed',
     syncRetry: 'Retry',
     syncConflict: 'Conflict',
+    syncLastSync: 'Last sync',
     syncJustNow: 'just now',
     syncMinutesAgo: 'min ago',
     syncHoursAgo: 'h ago',
-    syncNever: 'not yet saved',
+    syncDaysAgo: 'd ago',
+    syncNever: 'not yet',
     syncTitleSynced: 'Progress saved to your account at',
+    syncTitleFailed: 'Last sync attempt failed at',
     // Conflict dialog
     conflictTitle: 'Two versions of your progress',
     conflictBody:
@@ -169,20 +174,24 @@ export const translations = {
     // Split around the average gap so it can be highlighted inline.
     bottleneckFormulaPre: 'stracony czas = max(0; twoja przerwa −',
     bottleneckFormulaPost: 'śr.) × naciśnięcia',
-    syncSignIn: 'Zaloguj się, aby synchronizować postęp',
+    syncSignIn: 'Zaloguj się',
     syncChecking: 'Sprawdzam…',
     syncSyncing: 'Zapisuję…',
+    syncRetrying: 'Ponawiam…',
     syncSynced: 'Zapisano',
     syncPending: 'Niezapisane',
     syncOffline: 'Offline',
     syncFailed: 'Błąd zapisu',
     syncRetry: 'Ponów',
     syncConflict: 'Konflikt',
+    syncLastSync: 'Ostatni zapis',
     syncJustNow: 'przed chwilą',
     syncMinutesAgo: 'min temu',
     syncHoursAgo: 'godz. temu',
-    syncNever: 'jeszcze nie zapisano',
+    syncDaysAgo: 'dni temu',
+    syncNever: 'jeszcze nie',
     syncTitleSynced: 'Postęp zapisany na koncie o',
+    syncTitleFailed: 'Ostatnia próba zapisu nie powiodła się o',
     conflictTitle: 'Dwie wersje Twojego postępu',
     conflictBody:
       'To urządzenie i Twoje konto zmieniły się od ostatniej zgodności, więc żadna wersja nie jest po prostu nowsza. Wybierz, którą zachować — druga zostanie najpierw pobrana jako kopia zapasowa.',

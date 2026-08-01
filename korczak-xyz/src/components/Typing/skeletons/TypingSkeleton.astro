@@ -19,17 +19,10 @@ const PASSAGE_LINES = ['100%', '96%', '99%', '88%', '62%'];
    decides whether a row of buttons wraps — which is a whole row of shift. */
 const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
 
-/* The sync indicator's width, minus its own chrome (10px padding + 2px border
-   per side, plus the 9px dot and its 6px gap). Language-specific for the same
-   reason as CONTROLS: the indicator shares the book-picker row, so its width is
-   part of what decides whether that row wraps.
-
-   Sized for the *signed-in* indicator rather than the signed-out sign-in link,
-   which is the narrower of the two and the one a returning visitor sees. A
-   stand-in wider than what replaces it would leave the row wrapped for a beat
-   after hydration. Measured from the longest steady label — "Synced · 12 min
-   ago" / "Zapisano · 12 min temu". */
-const SYNC_W = { en: 150, pl: 165 }[lang];
+/* The sync indicator needs no measured width here, unlike CONTROLS: it now
+   renders into a fixed slot (.typing-sync-slot) that is the same width in every
+   state and every language, so the stand-in can simply reuse the slot's own
+   class and cannot drift away from what replaces it. */
 ---
 
 <div class="typing-game typing-skeleton" aria-hidden="true">
@@ -43,13 +36,15 @@ const SYNC_W = { en: 150, pl: 165 }[lang];
     <select class="typing-book-select typing-skel-select" disabled><option></option></select>
 
     {/*
-      SyncStatus renders null only while Firebase auth is still loading. Every
-      settled state puts something here: a sign-in link when signed out, and the
-      sync indicator when signed in — so unlike before, this slot is nearly
-      always filled and worth standing in for.
+      The two cells SyncStatus hydrates into — current sync and last sync. Every
+      state it can settle into, including the empty ones and the signed-out
+      sign-in link, fills exactly this slot, so hydration cannot move the row.
     */}
-    <span class="typing-sync typing-sync-state">
-      <span class="typing-skel" style={`--skel-w: ${SYNC_W}px; --skel-h: 1.1rem`} />
+    <span class="typing-sync-slot">
+      <span class="typing-sync-cell typing-sync-cell--now"></span>
+      <span class="typing-sync-cell typing-sync-cell--last">
+        <span class="typing-skel" style="--skel-w: 100%; --skel-h: 0.9rem" />
+      </span>
     </span>
   </div>
 
