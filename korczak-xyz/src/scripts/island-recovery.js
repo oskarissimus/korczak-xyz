@@ -14,7 +14,12 @@
 (function () {
   var MAX_RETRIES = 3;
   var BACKOFF_MS = [2000, 4000, 8000];
-  var RELOAD_KEY = 'island-recovery-reloaded:' + location.pathname;
+  // Evaluated per call, not once: with client-side routing this script runs a single time
+  // for the whole visit, and a key captured at startup would keep charging every later
+  // page's reload budget to the one the user happened to enter on.
+  function reloadKey() {
+    return 'island-recovery-reloaded:' + location.pathname;
+  }
 
   var t = window.__islandRecoveryI18n || {};
   var attempts = new WeakMap();
@@ -39,15 +44,16 @@
 
   function claimReload() {
     return session(function (s) {
-      if (s.getItem(RELOAD_KEY)) return false;
-      s.setItem(RELOAD_KEY, '1');
+      var key = reloadKey();
+      if (s.getItem(key)) return false;
+      s.setItem(key, '1');
       return true;
     });
   }
 
   function releaseReload() {
     session(function (s) {
-      s.removeItem(RELOAD_KEY);
+      s.removeItem(reloadKey());
     });
   }
 
@@ -251,8 +257,15 @@
   document.addEventListener('astro:hydration-error', onHydrationError);
   window.addEventListener('online', onOnline);
 
-  // A page that ended up healthy must not leave the one-reload budget spent.
-  window.addEventListener('load', function () {
+  // A page that ended up healthy must not leave the one-reload budget spent. `load` only
+  // ever fires for the page the visit started on, so later pages are covered by
+  // `astro:page-load` - which also fires for that first one, hence no `load` listener.
+  document.addEventListener('astro:page-load', function () {
+    // Islands belonging to a page that has since been swapped out are detached and can
+    // never recover; drop them rather than let the list grow for the whole visit.
+    pending = pending.filter(function (el) {
+      return el.isConnected;
+    });
     setTimeout(function () {
       if (!stuckIslands().length) releaseReload();
     }, 5000);

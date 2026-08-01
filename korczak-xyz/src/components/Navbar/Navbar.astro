@@ -1,6 +1,8 @@
 ---
 import { useTranslations, getAlternateLangPath, type Lang } from '../../i18n';
 import NavAuth from '../Auth/NavAuth';
+import NavAuthFallback from '../Auth/NavAuthFallback.astro';
+import { AUTH_CACHE_KEY } from '../../lib/authCache';
 import { execSync } from 'child_process';
 
 interface Props {
@@ -67,7 +69,10 @@ function isActive(itemPath: string): boolean {
 
       <!-- Right-aligned group: auth control + language switcher -->
       <div class="nav-right">
-        <NavAuth client:only="react" lang={lang} variant="control" />
+        {/* Persisted so a page change never unmounts it. Only the islands are persisted, not
+            the whole window: the links, the active state and the switcher below must keep
+            coming from the server for whichever page was just navigated to. */}
+        <NavAuth client:only="react" transition:persist="nav-auth-control" lang={lang} variant="control" />
 
         <!-- Language switcher -->
         <div class="lang-switcher">
@@ -92,10 +97,49 @@ function isActive(itemPath: string): boolean {
       <span class="build-time build-time--short">{buildTimestamp}</span>
     </div>
     <div class="status-user">
-      <NavAuth client:only="react" lang={lang} variant="identity" />
+      <NavAuth client:only="react" transition:persist="nav-auth-identity" lang={lang} variant="identity">
+        <NavAuthFallback slot="fallback" />
+      </NavAuth>
     </div>
   </div>
 </div>
+
+{/* Paints the email before anything else can. Inline and in the body, so it runs while the
+    parser is still here and the address is on screen in the first frame - a bundled script
+    would run after paint, and one in <head> would run before these spans exist. React then
+    hydrates from the same cache with the same string, so there is nothing to see. */}
+<script is:inline define:vars={{ cacheKey: AUTH_CACHE_KEY }}>
+  (function () {
+    // The fallback tree parsed just above. Absent once React has taken over the island,
+    // which is exactly when this has nothing left to do.
+    var el = document.querySelector('[data-nav-auth-email]');
+    if (!el) return;
+
+    var email;
+    try {
+      var cached = JSON.parse(window.localStorage.getItem(cacheKey) || 'null');
+      email = cached && typeof cached.email === 'string' ? cached.email : null;
+    } catch (e) {
+      email = null;
+    }
+    if (!email) return;
+
+    // Split at the last '@' exactly as splitEmail() does, so the three runs match what
+    // React will render and the '@' keeps its own element (see NavAuth.tsx on iOS data
+    // detectors). No folding here: the address is clipped by CSS until React measures the
+    // bar and abbreviates it properly.
+    var at = email.lastIndexOf('@');
+    var local = at > 0 ? email.slice(0, at) : email;
+    var domain = at > 0 ? email.slice(at + 1) : '';
+
+    el.querySelector('[data-part="local"]').textContent = local;
+    el.querySelector('[data-part="at"]').textContent = at > 0 ? '@' : '';
+    el.querySelector('[data-part="domain"]').textContent = domain;
+    el.title = email;
+    el.classList.add('nav-auth-email');
+    el.hidden = false;
+  })();
+</script>
 
 <style>
   .navbar-window {
@@ -334,41 +378,50 @@ function isActive(itemPath: string): boolean {
 </style>
 
 <script>
-  const menuButton = document.getElementById('menu-button');
-  const mainNav = document.getElementById('main-nav');
+  // Everything here binds to navbar elements, and client-side routing replaces those on
+  // every navigation while running this module only once. Hence an init driven by
+  // `astro:page-load`; the elements it finds are always the current page's, so re-binding
+  // cannot stack up listeners.
+  function initNavbar() {
+    const menuButton = document.getElementById('menu-button');
+    const mainNav = document.getElementById('main-nav');
 
-  menuButton?.addEventListener('click', () => {
-    mainNav?.classList.toggle('show');
-  });
-
-  // Format build timestamp. Two variants: the locale-aware long one for wide screens,
-  // and a compact ISO-style one for phones (CSS picks which is visible).
-  const updatedEl = document.getElementById('navbar-updated');
-  const timestamp = updatedEl?.dataset.timestamp;
-  if (updatedEl && timestamp) {
-    const date = new Date(timestamp);
-    const lang = document.documentElement.lang || 'en';
-    const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
-
-    const long = date.toLocaleString(locale, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    menuButton?.addEventListener('click', () => {
+      mainNav?.classList.toggle('show');
     });
 
-    // YYYY-MM-DD HH:MM in local time — 16 chars, unambiguous, and the same in every
-    // locale, so it needs no translation.
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    // Format build timestamp. Two variants: the locale-aware long one for wide screens,
+    // and a compact ISO-style one for phones (CSS picks which is visible).
+    const updatedEl = document.getElementById('navbar-updated');
+    const timestamp = updatedEl?.dataset.timestamp;
+    if (updatedEl && timestamp) {
+      const date = new Date(timestamp);
+      const lang = document.documentElement.lang || 'en';
+      const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
 
-    const longEl = updatedEl.querySelector('.build-time--long');
-    const shortEl = updatedEl.querySelector('.build-time--short');
-    if (longEl) longEl.textContent = long;
-    if (shortEl) shortEl.textContent = short;
+      const long = date.toLocaleString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
-    // Keeps the full date reachable when the compact form is showing.
-    updatedEl.title = long;
+      // YYYY-MM-DD HH:MM in local time — 16 chars, unambiguous, and the same in every
+      // locale, so it needs no translation.
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const short = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+      const longEl = updatedEl.querySelector('.build-time--long');
+      const shortEl = updatedEl.querySelector('.build-time--short');
+      if (longEl) longEl.textContent = long;
+      if (shortEl) shortEl.textContent = short;
+
+      // Keeps the full date reachable when the compact form is showing.
+      updatedEl.title = long;
+    }
   }
+
+  // `astro:page-load` covers the first load too, so this is the only call site needed.
+  document.addEventListener('astro:page-load', initNavbar);
 </script>

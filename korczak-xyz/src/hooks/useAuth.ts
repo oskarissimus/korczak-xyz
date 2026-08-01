@@ -6,6 +6,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth, firebaseEnabled } from '../lib/firebase';
+import { clearCachedUser, readCachedUser, writeCachedUser } from '../lib/authCache';
 
 // Minimal user shape we pass around (subset of the Firebase User).
 export interface AuthUser {
@@ -23,8 +24,13 @@ export interface AuthApi {
 }
 
 export function useAuth(): AuthApi {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(firebaseEnabled);
+  // Start from the cached user rather than from nothing. Firebase's own session lives in
+  // IndexedDB and takes a round-trip to read, and consumers that render nothing while
+  // `loading` is true would show a hole for the whole of it. A returning user is therefore
+  // signed in from the first paint, and `onAuthStateChanged` only ever confirms it.
+  const [cachedUser] = useState(readCachedUser);
+  const [user, setUser] = useState<AuthUser | null>(cachedUser);
+  const [loading, setLoading] = useState<boolean>(firebaseEnabled && !cachedUser);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +41,8 @@ export function useAuth(): AuthApi {
     const unsubscribe = onAuthStateChanged(auth, (u: User | null) => {
       setUser(u ? { uid: u.uid, email: u.email } : null);
       setLoading(false);
+      if (u) writeCachedUser({ uid: u.uid, email: u.email });
+      else clearCachedUser();
     });
     return unsubscribe;
   }, []);

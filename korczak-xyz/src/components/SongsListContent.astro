@@ -118,44 +118,52 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
 </style>
 
 <script>
-  const searchForm = document.getElementById('song-search-form') as HTMLFormElement;
-  const searchInput = document.getElementById('song-search') as HTMLInputElement;
-  const songsList = document.getElementById('songs-list');
-  const noResults = document.getElementById('no-results');
-  const songs = songsList?.querySelectorAll('.song-item') || [];
+  // Re-run per page: client-side routing replaces the form and the list on every
+  // navigation but executes this module only once. Every listener below is bound to an
+  // element from the page being initialised, so nothing accumulates.
+  function initSongSearch() {
+    const searchForm = document.getElementById('song-search-form') as HTMLFormElement;
+    const searchInput = document.getElementById('song-search') as HTMLInputElement;
+    const songsList = document.getElementById('songs-list');
+    const noResults = document.getElementById('no-results');
+    const songs = songsList?.querySelectorAll('.song-item') || [];
 
-  const toAscii = (str: string) => {
-    const charMap: Record<string, string> = {
-      'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D',
-      'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
+    const toAscii = (str: string) => {
+      const charMap: Record<string, string> = {
+        'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D',
+        'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
+      };
+      return str
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[łŁøØđĐßæÆœŒ]/g, c => charMap[c] || c);
     };
-    return str
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[łŁøØđĐßæÆœŒ]/g, c => charMap[c] || c);
-  };
 
-  searchInput?.addEventListener('input', (e) => {
-    const target = e.target as HTMLInputElement;
-    const query = toAscii(target.value.toLowerCase().trim());
-    let visibleCount = 0;
+    searchInput?.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      const query = toAscii(target.value.toLowerCase().trim());
+      let visibleCount = 0;
 
-    songs.forEach((song) => {
-      const songEl = song as HTMLElement;
-      const title = toAscii(songEl.dataset.title || '');
-      const author = toAscii(songEl.dataset.author || '');
-      const matches = title.includes(query) || author.includes(query);
-      songEl.style.display = matches ? '' : 'none';
-      if (matches) visibleCount++;
+      songs.forEach((song) => {
+        const songEl = song as HTMLElement;
+        const title = toAscii(songEl.dataset.title || '');
+        const author = toAscii(songEl.dataset.author || '');
+        const matches = title.includes(query) || author.includes(query);
+        songEl.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+      });
+
+      if (noResults) {
+        noResults.style.display = visibleCount === 0 && query !== '' ? '' : 'none';
+      }
     });
 
-    if (noResults) {
-      noResults.style.display = visibleCount === 0 && query !== '' ? '' : 'none';
-    }
-  });
+    searchForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      searchInput?.blur();
+    });
+  }
 
-  searchForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    searchInput?.blur();
-  });
+  // Fires on the first load as well as after each navigation.
+  document.addEventListener('astro:page-load', initSongSearch);
 </script>

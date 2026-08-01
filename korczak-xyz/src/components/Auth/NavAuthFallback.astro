@@ -1,0 +1,22 @@
+---
+/*
+ * Server-rendered stand-in for <NavAuth client:only variant="identity" />, in the same vein
+ * as the typing skeletons (src/components/Typing/skeletons/).
+ *
+ * Inside, it mirrors StatusBarEmail's markup exactly - the same three runs, split around the
+ * '@' for the same reason (see NavAuth.tsx) - so the inline script in Navbar.astro can fill
+ * it from the auth cache during parse and React can hydrate over identical content without
+ * anything visibly changing.
+ *
+ * It ships `hidden` and *without* the .nav-auth-email class: logged out, or on a first-ever
+ * visit, this must occupy nothing and show no empty inset box. The script adds both only
+ * when it actually has an address, which keeps the empty case out of reach of the author
+ * styles in auth.css that would otherwise beat `hidden`.
+ */
+---
+
+<span data-nav-auth-email hidden>
+  <span data-part="local"></span>
+  <span class="nav-auth-email-at" data-part="at"></span>
+  <span data-part="domain"></span>
+</span>
