@@ -10,9 +10,8 @@ dateAdded: 2026-08-02
 Wskazówka: dla brzmienia bliższego wersji Ramones zamień te akordy
 na chwyty barowe (power chords): A5, D5, E5, G5, C5
 
-[Zwrotka 1]
-a
-Spider-Man, Spider-Man,
+   a
+1. Spider-Man, Spider-Man,
 a
 Does whatever a spider can.
 d
@@ -22,9 +21,8 @@ Catches thieves just like flies.
      E    d                     a
 Look out! Here comes the Spider-Man!
 
-[Zwrotka 2]
-a
-Is he strong? Listen bud,
+   a
+2. Is he strong? Listen bud,
 a
 He's got radioactive blood.
 d
@@ -34,7 +32,7 @@ Take a look overhead.
     E      d                     a
 Hey there! There goes the Spider-Man!
 
-[Refren / Łącznik]
+Ref.:
        C        G
 In the chill of night,
        d            a
@@ -44,9 +42,8 @@ Like a streak of light,
    d               E
 He arrives just in time!
 
-[Zwrotka 3]
-a
-Spider-Man, Spider-Man,
+   a
+3. Spider-Man, Spider-Man,
 a
 Friendly neighborhood Spider-Man.
 d
