@@ -12,7 +12,7 @@ chords:
   g7: "x x 3 3 3 3"
   g6: "x x 2 3 3 3"
   "F#": "2 4 4 3 2 2"
-  Hb: "x 1 3 3 3 1"
+  B: "x 1 3 3 3 1"
   Eb: "x 6 8 8 8 6"
   d: "x 5 7 7 6 5"
   D: "x x 0 2 3 2"
@@ -21,18 +21,18 @@ chords:
   Edim7: "x x 2 3 2 3"
 ---
 ```plaintext
-g
-Remember when you were young,
-F#                      Hb
+   g
+1. Remember when you were young,
+F#                      B
 you shone like the sun.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
 g
 Now there's a look in your eyes,
-F#                             Hb
+F#                             B
 like black holes in the sky.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
          g*
@@ -43,23 +43,23 @@ g7           g6
 Blown on the steel breeze.
  Eb                    Edim7
 Come on you target for faraway laughter,
-Hb                    D
+B                    d
 Come on you stranger, you legend,
 D           g
 You martyr, and shine!
 
-g
-You reached for the secret too soon,
-F#                       Hb
+   g
+2. You reached for the secret too soon,
+F#                       B
 you cried for the moon.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
 g
 Threatened by shadows at night,
-F#                         Hb
+F#                         B
 and exposed in the light.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
          g*
@@ -70,23 +70,23 @@ g7          g6
 Rode on the steel breeze.
  Eb                    Edim7
 Come on you raver, you seer of visions,
-Hb                   D
+B                   d
 Come on you painter, you piper,
 D             g
 You prisoner, and shine!
 
-g
-Nobody knows where you are,
-F#                    Hb
+   g
+3. Nobody knows where you are,
+F#                    B
 how near or how far.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
 g
 Pile on many more layers
-F#                            Hb
+F#                            B
 and I'll be joining you there.
-Eb    d  c   Hb   F
+Eb    d  c   B   F
 Shine on you crazy diamond.
 
           g*
@@ -97,6 +97,8 @@ g7              g6
 And sail on the steel breeze.
  Eb                       Edim7
 Come on you boy child, you winner and loser,
-Hb                    D        D             g
-Come on you miner for truth and delusion, and shine!
+B                    d        
+Come on you miner for truth and
+D             g
+delusion, and shine!
 ```
