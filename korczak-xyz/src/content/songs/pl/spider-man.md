@@ -19,7 +19,7 @@ d
 Spins a web, any size,
 a
 Catches thieves just like flies.
-E d a
+     E    d                     a
 Look out! Here comes the Spider-Man!
 
 [Zwrotka 2]
@@ -31,17 +31,17 @@ d
 Can he swing from a thread?
 a
 Take a look overhead.
-E d a
+    E      d                     a
 Hey there! There goes the Spider-Man!
 
 [Refren / Łącznik]
-G C
+       C        G
 In the chill of night,
-d a
+       d            a
 At the scene of the crime,
-G C
+       C         G
 Like a streak of light,
-d E
+   d               E
 He arrives just in time!
 
 [Zwrotka 3]
@@ -53,6 +53,6 @@ d
 Wealth and fame, he's ignored,
 a
 Action is his reward.
-E d a
+     E    d                     a
 Look out! Here comes the Spider-Man!
 ```
