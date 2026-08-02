@@ -16,7 +16,8 @@
 
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { getClientId } from './clientId';
-import { db } from './firebase';
+import { getDb } from './firebase';
+import { runCloud } from './firestoreHealth';
 import { getLogUid, type LogEntry } from './logger';
 
 const BUFFER_KEY = 'logs:buffer';
@@ -105,7 +106,7 @@ export function enqueue(entry: LogEntry): void {
 }
 
 function canFlush(): boolean {
-  if (!db) return false;
+  if (!getDb()) return false;
   if (!getLogUid()) return false; // signed out: keep buffering, upload once a user appears
   if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
   if (Date.now() < nextAttemptAt) return false;
@@ -126,14 +127,19 @@ export async function flush(): Promise<void> {
     // draining a large backlog in a loop would compete with the typing path for the
     // network on exactly the slow connections that created the backlog.
     const batch = buffer.slice(0, BATCH_SIZE);
-    await addDoc(collection(db!, 'users', uid, 'logs'), {
-      createdAt: serverTimestamp(),
-      clientId: getClientId(),
-      count: batch.length,
-      from: batch[0]?.ts ?? null,
-      to: batch[batch.length - 1]?.ts ?? null,
-      entries: batch,
-    });
+    // Under a deadline like every other Firestore call: a client that dies mid-write never
+    // settles the promise, and `flushing` would then stay true for the life of the page -
+    // silencing the logging exactly when it is describing the failure worth reading.
+    await runCloud('logs', () =>
+      addDoc(collection(getDb()!, 'users', uid, 'logs'), {
+        createdAt: serverTimestamp(),
+        clientId: getClientId(),
+        count: batch.length,
+        from: batch[0]?.ts ?? null,
+        to: batch[batch.length - 1]?.ts ?? null,
+        entries: batch,
+      })
+    );
     // Drop exactly what was uploaded. Entries appended during the write stay put; splicing
     // by count rather than reassigning avoids losing them.
     buffer.splice(0, batch.length);

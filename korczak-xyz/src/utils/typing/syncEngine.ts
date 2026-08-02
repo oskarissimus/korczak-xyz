@@ -18,6 +18,7 @@
  *  - Nothing fails silently. Every transition is logged and surfaced through `getState()`.
  */
 
+import { isRecoverableClientError } from '../../lib/firestoreHealth';
 import { describeError, log } from '../../lib/logger';
 import {
   loadCloudProgress,
@@ -113,10 +114,21 @@ export class ProgressSyncEngine {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private firstPendingAt = 0;
   private consecutiveFailures = 0;
+  // The initial reconcile did not complete. Local progress is still safe to push - the checked
+  // write compares revisions rather than overwriting blind - but this engine has never seen the
+  // cloud copy, so it owes itself another look before it can be trusted to be in sync.
+  private reconcileOwed = false;
+  private reconcileInFlight = false;
 
   private readonly onOnline = () => {
     log.info('net.online', { bookId: this.opts.bookId });
     this.consecutiveFailures = 0;
+    // A reconnect is the one moment worth spending a round trip on unprompted: it is when a
+    // session that stalled while offline gets to find out where it actually stands.
+    if (this.reconcileOwed) {
+      void this.start();
+      return;
+    }
     if (this.hasPendingWork()) this.push('reconnect');
     else this.emit();
   };
@@ -170,7 +182,7 @@ export class ProgressSyncEngine {
   private deriveStatus(): SyncStatus {
     if (this.state.conflict) return 'conflict';
     if (!this.ready) return 'starting';
-    if (this.writeInFlight) return 'syncing';
+    if (this.writeInFlight || this.reconcileInFlight) return 'syncing';
     if (typeof navigator !== 'undefined' && !navigator.onLine && this.hasPendingWork()) {
       return 'offline';
     }
@@ -187,6 +199,9 @@ export class ProgressSyncEngine {
   async start(): Promise<void> {
     const { uid, bookId } = this.opts;
     const startedAt = Date.now();
+    if (this.reconcileInFlight || this.stopped) return;
+    this.reconcileInFlight = true;
+    this.clearTimers(); // a retry that this reconcile supersedes
     log.info('sync.reconcile.start', { bookId, uid });
     let decision: Decision | null = null;
     try {
@@ -196,6 +211,7 @@ export class ProgressSyncEngine {
       // of the comparison, so a slow network cannot cause a pull over fresh keystrokes.
       const local = normalizeProgress(this.opts.getLocal());
       const base = loadBookmark(bookId);
+      this.reconcileOwed = false;
       decision = reconcile(local, cloud, base);
       log.info('sync.reconcile.decision', {
         bookId,
@@ -209,14 +225,34 @@ export class ProgressSyncEngine {
       await this.applyDecision(decision, local, cloud);
     } catch (e) {
       log.error('sync.reconcile.fail', { bookId, ...describeError(e) });
+      this.reconcileOwed = true;
+      this.noteFailure(e);
       this.fail('reconcile-failed');
     } finally {
+      this.reconcileInFlight = false;
       // Unconditional, and the whole point. There is no interleaving - cancellation, a
       // second effect run, a thrown error - that can leave this engine permanently unable
       // to write, which is exactly what the previous implementation allowed.
       this.ready = true;
-      if (!this.stopped) this.emit();
+      if (!this.stopped) {
+        // Edits that arrived while the reconcile was in flight were parked rather than
+        // written (see `push`); the decision above saw them, but only a push told the cloud.
+        // A failed reconcile schedules a retry for the same reason - otherwise the engine
+        // sits there until the user happens to type again, since `push` is the only thing
+        // that drains queued work and nothing else calls it.
+        if (this.writeQueued) this.push('post-reconcile');
+        else if (this.reconcileOwed) this.scheduleRetry();
+        this.emit();
+      }
     }
+  }
+
+  /** Count an attempt against the retry backoff, forgiving one that the client caused. */
+  private noteFailure(e: unknown): void {
+    // A replaced Firestore client means the previous attempts were made against something
+    // that no longer exists. Serving out a backoff earned by a corpse would leave the session
+    // idle for up to a minute after it could have recovered.
+    this.consecutiveFailures = isRecoverableClientError(e) ? 1 : this.consecutiveFailures + 1;
   }
 
   private async applyDecision(
@@ -353,7 +389,8 @@ export class ProgressSyncEngine {
   // a retry does not change how the previous attempt ended. The write that lands clears it.
   retry(): void {
     this.consecutiveFailures = 0;
-    this.push('manual-retry');
+    if (this.reconcileOwed) void this.start();
+    else this.push('manual-retry');
   }
 
   private clearTimers(): void {
@@ -388,7 +425,11 @@ export class ProgressSyncEngine {
     );
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      void this.pushNow('retry');
+      // A reconcile that never completed is retried as a reconcile. Pushing instead would
+      // work - the checked write compares revisions - but it would leave the engine reporting
+      // 'synced' off a comparison it never made.
+      if (this.reconcileOwed) void this.start();
+      else void this.pushNow('retry');
     }, delay);
   }
 
@@ -453,7 +494,7 @@ export class ProgressSyncEngine {
         this.writeQueued = false; // one more pass, with whatever is current now
       }
     } catch (e) {
-      this.consecutiveFailures += 1;
+      this.noteFailure(e);
       log.warn('sync.push.fail', {
         bookId,
         trigger,

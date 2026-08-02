@@ -121,6 +121,29 @@ precedence ladder — `syncing` outranks `error`, so a single label showed a fai
 recoverable from `status`. The slot's width is fixed on purpose — it shares a centred flex row
 with the book `<select>`, and an indicator that resizes drags the picker sideways mid-sentence.
 
+### Firestore client health
+
+The Firestore JS client can die mid-session and stay dead. Going offline long enough for the
+auth token to need refreshing makes the refresh fail with `auth/network-request-failed`; that
+string reaches Firestore's `isPermanentError`, which knows only gRPC codes and calls
+`fail(0x3c6b)` on anything else. The assertion poisons the client's `AsyncQueue`, and from then
+on **every promise already waiting on it is never settled** — not resolved, not rejected. Any
+`await` on it hangs for the life of the page, so an "in flight" flag cleared in a `finally`
+never clears. That is how a session ends up showing a sync permanently in progress.
+
+- `src/lib/firestoreHealth.ts` — `runCloud()` puts a 25s deadline on every Firestore call and
+  treats a blown deadline (or an `INTERNAL ASSERTION FAILED`) as evidence the client is dead.
+  `installFirestoreWatchdog()` catches the assertion arriving as an unhandled rejection.
+- `src/lib/firebase.ts` — `getDb()` / `recycleDb()`. Recovery is `terminate()` plus a fresh
+  `getFirestore(app)`; nothing else revives a poisoned client. Read the handle per call, never
+  hold it.
+- `syncEngine` re-runs the initial reconcile on reconnect or on backoff when it never completed
+  (`reconcileOwed`), and forgives the retry backoff earned by a client that has since been
+  replaced (`isRecoverableClientError`).
+
+`syncEngine.test.ts` drives the whole chain with `firebase/firestore` mocked to return promises
+that never settle — the only faithful model of the dead-client case.
+
 ### Frontend logging
 
 Structured logs buffer in localStorage and upload in batches to `users/{uid}/logs`. They keep

@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { auth, firebaseEnabled } from '../lib/firebase';
 import { clearCachedUser, readCachedUser, writeCachedUser } from '../lib/authCache';
+import { installFirestoreWatchdog } from '../lib/firestoreHealth';
 import { installLogDebug } from '../lib/logDebug';
 import { onAuthResolved } from '../lib/logSink';
 import { describeError, log, setLogUid } from '../lib/logger';
@@ -44,6 +45,7 @@ export function useAuth(): AuthApi {
 
   useEffect(() => {
     installLogDebug();
+    installFirestoreWatchdog();
     if (!firebaseEnabled || !auth) {
       setLoading(false);
       log.info('auth.disabled', {});
