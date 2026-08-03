@@ -226,53 +226,37 @@
 
    The width is the whole point. The row is a centred flex line, so an indicator that resizes
    when its state changes slides the book <select> sideways under the cursor of someone who is
-   not even looking at it. Nothing inside here is allowed to size the slot: the cells are laid
+   not even looking at it. Nothing inside here is allowed to size the slot: the cell is laid
    out from this width, never the other way round. Content that outgrows it is clipped, which
    is why the labels are abbreviations and the sentences live in tooltips. */
 .typing-sync-slot {
   --sync-slot-w: 11rem;
   /* Height is fixed too, and for the same reason as the width - it is what the skeleton stands
-     in for. Left to the content it would follow the tallest glyph in either cell. */
+     in for, and it must not move between the empty state and a filled one. */
   --sync-cell-h: 36px;
   flex: none;
   width: var(--sync-slot-w);
+  min-height: var(--sync-cell-h);
   display: flex;
-  /* The text cell sets the height and the icon cell matches it, rather than each finding its
-     own - an empty icon cell would otherwise be shorter than the one beside it. */
-  align-items: stretch;
-  gap: 6px;
+  align-items: center;
 }
 
-/* Both cells keep the 90s inset-status-field look. Two of them rather than one because they
-   answer independent questions: whether a sync is happening now, and how the last one ended. */
+/* No border, no panel: a tick that needs a box drawn round it is a box drawn round nothing.
+   The glyph and its colour are the whole indicator; the row is quieter for it. */
 .typing-sync-cell {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
+  width: 100%;
   min-height: var(--sync-cell-h);
-  padding: 5px 8px;
-  border: 2px inset var(--retro-dark-gray);
-  background: var(--retro-gray);
+  padding: 0;
+  border: 0;
+  background: none;
   font-family: 'VT323', monospace;
   font-size: 1rem;
   line-height: 1;
-  color: var(--retro-black);
   white-space: nowrap;
-}
-
-/* Sized for its icon and holding that size when empty, so an idle indicator and a busy one
-   occupy the same pixels. */
-.typing-sync-cell--now {
-  flex: none;
-  width: 28px;
-  padding: 0;
-}
-
-.typing-sync-cell--last {
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: flex-start;
   overflow: hidden;
   /* Fixed-width digits: "9 min ago" and "11 min ago" must not twitch the glyph beside them. */
   font-variant-numeric: tabular-nums;
@@ -284,7 +268,7 @@ button.typing-sync-cell {
 }
 
 button.typing-sync-cell:active {
-  border-style: inset;
+  transform: translateY(1px);
 }
 
 .typing-sync-glyph {
@@ -297,7 +281,7 @@ button.typing-sync-cell:active {
   text-overflow: ellipsis;
 }
 
-/* Colour and shape carry the state at a glance; the sentence each cell also contains, offset
+/* Colour and shape carry the state at a glance; the sentence the cell also contains, offset
    out of view, is what carries it for anyone not looking at either. */
 .typing-sync--ok {
   color: #007000;
@@ -305,12 +289,6 @@ button.typing-sync-cell:active {
 
 .typing-sync--error {
   color: #900000;
-}
-
-/* Dimmer than the settled states but not so dim it reads as disabled - "nothing has happened
-   yet" is still information. */
-.typing-sync--none {
-  color: #4a4a4a;
 }
 
 .typing-sync-sr {
@@ -323,42 +301,4 @@ button.typing-sync-cell:active {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
-}
-
-/* In flight: a turning ring. */
-.typing-sync-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--retro-dark-gray);
-  border-top-color: var(--retro-cyan);
-  border-radius: 50%;
-  animation: typing-sync-spin 0.8s linear infinite;
-}
-
-/* Waiting to go out: a static square, deliberately quieter than the ring. */
-.typing-sync-queued {
-  width: 9px;
-  height: 9px;
-  border: 1px solid rgba(0, 0, 0, 0.45);
-  background: #c0a000;
-}
-
-@keyframes typing-sync-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes typing-sync-blink {
-  50% {
-    opacity: 0.25;
-  }
-}
-
-/* Without motion the ring cannot say "now" by turning, so it says it by blinking instead -
-   still distinguishable from the static queued square. */
-@media (prefers-reduced-motion: reduce) {
-  .typing-sync-spinner {
-    animation: typing-sync-blink 1.4s steps(2, start) infinite;
-  }
 }

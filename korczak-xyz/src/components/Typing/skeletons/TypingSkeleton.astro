@@ -36,16 +36,13 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
     <select class="typing-book-select typing-skel-select" disabled><option></option></select>
 
     {/*
-      The two cells SyncStatus hydrates into — current sync and last sync. Every
-      state it can settle into, including the empty ones and the signed-out
-      sign-in link, fills exactly this slot, so hydration cannot move the row.
+      The slot SyncStatus hydrates into. Held open and empty rather than filled
+      with a shimmer bar: what usually lands here is a single tick, so a
+      full-width bar would promise more than arrives. Every state the indicator
+      can settle into, including the signed-out sign-in link, fits exactly this
+      slot, so hydration cannot move the row.
     */}
-    <span class="typing-sync-slot">
-      <span class="typing-sync-cell typing-sync-cell--now"></span>
-      <span class="typing-sync-cell typing-sync-cell--last">
-        <span class="typing-skel" style="--skel-w: 100%; --skel-h: 0.9rem" />
-      </span>
-    </span>
+    <span class="typing-sync-slot"></span>
   </div>
 
   {/*

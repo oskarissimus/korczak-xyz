@@ -1158,8 +1158,8 @@ circle.typing-chart-line--keywpm {
   height: calc(1.4em + 16px); /* padding 6px, border 2px */
 }
 
-/* No stand-in rule for the sync cells: they carry their own fixed height (--sync-cell-h), so
-   the skeleton gets it from the same declaration the real ones do. */
+/* No stand-in rule for the sync slot: it carries its own fixed height (--sync-cell-h), so the
+   skeleton gets it from the same declaration the real one does. */
 
 .typing-skeleton .typing-hint,
 .typing-skeleton .typing-message,

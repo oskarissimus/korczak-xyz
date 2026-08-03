@@ -1,11 +1,15 @@
 /*
  * What the sync indicator should show, as a pure function of engine state.
  *
- * `SyncStatus` is a precedence ladder: one label for a machine that is doing two independent
- * things. A retry in flight reports 'syncing', so the failure being retried is invisible; a
- * settled engine reports 'synced', so nothing says whether that was a moment or an hour ago.
- * The indicator asks two questions instead - is something happening now, and how did the last
- * attempt end - and this is where a state answers both.
+ * The indicator answers one question: how did the last sync attempt end. `SyncStatus` cannot
+ * answer it on its own - it is a precedence ladder, so a retry in flight reports 'syncing' and
+ * hides the failure being retried, and a settled engine reports 'synced' without saying whether
+ * that was a moment or an hour ago. Reading `error`/`conflict` alongside `lastSyncedAt` and
+ * `lastFailedAt` is what keeps a failure visible while the engine is busy retrying it.
+ *
+ * Work in flight is deliberately *not* reported. It used to be, in a cell of its own, and it
+ * bought a spinner that no one acts on in exchange for something moving in the corner of the eye
+ * of someone trying to type. What matters is the outcome, and the outcome survives the retry.
  *
  * Kept separate from the component because that is the half worth testing: the repo's vitest
  * setup has no DOM, and this mirrors how reconcile.ts sits outside syncEngine.ts.
@@ -13,54 +17,37 @@
 
 import type { SyncState } from './syncEngine';
 
-/** Cell one: whether a sync is happening right now. */
-export type SyncActivity =
-  | 'idle' // nothing outstanding
-  | 'busy' // a reconcile or write is actually in flight
-  | 'queued'; // changes waiting on a debounce, a retry backoff, or a connection
-
-/** Cell two: how the most recent completed attempt ended. */
+/** How the most recent completed attempt ended. 'none' until one has. */
 export type SyncOutcome = 'ok' | 'fail' | 'none';
 
-export type SyncFailReason = 'conflict' | 'write-failed' | 'reconcile-failed' | 'offline';
+export type SyncFailReason = 'conflict' | 'write-failed' | 'reconcile-failed';
 
 export interface SyncDisplay {
-  activity: SyncActivity;
   outcome: SyncOutcome;
   /** The timestamp behind `outcome`, for the "2 min ago" label. Null until either has happened. */
   at: number | null;
-  /** Why the last attempt failed, or - when it did not - why work is still outstanding. */
+  /** Why the last attempt failed. Null when it did not. */
   reason: SyncFailReason | null;
-  /** Whether clicking the last-sync cell should retry. False for a conflict: the modal owns it. */
+  /** Whether clicking the indicator should retry. False for a conflict: the modal owns it. */
   retryable: boolean;
 }
 
 export function describeSync(sync: SyncState): SyncDisplay {
-  const { status, error, lastSyncedAt, lastFailedAt, pendingWork, conflict } = sync;
-
-  const activity: SyncActivity =
-    status === 'starting' || status === 'syncing'
-      ? 'busy'
-      : pendingWork || status === 'offline'
-        ? 'queued'
-        : 'idle';
+  const { status, error, lastSyncedAt, lastFailedAt, conflict } = sync;
 
   const failed = error != null || status === 'conflict' || conflict != null;
   const outcome: SyncOutcome = failed ? 'fail' : lastSyncedAt != null ? 'ok' : 'none';
   const at = outcome === 'fail' ? lastFailedAt : outcome === 'ok' ? lastSyncedAt : null;
 
-  const reason: SyncFailReason | null = failed
-    ? status === 'conflict' || conflict != null
+  const reason: SyncFailReason | null = !failed
+    ? null
+    : status === 'conflict' || conflict != null
       ? 'conflict'
       : error === 'reconcile-failed'
         ? 'reconcile-failed'
-        : 'write-failed'
-    : status === 'offline'
-      ? 'offline'
-      : null;
+        : 'write-failed';
 
   return {
-    activity,
     outcome,
     at,
     reason,

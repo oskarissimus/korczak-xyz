@@ -18,36 +18,12 @@ function state(overrides: Partial<SyncState> = {}): SyncState {
 }
 
 describe('describeSync', () => {
-  describe('activity', () => {
-    it('is busy while the initial reconcile runs', () => {
-      expect(describeSync(state({ status: 'starting' })).activity).toBe('busy');
-    });
-
-    it('is busy while a write is in flight', () => {
-      expect(describeSync(state({ status: 'syncing' })).activity).toBe('busy');
-    });
-
-    it('is queued when changes are waiting on the debounce', () => {
-      expect(describeSync(state({ status: 'pending', pendingWork: true })).activity).toBe('queued');
-    });
-
-    it('is queued when offline', () => {
-      expect(describeSync(state({ status: 'offline', pendingWork: true })).activity).toBe('queued');
-    });
-
-    it('is idle once everything has settled', () => {
-      expect(describeSync(state({ status: 'synced', lastSyncedAt: OK_AT })).activity).toBe('idle');
-    });
-
-    it('is idle during a conflict - the engine is waiting on a person, not the network', () => {
-      expect(describeSync(state({ status: 'conflict' })).activity).toBe('idle');
-    });
-  });
-
   describe('outcome', () => {
     it('reports nothing before the first attempt settles', () => {
-      const display = describeSync(state({ status: 'starting' }));
-      expect(display).toMatchObject({ activity: 'busy', outcome: 'none', at: null });
+      expect(describeSync(state({ status: 'starting' }))).toMatchObject({
+        outcome: 'none',
+        at: null,
+      });
     });
 
     it('dates a success from lastSyncedAt', () => {
@@ -63,33 +39,39 @@ describe('describeSync', () => {
     });
   });
 
-  // The whole reason the two cells exist: `status` alone cannot express these.
-  describe('the states the single label collapsed', () => {
-    it('shows a retry in flight as busy *and* still failing', () => {
+  // The whole reason this is not just `status`: the ladder collapses these onto one rung.
+  describe('the states the status ladder hides', () => {
+    it('keeps the failure visible while the retry that follows it is in flight', () => {
       const display = describeSync(
         state({
           status: 'syncing',
           error: 'write-failed',
           lastSyncedAt: OK_AT,
           lastFailedAt: FAIL_AT,
-          pendingWork: false,
         })
       );
-      expect(display).toMatchObject({ activity: 'busy', outcome: 'fail', at: FAIL_AT });
+      expect(display).toMatchObject({ outcome: 'fail', at: FAIL_AT });
     });
 
-    it('shows a scheduled retry as queued, which the status ladder reports as error', () => {
+    it('keeps it visible while a retry waits out its backoff', () => {
       const display = describeSync(
         state({ status: 'error', error: 'write-failed', lastFailedAt: FAIL_AT, pendingWork: true })
       );
-      expect(display).toMatchObject({ activity: 'queued', outcome: 'fail', retryable: true });
+      expect(display).toMatchObject({ outcome: 'fail', retryable: true });
     });
 
-    it('shows unsaved keystrokes alongside the last good save', () => {
+    it('still reports the last good save while keystrokes wait on the debounce', () => {
       const display = describeSync(
         state({ status: 'pending', pendingWork: true, lastSyncedAt: OK_AT })
       );
-      expect(display).toMatchObject({ activity: 'queued', outcome: 'ok', at: OK_AT });
+      expect(display).toMatchObject({ outcome: 'ok', at: OK_AT });
+    });
+
+    it('reports a working sync as ok while offline, since nothing has failed yet', () => {
+      const display = describeSync(
+        state({ status: 'offline', pendingWork: true, lastSyncedAt: OK_AT })
+      );
+      expect(display).toMatchObject({ outcome: 'ok', at: OK_AT, reason: null });
     });
   });
 

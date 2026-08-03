@@ -114,12 +114,16 @@ is stale" from "the two have branched" — a distinction `lastPlayedAt` cannot m
 - `src/components/Typing/SyncStatus.tsx` — the indicator on the book-picker row
 - `src/components/Typing/ConflictModal.tsx` — shown when the two have genuinely branched
 
-The indicator is two cells in one fixed-width slot: current sync (spinner in flight, square when
-queued, empty when idle) and last sync (✓/✕ plus a relative time). Two, because `SyncStatus` is a
-precedence ladder — `syncing` outranks `error`, so a single label showed a failing retry as
-"Saving…". That is also why `SyncState` carries `lastFailedAt` and `pendingWork`: neither is
-recoverable from `status`. The slot's width is fixed on purpose — it shares a centred flex row
-with the book `<select>`, and an indicator that resizes drags the picker sideways mid-sentence.
+The indicator shows the outcome of the last attempt and nothing else: a green ✓ when progress is
+on the account, a red ✕ with "Sync failed · 2 min ago" when it is not. Work in flight is not
+shown — it is transient, no one acts on it, and a spinner beside the passage is motion someone
+typing has to ignore. A failure is what persists and what can be clicked to retry.
+
+The outcome cannot come from `SyncStatus` alone: it is a precedence ladder, so `syncing` outranks
+`error` and a failing retry reads as healthy. `describeSync` reads `error`/`conflict` alongside
+`lastSyncedAt`/`lastFailedAt` instead, which is why `SyncState` carries `lastFailedAt` at all.
+The slot has no border and a fixed width — it shares a centred flex row with the book `<select>`,
+and an indicator that resizes drags the picker sideways mid-sentence.
 
 ### Firestore client health
 
