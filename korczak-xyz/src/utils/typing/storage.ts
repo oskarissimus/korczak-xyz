@@ -1,4 +1,14 @@
-// LocalStorage operations for the Touch-Typing Trainer.
+/*
+ * LocalStorage operations for the Touch-Typing Trainer.
+ *
+ * Every write here used to be wrapped in a bare `catch {}`. That is how a session ended up
+ * rolled back five sections: the store filled up, `saveProgress` began throwing on every
+ * keystroke, and nothing said so - the page carried on typing and pushing to Firestore while
+ * the stored copy stayed frozen, until the next page load read the frozen one back. So writes
+ * now go through `writeKey`, which reports the failure and, when the store is simply full,
+ * buys room by giving up session history rather than losing progress.
+ */
+import { describeError, log } from '../../lib/logger';
 import { bumpRevision } from './reconcile';
 import { clearAllBookmarks } from './syncBookmark';
 import type { TypingProgress, TypingSession } from './types';
@@ -14,6 +24,123 @@ const STORAGE_KEYS = {
 
 function progressKey(bookId: string): string {
   return `${STORAGE_KEYS.progressPrefix}${bookId}`;
+}
+
+// Total characters held in localStorage, across every key on the origin - the trainer shares
+// its budget with the rest of the site. Reported alongside a failed write, where knowing how
+// close to the ceiling we were is the whole diagnosis.
+export function storageBytes(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key == null) continue;
+      total += key.length + (localStorage.getItem(key)?.length ?? 0);
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+// Browsers disagree on how they say "full": the name is standard, the numeric codes are what
+// older Firefox and Safari builds report.
+function isQuotaError(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const { name, code } = e as { name?: unknown; code?: unknown };
+  return (
+    name === 'QuotaExceededError' ||
+    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    code === 22 ||
+    code === 1014
+  );
+}
+
+// Keys whose last write threw. A full store fails again on the very next keystroke, and an
+// `error` entry makes the log sink persist and flush immediately - so reporting every one
+// would hammer the store that is already full. One report per key, re-armed once it recovers.
+const failingKeys = new Set<string>();
+
+function reportFailed(key: string, value: string, e: unknown): void {
+  if (failingKeys.has(key)) return;
+  failingKeys.add(key);
+  log.error('storage.write.failed', {
+    key,
+    bytes: value.length,
+    total: storageBytes(),
+    ...describeError(e),
+  });
+}
+
+function reportRecovered(key: string): void {
+  if (!failingKeys.delete(key)) return;
+  log.info('storage.write.recovered', { key, total: storageBytes() });
+}
+
+/*
+ * Give up the older half of the session archive.
+ *
+ * Sessions are keystroke logs: replayable telemetry, and already mirrored to Firestore.
+ * Progress is neither - lose it and the user retypes the book. So when the store is full and
+ * something has to go, it is always this. Half at a time so one blocked write doesn't have to
+ * walk a 60-entry archive one entry at a time.
+ */
+function evictArchivedSessions(): { dropped: number; freed: number } {
+  const sessions = loadArchivedSessions();
+  if (sessions.length === 0) return { dropped: 0, freed: 0 };
+  const ordered = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
+  const keep = ordered.slice(Math.ceil(ordered.length / 2));
+  const before = readRaw(STORAGE_KEYS.sessions)?.length ?? 0;
+  const serialized = JSON.stringify(keep);
+  try {
+    localStorage.setItem(STORAGE_KEYS.sessions, serialized);
+  } catch {
+    return { dropped: 0, freed: 0 }; // nothing gained; the caller reports the original failure
+  }
+  return { dropped: ordered.length - keep.length, freed: before - serialized.length };
+}
+
+function readRaw(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write one key, reporting failure instead of swallowing it.
+ *
+ * Returns whether the value actually landed. A quota failure is retried once against a
+ * freshly-trimmed session archive, because the alternative - a write that silently never
+ * happens again for the life of the page - is the failure this whole module exists to prevent.
+ */
+function writeKey(key: string, value: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    // Evicting the archive to make room for the archive would be circular.
+    if (isQuotaError(e) && key !== STORAGE_KEYS.sessions) {
+      const { dropped, freed } = evictArchivedSessions();
+      if (dropped > 0) {
+        log.warn('storage.evicted', { key, droppedSessions: dropped, freedBytes: freed });
+        try {
+          localStorage.setItem(key, value);
+          reportRecovered(key);
+          return true;
+        } catch (retryError) {
+          reportFailed(key, value, retryError);
+          return false;
+        }
+      }
+    }
+    reportFailed(key, value, e);
+    return false;
+  }
+  reportRecovered(key);
+  return true;
 }
 
 // Progress — stored per book under `typing-progress:${bookId}`.
@@ -44,12 +171,7 @@ export function loadProgress(bookId: string): TypingProgress {
 }
 
 export function saveProgress(progress: TypingProgress): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(progressKey(progress.bookId), JSON.stringify(progress));
-  } catch {
-    // Ignore storage errors (private browsing, quota exceeded).
-  }
+  writeKey(progressKey(progress.bookId), JSON.stringify(progress));
 }
 
 // Reset carries the revision counter forward rather than restarting it. A reset that went
@@ -78,12 +200,7 @@ export function loadSelectedBookId(): string | null {
 }
 
 export function saveSelectedBookId(bookId: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.selectedBook, bookId);
-  } catch {
-    // Ignore storage errors.
-  }
+  writeKey(STORAGE_KEYS.selectedBook, bookId);
 }
 
 // Sessions
@@ -99,12 +216,7 @@ export function loadCurrentSession(): TypingSession | null {
 }
 
 export function saveCurrentSession(session: TypingSession): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.currentSession, JSON.stringify(session));
-  } catch {
-    // Ignore storage errors.
-  }
+  writeKey(STORAGE_KEYS.currentSession, JSON.stringify(session));
 }
 
 function loadArchivedSessions(): TypingSession[] {
@@ -118,12 +230,24 @@ function loadArchivedSessions(): TypingSession[] {
 }
 
 function saveArchivedSessions(sessions: TypingSession[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(sessions));
-  } catch {
-    // Ignore storage errors.
-  }
+  writeKey(STORAGE_KEYS.sessions, JSON.stringify(sessions));
+}
+
+/**
+ * Drop sessions from the archive by id.
+ *
+ * Called once their cloud copy is confirmed. Without it the archive is append-only for the
+ * life of the profile - which is what filled the store and stopped progress being saved. The
+ * archive is re-read here rather than taken from the caller, because a sitting can be archived
+ * while the uploads that authorised this prune are still in flight.
+ */
+export function removeArchivedSessions(ids: string[]): void {
+  if (typeof window === 'undefined' || ids.length === 0) return;
+  const drop = new Set(ids);
+  const sessions = loadArchivedSessions();
+  const remaining = sessions.filter((s) => !drop.has(s.id));
+  if (remaining.length === sessions.length) return;
+  saveArchivedSessions(remaining);
 }
 
 // Move the current session into the archive (if it recorded anything) and clear

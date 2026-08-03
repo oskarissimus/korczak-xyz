@@ -189,6 +189,17 @@ export function reconcile(
     return byAncestry(local, cloud, base ? 'no-lineage' : 'no-bookmark', false);
   }
 
+  // A writer cannot fall behind a bookmark it already reached by typing forward: the bookmark
+  // records a revision this same client wrote. A lower rev from the same writer means the local
+  // record was lost or rolled back - a failed localStorage write, a restored profile - not
+  // edited. `localChanged` below asks only whether local differs from the bookmark, never in
+  // which direction, so without this the rollback reads as progress and gets pushed, replacing
+  // the cloud with a state the user already typed past. Ancestry can still tell whether the
+  // cloud simply contains the local record (pull) or the two genuinely disagree (ask).
+  if (local.writerId === base.writerId && local.rev < base.rev) {
+    return byAncestry(local, cloud, 'local-behind-base', true);
+  }
+
   const localChanged = !sameRevision(local, base);
   const cloudChanged = !sameRevision(cloud, base);
 

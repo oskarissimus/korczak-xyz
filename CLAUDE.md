@@ -114,6 +114,14 @@ is stale" from "the two have branched" — a distinction `lastPlayedAt` cannot m
 - `src/components/Typing/SyncStatus.tsx` — the indicator on the book-picker row
 - `src/components/Typing/ConflictModal.tsx` — shown when the two have genuinely branched
 
+`rev` is compared by magnitude only *within* one `writerId` — and there, one direction is
+impossible. A writer cannot fall behind a bookmark it already reached by typing forward, so
+`local.rev < base.rev` from the same writer means the local record was lost or rolled back, not
+edited. The table asks only whether local *differs* from the bookmark, so without an explicit
+`local-behind-base` case the rollback reads as progress and gets pushed over good cloud data.
+That is exactly how a session lost five sections. Such a record is routed through strict
+ancestry instead: `pull` if the cloud contains it, `conflict` if not — never `push`.
+
 The indicator shows the outcome of the last attempt and nothing else: "✓ Synced" when progress is
 on the account, "✕ Sync failed · 2 min ago" when it is not. Work in flight is not shown — it is
 transient, no one acts on it, and a spinner beside the passage is motion someone typing has to
@@ -160,6 +168,32 @@ never clears. That is how a session ends up showing a sync permanently in progre
 `syncEngine.test.ts` drives the whole chain with `firebase/firestore` mocked to return promises
 that never settle — the only faithful model of the dead-client case.
 
+### Local storage budget
+
+The origin gets ~5 MB, shared with the solitaire game, the quiz and the song preferences. The
+trainer can spend all of it: `typing-progress:${bookId}` carries `typedHistory` — the whole book
+as typed — and `typing-sessions` archives every sitting's keystroke log. It once did, and the
+result was not an error but **silence**: `localStorage.setItem` threw on every keystroke while
+the page went on typing and pushing to Firestore, so the next page load read back a record three
+minutes stale and pushed it over the cloud. Hence:
+
+- Writes go through `writeKey` in `src/utils/typing/storage.ts`, never a bare `catch {}`. It
+  reports `storage.write.failed` (error) — **once per key per page load**, because a full store
+  fails again on the next keystroke and an `error` entry makes the log sink flush immediately,
+  writing to the store that is already full. `storage.write.recovered` re-arms it.
+- On a quota error it surrenders the older half of the session archive and retries once
+  (`storage.evicted`). Sessions are replayable telemetry already mirrored to Firestore; progress
+  is not, so progress always wins. The archive is never evicted to make room for the archive.
+- The archive is pruned as it uploads: `useTypingSession`'s seed effect drops each session once
+  its cloud write resolves (`removeArchivedSessions`). Before this it was append-only *and*
+  re-uploaded in full on every mount — its guard is a ref, which a page load resets.
+- `saveProgress` is coalesced to 500 ms, flushed on section completion and by `flushSession`
+  (pause, unmount, `pagehide`, reset, export). Both halves read `progressRef` at write time, so
+  a pending timer can only write the newest value.
+
+`storage.test.ts` fakes a `localStorage` with a byte ceiling — there is no jsdom in this project,
+so "the store is full" is otherwise not a reachable state in a test.
+
 ### Frontend logging
 
 Structured logs buffer in localStorage and upload in batches to `users/{uid}/logs`. They keep
@@ -175,9 +209,15 @@ typingLogs.info()       // client id, page id, uid, buffered count
 typingLogs.help()
 ```
 
-`progress.revert.detected` is an `error`-level assertion that fires if progress ever moves
-backwards by more than a single-section backspace. If it appears, the entry carries before/after
-snapshots and the sync status at the time.
+Two `error`-level assertions watch progress for going backwards, and they cover different
+windows — the first one alone missed the loss it was written to catch:
+
+- `progress.revert.detected` — progress moved backwards by more than a single-section backspace
+  *within a session*. Carries before/after snapshots and the sync status at the time.
+- `progress.stale.detected` — what loaded at mount already sits behind its own sync bookmark.
+  The in-session check cannot see this: the damage is baked into the stored value, so there is
+  no earlier value to compare against. Carries the loaded record, the bookmark and
+  `storageBytes()` — which is usually the explanation.
 
 ## Localization (i18n)
 

@@ -94,6 +94,48 @@ describe('reconcile', () => {
     });
   });
 
+  /*
+   * Local falling *behind* its own bookmark is not reachable by typing - the bookmark records a
+   * revision this same writer already reached. It happens when the local record is lost or
+   * rolled back, which is what a silently failing localStorage write looks like: the page keeps
+   * typing and keeps pushing while the stored copy stays frozen, and the next page load reads
+   * the frozen one. Treated as an ordinary difference from the bookmark it reads as progress,
+   * and the rollback gets pushed over good cloud data.
+   */
+  describe('local behind its own bookmark', () => {
+    it('pulls rather than pushing a local record that fell behind', () => {
+      const local = revised(20, 'A', { passageIndex: 12 });
+      const cloud = revised(30, 'A', { passageIndex: 17 });
+      const decision = reconcile(local, cloud, base(30, 'A'));
+      expect(decision.kind).toBe('pull');
+      expect(decision.reason).toBe('local-behind-base:local-is-ancestor');
+    });
+
+    it('asks rather than pushing when the cloud does not corroborate the local record', () => {
+      const local = revised(20, 'A', { passageIndex: 12, typedHistory: [] });
+      const cloud = revised(30, 'A', { passageIndex: 17, typedHistory: [] });
+      const decision = reconcile(local, cloud, base(30, 'A'));
+      expect(decision.kind).toBe('conflict');
+    });
+
+    // Revs are only ever compared by magnitude within one writer. Another device at a lower
+    // number has not gone backwards - it is counting its own edits.
+    it('does not fire for a different writer holding a lower rev', () => {
+      const local = revised(3, 'B', { passageIndex: 14 });
+      const cloud = revised(9, 'A', { passageIndex: 12 });
+      const decision = reconcile(local, cloud, base(9, 'A'));
+      expect(decision.kind).toBe('push');
+      expect(decision.reason).toBe('local-ahead-of-base');
+    });
+
+    it('does not fire when local still sits exactly on the bookmark', () => {
+      const local = revised(5, 'A', { passageIndex: 12 });
+      const cloud = revised(8, 'A', { passageIndex: 20 });
+      const decision = reconcile(local, cloud, base(5, 'A'));
+      expect(decision.reason).toBe('cloud-ahead-of-base');
+    });
+  });
+
   describe('legacy progress with no lineage', () => {
     it('pushes when the cloud is an ancestor of local', () => {
       const local = progress({ passageIndex: 20 });

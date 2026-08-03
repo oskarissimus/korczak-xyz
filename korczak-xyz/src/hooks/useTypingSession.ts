@@ -8,10 +8,13 @@ import {
   importLogFromJSON,
   loadAllSessions,
   loadProgress,
+  removeArchivedSessions,
   resetProgress as resetProgressStorage,
   saveCurrentSession,
   saveProgress,
+  storageBytes,
 } from '../utils/typing/storage';
+import { loadBookmark } from '../utils/typing/syncBookmark';
 import { saveCloudSession } from '../utils/typing/cloudStorage';
 import { downloadJSON } from '../utils/typing/download';
 import { bumpRevision } from '../utils/typing/reconcile';
@@ -28,6 +31,10 @@ export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
 const SESSION_SAVE_DEBOUNCE_MS = 800;
 const CLOUD_SAVE_DEBOUNCE_MS = 2000;
+// Progress carries `typedHistory` - the whole book as typed so far - so persisting it is a
+// couple of hundred kilobytes of serialize-and-write. Doing that per keystroke is both a
+// main-thread cost and the quickest way to exhaust a storage budget with no headroom left.
+const PROGRESS_SAVE_DEBOUNCE_MS = 500;
 // Idle this long with no keystroke and the session auto-pauses (abandoned).
 const IDLE_PAUSE_MS = 20000;
 // A gap longer than this since the last keystroke ends the current session; the
@@ -159,6 +166,25 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     archiveCurrentSession();
     sessionRef.current = newSession(book.id, loadProgress(book.id));
     log.info('session.mount', { bookId: book.id, ...summarize(progressRef.current) });
+    /*
+     * Progress sitting behind its own bookmark cannot have been produced by typing: the
+     * bookmark names a revision this same writer already reached. It means the stored copy was
+     * lost or rolled back between the two writes - which is what a silently failing
+     * localStorage write looks like from the next page load. `progress.revert.detected` cannot
+     * catch this one; it compares consecutive in-session values, and here the damage is
+     * already baked into what loaded. reconcile now refuses to push such a record, and this
+     * says out loud that it happened, at `error` level so it uploads immediately.
+     */
+    const loaded = progressRef.current;
+    const bookmark = loadBookmark(book.id);
+    if (bookmark && bookmark.writerId === loaded.writerId && loaded.rev < bookmark.rev) {
+      log.error('progress.stale.detected', {
+        bookId: book.id,
+        local: summarize(loaded),
+        bookmark,
+        storageBytes: storageBytes(),
+      });
+    }
     return () => {
       log.info('session.unmount', { bookId: book.id, ...summarize(progressRef.current) });
       flushSession();
@@ -166,7 +192,29 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Persisting progress is coalesced (see PROGRESS_SAVE_DEBOUNCE_MS). Both halves read
+  // `progressRef` at write time rather than closing over a snapshot, so a pending timer can
+  // only ever write the newest value - never resurrect an older one.
+  const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushProgressSave = useCallback(() => {
+    if (progressSaveTimerRef.current) {
+      clearTimeout(progressSaveTimerRef.current);
+      progressSaveTimerRef.current = null;
+    }
+    saveProgress(progressRef.current);
+  }, []);
+
+  const scheduleProgressSave = useCallback(() => {
+    if (progressSaveTimerRef.current) return; // already scheduled
+    progressSaveTimerRef.current = setTimeout(() => {
+      progressSaveTimerRef.current = null;
+      saveProgress(progressRef.current);
+    }, PROGRESS_SAVE_DEBOUNCE_MS);
+  }, []);
+
   const flushSession = useCallback(() => {
+    flushProgressSave();
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -183,7 +231,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     // Push the latest progress now rather than waiting out the trailing debounce, so a
     // refresh or a client-side navigation doesn't leave the cloud a few sections behind.
     engineRef.current?.flush('session-flush');
-  }, []);
+  }, [flushProgressSave]);
 
   const scheduleSessionSave = useCallback(() => {
     scheduleCloudSession();
@@ -304,7 +352,19 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       }
     }
 
-    saveProgress(progress);
+    // A finished section is written at once - it is the boundary a reader would notice losing,
+    // and it is rare enough to cost nothing. Everything within a section rides the debounce.
+    // A pull has already been written by `applyRemote`; flushing cancels any timer still
+    // holding the pre-pull value so nothing is left pending against adopted progress.
+    // On the first run there is nothing to persist: `progress` is what was just loaded, and
+    // mount - with the archive not yet uploaded - is the worst moment to spend the write.
+    if (previous) {
+      if (fromRemote || progress.passageIndex !== previous.passageIndex) {
+        flushProgressSave();
+      } else {
+        scheduleProgressSave();
+      }
+    }
     // A pull is already what the cloud holds; sending it straight back would be a pointless
     // round trip (and would churn the revision the two sides just agreed on).
     if (!fromRemote) engineRef.current?.notifyLocalChange();
@@ -347,9 +407,19 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     };
   }, [uid, book.id]);
 
-  // First sign-in on a device that already has local sessions: upload them once, so the
-  // stats page isn't missing everything typed before the account existed. Progress is the
-  // engine's business; this is only the append-only session archive.
+  /*
+   * Upload the local session archive, then let go of it.
+   *
+   * The archive used to be append-only for the life of the profile, and this effect re-sent
+   * every entry on every mount - its guard is a ref, so a page load resets it. Sixty sittings
+   * of keystroke events is most of a storage budget, and a full budget is what stopped
+   * progress being saved at all. Dropping each session once its cloud copy is confirmed fixes
+   * both: the archive stays small, and there is nothing left to re-upload next time.
+   *
+   * Pruning is gated strictly on a resolved write, so a signed-out archive is untouched and a
+   * failed upload leaves its session local. The stats views already merge cloud and local
+   * sessions, so nothing on screen changes.
+   */
   const seededSessionsForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!uid || seededSessionsForRef.current === uid) return;
@@ -357,17 +427,32 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     const sessions = loadAllSessions();
     if (sessions.length === 0) return;
     void (async () => {
+      // `loadAllSessions` includes the live session, which is still being written to. Only
+      // finished sittings may be pruned.
+      const liveId = sessionRef.current?.id;
+      const prunable: string[] = [];
       let uploaded = 0;
+      let failed = false;
       for (const s of sessions) {
         try {
           await saveCloudSession(uid, s);
           uploaded += 1;
+          if (s.id !== liveId) prunable.push(s.id);
         } catch (e) {
           log.warn('sync.sessions.seed.fail', { sessionId: s.id, ...describeError(e) });
-          return;
+          failed = true;
+          break;
         }
       }
-      log.info('sync.sessions.seed.ok', { uploaded });
+      // Prune whatever landed even if a later one failed - those copies are confirmed.
+      const before = storageBytes();
+      removeArchivedSessions(prunable);
+      if (failed) return;
+      log.info('sync.sessions.seed.ok', {
+        uploaded,
+        pruned: prunable.length,
+        freedBytes: before - storageBytes(),
+      });
     })();
   }, [uid]);
 
