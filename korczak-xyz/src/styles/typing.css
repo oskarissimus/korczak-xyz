@@ -120,28 +120,69 @@
 }
 
 /* A Win95 combo box, not a push button: a sunken white field with a raised drop-down button
-   flush against its inner right edge. The shell draws both, because a <select> can style its
-   own field or its own arrow but never both at once. */
+   flush against its inner right edge. The shell draws both, because one element can style its
+   own field or its own arrow but never both at once.
+
+   inline-grid, not inline-flex: the button and the width sizer share cell 1/1, so the widest
+   label sets the width and the button sets the height. */
 .typing-book-combo {
   position: relative;
-  display: inline-flex;
+  display: inline-grid;
   max-width: 100%;
   background: var(--retro-white);
   border: 2px inset var(--retro-dark-gray);
 }
 
-.typing-book-select {
-  appearance: none;
-  -webkit-appearance: none;
+/* Above the stats panel, which follows it in the source and would otherwise take the list's
+   overlap. Only while open, so the closed picker stays out of the stacking order entirely. */
+.typing-book-combo.is-open {
+  z-index: 20;
+}
+
+/* The metrics of one line of the control - shared by the button, each hidden sizer copy and each
+   row of the list, because those three have to agree on width to the pixel. */
+.typing-book-face {
   font-family: 'Press Start 2P', monospace;
   font-size: 0.6rem;
+  line-height: 1.4;
+  text-align: left;
   color: var(--retro-black);
+  /* The right side clears the drop-down button drawn below. */
+  padding: 6px 26px 6px 6px;
+}
+
+.typing-book-select {
+  grid-area: 1 / 1;
+  appearance: none;
+  -webkit-appearance: none;
   background: transparent;
   border: 0;
-  /* The right side clears the button drawn below. */
-  padding: 6px 26px 6px 6px;
   max-width: 100%;
   cursor: pointer;
+  /* On a phone the widest title is wider than the panel. The field clips, as the <select> did;
+     the list below it is where the whole title is legible. min-width lets the grid column shrink
+     under its content instead of pushing the button out of the dialog. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Hidden, but still measured: visibility keeps it out of the picture while it goes on claiming
+   its width, which display: none would not. Its own copies are stacked on each other too, so the
+   widest of them wins rather than their sum. */
+.typing-book-sizer {
+  grid-area: 1 / 1;
+  display: grid;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.typing-book-sizer > .typing-book-face {
+  grid-area: 1 / 1;
+  white-space: nowrap;
 }
 
 /* No border of its own to carry a focus ring any more, so it borrows the tabs' Win95 one.
@@ -182,6 +223,42 @@
   border-right: 4px solid transparent;
   border-top: 4px solid var(--retro-black);
   pointer-events: none;
+}
+
+/* The dropped list. A single hairline border and no bevel: in Win95 the list is a plain white
+   pane, and the sunken field above it already carries the chrome. The negative margin pulls it
+   over the field's bottom border so the two read as one control while open. */
+.typing-book-listbox {
+  position: absolute;
+  top: 100%;
+  /* Offsets on both sides rather than a width: the combo positions its children against its
+     padding box, so 0 would leave the list inset by the field's own 2px border on each side and
+     the two edges would not line up. */
+  left: -2px;
+  right: -2px;
+  margin: -2px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--retro-white);
+  border: 1px solid var(--retro-black);
+}
+
+/* Wrapping, not clipping: the field truncates because it has an arrow to make room for, but a row
+   the user is choosing between has to be readable in full. */
+.typing-book-option {
+  padding-right: 6px;
+  white-space: normal;
+  cursor: pointer;
+}
+
+/* Win95 filled the row under the pointer - or under the keyboard highlight - in the desktop's
+   selection colour. data-active rather than :hover so the mouse and the arrow keys drive the same
+   highlight, and only one row is ever lit. */
+.typing-book-option[data-active='true'] {
+  background: var(--retro-navy);
+  color: var(--retro-white);
 }
 
 /* Stats bar */
@@ -1169,14 +1246,11 @@ circle.typing-chart-line--keywpm {
   margin-left: auto;
 }
 
-/* The real picker sizes itself to its widest "Title — Author" option; an empty
-   stand-in would be far narrower and would stop the row wrapping where the real
-   one does. Re-measure if the book list gains a longer title: this is the real
-   select's rendered width in Chromium (combo box 250px, less its 2px borders),
-   and 378px here had already gone stale by 132px before anyone noticed. */
-.typing-skel-select {
-  width: 246px;
-  max-width: 100%;
+/* The stand-in's picker carries the real one's labels and the real .typing-book-sizer,
+   so it is the same width without a number here to keep up to date. All this
+   hides is which book is selected, which nothing knows until hydration. */
+.typing-skel-hidden-text {
+  visibility: hidden;
 }
 
 /* The stand-ins hold bars instead of text, so nothing establishes the line box

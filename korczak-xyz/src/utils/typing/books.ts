@@ -1,21 +1,17 @@
 // The available books, each parsed once and bundled via Vite's ?raw import.
 import krasnoludekRaw from './books/krasnoludek.txt?raw';
 import opowiescRaw from './books/opowiesc-wigilijna.txt?raw';
+import { BOOK_META } from './bookMeta';
 import { parseBook } from './parseBook';
 import type { Book } from './types';
 
-export const BOOKS: Book[] = [
-  parseBook(krasnoludekRaw, {
-    id: 'krasnoludek',
-    title: 'Krasnoludek',
-    author: 'Hans Christian Andersen',
-  }),
-  parseBook(opowiescRaw, {
-    id: 'opowiesc-wigilijna',
-    title: 'Opowieść wigilijna',
-    author: 'Charles Dickens',
-  }),
-];
+// Keyed by the ids in BOOK_META, so a book's metadata and its text cannot drift apart.
+const RAW: Record<string, string> = {
+  krasnoludek: krasnoludekRaw,
+  'opowiesc-wigilijna': opowiescRaw,
+};
+
+export const BOOKS: Book[] = BOOK_META.map((meta) => parseBook(RAW[meta.id], meta));
 
 export const DEFAULT_BOOK_ID = BOOKS[0].id;
 

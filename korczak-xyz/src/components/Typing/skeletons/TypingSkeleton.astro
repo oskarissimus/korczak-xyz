@@ -6,6 +6,8 @@
  * real island once React hydrates.
  */
 
+import { BOOK_META, bookLabel } from '../../../utils/typing/bookMeta';
+
 interface Props {
   lang: 'en' | 'pl';
 }
@@ -30,13 +32,23 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
   <div class="typing-book-picker">
     <span class="typing-skel" style="--skel-w: 3.5rem; --skel-h: 0.7rem"></span>
     {/*
-      A real disabled <select> in the real combo shell rather than a styled span:
-      the control's height comes from UA metrics that vary by browser, and this
-      way the stand-in and the real picker get the same ones instead of a
-      hard-coded guess. The shell must match TypingSession.tsx exactly.
+      The real picker's own markup, labels and all, rather than a stand-in sized
+      by hand. Both its width (the widest label, via the sizer) and its height
+      (one line of .typing-book-face) are now ours in CSS, so the two agree by
+      construction - which the hard-coded width this replaces did not: it was a
+      Chromium measurement of a <select>, and it had gone stale by 132px.
+      Must match BookSelect.tsx.
     */}
     <span class="typing-book-combo">
-      <select class="typing-book-select typing-skel-select" disabled><option></option></select>
+      <button type="button" class="typing-book-face typing-book-select" disabled tabindex="-1">
+        {/* Hidden rather than absent: which book is selected is only known after
+            hydration reads it back, but the text still has to establish the line
+            box, or the field lands a line short of the real one. */}
+        <span class="typing-skel-hidden-text">{bookLabel(BOOK_META[0])}</span>
+      </button>
+      <span class="typing-book-sizer">
+        {BOOK_META.map((book) => <span class="typing-book-face">{bookLabel(book)}</span>)}
+      </span>
     </span>
   </div>
 

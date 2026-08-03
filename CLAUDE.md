@@ -71,13 +71,27 @@ Above ~800px every state leaves the stats row at 86px with the tiles setting it,
 `✓ Synced` costs the layout nothing. Verified 320–1400px against the skeleton.
 
 The book-picker row is a Win95 dialog line: `Book [combo box]`, both at the left margin.
-`.typing-book-combo` wraps the `<select>` because one element cannot draw both a sunken field and a
+`.typing-book-combo` wraps the control because one element cannot draw both a sunken field and a
 raised drop-down button; both its pseudo-elements are `pointer-events: none` so clicks still reach
 the control.
 
-`.typing-skel-select` in `typing.css` hard-codes the real picker's rendered width so the row does
-not jump on hydration. Re-measure it in a browser whenever the book list changes — it had drifted
-132px before anyone noticed.
+It is **not** a `<select>`. A `<select>`'s popup belongs to the OS — `appearance: none` reaches the
+field and nothing else — so on a phone the list arrived as a translucent dark rounded iOS sheet
+over a Windows 95 dialog. `src/components/Typing/BookSelect.tsx` draws the list instead: the ARIA
+select-only combo box, focus staying on the button with `aria-activedescendant` naming the active
+row, which also keeps the on-screen keyboard away. The keys are a pure function in
+`src/utils/typing/comboKeys.ts` (tested in `comboKeys.test.ts`) — there is no jsdom here, so
+anything that has to be verified cannot live in the event handler.
+
+The picker renders in `Typing.tsx`, not in `TypingSession`, which is keyed on the book: a keyed
+remount would tear down the control from inside its own click handler. Focus afterwards belongs to
+the session, which claims the typing input on mount.
+
+Width is the widest `Title — Author`, the way a `<select>` sized itself: `.typing-book-sizer` stacks
+every label in the button's own grid cell, hidden but measured. That is also how the pre-hydration
+stand-in in `TypingSkeleton.astro` matches — it renders the same markup and labels from
+`bookMeta.ts` (metadata only, no `?raw` book texts). It used to hard-code the picker's measured
+width, which had gone stale by 132px; there is no number to keep up to date now.
 
 ### Firestore client health
 
