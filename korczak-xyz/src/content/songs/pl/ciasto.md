@@ -13,6 +13,7 @@ G         C
 Aaaaaaaaa ciasto
 G      C
 Dajcie ciasto
+
 G        C
 Nie chcę szynki
 G        C
@@ -21,6 +22,11 @@ G        C
 Nie chcę buły
 G      C
 Dajcie ciasto
-G    C
-Aaaa ciasto…
+
+G         C
+Aaaaaaaaa ciasto
+G         C
+Aaaaaaaaa ciasto
+G      C
+Dajcie ciasto
 ```
