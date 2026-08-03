@@ -46,7 +46,7 @@ function failLabel(display: SyncDisplay, t: T): string {
 }
 
 /*
- * Whether progress is actually reaching the account, shown next to the book picker.
+ * Whether progress is actually reaching the account, shown after the progress percentage.
  *
  * This used to render nothing at all while signed in, on the reasoning that the status bar's
  * email already said "you are signed in". It does - but being signed in was never the same
@@ -60,9 +60,10 @@ function failLabel(display: SyncDisplay, t: T): string {
  * ignore. A failure is the state that persists and the only one worth acting on, so it is the
  * only one that speaks.
  *
- * Every state renders into a fixed-width slot, including the empty ones. An indicator that
- * changes width sits in a centred flex row and drags the book <select> sideways under the
- * cursor, which is a real cost paid by someone who is not looking at the indicator at all.
+ * It reads on from "Progress: 42%", because that is the number it qualifies - progress on this
+ * machine, and whether it is also progress on the account. Every state renders into a slot that
+ * reserves the line's height, including the empty ones: the states differ in height, and one of
+ * them arrives at hydration, so without the reservation the line grows under the reader.
  */
 export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProps) {
   const { enabled, user, loading } = auth;
@@ -74,7 +75,7 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
   if (!enabled) return null;
 
   if (!user) {
-    // Still resolving: the slot is held open rather than filled, so the row does not jump
+    // Still resolving: the slot is held open rather than filled, so the line does not jump
     // when auth settles either way.
     if (loading) return <div className="typing-sync-slot" aria-hidden="true" />;
     const loginPath =
@@ -89,7 +90,7 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
   }
 
   // Nothing has settled yet - the first reconcile of the session is still running. The slot is
-  // held open at its width so the tick can appear without moving the picker.
+  // held open at its height so the tick can appear without moving the progress line.
   if (display.outcome === 'none') return <div className="typing-sync-slot" aria-hidden="true" />;
 
   const ago = display.at != null ? formatAgo(display.at, t) : null;
@@ -104,7 +105,7 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
         : `${t.syncTitleFailed} ${exactTime}${display.retryable ? ` · ${t.syncRetry}` : ''}`;
 
   // The word, not the age, when it worked: a green tick that re-renders its own age every 30s is
-  // noise on a row someone reads to pick a book, and the exact time is in the tooltip either way.
+  // noise on a line someone glances at mid-passage, and the exact time is in the tooltip anyway.
   // A failure earns the age too - "how long has this been broken" is the whole question.
   const label = ok ? t.syncSynced : `${failLabel(display, t)}${ago ? ` · ${ago}` : ''}`;
 

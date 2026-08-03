@@ -71,9 +71,10 @@ export const translations = {
     // Split around the average gap so it can be highlighted inline.
     bottleneckFormulaPre: 'time lost = max(0, your gap −',
     bottleneckFormulaPost: 'avg) × presses',
-    // Cloud sync. Kept short by construction: the indicator sits in a fixed-width slot on the
-    // book-picker row, and anything that outgrows it is clipped rather than allowed to reflow
-    // the row. Only the failure label is ever visible; the rest are tooltips and screen-reader text.
+    // Cloud sync. Kept short: the indicator shares the progress line with "Progress: 42%", and a
+    // label long enough to outgrow that line wraps the indicator underneath it — legible, but a
+    // row of shift on the panel someone is typing beneath. Nothing is clipped to make it fit.
+    // Only the failure label is ever visible; the rest are tooltips and screen-reader text.
     syncSignIn: 'Sign in to sync',
     syncSynced: 'Synced',
     syncFailed: 'Sync failed',

@@ -27,7 +27,7 @@ is stale" from "the two have branched" — a distinction `lastPlayedAt` cannot m
 - `src/utils/typing/reconcile.ts` — the decision table (pure; unit-tested in `reconcile.test.ts`)
 - `src/utils/typing/syncEngine.ts` — state machine, single-flight write queue, retry/backoff
 - `src/utils/typing/syncPresentation.ts` — `SyncState` → what the indicator shows (pure; tested)
-- `src/components/Typing/SyncStatus.tsx` — the indicator on the book-picker row
+- `src/components/Typing/SyncStatus.tsx` — the indicator on the progress line
 - `src/components/Typing/ConflictModal.tsx` — shown when the two have genuinely branched
 
 `rev` is compared by magnitude only *within* one `writerId` — and there, one direction is
@@ -48,14 +48,32 @@ The outcome cannot come from `SyncStatus` alone: it is a precedence ladder, so `
 `error` and a failing retry reads as healthy. `describeSync` reads `error`/`conflict` alongside
 `lastSyncedAt`/`lastFailedAt` instead, which is why `SyncState` carries `lastFailedAt` at all.
 
-The book-picker row is a Win95 dialog line: `Book [combo box]` at the left margin, the indicator
-at the right one, held apart by `margin-left: auto` on `.typing-sync-slot`. The slot is borderless
-and its width is a floor (13rem), not a cage — nothing sits to its right, so a long failure string
-grows leftward into slack instead of being clipped. Polish runs to 276px measured; reserving that
-permanently for an indicator that is 73px wide in the state it actually holds would eat a third of
-the row. `.typing-book-combo` wraps the `<select>` because one element cannot draw both a sunken
-field and a raised drop-down button; both its pseudo-elements are `pointer-events: none` so clicks
-still reach the control.
+The indicator reads on from `Progress: 42%` on the line under the progress bar
+(`.typing-progress-footer`), because that number is what it qualifies — progress here, and whether
+it is also progress on the account. `StatsBar` takes it as a `syncStatus?: ReactNode` slot so it
+never learns about the sync engine; `TypingSession` builds the node.
+
+The line reserves the indicator's height; the indicator itself reserves nothing. `--sync-cell-h`
+(36px, set by the signed-out sign-in button — the tallest state) lives on
+`.typing-progress-footer`, not on `.typing-sync-slot`, because what must not move is the line:
+the indicator arrives at hydration, and it is absent altogether when auth is off. Put the
+reservation on the slot and both of those cases shift the row. The button needs `line-height: 1`
+to fit inside 36px; its own font metrics make it 41px.
+
+Width is reserved nowhere. Nothing is anchored to the indicator's right edge and the percentage
+before it is left-aligned, so a long state — the Polish sign-in label is 325px measured — wraps
+under the percentage instead. That wrap only works because `.typing-progress` has **no
+`min-width` floor**: with one, flexbox squeezed the column to the floor while its content still
+demanded 325px and the button hung out of the panel. Nothing on this path may clip; a truncated
+"Sync failed ·" is the one output this indicator must not produce.
+
+Above ~800px every state leaves the stats row at 86px with the tiles setting it, so the common
+`✓ Synced` costs the layout nothing. Verified 320–1400px against the skeleton.
+
+The book-picker row is a Win95 dialog line: `Book [combo box]`, both at the left margin.
+`.typing-book-combo` wraps the `<select>` because one element cannot draw both a sunken field and a
+raised drop-down button; both its pseudo-elements are `pointer-events: none` so clicks still reach
+the control.
 
 `.typing-skel-select` in `typing.css` hard-codes the real picker's rendered width so the row does
 not jump on hydration. Re-measure it in a browser whenever the book list changes — it had drifted

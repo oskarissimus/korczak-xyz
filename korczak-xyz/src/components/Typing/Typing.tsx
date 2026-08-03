@@ -20,9 +20,9 @@ export default function Typing({ lang }: TypingProps) {
     saveSelectedBookId(id);
   };
 
-  // The picker row lives inside TypingSession, alongside the sync indicator that shares it -
-  // the indicator's state comes from the session's sync engine, and threading it back out to
-  // a sibling only to render it here would put a callback in the middle of the typing path.
+  // The picker row lives inside TypingSession rather than here, even though the book is this
+  // component's state: the row that changes book and the session that reads it belong to the
+  // same tree, and hoisting the row would put a callback in the middle of the typing path.
   return (
     <div className="typing-game">
       <TypingSession

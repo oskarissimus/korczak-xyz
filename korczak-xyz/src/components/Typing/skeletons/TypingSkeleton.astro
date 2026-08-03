@@ -1,8 +1,9 @@
 ---
 /**
  * Server-rendered stand-in for <Typing client:only="react" />, mirroring
- * Typing.tsx → TypingSession.tsx: book picker, sync row, stats bar, five-line
- * passage, controls. Astro swaps it for the real island once React hydrates.
+ * Typing.tsx → TypingSession.tsx: book picker, stats bar with the progress line
+ * and its sync indicator, five-line passage, controls. Astro swaps it for the
+ * real island once React hydrates.
  */
 
 interface Props {
@@ -19,10 +20,10 @@ const PASSAGE_LINES = ['100%', '96%', '99%', '88%', '62%'];
    decides whether a row of buttons wraps — which is a whole row of shift. */
 const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
 
-/* The sync indicator needs no measured width here, unlike CONTROLS: it now
-   renders into a fixed slot (.typing-sync-slot) that is the same width in every
-   state and every language, so the stand-in can simply reuse the slot's own
-   class and cannot drift away from what replaces it. */
+/* The sync indicator needs no measured width here, unlike CONTROLS: it sits at
+   the end of the progress line with nothing after it, so its width decides
+   nothing about where anything else lands. Its height does, and the stand-in
+   gets that from .typing-sync-slot itself rather than a guess. */
 ---
 
 <div class="typing-game typing-skeleton" aria-hidden="true">
@@ -37,15 +38,6 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
     <span class="typing-book-combo">
       <select class="typing-book-select typing-skel-select" disabled><option></option></select>
     </span>
-
-    {/*
-      The slot SyncStatus hydrates into. Held open and empty rather than filled
-      with a shimmer bar: what usually lands here is a single tick, so a
-      full-width bar would promise more than arrives. Every state the indicator
-      can settle into, including the signed-out sign-in link, fits exactly this
-      slot, so hydration cannot move the row.
-    */}
-    <span class="typing-sync-slot"></span>
   </div>
 
   {/*
@@ -68,7 +60,17 @@ const CONTROLS = { en: [38, 77, 77, 108], pl: [38, 100, 92, 115] }[lang];
     }
     <div class="typing-progress">
       <div class="typing-progress-track"></div>
-      <span class="typing-skel" style="--skel-w: 6rem; --skel-h: 0.85rem"></span>
+      <div class="typing-progress-footer">
+        <span class="typing-skel" style="--skel-w: 6rem; --skel-h: 0.85rem"></span>
+        {/*
+          The slot SyncStatus hydrates into. Held open and empty rather than
+          filled with a shimmer bar: what usually lands here is a tick and a
+          word, so a bar would promise more than arrives. Empty, it still holds
+          the line at the height every state of the indicator settles to,
+          including the taller signed-out sign-in button.
+        */}
+        <span class="typing-sync-slot"></span>
+      </div>
     </div>
   </div>
 

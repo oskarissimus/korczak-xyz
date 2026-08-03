@@ -100,11 +100,10 @@
   margin: 0 auto;
 }
 
-/* A Win95 dialog line: the labelled control at the left margin, its status at the right one.
-   The two ends are held apart by an auto margin on the sync slot rather than space-between,
-   because there are three children here and space-between would strand the "Book" label away
-   from the combo box it labels. Still wraps: on a narrow viewport the slot drops to its own
-   line instead of running into the picker. */
+/* A Win95 dialog line: the label and the combo box it labels, together at the left margin.
+   The sync indicator used to sit at the right end of this row, held off by an auto margin;
+   it now travels with the progress percentage it qualifies (see .typing-progress-footer),
+   which leaves nothing here that wants to be pushed anywhere. */
 .typing-book-picker {
   display: flex;
   flex-wrap: wrap;
@@ -228,11 +227,32 @@
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  min-width: 160px;
+  /* No min-width floor: the default `auto` is min-content, and that is what makes this column
+     wrap to its own line rather than overflow when the sync indicator below is in one of its
+     long states. A 160px floor let flexbox squeeze the column to 160px while its content still
+     demanded 325px, and the sign-in button spilled out of the panel. The 160px basis above
+     still sets the width whenever there is room for it. */
 }
 
 .typing-progress .typing-stat-label {
   color: var(--retro-black);
+}
+
+/* The line under the bar: "Progress: 42%" and, after it, whether that number reached the
+   account. Wraps, because the sync indicator's longest state (a Polish failure with its age)
+   is wider than the percentage and the bar together, and on a narrow viewport it should fall
+   under the percentage rather than stretch the column. */
+.typing-progress-footer {
+  /* The height the sync indicator's states settle to, set by the tallest of them (the
+     signed-out sign-in button). Reserved on the line rather than on the indicator, because the
+     line is what must not move: the indicator arrives at hydration, and it is absent entirely
+     when auth is switched off. Read by .typing-sync-cell in auth.css. */
+  --sync-cell-h: 36px;
+  min-height: var(--sync-cell-h);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .typing-progress-track {

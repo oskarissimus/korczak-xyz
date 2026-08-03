@@ -100,7 +100,6 @@ export default function TypingSession({
             ))}
           </select>
         </span>
-        <SyncStatus auth={auth} sync={sync} lang={lang} onRetry={retrySync} />
       </div>
 
       <StatsBar
@@ -108,6 +107,7 @@ export default function TypingSession({
         accuracy={accuracy}
         durationMs={durationMs}
         progressPercent={progressPercent}
+        syncStatus={<SyncStatus auth={auth} sync={sync} lang={lang} onRetry={retrySync} />}
         labels={{
           wpm: t.wpm,
           accuracy: t.accuracy,

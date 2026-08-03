@@ -179,7 +179,7 @@
 }
 
 /* --- Typing app sign-in prompt --- */
-/* An item on the trainer's book-picker row, sitting on the gray panel
+/* An item on the trainer's progress line, sitting on the gray panel
    (.typing-content) rather than the teal the rest of this file's chrome
    assumes — hence the dialog-ink colours here. */
 .typing-sync {
@@ -196,12 +196,13 @@
   background: var(--retro-gray);
   border: 2px outset var(--retro-white);
   padding: 6px 12px;
-  /* Fills the slot instead of sizing it - see .typing-sync-slot. */
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: center;
+  /* Sizes itself. The slot it sits in no longer reserves a width for it to fill, and a button
+     stretched past its label reads as a panel rather than a control. */
+  flex: none;
   white-space: nowrap;
-  overflow: hidden;
+  /* Without this the font's own line box makes the button 41px - taller than the height the
+     progress line reserves, so the Polish sign-in state alone would nudge the row at hydration. */
+  line-height: 1;
 }
 
 /* The link is an <a>, so the global a:visited / a:hover out-specify a bare
@@ -220,29 +221,34 @@
   border-style: inset;
 }
 
+/* On a phone the panel is narrower than the Polish sign-in label is long (325px measured), and
+   nowrap there means a button hanging out of the dialog. Everywhere wider it keeps its one line:
+   nowrap is what makes the progress column claim a row of its own rather than be squeezed. */
+@media (max-width: 600px) {
+  .typing-sync-link {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
 /* --- Typing app sync indicator --- */
-/* One fixed-width slot at the right end of the book-picker row, holding whichever of the
+/* One slot on the progress line, immediately after "Progress: 42%", holding whichever of the
    indicator's states applies - including the empty ones, and including the sign-in prompt above.
 
-   The auto margin is what pins it to the column's right edge, opposite the book picker. It also
-   retires the reason the width used to be rigid: the slot used to sit in a centred row, where
-   resizing it slid the <select> sideways, and now nothing stands to its right and the margin
-   absorbs whatever it does. So the width is a floor rather than a cage - the slot holds a
-   constant shape through the states it spends its life in, and the one state that genuinely
-   needs more room is allowed to take it instead of being clipped. */
+   It reserves nothing. The height the states differ by is reserved on the line itself
+   (.typing-progress-footer), which holds whether or not an indicator ever arrives. The width
+   the slot used to reserve - 13rem, to keep the book <select> from sliding sideways beneath the
+   cursor when the text changed - has no one left to protect: the percentage before it is
+   left-aligned and stays put whatever this does, and nothing is anchored to its right edge. So
+   the indicator is exactly as wide as the string it holds, which for the state it spends its
+   life in is a tick and a word. */
 .typing-sync-slot {
-  /* Comfortably over "✓ Synced" / "✓ Zapisano" and the empty state, which is what is on screen
-     essentially always, and over an English failure. The Polish ones run to 276px measured -
-     reserving that permanently, for an indicator that is 73px wide in the state it actually
-     holds, would eat a third of the row to no purpose. */
-  --sync-slot-w: 13rem;
-  /* Height is fixed outright - it is what the skeleton stands in for, and it must not move
-     between the empty state and a filled one. */
-  --sync-cell-h: 36px;
   flex: none;
-  min-width: var(--sync-slot-w);
-  min-height: var(--sync-cell-h);
-  margin-left: auto;
+  min-width: 0;
+  /* Never wider than the line it sits on - what does not fit wraps under the percentage. */
+  max-width: 100%;
   display: flex;
   align-items: center;
 }
@@ -252,22 +258,24 @@
 .typing-sync-cell {
   display: flex;
   align-items: center;
-  /* Flush with the column's right edge. Centred, it would sit inside its own slot with a gap
-     after it and read as floating rather than as the row's right-hand end. */
-  justify-content: flex-end;
+  /* Reads on from the percentage it follows, so it starts where the slot starts. */
+  justify-content: flex-start;
   gap: 5px;
-  /* Grows to fill the slot's floor so the text lands on the right edge, and past it when the
-     text is longer than the floor. No overflow rule: the slot sizes to this, so there is
-     nothing to clip, and a hidden overflow would only mask a future string that outgrew it -
-     a silently truncated "Sync failed ·" is the one thing this indicator must not produce. */
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: var(--sync-cell-h);
+  /* Sizes to its text and the slot sizes to it. No overflow rule anywhere on this path: a
+     silently truncated "Sync failed ·" is the one thing this indicator must not produce, so
+     nothing here is allowed to clip - a string too long for the line wraps the whole slot
+     under the percentage instead (see .typing-progress-footer). */
+  flex: none;
+  /* From .typing-progress-footer, which is what actually reserves the line's height; the
+     fallback only matters if the indicator is ever rendered somewhere that does not. */
+  min-height: var(--sync-cell-h, 36px);
   padding: 0;
   border: 0;
   background: none;
   font-family: 'VT323', monospace;
-  font-size: 1rem;
+  /* Matched to .typing-stat-label beside it - same family already, and at 1rem the two read as
+     two things on one line rather than one sentence. */
+  font-size: 0.85rem;
   line-height: 1;
   white-space: nowrap;
   /* Fixed-width digits: "9 min ago" and "11 min ago" must not twitch the glyph beside them. */
@@ -283,9 +291,11 @@ button.typing-sync-cell:active {
   transform: translateY(1px);
 }
 
+/* A shade over the label beside it - the same 1.05x it has always carried, rescaled with the
+   cell. A tick set at the text's own size disappears into it. */
 .typing-sync-glyph {
   flex: none;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
 }
 
 /* Sizes the cell, and through it the slot, rather than being squeezed by either. */
