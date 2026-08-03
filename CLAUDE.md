@@ -114,16 +114,28 @@ is stale" from "the two have branched" — a distinction `lastPlayedAt` cannot m
 - `src/components/Typing/SyncStatus.tsx` — the indicator on the book-picker row
 - `src/components/Typing/ConflictModal.tsx` — shown when the two have genuinely branched
 
-The indicator shows the outcome of the last attempt and nothing else: a green ✓ when progress is
-on the account, a red ✕ with "Sync failed · 2 min ago" when it is not. Work in flight is not
-shown — it is transient, no one acts on it, and a spinner beside the passage is motion someone
-typing has to ignore. A failure is what persists and what can be clicked to retry.
+The indicator shows the outcome of the last attempt and nothing else: "✓ Synced" when progress is
+on the account, "✕ Sync failed · 2 min ago" when it is not. Work in flight is not shown — it is
+transient, no one acts on it, and a spinner beside the passage is motion someone typing has to
+ignore. A failure is what persists and what can be clicked to retry. The success case shows the
+word without the age; the exact time is in the tooltip.
 
 The outcome cannot come from `SyncStatus` alone: it is a precedence ladder, so `syncing` outranks
 `error` and a failing retry reads as healthy. `describeSync` reads `error`/`conflict` alongside
 `lastSyncedAt`/`lastFailedAt` instead, which is why `SyncState` carries `lastFailedAt` at all.
-The slot has no border and a fixed width — it shares a centred flex row with the book `<select>`,
-and an indicator that resizes drags the picker sideways mid-sentence.
+
+The book-picker row is a Win95 dialog line: `Book [combo box]` at the left margin, the indicator
+at the right one, held apart by `margin-left: auto` on `.typing-sync-slot`. The slot is borderless
+and its width is a floor (13rem), not a cage — nothing sits to its right, so a long failure string
+grows leftward into slack instead of being clipped. Polish runs to 276px measured; reserving that
+permanently for an indicator that is 73px wide in the state it actually holds would eat a third of
+the row. `.typing-book-combo` wraps the `<select>` because one element cannot draw both a sunken
+field and a raised drop-down button; both its pseudo-elements are `pointer-events: none` so clicks
+still reach the control.
+
+`.typing-skel-select` in `typing.css` hard-codes the real picker's rendered width so the row does
+not jump on hydration. Re-measure it in a browser whenever the book list changes — it had drifted
+132px before anyone noticed.
 
 ### Firestore client health
 

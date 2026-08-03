@@ -103,9 +103,10 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
         ? `${t.syncTitleSynced} ${exactTime}`
         : `${t.syncTitleFailed} ${exactTime}${display.retryable ? ` · ${t.syncRetry}` : ''}`;
 
-  // A tick alone when it worked: the time it happened is in the tooltip, and a green tick that
-  // ages in place is noise on a row someone reads to pick a book. A failure earns its words.
-  const label = ok ? null : `${failLabel(display, t)}${ago ? ` · ${ago}` : ''}`;
+  // The word, not the age, when it worked: a green tick that re-renders its own age every 30s is
+  // noise on a row someone reads to pick a book, and the exact time is in the tooltip either way.
+  // A failure earns the age too - "how long has this been broken" is the whole question.
+  const label = ok ? t.syncSynced : `${failLabel(display, t)}${ago ? ` · ${ago}` : ''}`;
 
   // The glyph and the abbreviated label are for the eye; the sentence beside them, unstyled and
   // off-screen, is what a screen reader gets. Reading "✕ 2 min ago" aloud says nothing.
@@ -120,11 +121,9 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
       <span className="typing-sync-glyph" aria-hidden="true">
         {ok ? '✓' : '✕'}
       </span>
-      {label && (
-        <span className="typing-sync-ago" aria-hidden="true">
-          {label}
-        </span>
-      )}
+      <span className="typing-sync-ago" aria-hidden="true">
+        {label}
+      </span>
       <span className="typing-sync-sr">{srLabel}</span>
     </>
   );

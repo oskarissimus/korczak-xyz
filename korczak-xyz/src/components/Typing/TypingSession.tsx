@@ -87,18 +87,21 @@ export default function TypingSession({
         <label className="typing-book-label" htmlFor="typing-book-select">
           {t.book}
         </label>
-        <select
-          id="typing-book-select"
-          className="typing-book-select"
-          value={book.id}
-          onChange={(e) => onBookChange(e.target.value)}
-        >
-          {books.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.title} — {b.author}
-            </option>
-          ))}
-        </select>
+        {/* The shell draws the sunken field and the drop-down button; see .typing-book-combo. */}
+        <span className="typing-book-combo">
+          <select
+            id="typing-book-select"
+            className="typing-book-select"
+            value={book.id}
+            onChange={(e) => onBookChange(e.target.value)}
+          >
+            {books.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.title} — {b.author}
+              </option>
+            ))}
+          </select>
+        </span>
         <SyncStatus auth={auth} sync={sync} lang={lang} onRetry={retrySync} />
       </div>
 

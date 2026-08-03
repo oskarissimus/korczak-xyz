@@ -100,11 +100,16 @@
   margin: 0 auto;
 }
 
+/* A Win95 dialog line: the labelled control at the left margin, its status at the right one.
+   The two ends are held apart by an auto margin on the sync slot rather than space-between,
+   because there are three children here and space-between would strand the "Book" label away
+   from the combo box it labels. Still wraps: on a narrow viewport the slot drops to its own
+   line instead of running into the picker. */
 .typing-book-picker {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -115,15 +120,69 @@
   color: var(--retro-black);
 }
 
+/* A Win95 combo box, not a push button: a sunken white field with a raised drop-down button
+   flush against its inner right edge. The shell draws both, because a <select> can style its
+   own field or its own arrow but never both at once. */
+.typing-book-combo {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+}
+
 .typing-book-select {
+  appearance: none;
+  -webkit-appearance: none;
   font-family: 'Press Start 2P', monospace;
   font-size: 0.6rem;
   color: var(--retro-black);
-  background: var(--retro-gray);
-  border: 3px outset var(--retro-white);
-  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  /* The right side clears the button drawn below. */
+  padding: 6px 26px 6px 6px;
   max-width: 100%;
   cursor: pointer;
+}
+
+/* No border of its own to carry a focus ring any more, so it borrows the tabs' Win95 one.
+   The box-shadow is Tailwind's ring, which an outline rule does not override - it drew a blue
+   round-cornered halo just outside the sunken field, from a different decade than everything
+   else on the row. */
+.typing-book-select:focus {
+  box-shadow: none;
+}
+
+.typing-book-select:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: -4px;
+}
+
+/* The button chrome. ::before rather than ::after so the arrow paints over it. */
+.typing-book-combo::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  pointer-events: none;
+}
+
+/* Borders rather than a '▼' character: Press Start 2P has no U+25BC, and the fallback face it
+   would silently pull that one glyph from is nothing like the rest of the row. */
+.typing-book-combo::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  margin-top: -2px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--retro-black);
+  pointer-events: none;
 }
 
 /* Stats bar */
@@ -1128,9 +1187,11 @@ circle.typing-chart-line--keywpm {
 
 /* The real picker sizes itself to its widest "Title — Author" option; an empty
    stand-in would be far narrower and would stop the row wrapping where the real
-   one does. Re-measure if the book list gains a longer title. */
+   one does. Re-measure if the book list gains a longer title: this is the real
+   select's rendered width in Chromium (combo box 250px, less its 2px borders),
+   and 378px here had already gone stale by 132px before anyone noticed. */
 .typing-skel-select {
-  width: 378px;
+  width: 246px;
   max-width: 100%;
 }
 

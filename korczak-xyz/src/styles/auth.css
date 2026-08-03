@@ -221,22 +221,28 @@
 }
 
 /* --- Typing app sync indicator --- */
-/* One fixed-width slot on the book-picker row, holding whichever of the indicator's states
-   applies - including the empty ones, and including the sign-in prompt above.
+/* One fixed-width slot at the right end of the book-picker row, holding whichever of the
+   indicator's states applies - including the empty ones, and including the sign-in prompt above.
 
-   The width is the whole point. The row is a centred flex line, so an indicator that resizes
-   when its state changes slides the book <select> sideways under the cursor of someone who is
-   not even looking at it. Nothing inside here is allowed to size the slot: the cell is laid
-   out from this width, never the other way round. Content that outgrows it is clipped, which
-   is why the labels are abbreviations and the sentences live in tooltips. */
+   The auto margin is what pins it to the column's right edge, opposite the book picker. It also
+   retires the reason the width used to be rigid: the slot used to sit in a centred row, where
+   resizing it slid the <select> sideways, and now nothing stands to its right and the margin
+   absorbs whatever it does. So the width is a floor rather than a cage - the slot holds a
+   constant shape through the states it spends its life in, and the one state that genuinely
+   needs more room is allowed to take it instead of being clipped. */
 .typing-sync-slot {
-  --sync-slot-w: 11rem;
-  /* Height is fixed too, and for the same reason as the width - it is what the skeleton stands
-     in for, and it must not move between the empty state and a filled one. */
+  /* Comfortably over "✓ Synced" / "✓ Zapisano" and the empty state, which is what is on screen
+     essentially always, and over an English failure. The Polish ones run to 276px measured -
+     reserving that permanently, for an indicator that is 73px wide in the state it actually
+     holds, would eat a third of the row to no purpose. */
+  --sync-slot-w: 13rem;
+  /* Height is fixed outright - it is what the skeleton stands in for, and it must not move
+     between the empty state and a filled one. */
   --sync-cell-h: 36px;
   flex: none;
-  width: var(--sync-slot-w);
+  min-width: var(--sync-slot-w);
   min-height: var(--sync-cell-h);
+  margin-left: auto;
   display: flex;
   align-items: center;
 }
@@ -246,9 +252,16 @@
 .typing-sync-cell {
   display: flex;
   align-items: center;
-  justify-content: center;
+  /* Flush with the column's right edge. Centred, it would sit inside its own slot with a gap
+     after it and read as floating rather than as the row's right-hand end. */
+  justify-content: flex-end;
   gap: 5px;
-  width: 100%;
+  /* Grows to fill the slot's floor so the text lands on the right edge, and past it when the
+     text is longer than the floor. No overflow rule: the slot sizes to this, so there is
+     nothing to clip, and a hidden overflow would only mask a future string that outgrew it -
+     a silently truncated "Sync failed ·" is the one thing this indicator must not produce. */
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--sync-cell-h);
   padding: 0;
   border: 0;
@@ -257,7 +270,6 @@
   font-size: 1rem;
   line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
   /* Fixed-width digits: "9 min ago" and "11 min ago" must not twitch the glyph beside them. */
   font-variant-numeric: tabular-nums;
 }
@@ -276,9 +288,9 @@ button.typing-sync-cell:active {
   font-size: 1.05rem;
 }
 
+/* Sizes the cell, and through it the slot, rather than being squeezed by either. */
 .typing-sync-ago {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
 }
 
 /* Colour and shape carry the state at a glance; the sentence the cell also contains, offset
