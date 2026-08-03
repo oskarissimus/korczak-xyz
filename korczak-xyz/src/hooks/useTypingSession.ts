@@ -25,7 +25,7 @@ import {
   type SyncState,
 } from '../utils/typing/syncEngine';
 import type { AuthUser } from './useAuth';
-import type { Book, RecentChar, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
+import type { Book, TypingEvent, TypingProgress, TypingSession } from '../utils/typing/types';
 
 export type CharStatus = 'correct' | 'incorrect' | 'current' | 'pending';
 
@@ -66,11 +66,6 @@ export interface TypingSessionApi {
   progressPercent: number;
   isFinished: boolean;
   isPaused: boolean;
-  isTiming: boolean;
-  // Wall-clock times of the char keystrokes in the last `windowMs`, ascending.
-  // Reads the live log ref directly so a caller can sample it on its own timer
-  // without re-rendering the whole session on every keystroke.
-  getRecentChars: (windowMs: number) => RecentChar[];
   pause: () => void;
   resume: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -502,25 +497,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     return Date.now() - start;
   }, []);
 
-  // The live pulse chart samples this on its own timer (see LiveWpmPulse), which
-  // is why it reads the ref rather than being derived state: only that small
-  // subtree re-renders, not the passage. Walks back from the newest event and
-  // stops at the cutoff, so its cost is set by the window, not the session.
-  const getRecentChars = useCallback((windowMs: number): RecentChar[] => {
-    const s = sessionRef.current;
-    if (!s) return [];
-    const cutoff = Date.now() - windowMs;
-    const out: RecentChar[] = [];
-    for (let i = s.events.length - 1; i >= 0; i--) {
-      const e = s.events[i];
-      const t = s.startedAt + e.t; // events are stored as offsets from the session start
-      if (t < cutoff) break;
-      if (e.kind === 'char') out.push({ t, correct: !!e.correct });
-    }
-    out.reverse();
-    return out;
-  }, []);
-
   const handleChar = useCallback(
     (ch: string) => {
       maybeRotateSession(); // a long absence starts a new session
@@ -735,8 +711,6 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     progressPercent,
     isFinished,
     isPaused,
-    isTiming,
-    getRecentChars,
     pause,
     resume,
     inputRef,
