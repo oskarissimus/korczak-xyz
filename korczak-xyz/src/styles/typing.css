@@ -879,7 +879,7 @@ circle.typing-chart-line--keywpm {
 
 .typing-key-row {
   display: grid;
-  grid-template-columns: 5.5rem 1fr 4rem 4rem;
+  grid-template-columns: 5.5rem 1fr 4.5rem 4.5rem 4.5rem;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -898,6 +898,14 @@ circle.typing-chart-line--keywpm {
   color: var(--retro-cyan);
   text-transform: uppercase;
   font-size: 0.95rem;
+  /* Every heading here is longer than the number it labels — "Accuracy" over
+     "97%", "Napisano" over "812" — so the columns are sized by the headings and
+     the two-word ones ("Time lost", "Stracony czas") wrap. The taller line box
+     is paid once, by the header row. `anywhere` is the backstop: a heading that
+     still doesn't fit breaks rather than spilling out of the table. */
+  line-height: 1.1;
+  align-items: end;
+  overflow-wrap: anywhere;
   cursor: default;
   position: sticky;
   top: 0;
@@ -914,6 +922,12 @@ circle.typing-chart-line--keywpm {
 
 .typing-key-row--selected {
   background: rgba(255, 255, 0, 0.12);
+}
+
+/* Full words by default, abbreviations only where the 600px block asks for
+   them. Both are aria-hidden; the header's aria-label carries the full word. */
+.typing-key-head-short {
+  display: none;
 }
 
 .typing-key-glyph {
@@ -974,13 +988,21 @@ circle.typing-chart-line--keywpm {
   background: var(--retro-green);
 }
 
-/* Bottleneck sort: time lost has no meaningful midpoint, so the bar grows from
-   the left edge and the average center line is hidden. */
-.typing-key-diverge-track--single .typing-key-diverge-center {
-  display: none;
+/* Time lost sits beside the speed bar rather than replacing it, and it has no
+   meaningful midpoint to diverge from — so it gets a rule along the bottom of
+   its own cell, growing from the left, scaled to the worst trusted key. Under
+   the text rather than behind it: the number has to stay readable. */
+.typing-key-lost {
+  position: relative;
+  text-align: right;
+  min-width: 0;
 }
 
-.typing-key-diverge-fill--bottleneck {
+.typing-key-lost-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
   background: var(--retro-magenta);
 }
 
@@ -1104,7 +1126,9 @@ circle.typing-chart-line--keywpm {
    however far down the (long) list you scroll. */
 .typing-key-layout {
   display: grid;
-  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  /* 440px, not 380: five columns of headings need it. The chart beside it is an
+     SVG with a viewBox, so what it gives up is scale, not content. */
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -1121,16 +1145,28 @@ circle.typing-chart-line--keywpm {
   top: 8px;
 }
 
-/* The narrower left column can't afford the full-width row grid; trim the
-   fixed columns rather than dropping the WPM value, which is what's ranked. */
+/* The narrower left column can't afford the full-width row grid. 4.25rem (68px)
+   is what the longest heading needs at the reduced header size — "Accuracy" and
+   "Napisano" both measure 66px in VT323 at 0.85rem — and it clears every value
+   underneath ("Spacja" 64px, "1h 05m" 55px). Budget at 440px: 420px of content
+   − 272 of fixed columns − 24 of gaps leaves 124px for the bar cell, which holds
+   a 68px value, an 8px gap and the 40px minimum track. */
 .typing-key-layout .typing-key-row {
-  grid-template-columns: 3.5rem 1fr 2.75rem 3rem;
+  grid-template-columns: 4.25rem 1fr repeat(3, 4.25rem);
   gap: 6px;
 }
 
-.typing-key-layout .typing-key-bar-value {
-  width: 4.25rem;
+.typing-key-layout .typing-key-row--head {
+  font-size: 0.85rem;
+}
+
+.typing-key-layout .typing-key-bar-value,
+.typing-key-layout .typing-key-lost {
   font-size: 0.95rem;
+}
+
+.typing-key-layout .typing-key-bar-value {
+  width: 4.25rem; /* "120 WPM" is 65px at this size */
 }
 
 .typing-key-layout .typing-key-diverge-track {
@@ -1166,21 +1202,51 @@ circle.typing-chart-line--keywpm {
   .typing-key-spotlights {
     grid-template-columns: 1fr;
   }
+  /* A 320px phone leaves the row 238px of content — the window chrome takes the
+     rest — so here the columns are sized by their *values* ("Spacja" 55px,
+     "1h 05m" 50px, "1203" 39px, "100%" 39px) and the headings shorten to fit
+     rather than the other way round. Gap drops to 4px to buy the last of it. */
   .typing-key-row,
   .typing-key-layout .typing-key-row {
-    grid-template-columns: 4rem 1fr 3rem 3rem;
+    grid-template-columns: 3.5rem 1fr 3.25rem 2.5rem 2.5rem;
+    gap: 4px;
     font-size: 1rem;
+  }
+  .typing-key-row--head,
+  .typing-key-layout .typing-key-row--head {
+    font-size: 0.7rem;
+  }
+  .typing-key-head-full {
+    display: none;
+  }
+  .typing-key-head-short {
+    display: inline;
+  }
+  /* "Spacja" is the widest glyph label and needs the whole 56px. */
+  .typing-key-glyph {
+    font-size: 0.95rem;
+  }
+  /* Both numbers are the point of the table; the diverging bar is the reading
+     aid. At this width only one of the three fits, so the bar is what goes and
+     the speed value takes the cell. The time-lost rule stays — it underlines its
+     own cell and costs no width. */
+  .typing-key-diverge-track,
+  .typing-key-layout .typing-key-diverge-track {
+    display: none;
   }
   .typing-key-bar-value,
   .typing-key-layout .typing-key-bar-value {
+    width: auto;
+    flex: 1 1 auto;
+    font-size: 1rem;
+  }
+  /* The unit moves into the column heading, which reads WPM at this width —
+     34px of cell doesn't hold "126 WPM", and the number is what's compared. */
+  .typing-key-wpm-unit {
     display: none;
   }
-  /* Time lost is the value being ranked in bottleneck mode, so keep it on
-     screen — it's short enough ("52s", "1h 05m") to fit beside the bar. */
-  .typing-key-bar-value--lost,
-  .typing-key-layout .typing-key-bar-value--lost {
-    display: block;
-    width: 3.5rem;
+  .typing-key-layout .typing-key-lost {
+    font-size: 0.85rem;
   }
 }
 
@@ -1292,6 +1358,17 @@ circle.typing-chart-line--keywpm {
   min-height: calc(1.4em + 11px); /* padding 5px, border-bottom 1px */
 }
 
+/* The header is the exception: with five columns, "Time lost" / "Stracony czas"
+   wraps to two lines at line-height 1.1, and the stand-in's one bar per cell
+   doesn't. Below 600px the headings shorten and it goes back to one line. */
+.typing-skeleton .typing-key-row--head {
+  min-height: calc(2.2em + 11px);
+}
+
+.typing-skeleton .typing-key-row--head .typing-skel {
+  --skel-h: 0.95rem;
+}
+
 /* .typing-stat-value carries line-height: 1, so only the label below it needs
    the 1.4x treatment. Spread the two bars rather than centring them together. */
 .typing-skeleton .typing-stat {
@@ -1328,6 +1405,25 @@ circle.typing-chart-line--keywpm {
 @media (max-width: 600px) {
   .typing-skel-line {
     height: calc(1.4rem * 1.7);
+  }
+  /* Short headings here, so the header row is back to one line. The bars have
+     to come down with the type they stand in for, or they set the row's height
+     themselves and it overshoots. */
+  .typing-skeleton .typing-key-row--head {
+    min-height: calc(1.1em + 11px);
+  }
+  .typing-skeleton .typing-key-row--head .typing-skel {
+    --skel-h: 0.7rem;
+  }
+}
+
+/* Both legend lines under the key table wrap on narrow screens — the formula
+   one reaches three lines in Polish. Reserving two from 375px down is the
+   widest point where neither language still fits on one, so the stand-in never
+   overshoots (see the typing-hint note below for why that matters). */
+@media (max-width: 375px) {
+  .typing-skeleton .typing-key-avg-note {
+    min-height: 2.8em;
   }
 }
 
