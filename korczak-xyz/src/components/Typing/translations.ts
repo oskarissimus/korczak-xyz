@@ -39,6 +39,16 @@ export const translations = {
     keyCol: 'Key',
     medianLatency: 'Speed',
     timesTyped: 'Typed',
+    // Short column headings, used below 600px. Five columns of numbers leave a
+    // 320px phone about 238px of row, and a heading is always wider than the
+    // figure beneath it — "Accuracy" over "97%". These are what the columns are
+    // labelled there; the full words stay as each header's accessible name.
+    // "WPM" doubles as the unit, which the values drop at that width.
+    keyColShort: 'Key',
+    medianLatencyShort: 'WPM',
+    timeLostColShort: 'Lost',
+    timesTypedShort: 'Typed',
+    accuracyShort: 'Acc',
     sortSlowest: 'Slowest',
     sortFastest: 'Fastest',
     sortFrequent: 'Most typed',
@@ -137,6 +147,11 @@ export const translations = {
     keyCol: 'Klawisz',
     medianLatency: 'Szybkość',
     timesTyped: 'Napisano',
+    keyColShort: 'Klaw.',
+    medianLatencyShort: 'WPM',
+    timeLostColShort: 'Strata',
+    timesTypedShort: 'Ilość',
+    accuracyShort: 'Cel.',
     sortSlowest: 'Najwolniejsze',
     sortFastest: 'Najszybsze',
     sortFrequent: 'Najczęstsze',
