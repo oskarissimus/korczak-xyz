@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Tuner from '../../components/Tuner/Tuner';
+import { useTranslations } from '../../i18n';
+import '../../styles/tuner.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('tuner.title')} | korczak.xyz`} lang={lang}>
+  <div class="window tuner-window">
+    <div class="title-bar">
+      <span>{t('tuner.title')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content tuner-content">
+      <Tuner client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>

@@ -139,6 +139,11 @@ export const ui = {
     'pipes.reset': 'Reset',
     'pipes.fullscreen': 'Fullscreen',
 
+    // Guitar tuner
+    'Tuner': 'Guitar Tuner',
+    'tuner.title': 'Guitar Tuner',
+    'tuner.desc': 'Tune by microphone',
+
     // Status bar
     'statusBar.lastUpdated': 'Last updated:',
     // Narrow-screen variant, so the status bar stays on one line.
@@ -380,6 +385,11 @@ export const ui = {
     'pipes.play': 'Graj',
     'pipes.reset': 'Reset',
     'pipes.fullscreen': 'Pelny ekran',
+
+    // Guitar tuner
+    'Tuner': 'Stroik gitarowy',
+    'tuner.title': 'Stroik gitarowy',
+    'tuner.desc': 'Strojenie przez mikrofon',
 
     // Status bar
     'statusBar.lastUpdated': 'Aktualizacja:',
