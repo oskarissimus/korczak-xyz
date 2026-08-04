@@ -166,3 +166,14 @@ see the `i18n` skill for how.
 
 When work is finished, commit and push directly to `main`. Don't create feature branches
 or pull requests for routine work unless I explicitly ask for one.
+
+Claude Code on the web doesn't honour this on its own: each cloud session is assigned a
+generated `claude/<slug>` branch in its **system prompt**, which outranks this file. There is no
+setting to turn that off — the session form's branch picker only chooses what you start *from*,
+and the "Allow unrestricted branch pushes" toggle applies to Routines, not interactive sessions.
+So `.claude/hooks/session-start.sh` restates the rule as a `SessionStart` hook, whose
+`additionalContext` lands ahead of the first prompt where the session actually reads it. In cloud
+sessions only, it also checks out `main` when the assigned branch is still untouched — a clean
+tree sitting exactly on `origin/main`. A branch that already carries work is left alone, so the
+hook is safe on resume. This is a workaround for injected prompt text, not a supported switch; if
+web sessions start ignoring `main` again, that prompt likely changed.
