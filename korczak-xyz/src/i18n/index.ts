@@ -256,6 +256,9 @@ export const ui = {
     'hydrationError.message': 'Parts of this page could not be loaded. Check your internet connection and try again.',
     'hydrationError.reload': 'Reload',
     'anesthesia.andMoreErrors': 'and {count} more errors',
+
+    // Footer
+    'footer.marquee': '*** Welcome to korczak.xyz! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! *** Best viewed in Netscape Navigator 4.0 ***',
   },
   pl: {
     // Navigation
@@ -502,6 +505,9 @@ export const ui = {
     'hydrationError.title': 'Blad ladowania',
     'hydrationError.message': 'Nie udalo sie zaladowac czesci tej strony. Sprawdz polaczenie z internetem i sprobuj ponownie.',
     'hydrationError.reload': 'Odswiez',
+
+    // Footer
+    'footer.marquee': '*** Witaj na korczak.xyz! *** 7 lat doświadczenia w programowaniu *** Python, JavaScript, Docker, Kubernetes *** Napisz do mnie w sprawie mentoringu! *** Najlepiej oglądać w Netscape Navigator 4.0 ***',
   },
 } as const;
 

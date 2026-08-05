@@ -1,19 +1,18 @@
 ---
-import type { Lang } from '../i18n';
+import { useTranslations, type Lang } from '../i18n';
 
 interface Props {
   lang?: Lang;
 }
 
 const { lang = 'en' } = Astro.props;
+const t = useTranslations(lang);
 const homeLink = lang === 'en' ? '/' : '/pl/';
 ---
 
 <footer class="retro-footer">
   <div class="marquee-container">
-    <div class="marquee-text">
-      *** Welcome to korczak.xyz! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! *** Best viewed in Netscape Navigator 4.0 ***
-    </div>
+    <div class="marquee-text">{t('footer.marquee')}</div>
   </div>
 
   <div class="under-construction">
