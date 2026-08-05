@@ -179,6 +179,23 @@ that prop is what decides which app "Add to Home Screen" produces.
 without it, and the `@media (display-mode: standalone)` block in `Layout.astro` is entirely
 built on those insets.
 
+**Safari binds the manifest to the document, not to the DOM.** It reads `<link rel="manifest">`,
+the title and the touch icon when a document *loads* and never looks again. `ClientRouter`
+swaps all three correctly on a client-side navigation — verified in Chromium — but Safari goes
+on offering whatever it captured at the last full load, so clicking through the site to the
+tuner produced an "Add to Home Screen" dialog carrying the songbook's name and start URL under
+the tuner's icon: three pieces of state from three different moments. Refreshing fixed it,
+which is the tell.
+
+So `crossesAppBoundary` (`src/utils/pwa/scope.ts`, tested) marks links that would change the
+linked manifest with `data-astro-reload`, making those navigations real page loads, plus an
+`astro:page-load` reload as a safety net for back/forward. Navigation *within* one app and
+locale stays soft — clicking through the songbook is the case that matters. Note the identity
+is app **and** locale: `/songs` and `/pl/songs` are separate installable apps.
+
+`scope.ts` is split from `apps.ts` because it ships to the browser and `apps.ts` imports the
+whole translation table.
+
 ### Service worker
 
 One worker for all three apps — iOS shares a single registration and one CacheStorage across

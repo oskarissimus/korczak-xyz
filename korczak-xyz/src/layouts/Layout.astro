@@ -116,6 +116,58 @@ const recoveryStrings = {
     <div class="taskbar">
       <div class="taskbar-items"></div>
     </div>
+    <script>
+      /*
+       * Keep "Add to Home Screen" honest across client-side navigations.
+       *
+       * Safari binds the manifest, the title and the touch icon when a document loads and
+       * never re-reads them. ClientRouter swaps all three correctly in the DOM - that much is
+       * verified - but Safari goes on offering whatever it captured at the last full load, so
+       * clicking through the site to the tuner produced an install dialog carrying the
+       * songbook's name and start URL under the tuner's icon.
+       *
+       * So a navigation that changes which manifest the page links is made a real page load.
+       * Everything within one app and locale stays a soft navigation, which is the case that
+       * matters: clicking through the songbook.
+       */
+      import { crossesAppBoundary } from '../utils/pwa/scope';
+
+      declare global {
+        interface Window {
+          __pwaBoundary?: { from: string };
+        }
+      }
+
+      // Astro re-runs module scripts after every swap; the listeners belong to the document,
+      // which outlives them.
+      if (!window.__pwaBoundary) {
+        window.__pwaBoundary = { from: location.pathname };
+
+        document.addEventListener(
+          'click',
+          (event) => {
+            const link = (event.target as Element | null)?.closest?.('a[href]');
+            if (!(link instanceof HTMLAnchorElement)) return;
+            if (link.origin !== location.origin || link.hasAttribute('download')) return;
+            if (!crossesAppBoundary(location.pathname, link.pathname)) return;
+            // Read by ClientRouter's own click handler, which runs after this capture pass.
+            link.dataset.astroReload = '';
+          },
+          { capture: true },
+        );
+
+        /*
+         * Back/forward and any other soft navigation the click handler never saw. Costs a
+         * reload after the swap, which is worse than not needing one and much better than an
+         * install dialog describing a different app. It cannot loop: the reload is a real page
+         * load, so the next run of this script starts from the destination.
+         */
+        document.addEventListener('astro:page-load', () => {
+          const boundary = window.__pwaBoundary;
+          if (boundary && crossesAppBoundary(boundary.from, location.pathname)) location.reload();
+        });
+      }
+    </script>
   </body>
 </html>
 

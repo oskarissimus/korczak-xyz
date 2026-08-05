@@ -1,12 +1,16 @@
 import { getLocalizedPath, type Lang, type TranslationKey } from '../../i18n';
+import type { PwaApp } from './scope';
 
 /**
  * The site ships three installable web apps from one origin. `site` is the whole of
  * korczak.xyz; `tuner` and `songs` are the two that are worth having on a phone, and each is
  * confined to its own corner by `scope` - which is also what keeps the rest of the site, none
  * of which is built for a small screen, out of their windows.
+ *
+ * The path patterns that decide which app a URL belongs to live in scope.ts, which ships to
+ * the browser; this module does not, because it pulls in the whole translation table.
  */
-export type PwaApp = 'site' | 'tuner' | 'songs';
+export type { PwaApp };
 
 interface PwaAppDef {
   /** Unprefixed path the app opens at. The locale prefix is applied per language. */
