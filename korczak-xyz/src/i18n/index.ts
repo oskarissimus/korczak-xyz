@@ -259,6 +259,9 @@ export const ui = {
 
     // Footer
     'footer.marquee': '*** Welcome to korczak.xyz! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! *** Best viewed in Netscape Navigator 4.0 ***',
+    // Split around the korczak.xyz link, which is a brand name and stays untranslated.
+    'footer.underConstruction': 'Under Construction',
+    'footer.established': 'Est. 2024',
   },
   pl: {
     // Navigation
@@ -508,6 +511,8 @@ export const ui = {
 
     // Footer
     'footer.marquee': '*** Witaj na korczak.xyz! *** 7 lat doświadczenia w programowaniu *** Python, JavaScript, Docker, Kubernetes *** Napisz do mnie w sprawie mentoringu! *** Najlepiej oglądać w Netscape Navigator 4.0 ***',
+    'footer.underConstruction': 'Strona w budowie',
+    'footer.established': 'Od 2024',
   },
 } as const;
 
