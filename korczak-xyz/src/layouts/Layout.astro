@@ -279,8 +279,8 @@ const recoveryStrings = {
   }
 
   @keyframes marquee {
-    0% { transform: translateX(100%); }
-    100% { transform: translateX(-100%); }
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
   }
 
   .rainbow-text {
@@ -308,14 +308,27 @@ const recoveryStrings = {
   /* Marquee */
   .marquee-container {
     background: var(--retro-black);
-    padding: 10px;
+    /* No horizontal padding: `padding-left: 100%` below resolves against this content box,
+       while `overflow: hidden` clips at the padding box. Any gap between the two edges shows
+       a sliver of a glyph popping in at the start of each pass and vanishing early at the end. */
+    padding: 10px 0;
     overflow: hidden;
     border: 2px inset var(--retro-dark-gray);
   }
 
+  /* The text has to clear the container completely before the pass restarts, so the animation
+     must travel `container + text`. As a block box that is impossible to express: the box is as
+     wide as the container, `nowrap` text overflows it without widening it, and -100% falls short
+     by the length of the overflow. Shrink-to-fit makes 100% the text's own width, and the
+     padding parks it off the right edge to begin with. */
   .marquee-text {
+    display: inline-block;
+    padding-left: 100%;
     white-space: nowrap;
-    animation: marquee 15s linear infinite;
+    /* 28s, not the old 15s: the pass now covers `container + text` (~3100px at the 900px cap)
+       rather than twice the container (~1670px), so the old duration would run it half again
+       as fast. This keeps the original ~111px/s. */
+    animation: marquee 28s linear infinite;
     color: var(--retro-green);
     font-size: 1.3rem;
   }
