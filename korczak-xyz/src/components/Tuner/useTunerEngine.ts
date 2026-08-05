@@ -15,6 +15,7 @@ import { butterworthQs } from '../../utils/tuner/biquad';
 import { FRAME_SIZE, TunerDetector, type RejectionReason } from '../../utils/tuner/detect';
 import { isInTune, nearestString, STANDARD_TUNING } from '../../utils/tuner/notes';
 import { MedianWindow, OneEuroFilter } from '../../utils/tuner/smoothing';
+import { createWakeLock } from '../../utils/wakeLock';
 
 /** Corner frequencies of the capture graph. See detect.ts for why these and not others. */
 const HIGHPASS_HZ = 70;
@@ -300,6 +301,18 @@ export function useTunerEngine(): TunerEngine {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     };
+  }, [status]);
+
+  /*
+   * Tuning is watching a needle with both hands on the guitar, which is precisely the state the
+   * idle timer reads as nothing happening. Held only while actually listening, so a tuner left
+   * open on a bench does not sit there burning the screen.
+   */
+  useEffect(() => {
+    if (status !== 'listening') return;
+    const wakeLock = createWakeLock();
+    wakeLock.request();
+    return () => wakeLock.release();
   }, [status]);
 
   /*

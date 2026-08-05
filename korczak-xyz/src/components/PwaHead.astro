@@ -1,0 +1,26 @@
+---
+import { useTranslations, type Lang } from '../i18n';
+import { PWA_APPS, PWA_THEME_COLOR, manifestPath, type PwaApp } from '../utils/pwa/apps';
+
+interface Props {
+  app: PwaApp;
+  lang: Lang;
+}
+
+const { app, lang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+<link rel="manifest" href={manifestPath(app, lang)} />
+<link rel="apple-touch-icon" href={`/icons/${app}-180.png`} />
+<meta name="theme-color" content={PWA_THEME_COLOR} />
+
+<!--
+  iOS reads none of the manifest for the home screen label or the status bar; these three
+  Apple-specific tags are still the only way to set them. Without apple-mobile-web-app-title
+  the label falls back to <title>, which on this site is always `Something | korczak.xyz` and
+  gets truncated to "Songs|korcz...".
+-->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content={t(PWA_APPS[app].shortNameKey)} />

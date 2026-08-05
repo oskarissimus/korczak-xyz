@@ -144,6 +144,20 @@ export const ui = {
     'tuner.title': 'Guitar Tuner',
     'tuner.desc': 'Tune by microphone',
 
+    // Installable web apps. The short names are what iOS writes under the home screen icon,
+    // so they have to survive being truncated to about twelve characters.
+    'pwa.site.name': 'korczak.xyz',
+    'pwa.site.short': 'korczak.xyz',
+    'pwa.site.desc': 'Personal website of Oskar Korczak',
+    'pwa.tuner.short': 'Tuner',
+    'pwa.songs.short': 'Songs',
+    'pwa.songs.desc': 'Lyrics and chords, available offline',
+    'pwa.offline.title': 'Offline',
+    'pwa.offline.heading': 'No connection',
+    'pwa.offline.message': 'This page has not been saved for offline use. Reconnect and try again.',
+    'pwa.offline.retry': 'Try again',
+    'pwa.video.offline': 'Video unavailable offline',
+
     // Status bar
     'statusBar.lastUpdated': 'Last updated:',
     // Narrow-screen variant, so the status bar stays on one line.
@@ -396,6 +410,19 @@ export const ui = {
     'Tuner': 'Stroik gitarowy',
     'tuner.title': 'Stroik gitarowy',
     'tuner.desc': 'Strojenie przez mikrofon',
+
+    // Aplikacje instalowane na ekranie głównym
+    'pwa.site.name': 'korczak.xyz',
+    'pwa.site.short': 'korczak.xyz',
+    'pwa.site.desc': 'Strona osobista Oskara Korczaka',
+    'pwa.tuner.short': 'Stroik',
+    'pwa.songs.short': 'Teksty',
+    'pwa.songs.desc': 'Teksty i akordy, dostępne offline',
+    'pwa.offline.title': 'Offline',
+    'pwa.offline.heading': 'Brak połączenia',
+    'pwa.offline.message': 'Ta strona nie została zapisana do użytku offline. Połącz się i spróbuj ponownie.',
+    'pwa.offline.retry': 'Spróbuj ponownie',
+    'pwa.video.offline': 'Wideo niedostępne offline',
 
     // Status bar
     'statusBar.lastUpdated': 'Aktualizacja:',

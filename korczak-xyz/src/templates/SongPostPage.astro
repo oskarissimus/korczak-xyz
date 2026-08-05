@@ -37,7 +37,7 @@ function formatDate(date: Date, locale: string): string {
 const songsListUrl = getLocalizedPath('/songs/', lang);
 ---
 
-<Layout title={`${song.data.title} | korczak.xyz`} lang={lang}>
+<Layout title={`${song.data.title} | korczak.xyz`} lang={lang} pwa="songs">
   <div class="songs-stack">
     <div class="songs-list-layer">
       <SongsListContent lang={lang} />
@@ -47,6 +47,7 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
       data-songs-url={songsListUrl}
       data-songs-title={`${t('Songs')} | korczak.xyz`}
       data-song-title={`${song.data.title} | korczak.xyz`}
+      data-video-offline={t('pwa.video.offline')}
     >
     <div class="window song-header-window">
       <div class="song-header-bar">
@@ -187,6 +188,10 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
     transposeLine,
     type AccidentalPreference,
   } from '../utils/chords';
+  import { createWakeLock } from '../utils/wakeLock';
+
+  /* Hands are on the guitar, not the phone, for as long as the lyrics are scrolling. */
+  const autoscrollWakeLock = createWakeLock();
 
   // One module execution now covers many pages, so this is set up per page and torn down
   // again when the page is swapped out. The listeners that need the teardown are the ones
@@ -615,6 +620,7 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
       if (isAutoscrolling) return;
       isAutoscrolling = true;
       accumulatedScroll = 0;
+      autoscrollWakeLock.request();
 
       function scroll() {
         if (!isAutoscrolling) {
@@ -659,6 +665,7 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
     function stopAutoscroll() {
       isAutoscrolling = false;
       accumulatedScroll = 0;
+      autoscrollWakeLock.release();
       if (autoscrollAnimationId !== null) {
         cancelAnimationFrame(autoscrollAnimationId);
         autoscrollAnimationId = null;
@@ -847,6 +854,24 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
     updateAutoscrollUI();
     applyVideoVisibility();
     applyChordShapesVisibility();
+
+    /*
+     * The YouTube embeds are the one part of a song page that a cached copy cannot supply, so
+     * offline they collapse to an empty sunken frame that reads as a broken page. Say what has
+     * actually happened instead.
+     */
+    function applyVideoOfflineState() {
+      const label = songPage.dataset.videoOffline || '';
+      const offline = !navigator.onLine;
+      songPage.querySelectorAll<HTMLElement>('.youtube-embed').forEach(embed => {
+        embed.dataset.offlineLabel = label;
+        embed.classList.toggle('is-offline', offline);
+      });
+    }
+
+    applyVideoOfflineState();
+    window.addEventListener('online', applyVideoOfflineState);
+    window.addEventListener('offline', applyVideoOfflineState);
 
     // Closing the song window reveals the songs list underneath and
     // rewrites the URL back to the list (back/forward re-open/close it).

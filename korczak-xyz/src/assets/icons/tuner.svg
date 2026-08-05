@@ -1,0 +1,36 @@
+<!--
+  Home screen icon for the Guitar Tuner web app.
+
+  Source art for scripts/generate-icons.mjs, which rasterises it to the PNG sizes iOS wants.
+  Drawn on a 512 grid in the Win95 palette from Layout.astro so the installed app matches the
+  site: navy field, raised gray bezel, sunken black face. The needle sits dead centre on the
+  highlighted tick - the in-tune state, which is the one worth putting on a home screen.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <rect width="512" height="512" fill="#000080"/>
+
+  <!-- Raised bezel: light top/left, shadow bottom/right. -->
+  <rect x="48" y="48" width="416" height="416" fill="#c0c0c0"/>
+  <path d="M48 48h416v8H56v408h-8z" fill="#ffffff"/>
+  <path d="M464 48v416H48v-8h408V48z" fill="#808080"/>
+
+  <!-- Sunken face: the shading inverts. -->
+  <rect x="80" y="80" width="352" height="352" fill="#000000"/>
+  <path d="M80 80h352v8H88v344h-8z" fill="#808080"/>
+  <path d="M432 80v352H80v-8h344V80z" fill="#ffffff"/>
+
+  <!-- Dial ticks, centred on the hub at (256, 380). -->
+  <g stroke="#00ff00" stroke-width="10">
+    <line x1="110.5" y1="257.8" x2="83.6" y2="235.4"/>
+    <line x1="175.7" y1="207.8" x2="160.9" y2="176.1"/>
+    <line x1="336.3" y1="207.8" x2="351.1" y2="176.1"/>
+    <line x1="401.5" y1="257.8" x2="428.4" y2="235.4"/>
+  </g>
+  <!-- Centre tick: in tune. -->
+  <line x1="256" y1="190" x2="256" y2="150" stroke="#00ff00" stroke-width="18"/>
+
+  <!-- Needle. -->
+  <polygon points="256,164 269,380 243,380" fill="#ffff00"/>
+  <circle cx="256" cy="380" r="26" fill="#c0c0c0"/>
+  <circle cx="256" cy="380" r="26" fill="none" stroke="#000000" stroke-width="6"/>
+</svg>

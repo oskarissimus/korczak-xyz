@@ -1,0 +1,41 @@
+<!--
+  Home screen icon for the Songs web app.
+
+  Source art for scripts/generate-icons.mjs. Same Win95 frame as tuner.svg; the face shows
+  yellow chords sitting above green lyric lines, which is what the song pages actually render
+  and what distinguishes this icon from the tuner at home screen size.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <rect width="512" height="512" fill="#000080"/>
+
+  <!-- Raised bezel: light top/left, shadow bottom/right. -->
+  <rect x="48" y="48" width="416" height="416" fill="#c0c0c0"/>
+  <path d="M48 48h416v8H56v408h-8z" fill="#ffffff"/>
+  <path d="M464 48v416H48v-8h408V48z" fill="#808080"/>
+
+  <!-- Sunken face: the shading inverts. -->
+  <rect x="80" y="80" width="352" height="352" fill="#000000"/>
+  <path d="M80 80h352v8H88v344h-8z" fill="#808080"/>
+  <path d="M432 80v352H80v-8h344V80z" fill="#ffffff"/>
+
+  <!-- Three chord-over-lyric rows. -->
+  <g fill="#ffff00">
+    <rect x="112" y="120" width="48" height="26"/>
+    <rect x="200" y="120" width="40" height="26"/>
+    <rect x="280" y="120" width="56" height="26"/>
+  </g>
+  <rect x="112" y="158" width="288" height="22" fill="#00ff00"/>
+
+  <g fill="#ffff00">
+    <rect x="112" y="214" width="40" height="26"/>
+    <rect x="192" y="214" width="56" height="26"/>
+  </g>
+  <rect x="112" y="252" width="248" height="22" fill="#00ff00"/>
+
+  <g fill="#ffff00">
+    <rect x="112" y="308" width="56" height="26"/>
+    <rect x="208" y="308" width="40" height="26"/>
+    <rect x="272" y="308" width="48" height="26"/>
+  </g>
+  <rect x="112" y="346" width="272" height="22" fill="#00ff00"/>
+</svg>

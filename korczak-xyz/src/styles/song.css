@@ -563,6 +563,28 @@
     display: none;
 }
 
+/* Offline, the YouTube iframe fails silently and leaves an empty sunken box - which looks
+   like the page is broken rather than like the network is. 29 of the songs embed one, so in
+   the installed songbook this is the common case, not the edge one. The label is put on the
+   element by the page script, which is where the translated string is. */
+.youtube-embed.is-offline iframe {
+    display: none;
+}
+
+.youtube-embed.is-offline::after {
+    content: attr(data-offline-label);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px;
+    background: var(--retro-black, #000);
+    color: var(--retro-dark-gray, #808080);
+    font-family: 'VT323', monospace;
+}
+
 /* Chord-shape diagrams (toggled via .chord-shapes-toggle button) */
 .chord-shapes {
     margin: 15px 0;

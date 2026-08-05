@@ -1,0 +1,39 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { useTranslations, getLangFromUrl } from '../i18n';
+
+/**
+ * Last resort for a navigation the service worker can neither reach nor find in a cache.
+ *
+ * One page for both locales rather than a pair: it is served by the worker in place of a URL
+ * that was never cached, so it cannot know which locale the visitor wanted, and precaching two
+ * of them to pick between would be guesswork either way. It reads the language off the URL it
+ * happens to be rendered at and otherwise stays neutral.
+ */
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('pwa.offline.title')} | korczak.xyz`} lang={lang}>
+  <div class="window">
+    <div class="title-bar">
+      <span>{t('pwa.offline.title')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content">
+      <h1>{t('pwa.offline.heading')}</h1>
+      <p>{t('pwa.offline.message')}</p>
+      <button type="button" id="offline-retry">{t('pwa.offline.retry')}</button>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  document.getElementById('offline-retry')?.addEventListener('click', () => {
+    location.reload();
+  });
+</script>

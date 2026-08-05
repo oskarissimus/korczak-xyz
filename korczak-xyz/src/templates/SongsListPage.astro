@@ -11,6 +11,6 @@ const { lang } = Astro.props;
 const t = useTranslations(lang);
 ---
 
-<Layout title={`${t('Songs')} | korczak.xyz`} lang={lang}>
+<Layout title={`${t('Songs')} | korczak.xyz`} lang={lang} pwa="songs">
   <SongsListContent lang={lang} />
 </Layout>
