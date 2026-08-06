@@ -35,6 +35,11 @@ function formatDate(date: Date, locale: string): string {
 }
 
 const songsListUrl = getLocalizedPath('/songs/', lang);
+
+// The embed lives in the body, not the frontmatter — `videoUploadDate` is optional and some
+// songs carry a `<Youtube>` without one — so the body is what decides whether the toggle
+// has anything to toggle. Same test as the 📺 marker in the songs list.
+const hasVideo = song.body?.includes('<Youtube') ?? false;
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang} pwa="songs">
@@ -99,10 +104,12 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
                 <span class="autoscroll-speed">3</span>
                 <button class="autoscroll-faster" title="Faster">▶︎</button>
               </span>
-              <button class="video-toggle" title="Toggle video">
-                <span class="btn-icon">📺</span>
-                <span class="btn-label">{t('song.video')}</span>
-              </button>
+              {hasVideo && (
+                <button class="video-toggle" title="Toggle video">
+                  <span class="btn-icon">📺</span>
+                  <span class="btn-label">{t('song.video')}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -163,10 +170,12 @@ const songsListUrl = getLocalizedPath('/songs/', lang);
               <span class="autoscroll-speed">3</span>
               <button class="autoscroll-faster" title="Faster">▶︎</button>
             </span>
-            <button class="video-toggle" title="Toggle video">
-              <span class="btn-icon">📺</span>
-              <span class="btn-label">{t('song.video')}</span>
-            </button>
+            {hasVideo && (
+              <button class="video-toggle" title="Toggle video">
+                <span class="btn-icon">📺</span>
+                <span class="btn-label">{t('song.video')}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
