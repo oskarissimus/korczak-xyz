@@ -44,7 +44,7 @@ const recoveryStrings = {
   <head>
     <meta charset="utf-8" />
     <!-- viewport-fit=cover is what makes env(safe-area-inset-*) return anything but zero; the
-         standalone-mode rules further down depend on it. -->
+         --safe-* insets further down are built on it. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
     <!-- Nothing on the site is meant to be dialled or mailed, so keep mobile browsers from
          turning phone-number- or email-shaped text into links of their own accord. -->
@@ -245,11 +245,40 @@ const recoveryStrings = {
     --retro-black: #000000;
     --retro-green: #00ff00;
     --retro-red: #ff0000;
+
+    /* The safe area, as four named values. env() can only be read where it is written, and the
+       one device it is ever non-zero on is the one with no devtools window to open; behind
+       custom properties the whole layout can be driven from a desktop console with the insets
+       a real phone reports. */
+    --safe-top: env(safe-area-inset-top);
+    --safe-right: env(safe-area-inset-right);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+  }
+
+  /* The safe area belongs to the document, not to any one page's layout. On <body> it is one
+     `padding: 0` away from being lost - which is exactly what song.css does for its full-bleed
+     phone layout, and why the installed songbook drew its title bar under the clock. Up here a
+     page is free to zero its own padding and still cannot walk content into the hardware.
+
+     No display-mode gate: env() is zero wherever browser chrome already reserves the space, so
+     this is inert in a tab - except in landscape on a notched phone, where viewport-fit=cover
+     does put the page under the camera cutout and nothing was insetting it before.
+
+     No background either: with none set here, body's navy propagates to the canvas and fills
+     the padding, so the strip reads as the desktop the windows sit on. */
+  html {
+    padding-top: var(--safe-top);
+    padding-right: var(--safe-right);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
   }
 
   body {
     font-family: 'VT323', monospace;
-    min-height: 100dvh;
+    /* Minus the insets: the body now sits inside them, and 100dvh would scroll the page by
+       their height on content that fits. */
+    min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
     background: var(--retro-navy);
     color: var(--retro-yellow);
     padding: 20px;
@@ -592,28 +621,14 @@ const recoveryStrings = {
     }
   }
 
-  /* Launched from the home screen: no browser chrome, so the page owns the whole display and
-     has to get out of the way of the hardware itself. Depends on viewport-fit=cover in the
-     viewport meta - without it every inset below is zero. */
+  /* Launched from the home screen: no browser chrome, so the page owns the whole display.
+     Getting out of the way of the hardware is not in here - the --safe-* insets do that
+     everywhere, since they are zero wherever there is chrome to reserve the space. What is
+     left is behaviour that only makes sense once there is no browser around the page. */
   @media (display-mode: standalone) {
     body {
-      /* apple-mobile-web-app-status-bar-style is black-translucent, which puts the clock and
-         battery on top of the page rather than above it. */
-      padding-top: calc(20px + env(safe-area-inset-top));
-      padding-left: calc(20px + env(safe-area-inset-left));
-      padding-right: calc(20px + env(safe-area-inset-right));
       /* Rubber-band scrolling reads as a bug once there is no browser to pull against. */
       overscroll-behavior-y: none;
-    }
-
-    .taskbar {
-      height: calc(40px + env(safe-area-inset-bottom));
-      padding-bottom: calc(4px + env(safe-area-inset-bottom));
-    }
-
-    body.taskbar-visible .window.maximized {
-      bottom: calc(40px + env(safe-area-inset-bottom)) !important;
-      height: calc(100dvh - 40px - env(safe-area-inset-bottom)) !important;
     }
 
     /* Long-pressing the window chrome should not offer to copy it. Lyrics and prose stay
@@ -627,26 +642,20 @@ const recoveryStrings = {
     }
   }
 
-  @media (display-mode: standalone) and (max-width: 600px) {
-    body {
-      padding-top: calc(10px + env(safe-area-inset-top));
-      padding-left: calc(10px + env(safe-area-inset-left));
-      padding-right: calc(10px + env(safe-area-inset-right));
-    }
-  }
-
-  /* Taskbar */
+  /* Taskbar. Fixed to the viewport, so the padding on <html> does not reach it and it carries
+     its own insets - the home indicator sits exactly where it lives. */
   .taskbar {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 40px;
+    height: calc(40px + var(--safe-bottom));
     background: var(--retro-gray);
     border-top: 3px outset var(--retro-white);
     display: flex;
     align-items: center;
-    padding: 4px 8px;
+    padding: 4px calc(8px + var(--safe-right)) calc(4px + var(--safe-bottom))
+      calc(8px + var(--safe-left));
     z-index: 9999;
   }
 
@@ -684,17 +693,20 @@ const recoveryStrings = {
     display: none;
   }
 
-  /* Maximized window */
+  /* Maximized window. Fixed too, so like the taskbar it insets itself; without this its title
+     bar - and the button you press to restore it - lands under the status bar. It is
+     positioned on both edges, so width is auto rather than 100%, which would overflow by the
+     side insets. */
   .window.maximized {
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
+    top: var(--safe-top) !important;
+    left: var(--safe-left) !important;
+    right: var(--safe-right) !important;
+    bottom: var(--safe-bottom) !important;
+    width: auto !important;
     /* dvh, not vh: with no browser chrome the visual viewport is what matters, and vh keeps
        counting a URL bar that is not there. */
-    height: 100dvh !important;
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom)) !important;
     transform: none !important;
     margin: 0 !important;
     z-index: 9998 !important;
@@ -703,8 +715,8 @@ const recoveryStrings = {
 
   /* Adjust for taskbar when visible */
   body.taskbar-visible .window.maximized {
-    bottom: 40px !important;
-    height: calc(100dvh - 40px) !important;
+    bottom: calc(40px + var(--safe-bottom)) !important;
+    height: calc(100dvh - var(--safe-top) - 40px - var(--safe-bottom)) !important;
   }
 
   .window.maximized .window-content {

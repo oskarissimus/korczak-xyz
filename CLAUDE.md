@@ -175,9 +175,36 @@ that prop is what decides which app "Add to Home Screen" produces.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
   only runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
+### The safe area
+
 `viewport-fit=cover` is on the viewport meta because `env(safe-area-inset-*)` returns zero
-without it, and the `@media (display-mode: standalone)` block in `Layout.astro` is entirely
-built on those insets.
+without it. The status bar style is `black-translucent`, so in an installed app the clock and
+battery are painted *over* the page and something has to reserve that strip.
+
+The insets are named once in `:root` as `--safe-top/-right/-bottom/-left` and applied as
+padding on **`<html>`**, unconditionally — not on `<body>`, and not behind
+`@media (display-mode: standalone)`. Both of those were wrong for the same reason. On `body`
+the safe area is part of the page's own layout, so any page may take it away: `song.css` zeroes
+body padding for its full-bleed phone layout, and `body:has(.song-page:not(.song-closed))`
+(0,2,1) beats a global `body` (0,0,1) whatever media query wraps it — which is how the
+installed songbook came to draw its title bar under the Dynamic Island. On `<html>` a page can
+still go edge to edge, but only within the safe area. And the gate bought nothing: `env()` is
+already zero wherever browser chrome reserves the space, while dropping it fixes landscape in a
+tab, where `viewport-fit=cover` genuinely does put content under the camera cutout.
+
+Ancestor padding does not reach `position: fixed`, so `.taskbar` and `.window.maximized` carry
+their own `--safe-*` — a maximized window pinned to `top: 0` puts its own restore button under
+the clock. The maximized window is positioned on both edges and therefore sized `width: auto`;
+`100%` overflows by the side insets.
+
+What is left in the standalone block is only behaviour that needs there to be no browser:
+`overscroll-behavior-y` and the long-press/selection rules on window chrome. Nothing there is
+load-bearing for layout, which also means none of the above depends on iOS matching the
+`display-mode` media feature.
+
+Named custom properties rather than `env()` inline because `env()` reads as zero on every
+machine we can debug on: `document.documentElement.style.setProperty('--safe-top', '59px')` in
+a desktop console drives the real rules with what a Dynamic Island phone reports.
 
 **Safari binds the manifest to the document, not to the DOM.** It reads `<link rel="manifest">`,
 the title and the touch icon when a document *loads* and never looks again. `ClientRouter`

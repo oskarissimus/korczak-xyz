@@ -132,7 +132,10 @@
 
 /* Mobile song page - full width */
 @media (max-width: 600px) {
-    /* Remove body padding for song pages */
+    /* Remove body padding for song pages. Safe to zero all four sides: the safe-area insets
+       live on <html> (see Layout.astro), so full-bleed here still means full-bleed *inside*
+       the status bar and the home indicator. Before they moved up there, this shorthand took
+       the standalone padding-top with it and the installed songbook drew under the clock. */
     body:has(.song-page:not(.song-closed)) {
         padding: 0;
         padding-bottom: 50px;
