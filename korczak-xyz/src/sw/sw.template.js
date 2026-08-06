@@ -125,6 +125,21 @@ function documentKey(url) {
   return new URL(normalizePathname(url.pathname) + url.search, self.location.origin).href;
 }
 
+/**
+ * Reads a page out of the caches, this build's first.
+ *
+ * Not `caches.match(key)`: that searches in creation order, so the previous build retained by
+ * `activate` answers before the current one. Harmless for hashed assets, wrong for a document.
+ */
+async function matchDocument(key) {
+  for (const name of documentCacheOrder(await caches.keys(), BUILD_ID)) {
+    const cache = await caches.open(name);
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), ms);
@@ -159,11 +174,11 @@ async function handleDocument(request, url) {
     // A real 404 is an answer. Don't mask it with a stale copy.
     return response;
   } catch {
-    // caches.match searches every cache, including the previous build's, which is what makes
-    // the retention grace window useful rather than just harmless.
-    const cached = await caches.match(key);
+    // Falls back through the previous build's caches too, which is what makes the retention
+    // grace window useful rather than just harmless — but only after this build's.
+    const cached = await matchDocument(key);
     if (cached) return cached;
-    const offline = await caches.match(OFFLINE_URL);
+    const offline = await matchDocument(OFFLINE_URL);
     if (offline) return offline;
     return Response.error();
   }
@@ -175,7 +190,12 @@ async function handleAsset(request) {
   if (cached) return cached;
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    // HTML is never stored here, whatever the request called itself. Cache-first is safe only
+    // for a URL whose bytes cannot change under it, and a page is the opposite of that: stored
+    // once, it is served past every deploy until its cache is swept. Misrouting a page should
+    // cost one stale render, not a permanently wrong entry.
+    const isPage = (response.headers.get('content-type') || '').startsWith('text/html');
+    if (response.ok && !isPage) {
       const cache = await caches.open(RUNTIME_CACHE);
       await cachePut(cache, request, response.clone());
     }

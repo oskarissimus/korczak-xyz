@@ -225,6 +225,24 @@ in step with the deployed chunk hashes), hashed assets are cache-first, and **cr
 never intercepted at all** — Firestore's streaming connections and the token refresh described
 above are not something to put a cache in front of.
 
+**A page is decided by its path, not by what the request calls itself.** `mode: 'navigate'`
+covers only real navigations; `ClientRouter` fetches the next page's markup with a bare
+`fetch()`, which arrives as `mode: 'cors'`, `destination: ''` — the shape of a data fetch — and
+Astro marks it with nothing, since `internalFetchHeaders` compiles to `{}` without an adapter.
+Astro's `<link rel="prefetch">` looks the same. Classified as assets, those went cache-first,
+and a song page was served by the path written for fonts and hashed chunks: stored once, then
+served past every deploy until its cache was swept. An installed songbook went on showing the
+previous build's lyrics under a URL whose content had changed — visible only because the navbar
+carries a build stamp, and *self-healing on every second deploy*, which is what made it look
+like an iOS quirk. So `looksLikeDocumentPath` decides on the last path segment: every route here
+is extensionless and every non-document carries an extension. `handleAsset` additionally refuses
+to store `text/html`, so a future misclassification costs one stale render, not a stuck entry.
+
+**Reading a document back is `matchDocument`, never `caches.match`.** Bare `caches.match`
+searches every cache in *creation* order — oldest first — so the previous build that `activate`
+deliberately retains answers before the current one. For a content-hashed asset that is
+harmless; for a document the URL is stable and the markup is a build old.
+
 Two things that are load-bearing and look like details:
 
 - **Responses are re-created before being cached** (`cachePut`). `fetch` returns a *decoded*
@@ -241,6 +259,14 @@ Two things that are load-bearing and look like details:
 `public/_headers` serves `/sw.js` `no-cache`. Without that, an installed iOS app holds its
 worker indefinitely and never picks up a new one — you ship a fix and the home screen app goes
 on running last month's code.
+
+**That header does not survive the CDN, so registration asks for it too.** korczak.xyz sits
+behind Cloudflare in front of Netlify, and Cloudflare's 4-hour Browser Cache TTL raises any
+shorter origin `max-age` on a `.js` response: `/sw.js` arrives as `max-age=14400` however it
+leaves Netlify. (The other `_headers` rules are untouched — `/icons/*` is already longer at
+604800, and `/manifests/*` and HTML are `DYNAMIC`, so Cloudflare never rewrites them.) Hence
+`register('/sw.js', { updateViaCache: 'none' })` in `register-sw.js`, which puts the guarantee
+somewhere no CDN sits between us and it.
 
 ### Fonts
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { cacheName, cacheVersion, cachesToDelete, classifyRequest, normalizePathname } from './routing.js';
+import {
+  cacheName,
+  cacheVersion,
+  cachesToDelete,
+  classifyRequest,
+  documentCacheOrder,
+  looksLikeDocumentPath,
+  normalizePathname,
+} from './routing.js';
 
 const get = (overrides) => ({
   method: 'GET',
@@ -52,10 +60,50 @@ describe('classifyRequest', () => {
     expect(classifyRequest(get({ destination: 'document', pathname: '/games/tuner' }))).toBe('document');
   });
 
+  // The soft-navigation case. ClientRouter fetches the next page's markup with a bare fetch(),
+  // so nothing about the request says "page" except the path. Served cache-first, an installed
+  // songbook went on showing the previous build's lyrics under an unchanged URL.
+  it("treats ClientRouter's fetch for a page as a document", () => {
+    const softNav = { mode: 'cors', destination: '', cache: 'default' };
+    expect(classifyRequest(get({ ...softNav, pathname: '/songs/barka/' }))).toBe('document');
+    expect(classifyRequest(get({ ...softNav, pathname: '/pl/songs/barka' }))).toBe('document');
+  });
+
+  it("treats Astro's prefetch of a page as a document", () => {
+    const prefetch = { mode: 'no-cors', destination: '', cache: 'default' };
+    expect(classifyRequest(get({ ...prefetch, pathname: '/songs/barka' }))).toBe('document');
+    expect(classifyRequest(get({ ...prefetch, pathname: '/' }))).toBe('document');
+  });
+
   it('treats everything else same-origin as a cache-first asset', () => {
     expect(classifyRequest(get())).toBe('asset');
     expect(classifyRequest(get({ pathname: '/fonts/vt323-v18-latin.woff2' }))).toBe('asset');
     expect(classifyRequest(get({ pathname: '/icons/tuner-180.png' }))).toBe('asset');
+    expect(classifyRequest(get({ pathname: '/manifests/songs-pl.webmanifest' }))).toBe('asset');
+    expect(classifyRequest(get({ pathname: '/logo.png' }))).toBe('asset');
+  });
+});
+
+describe('looksLikeDocumentPath', () => {
+  it('accepts the routes, which are all extensionless', () => {
+    expect(looksLikeDocumentPath('/')).toBe(true);
+    expect(looksLikeDocumentPath('/songs')).toBe(true);
+    expect(looksLikeDocumentPath('/songs/barka/')).toBe(true);
+    expect(looksLikeDocumentPath('/pl/games/tuner')).toBe(true);
+    expect(looksLikeDocumentPath('/offline')).toBe(true);
+    // A slug may carry a dash; only a dot in the final segment means a file.
+    expect(looksLikeDocumentPath('/songs/spider-man')).toBe(true);
+  });
+
+  it('rejects anything with a file extension', () => {
+    expect(looksLikeDocumentPath('/_astro/chunk.abc123.js')).toBe(false);
+    expect(looksLikeDocumentPath('/fonts/vt323-v18-latin.woff2')).toBe(false);
+    expect(looksLikeDocumentPath('/manifests/songs-pl.webmanifest')).toBe(false);
+    expect(looksLikeDocumentPath('/sw.js')).toBe(false);
+  });
+
+  it('is not fooled by a dot in an earlier segment', () => {
+    expect(looksLikeDocumentPath('/_astro/chunk.abc123.js/preview')).toBe(true);
   });
 });
 
@@ -67,6 +115,31 @@ describe('cacheVersion', () => {
   it('returns null for caches that are not ours', () => {
     expect(cacheVersion('workbox-precache-v2')).toBeNull();
     expect(cacheVersion('k95-shell')).toBeNull();
+  });
+});
+
+describe('documentCacheOrder', () => {
+  const names = (version) => ['shell', 'songs', 'runtime'].map((kind) => cacheName(kind, version));
+  const older = '20260801090000-aaaaaaaa';
+  const previous = '20260803120000-bbbbbbbb';
+  const current = '20260805160245-cccccccc';
+
+  it('searches this build before the ones activate retained', () => {
+    // caches.match() would do the opposite: creation order, so `older` answers first.
+    const order = documentCacheOrder([...names(older), ...names(previous), ...names(current)], current);
+    expect(order.slice(0, 3).sort()).toEqual(names(current).sort());
+    expect(order.slice(3, 6).sort()).toEqual(names(previous).sort());
+    expect(order.slice(6).sort()).toEqual(names(older).sort());
+  });
+
+  it('leaves caches belonging to anything else on the origin out entirely', () => {
+    expect(documentCacheOrder([...names(current), 'some-other-app-v1'], current)).not.toContain(
+      'some-other-app-v1',
+    );
+  });
+
+  it('still offers the older builds when this one has no cache on disk yet', () => {
+    expect(documentCacheOrder(names(previous), current).sort()).toEqual(names(previous).sort());
   });
 });
 

@@ -43,6 +43,23 @@ export function cachesToDelete(names, currentVersion, keep = 2) {
 }
 
 /**
+ * Which caches to search for a document, best first.
+ *
+ * `caches.match()` with no cache name searches every cache in *creation* order — oldest first —
+ * so the previous build that `activate` deliberately retains wins over the current one. For a
+ * content-hashed asset that is harmless: same name, same bytes. For a document it is the whole
+ * problem, because the URL is stable and the markup behind it is a build old.
+ */
+export function documentCacheOrder(names, currentVersion) {
+  const ours = names.filter((name) => cacheVersion(name) !== null);
+  const current = ours.filter((name) => cacheVersion(name) === currentVersion);
+  const older = ours
+    .filter((name) => cacheVersion(name) !== currentVersion)
+    .sort((a, b) => (cacheVersion(a) < cacheVersion(b) ? 1 : -1));
+  return [...current, ...older];
+}
+
+/**
  * `trailingSlash: 'ignore'` means `/songs/x` and `/songs/x/` are one page reachable under two
  * URLs. Cached under both they would be two entries, and a hit under one spelling would miss
  * under the other, so every document is keyed on the slashless form.
@@ -51,6 +68,20 @@ export function normalizePathname(pathname) {
   if (typeof pathname !== 'string' || pathname === '') return '/';
   const trimmed = pathname.replace(/\/+$/, '');
   return trimmed === '' ? '/' : trimmed;
+}
+
+/**
+ * Whether a same-origin path serves a page.
+ *
+ * Every route on this site is extensionless — Astro's directory output plus
+ * `trailingSlash: 'ignore'` — and every same-origin non-document carries a file extension:
+ * `/_astro/*`, `/fonts/*`, `/icons/*`, `/manifests/*.webmanifest`, `/logo.png`. No route slug
+ * in the content collections contains a dot, so the last path segment is a reliable signal —
+ * and the only one available, per `classifyRequest`.
+ */
+export function looksLikeDocumentPath(pathname) {
+  const path = normalizePathname(pathname);
+  return !/\.[^./]+$/.test(path.slice(path.lastIndexOf('/')));
 }
 
 /**
@@ -79,5 +110,18 @@ export function classifyRequest({ method, mode, destination, cache, sameOrigin, 
   if (normalizePathname(pathname) === '/sw.js') return 'bypass';
 
   if (mode === 'navigate' || destination === 'document') return 'document';
+
+  // A page can also be requested without either of those labels, and the labels are all a
+  // request carries: ClientRouter fetches the next page's markup with a bare `fetch()`, which
+  // arrives as mode 'cors', destination '', indistinguishable from a data fetch. There is no
+  // header to key off either — `internalFetchHeaders` compiles to `{}` without an adapter, so
+  // a static build marks these fetches with nothing at all. Astro's `<link rel="prefetch">`
+  // has the same shape.
+  //
+  // Classified as an asset, a song page went to the cache-first path written for fonts and
+  // hashed chunks, and an installed songbook went on serving the previous build's markup under
+  // a URL whose content had changed. The path is the only thing left to decide on.
+  if (looksLikeDocumentPath(pathname)) return 'document';
+
   return 'asset';
 }
