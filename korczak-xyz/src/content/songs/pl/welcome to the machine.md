@@ -7,7 +7,7 @@ language: pl
 dateAdded: 2026-08-07
 chords:
   Cmaj7: "3 3 2 0 0 0"
-  e9: "0 2 0 0 0 2"
+  e9: "0 2 4 0 0 0"
 ---
 ```plaintext
 e9 Cmaj7 e9
