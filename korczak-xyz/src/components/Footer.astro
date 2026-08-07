@@ -36,10 +36,15 @@ const homeLink = lang === 'en' ? '/' : '/pl/';
     gap: 15px;
   }
 
+  /* A flex item, so it is blockified and `text-align` reaches its own lines. It keeps the
+     default `min-width: auto` - it may shrink to its longest word and no further, which is
+     what stops it overflowing rather than wrapping on the narrowest screens. `balance` splits
+     the two lines evenly instead of leaving `- Est. 2024` alone under a full line. */
   .construction-text {
     color: var(--retro-yellow);
     font-size: 1rem;
     text-align: center;
+    text-wrap: balance;
   }
 
   .construction-text a {

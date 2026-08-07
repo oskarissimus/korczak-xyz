@@ -499,16 +499,27 @@ const recoveryStrings = {
   }
 
   /* Under construction */
+  /* Deliberately `nowrap`: the two signs flank the text, so wrapping is the wrong axis to give
+     way on. With `wrap`, a phone-width line put `gif + text` on one row and left the second gif
+     stranded on a row of its own, centred under a caption it was supposed to be beside. The
+     text is the part that can take two lines, so it is the part that gives - it shrinks and
+     wraps between the signs, down to its longest word.
+
+     The horizontal padding is for the spin: the signs are 40px squares rotating about their
+     centres, and a transform does not widen the layout box, so at 45deg each corner sweeps
+     ~8px past it. Below 600px the body goes full bleed, and without this the leading sign
+     scrapes the edge of the screen twice a second. */
   .under-construction {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 10px;
     margin-top: 20px;
-    flex-wrap: wrap;
+    padding: 0 10px;
   }
 
   .construction-gif {
+    flex: none;
     width: 40px;
     height: 40px;
     background: repeating-linear-gradient(
