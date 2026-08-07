@@ -1,0 +1,64 @@
+<!--
+  Songs concept 4 - "Pick and grid".
+  Charcoal glass body, a candy-amber plectrum with a chord diagram stamped on it. The pick
+  silhouette is what reads at 60px; the grid is the detail you notice on the big tiles.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="s4-body" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6d7686"/>
+      <stop offset=".5" stop-color="#242b36"/>
+      <stop offset=".52" stop-color="#171c24"/>
+      <stop offset="1" stop-color="#05070b"/>
+    </linearGradient>
+    <linearGradient id="s4-pick" x1="0" y1="90" x2="0" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe9a8"/>
+      <stop offset=".42" stop-color="#ffb01f"/>
+      <stop offset=".44" stop-color="#f59307"/>
+      <stop offset="1" stop-color="#a34a00"/>
+    </linearGradient>
+    <linearGradient id="s4-gloss" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".05"/>
+    </linearGradient>
+    <radialGradient id="s4-vig" cx="256" cy="256" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".45"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#s4-body)"/>
+
+  <path d="M264 108c74 0 144 44 162 104 18 62-68 180-126 214-13 8-32 8-45 0-58-34-144-152-126-214 18-60 88-104 135-104Z" fill="#000" opacity=".45"/>
+  <path d="M256 96c74 0 144 44 162 104 18 62-68 180-126 214-13 8-32 8-45 0C189 380 103 262 121 200c18-60 88-104 135-104Z" fill="url(#s4-pick)"/>
+  <path d="M256 96c74 0 144 44 162 104 18 62-68 180-126 214-13 8-32 8-45 0C189 380 103 262 121 200c18-60 88-104 135-104Z" fill="none" stroke="#7a3600" stroke-opacity=".7" stroke-width="7"/>
+
+  <!-- Chord diagram. -->
+  <g stroke="#4a1f00" stroke-opacity=".85" stroke-linecap="round">
+    <rect x="188" y="176" width="136" height="16" rx="6" fill="#4a1f00" stroke="none"/>
+    <g stroke-width="9">
+      <line x1="196" y1="196" x2="196" y2="330"/>
+      <line x1="241" y1="196" x2="241" y2="330"/>
+      <line x1="286" y1="196" x2="286" y2="330"/>
+      <line x1="316" y1="196" x2="316" y2="330"/>
+    </g>
+    <g stroke-width="7">
+      <line x1="188" y1="240" x2="324" y2="240"/>
+      <line x1="188" y1="286" x2="324" y2="286"/>
+      <line x1="188" y1="330" x2="324" y2="330"/>
+    </g>
+  </g>
+  <g fill="#3a1800">
+    <circle cx="241" cy="218" r="17"/>
+    <circle cx="286" cy="264" r="17"/>
+    <circle cx="196" cy="264" r="17"/>
+  </g>
+
+  <!-- Plastic shine on the pick. -->
+  <path d="M256 112c-42 0-92 26-118 62 22-14 62-30 106-30 20 0 40 3 56 8-14-24-30-40-44-40Z" fill="#fff" opacity=".55"/>
+  <path d="M150 300c30 54 76 100 106 118-52-16-104-70-126-118Z" fill="#fff" opacity=".14"/>
+
+  <path d="M0 512h512v-72c-80-72-432-72-512 0Z" fill="#fff" opacity=".06"/>
+  <path d="M0 0h512v206c-90 92-422 92-512 0Z" fill="url(#s4-gloss)"/>
+  <rect width="512" height="512" fill="url(#s4-vig)"/>
+</svg>
