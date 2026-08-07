@@ -197,6 +197,19 @@ their own `--safe-*` — a maximized window pinned to `top: 0` puts its own rest
 the clock. The maximized window is positioned on both edges and therefore sized `width: auto`;
 `100%` overflows by the side insets.
 
+**Reserving the strip is only half of it: padding scrolls.** It holds the first screen clear of
+the clock and then the page slides straight under it, so the songbook read as fixed until you
+scrolled — while a maximized window, being fixed and inset, read as fixed all along. That pair
+of symptoms is the signature. So `body::before` also *paints* the strip: a fixed band in the
+desktop navy that the page scrolls behind, sized from `--safe-top` and therefore nothing at all
+in a browser. It sits above everything — the taskbar (9999) and the typing modal (10000) — on
+the grounds that a band any overlay can paint over is not doing its job.
+
+The corollary is that anything deliberately anchored to the top of the viewport must clear the
+band or it parks itself out of sight behind it. `typing.css` has two: the key table's sticky
+header (`top: var(--safe-top)`; the table has no scroll container of its own, so it sticks to
+the viewport) and `.typing-key-detail` (`calc(8px + var(--safe-top))`).
+
 What is left in the standalone block is only behaviour that needs there to be no browser:
 `overscroll-behavior-y` and the long-press/selection rules on window chrome. Nothing there is
 load-bearing for layout, which also means none of the above depends on iOS matching the

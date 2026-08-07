@@ -274,6 +274,27 @@ const recoveryStrings = {
     padding-left: var(--safe-left);
   }
 
+  /* Reserving the strip is only half of it: padding scrolls. It holds the first screen clear
+     of the clock and then the page slides straight under it, which is why an installed songbook
+     looked fixed until you scrolled - and why a maximized window, being fixed and inset, looked
+     fixed all along. So the strip is also painted: a band the page scrolls behind, in the same
+     navy as the desktop, sized from the same inset and therefore nothing at all in a browser.
+
+     Above everything, including the taskbar (9999) and the typing modal (10000). The point is
+     that the status bar always has an opaque backdrop of a known colour; a band any overlay can
+     paint over is a band that does not do its job. */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-top);
+    background: var(--retro-navy);
+    z-index: 10001;
+    pointer-events: none;
+  }
+
   body {
     font-family: 'VT323', monospace;
     /* Minus the insets: the body now sits inside them, and 100dvh would scroll the page by

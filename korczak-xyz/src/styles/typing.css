@@ -908,7 +908,10 @@ circle.typing-chart-line--keywpm {
   overflow-wrap: anywhere;
   cursor: default;
   position: sticky;
-  top: 0;
+  /* The table has no scroll container of its own, so this sticks to the viewport — which in
+     an installed app starts under the clock, behind the band that paints the status bar
+     (Layout.astro). Without the inset the header parks itself out of sight. */
+  top: var(--safe-top);
   /* Rows scroll underneath, so the header needs its own opaque backdrop and a
      lift out of the default stacking order — otherwise later-in-DOM rows paint
      straight through it. */
@@ -1142,7 +1145,8 @@ circle.typing-chart-line--keywpm {
 
 .typing-key-layout .typing-key-detail {
   position: sticky;
-  top: 8px;
+  /* Viewport-anchored, like the table header above it. */
+  top: calc(8px + var(--safe-top));
 }
 
 /* The narrower left column can't afford the full-width row grid. 4.25rem (68px)
