@@ -257,9 +257,10 @@ const recoveryStrings = {
   }
 
   /* The safe area belongs to the document, not to any one page's layout. On <body> it is one
-     `padding: 0` away from being lost - which is exactly what song.css does for its full-bleed
-     phone layout, and why the installed songbook drew its title bar under the clock. Up here a
-     page is free to zero its own padding and still cannot walk content into the hardware.
+     `padding: 0` away from being lost - and body padding is zeroed below 600px, which is
+     exactly how the installed songbook came to draw its title bar under the clock back when
+     song.css was the only thing doing it. Up here a page is free to zero its own padding and
+     still cannot walk content into the hardware.
 
      No display-mode gate: env() is zero wherever browser chrome already reserves the space, so
      this is inert in a tab - except in landscape on a notched phone, where viewport-fit=cover
@@ -628,8 +629,15 @@ const recoveryStrings = {
 
   /* Responsive */
   @media (max-width: 600px) {
+    /* Full bleed. A phone has no room to spend on a decorative gutter, and a window frame
+       stopping 10px short of the screen edge only reads as a margin, not as a desktop. The
+       song page has been doing this for its own layout; this is that, for every page.
+
+       padding-bottom, not the shorthand alone: the shorthand takes the base rule's 60px with
+       it, and the fixed .taskbar is 40px tall. 50px is what song.css already used. */
     body {
-      padding: 10px;
+      padding: 0;
+      padding-bottom: 50px;
       font-size: 1.1rem;
     }
 

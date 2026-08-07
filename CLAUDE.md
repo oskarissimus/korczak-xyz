@@ -184,9 +184,10 @@ battery are painted *over* the page and something has to reserve that strip.
 The insets are named once in `:root` as `--safe-top/-right/-bottom/-left` and applied as
 padding on **`<html>`**, unconditionally — not on `<body>`, and not behind
 `@media (display-mode: standalone)`. Both of those were wrong for the same reason. On `body`
-the safe area is part of the page's own layout, so any page may take it away: `song.css` zeroes
-body padding for its full-bleed phone layout, and `body:has(.song-page:not(.song-closed))`
-(0,2,1) beats a global `body` (0,0,1) whatever media query wraps it — which is how the
+the safe area is part of the page's own layout, so any page may take it away — and below 600px
+`Layout.astro` takes it away for *every* page, since the windows go full-bleed there. That used
+to be the song page alone, via `body:has(.song-page:not(.song-closed))`: a (0,2,1) selector
+beats a global `body` (0,0,1) whatever media query wraps it, which is how the
 installed songbook came to draw its title bar under the Dynamic Island. On `<html>` a page can
 still go edge to edge, but only within the safe area. And the gate bought nothing: `env()` is
 already zero wherever browser chrome reserves the space, while dropping it fixes landscape in a
