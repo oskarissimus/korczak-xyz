@@ -12,10 +12,28 @@
  * `astro build`, and making the deploy depend on sharp's native binaries to produce artwork
  * that changes once a year is a bad trade. Re-run this by hand after editing the SVGs.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+
+/**
+ * libvips decides a file is an SVG by looking for `<svg` in its first 1024 bytes, so a header
+ * comment long enough to push the tag past that makes the whole file stop being an image. sharp
+ * then reports "Input file contains unsupported image format", which sounds like a broken
+ * install rather than a comment three lines too long. Say what actually happened.
+ */
+const SNIFF_LIMIT = 1024;
+
+async function checkSniffable(file) {
+  if (!file.endsWith('.svg')) return;
+  const head = (await readFile(file)).subarray(0, SNIFF_LIMIT);
+  if (head.includes('<svg')) return;
+  throw new Error(
+    `${file}: the <svg> tag is past the first ${SNIFF_LIMIT} bytes, so libvips does not ` +
+      `recognise the file as an SVG. Shorten the header comment.`,
+  );
+}
 
 const siteDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(siteDir, 'public', 'icons');
@@ -72,6 +90,7 @@ async function maskable(source, mode) {
 await mkdir(outDir, { recursive: true });
 
 for (const [app, { file, maskable: mode }] of Object.entries(sources)) {
+  await checkSniffable(file);
   for (const size of SIZES) {
     const target = join(outDir, `${app}-${size}.png`);
     await render(file, size).png().toFile(target);
