@@ -1,36 +1,73 @@
 <!--
-  Home screen icon for the Guitar Tuner web app.
+  Home screen icon for the Guitar Tuner web app - "Aqua orb".
 
-  Source art for scripts/generate-icons.mjs, which rasterises it to the PNG sizes iOS wants.
-  Drawn on a 512 grid in the Win95 palette from Layout.astro so the installed app matches the
-  site: navy field, raised gray bezel, sunken black face. The needle sits dead centre on the
-  highlighted tick - the in-tune state, which is the one worth putting on a home screen.
+  Source art for scripts/generate-icons.mjs. A glass ball gauge on sky blue with a cast shadow:
+  first-generation iPhone / Mac OS X Aqua, drawn on the same 512 grid as before. The needle sits
+  dead centre on the highlighted tick - the in-tune state, which is the one worth putting on a
+  home screen.
+
+  Full bleed, unlike the Win95 art it replaces: every platform masks this to its own shape, so
+  the artwork runs to all four edges and nothing load-bearing comes within ~40px of them. The
+  convex read is three layers, applied in this order at the bottom of the file: a bounce light
+  along the bottom edge, the gloss sweep over the top half, then a perimeter vignette.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges">
-  <rect width="512" height="512" fill="#000080"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="t4-body" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#eaf6ff"/>
+      <stop offset=".5" stop-color="#8fc6f0"/>
+      <stop offset=".52" stop-color="#6fb0e4"/>
+      <stop offset="1" stop-color="#1f5f9e"/>
+    </linearGradient>
+    <radialGradient id="t4-orb" cx="215" cy="160" r="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bfe6ff"/>
+      <stop offset=".4" stop-color="#2f8fe0"/>
+      <stop offset=".8" stop-color="#0e4f96"/>
+      <stop offset="1" stop-color="#062f60"/>
+    </radialGradient>
+    <linearGradient id="t4-shine" x1="0" y1="96" x2="0" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+    <linearGradient id="t4-gloss" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".05"/>
+    </linearGradient>
+    <radialGradient id="t4-vig" cx="256" cy="256" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".35"/>
+    </radialGradient>
+  </defs>
 
-  <!-- Raised bezel: light top/left, shadow bottom/right. -->
-  <rect x="48" y="48" width="416" height="416" fill="#c0c0c0"/>
-  <path d="M48 48h416v8H56v408h-8z" fill="#ffffff"/>
-  <path d="M464 48v416H48v-8h408V48z" fill="#808080"/>
+  <rect width="512" height="512" fill="url(#t4-body)"/>
 
-  <!-- Sunken face: the shading inverts. -->
-  <rect x="80" y="80" width="352" height="352" fill="#000000"/>
-  <path d="M80 80h352v8H88v344h-8z" fill="#808080"/>
-  <path d="M432 80v352H80v-8h344V80z" fill="#ffffff"/>
+  <!-- Cast shadow. -->
+  <ellipse cx="256" cy="452" rx="150" ry="30" fill="#062f60" opacity=".38"/>
 
-  <!-- Dial ticks, centred on the hub at (256, 380). -->
-  <g stroke="#00ff00" stroke-width="10">
-    <line x1="110.5" y1="257.8" x2="83.6" y2="235.4"/>
-    <line x1="175.7" y1="207.8" x2="160.9" y2="176.1"/>
-    <line x1="336.3" y1="207.8" x2="351.1" y2="176.1"/>
-    <line x1="401.5" y1="257.8" x2="428.4" y2="235.4"/>
+  <!-- The ball. -->
+  <circle cx="256" cy="240" r="172" fill="url(#t4-orb)"/>
+  <circle cx="256" cy="240" r="172" fill="none" stroke="#04244d" stroke-opacity=".5" stroke-width="7"/>
+
+  <!-- Gauge inside the glass. -->
+  <g stroke="#eaffe6" stroke-linecap="round" opacity=".9">
+    <g stroke-width="11">
+      <line x1="150" y1="278" x2="128" y2="258"/>
+      <line x1="362" y1="278" x2="384" y2="258"/>
+      <line x1="182" y1="222" x2="164" y2="196"/>
+      <line x1="330" y1="222" x2="348" y2="196"/>
+    </g>
+    <line x1="256" y1="206" x2="256" y2="168" stroke="#7dff8f" stroke-width="18"/>
   </g>
-  <!-- Centre tick: in tune. -->
-  <line x1="256" y1="190" x2="256" y2="150" stroke="#00ff00" stroke-width="18"/>
+  <polygon points="256,180 267,330 245,330" fill="#ffe14d"/>
+  <polygon points="256,180 261,330 253,330" fill="#fff8c4" opacity=".8"/>
+  <circle cx="256" cy="330" r="26" fill="#eef6ff"/>
+  <circle cx="256" cy="330" r="26" fill="none" stroke="#0b3d72" stroke-width="5"/>
 
-  <!-- Needle. -->
-  <polygon points="256,164 269,380 243,380" fill="#ffff00"/>
-  <circle cx="256" cy="380" r="26" fill="#c0c0c0"/>
-  <circle cx="256" cy="380" r="26" fill="none" stroke="#000000" stroke-width="6"/>
+  <!-- The big specular cap that makes it a ball. -->
+  <path d="M256 92c74 0 136 40 136 84 0 40-62 62-136 62s-136-22-136-62c0-44 62-84 136-84Z" fill="url(#t4-shine)"/>
+  <ellipse cx="200" cy="372" rx="76" ry="24" fill="#fff" opacity=".18"/>
+
+  <path d="M0 512h512v-72c-80-72-432-72-512 0Z" fill="#fff" opacity=".08"/>
+  <path d="M0 0h512v206c-90 92-422 92-512 0Z" fill="url(#t4-gloss)"/>
+  <rect width="512" height="512" fill="url(#t4-vig)"/>
 </svg>

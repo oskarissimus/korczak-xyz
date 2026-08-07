@@ -31,16 +31,22 @@ const SIZES = [180, 192, 512];
 
 /**
  * A maskable icon may be cropped to any shape the platform likes - a circle, a squircle - so
- * everything that matters has to survive inside the middle 80%. We shrink the artwork and let
- * navy fill the margin rather than redrawing it.
+ * everything that matters has to survive inside the middle 80%.
+ *
+ * There are two ways to satisfy that and the artwork decides which. `inset` shrinks the source
+ * and lets navy fill the margin; that is for art with its own square edges, like the site logo,
+ * which a circular mask would otherwise clip. `bleed` ships the source unchanged, which is
+ * correct for art already drawn full bleed with its subject held away from the edges - shrinking
+ * that would paint a navy border around a glossy icon designed to have none, which is the exact
+ * square-inside-a-square look these icons were redrawn to escape.
  */
 const MASKABLE_SIZE = 512;
 const MASKABLE_SAFE = 0.8;
 
 const sources = {
-  site: join(siteDir, 'public', 'logo.png'),
-  tuner: join(siteDir, 'src', 'assets', 'icons', 'tuner.svg'),
-  songs: join(siteDir, 'src', 'assets', 'icons', 'songs.svg'),
+  site: { file: join(siteDir, 'public', 'logo.png'), maskable: 'inset' },
+  tuner: { file: join(siteDir, 'src', 'assets', 'icons', 'tuner.svg'), maskable: 'bleed' },
+  songs: { file: join(siteDir, 'src', 'assets', 'icons', 'songs.svg'), maskable: 'bleed' },
 };
 
 /**
@@ -51,7 +57,9 @@ function render(source, size) {
   return sharp(source, { density: 384 }).resize(size, size, { fit: 'contain', background: NAVY });
 }
 
-async function maskable(source) {
+async function maskable(source, mode) {
+  if (mode === 'bleed') return render(source, MASKABLE_SIZE).png();
+
   const inner = Math.round(MASKABLE_SIZE * MASKABLE_SAFE);
   const artwork = await render(source, inner).png().toBuffer();
   return sharp({
@@ -63,13 +71,14 @@ async function maskable(source) {
 
 await mkdir(outDir, { recursive: true });
 
-for (const [app, source] of Object.entries(sources)) {
+for (const [app, { file, maskable: mode }] of Object.entries(sources)) {
   for (const size of SIZES) {
     const target = join(outDir, `${app}-${size}.png`);
-    await render(source, size).png().toFile(target);
+    await render(file, size).png().toFile(target);
     console.log(`  ${app}-${size}.png`);
   }
-  await writeFile(join(outDir, `${app}-maskable.png`), await (await maskable(source)).toBuffer());
+  const mask = await maskable(file, mode);
+  await writeFile(join(outDir, `${app}-maskable.png`), await mask.toBuffer());
   console.log(`  ${app}-maskable.png`);
 }
 

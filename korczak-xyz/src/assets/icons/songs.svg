@@ -1,41 +1,100 @@
 <!--
-  Home screen icon for the Songs web app.
+  Home screen icon for the Songs web app - "Song sheet".
 
-  Source art for scripts/generate-icons.mjs. Same Win95 frame as tuner.svg; the face shows
-  yellow chords sitting above green lyric lines, which is what the song pages actually render
-  and what distinguishes this icon from the tuner at home screen size.
+  Source art for scripts/generate-icons.mjs. A stack of tilted paper sheets showing yellow chords
+  over green lyric lines - which is what the song pages actually render, and what distinguishes
+  this icon from the tuner at home screen size - with a red chord-diagram badge clipped to the
+  corner.
+
+  Full bleed and convex on the same terms as tuner.svg; see that file's note. The warm orange
+  body is deliberate: the tuner is blue, so the two are told apart by hue before shape at 46px.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges">
-  <rect width="512" height="512" fill="#000080"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="s5-body" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd88a"/>
+      <stop offset=".5" stop-color="#f08a1c"/>
+      <stop offset=".52" stop-color="#dc6f06"/>
+      <stop offset="1" stop-color="#7c3000"/>
+    </linearGradient>
+    <linearGradient id="s5-paper" x1="0" y1="90" x2="0" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e3dccb"/>
+    </linearGradient>
+    <linearGradient id="s5-gloss" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".07"/>
+    </linearGradient>
+    <radialGradient id="s5-vig" cx="256" cy="256" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".4"/>
+    </radialGradient>
+  </defs>
 
-  <!-- Raised bezel: light top/left, shadow bottom/right. -->
-  <rect x="48" y="48" width="416" height="416" fill="#c0c0c0"/>
-  <path d="M48 48h416v8H56v408h-8z" fill="#ffffff"/>
-  <path d="M464 48v416H48v-8h408V48z" fill="#808080"/>
+  <rect width="512" height="512" fill="url(#s5-body)"/>
 
-  <!-- Sunken face: the shading inverts. -->
-  <rect x="80" y="80" width="352" height="352" fill="#000000"/>
-  <path d="M80 80h352v8H88v344h-8z" fill="#808080"/>
-  <path d="M432 80v352H80v-8h344V80z" fill="#ffffff"/>
-
-  <!-- Three chord-over-lyric rows. -->
-  <g fill="#ffff00">
-    <rect x="112" y="120" width="48" height="26"/>
-    <rect x="200" y="120" width="40" height="26"/>
-    <rect x="280" y="120" width="56" height="26"/>
+  <!-- Sheets underneath. -->
+  <g transform="rotate(-9 256 256)">
+    <rect x="120" y="96" width="272" height="320" rx="16" fill="#c9c0ac"/>
   </g>
-  <rect x="112" y="158" width="288" height="22" fill="#00ff00"/>
-
-  <g fill="#ffff00">
-    <rect x="112" y="214" width="40" height="26"/>
-    <rect x="192" y="214" width="56" height="26"/>
+  <g transform="rotate(-4.5 256 256)">
+    <rect x="112" y="92" width="272" height="320" rx="16" fill="#efe9dc"/>
   </g>
-  <rect x="112" y="252" width="248" height="22" fill="#00ff00"/>
 
-  <g fill="#ffff00">
-    <rect x="112" y="308" width="56" height="26"/>
-    <rect x="208" y="308" width="40" height="26"/>
-    <rect x="272" y="308" width="48" height="26"/>
+  <!-- Top sheet. -->
+  <g transform="rotate(2.5 256 256)">
+    <rect x="106" y="88" width="280" height="330" rx="18" fill="#000" opacity=".25" transform="translate(6 8)"/>
+    <rect x="106" y="88" width="280" height="330" rx="18" fill="url(#s5-paper)"/>
+
+    <g fill="#e0a400">
+      <rect x="136" y="140" width="46" height="20" rx="6"/>
+      <rect x="198" y="140" width="32" height="20" rx="6"/>
+      <rect x="248" y="140" width="52" height="20" rx="6"/>
+    </g>
+    <rect x="136" y="172" width="212" height="16" rx="6" fill="#189b2b"/>
+
+    <g fill="#e0a400">
+      <rect x="136" y="216" width="34" height="20" rx="6"/>
+      <rect x="188" y="216" width="52" height="20" rx="6"/>
+    </g>
+    <rect x="136" y="248" width="168" height="16" rx="6" fill="#189b2b"/>
+
+    <g fill="#e0a400">
+      <rect x="136" y="292" width="52" height="20" rx="6"/>
+      <rect x="206" y="292" width="34" height="20" rx="6"/>
+      <rect x="258" y="292" width="44" height="20" rx="6"/>
+    </g>
+    <rect x="136" y="324" width="196" height="16" rx="6" fill="#189b2b"/>
+
+    <!-- Paper sheen. -->
+    <path d="M106 106a18 18 0 0 1 18-18h244a18 18 0 0 1 18 18v46c-84 30-196 30-280 0Z" fill="#fff" opacity=".5"/>
   </g>
-  <rect x="112" y="346" width="272" height="22" fill="#00ff00"/>
+
+  <!-- Chord badge. -->
+  <g transform="rotate(-14 380 118)">
+    <rect x="318" y="66" width="124" height="104" rx="20" fill="#000" opacity=".3" transform="translate(5 7)"/>
+    <rect x="318" y="66" width="124" height="104" rx="20" fill="#d61f36"/>
+    <path d="M318 86a20 20 0 0 1 20-20h84a20 20 0 0 1 20 20v22c-40 16-84 16-124 0Z" fill="#fff" opacity=".35"/>
+    <g stroke="#fff" stroke-linecap="round">
+      <g stroke-width="7">
+        <line x1="344" y1="102" x2="344" y2="150"/>
+        <line x1="366" y1="102" x2="366" y2="150"/>
+        <line x1="388" y1="102" x2="388" y2="150"/>
+        <line x1="410" y1="102" x2="410" y2="150"/>
+      </g>
+      <g stroke-width="6">
+        <line x1="340" y1="100" x2="414" y2="100"/>
+        <line x1="340" y1="126" x2="414" y2="126"/>
+        <line x1="340" y1="150" x2="414" y2="150"/>
+      </g>
+    </g>
+    <g fill="#fff">
+      <circle cx="366" cy="114" r="10"/>
+      <circle cx="410" cy="138" r="10"/>
+    </g>
+  </g>
+
+  <path d="M0 512h512v-72c-80-72-432-72-512 0Z" fill="#fff" opacity=".08"/>
+  <path d="M0 0h512v206c-90 92-422 92-512 0Z" fill="url(#s5-gloss)"/>
+  <rect width="512" height="512" fill="url(#s5-vig)"/>
 </svg>
