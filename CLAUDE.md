@@ -175,6 +175,25 @@ that prop is what decides which app "Add to Home Screen" produces.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
   only runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
+The tuner and songs art is drawn **full bleed**: every platform masks a home screen icon to its
+own shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
+and the convex read comes from a bounce light, a gloss sweep and a perimeter vignette layered at
+the end of each file. The square-on-navy art this replaced left a visible border on all four
+sides once iOS rounded the corners off the navy. `generate-icons.mjs` therefore picks the
+maskable treatment per source: `bleed` ships those two unscaled, `inset` keeps the old shrink-onto-navy
+for `logo.png`, whose own square edges a circular mask would clip.
+
+**Icon URLs carry a content hash** (`iconUrl.ts`, used by `PwaHead.astro` and the manifest
+route). `_headers` gives `/icons/*` a week, and Cloudflare's edge honours it: the filenames are
+not content-hashed the way `_astro/*` chunks are, so one URL meant different bytes either side of
+a deploy and the edge kept answering with whichever copy it took first. Clearing Safari's data
+does nothing — the request is answered before it reaches Netlify — which is how new artwork
+survived a redeploy, a full browsing-data wipe and a reinstall. A query string is part of the
+cache key everywhere (CDN, browser, service worker), so `?v=<hash>` misses on new art and the
+week-long TTL stays worth having on the bytes that really did not change. Note that iOS copies
+the touch icon at install and never re-fetches, so an icon already on a home screen only updates
+when the app is deleted and re-added.
+
 ### The safe area
 
 `viewport-fit=cover` is on the viewport meta because `env(safe-area-inset-*)` returns zero

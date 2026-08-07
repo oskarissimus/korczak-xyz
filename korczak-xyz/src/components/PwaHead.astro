@@ -1,6 +1,7 @@
 ---
 import { useTranslations, type Lang } from '../i18n';
 import { PWA_APPS, PWA_THEME_COLOR, manifestPath, type PwaApp } from '../utils/pwa/apps';
+import { iconUrl } from '../utils/pwa/iconUrl';
 
 interface Props {
   app: PwaApp;
@@ -12,7 +13,7 @@ const t = useTranslations(lang);
 ---
 
 <link rel="manifest" href={manifestPath(app, lang)} />
-<link rel="apple-touch-icon" href={`/icons/${app}-180.png`} />
+<link rel="apple-touch-icon" href={iconUrl(`${app}-180.png`)} />
 <meta name="theme-color" content={PWA_THEME_COLOR} />
 
 <!--

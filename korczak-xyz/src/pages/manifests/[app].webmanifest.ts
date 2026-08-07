@@ -8,6 +8,7 @@ import {
   startUrl,
   type PwaApp,
 } from '../../utils/pwa/apps';
+import { iconUrl } from '../../utils/pwa/iconUrl';
 
 /**
  * One manifest per app per locale, generated rather than hand-written so the app names come
@@ -26,14 +27,16 @@ export const GET: APIRoute = ({ params }) => {
   const def = PWA_APPS[app];
   const t = useTranslations(lang);
 
+  // Every src carries the artwork's content hash; see iconUrl.ts for why a stable icon URL is
+  // not safe behind a week-long CDN cache.
   const icons = [180, 192, 512].map((size) => ({
-    src: `/icons/${app}-${size}.png`,
+    src: iconUrl(`${app}-${size}.png`),
     sizes: `${size}x${size}`,
     type: 'image/png',
     purpose: 'any',
   }));
   icons.push({
-    src: `/icons/${app}-maskable.png`,
+    src: iconUrl(`${app}-maskable.png`),
     sizes: '512x512',
     type: 'image/png',
     purpose: 'maskable',
