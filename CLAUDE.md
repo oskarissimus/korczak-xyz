@@ -255,6 +255,18 @@ scrolling; a neck you have to scroll to answer is worse than a narrow one you ca
 component draws the stats heatmap, where each square takes the **weaker** of its two directions:
 a position you can read but not find is not a position you know.
 
+Fret 0 has no column of its own — the **string-name column is the open position**, and on the
+asked string it is the button. An open string is not stopped anywhere, so a box labelled `0`
+standing where the first fret's box stands reads as a fret, and "F on the D string" then looks
+like it could be answered there. This is the grammar `diagram.ts` already used, where the dot for
+an open string goes on the nut and the numbered cells start at 1, so the two notations agree
+again. The nut cell undoes two things the plain cells do, and both rules therefore sit *after*
+`--live`/`--muted` in the stylesheet: it draws no string line (the string starts at the nut, and a
+line through a letter reads as a strike-through), and it is not dimmed when its string is not the
+one being asked about — the other strings' names are how the neck is read, and cell opacity would
+take the letter with it. The nut bar itself is an `::after` painted into the grid gap and 1px past
+the cell top and bottom, so the six rows join up instead of reading as six dashes.
+
 ### Storage and stats
 
 Keys are `fretboard-deck` (the cache), `-events` (capped at 2000), `-sessions`, `-mastery`,

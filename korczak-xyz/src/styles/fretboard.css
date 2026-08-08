@@ -293,17 +293,12 @@
 }
 
 .fb-neck-fretno,
-.fb-neck-string {
+.fb-neck-open {
   font-family: 'VT323', monospace;
   font-size: 1rem;
   color: var(--retro-green);
   text-align: center;
   align-self: center;
-}
-
-.fb-neck-string {
-  padding-right: 6px;
-  min-width: 1.2em;
 }
 
 .fb-neck-cell {
@@ -342,6 +337,34 @@
 .fb-neck-cell--live:focus-visible {
   outline: 1px dotted var(--retro-white);
   outline-offset: -3px;
+}
+
+/* The nut: the open string's cell — pressed on the asked string, read as the
+   string's name everywhere else — drawn as the edge of the neck rather than as
+   another fret. After the live/muted rules, both of which it has to undo: the
+   string starts at the nut, so no line is drawn through the letter (a line
+   through a letter reads as a strike-through), and the other strings' names stay
+   at full strength because they are how the neck is read, not part of the target
+   — dimming the cell would take the letter with it. */
+.fb-neck-cell--open {
+  background-image: none;
+  position: relative;
+}
+
+.fb-neck-cell--open.fb-neck-cell--muted {
+  opacity: 1;
+}
+
+/* The nut bar itself, painted into the 2px grid gap on the cell's right and 1px
+   past the cell top and bottom, so the six rows join into one bar. */
+.fb-neck-cell--open::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: -2px;
+  width: 2px;
+  background: var(--retro-gray);
 }
 
 .fb-neck-cell--right {
