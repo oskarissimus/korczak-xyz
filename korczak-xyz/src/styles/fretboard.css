@@ -196,9 +196,10 @@
    green on navy, sunken into the panel. Width is 27 characters and there is no
    wrapping to fall back on, so the font size is what has to give on a phone —
    6vw puts the widest card inside a 320px screen with the panel padding paid
-   for, and the cap stops it becoming a poster on a desktop. */
+   for, and the cap stops it becoming a poster on a desktop. Shrinking to those
+   27 characters rather than stretching is `.fb-stage--card`'s job now — the
+   wrapper is the flex item, and the verdict is centred on whatever it measures. */
 .fb-diagram {
-  align-self: flex-start;
   max-width: 100%;
   overflow-x: auto;
   margin: 0;
@@ -260,13 +261,23 @@
   cursor: default;
 }
 
-.fb-pad-key--right {
+/* Each answer state names itself twice, and the `:hover` twin is not decoration.
+   Layout.astro carries a global `button:hover { background: #a0a0a0 }`, and
+   (0,1,1) outranks a single class — so the moment the answer lands and these
+   buttons go disabled (taking `:hover:not(:disabled)` out of the running with
+   them), the one key or cell whose colour *is* the answer went flat grey under
+   the pointer, and stayed grey until the mouse moved. On a phone it looked
+   right; on a mouse the verdict was the only thing you could not see. (0,2,0)
+   settles it. */
+.fb-pad-key--right,
+.fb-pad-key--right:hover {
   background: var(--retro-green);
   color: var(--retro-black);
   border-style: inset;
 }
 
-.fb-pad-key--wrong {
+.fb-pad-key--wrong,
+.fb-pad-key--wrong:hover {
   background: var(--retro-magenta);
   color: var(--retro-white);
   border-style: inset;
@@ -369,13 +380,18 @@
   background: var(--retro-gray);
 }
 
-.fb-neck-cell--right {
+/* Doubled against the global `button:hover` for the reason set out above the
+   note pad's two: the cell you just pressed is the one the pointer is sitting
+   on, and it is the one that must not lose its colour. */
+.fb-neck-cell--right,
+.fb-neck-cell--right:hover {
   background-color: rgba(0, 255, 0, 0.25);
   border-color: var(--retro-green);
   color: var(--retro-yellow);
 }
 
-.fb-neck-cell--wrong {
+.fb-neck-cell--wrong,
+.fb-neck-cell--wrong:hover {
   background-color: rgba(255, 0, 255, 0.3);
   border-color: var(--retro-magenta);
   color: var(--retro-white);
@@ -406,6 +422,86 @@
 
 .fb-heat-mature {
   background-color: #00a000;
+}
+
+/* --- the verdict over the card ------------------------------------------- */
+
+/* The positioning context for the verdict, wrapped around whichever box the card
+   is answered in. It has to shrink with the diagram: `.fb-diagram` sizes to its
+   own 27 characters, and a wrapper stretched to the panel would centre the ring
+   over the empty space beside it rather than over the card. The neck is full
+   width either way. */
+.fb-stage {
+  position: relative;
+}
+
+.fb-stage--card {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.fb-verdict-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The neck under it is still a control — the answer marks are on it, and the
+     next card re-enables its buttons. */
+  pointer-events: none;
+}
+
+/* Sized off the box rather than in pixels, so it is the same gesture on a 320px
+   phone and on a desktop: one mark across the middle of the card. The shadow is
+   what carries it over both the navy and the marks it crosses, the ring being
+   unfilled on purpose.
+
+   Both caps are load-bearing, and the neck is why. It is nearly square at 320px,
+   so a mark sized off its height alone comes out as wide as two frets and sits on
+   the very cells that carry the rest of the answer — which fret was right, which
+   one was pressed. `max-width` bounds it from the other side; the drawing stays
+   circular whatever box it lands in, being an SVG with a viewBox that is centred
+   and scaled to fit rather than stretched. */
+.fb-verdict-mark {
+  flex: none;
+  width: auto;
+  height: 58%;
+  min-height: 60px;
+  max-height: 124px;
+  max-width: 60%;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.85));
+  animation: fb-verdict-pop 140ms ease-out;
+}
+
+.fb-verdict-mark--ok {
+  color: var(--retro-green);
+}
+
+/* Not --retro-red: #ff0000 on #000080 is two dark colours, and the ring reads as
+   muddy at a glance. This is the same hue lifted until it separates from the
+   panel the way the green does. */
+.fb-verdict-mark--bad {
+  color: #ff4d4d;
+}
+
+/* Well over inside the 700ms a correct card stays up: the point is to catch the
+   eye arriving, not to be watched. */
+@keyframes fb-verdict-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-verdict-mark {
+    animation: none;
+  }
 }
 
 /* --- feedback ------------------------------------------------------------ */

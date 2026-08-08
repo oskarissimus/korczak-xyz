@@ -282,6 +282,31 @@ one being asked about — the other strings' names are how the neck is read, and
 take the letter with it. The nut bar itself is an `::after` painted into the grid gap and 1px past
 the cell top and bottom, so the six rows join up instead of reading as six dashes.
 
+### The verdict
+
+The written verdict under the card is precise and small, and a correct card is gone 700 ms later
+— so it is read after the fact or not at all. `Verdict.tsx` draws the maru/batsu pair over the
+box the card lives in instead: the diagram on a `name` card, the neck on a `find` card, wrapped
+in `.fb-stage` for the positioning context. That wrapper also carries the `align-self:
+flex-start` that used to be on `.fb-diagram`, because the diagram sizes to its own 27 characters
+and a stretched wrapper would centre the ring in the empty panel beside the card.
+
+It is an **SVG, not `✓`/`✕`** — neither glyph is in VT323, which is the whole subject of
+`chordMarks.css`, and this one additionally has to centre over a grid. It is **unfilled**: on a
+`find` card the marks underneath are the rest of the answer — which frets sound the note, which
+one was pressed — so a disc would hide exactly what it is reporting on. A drop shadow carries it
+over the navy instead. Both size caps earn their place: the neck is nearly square at 320px, so a
+mark sized off height alone came out two frets wide and sat on the answer cells, and `max-width`
+bounds it from the other side while the viewBox keeps it circular in the non-square box.
+
+The answer states beneath it (`.fb-neck-cell--right`/`--wrong`, `.fb-pad-key--right`/`--wrong`)
+each name themselves **twice**, the second time with `:hover`. `Layout.astro` has a global
+`button:hover { background: #a0a0a0 }`, and (0,1,1) beats a single class; the enabled cell is
+protected by `.fb-neck-cell--live:hover:not(:disabled)` at (0,3,1), but answering disables the
+buttons and takes that rule out with them. So the one cell the pointer was on — the one just
+pressed, whose colour *is* the answer — went flat grey and stayed grey until the mouse moved.
+It looked right on a phone, and on a mouse the verdict was the only thing you could not see.
+
 ### Storage and stats
 
 Keys are `fretboard-deck` (the cache), `-events` (capped at 2000), `-sessions`, `-mastery`,

@@ -29,6 +29,7 @@ import type { Deck, ReviewEvent, Settings } from '../../utils/fretboard/types';
 import { NeckPicker } from './NeckGrid';
 import NoteCard from './NoteCard';
 import NotePad from './NotePad';
+import Verdict from './Verdict';
 import { fill, type Translation } from './translations';
 
 /** How long a correct answer stays on screen before the next card. */
@@ -249,15 +250,20 @@ export default function FretboardSession({
         )}
       </p>
 
+      {/* The verdict is drawn over the box the card lives in — the diagram you read, or the
+          neck you tap — so it lands where the eye already is rather than in the row below. */}
       {key.direction === 'name' ? (
         <>
-          <NoteCard
-            stringIndex={key.stringIndex}
-            fret={key.fret}
-            stringLabels={settings.stringLabels}
-            notation={settings.notation}
-            label={positionLabel}
-          />
+          <div className="fb-stage fb-stage--card">
+            <NoteCard
+              stringIndex={key.stringIndex}
+              fret={key.fret}
+              stringLabels={settings.stringLabels}
+              notation={settings.notation}
+              label={positionLabel}
+            />
+            {result && <Verdict correct={result.correct} />}
+          </div>
           <NotePad
             onPick={answerNote}
             disabled={result != null}
@@ -267,18 +273,21 @@ export default function FretboardSession({
           />
         </>
       ) : (
-        <NeckPicker
-          maxFret={settings.maxFret}
-          activeString={key.stringIndex}
-          stringLabels={settings.stringLabels}
-          notation={settings.notation}
-          disabled={result != null}
-          chosenFret={result?.chosenFret ?? null}
-          answerFrets={result?.answerFrets ?? null}
-          onPick={answerFret}
-          label={t.tapFret}
-          fretLabel={(fret) => (fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret }))}
-        />
+        <div className="fb-stage">
+          <NeckPicker
+            maxFret={settings.maxFret}
+            activeString={key.stringIndex}
+            stringLabels={settings.stringLabels}
+            notation={settings.notation}
+            disabled={result != null}
+            chosenFret={result?.chosenFret ?? null}
+            answerFrets={result?.answerFrets ?? null}
+            onPick={answerFret}
+            label={t.tapFret}
+            fretLabel={(fret) => (fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret }))}
+          />
+          {result && <Verdict correct={result.correct} />}
+        </div>
       )}
 
       <div className="fb-feedback" role="status" aria-live="polite">
