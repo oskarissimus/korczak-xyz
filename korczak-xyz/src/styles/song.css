@@ -1,3 +1,5 @@
+@import './chordMarks.css';
+
 /* Songs list window stacked behind the song window */
 .songs-stack {
     display: grid;
@@ -609,6 +611,8 @@
     white-space: pre;
 }
 
+/* Shape and placement are in chordMarks.css, shared with the fretboard
+   trainer. The weight is the ✕ and ○ only — the pressed dot is drawn. */
 .chord-dot {
     font-weight: bold;
 }

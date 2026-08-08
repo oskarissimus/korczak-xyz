@@ -247,6 +247,20 @@ characters, which no phone renders without either shrinking the glyphs past read
 the answer off-screen, and the fret numbers are printed either way, so a window asks exactly the
 same question.
 
+Because both notations are laid out in *characters*, the marks on them cannot be allowed to
+advance like the characters they are: `●`, `○` and `✕` are not in VT323, so each comes from
+whatever fallback font the platform has — 0.602em against VT323's 0.40em in Chromium, and
+something else again on a phone. Half a cell of overhang pushed the rest of the row right, out
+of column with the rows above it and with the fret numbers, so in a chord shape every muted or
+open string sat offset from its neighbours. `src/styles/chordMarks.css` (shared by both, the way
+`tabs.css` is) boxes each mark at `1ch` — the width of `0` in the element's own font, which is
+VT323 whatever the glyph's own font turns out to be — and lets the glyph overhang the box
+instead of the layout. The pressed dot is then **drawn** rather than printed, because how far it
+overhangs is a property of a font we do not ship, and boxed-but-printed it swallows the dashes
+either side of it; a circle sized in `ch` is one cell everywhere. `-webkit-text-fill-color`
+hides the character without disturbing the box, the inherited `color` the circle paints itself
+with (so light mode keeps working by setting `color`), or the text itself.
+
 A `find` card is answered on `NeckGrid` instead, because pointing at a place on the instrument
 needs a target big enough for a thumb. Only the asked string is live, which is what makes 19px
 cells workable at 320px — vertical aim does not matter when five of the six rows cannot be

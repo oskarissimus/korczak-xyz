@@ -1,0 +1,56 @@
+/* The marks on a diagram of the neck — the pressed dot, and the songbook's
+   open/muted indicators beside the string letter.
+
+   Shared by the songbook's chord shapes and the fretboard trainer's cards,
+   which draw the same notation on purpose (`chordDiagram.ts` and
+   `fretboard/diagram.ts`); each pulls it in through its own stylesheet with
+   @import, the way `tabs.css` is shared.
+
+   `●`, `○` and `✕` are not in VT323, so every platform draws them from some
+   fallback font whose advance width has nothing to do with the monospace cell:
+   Chromium's is 0.602em against VT323's 0.40em, half a cell wider. These
+   diagrams are laid out in characters — `---+` cells, fret numbers padded onto
+   the columns the `+` land on — so a row carrying a mark pushed everything
+   after it half a cell right, out of column with the rows above and below it.
+   In a chord shape that is every muted or open string, which is why whole rows
+   sat offset from their neighbours.
+
+   The fix is to stop the glyph's advance width reaching the layout at all: the
+   mark gets a box exactly one cell wide and overhangs it. `1ch` is the width of
+   `0` in the element's own font — VT323, whatever font the glyph itself ends up
+   coming from. */
+
+.chord-dot,
+.fb-dot {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+}
+
+/* The pressed dot is then drawn rather than typed, because how far it overhangs
+   is a property of a fallback font we do not ship: 1.5 cells here, and iOS
+   picks its own. Boxed but left as a glyph it swallows the dashes either side
+   of it. A circle sized in `ch` is one cell on every platform.
+
+   `-webkit-text-fill-color` hides the glyph without disturbing the box, the
+   inherited `color` the circle paints itself with (so `.chord-press`,
+   light-mode and `.fb-dot` keep setting the colour the ordinary way), or the
+   character itself, which stays in the text for selection and assistive tech. */
+.chord-press,
+.fb-dot {
+  position: relative;
+  -webkit-text-fill-color: transparent;
+}
+
+.chord-press::after,
+.fb-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1ch;
+  height: 1ch;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: currentColor;
+}

@@ -1,6 +1,7 @@
 /* Fretboard Trainer — retro theme */
 
 @import './tabs.css';
+@import './chordMarks.css';
 
 .fretboard-window {
   margin-bottom: 20px;
@@ -211,9 +212,10 @@
   white-space: pre;
 }
 
+/* Shape and placement are in chordMarks.css, shared with the songbook; the dot
+   is drawn with this colour rather than printed. */
 .fb-dot {
   color: var(--retro-yellow);
-  font-weight: bold;
 }
 
 /* --- the note pad -------------------------------------------------------- */
