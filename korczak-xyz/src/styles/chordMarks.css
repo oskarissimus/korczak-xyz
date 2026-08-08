@@ -30,7 +30,9 @@
 /* The pressed dot is then drawn rather than typed, because how far it overhangs
    is a property of a fallback font we do not ship: 1.5 cells here, and iOS
    picks its own. Boxed but left as a glyph it swallows the dashes either side
-   of it. A circle sized in `ch` is one cell on every platform.
+   of it. A circle sized in `ch` overhangs by exactly as much as we say on every
+   platform — 1.2 cells, which stands a little proud of the grid the way the
+   printed glyph did, and still stops short of the dashes either side.
 
    `-webkit-text-fill-color` hides the glyph without disturbing the box, the
    inherited `color` the circle paints itself with (so `.chord-press`,
@@ -48,8 +50,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 1ch;
-  height: 1ch;
+  width: 1.2ch;
+  height: 1.2ch;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: currentColor;

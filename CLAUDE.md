@@ -257,7 +257,8 @@ open string sat offset from its neighbours. `src/styles/chordMarks.css` (shared 
 VT323 whatever the glyph's own font turns out to be — and lets the glyph overhang the box
 instead of the layout. The pressed dot is then **drawn** rather than printed, because how far it
 overhangs is a property of a font we do not ship, and boxed-but-printed it swallows the dashes
-either side of it; a circle sized in `ch` is one cell everywhere. `-webkit-text-fill-color`
+either side of it; a circle sized in `ch` overhangs by exactly as much as we say everywhere —
+1.2 cells, proud of the grid but clear of the dashes. `-webkit-text-fill-color`
 hides the character without disturbing the box, the inherited `color` the circle paints itself
 with (so light mode keeps working by setting `color`), or the text itself.
 
