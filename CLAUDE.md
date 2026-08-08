@@ -204,6 +204,25 @@ few seconds. A tab closed mid-sitting therefore loses nothing: the next load fin
 and finishes the sitting on its behalf (`commitSitting`, shared by both paths, so "half of it in
 the deck and none of it in the history" is unreachable).
 
+### What to ask is scheduled; what order to ask it in is shuffled
+
+`buildQueue` keeps those two apart. **Selection** stays by due date — a capped sitting draws the
+cards that have waited longest, and drawing a random handful instead would quietly abandon the
+schedule. **Order** is a shuffle, because once the cards are drawn their sequence carries no
+information, and a fixed one is something you learn instead of the neck: every sitting used to
+walk E, A, D, G, B, e in turn, which you can answer without reading the card. New cards are
+drawn from the whole fret range for the same reason — the range setting is the curriculum, so
+`scopeIds` is a stable enumeration and nothing more, not an introduction order.
+
+`spreadPositions` then pulls apart cards asking about the same place. `name:2-7` and `find:2-7`
+are different questions, but back to back the second is answered off the first — and it lands in
+the log as a fast, correct answer, so the scheduler pushes the card out and the stats page
+reports a fluency that was never demonstrated. A shuffle alone does not fix that; it only makes
+the clumping unpredictable.
+
+The randomness enters through `rng` on `QueueOptions`, defaulting to `Math.random`, so the
+module stays pure and a sitting's order is something a test can pin to a seed.
+
 ### The in-session queue is ordered by due time, not by a fixed gap
 
 A missed card comes back inside the sitting. It used to be re-inserted a fixed number of places
@@ -213,7 +232,9 @@ reached. Twenty-five answers, two cards seen. `requeue` now places the card in f
 everything scheduled later than it; cards not yet attempted this sitting have nothing scheduled
 and sort to the front, which is what guarantees the sitting keeps moving through its material.
 `MIN_REQUEUE_GAP` only binds at the tail, and only to stop a card being asked twice in a row —
-the answer is still on the screen you just read.
+the answer is still on the screen you just read. `requeue` is deliberately the one ordering
+decision that is **not** shuffled: its due-time ordering is what guarantees the sitting keeps
+moving, and randomness there would risk the deadlock back.
 
 ### Drawing the neck
 

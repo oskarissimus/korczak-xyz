@@ -31,13 +31,17 @@ export const SESSION_HORIZON_MS = 20 * 60_000;
 /** Hard ceiling on one sitting, so a run of bad answers cannot make the queue immortal. */
 export const MAX_ANSWERS_FACTOR = 3;
 
+/**
+ * Every card the current scope contains.
+ *
+ * A stable enumeration, not a running order — `ensureCards`, the deck counts and the heatmap all
+ * read it and none of them care what order it comes in. What a sitting asks, and in what order,
+ * is `buildQueue`'s business, and it shuffles.
+ */
 export function scopeIds(settings: Settings): string[] {
   const ids: string[] = [];
   const strings = [...settings.strings].sort((a, b) => a - b);
   const directions = settings.directions.length > 0 ? settings.directions : (['name'] as Direction[]);
-  // Fret-major: the open strings come first, then the first fret across all six, and so on.
-  // That is the order the neck is actually learnt in — every position is found by counting up
-  // from a string you already know, so the strings have to be known before anything above them.
   for (let fret = 0; fret <= Math.min(settings.maxFret, MAX_FRET); fret++) {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
@@ -115,18 +119,73 @@ export function interleave(base: string[], extra: string[]): string[] {
   return out;
 }
 
+/** Fisher–Yates. `rng` is injected so a sitting's order is reproducible in a test. */
+export function shuffle<T>(items: T[], rng: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/** How many cards apart the two directions of one position should be kept. */
+export const MIN_POSITION_GAP = 3;
+
+/**
+ * Push apart cards that ask about the same place on the neck.
+ *
+ * `name:2-7` and `find:2-7` are different questions, but back to back the second one is answered
+ * from having just read the first — and it lands in the log as a fast, correct answer, so the
+ * scheduler pushes the card out and the stats page reports a fluency that was never demonstrated.
+ * A shuffle alone does not fix this; it only makes the clumping unpredictable.
+ *
+ * Greedy: take the first remaining card whose position has not come up in the last `gap`, and
+ * fall back to the first remaining card when none qualifies. The fallback is what makes this
+ * total — a queue of nothing but one position has no valid arrangement — and it always returns a
+ * permutation of its input.
+ */
+export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string[] {
+  const positionOf = (id: string) => {
+    const key = parseCardId(id);
+    return key ? `${key.stringIndex}-${key.fret}` : id;
+  };
+
+  const remaining = [...queue];
+  const out: string[] = [];
+  while (remaining.length > 0) {
+    const recent = out.slice(-gap).map(positionOf);
+    let pick = remaining.findIndex((id) => !recent.includes(positionOf(id)));
+    if (pick < 0) pick = 0;
+    out.push(remaining[pick]);
+    remaining.splice(pick, 1);
+  }
+  return out;
+}
+
 export interface QueueOptions {
   /** Build a queue even though nothing is due, drawing the cards scheduled soonest. */
   ahead?: boolean;
+  /** Source of randomness for the running order. Injected so tests can pin it. */
+  rng?: () => number;
 }
 
 /**
  * The order a sitting asks its cards in.
  *
- * Overdue learning cards lead: they are mid-acquisition, and the whole point of minute-scale
- * steps is that they come back promptly. Then due reviews, oldest first, with new cards spread
- * through them. Cards answered during the sitting are put back by the caller — see `requeue` —
- * so this is where the sitting starts, not how long it will be.
+ * **What to ask is decided by due date; what order to ask it in is decided by the shuffle.**
+ * Keeping those apart is the whole design here. A capped sitting must still draw the cards that
+ * have waited longest — dropping those in favour of a random handful would quietly abandon the
+ * schedule — but once drawn, the order they arrive in carries no information, and a fixed one is
+ * something you learn instead of the neck. Deterministic order meant every sitting walked the
+ * strings E, A, D, G, B, e in turn, which is a sequence you can answer without reading the card.
+ *
+ * Overdue learning cards still lead the queue: they are mid-acquisition, and the whole point of
+ * minute-scale steps is that they come back promptly. They are shuffled among themselves.
+ *
+ * Cards answered during the sitting are put back by `requeue`, which is deliberately *not*
+ * random — its due-time ordering is what guarantees a sitting keeps moving through its material.
+ * So this is where the sitting starts, not how long it will be or what it ends up containing.
  */
 export function buildQueue(
   deck: Deck,
@@ -134,35 +193,51 @@ export function buildQueue(
   now: number,
   options: QueueOptions = {}
 ): string[] {
+  const rng = options.rng ?? Math.random;
   const cards = cardsInScope(deck, settings);
   const byDue = (a: Card, b: Card) => a.due - b.due;
 
-  const learning = cards
-    .filter((c) => (c.status === 'learning' || c.status === 'relearning') && c.due <= now)
-    .sort(byDue)
-    .map((c) => c.id);
+  const learning = shuffle(
+    cards
+      .filter((c) => (c.status === 'learning' || c.status === 'relearning') && c.due <= now)
+      .map((c) => c.id),
+    rng
+  );
 
-  const review = cards
-    .filter((c) => c.status === 'review' && c.due <= now)
-    .sort(byDue)
-    .map((c) => c.id);
+  // Selected oldest-first, then shuffled: the sitting takes the most overdue cards it has room
+  // for, and asks them in no particular order.
+  const review = shuffle(
+    cards
+      .filter((c) => c.status === 'review' && c.due <= now)
+      .sort(byDue)
+      .slice(0, settings.sessionLength)
+      .map((c) => c.id),
+    rng
+  );
 
-  // Scope order is the introduction order, and `cardsInScope` preserves it.
-  const fresh = cards
-    .filter((c) => c.status === 'new')
-    .slice(0, Math.max(0, settings.newPerSession))
-    .map((c) => c.id);
+  // Every unseen card in scope is a candidate, so the fret range is the whole curriculum: set it
+  // to 0-5 and you meet those positions in any order, widen it and the rest join immediately.
+  const fresh = shuffle(
+    cards.filter((c) => c.status === 'new').map((c) => c.id),
+    rng
+  ).slice(0, Math.max(0, settings.newPerSession));
 
   const queue = [...learning, ...interleave(review, fresh)].slice(0, settings.sessionLength);
-  if (queue.length > 0 || !options.ahead) return queue;
+  if (queue.length > 0) return spreadPositions(queue);
+  if (!options.ahead) return queue;
 
   // Nothing is due and a sitting was asked for anyway. Answering early is not free — the
   // scheduler grades it like any other answer — so take the cards closest to falling due.
-  return cards
-    .filter((c) => c.status !== 'new')
-    .sort(byDue)
-    .slice(0, settings.sessionLength)
-    .map((c) => c.id);
+  return spreadPositions(
+    shuffle(
+      cards
+        .filter((c) => c.status !== 'new')
+        .sort(byDue)
+        .slice(0, settings.sessionLength)
+        .map((c) => c.id),
+      rng
+    )
+  );
 }
 
 /**
