@@ -1,5 +1,7 @@
 /* Touch-Typing Trainer — retro theme */
 
+@import './tabs.css';
+
 .typing-window {
   margin-bottom: 20px;
 }
@@ -11,85 +13,6 @@
   background: var(--retro-gray);
   color: var(--retro-black);
   padding: 16px;
-}
-
-/* View switcher — a Win95 property-sheet tab strip, the same row in the same
-   place on all three pages. Everything below it is the panel the tabs belong
-   to, so the two share a surface and only the edge line divides them. */
-
-.typing-tabs {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  /* The bottom padding is the shelf the current tab sits on. No horizontal
-     padding: the first tab lines up with the panel's own left edge. */
-  padding: 4px 0 6px;
-  margin-bottom: 16px;
-}
-
-/* Top edge of the panel, running the width of the strip. align-items: flex-end
-   lands every tab's bottom on this line, so the tabs it crosses read as being
-   behind the panel — and the one that covers it reads as being part of it. */
-.typing-tabs::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 6px;
-  height: 2px;
-  background: var(--retro-white);
-}
-
-.typing-tab {
-  position: relative;
-  font-family: 'VT323', monospace;
-  font-size: 1.2rem;
-  background: var(--retro-gray);
-  /* Per-side rather than `outset`: a tab has no bottom edge of its own. */
-  border: 2px solid;
-  border-color: var(--retro-white) var(--retro-dark-gray) transparent var(--retro-white);
-  border-radius: 3px 3px 0 0;
-  padding: 5px 14px 4px;
-  text-decoration: none;
-}
-
-/* Out-specifies the global a:visited, which would otherwise paint whichever
-   tabs you have already been to magenta — a row that changes colour with your
-   browsing history reads as three unrelated buttons rather than one control. */
-.typing-tabs .typing-tab,
-.typing-tabs .typing-tab:visited,
-.typing-tabs .typing-tab:hover {
-  color: var(--retro-black);
-}
-
-.typing-tab:not([aria-current='page']):hover {
-  background: #a0a0a0;
-}
-
-/* No underline to fall back on, so keep the Win95 focus rectangle. */
-.typing-tab:focus-visible {
-  outline: 1px dotted var(--retro-black);
-  outline-offset: -4px;
-}
-
-/* The current view stands taller and, via the negative margin, laps its opaque
-   body over the panel line — the whole tab illusion is that one overlap. */
-.typing-tab[aria-current='page'] {
-  padding: 8px 16px 6px;
-  margin-bottom: -2px;
-  z-index: 1;
-  cursor: default;
-}
-
-@media (max-width: 420px) {
-  .typing-tab {
-    padding: 5px 8px 4px;
-  }
-
-  .typing-tab[aria-current='page'] {
-    padding: 8px 10px 6px;
-  }
 }
 
 .typing-game {

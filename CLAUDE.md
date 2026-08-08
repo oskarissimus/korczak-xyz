@@ -157,6 +157,102 @@ windows — the first one alone missed the loss it was written to catch:
   no earlier value to compare against. Carries the loaded record, the bookmark and
   `storageBytes()` — which is usually the explanation.
 
+## Fretboard Trainer
+
+Spaced-repetition flashcards for the notes on the neck, at `/games/fretboard/`. A card is one
+position, drilled **both ways round** on independent schedules: `name` shows the dot and asks
+what it is called, `find` names the note and a string and asks where it is. Reading a diagram
+and finding G on the A string mid-song are different skills, and the scheduler has no business
+assuming one implies the other.
+
+Answers are a tap, never a self-grade. Correctness is objective and the SM-2 rating comes from
+correctness plus how long it took (`≤2s` easy, `≤5s` good, slower hard, wrong again) — which is
+what makes the per-position accuracy and speed on the stats page measurements rather than
+claims. `srs.ts` is Anki's shape: minute-scale learning steps (1m, 10m) before day-scale
+intervals, relearning after a lapse, mature at ≥21 days.
+
+- `src/utils/fretboard/` — `notes.ts` (tuning, card ids), `diagram.ts`, `srs.ts`, `deck.ts`
+  (scope and queue), `replay.ts` (sync core), `stats.ts`, `storage.ts`, `cloud.ts`, `keys.ts`
+- `src/hooks/useFretboardData.ts` — local state, upload queue, pull and merge
+- `src/components/Fretboard/` — the two islands and their parts
+
+### The deck is derived; the answer log is the record
+
+The typing trainer reconciles by lineage because its progress is a *mutable document* two
+devices can branch. This data is not that shape, and copying `reconcile.ts` here would import a
+conflict model — and a conflict dialog — for a conflict that cannot happen. Two facts do the
+work instead:
+
+1. **A finished sitting is immutable and uniquely identified**, so merging two devices' logs is
+   a union by id. One document per sitting at `users/{uid}/fretboardSessions/{sessionId}`,
+   written once, never edited. No transactions, no bookmark, no `(rev, writerId)`.
+2. **Card state is a pure fold of the answers applied to it** — `rate()` takes `now` rather than
+   reading the clock precisely so this holds. The merged deck is what you get by folding the
+   merged log, so nobody wins and nothing is overwritten.
+
+The deck is still *cached*, because the log it was folded from is pruned once its sittings are
+safely in the cloud. `foldedThrough` is the newest event already in the cache, and it is what
+tells `reconcileDeck` whether arriving events go on top (**append**) or mean the fold has to
+start again (**rebuild**). When they interleave and the local log has been pruned there is
+nothing to rebuild from, so they are folded on top anyway (**append-late**): every answer is
+still counted, only the due dates come out of an older clock, which costs a card one early
+appearance. A caller holding the whole cloud log can pass `completeLog` and get the rebuild.
+
+Answers are written to `fretboard-current` as they happen and folded into the deck when the
+sitting ends — one small key per answer rather than re-serialising a quarter-megabyte log every
+few seconds. A tab closed mid-sitting therefore loses nothing: the next load finds the orphan
+and finishes the sitting on its behalf (`commitSitting`, shared by both paths, so "half of it in
+the deck and none of it in the history" is unreachable).
+
+### The in-session queue is ordered by due time, not by a fixed gap
+
+A missed card comes back inside the sitting. It used to be re-inserted a fixed number of places
+ahead — which **deadlocks**: with a gap of `g`, `g` cards that keep being missed each re-insert
+themselves exactly `g` ahead, the same handful cycle forever and nothing behind them is ever
+reached. Twenty-five answers, two cards seen. `requeue` now places the card in front of
+everything scheduled later than it; cards not yet attempted this sitting have nothing scheduled
+and sort to the front, which is what guarantees the sitting keeps moving through its material.
+`MIN_REQUEUE_GAP` only binds at the tail, and only to stop a card being asked twice in a row —
+the answer is still on the screen you just read.
+
+### Drawing the neck
+
+`diagram.ts` deliberately reproduces the songbook's chord-diagram grammar (`chordDiagram.ts`):
+same four-character row prefix, same `---+` cells, so the fret numbers land on the same columns
+and the two notations read as one. It is **not** the same function — a chord marks the five
+strings it does not use (`✕`/`○`), and a note card must leave them blank or it answers a
+question it did not ask. The window is five frets wide, not the whole neck: thirteen frets is 56
+characters, which no phone renders without either shrinking the glyphs past reading or pushing
+the answer off-screen, and the fret numbers are printed either way, so a window asks exactly the
+same question.
+
+A `find` card is answered on `NeckGrid` instead, because pointing at a place on the instrument
+needs a target big enough for a thumb. Only the asked string is live, which is what makes 19px
+cells workable at 320px — vertical aim does not matter when five of the six rows cannot be
+pressed. The grid's columns are `minmax(0, 1fr)`, so the whole neck always fits rather than
+scrolling; a neck you have to scroll to answer is worse than a narrow one you can see. The same
+component draws the stats heatmap, where each square takes the **weaker** of its two directions:
+a position you can read but not find is not a position you know.
+
+### Storage and stats
+
+Keys are `fretboard-deck` (the cache), `-events` (capped at 2000), `-sessions`, `-mastery`,
+`-settings`, `-current`, `-unsynced`, `-pulled-at`. Writes go through the same `writeKey`
+discipline as the typing trainer, sharing `src/lib/localStorage.ts`; under quota pressure it
+surrenders the oldest answers and never the deck cache, which is the one thing here that cannot
+be rebuilt offline.
+
+Everything on the stats page is recomputed from the deck and the log except the daily mastery
+snapshots, which exist because "how many cards were mature last Tuesday" is the one question the
+log cannot answer cheaply — and because a scheduler change should not rewrite last month.
+
+Note names stay international (A, A♯/B♭, B) in Polish too: Polish notation calls B natural "H",
+and the songbook on this site already writes chords the international way.
+
+The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (`.win-tabs` /
+`.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through
+the one stylesheet it already needed.
+
 ## Installable web apps (PWA)
 
 The site ships **three** installable apps from one origin: the whole site, the guitar tuner

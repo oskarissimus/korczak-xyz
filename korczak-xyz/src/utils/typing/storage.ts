@@ -8,6 +8,7 @@
  * now go through `writeKey`, which reports the failure and, when the store is simply full,
  * buys room by giving up session history rather than losing progress.
  */
+import { isQuotaError, storageBytes } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { bumpRevision } from './reconcile';
 import { clearAllBookmarks } from './syncBookmark';
@@ -26,36 +27,11 @@ function progressKey(bookId: string): string {
   return `${STORAGE_KEYS.progressPrefix}${bookId}`;
 }
 
-// Total characters held in localStorage, across every key on the origin - the trainer shares
-// its budget with the rest of the site. Reported alongside a failed write, where knowing how
-// close to the ceiling we were is the whole diagnosis.
-export function storageBytes(): number {
-  if (typeof window === 'undefined') return 0;
-  try {
-    let total = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key == null) continue;
-      total += key.length + (localStorage.getItem(key)?.length ?? 0);
-    }
-    return total;
-  } catch {
-    return 0;
-  }
-}
-
-// Browsers disagree on how they say "full": the name is standard, the numeric codes are what
-// older Firefox and Safari builds report.
-function isQuotaError(e: unknown): boolean {
-  if (typeof e !== 'object' || e === null) return false;
-  const { name, code } = e as { name?: unknown; code?: unknown };
-  return (
-    name === 'QuotaExceededError' ||
-    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-    code === 22 ||
-    code === 1014
-  );
-}
+// `storageBytes` counts every key on the origin, not just the trainer's - the budget is shared,
+// and it is reported alongside a failed write because knowing how close to the ceiling we were
+// is the whole diagnosis. Re-exported: it was defined here first and the stats page imports it
+// from here.
+export { storageBytes };
 
 // Keys whose last write threw. A full store fails again on the very next keystroke, and an
 // `error` entry makes the log sink persist and flush immediately - so reporting every one

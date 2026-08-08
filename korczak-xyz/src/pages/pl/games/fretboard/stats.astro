@@ -1,0 +1,27 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import FretboardStats from '../../../../components/Fretboard/FretboardStats';
+import FretboardTabs from '../../../../components/Fretboard/FretboardTabs.astro';
+import { useTranslations } from '../../../../i18n';
+import '../../../../styles/fretboard.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Fretboard')} | korczak.xyz`} lang={lang}>
+  <div class="window fretboard-window">
+    <div class="title-bar">
+      <span>{t('Fretboard')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content fretboard-content">
+      <FretboardTabs lang={lang} active="stats" />
+      <FretboardStats client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>
