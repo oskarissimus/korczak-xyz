@@ -3,13 +3,26 @@
  * own — there are too many of them, and they are too specific, to belong in the site-wide table.
  * The game's name and one-line description do live there, because the games index shows them.
  *
- * Note names stay international (A, A♯/B♭, B) in both languages. Polish notation calls B
- * natural "H" and B♭ "B", and half the country's guitarists have never used it: the songbook
- * here already writes chords the international way, and a trainer that disagreed with the
- * chord charts on the same site would be teaching a conflict.
+ * Note names are not in here. Which of the two notations they are shown under is a setting —
+ * see `Notation` in `src/utils/fretboard/notes.ts` — because it is a property of the player and
+ * not of the language they read the page in: someone reading the English page in Warsaw wants H,
+ * and the setting has to survive a locale switch. The language only picks the default.
  */
 
+import type { Notation } from '../../utils/fretboard/notes';
+
 export type Lang = 'en' | 'pl';
+
+/**
+ * Which notation a page opens on.
+ *
+ * Polish gets H notation, which is what is used here and what the songbook's chord transposer
+ * (`src/utils/chords.ts`) has always printed. A default only — the moment the setting is touched
+ * it is stored and synced, and follows the account instead.
+ */
+export function defaultNotationFor(lang: Lang): Notation {
+  return lang === 'pl' ? 'german' : 'international';
+}
 
 export const translations = {
   en: {
@@ -39,6 +52,13 @@ export const translations = {
     sessionLength: 'Session length',
     newPerSession: 'New per session',
     stringLabels: 'String names',
+    // The two buttons are the letters themselves, which is the whole of the difference and fits
+    // the row of single-letter string toggles above it. The tooltips spell it out.
+    notation: 'Note names',
+    notationIntl: 'B',
+    notationGerman: 'H',
+    notationIntlTitle: 'International: A♯/B♭, B',
+    notationGermanTitle: 'German: A♯/B, H',
     on: 'On',
     off: 'Off',
 
@@ -131,6 +151,11 @@ export const translations = {
     sessionLength: 'Długość sesji',
     newPerSession: 'Nowych na sesję',
     stringLabels: 'Nazwy strun',
+    notation: 'Nazwy dźwięków',
+    notationIntl: 'B',
+    notationGerman: 'H',
+    notationIntlTitle: 'Międzynarodowe: A♯/B♭, B',
+    notationGermanTitle: 'Niemieckie: A♯/B, H',
     on: 'Tak',
     off: 'Nie',
 

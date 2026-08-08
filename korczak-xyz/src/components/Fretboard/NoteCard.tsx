@@ -7,11 +7,13 @@
  */
 
 import { renderNoteDiagram } from '../../utils/fretboard/diagram';
+import type { Notation } from '../../utils/fretboard/notes';
 
 interface NoteCardProps {
   stringIndex: number;
   fret: number;
   stringLabels: boolean;
+  notation: Notation;
   /**
    * What the diagram says, for anyone not reading it as a picture. It names the position, not
    * the note — that is the question, and reading out the answer would be a strange kind of help.
@@ -33,8 +35,14 @@ function DiagramLine({ line }: { line: string }) {
   );
 }
 
-export default function NoteCard({ stringIndex, fret, stringLabels, label }: NoteCardProps) {
-  const lines = renderNoteDiagram(stringIndex, fret, { stringLabels });
+export default function NoteCard({
+  stringIndex,
+  fret,
+  stringLabels,
+  notation,
+  label,
+}: NoteCardProps) {
+  const lines = renderNoteDiagram(stringIndex, fret, { stringLabels, notation });
   return (
     <pre className="fb-diagram" role="img" aria-label={label}>
       {lines.map((line, i) => (

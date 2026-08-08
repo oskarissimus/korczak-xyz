@@ -9,7 +9,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { STRING_COUNT, STRING_LABELS } from '../../utils/fretboard/notes';
+import { STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
 import type { Direction } from '../../utils/fretboard/notes';
 import type { Settings } from '../../utils/fretboard/types';
 import type { Translation } from './translations';
@@ -99,7 +99,7 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
             active={settings.strings.includes(index)}
             onClick={() => toggleString(index)}
           >
-            {STRING_LABELS[index]}
+            {stringLabel(index, settings.notation)}
           </Choice>
         ))}
       </Row>
@@ -155,6 +155,27 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
           onClick={() => onChange({ ...settings, stringLabels: false })}
         >
           {t.off}
+        </Choice>
+      </Row>
+
+      {/* The two buttons are the letters that differ, which is shorter than any word for it in
+          either language and matches the single-letter string row above — one of which this
+          setting renames. `Międzynarodowe` wraps the row onto a second line at 320px, and the
+          pre-hydration stand-in reserves one line per row. */}
+      <Row label={t.notation}>
+        <Choice
+          active={settings.notation === 'international'}
+          onClick={() => onChange({ ...settings, notation: 'international' })}
+          title={t.notationIntlTitle}
+        >
+          {t.notationIntl}
+        </Choice>
+        <Choice
+          active={settings.notation === 'german'}
+          onClick={() => onChange({ ...settings, notation: 'german' })}
+          title={t.notationGermanTitle}
+        >
+          {t.notationGerman}
         </Choice>
       </Row>
     </div>

@@ -1,4 +1,4 @@
-import type { Direction } from './notes';
+import type { Direction, Notation } from './notes';
 import type { Bucket, Card, Rating } from './srs';
 
 /** The deck, keyed by card id (`${direction}:${stringIndex}-${fret}`). */
@@ -17,6 +17,8 @@ export interface Settings {
   newPerSession: number;
   /** Whether the diagram prints the string letters. Off is the harder deck. */
   stringLabels: boolean;
+  /** Which names the twelve are shown under. Display only — never what gets stored. */
+  notation: Notation;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,7 +28,20 @@ export const DEFAULT_SETTINGS: Settings = {
   sessionLength: 20,
   newPerSession: 6,
   stringLabels: true,
+  notation: 'international',
 };
+
+/**
+ * The defaults a page starts someone on.
+ *
+ * Only the notation varies, and only by locale: the Polish page opens on H notation because that
+ * is what is used here, the English one on international names. It is a *default* and not a
+ * consequence of the language — once the setting is touched it is stored and synced, and from
+ * then on it follows the account rather than which page it is read on.
+ */
+export function defaultSettings(notation: Notation): Settings {
+  return { ...DEFAULT_SETTINGS, notation };
+}
 
 /**
  * One answer.

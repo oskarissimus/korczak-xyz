@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { loadCloudSettings, pullSessions, pushSession, saveCloudSettings } from '../utils/fretboard/cloud';
 import { cardsInScope, ensureCards, scopeIds } from '../utils/fretboard/deck';
+import type { Notation } from '../utils/fretboard/notes';
 import { emptyCache, reconcileDeck, recordLocal } from '../utils/fretboard/replay';
 import { buildSessionRecord, countBuckets, snapshotMastery } from '../utils/fretboard/stats';
 import {
@@ -46,7 +47,7 @@ import type {
   SessionRecord,
   Settings,
 } from '../utils/fretboard/types';
-import { DEFAULT_SETTINGS } from '../utils/fretboard/types';
+import { DEFAULT_SETTINGS, defaultSettings } from '../utils/fretboard/types';
 import type { AuthUser } from './useAuth';
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error';
@@ -129,7 +130,14 @@ function commitSitting(
   return { cache: nextCache, session, events: storedEvents, mastery };
 }
 
-export function useFretboardData(user: AuthUser | null): FretboardData {
+/**
+ * @param defaultNotation which note names to start someone on, before they have chosen. Comes
+ *   from the page's locale — see `defaultSettings`.
+ */
+export function useFretboardData(
+  user: AuthUser | null,
+  defaultNotation: Notation
+): FretboardData {
   const [state, setState] = useState<FretboardState>(EMPTY);
   const [sync, setSync] = useState<SyncState>({
     status: 'off',
@@ -153,7 +161,7 @@ export function useFretboardData(user: AuthUser | null): FretboardData {
   // --- load ---------------------------------------------------------------------------------
 
   useEffect(() => {
-    const settings = loadSettings();
+    const settings = loadSettings(defaultNotation);
     let cache = loadDeckCache();
     let events = loadEvents();
     let mastery = loadMastery();
@@ -194,7 +202,7 @@ export function useFretboardData(user: AuthUser | null): FretboardData {
       mastery,
     });
     setSync((s) => ({ ...s, pending: loadUnsynced().length }));
-  }, [publish]);
+  }, [defaultNotation, publish]);
 
   // --- sync ---------------------------------------------------------------------------------
 
@@ -232,7 +240,7 @@ export function useFretboardData(user: AuthUser | null): FretboardData {
         // wins outright — there is no work in them to lose.
         const cloudSettings = await loadCloudSettings(uid);
         if (cloudSettings) {
-          const merged = { ...DEFAULT_SETTINGS, ...cloudSettings };
+          const merged = { ...defaultSettings(defaultNotation), ...cloudSettings };
           saveSettings(merged);
           publish({ ...stateRef.current, settings: merged });
         } else {
@@ -280,7 +288,7 @@ export function useFretboardData(user: AuthUser | null): FretboardData {
     } finally {
       syncingRef.current = false;
     }
-  }, [publish]);
+  }, [defaultNotation, publish]);
 
   useEffect(() => {
     uidRef.current = user?.uid ?? null;

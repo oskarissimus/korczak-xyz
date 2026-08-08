@@ -14,7 +14,8 @@
  * the same question.
  */
 
-import { MAX_FRET, STRING_COUNT, STRING_LABELS } from './notes';
+import { MAX_FRET, STRING_COUNT, stringLabel } from './notes';
+import type { Notation } from './notes';
 
 export const WINDOW_SPAN = 5;
 
@@ -45,6 +46,9 @@ export interface DiagramOptions {
   // drawn, and reading up from a known open string is how the neck is actually navigated.
   // Off is the harder deck: the row's identity has to be held in your head.
   stringLabels?: boolean;
+  // Which notation those letters are written in. One character either way, so the columns are
+  // unaffected — only the 2nd string changes, from B to H.
+  notation?: Notation;
 }
 
 /**
@@ -58,7 +62,12 @@ export function renderNoteDiagram(
   fret: number,
   options: DiagramOptions = {}
 ): string[] {
-  const { span = WINDOW_SPAN, maxFret = MAX_FRET, stringLabels = true } = options;
+  const {
+    span = WINDOW_SPAN,
+    maxFret = MAX_FRET,
+    stringLabels = true,
+    notation = 'international',
+  } = options;
   const window = fretWindow(fret, span, maxFret);
   const numCols = window.hi - window.lo + 1;
 
@@ -76,7 +85,7 @@ export function renderNoteDiagram(
     // Drawn high string first, the way a chart is read.
     const string = STRING_COUNT - 1 - row;
     const isTarget = string === stringIndex;
-    const letter = stringLabels ? STRING_LABELS[string] : ' ';
+    const letter = stringLabels ? stringLabel(string, notation) : ' ';
     const nut = isTarget && fret === 0 ? '●' : ' ';
 
     let body = '';

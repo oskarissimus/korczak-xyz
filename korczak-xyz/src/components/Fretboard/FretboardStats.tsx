@@ -22,7 +22,7 @@ import MasteryChart from './MasteryChart';
 import { NeckHeatmap } from './NeckGrid';
 import SyncBadge from './SyncBadge';
 import TrendChart from './TrendChart';
-import { translations, type Lang } from './translations';
+import { defaultNotationFor, translations, type Lang } from './translations';
 
 interface FretboardStatsProps {
   lang: Lang;
@@ -31,7 +31,7 @@ interface FretboardStatsProps {
 export default function FretboardStats({ lang }: FretboardStatsProps) {
   const t = translations[lang];
   const auth = useAuth();
-  const data = useFretboardData(auth.user);
+  const data = useFretboardData(auth.user, defaultNotationFor(lang));
 
   const locale = lang === 'pl' ? 'pl-PL' : 'en-GB';
   const formatDate = (at: number) =>
@@ -132,6 +132,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
           squares={squares}
           describe={describeSquare}
           label={t.neckTitle}
+          notation={data.settings.notation}
         />
         <ul className="fb-legend">
           {(['new', 'learning', 'young', 'mature'] as const).map((bucket) => (

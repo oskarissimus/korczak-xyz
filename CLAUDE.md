@@ -279,8 +279,32 @@ Everything on the stats page is recomputed from the deck and the log except the 
 snapshots, which exist because "how many cards were mature last Tuesday" is the one question the
 log cannot answer cheaply — and because a scheduler change should not rewrite last month.
 
-Note names stay international (A, A♯/B♭, B) in Polish too: Polish notation calls B natural "H",
-and the songbook on this site already writes chords the international way.
+### Notation
+
+German/Polish notation calls the black key below B natural **B**, which leaves B natural needing
+a letter of its own — **H**. That is a `notation` setting (`'international' | 'german'`), not a
+translation: it is a property of the player rather than of the page's language, and someone
+reading the English page in Warsaw still wants H. The locale only picks the default
+(`defaultNotationFor`), and once the setting is touched it is stored and synced and follows the
+account across both locales. This also settles a disagreement the site had with itself — the
+songbook's chord transposer (`src/utils/chords.ts`) has always printed `H`.
+
+Exactly two of the twelve change (`GERMAN_LABELS` in `notes.ts` is that sparse table, not a
+second full one), plus the 2nd string, which becomes the H string. `Cis`/`Des` is a further step
+nothing here takes.
+
+`PITCH_CLASSES[].name` stays international whichever is picked. It is what an answer is graded
+against and what lands in `ReviewEvent.answered` in localStorage and Firestore, so a notation
+reaching it would split one card's history in two — a deck practised one way and reviewed the
+other has to stay one deck. Card ids and storage keys carry no note names at all, so nothing here
+can orphan a deck. `pitchLabel`/`stringLabel`/`noteLabelAt` take the notation as a **required**
+argument rather than defaulting to international, because a defaulted one is how a single call
+site goes on quietly showing `B`.
+
+`keys.ts` maps letters per notation rather than keeping one set of naturals and a shift rule: `H`
+answers B natural, and `B` **unshifted** answers A♯, the letter being the flat name there. That
+closes the existing shift hole from the other side — shift on `B` reaches for what `B` already
+answers, so it does nothing.
 
 The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (`.win-tabs` /
 `.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through

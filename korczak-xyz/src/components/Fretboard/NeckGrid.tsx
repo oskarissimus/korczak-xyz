@@ -18,12 +18,14 @@
  */
 
 import type { ReactNode } from 'react';
-import { STRING_COUNT, STRING_LABELS } from '../../utils/fretboard/notes';
+import { STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
+import type { Notation } from '../../utils/fretboard/notes';
 import type { PositionStat } from '../../utils/fretboard/stats';
 
 interface NeckLayoutProps {
   maxFret: number;
   stringLabels?: boolean;
+  notation: Notation;
   /** `openLabel` is the string's name, and is given only for the nut cell (fret 0). */
   renderCell: (stringIndex: number, fret: number, openLabel: string | null) => ReactNode;
   className?: string;
@@ -33,6 +35,7 @@ interface NeckLayoutProps {
 function NeckLayout({
   maxFret,
   stringLabels = true,
+  notation,
   renderCell,
   className = '',
   label,
@@ -56,7 +59,7 @@ function NeckLayout({
         ))}
         {rows.map((stringIndex) => (
           <div key={stringIndex} className="fb-neck-row" style={{ display: 'contents' }}>
-            {renderCell(stringIndex, 0, stringLabels ? STRING_LABELS[stringIndex] : null)}
+            {renderCell(stringIndex, 0, stringLabels ? stringLabel(stringIndex, notation) : null)}
             {frets.map((fret) => renderCell(stringIndex, fret, null))}
           </div>
         ))}
@@ -71,6 +74,7 @@ interface NeckPickerProps {
   maxFret: number;
   activeString: number;
   stringLabels: boolean;
+  notation: Notation;
   disabled: boolean;
   chosenFret: number | null;
   /** Every fret that sounds the asked note — null until the card has been answered. */
@@ -84,6 +88,7 @@ export function NeckPicker({
   maxFret,
   activeString,
   stringLabels,
+  notation,
   disabled,
   chosenFret,
   answerFrets,
@@ -95,6 +100,7 @@ export function NeckPicker({
     <NeckLayout
       maxFret={maxFret}
       stringLabels={stringLabels}
+      notation={notation}
       className="fb-neck--picker"
       label={label}
       renderCell={(stringIndex, fret, openLabel) => {
@@ -155,13 +161,15 @@ interface NeckHeatmapProps {
   squares: PositionStat[];
   describe: (square: PositionStat) => string;
   label: string;
+  notation: Notation;
 }
 
-export function NeckHeatmap({ maxFret, squares, describe, label }: NeckHeatmapProps) {
+export function NeckHeatmap({ maxFret, squares, describe, label, notation }: NeckHeatmapProps) {
   const bySquare = new Map(squares.map((s) => [`${s.stringIndex}-${s.fret}`, s]));
   return (
     <NeckLayout
       maxFret={maxFret}
+      notation={notation}
       className="fb-neck--heat"
       label={label}
       renderCell={(stringIndex, fret, openLabel) => {

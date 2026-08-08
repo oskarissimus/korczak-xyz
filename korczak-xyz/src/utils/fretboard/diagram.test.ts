@@ -80,6 +80,18 @@ describe('renderNoteDiagram', () => {
     expect(without.join('\n')).toContain('●');
   });
 
+  it('names the 2nd string H under German notation, without moving a column', () => {
+    const intl = renderNoteDiagram(2, 7);
+    const german = renderNoteDiagram(2, 7, { notation: 'german' });
+    // Rows are drawn high string first, so the 2nd string is the second row after the header.
+    expect(intl[2].startsWith('B ')).toBe(true);
+    expect(german[2].startsWith('H ')).toBe(true);
+    expect(german[0]).toBe(intl[0]);
+    expect(german.map((l) => l.length)).toEqual(intl.map((l) => l.length));
+    // One character either way, so nothing but that letter differs.
+    expect(german.filter((l, i) => l !== intl[i])).toHaveLength(1);
+  });
+
   it('renders every card in the deck at the same width', () => {
     const widths = new Set<number>();
     for (let s = 0; s < STRING_COUNT; s++) {

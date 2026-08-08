@@ -5,7 +5,8 @@
  * missed, named in full, so the summary ends with something to do rather than a score.
  */
 
-import { STRING_LABELS, noteLabelAt, parseCardId } from '../../utils/fretboard/notes';
+import { noteLabelAt, parseCardId, stringLabel } from '../../utils/fretboard/notes';
+import type { Notation } from '../../utils/fretboard/notes';
 import { formatSeconds } from '../../utils/fretboard/stats';
 import type { SessionSummary as Summary } from '../../utils/fretboard/stats';
 import { fill, type Translation } from './translations';
@@ -16,6 +17,7 @@ interface SummaryProps {
   masteredAfter: number;
   statsHref: string;
   t: Translation;
+  notation: Notation;
   onAgain: () => void;
   onDone: () => void;
 }
@@ -30,14 +32,15 @@ function Tile({ label, value }: { label: string; value: string }) {
 }
 
 /** `A — D string, fret 7`: the note first, because that is what the card was about. */
-export function describeCard(cardId: string, t: Translation): string {
+export function describeCard(cardId: string, t: Translation, notation: Notation): string {
   const key = parseCardId(cardId);
   if (!key) return cardId;
+  const string = stringLabel(key.stringIndex, notation);
   const where =
     key.fret === 0
-      ? fill(t.a11yPositionOpen, { string: STRING_LABELS[key.stringIndex] })
-      : fill(t.a11yPosition, { string: STRING_LABELS[key.stringIndex], fret: key.fret });
-  return `${noteLabelAt(key.stringIndex, key.fret)} — ${where}`;
+      ? fill(t.a11yPositionOpen, { string })
+      : fill(t.a11yPosition, { string, fret: key.fret });
+  return `${noteLabelAt(key.stringIndex, key.fret, notation)} — ${where}`;
 }
 
 export default function SessionSummary({
@@ -46,6 +49,7 @@ export default function SessionSummary({
   masteredAfter,
   statsHref,
   t,
+  notation,
   onAgain,
   onDone,
 }: SummaryProps) {
@@ -72,7 +76,7 @@ export default function SessionSummary({
           <ul className="fb-missed-list">
             {summary.missed.slice(0, 8).map(({ cardId, misses }) => (
               <li key={cardId}>
-                {describeCard(cardId, t)}
+                {describeCard(cardId, t, notation)}
                 {misses > 1 && <span className="fb-missed-count"> ×{misses}</span>}
               </li>
             ))}

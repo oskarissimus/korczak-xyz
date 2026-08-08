@@ -18,6 +18,7 @@
 import { isQuotaError, storageBytes } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { emptyCache } from './replay';
+import type { Notation } from './notes';
 import type {
   DeckCache,
   MasterySnapshot,
@@ -25,7 +26,7 @@ import type {
   SessionRecord,
   Settings,
 } from './types';
-import { DEFAULT_SETTINGS } from './types';
+import { DEFAULT_SETTINGS, defaultSettings } from './types';
 
 const KEYS = {
   deck: 'fretboard-deck',
@@ -231,9 +232,11 @@ export function saveMastery(history: MasterySnapshot[]): void {
 
 // --- settings -------------------------------------------------------------------------------
 
-export function loadSettings(): Settings {
+export function loadSettings(notation: Notation): Settings {
   const stored = readJSON<Partial<Settings>>(KEYS.settings, {});
-  const merged = { ...DEFAULT_SETTINGS, ...stored };
+  // A settings record written before the notation setting existed has no `notation` key, so the
+  // spread hands it the page's default — which is the migration.
+  const merged = { ...defaultSettings(notation), ...stored };
   // A scope with no strings or no directions is an empty deck and a game that cannot start.
   if (!Array.isArray(merged.strings) || merged.strings.length === 0) {
     merged.strings = DEFAULT_SETTINGS.strings;

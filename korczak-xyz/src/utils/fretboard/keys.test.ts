@@ -3,26 +3,50 @@ import { fretFromKey, isAdvanceKey, noteFromKey } from './keys';
 
 describe('noteFromKey', () => {
   it('answers the natural for a plain letter, in either case', () => {
-    expect(noteFromKey('a', false)).toBe('A');
-    expect(noteFromKey('G', false)).toBe('G');
+    expect(noteFromKey('a', false, 'international')).toBe('A');
+    expect(noteFromKey('G', false, 'international')).toBe('G');
   });
 
   it('answers the sharp when shift is held', () => {
-    expect(noteFromKey('f', true)).toBe('F#');
-    expect(noteFromKey('c', true)).toBe('C#');
+    expect(noteFromKey('f', true, 'international')).toBe('F#');
+    expect(noteFromKey('c', true, 'international')).toBe('C#');
   });
 
   it('ignores shift on the two letters with no sharp on the pad', () => {
     // E♯ and B♯ are F and C, and nobody asks for them that way.
-    expect(noteFromKey('e', true)).toBeNull();
-    expect(noteFromKey('b', true)).toBeNull();
+    expect(noteFromKey('e', true, 'international')).toBeNull();
+    expect(noteFromKey('b', true, 'international')).toBeNull();
   });
 
   it('ignores everything that is not a note letter', () => {
-    expect(noteFromKey('h', false)).toBeNull();
-    expect(noteFromKey('1', false)).toBeNull();
-    expect(noteFromKey('Enter', false)).toBeNull();
-    expect(noteFromKey('', false)).toBeNull();
+    expect(noteFromKey('h', false, 'international')).toBeNull();
+    expect(noteFromKey('1', false, 'international')).toBeNull();
+    expect(noteFromKey('Enter', false, 'international')).toBeNull();
+    expect(noteFromKey('', false, 'international')).toBeNull();
+  });
+});
+
+describe('noteFromKey under German notation', () => {
+  it('answers B natural with H', () => {
+    expect(noteFromKey('h', false, 'german')).toBe('B');
+    expect(noteFromKey('H', false, 'german')).toBe('B');
+  });
+
+  it('answers the black key with an unshifted B', () => {
+    // The pad says `A♯/B` here, so `B` has to reach it — the letter is the flat name.
+    expect(noteFromKey('b', false, 'german')).toBe('A#');
+  });
+
+  it('has nothing above B or H to shift to', () => {
+    expect(noteFromKey('b', true, 'german')).toBeNull();
+    expect(noteFromKey('h', true, 'german')).toBeNull();
+    expect(noteFromKey('e', true, 'german')).toBeNull();
+  });
+
+  it('leaves the other letters as they were', () => {
+    expect(noteFromKey('a', false, 'german')).toBe('A');
+    expect(noteFromKey('f', true, 'german')).toBe('F#');
+    expect(noteFromKey('g', true, 'german')).toBe('G#');
   });
 });
 

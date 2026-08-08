@@ -17,7 +17,7 @@ import FretboardSession from './FretboardSession';
 import SessionSummary from './SessionSummary';
 import SettingsPanel from './SettingsPanel';
 import SyncBadge from './SyncBadge';
-import { translations, type Lang } from './translations';
+import { defaultNotationFor, translations, type Lang } from './translations';
 
 interface FretboardProps {
   lang: Lang;
@@ -43,7 +43,7 @@ function newSessionId(now: number): string {
 export default function Fretboard({ lang }: FretboardProps) {
   const t = translations[lang];
   const auth = useAuth();
-  const data = useFretboardData(auth.user);
+  const data = useFretboardData(auth.user, defaultNotationFor(lang));
 
   const [session, setSession] = useState<ActiveSession | null>(null);
   const [finished, setFinished] = useState<FinishedSession | null>(null);
@@ -132,6 +132,7 @@ export default function Fretboard({ lang }: FretboardProps) {
         masteredAfter={finished.masteredAfter}
         statsHref={statsHref}
         t={t}
+        notation={data.settings.notation}
         onAgain={() => startSession(true)}
         onDone={() => setFinished(null)}
       />

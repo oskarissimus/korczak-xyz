@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DIRECTIONS,
   MAX_FRET,
+  PITCH_CLASSES,
   STRING_COUNT,
   cardId,
   fretsSounding,
@@ -9,6 +10,8 @@ import {
   noteNameAt,
   octaveAt,
   parseCardId,
+  pitchLabel,
+  stringLabel,
 } from './notes';
 
 describe('noteNameAt', () => {
@@ -33,13 +36,51 @@ describe('noteNameAt', () => {
   });
 
   it('labels accidentals both ways round', () => {
-    expect(noteLabelAt(0, 1)).toBe('F');
-    expect(noteLabelAt(0, 2)).toBe('F♯/G♭');
+    expect(noteLabelAt(0, 1, 'international')).toBe('F');
+    expect(noteLabelAt(0, 2, 'international')).toBe('F♯/G♭');
   });
 
   it('rejects a position that is not on the instrument', () => {
     expect(() => noteNameAt(6, 0)).toThrow();
     expect(() => noteNameAt(0, -1)).toThrow();
+  });
+});
+
+describe('notation', () => {
+  it('renames exactly two of the twelve', () => {
+    const differ = PITCH_CLASSES.filter(
+      ({ name }) => pitchLabel(name, 'german') !== pitchLabel(name, 'international')
+    ).map(({ name }) => name);
+    expect(differ).toEqual(['A#', 'B']);
+  });
+
+  it('gives B to the black key and H to B natural', () => {
+    expect(pitchLabel('A#', 'international')).toBe('A♯/B♭');
+    expect(pitchLabel('A#', 'german')).toBe('A♯/B');
+    expect(pitchLabel('B', 'international')).toBe('B');
+    expect(pitchLabel('B', 'german')).toBe('H');
+  });
+
+  it('makes the 2nd string the H string, and leaves the case alone', () => {
+    const german = Array.from({ length: STRING_COUNT }, (_, s) => stringLabel(s, 'german'));
+    expect(german).toEqual(['E', 'A', 'D', 'G', 'H', 'e']);
+    const intl = Array.from({ length: STRING_COUNT }, (_, s) => stringLabel(s, 'international'));
+    expect(intl).toEqual(['E', 'A', 'D', 'G', 'B', 'e']);
+  });
+
+  it('follows through to a position on the neck', () => {
+    // 2nd string open, and the fret below it.
+    expect(noteLabelAt(4, 0, 'german')).toBe('H');
+    expect(noteLabelAt(4, 11, 'german')).toBe('A♯/B');
+  });
+
+  it('leaves the stored name alone, whichever notation is shown', () => {
+    // The deck is keyed and graded on `noteNameAt`, and `ReviewEvent.answered` records it. A
+    // notation that reached this far would split one card's history in two.
+    expect(noteNameAt(4, 0)).toBe('B');
+    expect(noteNameAt(4, 11)).toBe('A#');
+    expect(PITCH_CLASSES.map((p) => p.name)).toContain('B');
+    expect(PITCH_CLASSES.map((p) => p.name)).not.toContain('H');
   });
 });
 

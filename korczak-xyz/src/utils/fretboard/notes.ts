@@ -13,8 +13,12 @@ export const MAX_FRET = 12;
 export const TUNING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 // How each string is labelled on a diagram. Lower case for the high E, as every chord chart
-// in the songbook writes it.
-export const STRING_LABELS = ['E', 'A', 'D', 'G', 'B', 'e'] as const;
+// in the songbook writes it — and the same six under German notation, where the 2nd string is
+// the H string. Spelt out rather than derived from `pitchLabel`, because the casing is part of
+// the notation: the high E is lower case to tell it from the low one, and a pitch class has no
+// case. Private, so `stringLabel` is the one way to ask and no call site can pick the wrong one.
+const STRING_LABELS = ['E', 'A', 'D', 'G', 'B', 'e'] as const;
+const GERMAN_STRING_LABELS = ['E', 'A', 'D', 'G', 'H', 'e'] as const;
 
 export const STRING_COUNT = TUNING_MIDI.length;
 
@@ -36,6 +40,36 @@ export const PITCH_CLASSES = [
 ] as const;
 
 export type NoteName = (typeof PITCH_CLASSES)[number]['name'];
+
+/*
+ * Which names the twelve are shown under.
+ *
+ * German (and Polish) notation renames exactly two of them: the black key below B natural is
+ * called B, which leaves B natural needing a letter of its own — H. The songbook's chord
+ * transposer (`src/utils/chords.ts`) has always written them this way, so the two notations on
+ * this site now agree. The rest keep their international spelling: `Cis`/`Des` is a further step
+ * that nothing else here takes.
+ *
+ * This is a display choice and nothing more. `name` above stays international whichever is
+ * picked, because it is the value answers are compared against and the value written into
+ * `ReviewEvent.answered` — a deck practised under one notation and reviewed under the other has
+ * to remain one deck with one history.
+ */
+export type Notation = 'international' | 'german';
+
+const GERMAN_LABELS: Partial<Record<NoteName, string>> = { 'A#': 'A♯/B', B: 'H' };
+
+/** What a pitch class is called. */
+export function pitchLabel(name: NoteName, notation: Notation): string {
+  if (notation === 'german' && GERMAN_LABELS[name]) return GERMAN_LABELS[name] as string;
+  return PITCH_CLASSES.find((p) => p.name === name)?.label ?? name;
+}
+
+/** What a string is called down the left edge of a diagram. */
+export function stringLabel(stringIndex: number, notation: Notation): string {
+  const labels = notation === 'german' ? GERMAN_STRING_LABELS : STRING_LABELS;
+  return labels[stringIndex];
+}
 
 export interface Position {
   stringIndex: number; // 0 = low E
@@ -64,8 +98,8 @@ export function noteNameAt(stringIndex: number, fret: number): NoteName {
   return PITCH_CLASSES[midiAt(stringIndex, fret) % 12].name;
 }
 
-export function noteLabelAt(stringIndex: number, fret: number): string {
-  return PITCH_CLASSES[midiAt(stringIndex, fret) % 12].label;
+export function noteLabelAt(stringIndex: number, fret: number, notation: Notation): string {
+  return pitchLabel(noteNameAt(stringIndex, fret), notation);
 }
 
 // Which octave the position sounds in, in scientific pitch notation (middle C = C4).

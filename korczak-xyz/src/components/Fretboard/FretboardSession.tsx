@@ -15,12 +15,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, requeue } from '../../utils/fretboard/deck';
 import { fretFromKey, isAdvanceKey, noteFromKey } from '../../utils/fretboard/keys';
 import {
-  PITCH_CLASSES,
-  STRING_LABELS,
   fretsSounding,
   noteLabelAt,
   noteNameAt,
   parseCardId,
+  pitchLabel,
+  stringLabel,
 } from '../../utils/fretboard/notes';
 import type { NoteName } from '../../utils/fretboard/notes';
 import { createCard, isDueWithin, rate, ratingFromAnswer } from '../../utils/fretboard/srs';
@@ -190,7 +190,7 @@ export default function FretboardSession({
       }
       if (!key) return;
       if (key.direction === 'name') {
-        const note = noteFromKey(e.key, e.shiftKey);
+        const note = noteFromKey(e.key, e.shiftKey, settings.notation);
         if (note) {
           e.preventDefault();
           answerNote(note);
@@ -205,13 +205,13 @@ export default function FretboardSession({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [advance, answerFret, answerNote, key, result, settings.maxFret]);
+  }, [advance, answerFret, answerNote, key, result, settings.maxFret, settings.notation]);
 
   if (!key || !cardId) return null;
 
-  const stringName = STRING_LABELS[key.stringIndex];
+  const stringName = stringLabel(key.stringIndex, settings.notation);
   const askedNote = noteNameAt(key.stringIndex, key.fret);
-  const askedLabel = noteLabelAt(key.stringIndex, key.fret);
+  const askedLabel = noteLabelAt(key.stringIndex, key.fret, settings.notation);
   const positionLabel =
     key.fret === 0
       ? fill(t.a11yPositionOpen, { string: stringName })
@@ -255,6 +255,7 @@ export default function FretboardSession({
             stringIndex={key.stringIndex}
             fret={key.fret}
             stringLabels={settings.stringLabels}
+            notation={settings.notation}
             label={positionLabel}
           />
           <NotePad
@@ -262,6 +263,7 @@ export default function FretboardSession({
             disabled={result != null}
             chosen={result?.chosenNote ?? null}
             answer={result ? askedNote : null}
+            notation={settings.notation}
           />
         </>
       ) : (
@@ -269,6 +271,7 @@ export default function FretboardSession({
           maxFret={settings.maxFret}
           activeString={key.stringIndex}
           stringLabels={settings.stringLabels}
+          notation={settings.notation}
           disabled={result != null}
           chosenFret={result?.chosenFret ?? null}
           answerFrets={result?.answerFrets ?? null}
@@ -287,7 +290,7 @@ export default function FretboardSession({
             {!result.correct && (
               <span className="fb-answer">
                 {key.direction === 'name'
-                  ? fill(t.answerWas, { note: PITCH_CLASSES.find((p) => p.name === result.note)?.label ?? result.note })
+                  ? fill(t.answerWas, { note: pitchLabel(result.note, settings.notation) })
                   : fill(t.fretWas, { fret: result.answerFrets.join(' / ') })}
               </span>
             )}

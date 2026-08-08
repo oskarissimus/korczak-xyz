@@ -9,20 +9,37 @@
  * with one deliberate hole. There is no E♯ or B♯ button on the pad, because those names are not
  * how anyone asks for F and C, so shift on those two letters does nothing rather than
  * answering something the player did not mean.
+ *
+ * Under German notation the letters mean something else, so the map is per-notation rather than
+ * a set of naturals plus a rule. `H` answers B natural, and `B` — unshifted — answers A♯,
+ * because in that notation `B` *is* the black key. Which also closes the hole from the other
+ * side: shift on `B` is nothing, since what it would reach for is already what `B` answers.
+ * A single shared set of natural letters is what would silently desync here, so there isn't one.
  */
 
 import { PITCH_CLASSES } from './notes';
-import type { NoteName } from './notes';
+import type { Notation, NoteName } from './notes';
 
-const NATURALS = new Set<string>(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
 const NOTE_NAMES = new Set<string>(PITCH_CLASSES.map((p) => p.name));
 
+/** Letter → the natural it answers, per notation. Absent letters answer nothing. */
+const NATURAL_KEYS: Record<Notation, Record<string, NoteName>> = {
+  international: { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G' },
+  german: { A: 'A', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'B' },
+};
+
 /** The note a keypress answers on a `name` card, or null if it answers nothing. */
-export function noteFromKey(key: string, shift: boolean): NoteName | null {
+export function noteFromKey(key: string, shift: boolean, notation: Notation): NoteName | null {
   const letter = key.toUpperCase();
-  if (!NATURALS.has(letter)) return null;
-  if (!shift) return letter as NoteName;
-  const sharp = `${letter}#`;
+
+  // `B` in German notation is the accidental itself, so it answers with or without shift —
+  // and there is nothing above it to reach for.
+  if (notation === 'german' && letter === 'B') return shift ? null : 'A#';
+
+  const natural = NATURAL_KEYS[notation][letter];
+  if (!natural) return null;
+  if (!shift) return natural;
+  const sharp = `${natural}#`;
   return NOTE_NAMES.has(sharp) ? (sharp as NoteName) : null;
 }
 
