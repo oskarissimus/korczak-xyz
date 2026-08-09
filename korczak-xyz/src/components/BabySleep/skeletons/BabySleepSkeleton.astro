@@ -1,0 +1,62 @@
+---
+/**
+ * Server-rendered stand-in for <BabySleep client:only="react" />, mirroring the log tab: the live
+ * controls, the manual form and the history heading. Astro swaps it for the real island the moment
+ * React hydrates.
+ *
+ * It renders the *awake* state, which is what the island shows unless a sleep happens to be running —
+ * and it cannot know whether one is, because the entries live in localStorage and this runs on the
+ * server. Nothing here may import `storage.ts` for the same reason.
+ */
+import { translations, type Lang } from '../translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+---
+
+<div class="bs-log" aria-hidden="true">
+  <div class="bs-live">
+    <p class="bs-live-state">{t.awake}</p>
+    <div class="bs-live-buttons">
+      <span class="bs-big bs-big--night bs-skel">{t.startNight}</span>
+      <span class="bs-big bs-big--nap bs-skel">{t.startNap}</span>
+    </div>
+    <p class="bs-hint">{t.liveHint}</p>
+  </div>
+
+  <div class="bs-form">
+    <h2 class="bs-subhead">{t.addTitle}</h2>
+    <div class="bs-field">
+      <span class="bs-field-label">{t.kind}</span>
+      <div class="bs-toggle">
+        <span class="bs-toggle-btn bs-skel">{t.kindNight}</span>
+        <span class="bs-toggle-btn bs-toggle-btn--on bs-skel">{t.kindNap}</span>
+      </div>
+    </div>
+    <div class="bs-field">
+      <span class="bs-field-label">{t.fellAsleep}</span>
+      <div class="bs-when">
+        <span class="bs-date bs-skel-field"></span>
+        <span class="bs-time bs-skel-field"></span>
+      </div>
+    </div>
+    <div class="bs-field">
+      <span class="bs-field-label">{t.wokeUpLabel}</span>
+      <div class="bs-when">
+        <span class="bs-date bs-skel-field"></span>
+        <span class="bs-time bs-skel-field"></span>
+      </div>
+    </div>
+    <div class="bs-form-actions">
+      <span class="bs-action bs-skel">{t.add}</span>
+    </div>
+  </div>
+
+  <section class="bs-history">
+    <h2 class="bs-subhead">{t.historyTitle}</h2>
+  </section>
+</div>

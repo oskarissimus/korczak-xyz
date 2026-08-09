@@ -1,0 +1,667 @@
+/* Baby sleep log — retro theme */
+
+@import './tabs.css';
+
+.baby-sleep-window {
+  margin-bottom: 20px;
+}
+
+/* Same reasoning as the other two trainers: this is a property sheet, not a page in a teal window,
+   so the content area is the panel face and the ink has to be reset along with the surface. */
+.baby-sleep-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.bs-log,
+.bs-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+/* Reserves roughly what the island will occupy, so the tab strip above it does not jump. */
+.bs-loading {
+  min-height: 420px;
+}
+
+.bs-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.35rem;
+  margin: 0 0 8px;
+  color: var(--retro-black);
+}
+
+.bs-hint,
+.bs-note {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.bs-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
+/* Visually hidden but read aloud — the date and time fields are labelled by their fieldset legend
+   for a sighted reader and need their own name for a screen reader. */
+.bs-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- live controls --------------------------------------------------------- */
+
+.bs-live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.bs-live-state {
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.bs-live-since {
+  color: var(--retro-dark-gray);
+}
+
+.bs-live-timer {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--retro-navy);
+  /* Tabular by construction: the glyphs are fixed-width, so the seconds ticking cannot shift the
+     digits to their left. */
+}
+
+.bs-live-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The three-in-the-morning buttons. Big enough for a thumb without looking at the screen. */
+.bs-big {
+  flex: 1 1 140px;
+  min-height: 56px;
+  font-family: 'VT323', monospace;
+  font-size: 1.4rem;
+  padding: 10px 14px;
+  border: 3px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.bs-big:active {
+  border-style: inset;
+}
+
+/* Each state names itself twice, the second time with :hover. Layout.astro has a global
+   `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a single class — so without the
+   duplicate the button under the pointer goes flat grey and the colour that carries its meaning
+   disappears exactly while it is being used. */
+.bs-big--night,
+.bs-big--night:hover {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.bs-big--nap,
+.bs-big--nap:hover {
+  background: var(--retro-teal);
+  color: var(--retro-white);
+}
+
+.bs-big--wake,
+.bs-big--wake:hover {
+  background: var(--retro-yellow);
+  color: var(--retro-black);
+}
+
+/* --- the forgotten timer -------------------------------------------------- */
+
+.bs-warn {
+  padding: 10px 12px;
+  border: 2px inset var(--retro-white);
+  background: #ffffcc;
+  color: var(--retro-black);
+  font-size: 1.05rem;
+}
+
+.bs-warn p {
+  margin: 0 0 6px;
+}
+
+.bs-warn-title {
+  font-size: 1.2rem;
+}
+
+.bs-warn-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+/* --- form ----------------------------------------------------------------- */
+
+.bs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.bs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.bs-field-label {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  padding: 0;
+}
+
+.bs-when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* The label is the item in the row, so the row's flex sizing belongs on the label and not on the
+   input inside it. Putting `flex: 1 1 8.5em` on the input made it grow along *this* container's main
+   axis — which is vertical — so a date field filled the label's height and rendered about 150px
+   tall. The input sizes itself to its own text and padding now, and the label decides how much of
+   the row it takes. */
+.bs-when label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Both forms of the row: a label wrapping the input (the two islands) and the bare placeholder box
+   (the server-rendered skeletons, which have no label to wrap). `:has()` is already used this way
+   elsewhere in the site's CSS. */
+.bs-when > label:has(.bs-date),
+.bs-when > .bs-date {
+  flex: 1 1 8.5em;
+  max-width: 12em;
+}
+
+.bs-when > label:has(.bs-time),
+.bs-when > .bs-time {
+  flex: 0 1 6.5em;
+  max-width: 8em;
+}
+
+/* Date and time inputs need to be free to shrink: at VT323 1.1rem the native pickers are wider than
+   they look and would otherwise push .window-content into horizontal scroll on a 320px phone. */
+.bs-date,
+.bs-time {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.bs-skel-field {
+  display: block;
+  height: 2.4em;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.bs-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+
+.bs-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bs-toggle-btn {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  padding: 6px 12px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+/* Selection is background plus the leading ✓ the component draws, never border-style alone:
+   Layout.astro gives every button `:active { border-style: inset }`, so an inset border reads as
+   "being pressed right now" and cannot also mean "chosen". */
+.bs-toggle-btn--on,
+.bs-toggle-btn--on:hover {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+  border-style: inset;
+}
+
+.bs-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.bs-action {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  padding: 8px 18px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.bs-action:active {
+  border-style: inset;
+}
+
+.bs-error {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 1.05rem;
+  background: var(--retro-red);
+  color: var(--retro-white);
+  border: 2px inset var(--retro-white);
+}
+
+.bs-link {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bs-link:hover {
+  background: none;
+  color: var(--retro-teal);
+}
+
+/* --- history -------------------------------------------------------------- */
+
+.bs-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bs-day {
+  border: 2px inset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+.bs-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  padding: 6px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  background: var(--retro-dark-gray);
+  color: var(--retro-white);
+}
+
+.bs-day-meta {
+  font-size: 1rem;
+  color: var(--retro-gray);
+}
+
+.bs-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bs-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 1.1rem;
+  border-top: 1px solid var(--retro-dark-gray);
+}
+
+.bs-entry:first-child {
+  border-top: 0;
+}
+
+.bs-entry-kind {
+  min-width: 4.5em;
+}
+
+.bs-entry-span {
+  flex: 1 1 9em;
+}
+
+.bs-entry-dur {
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.bs-entry-running {
+  color: var(--retro-teal);
+  font-style: normal;
+}
+
+.bs-entry-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* An entry the stats will not count. It stays visible and editable — the point is that the page says
+   so rather than quietly dropping it. */
+.bs-entry--suspect {
+  background: #ffffcc;
+}
+
+.bs-entry--suspect .bs-entry-dur {
+  text-decoration: line-through;
+  color: var(--retro-dark-gray);
+}
+
+/* --- tiles ---------------------------------------------------------------- */
+
+/* A grid rather than a wrapping flex row: with `flex: 1 1 100px` the eighth tile wrapped onto a row
+   of its own and grew to the full width, so one figure read as more important than the seven above
+   it purely because of how the count divided. auto-fit keeps every tile the same size at every
+   viewport. */
+.bs-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.bs-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--retro-gray);
+  border: 2px inset var(--retro-white);
+  text-align: center;
+}
+
+.bs-tile-value {
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--retro-black);
+}
+
+.bs-tile-spread {
+  font-size: 1rem;
+  color: var(--retro-navy);
+}
+
+.bs-tile-label {
+  font-size: 1.05rem;
+}
+
+.bs-tile-of {
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+  min-height: 1em;
+}
+
+/* --- charts --------------------------------------------------------------- */
+
+.bs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The container is what keeps a width:100% SVG from pushing the whole window into horizontal
+   scroll on a phone. Nothing inside may be wider than it.
+
+   The `color` is not decoration: this panel paints itself black while the page's ink is
+   `--retro-black`, so anything nested here that draws text from the inherited colour — a legend,
+   above all — is black on black. That is not a subtle wash, it is invisible, and it looked like
+   missing labels rather than a colour bug because the timeline's legend sits outside this box and
+   read perfectly. Ink belongs with the surface that needs it. */
+.bs-chart {
+  background: var(--retro-black);
+  color: var(--retro-gray);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 10px 12px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.bs-chart svg {
+  display: block;
+  max-width: 100%;
+}
+
+.bs-chart--empty {
+  color: var(--retro-gray);
+  font-size: 1.05rem;
+}
+
+.bs-chart--empty p {
+  margin: 0;
+}
+
+.bs-chart--skeleton {
+  min-height: 200px;
+}
+
+.bs-chart-grid {
+  stroke: var(--retro-dark-gray);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.bs-chart-axis {
+  stroke: var(--retro-dark-gray);
+  stroke-width: 1;
+}
+
+.bs-chart-tick {
+  fill: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  font-size: 12px;
+}
+
+/* --- timeline ------------------------------------------------------------- */
+
+.bs-row {
+  fill: #1a1a2e;
+}
+
+.bs-row--partial {
+  fill: #141428;
+}
+
+/* Every colour class here carries `fill` *and* `background-color`: the same class paints an SVG rect
+   in the chart and an HTML <span> swatch in the legend beneath it, and `fill` does nothing to a
+   span. With only `fill` the legend is a row of empty boxes — which is exactly how the fretboard
+   trainer's legend shipped blank once. */
+.bs-block--night,
+.bs-swatch--night {
+  fill: #4a6ee0;
+  background-color: #4a6ee0;
+}
+
+.bs-block--nap,
+.bs-swatch--nap {
+  fill: #17b3a3;
+  background-color: #17b3a3;
+}
+
+.bs-block--running,
+.bs-swatch--running {
+  fill: var(--retro-yellow);
+  background-color: var(--retro-yellow);
+}
+
+/* --- daily totals --------------------------------------------------------- */
+
+.bs-bar--night {
+  fill: #4a6ee0;
+}
+
+.bs-bar--nap {
+  fill: #17b3a3;
+}
+
+/* A day still in progress. Dimmed rather than dropped: the data is real, the day is not over, and an
+   unmarked short bar reads as a bad night. */
+.bs-bar--partial {
+  opacity: 0.45;
+}
+
+.bs-swatch--partial {
+  background-color: #4a6ee0;
+  opacity: 0.45;
+}
+
+.bs-mean-line,
+.bs-swatch--mean {
+  stroke: var(--retro-yellow);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  fill: none;
+  background-color: var(--retro-yellow);
+}
+
+.bs-mean-label {
+  fill: var(--retro-yellow);
+}
+
+/* --- clock spread --------------------------------------------------------- */
+
+.bs-spread-band,
+.bs-swatch--band {
+  fill: #3a3a6a;
+  background-color: #3a3a6a;
+}
+
+.bs-dot,
+.bs-swatch--dot {
+  fill: var(--retro-cyan);
+  background-color: var(--retro-cyan);
+}
+
+/* --- legend --------------------------------------------------------------- */
+
+.bs-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  font-size: 1.05rem;
+}
+
+.bs-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bs-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.bs-swatch--mean {
+  height: 4px;
+  border: 0;
+}
+
+.bs-legend-value {
+  color: var(--retro-dark-gray);
+}
+
+/* Inline in the history list, where it names the kind rather than a chart series. */
+.bs-entry .bs-swatch {
+  width: 10px;
+  height: 10px;
+}
+
+/* --- window picker -------------------------------------------------------- */
+
+.bs-window-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* --- sync ----------------------------------------------------------------- */
+
+.bs-sync {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.bs-sync--quiet {
+  color: var(--retro-dark-gray);
+}
+
+.bs-sync--ok {
+  color: var(--retro-navy);
+}
+
+.bs-sync--error {
+  color: var(--retro-red);
+}
+
+/* --- server-rendered stand-ins -------------------------------------------- */
+
+/* The skeletons render buttons as spans so nothing is clickable before hydration; they still need
+   to occupy the same box. */
+.bs-skel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--retro-dark-gray);
+}
+
+.bs-big.bs-skel {
+  color: var(--retro-gray);
+}
