@@ -23,18 +23,45 @@
   }
 
   /**
+   * The subtree each app-specific tier covers. These have to agree with APP_TIERS in
+   * scripts/generate-sw.mjs, and with SCOPED in src/utils/pwa/scope.ts — the three are the
+   * same fact stated for three different consumers, and this one cannot import either of the
+   * others: it is inlined into <head> as a classic script.
+   *
+   * The songbook is the odd one: its index is part of the shell, so its tier is the song
+   * pages alone — but the pattern still has to match the index, or launching the installed app
+   * at /songs would never ask for the corpus.
+   */
+  var APP_TIERS = [
+    { tier: 'songs', pattern: /^(\/pl)?\/songs(\/|$)/ },
+    { tier: 'fretboard', pattern: /^(\/pl)?\/games\/fretboard(\/|$)/ },
+    { tier: 'baby-sleep', pattern: /^(\/pl)?\/games\/baby-sleep(\/|$)/ },
+  ];
+
+  /**
    * Which precache tiers this page is entitled to ask for.
    *
    * Nothing beyond the essentials is fetched for an ordinary browser tab. The shell carries
    * the navbar's auth island and with it the whole Firebase SDK — worth having on a dead
    * network if you installed the app, not worth pushing at someone who opened korczak.xyz
-   * once. On iOS both share a single worker and CacheStorage, so this distinction can only be
-   * drawn here, in the page.
+   * once. On iOS every app shares a single worker and CacheStorage, so this distinction can
+   * only be drawn here, in the page.
+   *
+   * At most one app tier is added, because a page belongs to one app: an installed songbook
+   * has no use for the sleep log's chunks, and charging every app for every other app is how
+   * the shell would grow without limit as apps are added.
    */
   function tiersToPrecache() {
     if (!isInstalledApp()) return [];
+    // Shell first: `message` fills tiers in the order given, and nothing else renders without
+    // it. See the note there.
     var tiers = ['shell'];
-    if (/^(\/pl)?\/songs(\/|$)/.test(location.pathname)) tiers.push('songs');
+    for (var i = 0; i < APP_TIERS.length; i++) {
+      if (APP_TIERS[i].pattern.test(location.pathname)) {
+        tiers.push(APP_TIERS[i].tier);
+        break;
+      }
+    }
     return tiers;
   }
 

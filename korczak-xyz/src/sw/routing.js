@@ -14,11 +14,20 @@ export function cacheName(kind, version) {
   return `${CACHE_PREFIX}-${kind}-${version}`;
 }
 
-/** `k95-shell-20260805160245-a1b2c3d4` -> `20260805160245-a1b2c3d4`. */
+/**
+ * `k95-shell-20260805160245-a1b2c3d4` -> `20260805160245-a1b2c3d4`.
+ *
+ * Read from the *end*, not from the third segment onwards: a tier is named after its app and
+ * an app id may contain a hyphen (`baby-sleep`), while a build id is always exactly the two
+ * segments `<timestamp>-<digest>`. Counting from the left, `k95-baby-sleep-<build>` reports its
+ * version as `sleep-<build>` — a version string matching no other cache, so `cachesToDelete`
+ * never sweeps that tier and `documentCacheOrder` files it under "some older build" forever.
+ * Nothing about that failure is visible from the outside; the cache simply grows.
+ */
 export function cacheVersion(name) {
   const parts = String(name).split('-');
-  if (parts.length < 3 || parts[0] !== CACHE_PREFIX) return null;
-  return parts.slice(2).join('-');
+  if (parts.length < 4 || parts[0] !== CACHE_PREFIX) return null;
+  return parts.slice(-2).join('-');
 }
 
 /**

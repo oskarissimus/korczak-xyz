@@ -4,6 +4,7 @@ import {
   PWA_APPS,
   PWA_THEME_COLOR,
   manifestPath,
+  parseManifestParam,
   scope,
   startUrl,
   type PwaApp,
@@ -12,7 +13,8 @@ import { iconUrl } from '../../utils/pwa/iconUrl';
 
 /**
  * One manifest per app per locale, generated rather than hand-written so the app names come
- * from the same translation table as everything else on the site.
+ * from the same translation table as everything else on the site. Adding an app to PWA_APPS is
+ * all it takes to get its manifests; only the artwork has to be produced by hand.
  *
  * iOS reads the manifest linked from the page you install from, so which of these a visitor
  * gets is decided by the `pwa` prop on that page's Layout.
@@ -23,7 +25,7 @@ export const getStaticPaths = () =>
   );
 
 export const GET: APIRoute = ({ params }) => {
-  const [app, lang] = (params.app ?? '').split('-') as [PwaApp, Lang];
+  const { app, lang } = parseManifestParam(params.app ?? '');
   const def = PWA_APPS[app];
   const t = useTranslations(lang);
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Rasterises the home screen icons for the three installable web apps.
+ * Rasterises the home screen icons for the installable web apps.
  *
  *   npm run icons
  *
@@ -61,10 +61,14 @@ const SIZES = [180, 192, 512];
 const MASKABLE_SIZE = 512;
 const MASKABLE_SAFE = 0.8;
 
+const iconsDir = join(siteDir, 'src', 'assets', 'icons');
+
 const sources = {
   site: { file: join(siteDir, 'public', 'logo.png'), maskable: 'inset' },
-  tuner: { file: join(siteDir, 'src', 'assets', 'icons', 'tuner.svg'), maskable: 'bleed' },
-  songs: { file: join(siteDir, 'src', 'assets', 'icons', 'songs.svg'), maskable: 'bleed' },
+  tuner: { file: join(iconsDir, 'tuner.svg'), maskable: 'bleed' },
+  songs: { file: join(iconsDir, 'songs.svg'), maskable: 'bleed' },
+  fretboard: { file: join(iconsDir, 'fretboard.svg'), maskable: 'bleed' },
+  'baby-sleep': { file: join(iconsDir, 'baby-sleep.svg'), maskable: 'bleed' },
 };
 
 /**

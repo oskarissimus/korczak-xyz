@@ -154,6 +154,8 @@ export const ui = {
     'pwa.tuner.short': 'Tuner',
     'pwa.songs.short': 'Songs',
     'pwa.songs.desc': 'Lyrics and chords, available offline',
+    'pwa.fretboard.short': 'Fretboard',
+    'pwa.babySleep.short': 'Baby Sleep',
     'pwa.offline.title': 'Offline',
     'pwa.offline.heading': 'No connection',
     'pwa.offline.message': 'This page has not been saved for offline use. Reconnect and try again.',
@@ -424,6 +426,10 @@ export const ui = {
     'pwa.tuner.short': 'Stroik',
     'pwa.songs.short': 'Teksty',
     'pwa.songs.desc': 'Teksty i akordy, dostępne offline',
+    // "Nuty na gryfie" and "Dziennik snu dziecka" are the full names; iOS truncates a home
+    // screen label at about twelve characters, so these two are shortened rather than cut.
+    'pwa.fretboard.short': 'Gryf',
+    'pwa.babySleep.short': 'Sen',
     'pwa.offline.title': 'Offline',
     'pwa.offline.heading': 'Brak połączenia',
     'pwa.offline.message': 'Ta strona nie została zapisana do użytku offline. Połącz się i spróbuj ponownie.',

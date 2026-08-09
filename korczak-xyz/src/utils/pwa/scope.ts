@@ -4,15 +4,22 @@
  * Split out from apps.ts because this half ships to the browser, and apps.ts imports the whole
  * i18n table.
  */
-export type PwaApp = 'site' | 'tuner' | 'songs';
+export type PwaApp = 'site' | 'tuner' | 'songs' | 'fretboard' | 'baby-sleep';
 
 /**
  * The scoped subtrees, in both locales. `site` is everything else, so it is not listed - it is
- * the fallback, and being a superset of the other two it could never be matched by order.
+ * the fallback, and being a superset of the others it could never be matched by order.
+ *
+ * Each pattern claims the app's whole subtree, not just its landing page, so the tabs within
+ * one app (the fretboard's stats, the sleep log's stats and share) stay inside it - both for
+ * the manifest's `scope`, which decides what iOS opens in the app rather than in Safari, and
+ * for crossesAppBoundary, which would otherwise make every tab click a full page load.
  */
 const SCOPED: ReadonlyArray<{ app: PwaApp; pattern: RegExp }> = [
   { app: 'tuner', pattern: /^(\/pl)?\/games\/tuner(\/|$)/ },
   { app: 'songs', pattern: /^(\/pl)?\/songs(\/|$)/ },
+  { app: 'fretboard', pattern: /^(\/pl)?\/games\/fretboard(\/|$)/ },
+  { app: 'baby-sleep', pattern: /^(\/pl)?\/games\/baby-sleep(\/|$)/ },
 ];
 
 function normalize(pathname: string): string {

@@ -112,6 +112,15 @@ describe('cacheVersion', () => {
     expect(cacheVersion(cacheName('shell', '20260805160245-a1b2c3d4'))).toBe('20260805160245-a1b2c3d4');
   });
 
+  it('reads it back out of a tier whose name contains a hyphen', () => {
+    // Tiers are named after their app, and `baby-sleep` has one. Counting segments from the
+    // left reports `sleep-20260805160245-a1b2c3d4` here, which matches no other cache — so the
+    // tier is never swept on activate and never searched as part of the current build.
+    expect(cacheVersion(cacheName('baby-sleep', '20260805160245-a1b2c3d4'))).toBe(
+      '20260805160245-a1b2c3d4',
+    );
+  });
+
   it('returns null for caches that are not ours', () => {
     expect(cacheVersion('workbox-precache-v2')).toBeNull();
     expect(cacheVersion('k95-shell')).toBeNull();
@@ -119,7 +128,10 @@ describe('cacheVersion', () => {
 });
 
 describe('documentCacheOrder', () => {
-  const names = (version) => ['shell', 'songs', 'runtime'].map((kind) => cacheName(kind, version));
+  // 'baby-sleep' is here because its hyphen is what cacheVersion has to survive; a tier it
+  // misreads is one activate never sweeps and matchDocument never counts as current.
+  const names = (version) =>
+    ['shell', 'songs', 'baby-sleep', 'runtime'].map((kind) => cacheName(kind, version));
   const older = '20260801090000-aaaaaaaa';
   const previous = '20260803120000-bbbbbbbb';
   const current = '20260805160245-cccccccc';
@@ -127,9 +139,10 @@ describe('documentCacheOrder', () => {
   it('searches this build before the ones activate retained', () => {
     // caches.match() would do the opposite: creation order, so `older` answers first.
     const order = documentCacheOrder([...names(older), ...names(previous), ...names(current)], current);
-    expect(order.slice(0, 3).sort()).toEqual(names(current).sort());
-    expect(order.slice(3, 6).sort()).toEqual(names(previous).sort());
-    expect(order.slice(6).sort()).toEqual(names(older).sort());
+    const n = names(current).length;
+    expect(order.slice(0, n).sort()).toEqual(names(current).sort());
+    expect(order.slice(n, 2 * n).sort()).toEqual(names(previous).sort());
+    expect(order.slice(2 * n).sort()).toEqual(names(older).sort());
   });
 
   it('leaves caches belonging to anything else on the origin out entirely', () => {
@@ -144,7 +157,10 @@ describe('documentCacheOrder', () => {
 });
 
 describe('cachesToDelete', () => {
-  const names = (version) => ['shell', 'songs', 'runtime'].map((kind) => cacheName(kind, version));
+  // 'baby-sleep' is here because its hyphen is what cacheVersion has to survive; a tier it
+  // misreads is one activate never sweeps and matchDocument never counts as current.
+  const names = (version) =>
+    ['shell', 'songs', 'baby-sleep', 'runtime'].map((kind) => cacheName(kind, version));
   const older = '20260801090000-aaaaaaaa';
   const previous = '20260803120000-bbbbbbbb';
   const current = '20260805160245-cccccccc';

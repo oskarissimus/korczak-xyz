@@ -16,8 +16,9 @@ interface Props {
   lang?: Lang;
   /**
    * Which installable web app this page belongs to. iOS reads the manifest linked from the
-   * page you install from, so this decides whether "Add to Home Screen" here produces the
-   * scoped Tuner/Songs app or the whole site.
+   * page you install from, so this decides whether "Add to Home Screen" here produces one of
+   * the scoped apps or the whole site. Every page of a scoped app has to set it — a tab that
+   * forgets installs the site under the app's own name.
    */
   pwa?: PwaApp;
 }

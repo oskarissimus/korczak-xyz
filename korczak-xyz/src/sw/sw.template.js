@@ -3,32 +3,14 @@
  * precache lists (which name content-hashed chunks that only exist after a build), inlines
  * routing.js, and writes the result to dist/sw.js.
  *
- * There is exactly one worker for all three installable apps, because iOS shares a single
- * registration and one CacheStorage across Safari and every home screen icon on the origin.
- * That is also why the song corpus is a separate, opt-in tier: a visitor who merely opens
- * korczak.xyz in Safari must not be made to download the whole songbook.
+ * There is exactly one worker for every installable app on the origin, because iOS shares a
+ * single registration and one CacheStorage across Safari and every home screen icon. That is
+ * also why everything past the essentials is an opt-in tier: a visitor who merely opens
+ * korczak.xyz in Safari must not be made to download the whole songbook, and an installed
+ * songbook must not be made to download the other apps.
  */
 
-const ESSENTIAL_CACHE = cacheName('essential', BUILD_ID);
-const SHELL_CACHE = cacheName('shell', BUILD_ID);
-const SONGS_CACHE = cacheName('songs', BUILD_ID);
 const RUNTIME_CACHE = cacheName('runtime', BUILD_ID);
-
-/**
- * Precache tiers, cheapest first. Only the essential tier runs unprompted; the other two are
- * requested by register-sw.js once it knows the page is running as an installed app.
- *
- * The reason is the navbar's auth island, which drags in the whole Firebase SDK — over half a
- * megabyte, on every page. That is a fair price for an app someone deliberately installed and
- * expects to work on a dead network, and an unreasonable one to charge a visitor who opened
- * korczak.xyz once in Safari. The worker cannot tell those two apart, because iOS gives them
- * the same registration; the page can.
- */
-const TIERS = {
-  essential: { cache: () => ESSENTIAL_CACHE, urls: () => ESSENTIAL_URLS },
-  shell: { cache: () => SHELL_CACHE, urls: () => SHELL_URLS },
-  songs: { cache: () => SONGS_CACHE, urls: () => SONGS_URLS },
-};
 
 const OFFLINE_URL = '/offline';
 
@@ -74,12 +56,26 @@ async function precache(cache, urls) {
   return results.filter((result) => result.status === 'rejected').length;
 }
 
-/** Fills a tier, skipping the work if a previous launch already did it for this build. */
+/**
+ * Fills a tier, skipping the work if a previous launch already did it for this build.
+ *
+ * `TIER_URLS` is written by the generator: `essential`, `shell`, and one named after each
+ * installable app. Only `essential` runs unprompted; the rest are requested by register-sw.js
+ * once it knows the page is running as an installed app, and which one. The reason is the
+ * navbar's auth island, which drags in the whole Firebase SDK — over half a megabyte, on every
+ * page. That is a fair price for an app someone deliberately installed and expects to work on
+ * a dead network, and an unreasonable one to charge a visitor who opened korczak.xyz once in
+ * Safari. The worker cannot tell those two apart, because iOS gives them the same
+ * registration; the page can.
+ *
+ * Each tier gets a cache of its own named after it, which is what keeps the apps separable —
+ * see cacheVersion in routing.js for what a hyphen in one of those names costs.
+ */
 async function precacheTier(name) {
-  const tier = TIERS[name];
-  if (!tier) return;
-  const urls = tier.urls();
-  const cache = await caches.open(tier.cache());
+  const urls = TIER_URLS[name];
+  // A page from a previous build can name a tier this worker no longer has. Nothing to do.
+  if (!urls) return;
+  const cache = await caches.open(cacheName(name, BUILD_ID));
   const already = await cache.keys();
   if (already.length >= urls.length) return;
   await precache(cache, urls);
@@ -113,8 +109,8 @@ self.addEventListener('message', (event) => {
   if (!data || data.type !== 'PRECACHE' || !Array.isArray(data.tiers)) return;
   event.waitUntil(
     (async () => {
-      // Sequential, not parallel: the songs tier is 82 requests and must not race the shell
-      // the app needs to render at all.
+      // Sequential, not parallel, and register-sw.js lists the shell first: the songs tier is
+      // 82 requests and must not race the shell the app needs to render at all.
       for (const tier of data.tiers) await precacheTier(tier);
     })(),
   );
