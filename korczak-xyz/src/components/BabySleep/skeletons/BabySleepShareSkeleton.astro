@@ -1,0 +1,39 @@
+---
+/**
+ * Server-rendered stand-in for <BabySleepShare client:only="react" />.
+ *
+ * It draws the owner's layout — heading, intro, the add row, the list heading — because that is the
+ * state the person who can actually reach this tab will nearly always be in, and matching it keeps
+ * the page from jumping when the island lands. It commits to no *content*: no addresses, and no
+ * claim about whether the log is shared, neither of which is knowable before Firestore has been
+ * asked. Nothing here may import `storage.ts` or `shares.ts` — this runs on the server.
+ */
+import { translations, type Lang } from '../translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+---
+
+<div class="bs-share" aria-hidden="true">
+  <section class="bs-section">
+    <h2 class="bs-subhead">{t.shareTitle}</h2>
+    <p class="bs-note">{t.shareIntro}</p>
+    <div class="bs-share-form">
+      <span class="bs-field-label">{t.shareAddLabel}</span>
+      <div class="bs-share-row">
+        <span class="bs-share-input bs-skel"></span>
+        <span class="bs-action bs-skel">{t.shareAddButton}</span>
+      </div>
+      <p class="bs-hint">{t.shareAddHint}</p>
+    </div>
+  </section>
+
+  <section class="bs-section">
+    <h3 class="bs-subhead">{t.shareListTitle}</h3>
+    <p class="bs-hint"></p>
+  </section>
+</div>

@@ -25,6 +25,7 @@ const KEYS = {
   entries: 'baby-sleep-entries',
   unsynced: 'baby-sleep-unsynced',
   settings: 'baby-sleep-settings',
+  owner: 'baby-sleep-owner',
 } as const;
 
 /** Roughly a year and a bit of history kept on the device. The cloud keeps everything. */
@@ -155,6 +156,44 @@ export function markUnsynced(ids: string[]): boolean {
 export function clearUnsynced(ids: string[]): boolean {
   const done = new Set(ids);
   return saveUnsynced(loadUnsynced().filter((id) => !done.has(id)));
+}
+
+// --- whose log is cached here -----------------------------------------------------------------
+
+/*
+ * `baby-sleep-entries` is one key for the whole origin, and until the log could be shared that was
+ * fine: there was one account, so there was one log. With a second account signing in on the same
+ * browser it is not. The cached entries are held with no record of which log they came from, so
+ * signing out and back in as the other person leaves the previous log's rows in place — and the
+ * first sync, seeing entries the cloud lacks, pushes them into the wrong subtree. They are not
+ * wrong-looking data; they are one household's entries duplicated into two logs, and the merge is
+ * designed to preserve exactly that.
+ *
+ * So the cache records which data owner it belongs to. A mismatch is not an error to report, it is
+ * a different log: drop the entries and the push queue and start clean.
+ */
+
+/** Returns whether anything was discarded, so the caller can log the interesting case. */
+export function adoptOwner(dataUid: string): boolean {
+  if (typeof window === 'undefined') return false;
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(KEYS.owner);
+  } catch {
+    return false;
+  }
+
+  if (stored === dataUid) return false;
+
+  // Absent: a store written before this key existed, which by definition holds the only log this
+  // browser has ever had. Adopt it rather than throwing away real history on the upgrade.
+  const switched = stored !== null;
+  if (switched) {
+    writeKey(KEYS.entries, JSON.stringify([]));
+    writeKey(KEYS.unsynced, JSON.stringify([]));
+  }
+  writeKey(KEYS.owner, dataUid);
+  return switched;
 }
 
 // --- settings -------------------------------------------------------------------------------

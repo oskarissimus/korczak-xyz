@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  authorLabel,
   formatClock,
   formatHm,
   formatRunning,
@@ -99,5 +100,28 @@ describe('date and time inputs', () => {
 
   it('accepts a leap day that does exist', () => {
     expect(fromDateTimeInputs('2024-02-29', '00:00')).toBe(new Date(2024, 1, 29).getTime());
+  });
+});
+
+describe('authorLabel', () => {
+  it('drops the domain, which is noise between two people who know the accounts', () => {
+    expect(authorLabel('gowecla@gmail.com')).toBe('gowecla');
+    expect(authorLabel('oskar.jan.korczak@gmail.com')).toBe('oskar.jan.korczak');
+  });
+
+  it('does not truncate — fitting the row is CSS’s job', () => {
+    // A label cut to a fixed width cuts differently in every address, and an ellipsis mid-name
+    // reads as a different person.
+    const long = 'a'.repeat(60);
+    expect(authorLabel(`${long}@gmail.com`)).toBe(long);
+  });
+
+  it('is empty for an absent author, so a caller can test the result', () => {
+    expect(authorLabel(undefined)).toBe('');
+    expect(authorLabel('')).toBe('');
+  });
+
+  it('passes through something that is not an address rather than dropping it', () => {
+    expect(authorLabel('ola')).toBe('ola');
   });
 });

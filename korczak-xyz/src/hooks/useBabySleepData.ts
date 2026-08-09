@@ -24,6 +24,7 @@ import { describeError, log } from '../lib/logger';
 import { pullEntries, pushEntry } from '../utils/babySleep/cloud';
 import { mergeEntries, resolveOpen, visibleEntries } from '../utils/babySleep/merge';
 import {
+  adoptOwner,
   clearUnsynced,
   loadEntries,
   loadUnsynced,
@@ -33,6 +34,7 @@ import {
 import type { EntryDraft, SleepEntry, SleepKind, SyncState } from '../utils/babySleep/types';
 import { editEntry, newEntry, tombstone } from '../utils/babySleep/types';
 import type { AuthUser } from './useAuth';
+import type { DataOwner } from './useDataOwner';
 
 export interface BabySleepData {
   ready: boolean;
@@ -53,7 +55,12 @@ export interface BabySleepData {
 
 const IDLE_SYNC: SyncState = { status: 'off', pending: 0, lastSyncedAt: null, lastError: null };
 
-export function useBabySleepData(user: AuthUser | null): BabySleepData {
+/**
+ * `owner` decides which subtree is read and written — see `useDataOwner`. It is a parameter rather
+ * than something resolved in here because the Share tab needs the same answer without wanting a log,
+ * and because the two are separately testable that way.
+ */
+export function useBabySleepData(user: AuthUser | null, owner: DataOwner): BabySleepData {
   const [entries, setEntries] = useState<SleepEntry[]>([]);
   const [ready, setReady] = useState(false);
   const [sync, setSync] = useState<SyncState>(IDLE_SYNC);
@@ -70,6 +77,14 @@ export function useBabySleepData(user: AuthUser | null): BabySleepData {
     entriesRef.current = next;
     setEntries(next);
   }, []);
+
+  /*
+   * Who is logging, for `authorEmail`. Read through a ref so the mutation callbacks do not have to
+   * take the user as a dependency — they are handed to `onClick` and re-creating them on every auth
+   * tick would remount nothing useful.
+   */
+  const authorRef = useRef<string | undefined>(undefined);
+  authorRef.current = user?.email ?? undefined;
 
   // --- load -------------------------------------------------------------------------------------
 
@@ -117,7 +132,7 @@ export function useBabySleepData(user: AuthUser | null): BabySleepData {
       const now = Date.now();
       // Starting a sleep while one is running closes nothing implicitly — the UI does not offer it,
       // and inventing a wake time for the previous entry would fabricate data.
-      commit([newEntry({ kind, start: instantOr(at, now), end: null }, now)]);
+      commit([newEntry({ kind, start: instantOr(at, now), end: null }, now, authorRef.current)]);
     },
     [commit]
   );
@@ -134,7 +149,7 @@ export function useBabySleepData(user: AuthUser | null): BabySleepData {
 
   const addEntry = useCallback(
     (draft: EntryDraft) => {
-      commit([newEntry(draft, Date.now())]);
+      commit([newEntry(draft, Date.now(), authorRef.current)]);
     },
     [commit]
   );
@@ -226,14 +241,31 @@ export function useBabySleepData(user: AuthUser | null): BabySleepData {
   runSyncRef.current = runSync;
 
   useEffect(() => {
-    uidRef.current = user?.uid ?? null;
-    if (!user) {
+    /*
+     * `owner.resolved` is as much of a precondition as being signed in. An unresolved owner is not
+     * "probably me" — a failed share lookup looks exactly like having no share, and guessing wrong
+     * sends the household's entries into a subtree nobody reads. Staying off is the safe answer;
+     * the log keeps working locally either way.
+     */
+    if (!user || !owner.resolved || !owner.dataUid) {
+      uidRef.current = null;
       pulledRef.current = false;
       setSync({ status: 'off', pending: loadUnsynced().length, lastSyncedAt: null, lastError: null });
       return;
     }
+
+    // The cache is one key for the whole origin, so it may be holding the log of whoever was signed
+    // in last. Discarding it is not a loss: everything in it is either already in the cloud or, if
+    // it never got there, belongs to an account this browser can still sign back into.
+    if (adoptOwner(owner.dataUid)) {
+      log.info('babySleep.cache.reset', { dataUid: owner.dataUid });
+      publish(loadEntries());
+    }
+
+    uidRef.current = owner.dataUid;
+    pulledRef.current = false;
     void runSync(true);
-  }, [user, ready, runSync]);
+  }, [user, ready, runSync, publish, owner.resolved, owner.dataUid]);
 
   useEffect(() => {
     // A reconnect is the other moment worth reading the whole collection: whatever the other device

@@ -350,6 +350,66 @@ The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (
 `.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through
 the one stylesheet it already needed.
 
+## Baby Sleep Log
+
+At `/games/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
+`src/utils/babySleep/` holds the shapes and the pure logic, `useBabySleepData` the state and sync.
+
+The reconciliation is **not** the typing trainer's: these documents are mutable but they are not a
+branching document two devices edit into a conflict, so `merge.ts` is a CRDT-ish union by id
+(`rev` → `updatedAt` → `writerId`, delete absorbing) and no conflict dialog is possible. The hook
+**pulls before it pushes**, unlike `useFretboardData`, because a blind `setDoc` would land on top of
+a correction made elsewhere.
+
+### Sharing
+
+The log can be read and written by a second account, so both parents log against one history. The
+data does not move for this: it stays at `users/{ownerUid}/babySleep`, and access is widened.
+
+One top-level document per invitee, **keyed by the lowercased email**:
+`shares/{email} → { email, ownerUid, ownerEmail, createdAt }`. The id is the address rather than a
+generated key because a security rule has to resolve it from the caller's token alone — `exists()`
+and `get()` are things a rule can do, and a `where('email','==',…)` query is not. That makes
+`normalizeShareEmail` (`shareKeys.ts`, tested) load-bearing rather than cosmetic: it lowercases on
+the way in, and if it ever stopped agreeing with the rule's `request.auth.token.email.lower()`, the
+owner would write grants the rule could never find and sharing would fail silently.
+
+One document does three jobs: it is the grant the rules read, the pointer telling the invitee's
+browser whose log to open, and the row the owner revokes. Unlike a sleep entry it is **really
+deleted** on revoke — the rule asks whether it exists, so a tombstone would leave access granted.
+
+`useDataOwner` resolves it, and **a failed lookup must never fall back to the user's own uid**.
+"I could not tell" and "you have no share" are indistinguishable from the fallback's side, and
+guessing wrong makes the invitee's device decide it owns a private log and push the household's
+entries into her own subtree. So a failure leaves `resolved` false, sync stays off, the log keeps
+working locally, and the share tab offers a retry.
+
+`baby-sleep-owner` records which data owner the localStorage cache belongs to. Without it, signing
+out and in as the other person on one browser leaves the previous log's rows cached, and the first
+sync — seeing entries the cloud lacks — pushes them into the wrong account. An absent value adopts
+the current owner, so an install predating this migrates instead of losing its history.
+
+`authorEmail` is set on creation and never on edit: it answers who *recorded* the sleep, which a
+later correction does not change. `writerId` cannot stand in for it — that is a browser profile, so
+one person on a phone and a laptop is two writers. It renders only on entries somebody **else**
+logged; labelling every row on a two-person log is noise.
+
+### The rules deliberately do not check `email_verified`
+
+Nothing in this flow verifies an address — the owner creates the invitee's account by hand in the
+Firebase console, and the site sends no email. Requiring verification would lock out the very
+account the share is for. That is safe **only because sign-up is disabled at the Identity Platform
+level**, which is what stops anyone claiming an address they do not own. If sign-up is ever enabled,
+`firestore.rules` must require `request.auth.token.email_verified` before anything else, or a
+stranger can register an invited address and walk in.
+
+Note there has never been an email whitelist in this repo, despite how the restriction is often
+described: the single occurrence of the owner's address is a comment in `NavAuth.tsx` about
+truncating a long name. Sign-up being off is a console setting, not a file.
+
+`firestore.rules` is not deployed by CI — `firebase deploy --only firestore:rules` is manual, and
+the sharing rules do nothing until it is run.
+
 ## Installable web apps (PWA)
 
 The site ships **three** installable apps from one origin: the whole site, the guitar tuner

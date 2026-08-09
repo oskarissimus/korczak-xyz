@@ -35,6 +35,18 @@ export interface SleepEntry {
   updatedAt: number;
   /** Which browser profile last wrote it — the final, deterministic tiebreak. */
   writerId: string;
+  /**
+   * Who logged it, once the log is shared with a second account.
+   *
+   * Set when the entry is created and never changed afterwards: it answers "who recorded this
+   * sleep", which a later correction does not alter. `writerId` cannot stand in for it — that is a
+   * browser profile, so one person on a phone and a laptop is two writers, and it is reassigned on
+   * every edit.
+   *
+   * Optional, and it must stay optional: everything logged before sharing existed lacks it, as does
+   * anything logged while signed out.
+   */
+  authorEmail?: string;
   /** Tombstone. Never removed by an edit: a delete is absorbing. See `pickEntry`. */
   deleted?: boolean;
 }
@@ -120,7 +132,12 @@ export function isStale(entry: SleepEntry, now: number): boolean {
 
 // --- constructing and editing ------------------------------------------------------------------
 
-export function newEntry(draft: EntryDraft, now: number): SleepEntry {
+/**
+ * `author` is the signed-in address, or undefined when nobody is signed in. `editEntry` and
+ * `tombstone` spread `prev`, so it needs no parameter of its own there — it rides along with every
+ * later revision of the same entry.
+ */
+export function newEntry(draft: EntryDraft, now: number, author?: string): SleepEntry {
   return {
     id: uuid(),
     kind: draft.kind,
@@ -129,6 +146,7 @@ export function newEntry(draft: EntryDraft, now: number): SleepEntry {
     rev: 0,
     updatedAt: now,
     writerId: getClientId(),
+    ...(author ? { authorEmail: author } : {}),
   };
 }
 
@@ -170,6 +188,11 @@ export function normalizeEntry(raw: unknown): SleepEntry | null {
     rev,
     updatedAt,
     writerId: typeof r.writerId === 'string' ? r.writerId : '',
+    // Spread conditionally rather than assigned, so an entry without an author has no key at all.
+    // `setDoc` rejects an explicit `undefined`, and this record goes straight to Firestore.
+    ...(typeof r.authorEmail === 'string' && r.authorEmail !== ''
+      ? { authorEmail: r.authorEmail }
+      : {}),
     ...(r.deleted === true ? { deleted: true as const } : {}),
   };
 }

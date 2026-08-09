@@ -12,6 +12,7 @@ export const translations = {
     navLabel: 'Baby sleep log sections',
     navLog: 'Log',
     navStats: 'Stats',
+    navShare: 'Share',
 
     // Live controls
     awake: 'Awake',
@@ -69,6 +70,7 @@ export const translations = {
     napsCount: '{count} nap',
     napsCountPlural: '{count} naps',
     dayTotal: '{total} total',
+    loggedBy: 'by {name}',
 
     // Stats — window
     windowLabel: 'Window',
@@ -120,12 +122,48 @@ export const translations = {
     syncPending: '{count} to upload',
     syncError: 'Sync failed',
     syncRetry: 'Retry',
+
+    // Share
+    shareTitle: 'Share this log',
+    shareIntro:
+      'Anyone you share with signs in with their own account and sees the same log — the same running sleep, the same history. Either of you can add, correct and delete entries.',
+    shareUnavailable:
+      'Accounts are not configured on this build, so there is nothing to share the log with. It is still kept on this device.',
+    shareSignedOutTitle: 'Sign in to share',
+    shareSignedOutBody:
+      'Sharing works between accounts, so the log has to be on an account before it can be shared. Signing in also syncs it to your other devices.',
+    shareSignIn: 'Sign in',
+    shareAddLabel: 'Email address',
+    shareAddButton: 'Share',
+    shareAddHint:
+      'The account has to be created in the Firebase console first — this page cannot create it. Adding the address here is safe either way: the access is simply waiting when the account appears.',
+    shareListTitle: 'Shared with',
+    shareEmpty: 'Not shared with anyone yet.',
+    shareRevoke: 'Revoke',
+    shareRevoked: 'Access removed.',
+    shareAdded: '{email} can now open this log.',
+    shareSince: 'since {date}',
+    shareErrEmpty: 'Enter an email address.',
+    shareErrMalformed: 'That does not look like an email address.',
+    shareErrTooLong: 'That address is too long.',
+    shareErrSelf: 'That is your own address — you already have access.',
+    shareErrFailed: 'Could not save the share. Check your connection and try again.',
+    shareGuestTitle: "You are logging into {owner}'s log",
+    shareGuestBody:
+      'Everything you add here goes to their log, and everything they add appears here. Only they can change who it is shared with.',
+    shareOwnerUnknown: 'another account',
+    shareUnresolvedTitle: 'Could not tell whose log this is',
+    shareUnresolvedBody:
+      'The log is still working on this device and nothing has been lost, but it is not syncing until this is settled — writing to the wrong account would be worse than waiting.',
+    shareRetry: 'Try again',
+    shareWorking: 'Saving…',
   },
   pl: {
     // Tabs
     navLabel: 'Sekcje dziennika snu',
     navLog: 'Dziennik',
     navStats: 'Statystyki',
+    navShare: 'Udostępnianie',
 
     // Live controls
     awake: 'Nie śpi',
@@ -183,6 +221,7 @@ export const translations = {
     napsCount: '{count} drzemka',
     napsCountPlural: '{count} drzemek',
     dayTotal: 'razem {total}',
+    loggedBy: 'zapisał(a) {name}',
 
     // Stats — window
     windowLabel: 'Zakres',
@@ -235,6 +274,41 @@ export const translations = {
     syncPending: '{count} do wysłania',
     syncError: 'Błąd synchronizacji',
     syncRetry: 'Ponów',
+
+    // Share
+    shareTitle: 'Udostępnij ten dziennik',
+    shareIntro:
+      'Osoba, której udostępnisz dziennik, loguje się na własne konto i widzi ten sam dziennik — ten sam trwający sen, tę samą historię. Każde z was może dodawać, poprawiać i usuwać wpisy.',
+    shareUnavailable:
+      'W tej wersji konta nie są skonfigurowane, więc nie ma komu udostępnić dziennika. Nadal jest zapisywany na tym urządzeniu.',
+    shareSignedOutTitle: 'Zaloguj się, aby udostępnić',
+    shareSignedOutBody:
+      'Udostępnianie działa między kontami, więc dziennik musi najpierw trafić na konto. Logowanie synchronizuje go też z twoimi pozostałymi urządzeniami.',
+    shareSignIn: 'Zaloguj się',
+    shareAddLabel: 'Adres e-mail',
+    shareAddButton: 'Udostępnij',
+    shareAddHint:
+      'Konto trzeba najpierw założyć w konsoli Firebase — ta strona tego nie zrobi. Dodanie adresu i tak jest bezpieczne: dostęp po prostu czeka, aż konto powstanie.',
+    shareListTitle: 'Udostępniono',
+    shareEmpty: 'Nikomu jeszcze nie udostępniono.',
+    shareRevoke: 'Odbierz dostęp',
+    shareRevoked: 'Dostęp odebrany.',
+    shareAdded: '{email} może teraz otworzyć ten dziennik.',
+    shareSince: 'od {date}',
+    shareErrEmpty: 'Podaj adres e-mail.',
+    shareErrMalformed: 'To nie wygląda na adres e-mail.',
+    shareErrTooLong: 'Ten adres jest za długi.',
+    shareErrSelf: 'To twój własny adres — masz już dostęp.',
+    shareErrFailed: 'Nie udało się zapisać. Sprawdź połączenie i spróbuj ponownie.',
+    shareGuestTitle: 'Piszesz do dziennika, którego właścicielem jest {owner}',
+    shareGuestBody:
+      'Wszystko, co tu dodasz, trafia do ich dziennika, a wszystko, co oni dodadzą, pojawia się tutaj. Tylko oni mogą zmienić, komu jest udostępniony.',
+    shareOwnerUnknown: 'inne konto',
+    shareUnresolvedTitle: 'Nie udało się ustalić, czyj to dziennik',
+    shareUnresolvedBody:
+      'Dziennik nadal działa na tym urządzeniu i nic nie zginęło, ale nie synchronizuje się, dopóki to się nie wyjaśni — zapis na złe konto byłby gorszy niż czekanie.',
+    shareRetry: 'Spróbuj ponownie',
+    shareWorking: 'Zapisywanie…',
   },
 } as const;
 

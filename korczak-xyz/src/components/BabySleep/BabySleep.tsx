@@ -11,6 +11,7 @@ import { useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useBabySleepData } from '../../hooks/useBabySleepData';
+import { useDataOwner } from '../../hooks/useDataOwner';
 import type { EntryDraft, SleepEntry } from '../../utils/babySleep/types';
 import EntryForm from './EntryForm';
 import EntryList from './EntryList';
@@ -28,7 +29,8 @@ const HISTORY_DAYS = 14;
 export default function BabySleep({ lang }: BabySleepProps) {
   const t = translations[lang];
   const auth = useAuth();
-  const data = useBabySleepData(auth.user);
+  const owner = useDataOwner(auth.user);
+  const data = useBabySleepData(auth.user, owner);
   const [editingId, setEditingId] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +108,7 @@ export default function BabySleep({ lang }: BabySleepProps) {
       <EntryList
         entries={recent}
         now={now}
+        viewer={auth.user?.email ?? null}
         formatDay={formatDay}
         formatTime={formatTime}
         onEdit={beginEdit}

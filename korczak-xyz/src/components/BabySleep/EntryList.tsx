@@ -8,7 +8,7 @@
  */
 
 import { dayKeyAt, dayKeyOf, dayStart, durationOf } from '../../utils/babySleep/days';
-import { formatHm } from '../../utils/babySleep/format';
+import { authorLabel, formatHm } from '../../utils/babySleep/format';
 import type { SleepEntry } from '../../utils/babySleep/types';
 import { isPlausible } from '../../utils/babySleep/types';
 import { fill, plural, type Translation } from './translations';
@@ -16,6 +16,12 @@ import { fill, plural, type Translation } from './translations';
 interface EntryListProps {
   entries: SleepEntry[];
   now: number;
+  /**
+   * Who is reading. Entries logged by anyone else are named; the reader's own are not — on a log
+   * shared between two people, labelling every row is noise, and "Ola logged this" is the only part
+   * that carries information. Null when signed out, where nothing is attributed at all.
+   */
+  viewer: string | null;
   formatDay: (t: number) => string;
   formatTime: (t: number) => string;
   onEdit: (entry: SleepEntry) => void;
@@ -43,12 +49,14 @@ function groupEntries(entries: SleepEntry[]): Group[] {
 export default function EntryList({
   entries,
   now,
+  viewer,
   formatDay,
   formatTime,
   onEdit,
   onDelete,
   t,
 }: EntryListProps) {
+  const viewerKey = viewer?.toLowerCase() ?? null;
   if (entries.length === 0) {
     return (
       <section className="bs-history">
@@ -84,6 +92,10 @@ export default function EntryList({
               {group.entries.map((entry) => {
                 const ms = durationOf(entry);
                 const suspect = !isPlausible(entry, now);
+                const author =
+                  entry.authorEmail && entry.authorEmail.toLowerCase() !== viewerKey
+                    ? authorLabel(entry.authorEmail)
+                    : '';
                 return (
                   <li
                     key={entry.id}
@@ -103,6 +115,11 @@ export default function EntryList({
                       )}
                     </span>
                     <span className="bs-entry-dur">{ms == null ? '' : formatHm(ms)}</span>
+                    {author && (
+                      <span className="bs-entry-author" title={entry.authorEmail}>
+                        {fill(t.loggedBy, { name: author })}
+                      </span>
+                    )}
                     <span className="bs-entry-actions">
                       <button type="button" className="bs-link" onClick={() => onEdit(entry)}>
                         {t.edit}

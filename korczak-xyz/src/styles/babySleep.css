@@ -389,6 +389,18 @@
   gap: 10px;
 }
 
+/* Who logged it, on a shared log. Drawn only for entries somebody *else* logged, so it is absent
+   from most rows and must not reserve a column — `flex-basis: 100%` drops it onto its own line on a
+   narrow screen rather than squeezing the times, and it is the least important thing in the row.
+   No truncation: `authorLabel` already dropped the domain, and an ellipsis mid-name reads as a
+   different person. */
+.bs-entry-author {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
 /* An entry the stats will not count. It stays visible and editable — the point is that the page says
    so rather than quietly dropping it. */
 .bs-entry--suspect {
@@ -649,6 +661,87 @@
 
 .bs-sync--error {
   color: var(--retro-red);
+}
+
+/* --- sharing -------------------------------------------------------------- */
+
+.bs-share {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bs-share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Wraps rather than shrinking: an email field narrowed to fit a button beside it on a 320px phone
+   shows about eight characters, and the address is the one thing here that has to be readable
+   before it is submitted. */
+.bs-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.bs-share-input {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  flex: 1 1 14em;
+  min-width: 0;
+}
+
+/* The skeleton draws the field as a span, which has no intrinsic height of its own. */
+span.bs-share-input {
+  height: 2.4em;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.bs-share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+.bs-share-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 1.1rem;
+  border-top: 1px solid var(--retro-dark-gray);
+}
+
+.bs-share-item:first-child {
+  border-top: 0;
+}
+
+/* The address takes the row and the date follows it; `min-width: 0` is what lets a long address
+   wrap inside the flex item instead of pushing Revoke off the edge. */
+.bs-share-email {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bs-share-since {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+/* The sign-in and retry buttons are anchors and buttons wearing the same class, so the anchor needs
+   the parts a button gets for free. */
+a.bs-action {
+  display: inline-block;
+  align-self: flex-start;
+  text-decoration: none;
 }
 
 /* --- server-rendered stand-ins -------------------------------------------- */

@@ -38,6 +38,27 @@ export function formatRunning(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// --- people ------------------------------------------------------------------------------------
+
+/**
+ * An address as a name to put beside an entry: the local part, without the domain.
+ *
+ * The domain is noise on a log shared between two people who both know whose account is whose, and
+ * `oskar.jan.korczak@gmail.com` is far too long to sit on a list row. What is left can still be
+ * long, so the rest of the fitting is CSS's — this does not truncate, because a label cut to a
+ * fixed number of characters cuts differently in every address and an ellipsis mid-name reads as a
+ * different person.
+ *
+ * Returns '' for anything that is not an address, so a caller can test the result rather than
+ * guarding beforehand.
+ */
+export function authorLabel(email: string | undefined): string {
+  if (!email) return '';
+  const at = email.indexOf('@');
+  const local = at === -1 ? email : email.slice(0, at);
+  return local.trim();
+}
+
 // --- form inputs -------------------------------------------------------------------------------
 
 /*

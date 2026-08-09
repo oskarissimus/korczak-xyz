@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useBabySleepData } from '../../hooks/useBabySleepData';
+import { useDataOwner } from '../../hooks/useDataOwner';
 import { resolveWindow } from '../../utils/babySleep/days';
 import { formatClock, formatHm, formatSpread } from '../../utils/babySleep/format';
 import { bedtimePoints, computeStats, firstNapPoints, wakePoints } from '../../utils/babySleep/stats';
@@ -69,7 +70,8 @@ function Tile({ label, value, n, spread, unit = 'days', t }: TileProps) {
 export default function BabySleepStats({ lang }: BabySleepStatsProps) {
   const t = translations[lang];
   const auth = useAuth();
-  const data = useBabySleepData(auth.user);
+  const owner = useDataOwner(auth.user);
+  const data = useBabySleepData(auth.user, owner);
 
   const [stored] = useState(() => loadSettings());
   const [choice, setChoice] = useState<WindowChoice>(() =>

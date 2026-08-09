@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { mergeEntries, pickEntry, pruneEntries, resolveOpen, visibleEntries } from './merge';
 import type { SleepEntry, SleepKind } from './types';
+import { editEntry, newEntry, normalizeEntry, tombstone } from './types';
 
 const T0 = new Date(2026, 0, 15, 12, 0, 0, 0).getTime();
 const HOUR = 3_600_000;
@@ -208,5 +209,58 @@ describe('pruneEntries', () => {
   it('keeps a tombstone inside the horizon, so a delete is not undone by the next pull', () => {
     const gone = make({ id: 'gone', deleted: true });
     expect(pruneEntries([gone], T0, 400, new Set()).map((e) => e.id)).toEqual(['gone']);
+  });
+});
+
+/*
+ * Attribution rides along with the entry rather than being tracked separately, so what has to hold
+ * is that it survives every path a record takes: an edit, a delete, a round trip through
+ * `normalizeEntry`, and a merge between two devices.
+ */
+describe('authorEmail', () => {
+  it('records who logged it, and is absent when nobody is signed in', () => {
+    expect(newEntry({ kind: 'nap', start: T0, end: null }, T0, 'ola@example.com').authorEmail).toBe(
+      'ola@example.com'
+    );
+    expect(newEntry({ kind: 'nap', start: T0, end: null }, T0).authorEmail).toBeUndefined();
+  });
+
+  it('has no key at all when there is no author, because setDoc rejects undefined', () => {
+    expect('authorEmail' in newEntry({ kind: 'nap', start: T0, end: null }, T0)).toBe(false);
+  });
+
+  it('does not change when somebody else corrects the entry', () => {
+    // "Logged by" answers who recorded the sleep. A later correction does not make it theirs.
+    const logged = newEntry({ kind: 'nap', start: T0, end: null }, T0, 'ola@example.com');
+    const corrected = editEntry(logged, { end: T0 + HOUR }, T0 + HOUR);
+    expect(corrected.authorEmail).toBe('ola@example.com');
+    expect(tombstone(corrected, T0 + 2 * HOUR).authorEmail).toBe('ola@example.com');
+  });
+
+  it('survives a round trip through normalizeEntry', () => {
+    const entry = newEntry({ kind: 'night', start: T0, end: null }, T0, 'ola@example.com');
+    expect(normalizeEntry(JSON.parse(JSON.stringify(entry)))?.authorEmail).toBe('ola@example.com');
+  });
+
+  it('rejects an author that is not a usable string, without losing the entry', () => {
+    const base = make({ id: 'x' });
+    expect(normalizeEntry({ ...base, authorEmail: 42 })?.authorEmail).toBeUndefined();
+    expect(normalizeEntry({ ...base, authorEmail: '' })?.authorEmail).toBeUndefined();
+    expect(normalizeEntry({ ...base, authorEmail: 42 })?.id).toBe('x');
+  });
+
+  it('follows the revision that wins the merge', () => {
+    const mine = make({ id: 'x', rev: 1, authorEmail: 'me@example.com' });
+    const theirs = make({ id: 'x', rev: 2, authorEmail: 'ola@example.com' });
+    const merged = mergeEntries([mine], [theirs]);
+    expect(merged.entries[0].authorEmail).toBe('ola@example.com');
+  });
+
+  it('does not resurrect an author the winning revision dropped', () => {
+    // An entry logged before sharing existed has no author, and a merge must not invent one for it
+    // from the losing side.
+    const older = make({ id: 'x', rev: 1, authorEmail: 'me@example.com' });
+    const newer = make({ id: 'x', rev: 2 });
+    expect(mergeEntries([older], [newer]).entries[0].authorEmail).toBeUndefined();
   });
 });

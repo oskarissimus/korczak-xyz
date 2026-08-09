@@ -1,10 +1,55 @@
 rules_version = '2';
 
-// Typing trainer data is private to each account. Since only one account
-// exists (sign-up is disabled at the Identity Platform level), this means the
-// data is readable/writable only by the owner.
+// Each account's data is private to it, with one deliberate exception: the baby sleep log can be
+// shared with a second account, so both parents can log against one history. Everything else —
+// typing progress, fretboard sittings, diagnostic logs — remains owner-only.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // The share document id is the invitee's address, lowercased. `shareKeys.ts` lowercases the
+    // address on the way in for exactly this reason: if the two ever disagreed, the owner would
+    // write a grant that this rule could never find, and the share would silently do nothing.
+    function callerEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function callerShare() {
+      return get(/databases/$(database)/documents/shares/$(callerEmail())).data;
+    }
+
+    function hasShare() {
+      return exists(/databases/$(database)/documents/shares/$(callerEmail()));
+    }
+
+    // Who may read and write somebody else's sleep log. One document per invited address, at the
+    // top level rather than under the owner's subtree, because this rule has to resolve it from the
+    // caller's token before it knows whose data is being asked for.
+    //
+    // Note there is deliberately no `email_verified` check here or below. Nothing in the invite
+    // flow verifies an address — the owner creates the invitee's account by hand in the Firebase
+    // console — so requiring verification would lock out the very account the share is for. That is
+    // safe only because sign-up is disabled at the Identity Platform level, which is what stops
+    // anyone from claiming an address they do not own. IF SIGN-UP IS EVER ENABLED, THIS RULE MUST
+    // REQUIRE request.auth.token.email_verified FIRST, or a stranger can register an invited
+    // address and walk in.
+    match /shares/{email} {
+      // The invitee reads their own share to learn whose log to open; the owner lists the shares
+      // they granted. The owner's list query filters on ownerUid, which is what makes every
+      // document it can return satisfy the second clause.
+      allow read: if signedIn()
+        && (callerEmail() == email || request.auth.uid == resource.data.ownerUid);
+
+      // Only ever created by the owner, for their own uid, with the id and the field agreeing.
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.ownerUid
+        && request.resource.data.email == email;
+
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+    }
+
     // Covers progress, sessions, and the frontend diagnostic log batches written to
     // users/{uid}/logs.
     //
@@ -14,7 +59,15 @@ service cloud.firestore {
     // grants nothing and denies nothing, it is simply ignored. Not worth trading the
     // catch-all's "any future collection just works" for, on a single-account database.
     match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // The shared baby sleep log. This sits *beside* the catch-all above rather than replacing it,
+    // and the same permissive union that makes a narrower rule pointless is what makes a wider one
+    // work: the owner keeps their access through the rule above, and this one adds the invitee's.
+    // Only this collection is shared — a share grants nothing anywhere else under users/{uid}.
+    match /users/{uid}/babySleep/{entryId} {
+      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
     }
   }
 }
