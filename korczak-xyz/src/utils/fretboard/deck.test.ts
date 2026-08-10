@@ -56,7 +56,20 @@ describe('scopeIds', () => {
   });
 
   it('covers the whole neck in both directions', () => {
-    expect(scopeIds(settings({ maxFret: 12 }))).toHaveLength(6 * 13 * 2);
+    // Two cards per position, plus a second `find` card for each black key: frets 0-11 cover the
+    // twelve pitch classes once per string, five of them black, and fret 12 repeats the open
+    // string, which is natural on all six.
+    expect(scopeIds(settings({ maxFret: 12 }))).toHaveLength(6 * 13 * 2 + 6 * 5);
+  });
+
+  it('asks a black key both ways it is spelt, and a natural once', () => {
+    const black = settings({ maxFret: 1, strings: [1], directions: ['find'] }); // A string
+    expect(scopeIds(black)).toEqual(['find:1-0', 'find:1-1', 'find:1-1:b']);
+  });
+
+  it('does not split a `name` card, where either spelling is the right answer', () => {
+    const scope = settings({ maxFret: 1, strings: [1], directions: ['name'] });
+    expect(scopeIds(scope)).toEqual(['name:1-0', 'name:1-1']);
   });
 
   it('ignores strings that are not on the instrument', () => {

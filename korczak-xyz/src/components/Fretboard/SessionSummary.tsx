@@ -5,7 +5,7 @@
  * missed, named in full, so the summary ends with something to do rather than a score.
  */
 
-import { noteLabelAt, parseCardId, stringLabel } from '../../utils/fretboard/notes';
+import { cardNoteLabel, parseCardId, stringLabel } from '../../utils/fretboard/notes';
 import type { Notation } from '../../utils/fretboard/notes';
 import { formatSeconds } from '../../utils/fretboard/stats';
 import type { SessionSummary as Summary } from '../../utils/fretboard/stats';
@@ -31,7 +31,12 @@ function Tile({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** `A — D string, fret 7`: the note first, because that is what the card was about. */
+/**
+ * `A — D string, fret 7`: the note first, because that is what the card was about.
+ *
+ * Named under the spelling the card asked, so the two `find` cards on a black key are two lines
+ * — missing `D♭` and missing `C♯` are different things to go back and look at.
+ */
 export function describeCard(cardId: string, t: Translation, notation: Notation): string {
   const key = parseCardId(cardId);
   if (!key) return cardId;
@@ -40,7 +45,7 @@ export function describeCard(cardId: string, t: Translation, notation: Notation)
     key.fret === 0
       ? fill(t.a11yPositionOpen, { string })
       : fill(t.a11yPosition, { string, fret: key.fret });
-  return `${noteLabelAt(key.stringIndex, key.fret, notation)} — ${where}`;
+  return `${cardNoteLabel(key, notation)} — ${where}`;
 }
 
 export default function SessionSummary({

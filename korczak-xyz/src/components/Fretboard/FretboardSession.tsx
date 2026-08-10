@@ -15,8 +15,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, requeue } from '../../utils/fretboard/deck';
 import { fretFromKey, isAdvanceKey, noteFromKey } from '../../utils/fretboard/keys';
 import {
+  cardNoteLabel,
   fretsSounding,
-  noteLabelAt,
   noteNameAt,
   parseCardId,
   pitchLabel,
@@ -212,7 +212,8 @@ export default function FretboardSession({
 
   const stringName = stringLabel(key.stringIndex, settings.notation);
   const askedNote = noteNameAt(key.stringIndex, key.fret);
-  const askedLabel = noteLabelAt(key.stringIndex, key.fret, settings.notation);
+  // One spelling on a `find` card — the card is asked as "C♯" or as "D♭", never as both.
+  const askedLabel = cardNoteLabel(key, settings.notation);
   const positionLabel =
     key.fret === 0
       ? fill(t.a11yPositionOpen, { string: stringName })

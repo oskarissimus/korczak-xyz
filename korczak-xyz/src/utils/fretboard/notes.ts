@@ -22,24 +22,52 @@ const GERMAN_STRING_LABELS = ['E', 'A', 'D', 'G', 'H', 'e'] as const;
 
 export const STRING_COUNT = TUNING_MIDI.length;
 
-// The twelve answers. `name` is what gets stored and compared; `label` is what the button
-// shows — a flashcard that only ever says "A♯" teaches half of what that fret is called.
+/*
+ * The twelve answers, each under both of its names.
+ *
+ * `name` is what gets stored and compared. The two spellings are held apart rather than baked
+ * into one `C♯/D♭` string because the two questions this game asks want different things from
+ * them: a `name` card, whose answer is a pitch class however you spell it, shows both — a
+ * flashcard that only ever said "A♯" would teach half of what that fret is called — while a
+ * `find` card asks under one spelling at a time. See `Spelling`.
+ *
+ * The seven naturals spell the same both ways, which is what makes "has two names" a property
+ * this table already carries rather than a list to keep in step with it.
+ */
 export const PITCH_CLASSES = [
-  { name: 'C', label: 'C' },
-  { name: 'C#', label: 'C♯/D♭' },
-  { name: 'D', label: 'D' },
-  { name: 'D#', label: 'D♯/E♭' },
-  { name: 'E', label: 'E' },
-  { name: 'F', label: 'F' },
-  { name: 'F#', label: 'F♯/G♭' },
-  { name: 'G', label: 'G' },
-  { name: 'G#', label: 'G♯/A♭' },
-  { name: 'A', label: 'A' },
-  { name: 'A#', label: 'A♯/B♭' },
-  { name: 'B', label: 'B' },
+  { name: 'C', sharp: 'C', flat: 'C' },
+  { name: 'C#', sharp: 'C♯', flat: 'D♭' },
+  { name: 'D', sharp: 'D', flat: 'D' },
+  { name: 'D#', sharp: 'D♯', flat: 'E♭' },
+  { name: 'E', sharp: 'E', flat: 'E' },
+  { name: 'F', sharp: 'F', flat: 'F' },
+  { name: 'F#', sharp: 'F♯', flat: 'G♭' },
+  { name: 'G', sharp: 'G', flat: 'G' },
+  { name: 'G#', sharp: 'G♯', flat: 'A♭' },
+  { name: 'A', sharp: 'A', flat: 'A' },
+  { name: 'A#', sharp: 'A♯', flat: 'B♭' },
+  { name: 'B', sharp: 'B', flat: 'B' },
 ] as const;
 
 export type NoteName = (typeof PITCH_CLASSES)[number]['name'];
+
+/**
+ * Which of a note's two names is meant.
+ *
+ * `C♯` and `D♭` are the same fret and a different question — the fretboard is learnt from
+ * written music, and music written in flats never mentions C♯. So a `find` card is asked under
+ * one spelling at a time, and the two are separate cards on separate schedules for the same
+ * reason the two directions are: knowing one is not knowing the other.
+ *
+ * Naturals have one name under both, so they are one card, and `sharp` is what they carry.
+ */
+export type Spelling = 'sharp' | 'flat';
+
+/** Whether the pitch class is spelt two ways — the five black keys are, the seven naturals not. */
+export function hasTwoSpellings(name: NoteName): boolean {
+  const pitch = PITCH_CLASSES.find((p) => p.name === name);
+  return pitch != null && pitch.sharp !== pitch.flat;
+}
 
 /*
  * Which names the twelve are shown under.
@@ -57,12 +85,31 @@ export type NoteName = (typeof PITCH_CLASSES)[number]['name'];
  */
 export type Notation = 'international' | 'german';
 
-const GERMAN_LABELS: Partial<Record<NoteName, string>> = { 'A#': 'A♯/B', B: 'H' };
+const GERMAN_LABELS: Partial<Record<NoteName, Record<Spelling, string>>> = {
+  'A#': { sharp: 'A♯', flat: 'B' },
+  B: { sharp: 'H', flat: 'H' },
+};
 
-/** What a pitch class is called. */
+/**
+ * What a pitch class is called under one of its two spellings.
+ *
+ * Note that the notation only renames; it never merges or splits. `A♯` is still spelt two ways
+ * under German notation — its flat name is simply `B` rather than `B♭` — so which positions are
+ * two cards is the same question under either, and `hasTwoSpellings` can answer it without one.
+ * A deck whose shape moved with a display setting would be a different deck each way round.
+ */
+export function spellingLabel(name: NoteName, spelling: Spelling, notation: Notation): string {
+  const pitch = PITCH_CLASSES.find((p) => p.name === name);
+  if (!pitch) return name;
+  if (notation === 'german') return GERMAN_LABELS[name]?.[spelling] ?? pitch[spelling];
+  return pitch[spelling];
+}
+
+/** What a pitch class is called when both spellings are meant at once. */
 export function pitchLabel(name: NoteName, notation: Notation): string {
-  if (notation === 'german' && GERMAN_LABELS[name]) return GERMAN_LABELS[name] as string;
-  return PITCH_CLASSES.find((p) => p.name === name)?.label ?? name;
+  const sharp = spellingLabel(name, 'sharp', notation);
+  const flat = spellingLabel(name, 'flat', notation);
+  return sharp === flat ? sharp : `${sharp}/${flat}`;
 }
 
 /** What a string is called down the left edge of a diagram. */
@@ -122,24 +169,63 @@ export const DIRECTIONS: Direction[] = ['name', 'find'];
 /*
  * Card ids.
  *
- * `${direction}:${stringIndex}-${fret}` — stable, sortable, and readable in a stored deck,
- * which matters when the only debugger available is a JSON dump in devtools.
+ * `${direction}:${stringIndex}-${fret}`, with `:b` appended for the flat card — stable, sortable,
+ * and readable in a stored deck, which matters when the only debugger available is a JSON dump
+ * in devtools. `b` is how the songbook's transposer writes a flat in ASCII (`src/utils/chords.ts`).
+ *
+ * The **sharp card is the unsuffixed one**, and that is a migration rather than a preference: the
+ * plain id is what every deck already stored and every logged answer already names, back when one
+ * card asked "C♯/D♭" under both names at once. Reading it as the sharp card keeps the schedule
+ * that card earnt, and leaves the flat card to arrive as the new material it genuinely is.
  */
-export function cardId(direction: Direction, stringIndex: number, fret: number): string {
-  return `${direction}:${stringIndex}-${fret}`;
+const FLAT_SUFFIX = ':b';
+
+export function cardId(
+  direction: Direction,
+  stringIndex: number,
+  fret: number,
+  spelling: Spelling = 'sharp'
+): string {
+  const base = `${direction}:${stringIndex}-${fret}`;
+  return spelling === 'flat' ? `${base}${FLAT_SUFFIX}` : base;
 }
 
 export interface CardKey extends Position {
   direction: Direction;
+  /**
+   * Which name the card asks the position under. `sharp` wherever there is nothing to choose —
+   * on a natural, which has one name, and on a `name` card, which asks for the pitch class and
+   * takes either name as the answer.
+   */
+  spelling: Spelling;
 }
 
 export function parseCardId(id: string): CardKey | null {
-  const match = /^(name|find):(\d)-(\d{1,2})$/.exec(id);
+  const match = /^(name|find):(\d)-(\d{1,2})(:b)?$/.exec(id);
   if (!match) return null;
   const stringIndex = Number(match[2]);
   const fret = Number(match[3]);
   if (!isValidPosition(stringIndex, fret, Number.MAX_SAFE_INTEGER)) return null;
-  return { direction: match[1] as Direction, stringIndex, fret };
+  const direction = match[1] as Direction;
+  const spelling: Spelling = match[4] ? 'flat' : 'sharp';
+  // The flat card exists only where it asks a different question: a `find` card on a black key.
+  // A flat `name` card, or a flat card on a natural, is not something `scopeIds` can mint, so an
+  // id spelt that way is a typo or a corrupt record and not a card to fold answers into.
+  if (spelling === 'flat' && (direction !== 'find' || !hasTwoSpellings(noteNameAt(stringIndex, fret)))) {
+    return null;
+  }
+  return { direction, stringIndex, fret, spelling };
+}
+
+/**
+ * What the note on a card is called, on the card.
+ *
+ * One spelling on a `find` card, because the spelling is the question; both on a `name` card,
+ * because either is a right answer there.
+ */
+export function cardNoteLabel(key: CardKey, notation: Notation): string {
+  if (key.direction !== 'find') return noteLabelAt(key.stringIndex, key.fret, notation);
+  return spellingLabel(noteNameAt(key.stringIndex, key.fret), key.spelling, notation);
 }
 
 /**

@@ -163,7 +163,8 @@ Spaced-repetition flashcards for the notes on the neck, at `/games/fretboard/`. 
 position, drilled **both ways round** on independent schedules: `name` shows the dot and asks
 what it is called, `find` names the note and a string and asks where it is. Reading a diagram
 and finding G on the A string mid-song are different skills, and the scheduler has no business
-assuming one implies the other.
+assuming one implies the other. On a black key `find` is split again, once per spelling — see
+below.
 
 Answers are a tap, never a self-grade. Correctness is objective and the SM-2 rating comes from
 correctness plus how long it took (`≤2s` easy, `≤5s` good, slower hard, wrong again) — which is
@@ -175,6 +176,35 @@ intervals, relearning after a lapse, mature at ≥21 days.
   (scope and queue), `replay.ts` (sync core), `stats.ts`, `storage.ts`, `cloud.ts`, `keys.ts`
 - `src/hooks/useFretboardData.ts` — local state, upload queue, pull and merge
 - `src/components/Fretboard/` — the two islands and their parts
+
+### A black key is two `find` cards, one per spelling
+
+"Where is C♯ on the A string" and "where is D♭ on the A string" have the same answer and are not
+the same question. A card that asked under both names at once (`C♯/D♭ on the A string`) could be
+passed while only ever reading one of them, and music written in flats never mentions C♯ — so the
+`find` direction is split by `Spelling` (`'sharp' | 'flat'`), and the two halves are separate
+cards on separate schedules for exactly the reason the two directions are.
+
+The `name` direction is **not** split: it asks what a pitch class is called, and both names are
+right, so its pad goes on showing `C♯/D♭`. A natural has one name under either spelling, so it
+stays one card each way round. `hasTwoSpellings` is what decides, and it reads `PITCH_CLASSES`
+(now `{ name, sharp, flat }`) rather than a second list to keep in step.
+
+The flat card's id carries `:b` — `find:1-4:b`, the ASCII flat the songbook's transposer already
+writes — and **the sharp card is the unsuffixed one**. That is a migration, not a preference:
+`find:1-4` is what every stored deck and every logged answer already names, so reading it as the
+sharp card keeps the schedule it earnt and lets the flat card arrive as the new material it is.
+`parseCardId` rejects a `:b` that could never have been minted (a `name` card, or a natural),
+because such an id is a corrupt record and not a card to fold answers into.
+
+Which positions are two cards must not move with the notation setting, or a deck would change
+shape when a display option is touched. It cannot: German notation *renames* and never merges —
+`A♯`'s flat name is `B` there rather than `B♭`, still two names — so `hasTwoSpellings` answers
+without being told the notation at all.
+
+`spreadPositions` needed nothing for this. It keys on the position, and the two spellings share
+one; they are in fact the sharpest case it exists for, since they share the answer too and back
+to back the second is not read at all.
 
 ### The deck is derived; the answer log is the record
 
@@ -337,9 +367,10 @@ nothing here takes.
 against and what lands in `ReviewEvent.answered` in localStorage and Firestore, so a notation
 reaching it would split one card's history in two — a deck practised one way and reviewed the
 other has to stay one deck. Card ids and storage keys carry no note names at all, so nothing here
-can orphan a deck. `pitchLabel`/`stringLabel`/`noteLabelAt` take the notation as a **required**
-argument rather than defaulting to international, because a defaulted one is how a single call
-site goes on quietly showing `B`.
+can orphan a deck — the one thing a card id does carry about a name is *which spelling* it asks
+under, and that is notation-independent. `pitchLabel`/`spellingLabel`/`stringLabel`/`noteLabelAt`
+take the notation as a **required** argument rather than defaulting to international, because a
+defaulted one is how a single call site goes on quietly showing `B`.
 
 `keys.ts` maps letters per notation rather than keeping one set of naturals and a shift rule: `H`
 answers B natural, and `B` **unshifted** answers A♯, the letter being the flat name there. That

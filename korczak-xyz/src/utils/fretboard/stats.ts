@@ -213,7 +213,7 @@ export interface PositionStat {
   correct: number;
   accuracy: number | null;
   avgMs: number | null;
-  /** The weaker of the two directions — a position is only known when both ways round are. */
+  /** The weakest card on the square — a position is only known when every way of asking it is. */
   bucket: Bucket;
 }
 
@@ -222,9 +222,10 @@ const BUCKET_ORDER: Bucket[] = ['new', 'learning', 'young', 'mature'];
 /**
  * Collapse the deck onto the neck for the heatmap.
  *
- * The two directions share a square, because the square is a place on the instrument and that
- * is what the picture is about. They are combined by taking the weaker one: a position you can
- * read but not find is not a position you know.
+ * Every card asking about a position shares its square — both directions, and on a black key
+ * both spellings of the `find` card — because the square is a place on the instrument and that
+ * is what the picture is about. They are combined by taking the weakest: a position you can
+ * read but not find is not a position you know, and nor is one you can find as C♯ but not as D♭.
  */
 export function positionStats(deck: Deck): PositionStat[] {
   const squares = new Map<string, PositionStat>();

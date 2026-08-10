@@ -1,7 +1,7 @@
 import type { Direction, Notation } from './notes';
 import type { Bucket, Card, Rating } from './srs';
 
-/** The deck, keyed by card id (`${direction}:${stringIndex}-${fret}`). */
+/** The deck, keyed by card id (`${direction}:${stringIndex}-${fret}`, plus `:b` on a flat card). */
 export type Deck = Record<string, Card>;
 
 export interface Settings {

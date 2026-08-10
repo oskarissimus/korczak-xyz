@@ -5,12 +5,15 @@ import {
   PITCH_CLASSES,
   STRING_COUNT,
   cardId,
+  cardNoteLabel,
   fretsSounding,
+  hasTwoSpellings,
   noteLabelAt,
   noteNameAt,
   octaveAt,
   parseCardId,
   pitchLabel,
+  spellingLabel,
   stringLabel,
 } from './notes';
 
@@ -84,6 +87,30 @@ describe('notation', () => {
   });
 });
 
+describe('spellings', () => {
+  it('gives the five black keys two names and the seven naturals one', () => {
+    const two = PITCH_CLASSES.filter(({ name }) => hasTwoSpellings(name)).map(({ name }) => name);
+    expect(two).toEqual(['C#', 'D#', 'F#', 'G#', 'A#']);
+  });
+
+  it('spells each side of a black key on its own', () => {
+    expect(spellingLabel('C#', 'sharp', 'international')).toBe('C♯');
+    expect(spellingLabel('C#', 'flat', 'international')).toBe('D♭');
+    expect(spellingLabel('D', 'flat', 'international')).toBe('D');
+  });
+
+  it('renames rather than merges under German notation', () => {
+    // A♯ is still two names there — the flat one is just B rather than B♭ — so which positions
+    // are two cards cannot move with the setting.
+    expect(spellingLabel('A#', 'sharp', 'german')).toBe('A♯');
+    expect(spellingLabel('A#', 'flat', 'german')).toBe('B');
+    expect(spellingLabel('B', 'sharp', 'german')).toBe('H');
+    expect(spellingLabel('B', 'flat', 'german')).toBe('H');
+    expect(hasTwoSpellings('A#')).toBe(true);
+    expect(hasTwoSpellings('B')).toBe(false);
+  });
+});
+
 describe('card ids', () => {
   it('round-trips every card in the full deck', () => {
     for (const direction of DIRECTIONS) {
@@ -93,10 +120,28 @@ describe('card ids', () => {
             direction,
             stringIndex: s,
             fret: f,
+            spelling: 'sharp',
           });
         }
       }
     }
+  });
+
+  it('round-trips the flat card of a black key', () => {
+    expect(parseCardId(cardId('find', 1, 4, 'flat'))).toEqual({
+      direction: 'find',
+      stringIndex: 1,
+      fret: 4,
+      spelling: 'flat',
+    });
+  });
+
+  it('reads a plain id as the sharp card, so a stored deck keeps its schedule', () => {
+    // `find:1-4` is what the deck held back when one card asked "C♯/D♭" under both names. It has
+    // to go on naming a card that exists, or every schedule earnt on a black key is orphaned.
+    expect(cardId('find', 1, 4)).toBe('find:1-4');
+    expect(cardId('find', 1, 4, 'flat')).toBe('find:1-4:b');
+    expect(parseCardId('find:1-4')?.spelling).toBe('sharp');
   });
 
   it('keeps the two directions apart', () => {
@@ -108,6 +153,31 @@ describe('card ids', () => {
     expect(parseCardId('sing:3-7')).toBeNull();
     expect(parseCardId('name:9-7')).toBeNull();
     expect(parseCardId('')).toBeNull();
+  });
+
+  it('returns null for a flat card that could never be minted', () => {
+    // A `name` card takes either spelling as its answer, and a natural has only the one.
+    expect(parseCardId('name:1-4:b')).toBeNull();
+    expect(parseCardId('find:1-3:b')).toBeNull(); // string A, fret 3 — C, a natural
+  });
+});
+
+describe('cardNoteLabel', () => {
+  const find = (fret: number, spelling: 'sharp' | 'flat') =>
+    parseCardId(cardId('find', 1, fret, spelling))!;
+
+  it('names a find card under the one spelling it asks', () => {
+    expect(cardNoteLabel(find(4, 'sharp'), 'international')).toBe('C♯');
+    expect(cardNoteLabel(find(4, 'flat'), 'international')).toBe('D♭');
+  });
+
+  it('names a name card under both, because either answer is right', () => {
+    expect(cardNoteLabel(parseCardId('name:1-4')!, 'international')).toBe('C♯/D♭');
+  });
+
+  it('follows the notation', () => {
+    expect(cardNoteLabel(find(1, 'flat'), 'german')).toBe('B');
+    expect(cardNoteLabel(find(1, 'sharp'), 'german')).toBe('A♯');
   });
 });
 

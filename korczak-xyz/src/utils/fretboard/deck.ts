@@ -7,7 +7,7 @@
  * deleted: widen the range again and the schedule you had earnt is still there.
  */
 
-import { MAX_FRET, STRING_COUNT, cardId, parseCardId } from './notes';
+import { MAX_FRET, STRING_COUNT, cardId, hasTwoSpellings, noteNameAt, parseCardId } from './notes';
 import type { CardKey, Direction } from './notes';
 import type { Bucket, Card } from './srs';
 import { bucketOf, createCard, isDue } from './srs';
@@ -37,6 +37,12 @@ export const MAX_ANSWERS_FACTOR = 3;
  * A stable enumeration, not a running order — `ensureCards`, the deck counts and the heatmap all
  * read it and none of them care what order it comes in. What a sitting asks, and in what order,
  * is `buildQueue`'s business, and it shuffles.
+ *
+ * A black key is two `find` cards, not one. "Where is C♯ on the A string" and "where is D♭ on the
+ * A string" have the same answer and are not the same question: music written in flats never says
+ * C♯, and a card asking under both names at once lets you pass it while only ever reading one of
+ * them. The `name` direction is not split — it asks what a pitch class is called, and both names
+ * are right — so a natural is one card in each direction and a black key is one and two.
  */
 export function scopeIds(settings: Settings): string[] {
   const ids: string[] = [];
@@ -45,7 +51,12 @@ export function scopeIds(settings: Settings): string[] {
   for (let fret = 0; fret <= Math.min(settings.maxFret, MAX_FRET); fret++) {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
-      for (const direction of directions) ids.push(cardId(direction, string, fret));
+      for (const direction of directions) {
+        ids.push(cardId(direction, string, fret));
+        if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
+          ids.push(cardId(direction, string, fret, 'flat'));
+        }
+      }
     }
   }
   return ids;
@@ -129,7 +140,7 @@ export function shuffle<T>(items: T[], rng: () => number): T[] {
   return out;
 }
 
-/** How many cards apart the two directions of one position should be kept. */
+/** How many cards apart the cards asking about one position should be kept. */
 export const MIN_POSITION_GAP = 3;
 
 /**
@@ -139,6 +150,10 @@ export const MIN_POSITION_GAP = 3;
  * from having just read the first — and it lands in the log as a fast, correct answer, so the
  * scheduler pushes the card out and the stats page reports a fluency that was never demonstrated.
  * A shuffle alone does not fix this; it only makes the clumping unpredictable.
+ *
+ * The two spellings of a black key (`find:1-4` and `find:1-4:b`) are the sharpest case of it:
+ * they share a position *and* an answer, so back to back the second is not even read. They land
+ * on the same key here without being mentioned, because the key is the position.
  *
  * Greedy: take the first remaining card whose position has not come up in the last `gap`, and
  * fall back to the first remaining card when none qualifies. The fallback is what makes this
