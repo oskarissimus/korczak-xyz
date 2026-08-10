@@ -270,6 +270,14 @@
   border-style: inset;
 }
 
+/* Which sleep is being cut in two. The form sits above the history, so by the time the times are
+   typed the row it was opened from may be off the screen. */
+.bs-split-of {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
 .bs-form-actions {
   display: flex;
   gap: 8px;

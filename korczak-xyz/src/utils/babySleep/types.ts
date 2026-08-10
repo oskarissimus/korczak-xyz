@@ -1,9 +1,11 @@
 /*
  * Baby sleep log — the shape of the record, and what counts as a believable one.
  *
- * One entry is one contiguous stretch of sleep. Night sleep is deliberately a single block from
- * bedtime to the morning wake-up: brief night wakings are not modelled, so a night's total is the
- * duration of its one entry and nothing has to be grouped to get it.
+ * One entry is one contiguous stretch of sleep — and *contiguous* is the whole of it. A night broken
+ * by a waking is therefore two entries with a gap between them, not one entry carrying a list of
+ * wakings: nothing here needs a new field, and the merge rule that already handles two rows handles
+ * it without being told anything. A night's total is its blocks added up, which `groupByDay` does,
+ * and `nightBlocks` in `stats.ts` is where the blocks are read back as one night.
  *
  * `end: null` means the sleep is in progress. Such an entry is a real, durable record the instant
  * the button writes it — it needs no crash recovery, and it syncs, so a second device shows
@@ -207,7 +209,7 @@ export interface TimeWindow {
   to: number;
 }
 
-/** One local day's sleep. `night` is a single block by definition; naps are however many. */
+/** One local day's sleep. One night, in however many blocks a waking broke it into; any naps. */
 export interface DayBucket {
   /** Local `yyyy-mm-dd`. */
   key: string;
@@ -215,7 +217,11 @@ export interface DayBucket {
   start: number;
   /** Local midnight closing it — not `start + 86_400_000`, which is wrong twice a year. */
   end: number;
-  /** null when no believable closed night is attributed to this day. */
+  /**
+   * The night's blocks added up, or null when no believable closed night is attributed to this day.
+   * Non-null does not mean the night is *finished* — a night whose second block is still running has
+   * its first block counted here. `nightBlocks` is what answers that question.
+   */
   nightMs: number | null;
   napMs: number;
   naps: number;
@@ -246,6 +252,10 @@ export interface SleepStats {
   /** Total sleep per day. Counts only days with a believable closed night, so today does not sag it. */
   totalPerDay: MeanStat;
   nightPerDay: MeanStat;
+  /** How many times a night was broken by a waking. A night slept through contributes a real 0. */
+  nightWakes: MeanStat;
+  /** Time awake between the blocks of one night — the part of the night that was not sleep. */
+  nightAwake: MeanStat;
   napPerDay: MeanStat;
   napsPerDay: MeanStat;
   napLength: MeanStat;

@@ -9,6 +9,7 @@
 
 import { dayKeyAt, dayKeyOf, dayStart, durationOf } from '../../utils/babySleep/days';
 import { authorLabel, formatHm } from '../../utils/babySleep/format';
+import { canSplit } from '../../utils/babySleep/split';
 import type { SleepEntry } from '../../utils/babySleep/types';
 import { isPlausible } from '../../utils/babySleep/types';
 import { fill, plural, type Translation } from './translations';
@@ -25,6 +26,12 @@ interface EntryListProps {
   formatDay: (t: number) => string;
   formatTime: (t: number) => string;
   onEdit: (entry: SleepEntry) => void;
+  /**
+   * Cut this sleep in two around a waking. Offered on any sleep with room for one — naps as well as
+   * nights, and the sleep still running, whose second half stays running. That last case is the one
+   * that matters at eight in the morning, when the waking was slept through and never logged.
+   */
+  onSplit: (entry: SleepEntry) => void;
   onDelete: (entry: SleepEntry) => void;
   t: Translation;
 }
@@ -53,6 +60,7 @@ export default function EntryList({
   formatDay,
   formatTime,
   onEdit,
+  onSplit,
   onDelete,
   t,
 }: EntryListProps) {
@@ -124,6 +132,11 @@ export default function EntryList({
                       <button type="button" className="bs-link" onClick={() => onEdit(entry)}>
                         {t.edit}
                       </button>
+                      {canSplit(entry, now) && (
+                        <button type="button" className="bs-link" onClick={() => onSplit(entry)}>
+                          {t.splitAction}
+                        </button>
+                      )}
                       <button type="button" className="bs-link" onClick={() => onDelete(entry)}>
                         {t.remove}
                       </button>

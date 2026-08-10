@@ -50,6 +50,15 @@ export const translations = {
     add: 'Add',
     cancel: 'Cancel',
 
+    // Night wakings
+    splitAction: 'Add wake',
+    splitTitle: 'Wake period',
+    splitOf: 'Splitting {kind} {from} – {to}',
+    backAsleep: 'Fell asleep again',
+    splitButton: 'Split',
+    splitHint:
+      'The two halves still count as one night — same bedtime, same morning. Only the time awake comes out of its total.',
+
     // Validation
     errNoStart: 'Enter a date and time for when the baby fell asleep.',
     errEndBeforeStart: 'The wake-up time has to come after falling asleep.',
@@ -58,6 +67,9 @@ export const translations = {
     errTooLongNight: 'Longer than sixteen hours — check the times.',
     errFuture: 'That is in the future.',
     errOverlap: 'This overlaps a sleep already logged.',
+    errWakeOutside: 'The waking has to fall inside this sleep.',
+    errWakeOrder: 'Falling asleep again has to come after waking up.',
+    errSplitTooShort: 'That leaves a piece shorter than five minutes.',
 
     // History
     historyTitle: 'Recent sleeps',
@@ -86,6 +98,8 @@ export const translations = {
     tileNight: 'Night sleep',
     tileNaps: 'Nap sleep',
     tileNapCount: 'Naps per day',
+    tileNightWakes: 'Night wakings',
+    tileNightAwake: 'Awake at night',
     tileNapLength: 'Nap length',
     tileBedtime: 'Falls asleep',
     tileWake: 'Wakes up',
@@ -114,7 +128,7 @@ export const translations = {
     bedtimeSeries: 'Falls asleep',
     wakeSeries: 'Wakes up',
     statsNote:
-      'Averages count only days that finished with a night logged, so today never drags them down. A sleep still running, or one left running far too long, is drawn but never counted.',
+      'Averages count only days that finished with a night logged, so today never drags them down. A sleep still running, or one left running far too long, is drawn but never counted. A night broken by a waking counts as one night: its blocks are added up, and the time awake is reported on its own.',
 
     // Sync
     syncSignedOut: 'This device only',
@@ -201,6 +215,15 @@ export const translations = {
     add: 'Dodaj',
     cancel: 'Anuluj',
 
+    // Night wakings
+    splitAction: 'Dodaj pobudkę',
+    splitTitle: 'Przerwa we śnie',
+    splitOf: 'Dzielisz: {kind} {from} – {to}',
+    backAsleep: 'Znów zasnęło',
+    splitButton: 'Podziel',
+    splitHint:
+      'Obie części nadal liczą się jako jedna noc — to samo zaśnięcie, ta sama pobudka rano. Z jej sumy odchodzi tylko czas czuwania.',
+
     // Validation
     errNoStart: 'Podaj datę i godzinę zaśnięcia.',
     errEndBeforeStart: 'Pobudka musi być po zaśnięciu.',
@@ -209,6 +232,9 @@ export const translations = {
     errTooLongNight: 'Dłużej niż szesnaście godzin — sprawdź godziny.',
     errFuture: 'To jest w przyszłości.',
     errOverlap: 'To nakłada się na już zapisany sen.',
+    errWakeOutside: 'Pobudka musi mieścić się w tym śnie.',
+    errWakeOrder: 'Ponowne zaśnięcie musi być po pobudce.',
+    errSplitTooShort: 'Zostałby kawałek krótszy niż pięć minut.',
 
     // History
     historyTitle: 'Ostatnie sny',
@@ -237,6 +263,8 @@ export const translations = {
     tileNight: 'Sen nocny',
     tileNaps: 'Drzemki',
     tileNapCount: 'Drzemek na dobę',
+    tileNightWakes: 'Pobudki w nocy',
+    tileNightAwake: 'Czuwanie w nocy',
     tileNapLength: 'Długość drzemki',
     tileBedtime: 'Zasypia',
     tileWake: 'Wstaje',
@@ -266,7 +294,7 @@ export const translations = {
     bedtimeSeries: 'Zasypia',
     wakeSeries: 'Wstaje',
     statsNote:
-      'Średnie liczą tylko dni zakończone zapisaną nocą, więc dzisiejszy dzień ich nie zaniża. Sen, który trwa — albo taki, który trwa o wiele za długo — jest rysowany, ale nigdy liczony.',
+      'Średnie liczą tylko dni zakończone zapisaną nocą, więc dzisiejszy dzień ich nie zaniża. Sen, który trwa — albo taki, który trwa o wiele za długo — jest rysowany, ale nigdy liczony. Noc przerwana pobudką liczy się jako jedna noc: jej części się sumują, a czas czuwania podawany jest osobno.',
 
     // Sync
     syncSignedOut: 'Tylko na tym urządzeniu',

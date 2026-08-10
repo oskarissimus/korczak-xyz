@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { pullEntries, pushEntry } from '../utils/babySleep/cloud';
 import { mergeEntries, resolveOpen, visibleEntries } from '../utils/babySleep/merge';
+import { splitEntry } from '../utils/babySleep/split';
 import {
   adoptOwner,
   clearUnsynced,
@@ -49,6 +50,8 @@ export interface BabySleepData {
   endSleep: (at?: number) => void;
   addEntry: (draft: EntryDraft) => void;
   updateEntry: (id: string, patch: Partial<EntryDraft>) => void;
+  /** Cut a sleep in two around a waking. Both halves are written, and pushed, together. */
+  splitSleep: (id: string, wakeAt: number, sleepAt: number) => void;
   removeEntry: (id: string) => void;
   retrySync: () => void;
 }
@@ -159,6 +162,28 @@ export function useBabySleepData(user: AuthUser | null, owner: DataOwner): BabyS
       const prev = entriesRef.current.find((e) => e.id === id);
       if (!prev || prev.deleted) return;
       commit([editEntry(prev, patch, Date.now())]);
+    },
+    [commit]
+  );
+
+  /*
+   * The shortened first half and the new second half go through one `commit`, so they are merged,
+   * saved and queued in a single step. Splitting them across two calls would leave a moment where
+   * the log holds a night ending at the waking and nothing after it — briefly on this device, and
+   * durably on another one if the tab died between the two.
+   *
+   * A rejected split is silently nothing. `SplitForm` runs the same pure function first and is what
+   * puts the reason on the screen; this second check is against the entry as it stands *now*, which
+   * a sync may have changed since the form read it.
+   */
+  const splitSleep = useCallback(
+    (id: string, wakeAt: number, sleepAt: number) => {
+      const now = Date.now();
+      const prev = entriesRef.current.find((e) => e.id === id);
+      if (!prev) return;
+      const outcome = splitEntry(prev, wakeAt, sleepAt, now);
+      if (!outcome.ok) return;
+      commit(outcome.entries);
     },
     [commit]
   );
@@ -298,6 +323,7 @@ export function useBabySleepData(user: AuthUser | null, owner: DataOwner): BabyS
     endSleep,
     addEntry,
     updateEntry,
+    splitSleep,
     removeEntry,
     retrySync,
   };

@@ -16,6 +16,7 @@ import type { EntryDraft, SleepEntry } from '../../utils/babySleep/types';
 import EntryForm from './EntryForm';
 import EntryList from './EntryList';
 import LiveControls from './LiveControls';
+import SplitForm from './SplitForm';
 import SyncBadge from './SyncBadge';
 import { fill, localeOf, plural, translations, type Lang } from './translations';
 
@@ -32,6 +33,12 @@ export default function BabySleep({ lang }: BabySleepProps) {
   const owner = useDataOwner(auth.user);
   const data = useBabySleepData(auth.user, owner);
   const [editingId, setEditingId] = useState<string | null>(null);
+  /*
+   * Which sleep is having a wake period added to it. Mutually exclusive with `editingId` — both
+   * forms occupy the same place on the page, and correcting an entry's times while also cutting it
+   * in two is two answers to the same question.
+   */
+  const [splittingId, setSplittingId] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   const locale = localeOf(lang);
@@ -55,9 +62,22 @@ export default function BabySleep({ lang }: BabySleepProps) {
   );
 
   const editing = editingId ? data.entries.find((e) => e.id === editingId) : undefined;
+  /*
+   * Looked up on every render rather than held in state, so the form is following the live entry. It
+   * also means a split that arrives from another device — or a delete — closes the form instead of
+   * leaving it addressing a sleep that no longer has those times.
+   */
+  const splitting = splittingId ? data.entries.find((e) => e.id === splittingId) : undefined;
 
   const beginEdit = (entry: SleepEntry) => {
+    setSplittingId(null);
     setEditingId(entry.id);
+    formRef.current?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const beginSplit = (entry: SleepEntry) => {
+    setEditingId(null);
+    setSplittingId(entry.id);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
@@ -96,13 +116,26 @@ export default function BabySleep({ lang }: BabySleepProps) {
       )}
 
       <div ref={formRef}>
-        <EntryForm
-          editing={editing}
-          others={data.entries}
-          onSubmit={submit}
-          onCancel={editing ? () => setEditingId(null) : undefined}
-          t={t}
-        />
+        {splitting ? (
+          <SplitForm
+            entry={splitting}
+            formatTime={formatTime}
+            onSplit={(wakeAt, sleepAt) => {
+              data.splitSleep(splitting.id, wakeAt, sleepAt);
+              setSplittingId(null);
+            }}
+            onCancel={() => setSplittingId(null)}
+            t={t}
+          />
+        ) : (
+          <EntryForm
+            editing={editing}
+            others={data.entries}
+            onSubmit={submit}
+            onCancel={editing ? () => setEditingId(null) : undefined}
+            t={t}
+          />
+        )}
       </div>
 
       <EntryList
@@ -112,8 +145,10 @@ export default function BabySleep({ lang }: BabySleepProps) {
         formatDay={formatDay}
         formatTime={formatTime}
         onEdit={beginEdit}
+        onSplit={beginSplit}
         onDelete={(entry) => {
           if (entry.id === editingId) setEditingId(null);
+          if (entry.id === splittingId) setSplittingId(null);
           data.removeEntry(entry.id);
         }}
         t={t}

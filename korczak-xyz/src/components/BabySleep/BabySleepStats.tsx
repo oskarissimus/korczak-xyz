@@ -146,8 +146,18 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
       />
 
       <div className="bs-tiles">
+        {/* The night figures together, then the nap ones: how long the night was, how often it broke
+            and how much of it was spent awake are one question asked three ways, and reading them
+            off a row that alternates between nights and naps is harder than it needs to be. */}
         {durationTile(t.tileTotal, stats.totalPerDay)}
         {durationTile(t.tileNight, stats.nightPerDay)}
+        <Tile
+          label={t.tileNightWakes}
+          value={stats.nightWakes.mean == null ? t.noData : stats.nightWakes.mean.toFixed(1)}
+          n={stats.nightWakes.n}
+          t={t}
+        />
+        {durationTile(t.tileNightAwake, stats.nightAwake)}
         {durationTile(t.tileNaps, stats.napPerDay)}
         <Tile
           label={t.tileNapCount}

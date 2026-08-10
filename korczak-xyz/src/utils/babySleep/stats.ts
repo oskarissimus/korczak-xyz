@@ -16,6 +16,12 @@
  * Days still in progress are shown on the charts and excluded from every denominator. Today's naps
  * are real but incomplete, and averaging them in drags every figure down each morning, which is the
  * commonest way a sleep tracker comes to be distrusted.
+ *
+ * A third rule joined them when night wakings arrived: **a night is however many blocks it was slept
+ * in, and it is still one night.** Several `night` entries on one day are a night broken by a
+ * waking, whether they were logged live ("woke up", then "night sleep" again at 3am) or cut apart
+ * afterwards by `split.ts`. So its duration is the blocks added up, its bedtime is the first block's
+ * start and its wake-up is the last block's end — one of each per day, never one per entry.
  */
 
 import { circularStat, linearStat } from './circular';
@@ -27,9 +33,36 @@ function meanStat(values: number[]): MeanStat {
   return { mean, sd, n };
 }
 
-/** Closed nights attributed to a day. There is normally one; two means the log was edited oddly. */
-function closedNights(bucket: DayBucket): SleepEntry[] {
-  return bucket.entries.filter((e) => e.kind === 'night' && e.end != null);
+/**
+ * The night attributed to a day, as the blocks it was actually slept in — earliest first.
+ *
+ * Null when the day has no night at all, and null when any of its blocks is still running: half a
+ * night has no wake-up time, and a night with a block open is half a night however much of it is
+ * already closed.
+ *
+ * That second case is why this exists rather than a filter on `nightMs`. Before wakings were
+ * modelled, an unfinished night left `nightMs` null and that alone kept tonight out of every night
+ * figure. A broken night can have a closed first block and a running second one, so it reports a
+ * duration while the baby is still asleep — and `nightMs == null` would let it into the averages.
+ */
+export function nightBlocks(bucket: DayBucket): SleepEntry[] | null {
+  const nights = bucket.entries.filter((e) => e.kind === 'night');
+  if (nights.length === 0 || nights.some((e) => e.end == null)) return null;
+  return [...nights].sort((a, b) => a.start - b.start);
+}
+
+/** How many times a night was broken. Zero for a night slept through — a real figure, not missing. */
+function wakeCount(blocks: SleepEntry[]): number {
+  return blocks.length - 1;
+}
+
+/** Time spent awake between the blocks of one night. */
+function awakeMs(blocks: SleepEntry[]): number {
+  let total = 0;
+  for (let i = 1; i < blocks.length; i += 1) {
+    total += Math.max(0, blocks[i].start - (blocks[i - 1].end as number));
+  }
+  return total;
 }
 
 function closedNaps(bucket: DayBucket): SleepEntry[] {
@@ -54,12 +87,20 @@ export function computeStats(entries: SleepEntry[], window: TimeWindow, now: num
   const settled = days.filter((d) => !d.partial);
   const tracked = settled.filter(isTracked);
 
-  const withNight = tracked.filter((d) => d.nightMs != null);
+  // Days whose night is finished, paired with the blocks it was slept in. `nightMs` on these is the
+  // whole night, because every block of it is closed.
+  const nights = tracked.flatMap((d) => {
+    const blocks = nightBlocks(d);
+    return blocks ? [{ day: d, blocks }] : [];
+  });
+  const withNight = nights.map((n) => n.day);
 
   return {
     days,
     totalPerDay: meanStat(withNight.map((d) => (d.nightMs ?? 0) + d.napMs)),
     nightPerDay: meanStat(withNight.map((d) => d.nightMs as number)),
+    nightWakes: meanStat(nights.map((n) => wakeCount(n.blocks))),
+    nightAwake: meanStat(nights.map((n) => awakeMs(n.blocks))),
     napPerDay: meanStat(tracked.map((d) => d.napMs)),
     napsPerDay: meanStat(tracked.map((d) => d.naps)),
     napLength: meanStat(
@@ -81,16 +122,27 @@ export function computeStats(entries: SleepEntry[], window: TimeWindow, now: num
  * the number means, not about which rows happen to be present.
  */
 
+/*
+ * One point per *night*, not one per night entry. A night broken by a waking is two entries, and
+ * mapping over them gave that day two bedtimes and two wake-ups — a 03:20 "bedtime" and a 03:00
+ * "wake-up" that nobody experienced, dragging both circular means towards the middle of the night.
+ * The bedtime is when the night started and the wake-up is when it ended, however many times it was
+ * interrupted in between.
+ */
+
 export function bedtimePoints(days: DayBucket[]): ClockPoint[] {
-  return days.flatMap((d) =>
-    closedNights(d).map((e) => ({ at: d.start, minutes: minutesOfDay(e.start) }))
-  );
+  return days.flatMap((d) => {
+    const blocks = nightBlocks(d);
+    return blocks ? [{ at: d.start, minutes: minutesOfDay(blocks[0].start) }] : [];
+  });
 }
 
 export function wakePoints(days: DayBucket[]): ClockPoint[] {
-  return days.flatMap((d) =>
-    closedNights(d).map((e) => ({ at: d.start, minutes: minutesOfDay(e.end as number) }))
-  );
+  return days.flatMap((d) => {
+    const blocks = nightBlocks(d);
+    if (!blocks) return [];
+    return [{ at: d.start, minutes: minutesOfDay(blocks[blocks.length - 1].end as number) }];
+  });
 }
 
 /**

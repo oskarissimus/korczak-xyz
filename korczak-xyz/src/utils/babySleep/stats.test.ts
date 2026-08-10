@@ -126,6 +126,12 @@ describe('computeStats', () => {
     expect(stats.napStart.mean).toBeCloseTo(12 * 60, 6);
   });
 
+  it('counts a night slept through as no wakings, which is a figure and not a gap', () => {
+    const stats = computeStats([...normalDay(12), ...normalDay(13)], week, T0);
+    expect(stats.nightWakes).toMatchObject({ mean: 0, n: 2 });
+    expect(stats.nightAwake).toMatchObject({ mean: 0, n: 2 });
+  });
+
   it('ignores entries outside the window', () => {
     const stats = computeStats(normalDay(1), week, T0);
     expect(stats.nightPerDay.n).toBe(0);
@@ -134,6 +140,62 @@ describe('computeStats', () => {
   it('ignores deleted entries', () => {
     const entries = normalDay(13).map((e) => ({ ...e, deleted: true }));
     expect(computeStats(entries, week, T0).nightPerDay.n).toBe(0);
+  });
+});
+
+/*
+ * A night broken by a waking — two `night` entries on one day, however they got there: tapped live
+ * ("woke up", then "night sleep" again at three), or cut apart afterwards by `split.ts`.
+ */
+describe('a night broken by a waking', () => {
+  /** 20:00 to 03:00, awake 25 minutes, 03:25 to 06:30. */
+  const broken = (d: number) => [
+    entry('night', local(d, 20), local(d + 1, 3)),
+    entry('night', local(d + 1, 3, 25), local(d + 1, 6, 30)),
+  ];
+
+  it('is one night: one bedtime, one wake-up, and the blocks added up', () => {
+    const stats = computeStats(broken(13), week, T0);
+    expect(stats.nightPerDay).toMatchObject({ mean: 10 * HOUR + 5 * 60_000, n: 1 });
+    expect(stats.bedtime).toMatchObject({ n: 1 });
+    expect(stats.bedtime.mean).toBeCloseTo(20 * 60, 6);
+    expect(stats.wakeTime).toMatchObject({ n: 1 });
+    expect(stats.wakeTime.mean).toBeCloseTo(6 * 60 + 30, 6);
+  });
+
+  it('does not count the time awake as sleep', () => {
+    const slept = computeStats([entry('night', local(13, 20), local(14, 6, 30))], week, T0);
+    const woke = computeStats(broken(13), week, T0);
+    expect((slept.nightPerDay.mean as number) - (woke.nightPerDay.mean as number)).toBe(25 * 60_000);
+  });
+
+  it('reports how often and how long', () => {
+    const stats = computeStats(broken(13), week, T0);
+    expect(stats.nightWakes).toMatchObject({ mean: 1, n: 1 });
+    expect(stats.nightAwake).toMatchObject({ mean: 25 * 60_000, n: 1 });
+  });
+
+  it('gives the day one point on each chart, not one per block', () => {
+    const days = groupByDay(broken(13), week, T0);
+    expect(bedtimePoints(days).map((p) => p.minutes)).toEqual([20 * 60]);
+    expect(wakePoints(days).map((p) => p.minutes)).toEqual([6 * 60 + 30]);
+  });
+
+  it('counts no night at all while one of its blocks is still running', () => {
+    // The night of the 14th: first block closed at 03:00, second still going at midday on the 15th.
+    // `nightMs` is not null here — the closed block has a duration — so only the block-level check
+    // keeps a half-finished night out of the averages.
+    const entries = [
+      entry('night', local(14, 20), local(15, 3)),
+      entry('night', local(15, 3, 25), null),
+    ];
+    const stats = computeStats(entries, week, T0);
+    const day = stats.days.find((d) => d.key === '2026-01-14');
+    expect(day?.nightMs).toBe(7 * HOUR);
+    expect(stats.nightPerDay.n).toBe(0);
+    expect(stats.bedtime.n).toBe(0);
+    expect(stats.wakeTime.n).toBe(0);
+    expect(stats.nightWakes.n).toBe(0);
   });
 });
 

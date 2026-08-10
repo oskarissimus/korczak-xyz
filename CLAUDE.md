@@ -361,6 +361,34 @@ branching document two devices edit into a conflict, so `merge.ts` is a CRDT-ish
 **pulls before it pushes**, unlike `useFretboardData`, because a blind `setDoc` would land on top of
 a correction made elsewhere.
 
+### Night wakings
+
+A night broken by a waking is **two entries with a gap between them**, not one entry carrying a list
+of wakings. The record shape does not change for this, and that is the point: an entry is one
+contiguous stretch of sleep, so the per-entry merge rule already handles two rows without being told
+anything, where a `wakes: [...]` array inside an entry would need a merge rule of its own for two
+devices editing the same night.
+
+Two ways in, producing the same rows. Live: tap "woke up", tap "night sleep" again when the baby
+settles — nothing new was needed for that. After the fact: `split.ts`, cutting a sleep already logged
+into the two halves it was really slept in, reachable from `Add wake` on any row with room for one —
+naps included, and the sleep still running, whose second half stays running (the case where the
+waking was slept through and only logged in the morning). The first half **keeps the entry's id**, so
+another device receives an ordinary edit rather than a delete and two inserts, and both halves go
+through one `commit` so no device ever sees a night that ends at the waking and has nothing after it.
+
+`stats.ts` is where the blocks are read back as one night, through `nightBlocks`. Getting the total
+right was free — `groupByDay` already summed several night entries into one `nightMs` — but the clock
+times were not: `bedtimePoints`/`wakePoints` mapped over night *entries*, so a broken night gave its
+day a 03:20 "bedtime" and a 03:00 "wake-up" that nobody experienced, pulling both circular means
+towards the middle of the night. One point per night now: the first block's start and the last
+block's end.
+
+`nightBlocks` returns null while any block is still running, and that is load-bearing rather than
+tidy. `nightMs != null` used to mean "this night is finished", because an unfinished night was one
+open entry with no duration. A broken night has a closed first block, so it reports a duration while
+the baby is still asleep — and the old test would have let half of tonight into the averages.
+
 ### Sharing
 
 The log can be read and written by a second account, so both parents log against one history. The
