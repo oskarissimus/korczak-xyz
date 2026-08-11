@@ -631,8 +631,14 @@ const recoveryStrings = {
     color: var(--retro-black);
   }
 
-  button:hover {
-    background: #a0a0a0;
+  /* Only where there is a pointer that can actually hover. A touchscreen has none, and applies
+     `:hover` on tap instead — then holds it until something else is tapped, so the last button
+     pressed goes on looking pressed. That reads as "still selected" on a screen that has since
+     moved on to the next thing, which is what it did to the fretboard trainer's neck. */
+  @media (hover: hover) {
+    button:hover {
+      background: #a0a0a0;
+    }
   }
 
   button:active {

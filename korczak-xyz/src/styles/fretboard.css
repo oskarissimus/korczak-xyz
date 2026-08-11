@@ -100,8 +100,17 @@
   justify-content: center;
 }
 
-.fb-btn:hover {
-  background: #a0a0a0;
+/* Hover styling is gated on there being a pointer that can hover. A touchscreen
+   has none: it applies `:hover` on tap and then holds it until something else is
+   tapped, so the cell you just answered with goes on looking pressed under the
+   *next* question. On a `find` card that hid itself — the tapped cell usually
+   becomes muted on the next card, which is a <span> and so a different element,
+   and the stale hover dies with the node — but a `pitch` card leaves every row
+   live, the buttons persist, and the highlight rides along. */
+@media (hover: hover) {
+  .fb-btn:hover {
+    background: #a0a0a0;
+  }
 }
 
 .fb-btn:active {
@@ -118,8 +127,10 @@
   color: var(--retro-white);
 }
 
-.fb-btn--primary:hover {
-  background: #0a8f8f;
+@media (hover: hover) {
+  .fb-btn--primary:hover {
+    background: #0a8f8f;
+  }
 }
 
 .fb-btn--big {
@@ -249,8 +260,10 @@
   cursor: pointer;
 }
 
-.fb-pad-key:hover:not(:disabled) {
-  background: #a0a0a0;
+@media (hover: hover) {
+  .fb-pad-key:hover:not(:disabled) {
+    background: #a0a0a0;
+  }
 }
 
 .fb-pad-key:active:not(:disabled) {
@@ -268,7 +281,10 @@
    them), the one key or cell whose colour *is* the answer went flat grey under
    the pointer, and stayed grey until the mouse moved. On a phone it looked
    right; on a mouse the verdict was the only thing you could not see. (0,2,0)
-   settles it. */
+   settles it. Still needed now that the global rule is behind `(hover: hover)`:
+   that gate only excludes the touchscreens, and this was always the mouse's bug.
+   The twins stay ungated so the base half of each pair keeps applying on a
+   phone, where the colour *is* the answer. */
 .fb-pad-key--right,
 .fb-pad-key--right:hover {
   background: var(--retro-green);
@@ -344,9 +360,11 @@
   cursor: pointer;
 }
 
-.fb-neck-cell--live:hover:not(:disabled) {
-  border-color: var(--retro-cyan);
-  background-color: rgba(0, 255, 255, 0.12);
+@media (hover: hover) {
+  .fb-neck-cell--live:hover:not(:disabled) {
+    border-color: var(--retro-cyan);
+    background-color: rgba(0, 255, 255, 0.12);
+  }
 }
 
 .fb-neck-cell--live:focus-visible {
@@ -600,8 +618,10 @@
   cursor: pointer;
 }
 
-.fb-choice:hover {
-  background: #a0a0a0;
+@media (hover: hover) {
+  .fb-choice:hover {
+    background: #a0a0a0;
+  }
 }
 
 /* A pressed button is the state: sunken, and darker so it reads as chosen
