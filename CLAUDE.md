@@ -771,3 +771,32 @@ sessions only, it also checks out `main` when the assigned branch is still untou
 tree sitting exactly on `origin/main`. A branch that already carries work is left alone, so the
 hook is safe on resume. This is a workaround for injected prompt text, not a supported switch; if
 web sessions start ignoring `main` again, that prompt likely changed.
+
+### End every push with the hash and the time
+
+After pushing, the **last line of the reply** is the short commit hash and the push time. Nothing
+after it. That line is what I read: I am watching the navbar's status bar for the deploy to land,
+and it prints exactly `git rev-parse --short HEAD` next to a timestamp, so the reply has to give me
+the two strings I am about to compare against. Burying them in a paragraph, or writing "pushed to
+main" without them, means opening a terminal to find out what I am waiting for.
+
+Format, one line, at the very end:
+
+```
+`4a1ccf8` · pushed 06:54 UTC / 08:54 Warsaw · 11 Aug 2026
+```
+
+- **Short hash**, from `git rev-parse --short HEAD` — the same command `Navbar.astro` runs at build
+  time, so it is character-for-character what the status bar links to.
+- **Both clocks.** The navbar renders its timestamp with `toLocaleString` in the *viewer's* zone,
+  which for me is Europe/Warsaw (`+0200` in summer, `+0100` in winter) while this container runs in
+  UTC. Giving only one of them leaves me doing the arithmetic on a phone.
+- Several pushes in one reply: one line each, in order, oldest first.
+
+Two things that line does **not** promise, and should not be written as though it does:
+
+- **The navbar timestamp is the build time, not the commit time.** It is `new Date()` evaluated
+  while Netlify builds, so it lands a minute or two after the push and will never match to the
+  minute. The *hash* is the thing that matches exactly — tell me to compare on that.
+- Pushing is not deploying. Don't report a deploy as done from a successful push; CI is the only
+  thing that knows, and nothing in this repo waits on it.
