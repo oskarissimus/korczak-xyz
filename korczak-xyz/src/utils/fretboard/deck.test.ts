@@ -12,15 +12,6 @@ import {
   shuffle,
   spreadPositions,
 } from './deck';
-import {
-  PITCH_CLASSES,
-  hasTwoSpellings,
-  isPositionKey,
-  noteNameAt,
-  parseCardId,
-} from './notes';
-import type { PositionCardKey } from './notes';
-import { SCALE_TYPES } from './scales';
 import { DAY, MINUTE, createCard } from './srs';
 import type { Card } from './srs';
 import type { Deck, Settings } from './types';
@@ -107,117 +98,6 @@ describe('scopeIds', () => {
     const narrow = scopeIds(settings({ maxFret: 12, strings: [5], directions: ['pitch'] }));
     expect(narrow).toContain('pitch:64'); // the open high e
     expect(narrow).not.toContain('pitch:40'); // the low E is on a string no longer asked
-  });
-});
-
-describe('scopeIds, in a key', () => {
-  it('is what it always was when no key is set', () => {
-    // The one case that has to be untouched: `scale: null` is every deck already stored.
-    for (const maxFret of [0, 1, 5, 12]) {
-      const scope = settings({ maxFret });
-      expect(scopeIds({ ...scope, scale: null })).toEqual(scopeIds(scope));
-    }
-  });
-
-  it('asks only the naturals in C major', () => {
-    const scope = settings({
-      maxFret: 12,
-      strings: [0],
-      directions: ['name'],
-      scale: { root: 'C', type: 'major' },
-    });
-    for (const id of scopeIds(scope)) {
-      const key = parseCardId(id);
-      expect(key && isPositionKey(key)).toBe(true);
-      const position = key as PositionCardKey;
-      expect(hasTwoSpellings(noteNameAt(position.stringIndex, position.fret))).toBe(false);
-    }
-    // Seven naturals over an octave, plus the low E repeating at the twelfth fret.
-    expect(scopeIds(scope)).toHaveLength(8);
-  });
-
-  it('asks G major for F♯ and never for G♭', () => {
-    // Second fret of the low E string is F♯, the one black note in G major.
-    const scope = settings({
-      maxFret: 2,
-      strings: [0],
-      directions: ['find'],
-      scale: { root: 'G', type: 'major' },
-    });
-    expect(scopeIds(scope)).toEqual(['find:0-0', 'find:0-2']);
-  });
-
-  it('asks F major for B♭ and never for A♯', () => {
-    // Sixth fret of the low E string is A♯/B♭, the one black note in F major.
-    const scope = settings({
-      maxFret: 6,
-      strings: [0],
-      directions: ['find'],
-      scale: { root: 'F', type: 'major' },
-    });
-    expect(scopeIds(scope)).toEqual([
-      'find:0-0',
-      'find:0-1',
-      'find:0-3',
-      'find:0-5',
-      'find:0-6:b',
-    ]);
-  });
-
-  it('leaves a `name` card unsplit whichever way the key spells it', () => {
-    // A `name` card takes either spelling as its answer, so the key has nothing to choose.
-    const flat = settings({
-      maxFret: 6,
-      strings: [0],
-      directions: ['name'],
-      scale: { root: 'F', type: 'major' },
-    });
-    expect(scopeIds(flat)).toEqual([
-      'name:0-0',
-      'name:0-1',
-      'name:0-3',
-      'name:0-5',
-      'name:0-6',
-    ]);
-  });
-
-  it('filters `pitch` cards by pitch class and spells them the same way', () => {
-    // E2 F2 F♯2 G2 on the low E string; G major keeps E, F♯ and G, and drops F.
-    const scope = settings({
-      maxFret: 3,
-      strings: [0],
-      directions: ['pitch'],
-      scale: { root: 'G', type: 'major' },
-    });
-    expect(scopeIds(scope)).toEqual(['pitch:40', 'pitch:42', 'pitch:43']);
-  });
-
-  it('mints ids the parser accepts, for every key and every scale', () => {
-    // The failure a new *direction* has — ids one side mints and the other refuses — must not be
-    // reachable here, because a scale mints nothing new.
-    for (const type of SCALE_TYPES) {
-      for (const { name: root } of PITCH_CLASSES) {
-        const ids = scopeIds(settings({ maxFret: 12, scale: { root, type } }));
-        for (const id of ids) expect(parseCardId(id)).not.toBeNull();
-      }
-    }
-  });
-
-  it('never empties the deck at the narrowest scope the settings offer', () => {
-    // One string, frets 0-3, one direction — the smallest the panel can be set to. The sparsest
-    // scale offered has a largest gap of three semitones, so two consecutive chromatic notes can
-    // be out of key and four consecutive frets can never all be.
-    for (const type of SCALE_TYPES) {
-      for (const { name: root } of PITCH_CLASSES) {
-        const scope = settings({
-          maxFret: 3,
-          strings: [3],
-          directions: ['find'],
-          scale: { root, type },
-        });
-        expect(scopeIds(scope).length).toBeGreaterThan(0);
-      }
-    }
   });
 });
 

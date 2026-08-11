@@ -242,8 +242,8 @@ export function useFretboardData(
         const cloudSettings = await loadCloudSettings(uid);
         if (cloudSettings) {
           // Through the same repair as a stored record, not a bare spread over the defaults: this
-          // copy is used for the rest of the session, so a direction or a scale this build cannot
-          // read has to be dropped here rather than on the next page load.
+          // copy is used for the rest of the session, so a direction this build cannot read has to
+          // be dropped here rather than on the next page load.
           const merged = sanitizeSettings(cloudSettings, defaultNotation);
           saveSettings(merged);
           publish({ ...stateRef.current, settings: merged });

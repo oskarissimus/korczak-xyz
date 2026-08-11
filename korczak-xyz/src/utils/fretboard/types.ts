@@ -1,5 +1,4 @@
 import type { Direction, Notation } from './notes';
-import type { ScaleChoice } from './scales';
 import type { Bucket, Card, Rating } from './srs';
 
 /** The deck, keyed by card id (`${direction}:${stringIndex}-${fret}`, plus `:b` on a flat card). */
@@ -10,15 +9,6 @@ export interface Settings {
   maxFret: number;
   /** Which strings are in scope, as indices (0 = low E). */
   strings: number[];
-  /**
-   * Practise inside one key, or `null` for all twelve notes.
-   *
-   * A filter over the rectangle above and nothing more — it narrows which cards are asked, and
-   * picks which of a black note's two names they are asked under. `null`, never `undefined`:
-   * `saveCloudSettings` hands this object straight to `setDoc`, and Firestore rejects
-   * `undefined` unless the client is built with `ignoreUndefinedProperties`.
-   */
-  scale: ScaleChoice | null;
   /** Which way round positions are asked. Empty is not allowed; the UI keeps at least one. */
   directions: Direction[];
   /** How many cards a sitting aims for, before in-session repeats. */
@@ -34,7 +24,6 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   maxFret: 5,
   strings: [0, 1, 2, 3, 4, 5],
-  scale: null,
   directions: ['name', 'find'],
   sessionLength: 20,
   newPerSession: 6,

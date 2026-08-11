@@ -45,18 +45,6 @@ export const translations = {
     // Settings
     settings: 'Settings',
     frets: 'Frets',
-    // The scale row. The two pentatonics are labelled by their third rather than spelt out —
-    // `Major pentatonic` wraps the row on its own, and beside `Major` the shorthand is unambiguous.
-    scale: 'Scale',
-    scaleOff: 'All notes',
-    scaleMajor: 'Major',
-    scaleMinor: 'Minor',
-    scalePentMajor: 'Pent. major',
-    scalePentMinor: 'Pent. minor',
-    scaleBlues: 'Blues',
-    // The root, which is only asked for once a scale is picked. The buttons are the note names
-    // themselves, under the notation setting — see `keyLabel`.
-    key: 'Key',
     strings: 'Strings',
     directions: 'Ask',
     dirName: 'Name the note',
@@ -162,14 +150,6 @@ export const translations = {
 
     settings: 'Ustawienia',
     frets: 'Progi',
-    scale: 'Skala',
-    scaleOff: 'Wszystkie',
-    scaleMajor: 'Durowa',
-    scaleMinor: 'Molowa',
-    scalePentMajor: 'Pent. dur.',
-    scalePentMinor: 'Pent. mol.',
-    scaleBlues: 'Bluesowa',
-    key: 'Tonacja',
     strings: 'Struny',
     directions: 'Pytaj',
     dirName: 'Nazwij dźwięk',

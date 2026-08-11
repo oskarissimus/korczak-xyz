@@ -20,7 +20,6 @@ import { describeError, log } from '../../lib/logger';
 import { emptyCache } from './replay';
 import { isDirection } from './notes';
 import type { Notation } from './notes';
-import { isScaleChoice } from './scales';
 import type {
   DeckCache,
   MasterySnapshot,
@@ -260,10 +259,6 @@ export function sanitizeSettings(stored: Partial<Settings>, notation: Notation):
   if (merged.directions.length === 0) {
     merged.directions = DEFAULT_SETTINGS.directions;
   }
-  // A scale this build cannot evaluate is dropped to no scale, which is the full chromatic deck —
-  // the mild failure, unlike an unknown direction. `scaleNotes` would throw on the missing table
-  // entry if one got this far.
-  merged.scale = isScaleChoice(merged.scale) ? merged.scale : null;
   return merged;
 }
 

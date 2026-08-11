@@ -9,10 +9,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { PITCH_CLASSES, STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
-import type { Direction, NoteName } from '../../utils/fretboard/notes';
-import { SCALE_TYPES, keyLabel } from '../../utils/fretboard/scales';
-import type { ScaleType } from '../../utils/fretboard/scales';
+import { STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
+import type { Direction } from '../../utils/fretboard/notes';
 import type { Settings } from '../../utils/fretboard/types';
 import type { Translation } from './translations';
 
@@ -22,24 +20,18 @@ interface SettingsPanelProps {
   t: Translation;
 }
 
-const FRET_CHOICES = [3, 5, 7, 12];
-const LENGTH_CHOICES = [10, 20, 40];
-const NEW_CHOICES = [3, 6, 10];
+// Exported so `FretboardSkeleton.astro` can lay out the same buttons rather than approximate them.
+export const FRET_CHOICES = [3, 5, 7, 12];
+export const LENGTH_CHOICES = [10, 20, 40];
+export const NEW_CHOICES = [3, 6, 10];
 
-/** Which label each scale type takes, so the row is one `SCALE_TYPES.map`. */
-const SCALE_LABELS: Record<ScaleType, keyof Translation> = {
-  major: 'scaleMajor',
-  minor: 'scaleMinor',
-  pentatonicMajor: 'scalePentMajor',
-  pentatonicMinor: 'scalePentMinor',
-  blues: 'scaleBlues',
-};
+/** What the fret-range buttons say. Shared with the stand-in for the same reason. */
+export const fretChoiceLabel = (fret: number) => `0–${fret}`;
 
 /*
- * The row label names the group as well as printing it. Without that it is loose text next to a
- * run of buttons, and the Key row makes the cost obvious: its twelve roots and the six string
- * toggles carry the same four names between them, so `E` and `G` and `B` each announce themselves
- * twice on one panel with nothing to tell them apart.
+ * The row label names the group as well as printing it. Without that it is loose text beside a run
+ * of buttons, and several of these rows are single letters: the strings row alone announces `E`,
+ * `A`, `D`, `G`, `B` and `e` with nothing said about what they are toggling.
  */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -95,11 +87,6 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
     onChange({ ...settings, directions });
   };
 
-  // Picking a type with no key set has to choose a root, and C is the one to open on: it is the
-  // key with no accidentals, so the first thing anyone sees is the scale and not a spelling.
-  const setScaleType = (type: ScaleType) =>
-    onChange({ ...settings, scale: { root: settings.scale?.root ?? 'C', type } });
-
   return (
     <div className="fb-settings">
       <h3 className="fb-subhead">{t.settings}</h3>
@@ -111,47 +98,10 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
             active={settings.maxFret === fret}
             onClick={() => onChange({ ...settings, maxFret: fret })}
           >
-            0–{fret}
+            {fretChoiceLabel(fret)}
           </Choice>
         ))}
       </Row>
-
-      {/* Scope, like the fret range above it: which of the notes on those frets get asked. Off is
-          all twelve, which is what the trainer has always done. */}
-      <Row label={t.scale}>
-        <Choice active={settings.scale == null} onClick={() => onChange({ ...settings, scale: null })}>
-          {t.scaleOff}
-        </Choice>
-        {SCALE_TYPES.map((type) => (
-          <Choice
-            key={type}
-            active={settings.scale?.type === type}
-            onClick={() => setScaleType(type)}
-          >
-            {t[SCALE_LABELS[type]]}
-          </Choice>
-        ))}
-      </Row>
-
-      {/* Only once a scale is chosen — a row of twelve roots is the biggest control on the panel,
-          and it says nothing at all when there is no key to be the root of. Each button is
-          labelled under its own key's spelling, so it reads E♭ beside Major and D♯ beside Minor. */}
-      {settings.scale && (
-        <Row label={t.key}>
-          {PITCH_CLASSES.map(({ name }) => {
-            const choice = { root: name as NoteName, type: settings.scale!.type };
-            return (
-              <Choice
-                key={name}
-                active={settings.scale!.root === name}
-                onClick={() => onChange({ ...settings, scale: choice })}
-              >
-                {keyLabel(choice, settings.notation)}
-              </Choice>
-            );
-          })}
-        </Row>
-      )}
 
       <Row label={t.strings}>
         {Array.from({ length: STRING_COUNT }, (_, i) => STRING_COUNT - 1 - i).map((index) => (

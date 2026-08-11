@@ -7,7 +7,14 @@
  * It stands in for the *start* screen specifically because that is what the island always
  * renders first — a sitting is something you begin, never something the page loads into.
  */
-import { translations, type Lang } from '../translations';
+import { STRING_COUNT, stringLabel } from '../../../utils/fretboard/notes';
+import {
+  FRET_CHOICES,
+  LENGTH_CHOICES,
+  NEW_CHOICES,
+  fretChoiceLabel,
+} from '../SettingsPanel';
+import { defaultNotationFor, translations, type Lang } from '../translations';
 
 interface Props {
   lang: Lang;
@@ -17,15 +24,37 @@ const { lang } = Astro.props;
 const t = translations[lang];
 
 const TILES = [t.due, t.fresh, t.mastered];
-/* The settings rows, as how many buttons each holds — frets, scale, strings, ask,
-   session length, new per session, string names, notation. Same rows as
-   SettingsPanel, so the block reserves the height the real one will take, and the
-   counts matter rather than only the row count: a row of six wraps at 320px where a
-   row of two does not, and a stand-in that reserved three everywhere reserved the
-   wrong height for both. SettingsPanel's twelve-button Key row is deliberately not
-   here — it is rendered only once a scale is chosen, and no scale is the default a
-   first visit hydrates into. */
-const ROW_CHOICES = [4, 6, 6, 3, 3, 3, 2, 2];
+
+/*
+ * The settings rows, with the buttons' real labels.
+ *
+ * A count of buttons is not enough to reserve the right height, because what a row costs at 320px
+ * is how many lines it wraps onto, and that is set by the width of the text on the buttons. Three
+ * chips of blank space stood in for `Name the note` / `Find the note` / `Find the pitch` and did
+ * not wrap where the real row wraps onto three lines; six of them were wider than six single
+ * letters and wrapped where the strings row does not. The two errors were ~35px each and in
+ * opposite directions, so the total looked closer than any row actually was.
+ *
+ * So the stand-in prints what the panel prints, from the same constants — the technique
+ * `TypingSkeleton.astro` uses for the book picker, and for the same reason: nothing here is a
+ * measurement to keep up to date. The notation is the locale's default, which is what an
+ * un-hydrated page has no better guess than anyway.
+ */
+const notation = defaultNotationFor(lang);
+const ROWS: { label: string; choices: (string | number)[] }[] = [
+  { label: t.frets, choices: FRET_CHOICES.map(fretChoiceLabel) },
+  {
+    label: t.strings,
+    choices: Array.from({ length: STRING_COUNT }, (_, i) =>
+      stringLabel(STRING_COUNT - 1 - i, notation)
+    ),
+  },
+  { label: t.directions, choices: [t.dirName, t.dirFind, t.dirPitch] },
+  { label: t.sessionLength, choices: LENGTH_CHOICES },
+  { label: t.newPerSession, choices: NEW_CHOICES },
+  { label: t.stringLabels, choices: [t.on, t.off] },
+  { label: t.notation, choices: [t.notationIntl, t.notationGerman] },
+];
 ---
 
 <div class="fb-start" aria-hidden="true">
@@ -49,12 +78,12 @@ const ROW_CHOICES = [4, 6, 6, 3, 3, 3, 2, 2];
   <div class="fb-settings">
     <h3 class="fb-subhead">{t.settings}</h3>
     {
-      ROW_CHOICES.map((choices) => (
+      ROWS.map((row) => (
         <div class="fb-setting">
-          <span class="fb-setting-label">&nbsp;</span>
+          <span class="fb-setting-label">{row.label}</span>
           <div class="fb-setting-controls">
-            {Array.from({ length: choices }).map(() => (
-              <span class="fb-choice">&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            {row.choices.map((choice) => (
+              <span class="fb-choice">{choice}</span>
             ))}
           </div>
         </div>
