@@ -65,6 +65,18 @@ describe('summarizeSession', () => {
     expect(find).toMatchObject({ answers: 2, correct: 1, totalMs: 12_000 });
   });
 
+  it('counts a `pitch` card under its own direction', () => {
+    const summary = summarizeSession([
+      ...events,
+      event({ id: 'p', cardId: 'pitch:61', correct: true, ms: 3_000, answered: '2-11' }),
+    ]);
+    expect(summary.byDirection.find((d) => d.direction === 'pitch')).toMatchObject({
+      answers: 1,
+      correct: 1,
+      totalMs: 3_000,
+    });
+  });
+
   it('ranks what was missed, worst first', () => {
     const summary = summarizeSession([...events, event({ id: 'e', correct: false, rating: 'again' })]);
     expect(summary.missed[0]).toEqual({ cardId: 'name:0-5', misses: 2 });
@@ -168,6 +180,17 @@ describe('positionStats', () => {
 
   it('leaves an unseen square without an accuracy rather than calling it zero', () => {
     expect(positionStats({ 'name:0-0': createCard('name:0-0') })[0].accuracy).toBeNull();
+  });
+
+  it('leaves `pitch` cards out — they belong to no one square', () => {
+    // Three or four places answer a pitch card. Folding it onto all of them would count one
+    // card several times over, and onto one of them would be a place it never named.
+    const positional = { 'name:2-7': card('name:2-7', { seen: 4, correct: 4, totalMs: 4_000 }) };
+    const withPitch: Deck = {
+      ...positional,
+      'pitch:61': card('pitch:61', { seen: 9, correct: 1, totalMs: 40_000, status: 'learning' }),
+    };
+    expect(positionStats(withPitch)).toEqual(positionStats(positional));
   });
 });
 

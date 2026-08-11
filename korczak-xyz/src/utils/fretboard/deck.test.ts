@@ -77,6 +77,28 @@ describe('scopeIds', () => {
       'name:0-0',
     ]);
   });
+
+  it('enumerates a `pitch` card per pitch, not per position', () => {
+    // Two strings, one fret each: four places and four distinct pitches, E2 F2 A2 A♯2 — and the
+    // one black key among them is asked under both of its names.
+    const scope = settings({ maxFret: 1, strings: [0, 1], directions: ['pitch'] });
+    expect(scopeIds(scope)).toEqual(['pitch:40', 'pitch:41', 'pitch:45', 'pitch:46', 'pitch:46:b']);
+  });
+
+  it('mints one `pitch` card where several places sound the same note', () => {
+    // E4 lies under three fingers on a twelve-fret neck and is one card all the same.
+    const ids = scopeIds(settings({ maxFret: 12, directions: ['pitch'] }));
+    expect(ids.filter((id) => id === 'pitch:64')).toHaveLength(1);
+    expect(new Set(ids).size).toBe(ids.length);
+    // 37 pitches from E2 to E5, of which 15 are black keys and asked under both names.
+    expect(ids).toHaveLength(37 + 15);
+  });
+
+  it('drops a pitch the scope can no longer reach', () => {
+    const narrow = scopeIds(settings({ maxFret: 12, strings: [5], directions: ['pitch'] }));
+    expect(narrow).toContain('pitch:64'); // the open high e
+    expect(narrow).not.toContain('pitch:40'); // the low E is on a string no longer asked
+  });
 });
 
 describe('ensureCards', () => {
@@ -291,6 +313,21 @@ describe('spreadPositions', () => {
 
   it('handles an empty queue', () => {
     expect(spreadPositions([])).toEqual([]);
+  });
+
+  it('separates the two spellings of one pitch, which share an answer', () => {
+    const queue = ['pitch:61', 'pitch:61:b', 'name:2-2', 'find:2-2'];
+    const spread = spreadPositions(queue);
+    expect(spread.indexOf('pitch:61:b') - spread.indexOf('pitch:61')).not.toBe(1);
+    expect(sorted(spread)).toEqual(sorted(queue));
+  });
+
+  it('separates a pitch card from the positional cards on the place it is keyed to', () => {
+    // C♯4 is lowest on the D string, fret 11 — so it groups with the cards asking about that
+    // square, and back to back one would answer the other.
+    const queue = ['pitch:61', 'name:2-11', 'name:0-0', 'find:5-5'];
+    const spread = spreadPositions(queue);
+    expect(Math.abs(spread.indexOf('pitch:61') - spread.indexOf('name:2-11'))).toBeGreaterThan(1);
   });
 });
 

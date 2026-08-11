@@ -7,7 +7,7 @@
  * which means a scheduler change is reflected in the stats instead of contradicted by them.
  */
 
-import { parseCardId } from './notes';
+import { isPositionKey, parseCardId } from './notes';
 import type { Direction } from './notes';
 import type { Bucket, Card } from './srs';
 import { bucketOf } from './srs';
@@ -222,16 +222,21 @@ const BUCKET_ORDER: Bucket[] = ['new', 'learning', 'young', 'mature'];
 /**
  * Collapse the deck onto the neck for the heatmap.
  *
- * Every card asking about a position shares its square — both directions, and on a black key
- * both spellings of the `find` card — because the square is a place on the instrument and that
+ * Every card asking about a position shares its square — both of those directions, and on a black
+ * key both spellings of the `find` card — because the square is a place on the instrument and that
  * is what the picture is about. They are combined by taking the weakest: a position you can
  * read but not find is not a position you know, and nor is one you can find as C♯ but not as D♭.
+ *
+ * `pitch` cards are not in the picture at all. They ask for a pitch anywhere on the neck, so they
+ * belong to no one square, and there is nothing to take the weakest of.
  */
 export function positionStats(deck: Deck): PositionStat[] {
   const squares = new Map<string, PositionStat>();
   for (const card of Object.values(deck)) {
     const key = parseCardId(card.id);
-    if (!key) continue;
+    // A `pitch` card is not about a square — three or four of them answer it — so it has no place
+    // in a picture of squares. Folding it onto all of them would count one card several times.
+    if (!key || !isPositionKey(key)) continue;
     const squareKey = `${key.stringIndex}-${key.fret}`;
     const existing = squares.get(squareKey);
     const bucket = bucketOf(card);

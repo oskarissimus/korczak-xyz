@@ -8,14 +8,25 @@ import {
   cardNoteLabel,
   fretsSounding,
   hasTwoSpellings,
+  isPositionKey,
+  midiLabel,
+  midisInScope,
   noteLabelAt,
   noteNameAt,
   octaveAt,
   parseCardId,
+  pitchCardId,
   pitchLabel,
+  positionsSounding,
   spellingLabel,
   stringLabel,
 } from './notes';
+import type { PositionDirection } from './notes';
+
+const POSITION_DIRECTIONS = DIRECTIONS.filter(
+  (d): d is PositionDirection => d !== 'pitch'
+);
+const ALL_STRINGS = Array.from({ length: STRING_COUNT }, (_, i) => i);
 
 describe('noteNameAt', () => {
   it('names the open strings', () => {
@@ -113,7 +124,7 @@ describe('spellings', () => {
 
 describe('card ids', () => {
   it('round-trips every card in the full deck', () => {
-    for (const direction of DIRECTIONS) {
+    for (const direction of POSITION_DIRECTIONS) {
       for (let s = 0; s < STRING_COUNT; s++) {
         for (let f = 0; f <= MAX_FRET; f++) {
           expect(parseCardId(cardId(direction, s, f))).toEqual({
@@ -159,6 +170,94 @@ describe('card ids', () => {
     // A `name` card takes either spelling as its answer, and a natural has only the one.
     expect(parseCardId('name:1-4:b')).toBeNull();
     expect(parseCardId('find:1-3:b')).toBeNull(); // string A, fret 3 — C, a natural
+  });
+
+  it('round-trips a pitch card, which is keyed on the pitch and not on a place', () => {
+    expect(pitchCardId(61)).toBe('pitch:61');
+    expect(pitchCardId(61, 'flat')).toBe('pitch:61:b');
+    expect(parseCardId('pitch:61')).toEqual({ direction: 'pitch', midi: 61, spelling: 'sharp' });
+    expect(parseCardId('pitch:61:b')).toEqual({ direction: 'pitch', midi: 61, spelling: 'flat' });
+  });
+
+  it('splits a pitch card by spelling only where there are two names', () => {
+    expect(parseCardId('pitch:60:b')).toBeNull(); // C4 is a natural
+    expect(parseCardId('pitch:71:b')).toBeNull(); // B4
+  });
+
+  it('returns null for a pitch id that could never be minted', () => {
+    expect(parseCardId('pitch:200')).toBeNull(); // outside MIDI
+    expect(parseCardId('pitch:2-5')).toBeNull(); // a position where a pitch belongs
+    expect(parseCardId('pitch:')).toBeNull();
+  });
+
+  it('tells a card about a place from a card about a pitch', () => {
+    expect(isPositionKey(parseCardId('find:1-4')!)).toBe(true);
+    expect(isPositionKey(parseCardId('pitch:61')!)).toBe(false);
+  });
+});
+
+describe('midiLabel', () => {
+  it('carries the octave, in sounding pitch', () => {
+    // The open low E sounds E2 and the twelfth fret of the high e sounds E5 — what a tuner shows,
+    // an octave below where a guitar is written.
+    expect(midiLabel(40, 'sharp', 'international')).toBe('E2');
+    expect(midiLabel(64, 'sharp', 'international')).toBe('E4');
+    expect(midiLabel(76, 'sharp', 'international')).toBe('E5');
+    expect(midiLabel(60, 'sharp', 'international')).toBe('C4');
+  });
+
+  it('names both spellings of a black key in the same octave', () => {
+    expect(midiLabel(61, 'sharp', 'international')).toBe('C♯4');
+    expect(midiLabel(61, 'flat', 'international')).toBe('D♭4');
+    expect(midiLabel(70, 'sharp', 'international')).toBe('A♯4');
+    expect(midiLabel(70, 'flat', 'international')).toBe('B♭4');
+  });
+
+  it('follows the notation', () => {
+    expect(midiLabel(70, 'flat', 'german')).toBe('B4');
+    expect(midiLabel(71, 'sharp', 'german')).toBe('H4');
+  });
+});
+
+describe('positionsSounding', () => {
+  it('finds every place one pitch lies under', () => {
+    // E4 — the open high e, and the same note further down two other strings.
+    expect(positionsSounding(64, ALL_STRINGS, 12)).toEqual([
+      { stringIndex: 3, fret: 9 },
+      { stringIndex: 4, fret: 5 },
+      { stringIndex: 5, fret: 0 },
+    ]);
+  });
+
+  it('does not confuse a pitch with its octave, the way a pitch class would', () => {
+    // `fretsSounding` counts the open low E and its twelfth fret as one answer; these are two
+    // different pitches and only one of them is E2.
+    expect(fretsSounding(0, 'E', 12)).toEqual([0, 12]);
+    expect(positionsSounding(40, [0], 12)).toEqual([{ stringIndex: 0, fret: 0 }]);
+    expect(positionsSounding(52, [0], 12)).toEqual([{ stringIndex: 0, fret: 12 }]);
+  });
+
+  it('stays inside the strings and frets it was given', () => {
+    expect(positionsSounding(64, [5], 12)).toEqual([{ stringIndex: 5, fret: 0 }]);
+    expect(positionsSounding(64, ALL_STRINGS, 3)).toEqual([{ stringIndex: 5, fret: 0 }]);
+    expect(positionsSounding(39, ALL_STRINGS, 12)).toEqual([]); // below the low E
+  });
+});
+
+describe('midisInScope', () => {
+  it('is every distinct pitch the scope can sound, once each', () => {
+    const midis = midisInScope(ALL_STRINGS, 12);
+    // E2 to E5 without a gap: the strings overlap, and a pitch is one card however many places
+    // on the neck play it.
+    expect(midis[0]).toBe(40);
+    expect(midis[midis.length - 1]).toBe(76);
+    expect(midis).toHaveLength(37);
+    expect(new Set(midis).size).toBe(midis.length);
+  });
+
+  it('shrinks with the scope', () => {
+    expect(midisInScope([0], 3)).toEqual([40, 41, 42, 43]);
+    expect(midisInScope([], 12)).toEqual([]);
   });
 });
 

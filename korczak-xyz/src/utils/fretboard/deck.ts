@@ -7,8 +7,20 @@
  * deleted: widen the range again and the schedule you had earnt is still there.
  */
 
-import { MAX_FRET, STRING_COUNT, cardId, hasTwoSpellings, noteNameAt, parseCardId } from './notes';
-import type { CardKey, Direction } from './notes';
+import {
+  MAX_FRET,
+  STRING_COUNT,
+  cardId,
+  hasTwoSpellings,
+  isPositionKey,
+  midisInScope,
+  noteNameAt,
+  parseCardId,
+  pitchCardId,
+  pitchClassOfMidi,
+  positionsSounding,
+} from './notes';
+import type { CardKey, Direction, PositionCardKey } from './notes';
 import type { Bucket, Card } from './srs';
 import { bucketOf, createCard, isDue } from './srs';
 import type { Deck, Settings } from './types';
@@ -52,11 +64,20 @@ export function scopeIds(settings: Settings): string[] {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
       for (const direction of directions) {
+        if (direction === 'pitch') continue; // enumerated by pitch below, not per position
         ids.push(cardId(direction, string, fret));
         if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
           ids.push(cardId(direction, string, fret, 'flat'));
         }
       }
+    }
+  }
+  // A `pitch` card is one pitch, not one position, so it is enumerated over the distinct pitches
+  // the scope can sound rather than over the grid — several places on the neck answer each one.
+  if (directions.includes('pitch')) {
+    for (const midi of midisInScope(strings, Math.min(settings.maxFret, MAX_FRET))) {
+      ids.push(pitchCardId(midi));
+      if (hasTwoSpellings(pitchClassOfMidi(midi))) ids.push(pitchCardId(midi, 'flat'));
     }
   }
   return ids;
@@ -155,15 +176,28 @@ export const MIN_POSITION_GAP = 3;
  * they share a position *and* an answer, so back to back the second is not even read. They land
  * on the same key here without being mentioned, because the key is the position.
  *
+ * A `pitch` card has no single position — that is the point of it — so it is keyed on the lowest
+ * one that sounds it. One key per card is all this function has, and that is the most useful one
+ * available: the two spellings of a pitch share it, which is the same-answer case again, and the
+ * card is also held apart from the `name`/`find` cards on that square. The pitch's other squares
+ * are not covered, and a leak there is the mild one — a different place, read differently.
+ *
  * Greedy: take the first remaining card whose position has not come up in the last `gap`, and
  * fall back to the first remaining card when none qualifies. The fallback is what makes this
  * total — a queue of nothing but one position has no valid arrangement — and it always returns a
  * permutation of its input.
  */
+const ALL_STRINGS = Array.from({ length: STRING_COUNT }, (_, i) => i);
+
 export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string[] {
   const positionOf = (id: string) => {
     const key = parseCardId(id);
-    return key ? `${key.stringIndex}-${key.fret}` : id;
+    if (!key) return id;
+    if (isPositionKey(key)) return `${key.stringIndex}-${key.fret}`;
+    // Keyed on the whole neck rather than the current scope, so the grouping is a property of the
+    // card and does not shift when the settings do.
+    const canonical = positionsSounding(key.midi, ALL_STRINGS, MAX_FRET)[0];
+    return canonical ? `${canonical.stringIndex}-${canonical.fret}` : id;
   };
 
   const remaining = [...queue];
@@ -289,9 +323,15 @@ export function requeue(
   return [...queue.slice(0, at), id, ...queue.slice(at)];
 }
 
-/** Every card the deck holds, with its position decoded — for the stats heatmap. */
-export function deckPositions(deck: Deck): { card: Card; key: CardKey }[] {
+/**
+ * Every card the deck holds that is *about a position*, with that position decoded — for the
+ * stats heatmap. `pitch` cards are left out because they are not about one square, and the
+ * heatmap is a picture of squares.
+ */
+export function deckPositions(deck: Deck): { card: Card; key: PositionCardKey }[] {
   return Object.values(deck)
     .map((card) => ({ card, key: parseCardId(card.id) }))
-    .filter((entry): entry is { card: Card; key: CardKey } => entry.key != null);
+    .filter((entry): entry is { card: Card; key: PositionCardKey } =>
+      entry.key != null && isPositionKey(entry.key)
+    );
 }

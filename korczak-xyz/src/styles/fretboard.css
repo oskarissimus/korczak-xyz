@@ -296,9 +296,11 @@
 /* The columns are minmax(0, 1fr) — set in the component, since only it knows how
    many frets there are — so the whole neck always fits the panel rather than
    scrolling. Thirteen frets on a 320px screen leaves about 19px a cell, which is
-   under the usual touch target and still the right trade: only one string is
-   ever live, so vertical aim does not matter and a neck you have to scroll to
-   answer is worse than a narrow one you can see. */
+   under the usual touch target and still the right trade: a neck you have to
+   scroll to answer is worse than a narrow one you can see. On a `find` card only
+   one string is live, so vertical aim does not matter at all; on a `pitch` card
+   every string in the scope is, and the 40px row height below is then the whole
+   of the target — which is why it is the dimension defended there. */
 .fb-neck-grid {
   display: grid;
   gap: 2px;

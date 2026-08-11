@@ -117,6 +117,12 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
         >
           {t.dirFind}
         </Choice>
+        <Choice
+          active={settings.directions.includes('pitch')}
+          onClick={() => toggleDirection('pitch')}
+        >
+          {t.dirPitch}
+        </Choice>
       </Row>
 
       <Row label={t.sessionLength}>

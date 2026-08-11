@@ -6,8 +6,11 @@
  * enough to hit with a thumb. Same palette, same string order, so the two still read as the
  * same neck.
  *
- * Only the asked string is live. That is what makes 22px-wide cells workable on a phone —
- * vertical aim does not matter when five of the six rows cannot be pressed.
+ * On a `find` card only the asked string is live, and that is what makes 22px-wide cells workable
+ * on a phone — vertical aim does not matter when five of the six rows cannot be pressed. A `pitch`
+ * card asks for a note anywhere, so every string in the scope is live and vertical aim starts
+ * mattering; the rows are 40px tall, which is a whole touch target, and the horizontal precision
+ * the narrow cells demand is the same either way.
  *
  * Fret 0 has no column of its own. An open string is not stopped anywhere, so a box labelled
  * `0` sitting where the first fret's box sits reads as a fret — and the answer to "F on the D
@@ -19,7 +22,7 @@
 
 import type { ReactNode } from 'react';
 import { STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
-import type { Notation } from '../../utils/fretboard/notes';
+import type { Notation, Position } from '../../utils/fretboard/notes';
 import type { PositionStat } from '../../utils/fretboard/stats';
 
 interface NeckLayoutProps {
@@ -68,33 +71,38 @@ function NeckLayout({
   );
 }
 
-// --- answering a `find` card ------------------------------------------------------------------
+// --- answering a `find` or `pitch` card --------------------------------------------------------
+
+const samePosition = (a: Position, b: Position) =>
+  a.stringIndex === b.stringIndex && a.fret === b.fret;
 
 interface NeckPickerProps {
   maxFret: number;
-  activeString: number;
+  /** The strings that can be pressed: the asked one on a `find` card, the scope on a `pitch` one. */
+  liveStrings: readonly number[];
   stringLabels: boolean;
   notation: Notation;
   disabled: boolean;
-  chosenFret: number | null;
-  /** Every fret that sounds the asked note — null until the card has been answered. */
-  answerFrets: number[] | null;
-  onPick: (fret: number) => void;
+  chosen: Position | null;
+  /** Every place that answers the card — null until it has been answered. */
+  answers: readonly Position[] | null;
+  onPick: (stringIndex: number, fret: number) => void;
   label: string;
-  fretLabel: (fret: number) => string;
+  /** Names the whole place, not just the fret: on a `pitch` card the string is part of the answer. */
+  cellLabel: (stringIndex: number, fret: number) => string;
 }
 
 export function NeckPicker({
   maxFret,
-  activeString,
+  liveStrings,
   stringLabels,
   notation,
   disabled,
-  chosenFret,
-  answerFrets,
+  chosen,
+  answers,
   onPick,
   label,
-  fretLabel,
+  cellLabel,
 }: NeckPickerProps) {
   return (
     <NeckLayout
@@ -104,9 +112,11 @@ export function NeckPicker({
       className="fb-neck--picker"
       label={label}
       renderCell={(stringIndex, fret, openLabel) => {
-        const live = stringIndex === activeString;
-        const isAnswer = answerFrets != null && live && answerFrets.includes(fret);
-        const isMistake = answerFrets != null && live && chosenFret === fret && !isAnswer;
+        const here = { stringIndex, fret };
+        const live = liveStrings.includes(stringIndex);
+        const isAnswer = answers != null && answers.some((p) => samePosition(p, here));
+        const isMistake =
+          answers != null && chosen != null && samePosition(chosen, here) && !isAnswer;
         const classes = [
           'fb-neck-cell',
           fret === 0 ? 'fb-neck-cell--open' : '',
@@ -118,7 +128,9 @@ export function NeckPicker({
           .join(' ');
 
         // The nut cell shows the string's name until the card is answered, at which point the
-        // verdict is what the row is for; the prompt names the string throughout.
+        // verdict is what the row is for. That costs one label — on a `pitch` card, where the
+        // prompt names no string, it is the label of a row you have just marked and are looking
+        // straight at, and the five others are still there to read the neck by.
         const mark = isAnswer ? '●' : isMistake ? '✕' : '';
         const content = mark ? (
           <span className="fb-neck-mark" aria-hidden="true">
@@ -143,8 +155,8 @@ export function NeckPicker({
             type="button"
             className={classes}
             disabled={disabled}
-            onClick={() => onPick(fret)}
-            aria-label={fretLabel(fret)}
+            onClick={() => onPick(stringIndex, fret)}
+            aria-label={cellLabel(stringIndex, fret)}
           >
             {content}
           </button>

@@ -159,12 +159,12 @@ windows — the first one alone missed the loss it was written to catch:
 
 ## Fretboard Trainer
 
-Spaced-repetition flashcards for the notes on the neck, at `/games/fretboard/`. A card is one
+Spaced-repetition flashcards for the notes on the neck, at `/games/fretboard/`. Most cards are one
 position, drilled **both ways round** on independent schedules: `name` shows the dot and asks
 what it is called, `find` names the note and a string and asks where it is. Reading a diagram
 and finding G on the A string mid-song are different skills, and the scheduler has no business
 assuming one implies the other. On a black key `find` is split again, once per spelling — see
-below.
+below. A third direction, `pitch`, is not about a position at all — see further below.
 
 Answers are a tap, never a self-grade. Correctness is objective and the SM-2 rating comes from
 correctness plus how long it took (`≤2s` easy, `≤5s` good, slower hard, wrong again) — which is
@@ -205,6 +205,67 @@ without being told the notation at all.
 `spreadPositions` needed nothing for this. It keys on the position, and the two spellings share
 one; they are in fact the sharpest case it exists for, since they share the answer too and back
 to back the second is not read at all.
+
+### A `pitch` card is a pitch, not a place
+
+`find` bakes a string into the question. The skill it therefore never asks for is the one you use
+when someone calls a note at you: `C♯4` — find it *anywhere*, and choosing the string is part of
+the answer rather than part of the question. So `pitch` is a third direction on its own schedule,
+by the same argument as `name` against `find`, and **one way round only**: the reverse ("which
+pitch, with octave, is this dot?") would need a pad of forty-odd buttons and would mostly test
+arithmetic.
+
+Octaves are **sounding pitch, not written pitch** — the open low E is `E2`, the open high e is
+`E4`. That is what a tuner shows and what `TUNING_MIDI` already says; writing a guitar an octave
+up is a notation convention this game does not otherwise take part in. `octaveAt` had said so in
+a comment since it was written, and was dead code outside its test until now. At `maxFret: 12` the
+deck spans `E2`–`E5`, 37 pitches.
+
+The card id is `pitch:${midi}`, because the MIDI number *is* the question — one pitch, one card,
+however many places on the neck sound it. That breaks the assumption every other part of this game
+had been able to make, that a card decodes to a `(stringIndex, fret)`, so `parseCardId` returns a
+**discriminated union** and `isPositionKey` is the narrowing. That was the point of the union
+rather than optional fields: the compiler names every site that assumed a place, and there were
+more of them than a search would have found. The spelling split applies here as it does to `find`,
+for the same reason — `pitch:61` and `pitch:61:b` are `C♯4` and `D♭4`.
+
+**Any one correct position grades the card**, and the verdict then lights up the others, so the
+alternatives are still taught. `positionsSounding` is the cross-string sibling of `fretsSounding`
+and compares whole MIDI numbers rather than pitch classes — the open low E and its twelfth fret
+are one answer to a `find` card and two different pitches here.
+
+`scopeIds` enumerates these over `midisInScope` rather than over the grid: the fret × string loop
+would mint the same pitch several times, once per place that plays it. Everything else about scope
+is unchanged — `ensureCards` still never removes, so narrowing the strings leaves an unreachable
+pitch's schedule intact.
+
+`spreadPositions` keys a pitch card on the **lowest position that sounds it**, computed over the
+whole neck so the grouping is a property of the card and not of the current settings. One key per
+card is all that function has, and that is the most useful one: the two spellings of a pitch share
+it (the same-answer case again), and the card is also held apart from the `name`/`find` cards on
+that square. The pitch's other squares are uncovered, and a leak there is the mild kind.
+
+The neck heatmap leaves these out. A pitch card belongs to no one square, so folding it onto all
+three or four would count one card several times and onto one of them would name a place the card
+never did. `positionStats` skips them and `neckHint` no longer claims to count everything.
+
+`NeckPicker` is position-valued for this — `liveStrings`, `chosen`, `answers`, `onPick(string,
+fret)`. Every string in the scope is live, so vertical aim starts mattering where it did not
+before; the rows are 40px, which is a whole touch target, and the horizontal precision the ~19px
+cells demand at 320px is the same as it always was. `cellLabel` replaced `fretLabel` because a
+screen reader now has 78 buttons to tell apart rather than 13, and the prompt no longer names a
+string to tell them by.
+
+The keyboard does **not** answer these. `fretFromKey` returns a bare fret, and a fret without a
+string says nothing here; a two-keystroke string-then-fret mapping would be modal state for a
+control that is a tap away. The advance key still works.
+
+One thing to know about deploying it: a stale bundle reading `directions: ['name','find','pitch']`
+out of the synced settings mints ids its own `parseCardId` rejects, and a sitting comes up empty.
+No new direction token can ever be safe backwards, so this is accepted rather than fixed — the
+service worker is network-first for documents, so the window is a page already open across the
+deploy. What *is* fixed is the forward case: `loadSettings` filters `directions` against
+`DIRECTIONS`, and `FretboardSession` skips a card it cannot read instead of rendering nothing.
 
 ### The deck is derived; the answer log is the record
 

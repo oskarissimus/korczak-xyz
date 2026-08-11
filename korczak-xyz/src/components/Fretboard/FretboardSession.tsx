@@ -17,12 +17,15 @@ import { fretFromKey, isAdvanceKey, noteFromKey } from '../../utils/fretboard/ke
 import {
   cardNoteLabel,
   fretsSounding,
+  isPositionKey,
   noteNameAt,
   parseCardId,
+  pitchClassOfMidi,
   pitchLabel,
+  positionsSounding,
   stringLabel,
 } from '../../utils/fretboard/notes';
-import type { NoteName } from '../../utils/fretboard/notes';
+import type { Notation, NoteName, Position } from '../../utils/fretboard/notes';
 import { createCard, isDueWithin, rate, ratingFromAnswer } from '../../utils/fretboard/srs';
 import { formatSeconds } from '../../utils/fretboard/stats';
 import type { Deck, ReviewEvent, Settings } from '../../utils/fretboard/types';
@@ -51,8 +54,14 @@ interface Result {
   ms: number;
   note: NoteName;
   chosenNote: NoteName | null;
-  chosenFret: number | null;
-  answerFrets: number[];
+  chosen: Position | null;
+  /** Every place that answered the card. A `pitch` card has several, on several strings. */
+  answers: Position[];
+}
+
+/** `D 10 / G 5 / B 1` — where the pitch was, for the readout under a wrong answer. */
+function describePositions(positions: Position[], notation: Notation): string {
+  return positions.map((p) => `${stringLabel(p.stringIndex, notation)} ${p.fret}`).join(' / ');
 }
 
 export default function FretboardSession({
@@ -149,34 +158,55 @@ export default function FretboardSession({
 
   const answerNote = useCallback(
     (note: NoteName) => {
-      if (!key) return;
+      if (!key || !isPositionKey(key)) return;
       const expected = noteNameAt(key.stringIndex, key.fret);
       submit(note === expected, note, {
         note: expected,
         chosenNote: note,
-        chosenFret: null,
-        answerFrets: [key.fret],
+        chosen: null,
+        answers: [{ stringIndex: key.stringIndex, fret: key.fret }],
       });
     },
     [key, submit]
   );
 
-  const answerFret = useCallback(
-    (fret: number) => {
+  const answerPosition = useCallback(
+    (stringIndex: number, fret: number) => {
       if (!key) return;
+      const chosen = { stringIndex, fret };
+      const hit = (valid: Position[]) =>
+        valid.some((p) => p.stringIndex === stringIndex && p.fret === fret);
+
+      if (key.direction === 'pitch') {
+        // Every place in the scope sounding that exact pitch is right — the card asked for the
+        // note, and which finger you reach it with is not the question. Compared as whole MIDI
+        // numbers, so the octave the card names is the octave that counts.
+        const valid = positionsSounding(key.midi, settings.strings, settings.maxFret);
+        submit(hit(valid), `${stringIndex}-${fret}`, {
+          note: pitchClassOfMidi(key.midi),
+          chosenNote: null,
+          chosen,
+          answers: valid,
+        });
+        return;
+      }
+
       const expected = noteNameAt(key.stringIndex, key.fret);
       // Any fret on that string sounding the note is right: on a twelve-fret neck the open
       // string and the twelfth fret are the same note, and marking one of them wrong would be
       // teaching something false.
-      const valid = fretsSounding(key.stringIndex, expected, settings.maxFret);
-      submit(valid.includes(fret), String(fret), {
+      const valid = fretsSounding(key.stringIndex, expected, settings.maxFret).map((f) => ({
+        stringIndex: key.stringIndex,
+        fret: f,
+      }));
+      submit(hit(valid), String(fret), {
         note: expected,
         chosenNote: null,
-        chosenFret: fret,
-        answerFrets: valid,
+        chosen,
+        answers: valid,
       });
     },
-    [key, settings.maxFret, submit]
+    [key, settings.maxFret, settings.strings, submit]
   );
 
   useEffect(() => {
@@ -198,26 +228,49 @@ export default function FretboardSession({
         }
         return;
       }
+      // A digit names a fret and a `pitch` card needs a string as well, so there is nothing one
+      // keystroke can say there. It is answered by tapping the neck; the advance key still works.
+      if (key.direction !== 'find') return;
       const fret = fretFromKey(e.key, settings.maxFret);
       if (fret != null) {
         e.preventDefault();
-        answerFret(fret);
+        answerPosition(key.stringIndex, fret);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [advance, answerFret, answerNote, key, result, settings.maxFret, settings.notation]);
+  }, [advance, answerPosition, answerNote, key, result, settings.maxFret, settings.notation]);
+
+  // An id this build cannot read is not a card to ask. Settings sync between devices, so a newer
+  // build can name a direction this one has never heard of; skipping the card keeps the sitting
+  // going where returning null used to end it on a blank screen.
+  useEffect(() => {
+    if (cardId && !key) advance();
+  }, [advance, cardId, key]);
 
   if (!key || !cardId) return null;
 
-  const stringName = stringLabel(key.stringIndex, settings.notation);
-  const askedNote = noteNameAt(key.stringIndex, key.fret);
-  // One spelling on a `find` card — the card is asked as "C♯" or as "D♭", never as both.
+  // One spelling on a `find` or `pitch` card — asked as "C♯" or as "D♭", never as both.
   const askedLabel = cardNoteLabel(key, settings.notation);
-  const positionLabel =
-    key.fret === 0
+  const askedNote = isPositionKey(key)
+    ? noteNameAt(key.stringIndex, key.fret)
+    : pitchClassOfMidi(key.midi);
+  const stringName = isPositionKey(key) ? stringLabel(key.stringIndex, settings.notation) : '';
+  const positionLabel = !isPositionKey(key)
+    ? ''
+    : key.fret === 0
       ? fill(t.a11yPositionOpen, { string: stringName })
       : fill(t.a11yPosition, { string: stringName, fret: key.fret });
+  const liveStrings = isPositionKey(key) ? [key.stringIndex] : settings.strings;
+  const cellLabel = (stringIndex: number, fret: number) => {
+    // A `find` card fixes the string and the prompt names it, so the fret is the whole answer;
+    // on a `pitch` card the string is half of it and has to be spoken.
+    if (isPositionKey(key)) return fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret });
+    const string = stringLabel(stringIndex, settings.notation);
+    return fret === 0
+      ? fill(t.a11yPositionOpen, { string })
+      : fill(t.a11yPosition, { string, fret });
+  };
 
   return (
     <div className="fb-session">
@@ -246,14 +299,14 @@ export default function FretboardSession({
         ) : (
           <>
             <span className="fb-prompt-note">{askedLabel}</span>{' '}
-            {fill(t.onString, { string: stringName })}
+            {key.direction === 'pitch' ? t.anywhere : fill(t.onString, { string: stringName })}
           </>
         )}
       </p>
 
       {/* The verdict is drawn over the box the card lives in — the diagram you read, or the
           neck you tap — so it lands where the eye already is rather than in the row below. */}
-      {key.direction === 'name' ? (
+      {isPositionKey(key) && key.direction === 'name' ? (
         <>
           <div className="fb-stage fb-stage--card">
             <NoteCard
@@ -277,15 +330,15 @@ export default function FretboardSession({
         <div className="fb-stage">
           <NeckPicker
             maxFret={settings.maxFret}
-            activeString={key.stringIndex}
+            liveStrings={liveStrings}
             stringLabels={settings.stringLabels}
             notation={settings.notation}
             disabled={result != null}
-            chosenFret={result?.chosenFret ?? null}
-            answerFrets={result?.answerFrets ?? null}
-            onPick={answerFret}
-            label={t.tapFret}
-            fretLabel={(fret) => (fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret }))}
+            chosen={result?.chosen ?? null}
+            answers={result?.answers ?? null}
+            onPick={answerPosition}
+            label={key.direction === 'pitch' ? t.tapAnywhere : t.tapFret}
+            cellLabel={cellLabel}
           />
           {result && <Verdict correct={result.correct} />}
         </div>
@@ -301,7 +354,11 @@ export default function FretboardSession({
               <span className="fb-answer">
                 {key.direction === 'name'
                   ? fill(t.answerWas, { note: pitchLabel(result.note, settings.notation) })
-                  : fill(t.fretWas, { fret: result.answerFrets.join(' / ') })}
+                  : key.direction === 'pitch'
+                    ? fill(t.positionsWere, {
+                        positions: describePositions(result.answers, settings.notation),
+                      })
+                    : fill(t.fretWas, { fret: result.answers.map((p) => p.fret).join(' / ') })}
               </span>
             )}
             <span className="fb-time">{formatSeconds(result.ms)}</span>
@@ -312,7 +369,13 @@ export default function FretboardSession({
             )}
           </>
         ) : (
-          <span className="fb-hint">{key.direction === 'name' ? t.tapNote : t.tapFret}</span>
+          <span className="fb-hint">
+            {key.direction === 'name'
+              ? t.tapNote
+              : key.direction === 'pitch'
+                ? t.tapAnywhere
+                : t.tapFret}
+          </span>
         )}
       </div>
     </div>

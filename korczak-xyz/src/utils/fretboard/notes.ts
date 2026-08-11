@@ -149,9 +149,39 @@ export function noteLabelAt(stringIndex: number, fret: number, notation: Notatio
   return pitchLabel(noteNameAt(stringIndex, fret), notation);
 }
 
-// Which octave the position sounds in, in scientific pitch notation (middle C = C4).
+export const MIN_MIDI = 0;
+export const MAX_MIDI = 127;
+
+export function isValidMidi(midi: number): boolean {
+  return Number.isInteger(midi) && midi >= MIN_MIDI && midi <= MAX_MIDI;
+}
+
+/*
+ * Which octave a pitch sounds in, in scientific pitch notation (middle C = C4).
+ *
+ * The guitar is written an octave above where it sounds; these are the sounding numbers, so the
+ * open low E is E2 and the open high e is E4 — what a tuner shows, and what `TUNING_MIDI` already
+ * says.
+ *
+ * There is no spelling argument because no accidental in `PITCH_CLASSES` crosses an octave
+ * boundary: the five black keys are spelt C♯/D♭ … A♯/B♭, never B♯ or C♭, so both names of a pitch
+ * sit in the same octave. A table that ever gained one would have to take the spelling here.
+ */
+export function octaveOfMidi(midi: number): number {
+  return Math.floor(midi / 12) - 1;
+}
+
+export function pitchClassOfMidi(midi: number): NoteName {
+  return PITCH_CLASSES[((midi % 12) + 12) % 12].name;
+}
+
 export function octaveAt(stringIndex: number, fret: number): number {
-  return Math.floor(midiAt(stringIndex, fret) / 12) - 1;
+  return octaveOfMidi(midiAt(stringIndex, fret));
+}
+
+/** What one pitch is called — `C♯4`, `D♭4`, `E2`; `B4`/`H4` under German notation. */
+export function midiLabel(midi: number, spelling: Spelling, notation: Notation): string {
+  return `${spellingLabel(pitchClassOfMidi(midi), spelling, notation)}${octaveOfMidi(midi)}`;
 }
 
 /*
@@ -161,10 +191,20 @@ export function octaveAt(stringIndex: number, fret: number): number {
  * where it is. They are separate cards on separate schedules because they are separate skills —
  * reading a diagram fluently does nothing for finding G on the A string mid-song, and the
  * scheduler has no business assuming one implies the other.
+ *
+ * `pitch` is a third skill and not a relabelling of `find`: it names one pitch with its octave —
+ * `C♯4`, not "C♯ on the A string" — and asks for it anywhere on the neck, so choosing the string
+ * is part of the answer rather than part of the question. That is what you do when someone calls
+ * a note at you, and `find` never asks it.
  */
-export type Direction = 'name' | 'find';
+export type PositionDirection = 'name' | 'find';
+export type Direction = PositionDirection | 'pitch';
 
-export const DIRECTIONS: Direction[] = ['name', 'find'];
+export const DIRECTIONS: Direction[] = ['name', 'find', 'pitch'];
+
+export function isDirection(value: unknown): value is Direction {
+  return typeof value === 'string' && (DIRECTIONS as string[]).includes(value);
+}
 
 /*
  * Card ids.
@@ -177,11 +217,14 @@ export const DIRECTIONS: Direction[] = ['name', 'find'];
  * plain id is what every deck already stored and every logged answer already names, back when one
  * card asked "C♯/D♭" under both names at once. Reading it as the sharp card keeps the schedule
  * that card earnt, and leaves the flat card to arrive as the new material it genuinely is.
+ *
+ * A `pitch` card is not a position, so it is not keyed on one: `pitch:${midi}`, because the MIDI
+ * number *is* the question — one pitch, one card, however many places on the neck sound it.
  */
 const FLAT_SUFFIX = ':b';
 
 export function cardId(
-  direction: Direction,
+  direction: PositionDirection,
   stringIndex: number,
   fret: number,
   spelling: Spelling = 'sharp'
@@ -190,23 +233,56 @@ export function cardId(
   return spelling === 'flat' ? `${base}${FLAT_SUFFIX}` : base;
 }
 
-export interface CardKey extends Position {
-  direction: Direction;
-  /**
-   * Which name the card asks the position under. `sharp` wherever there is nothing to choose —
-   * on a natural, which has one name, and on a `name` card, which asks for the pitch class and
-   * takes either name as the answer.
-   */
+export function pitchCardId(midi: number, spelling: Spelling = 'sharp'): string {
+  const base = `pitch:${midi}`;
+  return spelling === 'flat' ? `${base}${FLAT_SUFFIX}` : base;
+}
+
+/**
+ * Which name the card asks under. `sharp` wherever there is nothing to choose — on a natural,
+ * which has one name, and on a `name` card, which asks for the pitch class and takes either name
+ * as the answer.
+ */
+interface Spelt {
   spelling: Spelling;
 }
 
+export interface PositionCardKey extends Position, Spelt {
+  direction: PositionDirection;
+}
+
+export interface PitchCardKey extends Spelt {
+  direction: 'pitch';
+  midi: number;
+}
+
+/*
+ * A card is asked about a place on the neck or about a pitch, and the two carry different things.
+ * The union is deliberate: it makes the compiler point at every site that assumed a card has a
+ * string and a fret, which is most of what this feature had to visit.
+ */
+export type CardKey = PositionCardKey | PitchCardKey;
+
+export function isPositionKey(key: CardKey): key is PositionCardKey {
+  return key.direction !== 'pitch';
+}
+
 export function parseCardId(id: string): CardKey | null {
+  const pitch = /^pitch:(\d{1,3})(:b)?$/.exec(id);
+  if (pitch) {
+    const midi = Number(pitch[1]);
+    if (!isValidMidi(midi)) return null;
+    const spelling: Spelling = pitch[2] ? 'flat' : 'sharp';
+    if (spelling === 'flat' && !hasTwoSpellings(pitchClassOfMidi(midi))) return null;
+    return { direction: 'pitch', midi, spelling };
+  }
+
   const match = /^(name|find):(\d)-(\d{1,2})(:b)?$/.exec(id);
   if (!match) return null;
   const stringIndex = Number(match[2]);
   const fret = Number(match[3]);
   if (!isValidPosition(stringIndex, fret, Number.MAX_SAFE_INTEGER)) return null;
-  const direction = match[1] as Direction;
+  const direction = match[1] as PositionDirection;
   const spelling: Spelling = match[4] ? 'flat' : 'sharp';
   // The flat card exists only where it asks a different question: a `find` card on a black key.
   // A flat `name` card, or a flat card on a natural, is not something `scopeIds` can mint, so an
@@ -220,10 +296,12 @@ export function parseCardId(id: string): CardKey | null {
 /**
  * What the note on a card is called, on the card.
  *
- * One spelling on a `find` card, because the spelling is the question; both on a `name` card,
- * because either is a right answer there.
+ * One spelling on a `find` or `pitch` card, because the spelling is the question; both on a `name`
+ * card, because either is a right answer there. A `pitch` card carries its octave, which is the
+ * whole of what it asks that `find` does not.
  */
 export function cardNoteLabel(key: CardKey, notation: Notation): string {
+  if (key.direction === 'pitch') return midiLabel(key.midi, key.spelling, notation);
   if (key.direction !== 'find') return noteLabelAt(key.stringIndex, key.fret, notation);
   return spellingLabel(noteNameAt(key.stringIndex, key.fret), key.spelling, notation);
 }
@@ -247,4 +325,36 @@ export function fretsSounding(
     if (midiAt(stringIndex, fret) % 12 === target) frets.push(fret);
   }
   return frets;
+}
+
+/**
+ * Every place in the scope that sounds exactly this pitch.
+ *
+ * The cross-string sibling of `fretsSounding`, and the answer to a `pitch` card: the same pitch
+ * lies under three or four fingers on a guitar, and all of them are right. Unlike `fretsSounding`
+ * this compares the whole MIDI number rather than the pitch class, so the open low E and its
+ * twelfth fret — an octave apart — are not confused for each other.
+ */
+export function positionsSounding(
+  midi: number,
+  strings: readonly number[],
+  maxFret = MAX_FRET
+): Position[] {
+  const positions: Position[] = [];
+  for (const stringIndex of [...strings].sort((a, b) => a - b)) {
+    if (stringIndex < 0 || stringIndex >= STRING_COUNT) continue;
+    const fret = midi - TUNING_MIDI[stringIndex];
+    if (fret >= 0 && fret <= maxFret) positions.push({ stringIndex, fret });
+  }
+  return positions;
+}
+
+/** Every distinct pitch the scope can sound — one `pitch` card each, in ascending order. */
+export function midisInScope(strings: readonly number[], maxFret = MAX_FRET): number[] {
+  const midis = new Set<number>();
+  for (const stringIndex of strings) {
+    if (stringIndex < 0 || stringIndex >= STRING_COUNT) continue;
+    for (let fret = 0; fret <= maxFret; fret++) midis.add(TUNING_MIDI[stringIndex] + fret);
+  }
+  return [...midis].sort((a, b) => a - b);
 }

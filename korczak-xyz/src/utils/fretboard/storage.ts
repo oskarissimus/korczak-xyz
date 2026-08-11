@@ -18,6 +18,7 @@
 import { isQuotaError, storageBytes } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { emptyCache } from './replay';
+import { isDirection } from './notes';
 import type { Notation } from './notes';
 import type {
   DeckCache,
@@ -241,7 +242,13 @@ export function loadSettings(notation: Notation): Settings {
   if (!Array.isArray(merged.strings) || merged.strings.length === 0) {
     merged.strings = DEFAULT_SETTINGS.strings;
   }
-  if (!Array.isArray(merged.directions) || merged.directions.length === 0) {
+  // Settings sync between devices, so a direction this build has never heard of can arrive from
+  // one that has. Dropping it here is what stops `scopeIds` minting card ids that `parseCardId`
+  // will then refuse, which is a sitting with nothing in it.
+  merged.directions = Array.isArray(merged.directions)
+    ? merged.directions.filter(isDirection)
+    : [];
+  if (merged.directions.length === 0) {
     merged.directions = DEFAULT_SETTINGS.directions;
   }
   return merged;

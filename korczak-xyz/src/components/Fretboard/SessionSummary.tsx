@@ -5,7 +5,12 @@
  * missed, named in full, so the summary ends with something to do rather than a score.
  */
 
-import { cardNoteLabel, parseCardId, stringLabel } from '../../utils/fretboard/notes';
+import {
+  cardNoteLabel,
+  isPositionKey,
+  parseCardId,
+  stringLabel,
+} from '../../utils/fretboard/notes';
 import type { Notation } from '../../utils/fretboard/notes';
 import { formatSeconds } from '../../utils/fretboard/stats';
 import type { SessionSummary as Summary } from '../../utils/fretboard/stats';
@@ -40,6 +45,8 @@ function Tile({ label, value }: { label: string; value: string }) {
 export function describeCard(cardId: string, t: Translation, notation: Notation): string {
   const key = parseCardId(cardId);
   if (!key) return cardId;
+  // A `pitch` card names no place — several answer it — so the pitch and its octave are the line.
+  if (!isPositionKey(key)) return `${cardNoteLabel(key, notation)} — ${t.anywhereShort}`;
   const string = stringLabel(key.stringIndex, notation);
   const where =
     key.fret === 0
