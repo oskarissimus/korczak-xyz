@@ -17,9 +17,15 @@ const { lang } = Astro.props;
 const t = translations[lang];
 
 const TILES = [t.due, t.fresh, t.mastered];
-/* The settings rows, as label widths. Same rows as SettingsPanel, so the block
-   reserves the height the real one will take. */
-const ROWS = 7;
+/* The settings rows, as how many buttons each holds — frets, scale, strings, ask,
+   session length, new per session, string names, notation. Same rows as
+   SettingsPanel, so the block reserves the height the real one will take, and the
+   counts matter rather than only the row count: a row of six wraps at 320px where a
+   row of two does not, and a stand-in that reserved three everywhere reserved the
+   wrong height for both. SettingsPanel's twelve-button Key row is deliberately not
+   here — it is rendered only once a scale is chosen, and no scale is the default a
+   first visit hydrates into. */
+const ROW_CHOICES = [4, 6, 6, 3, 3, 3, 2, 2];
 ---
 
 <div class="fb-start" aria-hidden="true">
@@ -43,13 +49,13 @@ const ROWS = 7;
   <div class="fb-settings">
     <h3 class="fb-subhead">{t.settings}</h3>
     {
-      Array.from({ length: ROWS }).map(() => (
+      ROW_CHOICES.map((choices) => (
         <div class="fb-setting">
           <span class="fb-setting-label">&nbsp;</span>
           <div class="fb-setting-controls">
-            <span class="fb-choice">&nbsp;&nbsp;&nbsp;&nbsp;</span>
-            <span class="fb-choice">&nbsp;&nbsp;&nbsp;&nbsp;</span>
-            <span class="fb-choice">&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            {Array.from({ length: choices }).map(() => (
+              <span class="fb-choice">&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            ))}
           </div>
         </div>
       ))

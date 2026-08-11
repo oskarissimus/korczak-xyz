@@ -20,7 +20,8 @@ import {
   pitchClassOfMidi,
   positionsSounding,
 } from './notes';
-import type { CardKey, Direction, PositionCardKey } from './notes';
+import type { CardKey, Direction, NoteName, PositionCardKey, Spelling } from './notes';
+import { isInScale, keySpelling } from './scales';
 import type { Bucket, Card } from './srs';
 import { bucketOf, createCard, isDue } from './srs';
 import type { Deck, Settings } from './types';
@@ -55,20 +56,40 @@ export const MAX_ANSWERS_FACTOR = 3;
  * C♯, and a card asking under both names at once lets you pass it while only ever reading one of
  * them. The `name` direction is not split — it asks what a pitch class is called, and both names
  * are right — so a natural is one card in each direction and a black key is one and two.
+ *
+ * A key narrows this and changes nothing else. Positions sounding a note outside the scale are
+ * left out, and a black key inside it is **one** card rather than two: the key decides which of
+ * its names to ask under, because G major contains F♯ and does not contain G♭. That is the same
+ * argument the spelling split was made on, applied one level up. With no key set, every line
+ * below is what it always was.
  */
 export function scopeIds(settings: Settings): string[] {
   const ids: string[] = [];
   const strings = [...settings.strings].sort((a, b) => a - b);
   const directions = settings.directions.length > 0 ? settings.directions : (['name'] as Direction[]);
+  const scale = settings.scale;
+
+  // Which names a note in scope is asked under: both when there is no key, and the key's own
+  // otherwise. A natural spells the same either way and is always the unsuffixed card.
+  const spellings = (name: NoteName): Spelling[] => {
+    if (!hasTwoSpellings(name)) return ['sharp'];
+    return scale ? [keySpelling(scale)] : ['sharp', 'flat'];
+  };
+
   for (let fret = 0; fret <= Math.min(settings.maxFret, MAX_FRET); fret++) {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
+      const note = noteNameAt(string, fret);
+      if (!isInScale(scale, note)) continue;
       for (const direction of directions) {
         if (direction === 'pitch') continue; // enumerated by pitch below, not per position
-        ids.push(cardId(direction, string, fret));
-        if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
-          ids.push(cardId(direction, string, fret, 'flat'));
+        // Only `find` asks under one name at a time; a `name` card asks for the pitch class and
+        // takes either, so it is one card whatever the key.
+        if (direction !== 'find') {
+          ids.push(cardId(direction, string, fret));
+          continue;
         }
+        for (const spelling of spellings(note)) ids.push(cardId(direction, string, fret, spelling));
       }
     }
   }
@@ -76,8 +97,9 @@ export function scopeIds(settings: Settings): string[] {
   // the scope can sound rather than over the grid — several places on the neck answer each one.
   if (directions.includes('pitch')) {
     for (const midi of midisInScope(strings, Math.min(settings.maxFret, MAX_FRET))) {
-      ids.push(pitchCardId(midi));
-      if (hasTwoSpellings(pitchClassOfMidi(midi))) ids.push(pitchCardId(midi, 'flat'));
+      const note = pitchClassOfMidi(midi);
+      if (!isInScale(scale, note)) continue;
+      for (const spelling of spellings(note)) ids.push(pitchCardId(midi, spelling));
     }
   }
   return ids;

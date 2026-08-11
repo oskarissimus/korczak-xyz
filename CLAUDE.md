@@ -267,6 +267,44 @@ service worker is network-first for documents, so the window is a page already o
 deploy. What *is* fixed is the forward case: `loadSettings` filters `directions` against
 `DIRECTIONS`, and `FretboardSession` skips a card it cannot read instead of rendering nothing.
 
+### A scale narrows the scope and touches nothing else
+
+Scope was a rectangle — which strings, how many frets up. That is the right first cut, but it is
+not how anyone plays: someone working on a song in G major wants the notes of G major on the neck.
+So `Settings.scale` is a `{ root, type }` or `null`, and `scopeIds` skips positions sounding a note
+outside it. Five types plus off (`scales.ts`): major, natural minor, both pentatonics, blues.
+
+The whole change is that one filter, because **a scale mints no new kind of card**. A card is still
+`find:1-4`; `parseCardId`, the event log and the fold are untouched, and since `ensureCards` never
+removes, the schedule a card earnt is waiting when you come back to that key. Contrast the `pitch`
+direction, which cost a discriminated union across the app.
+
+It is also the one settings field that is **safe across a deploy in both directions**. An older
+build ignores `scale` and practises the full chromatic deck; a newer scale type arriving on an
+older one is dropped to `null` by `isScaleChoice`, which is again the full deck. Neither can mint
+an id the other refuses — the failure mode a new direction token has is unreachable here.
+
+**The key decides the spelling of its black notes.** G major asks for F♯ and never G♭; F major for
+B♭ and never A♯, so a black key in scope is *one* `find` card rather than two. That is the existing
+spelling-split argument one level up: music written in flats never says C♯. `keySpelling` is a
+12-entry circle-of-fifths table read on the **relative major's** tonic (`SCALES[].relativeMajor`),
+which is what makes A minor spell like C major and D minor like F major — get that offset wrong and
+every minor key comes out spelt as its parallel major. `keyLabel` names the key from the same
+table, so one root button reads `E♭` beside *Major* and `D♯` beside *Minor*. The `name` direction
+is not split, here as anywhere: either spelling answers it.
+
+**The twelve-button answer pad does not narrow to the scale.** Tempting — thinking inside a key is
+the point — but a card's difficulty must not move with a scope setting, or the same card id mixes
+1-of-7 and 1-of-12 answers in one history and the stats page's per-position accuracy stops being a
+like-for-like measurement. `NeckGrid` likewise does not dim the out-of-key frets on a `find` card:
+which fret sounds the note *is* the question.
+
+`sanitizeSettings` (in `storage.ts`, not `loadSettings`) is where the repair lives, because both
+ways in need it. The cloud copy is pulled straight out of Firestore on first contact and used for
+the rest of the session, so a record repaired only on the way out of localStorage is repaired one
+page load too late — which is how a bad `directions` used to survive a whole sitting. Note `scale`
+is `null` and never `undefined`: `saveCloudSettings` hands the object straight to `setDoc`.
+
 ### The deck is derived; the answer log is the record
 
 The typing trainer reconciles by lineage because its progress is a *mutable document* two

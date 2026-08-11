@@ -20,6 +20,7 @@ import { describeError, log } from '../../lib/logger';
 import { emptyCache } from './replay';
 import { isDirection } from './notes';
 import type { Notation } from './notes';
+import { isScaleChoice } from './scales';
 import type {
   DeckCache,
   MasterySnapshot,
@@ -233,10 +234,18 @@ export function saveMastery(history: MasterySnapshot[]): void {
 
 // --- settings -------------------------------------------------------------------------------
 
-export function loadSettings(notation: Notation): Settings {
-  const stored = readJSON<Partial<Settings>>(KEYS.settings, {});
-  // A settings record written before the notation setting existed has no `notation` key, so the
-  // spread hands it the page's default — which is the migration.
+/**
+ * Fill in what a stored or synced record is missing, and repair what it should not contain.
+ *
+ * Both ways in need this, which is why it is not inlined in `loadSettings`: the cloud copy is
+ * pulled straight out of Firestore on first contact (`useFretboardData`) and used for the rest of
+ * that session, so a record repaired only on the way out of localStorage is repaired one page
+ * load too late.
+ *
+ * A record written before a setting existed simply has no key for it, so the spread over the
+ * defaults is the migration.
+ */
+export function sanitizeSettings(stored: Partial<Settings>, notation: Notation): Settings {
   const merged = { ...defaultSettings(notation), ...stored };
   // A scope with no strings or no directions is an empty deck and a game that cannot start.
   if (!Array.isArray(merged.strings) || merged.strings.length === 0) {
@@ -251,7 +260,15 @@ export function loadSettings(notation: Notation): Settings {
   if (merged.directions.length === 0) {
     merged.directions = DEFAULT_SETTINGS.directions;
   }
+  // A scale this build cannot evaluate is dropped to no scale, which is the full chromatic deck —
+  // the mild failure, unlike an unknown direction. `scaleNotes` would throw on the missing table
+  // entry if one got this far.
+  merged.scale = isScaleChoice(merged.scale) ? merged.scale : null;
   return merged;
+}
+
+export function loadSettings(notation: Notation): Settings {
+  return sanitizeSettings(readJSON<Partial<Settings>>(KEYS.settings, {}), notation);
 }
 
 export function saveSettings(settings: Settings): void {

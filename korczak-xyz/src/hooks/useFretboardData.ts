@@ -38,6 +38,7 @@ import {
   saveSessions,
   saveSettings,
   saveUnsynced,
+  sanitizeSettings,
 } from '../utils/fretboard/storage';
 import type {
   Deck,
@@ -47,7 +48,7 @@ import type {
   SessionRecord,
   Settings,
 } from '../utils/fretboard/types';
-import { DEFAULT_SETTINGS, defaultSettings } from '../utils/fretboard/types';
+import { DEFAULT_SETTINGS } from '../utils/fretboard/types';
 import type { AuthUser } from './useAuth';
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error';
@@ -240,7 +241,10 @@ export function useFretboardData(
         // wins outright — there is no work in them to lose.
         const cloudSettings = await loadCloudSettings(uid);
         if (cloudSettings) {
-          const merged = { ...defaultSettings(defaultNotation), ...cloudSettings };
+          // Through the same repair as a stored record, not a bare spread over the defaults: this
+          // copy is used for the rest of the session, so a direction or a scale this build cannot
+          // read has to be dropped here rather than on the next page load.
+          const merged = sanitizeSettings(cloudSettings, defaultNotation);
           saveSettings(merged);
           publish({ ...stateRef.current, settings: merged });
         } else {
