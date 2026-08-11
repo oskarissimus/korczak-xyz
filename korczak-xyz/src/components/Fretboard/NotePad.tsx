@@ -5,10 +5,14 @@
  * because a text field would need to accept `A#`, `a#`, `A♯` and `Bb` and then argue about
  * which of them you meant. Each button carries both spellings, so the deck teaches that
  * `A♯` and `B♭` are the same fret rather than quietly picking a side — which under German
- * notation reads `A♯/B`, the black key having taken the name B outright.
+ * notation reads `Ais/B`, the black key having taken the name B outright.
  *
- * `onPick` hands back `name`, never the label: what the button says is a setting, what the
- * answer is is not.
+ * The notation is the card's, not a global setting: a `name` card asking for `Cis/Des` is
+ * answered on a German pad and one asking for `C♯/D♭` on an international one, which is the whole
+ * of the difference between those two cards. See `cardNotation`.
+ *
+ * `onPick` hands back `name`, never the label: what the button says is the card's business, what
+ * the answer is is not.
  */
 
 import { PITCH_CLASSES, pitchLabel } from '../../utils/fretboard/notes';

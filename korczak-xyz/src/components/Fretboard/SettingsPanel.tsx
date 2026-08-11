@@ -9,8 +9,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { STRING_COUNT, stringLabel } from '../../utils/fretboard/notes';
-import type { Direction } from '../../utils/fretboard/notes';
+import { STRING_COUNT, displayNotation, stringLabel } from '../../utils/fretboard/notes';
+import type { Direction, Notation } from '../../utils/fretboard/notes';
 import type { Settings } from '../../utils/fretboard/types';
 import type { Translation } from './translations';
 
@@ -87,6 +87,15 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
     onChange({ ...settings, directions });
   };
 
+  const toggleNotation = (notation: Notation) => {
+    const has = settings.notations.includes(notation);
+    if (has && settings.notations.length === 1) return;
+    const notations = has
+      ? settings.notations.filter((n) => n !== notation)
+      : ([...settings.notations, notation] as Notation[]);
+    onChange({ ...settings, notations });
+  };
+
   return (
     <div className="fb-settings">
       <h3 className="fb-subhead">{t.settings}</h3>
@@ -110,7 +119,7 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
             active={settings.strings.includes(index)}
             onClick={() => toggleString(index)}
           >
-            {stringLabel(index, settings.notation)}
+            {stringLabel(index, displayNotation(settings.notations))}
           </Choice>
         ))}
       </Row>
@@ -175,21 +184,23 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
         </Choice>
       </Row>
 
-      {/* The two buttons are the letters that differ, which is shorter than any word for it in
-          either language and matches the single-letter string row above — one of which this
-          setting renames. `Międzynarodowe` wraps the row onto a second line at 320px, and the
-          pre-hydration stand-in reserves one line per row. */}
+      {/* Both can be on, like the directions row and unlike every other row here: `C♯` and `Cis`
+          are two things to know, and the deck will drill them on separate schedules rather than
+          make you pick a side. The buttons are the letters that differ, which is shorter than any
+          word for it in either language and matches the single-letter string row above — one of
+          which this setting renames. `Międzynarodowe` wraps the row onto a second line at 320px,
+          and the pre-hydration stand-in reserves one line per row. */}
       <Row label={t.notation}>
         <Choice
-          active={settings.notation === 'international'}
-          onClick={() => onChange({ ...settings, notation: 'international' })}
+          active={settings.notations.includes('international')}
+          onClick={() => toggleNotation('international')}
           title={t.notationIntlTitle}
         >
           {t.notationIntl}
         </Choice>
         <Choice
-          active={settings.notation === 'german'}
-          onClick={() => onChange({ ...settings, notation: 'german' })}
+          active={settings.notations.includes('german')}
+          onClick={() => toggleNotation('german')}
           title={t.notationGermanTitle}
         >
           {t.notationGerman}

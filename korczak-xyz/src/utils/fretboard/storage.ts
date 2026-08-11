@@ -18,7 +18,7 @@
 import { isQuotaError, storageBytes } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { emptyCache } from './replay';
-import { isDirection } from './notes';
+import { isDirection, isNotation } from './notes';
 import type { Notation } from './notes';
 import type {
   DeckCache,
@@ -234,6 +234,21 @@ export function saveMastery(history: MasterySnapshot[]): void {
 // --- settings -------------------------------------------------------------------------------
 
 /**
+ * What a record written before the notation became a deck axis meant by `notation`.
+ *
+ * **Both**, when it said German. The plain card ids that deck is made of never committed to a
+ * notation — the setting was display-only and `ReviewEvent.answered` stored international names —
+ * so reading them as the international cards they now are is the only reading that keeps every
+ * schedule the player earnt. Migrating a German reader to `['german']` alone would put their
+ * whole deck out of scope and start them again from nothing; adding German alongside leaves the
+ * work intact and lets the German cards arrive as the new material they are.
+ */
+function migratedNotations(notation: unknown): Notation[] | null {
+  if (!isNotation(notation)) return null;
+  return notation === 'german' ? ['international', 'german'] : ['international'];
+}
+
+/**
  * Fill in what a stored or synced record is missing, and repair what it should not contain.
  *
  * Both ways in need this, which is why it is not inlined in `loadSettings`: the cloud copy is
@@ -244,8 +259,12 @@ export function saveMastery(history: MasterySnapshot[]): void {
  * A record written before a setting existed simply has no key for it, so the spread over the
  * defaults is the migration.
  */
-export function sanitizeSettings(stored: Partial<Settings>, notation: Notation): Settings {
-  const merged = { ...defaultSettings(notation), ...stored };
+export function sanitizeSettings(
+  stored: Partial<Settings> & { notation?: unknown },
+  notation: Notation
+): Settings {
+  const { notation: legacyNotation, ...rest } = stored;
+  const merged = { ...defaultSettings(notation), ...rest };
   // A scope with no strings or no directions is an empty deck and a game that cannot start.
   if (!Array.isArray(merged.strings) || merged.strings.length === 0) {
     merged.strings = DEFAULT_SETTINGS.strings;
@@ -258,6 +277,15 @@ export function sanitizeSettings(stored: Partial<Settings>, notation: Notation):
     : [];
   if (merged.directions.length === 0) {
     merged.directions = DEFAULT_SETTINGS.directions;
+  }
+  // Read from `rest` rather than `merged`: the defaults always supply a list, so asking the merged
+  // record whether it has one would answer yes for every record ever written and the migration
+  // below would never run.
+  merged.notations = Array.isArray(rest.notations)
+    ? [...new Set(rest.notations.filter(isNotation))]
+    : (migratedNotations(legacyNotation) ?? []);
+  if (merged.notations.length === 0) {
+    merged.notations = defaultSettings(notation).notations;
   }
   return merged;
 }

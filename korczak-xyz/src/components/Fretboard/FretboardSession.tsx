@@ -16,6 +16,8 @@ import { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, requeue } from '../../utils/fre
 import { fretFromKey, isAdvanceKey, noteFromKey } from '../../utils/fretboard/keys';
 import {
   cardNoteLabel,
+  cardNotation,
+  displayNotation,
   fretsSounding,
   isPositionKey,
   noteNameAt,
@@ -89,6 +91,12 @@ export default function FretboardSession({
   const cardId = queue[index];
   const key = cardId ? parseCardId(cardId) : null;
   const done = index >= queue.length;
+
+  // Everything on the card is drawn in the notation the card asks in — the pad it is answered on,
+  // the string letters beside the neck, and what the keyboard letters mean. A card that reads the
+  // same under both borrows the display notation rather than flipping the sitting to
+  // international for the naturals; see `cardNotation`.
+  const notation = key ? cardNotation(key, displayNotation(settings.notations)) : 'international';
 
   // The sitting ends when the queue runs out — including the repeats it grew along the way.
   useEffect(() => {
@@ -221,7 +229,7 @@ export default function FretboardSession({
       }
       if (!key) return;
       if (key.direction === 'name') {
-        const note = noteFromKey(e.key, e.shiftKey, settings.notation);
+        const note = noteFromKey(e.key, e.shiftKey, notation);
         if (note) {
           e.preventDefault();
           answerNote(note);
@@ -239,7 +247,7 @@ export default function FretboardSession({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [advance, answerPosition, answerNote, key, result, settings.maxFret, settings.notation]);
+  }, [advance, answerPosition, answerNote, key, notation, result, settings.maxFret]);
 
   // An id this build cannot read is not a card to ask. Settings sync between devices, so a newer
   // build can name a direction this one has never heard of; skipping the card keeps the sitting
@@ -250,12 +258,13 @@ export default function FretboardSession({
 
   if (!key || !cardId) return null;
 
-  // One spelling on a `find` or `pitch` card — asked as "C♯" or as "D♭", never as both.
-  const askedLabel = cardNoteLabel(key, settings.notation);
+  // One spelling on a `find` or `pitch` card — asked as "C♯", "D♭", "Cis" or "Des", never as more
+  // than one of them.
+  const askedLabel = cardNoteLabel(key);
   const askedNote = isPositionKey(key)
     ? noteNameAt(key.stringIndex, key.fret)
     : pitchClassOfMidi(key.midi);
-  const stringName = isPositionKey(key) ? stringLabel(key.stringIndex, settings.notation) : '';
+  const stringName = isPositionKey(key) ? stringLabel(key.stringIndex, notation) : '';
   const positionLabel = !isPositionKey(key)
     ? ''
     : key.fret === 0
@@ -266,7 +275,7 @@ export default function FretboardSession({
     // A `find` card fixes the string and the prompt names it, so the fret is the whole answer;
     // on a `pitch` card the string is half of it and has to be spoken.
     if (isPositionKey(key)) return fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret });
-    const string = stringLabel(stringIndex, settings.notation);
+    const string = stringLabel(stringIndex, notation);
     return fret === 0
       ? fill(t.a11yPositionOpen, { string })
       : fill(t.a11yPosition, { string, fret });
@@ -313,7 +322,7 @@ export default function FretboardSession({
               stringIndex={key.stringIndex}
               fret={key.fret}
               stringLabels={settings.stringLabels}
-              notation={settings.notation}
+              notation={notation}
               label={positionLabel}
             />
             {result && <Verdict correct={result.correct} />}
@@ -323,7 +332,7 @@ export default function FretboardSession({
             disabled={result != null}
             chosen={result?.chosenNote ?? null}
             answer={result ? askedNote : null}
-            notation={settings.notation}
+            notation={notation}
           />
         </>
       ) : (
@@ -332,7 +341,7 @@ export default function FretboardSession({
             maxFret={settings.maxFret}
             liveStrings={liveStrings}
             stringLabels={settings.stringLabels}
-            notation={settings.notation}
+            notation={notation}
             disabled={result != null}
             chosen={result?.chosen ?? null}
             answers={result?.answers ?? null}
@@ -353,10 +362,10 @@ export default function FretboardSession({
             {!result.correct && (
               <span className="fb-answer">
                 {key.direction === 'name'
-                  ? fill(t.answerWas, { note: pitchLabel(result.note, settings.notation) })
+                  ? fill(t.answerWas, { note: pitchLabel(result.note, notation) })
                   : key.direction === 'pitch'
                     ? fill(t.positionsWere, {
-                        positions: describePositions(result.answers, settings.notation),
+                        positions: describePositions(result.answers, notation),
                       })
                     : fill(t.fretWas, { fret: result.answers.map((p) => p.fret).join(' / ') })}
               </span>

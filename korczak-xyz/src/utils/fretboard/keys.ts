@@ -15,6 +15,10 @@
  * because in that notation `B` *is* the black key. Which also closes the hole from the other
  * side: shift on `B` is nothing, since what it would reach for is already what `B` answers.
  * A single shared set of natural letters is what would silently desync here, so there isn't one.
+ *
+ * The spelt-out accidentals need nothing further. `Cis` is reached with shift on `C`, the letter
+ * it begins with; `Des` has no key of its own, exactly as `D♭` has none — a pad button is one
+ * pitch class under both its names, and the shift rule reaches it under the sharp one.
  */
 
 import { PITCH_CLASSES } from './notes';

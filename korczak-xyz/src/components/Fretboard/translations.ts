@@ -3,10 +3,11 @@
  * own — there are too many of them, and they are too specific, to belong in the site-wide table.
  * The game's name and one-line description do live there, because the games index shows them.
  *
- * Note names are not in here. Which of the two notations they are shown under is a setting —
- * see `Notation` in `src/utils/fretboard/notes.ts` — because it is a property of the player and
- * not of the language they read the page in: someone reading the English page in Warsaw wants H,
- * and the setting has to survive a locale switch. The language only picks the default.
+ * Note names are not in here. Which notations the deck asks under is a setting — see `Notation`
+ * in `src/utils/fretboard/notes.ts` — because it is a property of the player and not of the
+ * language they read the page in: someone reading the English page in Warsaw wants H, and the
+ * setting has to survive a locale switch. The language only picks the default, and either
+ * language can have both notations in the deck at once.
  */
 
 import type { Notation } from '../../utils/fretboard/notes';
@@ -58,8 +59,8 @@ export const translations = {
     notation: 'Note names',
     notationIntl: 'B',
     notationGerman: 'H',
-    notationIntlTitle: 'International: A♯/B♭, B',
-    notationGermanTitle: 'German: A♯/B, H',
+    notationIntlTitle: 'International: C♯/D♭, A♯/B♭, B — both can be on',
+    notationGermanTitle: 'German: Cis/Des, Ais/B, H — both can be on',
     on: 'On',
     off: 'Off',
 
@@ -161,8 +162,8 @@ export const translations = {
     notation: 'Nazwy dźwięków',
     notationIntl: 'B',
     notationGerman: 'H',
-    notationIntlTitle: 'Międzynarodowe: A♯/B♭, B',
-    notationGermanTitle: 'Niemieckie: A♯/B, H',
+    notationIntlTitle: 'Międzynarodowe: C♯/D♭, A♯/B♭, B — można oba naraz',
+    notationGermanTitle: 'Niemieckie: Cis/Des, Ais/B, H — można oba naraz',
     on: 'Tak',
     off: 'Nie',
 

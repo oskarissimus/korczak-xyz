@@ -1,7 +1,10 @@
 import type { Direction, Notation } from './notes';
 import type { Bucket, Card, Rating } from './srs';
 
-/** The deck, keyed by card id (`${direction}:${stringIndex}-${fret}`, plus `:b` on a flat card). */
+/**
+ * The deck, keyed by card id — `${direction}:${stringIndex}-${fret}`, plus `:b` on a flat card
+ * and `:de` on a German-notation one.
+ */
 export type Deck = Record<string, Card>;
 
 export interface Settings {
@@ -17,8 +20,15 @@ export interface Settings {
   newPerSession: number;
   /** Whether the diagram prints the string letters. Off is the harder deck. */
   stringLabels: boolean;
-  /** Which names the twelve are shown under. Display only — never what gets stored. */
-  notation: Notation;
+  /**
+   * Which sets of note names the deck asks under. Empty is not allowed; the UI keeps at least one.
+   *
+   * A list rather than a choice, because `C♯` and `Cis` are two things to know and a player may
+   * want both drilled — the two spellings of a black key are in the deck together for the same
+   * reason. Where the notations agree on the word there is still only one card; see
+   * `hasTwoNotations`.
+   */
+  notations: Notation[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -28,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sessionLength: 20,
   newPerSession: 6,
   stringLabels: true,
-  notation: 'international',
+  notations: ['international'],
 };
 
 /**
@@ -40,7 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
  * then on it follows the account rather than which page it is read on.
  */
 export function defaultSettings(notation: Notation): Settings {
-  return { ...DEFAULT_SETTINGS, notation };
+  return { ...DEFAULT_SETTINGS, notations: [notation] };
 }
 
 /**

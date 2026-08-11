@@ -20,7 +20,7 @@ import {
   pitchClassOfMidi,
   positionsSounding,
 } from './notes';
-import type { CardKey, Direction, PositionCardKey } from './notes';
+import type { CardKey, Direction, Notation, PositionCardKey } from './notes';
 import type { Bucket, Card } from './srs';
 import { bucketOf, createCard, isDue } from './srs';
 import type { Deck, Settings } from './types';
@@ -55,19 +55,28 @@ export const MAX_ANSWERS_FACTOR = 3;
  * C♯, and a card asking under both names at once lets you pass it while only ever reading one of
  * them. The `name` direction is not split — it asks what a pitch class is called, and both names
  * are right — so a natural is one card in each direction and a black key is one and two.
+ *
+ * The selected notations multiply that again, by the same argument one step out: `Cis` and `C♯`
+ * are two things to know. Only where the two notations print different words, though — `cardId`
+ * normalises the rest away, and pushing an id twice is what the dedupe below is for. Selecting
+ * one notation therefore leaves the deck exactly the size it was.
  */
 export function scopeIds(settings: Settings): string[] {
   const ids: string[] = [];
   const strings = [...settings.strings].sort((a, b) => a - b);
   const directions = settings.directions.length > 0 ? settings.directions : (['name'] as Direction[]);
+  const notations =
+    settings.notations.length > 0 ? settings.notations : (['international'] as Notation[]);
   for (let fret = 0; fret <= Math.min(settings.maxFret, MAX_FRET); fret++) {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
       for (const direction of directions) {
         if (direction === 'pitch') continue; // enumerated by pitch below, not per position
-        ids.push(cardId(direction, string, fret));
-        if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
-          ids.push(cardId(direction, string, fret, 'flat'));
+        for (const notation of notations) {
+          ids.push(cardId(direction, string, fret, 'sharp', notation));
+          if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
+            ids.push(cardId(direction, string, fret, 'flat', notation));
+          }
         }
       }
     }
@@ -76,11 +85,15 @@ export function scopeIds(settings: Settings): string[] {
   // the scope can sound rather than over the grid — several places on the neck answer each one.
   if (directions.includes('pitch')) {
     for (const midi of midisInScope(strings, Math.min(settings.maxFret, MAX_FRET))) {
-      ids.push(pitchCardId(midi));
-      if (hasTwoSpellings(pitchClassOfMidi(midi))) ids.push(pitchCardId(midi, 'flat'));
+      for (const notation of notations) {
+        ids.push(pitchCardId(midi, 'sharp', notation));
+        if (hasTwoSpellings(pitchClassOfMidi(midi))) {
+          ids.push(pitchCardId(midi, 'flat', notation));
+        }
+      }
     }
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
 /** Add a card for every id in scope the deck does not have yet. Never removes any. */
@@ -174,7 +187,9 @@ export const MIN_POSITION_GAP = 3;
  *
  * The two spellings of a black key (`find:1-4` and `find:1-4:b`) are the sharpest case of it:
  * they share a position *and* an answer, so back to back the second is not even read. They land
- * on the same key here without being mentioned, because the key is the position.
+ * on the same key here without being mentioned, because the key is the position — and so, for
+ * the same reason and at no extra cost, do `find:1-4` and `find:1-4:de`, which differ only in
+ * whether the note is called C♯ or Cis.
  *
  * A `pitch` card has no single position — that is the point of it — so it is keyed on the lowest
  * one that sounds it. One key per card is all this function has, and that is the most useful one

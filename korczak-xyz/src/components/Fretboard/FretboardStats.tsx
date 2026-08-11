@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useFretboardData } from '../../hooks/useFretboardData';
 import { cardsInScope, countDeck } from '../../utils/fretboard/deck';
+import { displayNotation } from '../../utils/fretboard/notes';
 import {
   dailyStats,
   formatDuration,
@@ -132,7 +133,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
           squares={squares}
           describe={describeSquare}
           label={t.neckTitle}
-          notation={data.settings.notation}
+          notation={displayNotation(data.settings.notations)}
         />
         <ul className="fb-legend">
           {(['new', 'learning', 'young', 'mature'] as const).map((bucket) => (

@@ -12,6 +12,7 @@ import {
   shuffle,
   spreadPositions,
 } from './deck';
+import { DIRECTIONS, NOTATIONS, parseCardId } from './notes';
 import { DAY, MINUTE, createCard } from './srs';
 import type { Card } from './srs';
 import type { Deck, Settings } from './types';
@@ -98,6 +99,63 @@ describe('scopeIds', () => {
     const narrow = scopeIds(settings({ maxFret: 12, strings: [5], directions: ['pitch'] }));
     expect(narrow).toContain('pitch:64'); // the open high e
     expect(narrow).not.toContain('pitch:40'); // the low E is on a string no longer asked
+  });
+
+  it('asks a note under each selected notation, where the two disagree about it', () => {
+    // A string, frets 0-2: A, A♯/B♭, B. Under German that is A, Ais/B, H — so the A is one card
+    // and the other two are two apiece.
+    const scope = settings({
+      maxFret: 2,
+      strings: [1],
+      directions: ['name'],
+      notations: ['international', 'german'],
+    });
+    expect(scope.notations).toEqual(['international', 'german']);
+    expect(sorted(scopeIds(scope))).toEqual([
+      'name:1-0',
+      'name:1-1',
+      'name:1-1:de',
+      'name:1-2',
+      'name:1-2:de',
+    ]);
+  });
+
+  it('leaves the deck the size it was when one notation is selected', () => {
+    // One notation asks each question once, whichever notation it is — the axis costs nothing
+    // until both are on. The two decks are not the same *cards*, though: the six pitch classes
+    // German renames are its own `:de` cards there, and only the words both notations agree on
+    // are shared. That is the point of an absolute id, and it is why a player switching from one
+    // notation to the other meets the renamed half as new material.
+    const intl = scopeIds(settings({ maxFret: 12, notations: ['international'] }));
+    const german = scopeIds(settings({ maxFret: 12, notations: ['german'] }));
+    expect(german).toHaveLength(intl.length);
+    expect(german.filter((id) => id.endsWith(':de'))).not.toHaveLength(0);
+    // The naturals C D E F G A are one card in both, and the same one.
+    expect(german).toContain('find:1-3'); // C on the A string
+    expect(intl).toContain('find:1-3');
+  });
+
+  it('multiplies the two spellings of a black key by the two notations', () => {
+    // C♯, D♭, Cis, Des on the A string — one place, four ways of asking for it.
+    const scope = settings({
+      maxFret: 4,
+      strings: [1],
+      directions: ['find'],
+      notations: ['international', 'german'],
+    });
+    expect(sorted(scopeIds(scope)).filter((id) => id.startsWith('find:1-4'))).toEqual([
+      'find:1-4',
+      'find:1-4:b',
+      'find:1-4:b:de',
+      'find:1-4:de',
+    ]);
+  });
+
+  it('mints every id it enumerates as a card `parseCardId` can read back', () => {
+    const scope = settings({ maxFret: 12, directions: DIRECTIONS, notations: NOTATIONS });
+    const ids = scopeIds(scope);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(parseCardId(id), id).not.toBeNull();
   });
 });
 

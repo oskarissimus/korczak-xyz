@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useFretboardData } from '../../hooks/useFretboardData';
 import { buildQueue, cardsInScope, countDeck, nextDueAt } from '../../utils/fretboard/deck';
+import { displayNotation } from '../../utils/fretboard/notes';
 import { formatDuration, summarizeSession } from '../../utils/fretboard/stats';
 import type { SessionSummary as Summary } from '../../utils/fretboard/stats';
 import type { ReviewEvent } from '../../utils/fretboard/types';
@@ -132,7 +133,7 @@ export default function Fretboard({ lang }: FretboardProps) {
         masteredAfter={finished.masteredAfter}
         statsHref={statsHref}
         t={t}
-        notation={data.settings.notation}
+        notation={displayNotation(data.settings.notations)}
         onAgain={() => startSession(true)}
         onDone={() => setFinished(null)}
       />

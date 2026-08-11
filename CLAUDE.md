@@ -164,7 +164,9 @@ position, drilled **both ways round** on independent schedules: `name` shows the
 what it is called, `find` names the note and a string and asks where it is. Reading a diagram
 and finding G on the A string mid-song are different skills, and the scheduler has no business
 assuming one implies the other. On a black key `find` is split again, once per spelling — see
-below. A third direction, `pitch`, is not about a position at all — see further below.
+below. A third direction, `pitch`, is not about a position at all — see further below. And a card
+is split once more wherever the two notations call the note different things, so `C♯` and `Cis`
+can both be in the deck rather than one or the other — see *Both notations at once*.
 
 Answers are a tap, never a self-grade. Correctness is objective and the SM-2 rating comes from
 correctness plus how long it took (`≤2s` easy, `≤5s` good, slower hard, wrong again) — which is
@@ -412,31 +414,72 @@ log cannot answer cheaply — and because a scheduler change should not rewrite 
 
 ### Notation
 
-German/Polish notation calls the black key below B natural **B**, which leaves B natural needing
-a letter of its own — **H**. That is a `notation` setting (`'international' | 'german'`), not a
-translation: it is a property of the player rather than of the page's language, and someone
-reading the English page in Warsaw still wants H. The locale only picks the default
-(`defaultNotationFor`), and once the setting is touched it is stored and synced and follows the
-account across both locales. This also settles a disagreement the site had with itself — the
-songbook's chord transposer (`src/utils/chords.ts`) has always printed `H`.
+German/Polish notation is a different set of names, not a different way of writing the same ones:
+the accidentals are syllables (**Cis**, **Des**, **Fis**, **Ges**), the black key below B natural
+is called **B** outright, and B natural takes a letter of its own — **H**. Exactly six of the
+twelve come out differently; the naturals C D E F G A are the same word in both, which is why
+`GERMAN_LABELS` in `notes.ts` is a sparse table rather than a second full one. The 2nd string
+becomes the H string.
 
-Exactly two of the twelve change (`GERMAN_LABELS` in `notes.ts` is that sparse table, not a
-second full one), plus the 2nd string, which becomes the H string. `Cis`/`Des` is a further step
-nothing here takes.
+It is a property of the player rather than of the page's language — someone reading the English
+page in Warsaw still wants H — so the locale only picks the default (`defaultNotationFor`), and
+once the setting is touched it is stored and synced and follows the account across both locales.
+
+The songbook's chord transposer (`src/utils/chords.ts`) prints `H` and `B` the same way but keeps
+`#` for the rest, and that is **not** a disagreement to fix: a chord symbol is written `C#m` in
+Poland as everywhere else, while the note under it is called cis. Chord symbols and note names
+are two notations, and only one of them is the fretboard trainer's business.
 
 `PITCH_CLASSES[].name` stays international whichever is picked. It is what an answer is graded
 against and what lands in `ReviewEvent.answered` in localStorage and Firestore, so a notation
 reaching it would split one card's history in two — a deck practised one way and reviewed the
-other has to stay one deck. Card ids and storage keys carry no note names at all, so nothing here
-can orphan a deck — the one thing a card id does carry about a name is *which spelling* it asks
-under, and that is notation-independent. `pitchLabel`/`spellingLabel`/`stringLabel`/`noteLabelAt`
-take the notation as a **required** argument rather than defaulting to international, because a
-defaulted one is how a single call site goes on quietly showing `B`.
+other has to stay one deck. `pitchLabel`/`spellingLabel`/`stringLabel`/`noteLabelAt` take the
+notation as a **required** argument rather than defaulting to international, because a defaulted
+one is how a single call site goes on quietly showing `B`.
 
 `keys.ts` maps letters per notation rather than keeping one set of naturals and a shift rule: `H`
 answers B natural, and `B` **unshifted** answers A♯, the letter being the flat name there. That
 closes the existing shift hole from the other side — shift on `B` reaches for what `B` already
-answers, so it does nothing.
+answers, so it does nothing. The syllables need nothing further: `Cis` is shift on the letter it
+begins with, and `Des` has no key of its own exactly as `D♭` has none.
+
+### Both notations at once, because `C♯` and `Cis` are two things to know
+
+`notation` is **not** a display setting and has not been one since the deck gained a notation
+axis. `Settings.notations` is a *list* — the panel's `B`/`H` row toggles like the directions row,
+either or both — and a second notation puts a second card on a second schedule, by exactly the
+argument that splits a black key's `find` card by spelling. Reading `Cis` and reading `C♯` are
+different acts, and passing one is not passing the other.
+
+Only where the two disagree about the word. `hasTwoNotations` decides by comparing what the card
+would print under each — not against a list of pitch classes, so the axis cannot drift from the
+names — and `cardId` **normalises the rest away**: `find:1-3` is C on the A string in both, so
+there is no `find:1-3:de` and `parseCardId` refuses one. That is what lets `scopeIds` loop over
+the selected notations and dedupe, and it is why selecting one notation leaves the deck exactly
+the size it was.
+
+The German card's id carries `:de`, after `:b`, and **the international card is the unsuffixed
+one** — the same migration argument the spelling split made. Plain ids are what every stored deck
+and every logged answer already name, from back when the notation never reached an id at all.
+So a stored `notation: 'german'` migrates to `['international', 'german']`, not to `['german']`:
+those cards *are* the international ones now (`ReviewEvent.answered` has always held
+international names), and migrating to German alone would put a Polish player's whole deck out of
+scope and start them again at zero. Adding German alongside keeps the work and lets the German
+cards arrive as the new material they are.
+
+The consequence to know: switching from one notation to the other is not a relabelling. Six of
+the twelve pitch classes are genuinely different cards, and they arrive new.
+
+Everything on a card is drawn in the **card's** notation — the pad it is answered on, the string
+letters beside the neck, what the keyboard letters mean. A card that reads the same either way has
+no opinion, so `cardNotation` has it borrow `displayNotation`; otherwise a player drilling German
+names would meet an international pad on every card that happened to land on a natural, mid
+sitting, for no reason they could see. `displayNotation` is also what the two pictures that are
+not cards use — the settings panel's string row and the stats heatmap — and it prefers German
+whenever German is in the deck at all, that being the marked case.
+
+`spreadPositions` needed nothing for this either. The two notations of one position share its
+key, which is the same-answer case the spellings already were.
 
 The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (`.win-tabs` /
 `.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through

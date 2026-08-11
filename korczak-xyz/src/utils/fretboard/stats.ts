@@ -222,10 +222,11 @@ const BUCKET_ORDER: Bucket[] = ['new', 'learning', 'young', 'mature'];
 /**
  * Collapse the deck onto the neck for the heatmap.
  *
- * Every card asking about a position shares its square — both of those directions, and on a black
- * key both spellings of the `find` card — because the square is a place on the instrument and that
- * is what the picture is about. They are combined by taking the weakest: a position you can
- * read but not find is not a position you know, and nor is one you can find as C♯ but not as D♭.
+ * Every card asking about a position shares its square — both of those directions, on a black key
+ * both spellings of the `find` card, and under each notation in the deck — because the square is a
+ * place on the instrument and that is what the picture is about. They are combined by taking the
+ * weakest: a position you can read but not find is not a position you know, and nor is one you can
+ * find as C♯ but not as D♭, or as C♯ but not as Cis.
  *
  * `pitch` cards are not in the picture at all. They ask for a pitch anywhere on the neck, so they
  * belong to no one square, and there is nothing to take the weakest of.

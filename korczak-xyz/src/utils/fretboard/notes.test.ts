@@ -6,7 +6,10 @@ import {
   STRING_COUNT,
   cardId,
   cardNoteLabel,
+  cardNotation,
+  displayNotation,
   fretsSounding,
+  hasTwoNotations,
   hasTwoSpellings,
   isPositionKey,
   midiLabel,
@@ -61,18 +64,27 @@ describe('noteNameAt', () => {
 });
 
 describe('notation', () => {
-  it('renames exactly two of the twelve', () => {
+  it('renames six of the twelve and leaves the naturals alone', () => {
     const differ = PITCH_CLASSES.filter(
       ({ name }) => pitchLabel(name, 'german') !== pitchLabel(name, 'international')
     ).map(({ name }) => name);
-    expect(differ).toEqual(['A#', 'B']);
+    // The five black keys, whose accidentals are spelt out as syllables, and B natural, which
+    // needs a letter of its own once the black key below it has taken B.
+    expect(differ).toEqual(['C#', 'D#', 'F#', 'G#', 'A#', 'B']);
   });
 
   it('gives B to the black key and H to B natural', () => {
     expect(pitchLabel('A#', 'international')).toBe('A♯/B♭');
-    expect(pitchLabel('A#', 'german')).toBe('A♯/B');
+    expect(pitchLabel('A#', 'german')).toBe('Ais/B');
     expect(pitchLabel('B', 'international')).toBe('B');
     expect(pitchLabel('B', 'german')).toBe('H');
+  });
+
+  it('spells the accidentals out as syllables', () => {
+    expect(pitchLabel('C#', 'german')).toBe('Cis/Des');
+    expect(pitchLabel('D#', 'german')).toBe('Dis/Es');
+    expect(pitchLabel('F#', 'german')).toBe('Fis/Ges');
+    expect(pitchLabel('G#', 'german')).toBe('Gis/As');
   });
 
   it('makes the 2nd string the H string, and leaves the case alone', () => {
@@ -85,7 +97,7 @@ describe('notation', () => {
   it('follows through to a position on the neck', () => {
     // 2nd string open, and the fret below it.
     expect(noteLabelAt(4, 0, 'german')).toBe('H');
-    expect(noteLabelAt(4, 11, 'german')).toBe('A♯/B');
+    expect(noteLabelAt(4, 11, 'german')).toBe('Ais/B');
   });
 
   it('leaves the stored name alone, whichever notation is shown', () => {
@@ -113,7 +125,7 @@ describe('spellings', () => {
   it('renames rather than merges under German notation', () => {
     // A♯ is still two names there — the flat one is just B rather than B♭ — so which positions
     // are two cards cannot move with the setting.
-    expect(spellingLabel('A#', 'sharp', 'german')).toBe('A♯');
+    expect(spellingLabel('A#', 'sharp', 'german')).toBe('Ais');
     expect(spellingLabel('A#', 'flat', 'german')).toBe('B');
     expect(spellingLabel('B', 'sharp', 'german')).toBe('H');
     expect(spellingLabel('B', 'flat', 'german')).toBe('H');
@@ -132,6 +144,7 @@ describe('card ids', () => {
             stringIndex: s,
             fret: f,
             spelling: 'sharp',
+            notation: 'international',
           });
         }
       }
@@ -144,15 +157,42 @@ describe('card ids', () => {
       stringIndex: 1,
       fret: 4,
       spelling: 'flat',
+      notation: 'international',
     });
   });
 
-  it('reads a plain id as the sharp card, so a stored deck keeps its schedule', () => {
-    // `find:1-4` is what the deck held back when one card asked "C♯/D♭" under both names. It has
-    // to go on naming a card that exists, or every schedule earnt on a black key is orphaned.
+  it('reads a plain id as the sharp, international card, so a stored deck keeps its schedule', () => {
+    // `find:1-4` is what the deck held back when one card asked "C♯/D♭" under both spellings and
+    // the notation never reached an id at all. It has to go on naming a card that exists, or
+    // every schedule earnt on a black key is orphaned.
     expect(cardId('find', 1, 4)).toBe('find:1-4');
     expect(cardId('find', 1, 4, 'flat')).toBe('find:1-4:b');
     expect(parseCardId('find:1-4')?.spelling).toBe('sharp');
+    expect(parseCardId('find:1-4')?.notation).toBe('international');
+  });
+
+  it('carries the notation as its own suffix, after the spelling', () => {
+    expect(cardId('find', 1, 4, 'sharp', 'german')).toBe('find:1-4:de');
+    expect(cardId('find', 1, 4, 'flat', 'german')).toBe('find:1-4:b:de');
+    expect(parseCardId('find:1-4:b:de')).toEqual({
+      direction: 'find',
+      stringIndex: 1,
+      fret: 4,
+      spelling: 'flat',
+      notation: 'german',
+    });
+  });
+
+  it('mints no German card where the two notations agree on the word', () => {
+    // A string, fret 3 is C — called C either way, so a second id would be a second schedule for
+    // one thing learnt once.
+    expect(cardId('find', 1, 3, 'sharp', 'german')).toBe('find:1-3');
+    expect(cardId('name', 1, 3, 'sharp', 'german')).toBe('name:1-3');
+    expect(parseCardId('find:1-3:de')).toBeNull();
+    expect(parseCardId('name:1-3:de')).toBeNull();
+    // …and does mint one where they disagree, in either direction.
+    expect(cardId('name', 1, 4, 'sharp', 'german')).toBe('name:1-4:de'); // C♯/D♭ vs Cis/Des
+    expect(cardId('name', 1, 2, 'sharp', 'german')).toBe('name:1-2:de'); // B vs H
   });
 
   it('keeps the two directions apart', () => {
@@ -175,8 +215,25 @@ describe('card ids', () => {
   it('round-trips a pitch card, which is keyed on the pitch and not on a place', () => {
     expect(pitchCardId(61)).toBe('pitch:61');
     expect(pitchCardId(61, 'flat')).toBe('pitch:61:b');
-    expect(parseCardId('pitch:61')).toEqual({ direction: 'pitch', midi: 61, spelling: 'sharp' });
-    expect(parseCardId('pitch:61:b')).toEqual({ direction: 'pitch', midi: 61, spelling: 'flat' });
+    expect(parseCardId('pitch:61')).toEqual({
+      direction: 'pitch',
+      midi: 61,
+      spelling: 'sharp',
+      notation: 'international',
+    });
+    expect(parseCardId('pitch:61:b')).toEqual({
+      direction: 'pitch',
+      midi: 61,
+      spelling: 'flat',
+      notation: 'international',
+    });
+  });
+
+  it('splits a pitch card by notation only where the two disagree', () => {
+    expect(pitchCardId(61, 'sharp', 'german')).toBe('pitch:61:de'); // C♯4 / Cis4
+    expect(pitchCardId(60, 'sharp', 'german')).toBe('pitch:60'); // C4 either way
+    expect(parseCardId('pitch:60:de')).toBeNull();
+    expect(parseCardId('pitch:61:de')?.notation).toBe('german');
   });
 
   it('splits a pitch card by spelling only where there are two names', () => {
@@ -215,7 +272,9 @@ describe('midiLabel', () => {
 
   it('follows the notation', () => {
     expect(midiLabel(70, 'flat', 'german')).toBe('B4');
+    expect(midiLabel(70, 'sharp', 'german')).toBe('Ais4');
     expect(midiLabel(71, 'sharp', 'german')).toBe('H4');
+    expect(midiLabel(61, 'sharp', 'german')).toBe('Cis4');
   });
 });
 
@@ -262,21 +321,53 @@ describe('midisInScope', () => {
 });
 
 describe('cardNoteLabel', () => {
-  const find = (fret: number, spelling: 'sharp' | 'flat') =>
-    parseCardId(cardId('find', 1, fret, spelling))!;
+  const find = (
+    fret: number,
+    spelling: 'sharp' | 'flat',
+    notation: 'international' | 'german' = 'international'
+  ) => parseCardId(cardId('find', 1, fret, spelling, notation))!;
 
   it('names a find card under the one spelling it asks', () => {
-    expect(cardNoteLabel(find(4, 'sharp'), 'international')).toBe('C♯');
-    expect(cardNoteLabel(find(4, 'flat'), 'international')).toBe('D♭');
+    expect(cardNoteLabel(find(4, 'sharp'))).toBe('C♯');
+    expect(cardNoteLabel(find(4, 'flat'))).toBe('D♭');
   });
 
   it('names a name card under both, because either answer is right', () => {
-    expect(cardNoteLabel(parseCardId('name:1-4')!, 'international')).toBe('C♯/D♭');
+    expect(cardNoteLabel(parseCardId('name:1-4')!)).toBe('C♯/D♭');
+    expect(cardNoteLabel(parseCardId('name:1-4:de')!)).toBe('Cis/Des');
   });
 
-  it('follows the notation', () => {
-    expect(cardNoteLabel(find(1, 'flat'), 'german')).toBe('B');
-    expect(cardNoteLabel(find(1, 'sharp'), 'german')).toBe('A♯');
+  it('follows the notation the card asks in, not one it is handed', () => {
+    expect(cardNoteLabel(find(1, 'flat', 'german'))).toBe('B');
+    expect(cardNoteLabel(find(1, 'sharp', 'german'))).toBe('Ais');
+    expect(cardNoteLabel(find(1, 'sharp'))).toBe('A♯');
+  });
+});
+
+describe('hasTwoNotations and cardNotation', () => {
+  it('is two cards exactly where the two notations print different words', () => {
+    expect(hasTwoNotations(parseCardId('find:1-4')!)).toBe(true); // C♯ / Cis
+    expect(hasTwoNotations(parseCardId('find:1-2')!)).toBe(true); // B / H
+    expect(hasTwoNotations(parseCardId('find:1-3')!)).toBe(false); // C / C
+    expect(hasTwoNotations(parseCardId('name:1-3')!)).toBe(false);
+    expect(hasTwoNotations(parseCardId('pitch:60')!)).toBe(false); // C4 / C4
+  });
+
+  it('draws a card in its own notation, and borrows the display one when it has none', () => {
+    expect(cardNotation(parseCardId('find:1-4')!, 'german')).toBe('international');
+    expect(cardNotation(parseCardId('find:1-4:de')!, 'international')).toBe('german');
+    // Nothing to insist on: the whole card would read the same either way, so the sitting keeps
+    // whichever notation it is otherwise showing rather than flipping on the naturals.
+    expect(cardNotation(parseCardId('find:1-3')!, 'german')).toBe('german');
+    expect(cardNotation(parseCardId('find:1-3')!, 'international')).toBe('international');
+  });
+});
+
+describe('displayNotation', () => {
+  it('prefers German whenever it is in the deck at all', () => {
+    expect(displayNotation(['international'])).toBe('international');
+    expect(displayNotation(['german'])).toBe('german');
+    expect(displayNotation(['international', 'german'])).toBe('german');
   });
 });
 
