@@ -8,6 +8,10 @@ dateAdded: 2026-08-07
 chords:
   Cmaj7: "3 3 2 0 0 0"
   e9: "0 2 4 0 0 0"
+  e: "0 2 2 0 0 0"
+  C: "x 3 2 0 1 0"
+  a: "x 0 2 2 1 0"
+  A: "x 0 2 2 2 0"
 ---
 ```plaintext
 e9 Cmaj7 e9
