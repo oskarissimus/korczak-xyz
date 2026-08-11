@@ -793,10 +793,42 @@ Format, one line, at the very end:
   UTC. Giving only one of them leaves me doing the arithmetic on a phone.
 - Several pushes in one reply: one line each, in order, oldest first.
 
-Two things that line does **not** promise, and should not be written as though it does:
+One thing that line does **not** promise: **the navbar timestamp is the build time, not the commit
+time.** It is `new Date()` evaluated while Netlify builds, so it lands a minute or two after the
+push and will never match to the minute. The *hash* is the thing that matches exactly — compare on
+that.
 
-- **The navbar timestamp is the build time, not the commit time.** It is `new Date()` evaluated
-  while Netlify builds, so it lands a minute or two after the push and will never match to the
-  minute. The *hash* is the thing that matches exactly — tell me to compare on that.
-- Pushing is not deploying. Don't report a deploy as done from a successful push; CI is the only
-  thing that knows, and nothing in this repo waits on it.
+### Don't make me poll for the deploy — read it off the site
+
+Netlify builds and deploys every push to `main` (`korczak-xyz/netlify.toml`; the GitHub Actions
+workflow is a build check and deploys nothing). So the push is not the end of the job, and the
+answer to "has it landed yet" is a request away rather than something to hand back to me:
+
+```
+curl -sS https://korczak.xyz/ | grep -o 'commit/[0-9a-f]\{7,\}' | head -1
+```
+
+That is the deployed commit, straight from the status bar's own markup — the same string the navbar
+links to, so it settles the question exactly. `data-timestamp="..."` on the same page carries the
+build time. The HTML is served `max-age=0, must-revalidate` and Cloudflare marks it `DYNAMIC`, so a
+poll always sees the current deploy and never a cached one. Poll every 15–30s; a deploy here takes
+a couple of minutes.
+
+**Wait for it before signing off**, unless I have said not to. Report the hash as *live* only once
+the site has actually served it, and say plainly if it has not landed yet rather than implying it
+has. If it has not flipped after ~10 minutes, say so and stop polling — that is a failed build, and
+I would rather hear it than watch a phone.
+
+**But first check the commit can deploy at all.** The Netlify site's base directory is
+`korczak-xyz/`, and Netlify's monorepo default skips any build whose commit changed nothing under
+it — roughly `git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- korczak-xyz`. A commit touching
+only root-level files (this file, `.claude/`, `README.md`, `resume/`) therefore **never deploys**,
+the status bar keeps the hash of the last commit that did, and polling for it would spin until it
+gave up. That is correct behaviour, not a failure — nothing user-facing changed. So:
+
+```
+git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^korczak-xyz/'
+```
+
+No match: say the commit is docs-only and does not deploy, name the hash the site is still serving,
+and don't poll. Match: poll, and report it live.
