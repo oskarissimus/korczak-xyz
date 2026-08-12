@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getClientId } from '../lib/clientId';
 import { describeError, log } from '../lib/logger';
-import { computeAccuracy, computeWpm } from '../utils/typing/metrics';
+import { activeGapMs, computeAccuracy, computeWpm } from '../utils/typing/metrics';
+import { charsCovered, estimateRemainingMs, typeableChars } from '../utils/typing/estimate';
 import {
   archiveCurrentSession,
   exportLogToJSON,
@@ -62,7 +63,9 @@ export interface TypingSessionApi {
   progress: TypingProgress;
   wpm: number;
   accuracy: number;
-  durationMs: number;
+  durationMs: number; // this sitting's stopwatch
+  timeSpentMs: number; // lifetime active typing time on this book
+  remainingMs: number | null; // null until there is a pace to measure, and once finished
   progressPercent: number;
   isFinished: boolean;
   isPaused: boolean;
@@ -118,6 +121,13 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const segmentStartRef = useRef<number | null>(null);
   const [isTiming, setIsTiming] = useState(false);
   const [, setDurationTick] = useState(0);
+
+  // Wall clock of the previous character keystroke, for the book's lifetime clock on
+  // `progress`. Only characters touch it: activeTypingMs measures the gaps between char
+  // events and a backspace in between does not end one, so crediting backspaces here would
+  // make the live total disagree with the same sitting replayed from its log. `null` means
+  // the next keystroke starts a stretch and is credited nothing.
+  const lastCharAtRef = useRef<number | null>(null);
 
   // The live session log lives in a ref: it mutates on every keystroke and we
   // don't want to re-render for it. It is persisted (debounced) to localStorage.
@@ -253,6 +263,10 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     }
   }, []);
   const stopSegment = useCallback(() => {
+    // The book's clock stops here too: the stretch is over, so the first keystroke after it
+    // is credited nothing rather than the cap. Whatever was typed before is already banked
+    // on `progress` - this ref only decides what the *next* keystroke is worth.
+    lastCharAtRef.current = null;
     if (segmentStartRef.current != null) {
       durationAccumMsRef.current += Date.now() - segmentStartRef.current;
       segmentStartRef.current = null;
@@ -262,6 +276,7 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
   const resetStopwatch = useCallback(() => {
     durationAccumMsRef.current = 0;
     segmentStartRef.current = null;
+    lastCharAtRef.current = null;
     setIsTiming(false);
   }, []);
 
@@ -501,6 +516,12 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     (ch: string) => {
       maybeRotateSession(); // a long absence starts a new session
       if (isPausedRef.current) setIsPaused(false); // typing resumes the session
+      // What this keystroke adds to the book's lifetime clock. Measured out here rather than
+      // inside the updater below: advancing the ref is a side effect, and an updater React is
+      // free to call more than once for one keystroke would bank the same gap twice.
+      const at = Date.now();
+      const sliceMs = activeGapMs(lastCharAtRef.current, at);
+      lastCharAtRef.current = at;
       setProgress((prev) => {
         if (prev.passageIndex >= passages.length) return prev;
         const current = passages[prev.passageIndex];
@@ -533,6 +554,8 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
             totalKeystrokes,
             correctKeystrokes,
             bestWpm: Math.max(prev.bestWpm, wpm),
+            totalTimeMs: prev.totalTimeMs + sliceMs,
+            timedKeystrokes: prev.timedKeystrokes + 1,
             lastPlayedAt,
           });
         }
@@ -550,6 +573,8 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
           typed: prev.typed + ch,
           totalKeystrokes,
           correctKeystrokes,
+          totalTimeMs: prev.totalTimeMs + sliceMs,
+          timedKeystrokes: prev.timedKeystrokes + 1,
           lastPlayedAt,
         });
       });
@@ -698,6 +723,29 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
 
   const progressPercent = passages.length === 0 ? 0 : (progress.passageIndex / passages.length) * 100;
 
+  /*
+   * The book's own clock, and what is left of the book at the pace it records.
+   *
+   * Neither needs a ticking interval, unlike `durationMs` above: active typing time only
+   * advances on a keystroke, and a keystroke has already re-rendered this hook. A clock that
+   * sat still while the reader sat still would be wrong for the sitting stopwatch and is
+   * exactly right here.
+   */
+  const timeSpentMs = progress.totalTimeMs;
+  // The book's length is a property of the book, so it is measured once per book rather than
+  // once per keystroke - this is a scan of every section, and the longest book here has
+  // around two thousand of them.
+  const bookChars = useMemo(() => typeableChars(passages), [passages]);
+  const remainingMs = useMemo(
+    () =>
+      estimateRemainingMs({
+        remainingChars: bookChars - charsCovered(passages, progress),
+        totalTimeMs: progress.totalTimeMs,
+        timedKeystrokes: progress.timedKeystrokes,
+      }),
+    [bookChars, passages, progress]
+  );
+
   return {
     book,
     passage,
@@ -708,6 +756,8 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
     wpm,
     accuracy,
     durationMs,
+    timeSpentMs,
+    remainingMs,
     progressPercent,
     isFinished,
     isPaused,

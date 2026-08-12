@@ -39,6 +39,22 @@ export interface TypingProgress {
   totalKeystrokes: number;
   correctKeystrokes: number;
   bestWpm: number;
+  /*
+   * Lifetime time spent typing this book, and the keystrokes that time was measured over.
+   *
+   * `totalTimeMs` is *active* typing time - the gap before each keystroke, capped at 3s (see
+   * activeGapMs) - so it is the same measurement WPM divides by and the stats page charts,
+   * and walking away from the keyboard adds three seconds rather than an afternoon.
+   *
+   * The two are a pair and are read as a ratio: they give the reader's realised pace, which
+   * is what turns "42% done" into "about 6h 40m left". `totalKeystrokes` cannot play that
+   * part even though it counts the same events. It predates this clock, so every record that
+   * already exists carries a large one against a `totalTimeMs` of zero - a pace of infinity,
+   * for exactly the readers with the most history, and one that never washes out. A counter
+   * minted alongside the clock is consistent with it from its first keystroke.
+   */
+  totalTimeMs: number;
+  timedKeystrokes: number;
   lastPlayedAt: number | null;
   // Sync lineage. `rev` counts revisions of this book's progress on whichever device
   // produced them, and only ever increases; `writerId` names that device. Together with the
@@ -57,6 +73,10 @@ export interface TypingProgress {
 // with no history, or an early build that appended instead of index-assigning
 // (which mis-filed entries when resuming deep in a book). Drop it in that case;
 // it re-aligns from the current position on the next completed section.
+function nonNegative(value: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
 export function normalizeProgress(progress: TypingProgress): TypingProgress {
   // Progress written before the lineage fields existed arrives without them. Treat it as
   // revision 0 from an unknown writer rather than rejecting it; reconcile() has a dedicated
@@ -66,6 +86,12 @@ export function normalizeProgress(progress: TypingProgress): TypingProgress {
     rev: typeof progress.rev === 'number' && progress.rev >= 0 ? progress.rev : 0,
     writerId: typeof progress.writerId === 'string' ? progress.writerId : '',
     updatedAt: typeof progress.updatedAt === 'number' ? progress.updatedAt : null,
+    // Progress written before the book clock existed arrives without it. Defaulted here as
+    // well as by loadProgress's spread, because a record pulled from Firestore reaches
+    // normalizeProgress without passing through that spread, and a NaN would propagate
+    // through every later addition.
+    totalTimeMs: nonNegative(progress.totalTimeMs),
+    timedKeystrokes: nonNegative(progress.timedKeystrokes),
   };
   if (
     !Array.isArray(withLineage.typedHistory) ||
@@ -86,6 +112,8 @@ export function createDefaultProgress(bookId: string): TypingProgress {
     totalKeystrokes: 0,
     correctKeystrokes: 0,
     bestWpm: 0,
+    totalTimeMs: 0,
+    timedKeystrokes: 0,
     lastPlayedAt: null,
     rev: 0,
     writerId: '',

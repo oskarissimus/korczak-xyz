@@ -31,6 +31,8 @@ export default function TypingSession({ book, user, auth, lang }: TypingSessionP
     wpm,
     accuracy,
     durationMs,
+    timeSpentMs,
+    remainingMs,
     progressPercent,
     isFinished,
     isPaused,
@@ -77,6 +79,8 @@ export default function TypingSession({ book, user, auth, lang }: TypingSessionP
         wpm={wpm}
         accuracy={accuracy}
         durationMs={durationMs}
+        timeSpentMs={timeSpentMs}
+        remainingMs={remainingMs}
         progressPercent={progressPercent}
         syncStatus={<SyncStatus auth={auth} sync={sync} lang={lang} onRetry={retrySync} />}
         labels={{
@@ -84,6 +88,8 @@ export default function TypingSession({ book, user, auth, lang }: TypingSessionP
           accuracy: t.accuracy,
           progress: t.progress,
           timeSpent: t.timeSpent,
+          timeInBook: t.timeInBook,
+          timeLeft: t.timeLeft,
         }}
       />
 

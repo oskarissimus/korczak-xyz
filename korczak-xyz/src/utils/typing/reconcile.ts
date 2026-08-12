@@ -219,14 +219,27 @@ export function reconcile(
 /**
  * The progress to keep once a decision (or a user's choice) has picked a side.
  *
- * `bestWpm` is the one field that is never in conflict: it is a lifetime maximum, so a
- * discarded branch's record still stands. Everything else comes from the winner wholesale -
- * merging positions would invent a state neither side ever typed.
+ * Positions come from the winner wholesale - merging those would invent a state neither side
+ * ever typed. Two things survive a discarded branch, because both are lifetime records rather
+ * than claims about where the reader is:
+ *
+ * - `bestWpm`, a maximum: the fast sitting happened, whichever device saw it.
+ * - the time spent on the book, which is otherwise silently thrown away every time a device
+ *   pulls. Carried as a **pair** from whichever side has more of it, rather than as two
+ *   independent maxima: `totalTimeMs` and `timedKeystrokes` are only meaningful as a ratio,
+ *   and taking each one's maximum could mate one branch's hours to the other's keystrokes and
+ *   report a pace neither reader ever typed at.
  */
 export function mergeWinner(winner: TypingProgress, loser: TypingProgress): TypingProgress {
   const bestWpm = Math.max(winner.bestWpm, loser.bestWpm);
-  if (bestWpm === winner.bestWpm) return winner;
-  return { ...winner, bestWpm };
+  const clock = loser.totalTimeMs > winner.totalTimeMs ? loser : winner;
+  if (bestWpm === winner.bestWpm && clock === winner) return winner;
+  return {
+    ...winner,
+    bestWpm,
+    totalTimeMs: clock.totalTimeMs,
+    timedKeystrokes: clock.timedKeystrokes,
+  };
 }
 
 // Stamp the next revision of this book's progress. Called on every local mutation, so `rev`

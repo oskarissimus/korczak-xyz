@@ -13,13 +13,26 @@ export function charEvents(events: TypingEvent[]): TypingEvent[] {
   return events.filter((e) => e.kind === 'char');
 }
 
+// What one keystroke contributes to active typing time: the gap since the previous
+// keystroke, capped so an idle stretch counts for at most IDLE_GAP_CAP_MS. The first
+// keystroke of a stretch has nothing to measure from and contributes nothing.
+//
+// Exported because the same rule now runs in two places: replayed over a finished log by
+// activeTypingMs below, and live on each keystroke by useTypingSession, which folds the
+// slice into the book's lifetime total. Two copies of the cap would let the number on the
+// practice screen drift from the one the stats page charts for the same sitting.
+export function activeGapMs(previousAt: number | null, at: number): number {
+  if (previousAt == null) return 0;
+  return Math.min(Math.max(0, at - previousAt), IDLE_GAP_CAP_MS);
+}
+
 // Active typing time in ms: the sum of consecutive char-event gaps, each capped
 // at IDLE_GAP_CAP_MS so idle stretches contribute at most the cap.
 export function activeTypingMs(events: TypingEvent[]): number {
   const chars = charEvents(events);
   let active = 0;
   for (let i = 1; i < chars.length; i++) {
-    active += Math.min(chars[i].t - chars[i - 1].t, IDLE_GAP_CAP_MS);
+    active += activeGapMs(chars[i - 1].t, chars[i].t);
   }
   return active;
 }

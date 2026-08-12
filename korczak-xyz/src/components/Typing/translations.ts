@@ -6,6 +6,11 @@ export const translations = {
     wpm: 'WPM',
     accuracy: 'Accuracy',
     progress: 'Progress',
+    // On the line under the progress bar, beside "Progress: 42%": lifetime time on this book
+    // and what is left of it. One word each — the column they sit on has no min-width floor,
+    // so a long label is what pushes the whole progress bar onto its own line on a phone.
+    timeInBook: 'Spent',
+    timeLeft: 'Left',
     reset: 'Reset progress',
     pause: 'Pause',
     resume: 'Resume',
@@ -116,6 +121,8 @@ export const translations = {
     wpm: 'WPM',
     accuracy: 'Celność',
     progress: 'Postęp',
+    timeInBook: 'Czas',
+    timeLeft: 'Zostało',
     reset: 'Zresetuj postęp',
     pause: 'Pauza',
     resume: 'Wznów',

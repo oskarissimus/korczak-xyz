@@ -255,6 +255,32 @@ describe('mergeWinner', () => {
     const winner = progress({ passageIndex: 10, bestWpm: 70 });
     expect(mergeWinner(winner, progress({ bestWpm: 12 }))).toBe(winner);
   });
+
+  it("keeps the losing side's longer time on the book", () => {
+    const winner = progress({ passageIndex: 10, totalTimeMs: 60_000, timedKeystrokes: 300 });
+    const loser = progress({ passageIndex: 2, totalTimeMs: 900_000, timedKeystrokes: 5_000 });
+    const merged = mergeWinner(winner, loser);
+    expect(merged.totalTimeMs).toBe(900_000);
+    expect(merged.timedKeystrokes).toBe(5_000);
+    expect(merged.passageIndex).toBe(10);
+  });
+
+  it('keeps its own time when the winner has typed longer', () => {
+    const winner = progress({ passageIndex: 10, totalTimeMs: 900_000, timedKeystrokes: 5_000 });
+    const loser = progress({ passageIndex: 2, totalTimeMs: 60_000, timedKeystrokes: 300 });
+    expect(mergeWinner(winner, loser)).toBe(winner);
+  });
+
+  // The clock and its keystroke count are only meaningful as a ratio. Taking each field's
+  // maximum independently would pair the slow branch's 900s with the fast branch's 5000
+  // keystrokes and report a pace neither device ever typed at.
+  it('carries the clock and its keystrokes from the same side', () => {
+    const winner = progress({ totalTimeMs: 60_000, timedKeystrokes: 5_000 });
+    const loser = progress({ totalTimeMs: 900_000, timedKeystrokes: 300 });
+    const merged = mergeWinner(winner, loser);
+    expect(merged.totalTimeMs).toBe(900_000);
+    expect(merged.timedKeystrokes).toBe(300);
+  });
 });
 
 describe('bumpRevision', () => {
