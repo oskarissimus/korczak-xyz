@@ -84,13 +84,11 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
           <>
             <polyline
               className="fb-line fb-line--speed"
-              fill="none"
               strokeWidth={2}
               points={speed.map((p) => `${p.x},${p.y}`).join(' ')}
             />
             <polyline
               className="fb-line fb-line--accuracy"
-              fill="none"
               strokeWidth={2}
               points={accuracy.map((p) => `${p.x},${p.y}`).join(' ')}
             />
@@ -99,13 +97,13 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
 
         {showMarkers &&
           speed.map((p) => (
-            <circle key={`s${p.d.day}`} className="fb-line fb-line--speed" cx={p.x} cy={p.y} r={3}>
+            <circle key={`s${p.d.day}`} className="fb-point--speed" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${(p.d.avgMs / 1000).toFixed(1)}s`}</title>
             </circle>
           ))}
         {showMarkers &&
           accuracy.map((p) => (
-            <circle key={`a${p.d.day}`} className="fb-line fb-line--accuracy" cx={p.x} cy={p.y} r={3}>
+            <circle key={`a${p.d.day}`} className="fb-point--accuracy" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${Math.round(p.d.accuracy * 100)}% (${p.d.answers})`}</title>
             </circle>
           ))}

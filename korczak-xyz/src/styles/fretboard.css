@@ -714,13 +714,28 @@
   background-color: #2a2a4a;
 }
 
+/* The line is stroked and the markers on it are filled, so the two cannot share a
+   class: one `fill` serves both, and on a <polyline> a fill closes the path back to
+   its first point and floods the area under the trend. `fill="none"` on the element
+   does not save it — a stylesheet beats a presentation attribute — which is how the
+   speed line came to be drawn as a pair of solid yellow triangles. */
+.fb-line {
+  fill: none;
+}
+
 .fb-line--accuracy {
   stroke: var(--retro-cyan);
-  fill: var(--retro-cyan);
 }
 
 .fb-line--speed {
   stroke: var(--retro-yellow);
+}
+
+.fb-point--accuracy {
+  fill: var(--retro-cyan);
+}
+
+.fb-point--speed {
   fill: var(--retro-yellow);
 }
 
