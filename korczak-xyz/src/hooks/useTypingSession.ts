@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getClientId } from '../lib/clientId';
 import { describeError, log } from '../lib/logger';
-import { activeGapMs, computeAccuracy, computeWpm } from '../utils/typing/metrics';
+import {
+  activeGapMs,
+  bookTimeFromSessions,
+  computeAccuracy,
+  computeWpm,
+} from '../utils/typing/metrics';
 import { charsCovered, estimateRemainingMs, typeableChars } from '../utils/typing/estimate';
 import {
   archiveCurrentSession,
+  dedupeSessionsById,
   exportLogToJSON,
+  hasBackfilledTime,
   importLogFromJSON,
   loadAllSessions,
   loadProgress,
+  markTimeBackfilled,
   removeArchivedSessions,
   resetProgress as resetProgressStorage,
   saveCurrentSession,
@@ -16,7 +24,7 @@ import {
   storageBytes,
 } from '../utils/typing/storage';
 import { loadBookmark } from '../utils/typing/syncBookmark';
-import { saveCloudSession } from '../utils/typing/cloudStorage';
+import { loadCloudSessionsForBook, saveCloudSession } from '../utils/typing/cloudStorage';
 import { downloadJSON } from '../utils/typing/download';
 import { bumpRevision } from '../utils/typing/reconcile';
 import {
@@ -465,6 +473,55 @@ export function useTypingSession(user: AuthUser | null, book: Book): TypingSessi
       });
     })();
   }, [uid]);
+
+  /*
+   * Seed this book's clock from the sittings already recorded, once.
+   *
+   * `totalTimeMs` only counts keystrokes typed since it shipped, so a reader with history meets
+   * "Spent: 0s" about a book they have spent hours in, and no estimate at all. The hours are
+   * recoverable: a sitting is a keystroke log, and replaying activeTypingMs over it yields
+   * exactly what the live counter banks - the same rule, not an approximation.
+   *
+   * Safe to run more than once by construction, which is what the guards lean on. The sum is a
+   * deterministic function of the log, so two devices computing it independently agree, and
+   * `mergeWinner` takes the larger clock rather than adding them. On top of that: a non-zero
+   * `timedKeystrokes` means someone has already done this (or typed since), and the marker
+   * stops the *fetch* repeating for a book whose logs genuinely add up to nothing.
+   *
+   * Racing the initial reconcile is likewise safe - if a pull lands first, mergeWinner keeps
+   * whichever side holds more time.
+   */
+  const backfilledTimeForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!uid) return;
+    const key = `${uid}:${book.id}`;
+    if (backfilledTimeForRef.current === key) return;
+    if (progressRef.current.timedKeystrokes > 0 || hasBackfilledTime(book.id)) return;
+    backfilledTimeForRef.current = key;
+    void (async () => {
+      try {
+        const cloud = await loadCloudSessionsForBook(uid, book.id);
+        const merged = dedupeSessionsById([...loadAllSessions(), ...cloud]);
+        const { totalTimeMs, timedKeystrokes } = bookTimeFromSessions(merged, book.id);
+        // Only on success: a failed fetch must stay retryable on the next mount.
+        markTimeBackfilled(book.id);
+        if (timedKeystrokes === 0) return;
+        setProgress((prev) =>
+          // Typing during the fetch means the counter is live and owns the number now.
+          prev.timedKeystrokes > 0 ? prev : edited({ ...prev, totalTimeMs, timedKeystrokes })
+        );
+        log.info('progress.timeBackfill.ok', {
+          bookId: book.id,
+          sessions: merged.filter((s) => s.bookId === book.id).length,
+          totalTimeMs,
+          timedKeystrokes,
+        });
+      } catch (e) {
+        backfilledTimeForRef.current = null; // let the next mount try again
+        log.warn('progress.timeBackfill.fail', { bookId: book.id, ...describeError(e) });
+      }
+    })();
+  }, [uid, book.id, edited]);
 
   // Tick once a second while the stopwatch is running so the displayed clock
   // advances between keystrokes. Idle when paused/stopped (no interval churn).

@@ -1,5 +1,5 @@
 // Typing metrics derived from an event log.
-import type { TypingEvent } from './types';
+import type { TypingEvent, TypingSession } from './types';
 
 // Standard "word" = 5 characters.
 const CHARS_PER_WORD = 5;
@@ -35,6 +35,36 @@ export function activeTypingMs(events: TypingEvent[]): number {
     active += activeGapMs(chars[i - 1].t, chars[i].t);
   }
   return active;
+}
+
+/*
+ * The book clock, replayed from finished sittings.
+ *
+ * `TypingProgress.totalTimeMs` only counts keystrokes typed since it shipped, so a reader with
+ * history opens the page to "Spent: 0s" about a book they have put hours into. Those hours are
+ * not lost: every sitting is a keystroke log, and the live counter banks exactly what
+ * activeTypingMs measures here - so replaying the log recovers the true figure rather than
+ * estimating one. Used once per book to seed the counter (see useTypingSession).
+ *
+ * Summed per sitting and never across the join: activeTypingMs measures the gaps *within* one
+ * sitting, and the hours between two sittings are not time spent typing.
+ *
+ * Takes an already-deduped list - `dedupeSessionsById` in storage.ts, which the caller has to
+ * apply anyway to merge the local and cloud copies - so this module needs nothing from
+ * localStorage.
+ */
+export function bookTimeFromSessions(
+  sessions: TypingSession[],
+  bookId: string
+): { totalTimeMs: number; timedKeystrokes: number } {
+  let totalTimeMs = 0;
+  let timedKeystrokes = 0;
+  for (const session of sessions) {
+    if (session.bookId !== bookId) continue;
+    totalTimeMs += activeTypingMs(session.events);
+    timedKeystrokes += charEvents(session.events).length;
+  }
+  return { totalTimeMs, timedKeystrokes };
 }
 
 // Accuracy over all typed characters, as a percentage (0-100).

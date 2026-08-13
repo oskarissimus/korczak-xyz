@@ -6,7 +6,16 @@
 // died mid-session leaves its promises unsettled forever rather than rejecting them, and the
 // sync engine's single-flight guard would wedge on the first such call - see firestoreHealth.ts.
 // The Firestore handle is read per call for the same reason: recovery replaces the instance.
-import { collection, doc, getDoc, getDocs, runTransaction, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  runTransaction,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 import { getDb } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
 import type { SyncBookmark } from './reconcile';
@@ -90,6 +99,22 @@ export async function loadCloudSessions(uid: string): Promise<TypingSession[]> {
   if (!db) return [];
   const snap = await runCloud('loadSessions', () =>
     getDocs(collection(db, 'users', uid, 'sessions'))
+  );
+  return snap.docs.map((d) => d.data() as TypingSession);
+}
+
+// One book's sittings. The stats views want every book's, but a caller asking about a single
+// book should not download the rest - a session document carries a whole keystroke log, so the
+// difference is megabytes. Filtered server-side on one field, which Firestore's automatic
+// single-field index already covers (no firestore.indexes.json entry needed).
+export async function loadCloudSessionsForBook(
+  uid: string,
+  bookId: string
+): Promise<TypingSession[]> {
+  const db = getDb();
+  if (!db) return [];
+  const snap = await runCloud('loadSessionsForBook', () =>
+    getDocs(query(collection(db, 'users', uid, 'sessions'), where('bookId', '==', bookId)))
   );
   return snap.docs.map((d) => d.data() as TypingSession);
 }

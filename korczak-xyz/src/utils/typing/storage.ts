@@ -21,10 +21,19 @@ const STORAGE_KEYS = {
   selectedBook: 'typing-selected-book', // which book the picker last showed
   currentSession: 'typing-current-session', // live, append-only log
   sessions: 'typing-sessions', // archive of finished sessions
+  // Per-book: the book clock has been seeded from this book's session logs (see
+  // bookTimeFromSessions). Only stops the *fetch* repeating on every mount for a book whose
+  // logs really do add up to nothing - a book with history is guarded by its own non-zero
+  // `timedKeystrokes`, and the sum is deterministic anyway, so a repeat run cannot inflate it.
+  timeBackfillPrefix: 'typing-time-backfill:',
 } as const;
 
 function progressKey(bookId: string): string {
   return `${STORAGE_KEYS.progressPrefix}${bookId}`;
+}
+
+function timeBackfillKey(bookId: string): string {
+  return `${STORAGE_KEYS.timeBackfillPrefix}${bookId}`;
 }
 
 // `storageBytes` counts every key on the origin, not just the trainer's - the budget is shared,
@@ -161,7 +170,34 @@ export function resetProgress(bookId: string, writerId: string): TypingProgress 
     writerId
   );
   saveProgress(fresh);
+  // Starting the book again should be free to re-derive the clock from the logs, so the
+  // one-shot marker is lifted with everything else.
+  clearTimeBackfilled(bookId);
   return fresh;
+}
+
+// Whether this book's clock has already been seeded from its session logs.
+
+export function hasBackfilledTime(bookId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(timeBackfillKey(bookId)) != null;
+  } catch {
+    return false;
+  }
+}
+
+export function markTimeBackfilled(bookId: string): void {
+  writeKey(timeBackfillKey(bookId), '1');
+}
+
+function clearTimeBackfilled(bookId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(timeBackfillKey(bookId));
+  } catch {
+    // Nothing to do: a marker that outlives a reset only costs one skipped re-derivation.
+  }
 }
 
 // Which book the picker last had selected.
