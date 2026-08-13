@@ -78,18 +78,33 @@ const samePosition = (a: Position, b: Position) =>
 
 interface NeckPickerProps {
   maxFret: number;
-  /** The strings that can be pressed: the asked one on a `find` card, the scope on a `pitch` one. */
+  /** The strings that can be pressed: the asked one on a `find` card, the scope on the others. */
   liveStrings: readonly number[];
   stringLabels: boolean;
   notation: Notation;
   disabled: boolean;
-  chosen: Position | null;
+  /**
+   * What the player has pressed — the one place on a single-answer card, the selection so far on
+   * a select-all one. It is the same list before and after the answer, which is what lets the
+   * marks in progress become the marks the verdict is read from without being handed over.
+   */
+  chosen: readonly Position[];
   /** Every place that answers the card — null until it has been answered. */
   answers: readonly Position[] | null;
   onPick: (stringIndex: number, fret: number) => void;
   label: string;
   /** Names the whole place, not just the fret: on a `pitch` card the string is part of the answer. */
   cellLabel: (stringIndex: number, fret: number) => string;
+  /**
+   * Whether the card is answered by marking every place.
+   *
+   * Two things turn on it, and both are about what an unpressed right answer means. While the
+   * card is open the cells are a selection, so they carry `aria-pressed`; once it is answered, a
+   * right answer that was *not* pressed is one you missed, and saying so is most of what the
+   * verdict on these cards has to tell you. On a single-answer card the same cell means "this
+   * works too", which is a different thing and drawn as one.
+   */
+  multi?: boolean;
 }
 
 export function NeckPicker({
@@ -103,6 +118,7 @@ export function NeckPicker({
   onPick,
   label,
   cellLabel,
+  multi = false,
 }: NeckPickerProps) {
   return (
     <NeckLayout
@@ -115,14 +131,21 @@ export function NeckPicker({
         const here = { stringIndex, fret };
         const live = liveStrings.includes(stringIndex);
         const isAnswer = answers != null && answers.some((p) => samePosition(p, here));
-        const isMistake =
-          answers != null && chosen != null && samePosition(chosen, here) && !isAnswer;
+        const isChosen = chosen.some((p) => samePosition(p, here));
+        const isMistake = answers != null && isChosen && !isAnswer;
+        // A right answer left unmarked on a select-all card: shown, because the card is about
+        // the whole set, but not as something that was got right.
+        const isMissed = multi && isAnswer && !isChosen;
+        // Before the answer lands, a marked cell is a selection and nothing more.
+        const isPicked = answers == null && isChosen;
         const classes = [
           'fb-neck-cell',
           fret === 0 ? 'fb-neck-cell--open' : '',
           live ? 'fb-neck-cell--live' : 'fb-neck-cell--muted',
-          isAnswer ? 'fb-neck-cell--right' : '',
+          isAnswer && !isMissed ? 'fb-neck-cell--right' : '',
+          isMissed ? 'fb-neck-cell--missed' : '',
           isMistake ? 'fb-neck-cell--wrong' : '',
+          isPicked ? 'fb-neck-cell--picked' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -131,7 +154,7 @@ export function NeckPicker({
         // verdict is what the row is for. That costs one label — on a `pitch` card, where the
         // prompt names no string, it is the label of a row you have just marked and are looking
         // straight at, and the five others are still there to read the neck by.
-        const mark = isAnswer ? '●' : isMistake ? '✕' : '';
+        const mark = isMissed ? '○' : isAnswer || isPicked ? '●' : isMistake ? '✕' : '';
         const content = mark ? (
           <span className="fb-neck-mark" aria-hidden="true">
             {mark}
@@ -157,6 +180,7 @@ export function NeckPicker({
             disabled={disabled}
             onClick={() => onPick(stringIndex, fret)}
             aria-label={cellLabel(stringIndex, fret)}
+            aria-pressed={multi && answers == null ? isChosen : undefined}
           >
             {content}
           </button>

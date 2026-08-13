@@ -227,14 +227,27 @@ export function midiLabel(midi: number, spelling: Spelling, notation: Notation):
  * `C♯4`, not "C♯ on the A string" — and asks for it anywhere on the neck, so choosing the string
  * is part of the answer rather than part of the question. That is what you do when someone calls
  * a note at you, and `find` never asks it.
+ *
+ * `allNote` and `allPitch` ask for **every** place at once — mark every E on the neck, mark every
+ * E3 — and are graded on the whole set. `find` and `pitch` are satisfied by the first place you
+ * think of, which is why they teach nothing about the others: the octave shapes, and the fact
+ * that a pitch class comes round every twelve frets, are exactly what being asked for one
+ * position at a time never makes you look at. So they are two more directions rather than a
+ * harder way of scoring the two that exist.
  */
 export type PositionDirection = 'name' | 'find';
-export type Direction = PositionDirection | 'pitch';
+/** The directions keyed on one exact pitch rather than on a place: `pitch:64`, `allPitch:64`. */
+export type PitchDirection = 'pitch' | 'allPitch';
+export type Direction = PositionDirection | PitchDirection | 'allNote';
 
-export const DIRECTIONS: Direction[] = ['name', 'find', 'pitch'];
+export const DIRECTIONS: Direction[] = ['name', 'find', 'pitch', 'allNote', 'allPitch'];
 
 export function isDirection(value: unknown): value is Direction {
   return typeof value === 'string' && (DIRECTIONS as string[]).includes(value);
+}
+
+export function isPositionDirection(direction: Direction): direction is PositionDirection {
+  return direction === 'name' || direction === 'find';
 }
 
 /*
@@ -254,7 +267,12 @@ export function isDirection(value: unknown): value is Direction {
  * they genuinely are.
  *
  * A `pitch` card is not a position, so it is not keyed on one: `pitch:${midi}`, because the MIDI
- * number *is* the question — one pitch, one card, however many places on the neck sound it.
+ * number *is* the question — one pitch, one card, however many places on the neck sound it. An
+ * `allPitch` card asks about the same pitch and is keyed the same way, under its own direction.
+ *
+ * An `allNote` card is not even a pitch: it is a pitch class, asked over the whole neck, so it is
+ * keyed on the index into `PITCH_CLASSES` — `allNote:4` is E. The index rather than the name
+ * because a name would have to be spelt, and the spelling is already the `:b` suffix's job.
  */
 const FLAT_SUFFIX = ':b';
 const GERMAN_SUFFIX = ':de';
@@ -285,11 +303,25 @@ export function cardId(
 }
 
 export function pitchCardId(
+  direction: PitchDirection,
   midi: number,
   spelling: Spelling = 'sharp',
   notation: Notation = 'international'
 ): string {
-  return `pitch:${midi}${nameSuffix({ direction: 'pitch', midi, spelling, notation })}`;
+  return `${direction}:${midi}${nameSuffix({ direction, midi, spelling, notation })}`;
+}
+
+export function pitchClassIndex(note: NoteName): number {
+  return PITCH_CLASSES.findIndex((p) => p.name === note);
+}
+
+export function noteCardId(
+  note: NoteName,
+  spelling: Spelling = 'sharp',
+  notation: Notation = 'international'
+): string {
+  const key: NoteCardKey = { direction: 'allNote', note, spelling, notation };
+  return `allNote:${pitchClassIndex(note)}${nameSuffix(key)}`;
 }
 
 /**
@@ -310,35 +342,71 @@ export interface PositionCardKey extends Position, Named {
 }
 
 export interface PitchCardKey extends Named {
-  direction: 'pitch';
+  direction: PitchDirection;
   midi: number;
 }
 
+export interface NoteCardKey extends Named {
+  direction: 'allNote';
+  note: NoteName;
+}
+
 /*
- * A card is asked about a place on the neck or about a pitch, and the two carry different things.
- * The union is deliberate: it makes the compiler point at every site that assumed a card has a
- * string and a fret, which is most of what this feature had to visit.
+ * A card is asked about a place on the neck, about a pitch, or about a pitch class, and the three
+ * carry different things. The union is deliberate: it makes the compiler point at every site that
+ * assumed a card has a string and a fret, which is most of what these features had to visit.
  */
-export type CardKey = PositionCardKey | PitchCardKey;
+export type CardKey = PositionCardKey | PitchCardKey | NoteCardKey;
 
 export function isPositionKey(key: CardKey): key is PositionCardKey {
-  return key.direction !== 'pitch';
+  return isPositionDirection(key.direction);
+}
+
+export function isPitchKey(key: CardKey): key is PitchCardKey {
+  return key.direction === 'pitch' || key.direction === 'allPitch';
+}
+
+/**
+ * Whether the card is answered by marking every place at once rather than by one tap.
+ *
+ * The distinction the answer surface turns on, and the reason it is asked of the key rather than
+ * read off the direction at each site: `allNote` and `allPitch` are keyed on different things and
+ * have nothing else in common, so the direction pair would otherwise be spelt out in the session,
+ * the grader and the timer alike.
+ */
+export function asksEveryPlace(key: CardKey): boolean {
+  return key.direction === 'allNote' || key.direction === 'allPitch';
 }
 
 export function parseCardId(id: string): CardKey | null {
-  const pitch = /^pitch:(\d{1,3})(:b)?(:de)?$/.exec(id);
+  const pitch = /^(pitch|allPitch):(\d{1,3})(:b)?(:de)?$/.exec(id);
   if (pitch) {
-    const midi = Number(pitch[1]);
+    const midi = Number(pitch[2]);
     if (!isValidMidi(midi)) return null;
-    const spelling: Spelling = pitch[2] ? 'flat' : 'sharp';
+    const spelling: Spelling = pitch[3] ? 'flat' : 'sharp';
     if (spelling === 'flat' && !hasTwoSpellings(pitchClassOfMidi(midi))) return null;
     const key: PitchCardKey = {
-      direction: 'pitch',
+      direction: pitch[1] as PitchDirection,
       midi,
       spelling,
-      notation: pitch[3] ? 'german' : 'international',
+      notation: pitch[4] ? 'german' : 'international',
     };
-    return pitch[3] && !hasTwoNotations(key) ? null : key;
+    return pitch[4] && !hasTwoNotations(key) ? null : key;
+  }
+
+  const note = /^allNote:(\d{1,2})(:b)?(:de)?$/.exec(id);
+  if (note) {
+    const pitchClass = PITCH_CLASSES[Number(note[1])];
+    if (!pitchClass) return null;
+    const spelling: Spelling = note[2] ? 'flat' : 'sharp';
+    if (spelling === 'flat' && !hasTwoSpellings(pitchClass.name)) return null;
+    const key: NoteCardKey = {
+      direction: 'allNote',
+      note: pitchClass.name,
+      spelling,
+      notation: note[3] ? 'german' : 'international',
+    };
+    return note[3] && !hasTwoNotations(key) ? null : key;
   }
 
   const match = /^(name|find):(\d)-(\d{1,2})(:b)?(:de)?$/.exec(id);
@@ -369,14 +437,22 @@ export function parseCardId(id: string): CardKey | null {
 /**
  * What the note on a card is called, under a notation the card need not be the one asking in.
  *
- * One spelling on a `find` or `pitch` card, because the spelling is the question; both on a `name`
- * card, because either is a right answer there. A `pitch` card carries its octave, which is the
- * whole of what it asks that `find` does not.
+ * One spelling everywhere the spelling is the question — which is every direction except `name`,
+ * where either spelling is a right answer and both are therefore shown. A `pitch` or `allPitch`
+ * card carries its octave, which is the whole of what those ask that `find` and `allNote` do not.
  */
 function labelUnder(key: CardKey, notation: Notation): string {
-  if (key.direction === 'pitch') return midiLabel(key.midi, key.spelling, notation);
-  if (key.direction !== 'find') return noteLabelAt(key.stringIndex, key.fret, notation);
+  if (isPitchKey(key)) return midiLabel(key.midi, key.spelling, notation);
+  if (key.direction === 'allNote') return spellingLabel(key.note, key.spelling, notation);
+  if (key.direction === 'name') return noteLabelAt(key.stringIndex, key.fret, notation);
   return spellingLabel(noteNameAt(key.stringIndex, key.fret), key.spelling, notation);
+}
+
+/** The pitch class a card is about, whatever the card is keyed on. */
+export function cardNote(key: CardKey): NoteName {
+  if (isPitchKey(key)) return pitchClassOfMidi(key.midi);
+  if (key.direction === 'allNote') return key.note;
+  return noteNameAt(key.stringIndex, key.fret);
 }
 
 /**
@@ -459,4 +535,61 @@ export function midisInScope(strings: readonly number[], maxFret = MAX_FRET): nu
     for (let fret = 0; fret <= maxFret; fret++) midis.add(TUNING_MIDI[stringIndex] + fret);
   }
   return [...midis].sort((a, b) => a - b);
+}
+
+/**
+ * Every place in the scope that sounds the pitch class — the answer to an `allNote` card.
+ *
+ * `fretsSounding` across all the strings rather than one, so the same note recurs every twelve
+ * frets on each of them. Low string first, then up the neck: the order a player would read them
+ * off, and the order the readout under a missed card prints them in.
+ */
+export function positionsOfNote(
+  note: NoteName,
+  strings: readonly number[],
+  maxFret = MAX_FRET
+): Position[] {
+  const positions: Position[] = [];
+  for (const stringIndex of [...strings].sort((a, b) => a - b)) {
+    if (stringIndex < 0 || stringIndex >= STRING_COUNT) continue;
+    for (const fret of fretsSounding(stringIndex, note, maxFret)) {
+      positions.push({ stringIndex, fret });
+    }
+  }
+  return positions;
+}
+
+/** Every pitch class the scope can sound — one `allNote` card each, in `PITCH_CLASSES` order. */
+export function notesInScope(strings: readonly number[], maxFret = MAX_FRET): NoteName[] {
+  const names = new Set(midisInScope(strings, maxFret).map(pitchClassOfMidi));
+  return PITCH_CLASSES.filter((p) => names.has(p.name)).map((p) => p.name);
+}
+
+/**
+ * Every place in the scope that answers the card — empty for a `name` card, which is not answered
+ * on the neck at all.
+ *
+ * One function rather than a branch at each call site because three things have to agree about
+ * this set and they are in three files: the grader, the marks the verdict lights up, and the
+ * per-position budget the rating is measured against. They disagreed once already, when `find`
+ * counted the twelfth-fret octave and the readout under it did not.
+ *
+ * Note that the answer moves with the scope — widen the fret range and a `find` card gains its
+ * octave, an `allNote` card gains a whole string's worth. That is deliberate and as old as
+ * `fretsSounding`: the scope is the neck as far as this deck is concerned, and marking a position
+ * outside it would be marking something the card never showed.
+ */
+export function positionsAnswering(
+  key: CardKey,
+  strings: readonly number[],
+  maxFret = MAX_FRET
+): Position[] {
+  if (isPitchKey(key)) return positionsSounding(key.midi, strings, maxFret);
+  if (key.direction === 'allNote') return positionsOfNote(key.note, strings, maxFret);
+  if (key.direction !== 'find') return [];
+  // The asked string only, and every fret on it that sounds the note: the card named the string,
+  // so the rest of the neck is not what it asked about.
+  return fretsSounding(key.stringIndex, noteNameAt(key.stringIndex, key.fret), maxFret).map(
+    (fret) => ({ stringIndex: key.stringIndex, fret })
+  );
 }

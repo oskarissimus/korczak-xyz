@@ -228,15 +228,17 @@ const BUCKET_ORDER: Bucket[] = ['new', 'learning', 'young', 'mature'];
  * weakest: a position you can read but not find is not a position you know, and nor is one you can
  * find as C♯ but not as D♭, or as C♯ but not as Cis.
  *
- * `pitch` cards are not in the picture at all. They ask for a pitch anywhere on the neck, so they
- * belong to no one square, and there is nothing to take the weakest of.
+ * The cards that ask about no one square are not in the picture at all — `pitch` and `allPitch`,
+ * which ask for a pitch wherever it lies, and `allNote`, which asks for a whole pitch class.
+ * There is nothing to take the weakest of on any one square, and folding a select-all card onto
+ * every square it covers would count one card a dozen times.
  */
 export function positionStats(deck: Deck): PositionStat[] {
   const squares = new Map<string, PositionStat>();
   for (const card of Object.values(deck)) {
     const key = parseCardId(card.id);
-    // A `pitch` card is not about a square — three or four of them answer it — so it has no place
-    // in a picture of squares. Folding it onto all of them would count one card several times.
+    // A card that is not keyed on a position has no place in a picture of squares: three or four
+    // of them answer a `pitch` card, and a dozen answer an `allNote` one.
     if (!key || !isPositionKey(key)) continue;
     const squareKey = `${key.stringIndex}-${key.fret}`;
     const existing = squares.get(squareKey);

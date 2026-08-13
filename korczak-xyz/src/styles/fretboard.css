@@ -144,6 +144,20 @@
   border-width: 2px;
 }
 
+/* The check button is the first `.fb-btn` here that is ever disabled, and it is
+   disabled at both ends of a select-all card: before anything is marked, and
+   again once the card is graded. Greyed rather than hidden, the way a Win95
+   dialog greys what is not available yet — a control that appears on the first
+   tap is one nobody knew was coming. It has to outrank `--primary` (which is why
+   it names the class as well) and the global `button:hover` (which is what the
+   twin is for, as under the note pad). */
+.fb-btn:disabled,
+.fb-btn:disabled:hover {
+  background: var(--retro-gray);
+  color: var(--retro-dark-gray);
+  cursor: default;
+}
+
 .fb-link {
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
@@ -417,8 +431,39 @@
   color: var(--retro-white);
 }
 
+/* A place marked on a select-all card, before the check. Cyan, the colour the live
+   cells already outline themselves in, because this is not a verdict: nothing has
+   been graded yet and green here would read as one. Doubled against the global
+   `button:hover` for the reason above — the cell under the pointer is the one just
+   pressed, and losing its mark to grey is losing the only record of the tap. */
+.fb-neck-cell--picked,
+.fb-neck-cell--picked:hover:not(:disabled) {
+  background-color: rgba(0, 255, 255, 0.28);
+  border-color: var(--retro-cyan);
+  color: var(--retro-cyan);
+}
+
+/* A right answer that was not marked. It is drawn as a place, not as a score: the
+   `○` and the dimmer green say "this one too" where the filled green dots say
+   "these you had". Without the pair, a set missing one position looks exactly like
+   a set that had it, and the one thing a select-all card has to report is which
+   one got away. */
+.fb-neck-cell--missed,
+.fb-neck-cell--missed:hover {
+  background-color: rgba(0, 255, 0, 0.1);
+  border-color: rgba(0, 255, 0, 0.55);
+  color: var(--retro-green);
+}
+
 .fb-neck-mark {
   font-weight: bold;
+}
+
+/* The check button under a select-all neck. Its own row so the button keeps its
+   natural width instead of stretching across the panel with the neck. */
+.fb-check-row {
+  display: flex;
+  justify-content: flex-start;
 }
 
 /* The heatmap is a picture, not a control: no targets to hit, so the squares

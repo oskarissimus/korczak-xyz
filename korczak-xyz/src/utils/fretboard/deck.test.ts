@@ -101,6 +101,38 @@ describe('scopeIds', () => {
     expect(narrow).not.toContain('pitch:40'); // the low E is on a string no longer asked
   });
 
+  it('mints one `allNote` card per pitch class, however wide the neck is', () => {
+    // Twelve classes, five of them black and asked under both names — and the same seventeen
+    // cards whether the scope is four frets of one string or the whole neck, because the card
+    // is the class and not the places that sound it.
+    const wide = scopeIds(settings({ maxFret: 12, directions: ['allNote'] }));
+    expect(wide).toHaveLength(12 + 5);
+    expect(wide.filter((id) => id === 'allNote:4')).toHaveLength(1);
+    // A scope too narrow to sound all twelve asks about the ones it can reach.
+    expect(scopeIds(settings({ maxFret: 2, strings: [0], directions: ['allNote'] }))).toEqual([
+      'allNote:4', // E
+      'allNote:5', // F
+      'allNote:6', // F♯
+      'allNote:6:b', // G♭
+    ]);
+  });
+
+  it('enumerates `allPitch` over the pitches, alongside `pitch` and apart from it', () => {
+    const scope = settings({ maxFret: 1, strings: [0, 1], directions: ['pitch', 'allPitch'] });
+    expect(sorted(scopeIds(scope))).toEqual([
+      'allPitch:40',
+      'allPitch:41',
+      'allPitch:45',
+      'allPitch:46',
+      'allPitch:46:b',
+      'pitch:40',
+      'pitch:41',
+      'pitch:45',
+      'pitch:46',
+      'pitch:46:b',
+    ]);
+  });
+
   it('asks a note under each selected notation, where the two disagree about it', () => {
     // A string, frets 0-2: A, A♯/B♭, B. Under German that is A, Ais/B, H — so the A is one card
     // and the other two are two apiece.

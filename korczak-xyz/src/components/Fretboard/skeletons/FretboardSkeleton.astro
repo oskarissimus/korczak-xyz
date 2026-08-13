@@ -49,7 +49,10 @@ const ROWS: { label: string; choices: (string | number)[] }[] = [
       stringLabel(STRING_COUNT - 1 - i, notation)
     ),
   },
-  { label: t.directions, choices: [t.dirName, t.dirFind, t.dirPitch] },
+  {
+    label: t.directions,
+    choices: [t.dirName, t.dirFind, t.dirPitch, t.dirAllNote, t.dirAllPitch],
+  },
   { label: t.sessionLength, choices: LENGTH_CHOICES },
   { label: t.newPerSession, choices: NEW_CHOICES },
   { label: t.stringLabels, choices: [t.on, t.off] },

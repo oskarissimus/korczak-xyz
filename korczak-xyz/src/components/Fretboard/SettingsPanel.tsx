@@ -143,6 +143,22 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
         >
           {t.dirPitch}
         </Choice>
+        {/* The two select-all directions sit after the ones they are built from, since each is
+            the same question asked of the whole neck at once. They add few cards — twelve pitch
+            classes and the pitches the scope can sound — but each of those cards is a long
+            answer, so they are off by default like every other direction past the first two. */}
+        <Choice
+          active={settings.directions.includes('allNote')}
+          onClick={() => toggleDirection('allNote')}
+        >
+          {t.dirAllNote}
+        </Choice>
+        <Choice
+          active={settings.directions.includes('allPitch')}
+          onClick={() => toggleDirection('allPitch')}
+        >
+          {t.dirAllPitch}
+        </Choice>
       </Row>
 
       <Row label={t.sessionLength}>

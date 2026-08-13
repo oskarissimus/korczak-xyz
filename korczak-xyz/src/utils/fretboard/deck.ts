@@ -12,12 +12,16 @@ import {
   STRING_COUNT,
   cardId,
   hasTwoSpellings,
+  isPositionDirection,
   isPositionKey,
   midisInScope,
+  noteCardId,
   noteNameAt,
+  notesInScope,
   parseCardId,
   pitchCardId,
   pitchClassOfMidi,
+  positionsOfNote,
   positionsSounding,
 } from './notes';
 import type { CardKey, Direction, Notation, PositionCardKey } from './notes';
@@ -60,6 +64,11 @@ export const MAX_ANSWERS_FACTOR = 3;
  * are two things to know. Only where the two notations print different words, though — `cardId`
  * normalises the rest away, and pushing an id twice is what the dedupe below is for. Selecting
  * one notation therefore leaves the deck exactly the size it was.
+ *
+ * Three of the five directions are not enumerated over the grid at all, because they are not
+ * keyed on a place: a `pitch` or `allPitch` card is one pitch however many fingers reach it, and
+ * an `allNote` card is one pitch class however many places sound it. Walking the fret × string
+ * loop would mint each of them several times over.
  */
 export function scopeIds(settings: Settings): string[] {
   const ids: string[] = [];
@@ -67,11 +76,12 @@ export function scopeIds(settings: Settings): string[] {
   const directions = settings.directions.length > 0 ? settings.directions : (['name'] as Direction[]);
   const notations =
     settings.notations.length > 0 ? settings.notations : (['international'] as Notation[]);
-  for (let fret = 0; fret <= Math.min(settings.maxFret, MAX_FRET); fret++) {
+  const maxFret = Math.min(settings.maxFret, MAX_FRET);
+  for (let fret = 0; fret <= maxFret; fret++) {
     for (const string of strings) {
       if (string < 0 || string >= STRING_COUNT) continue;
       for (const direction of directions) {
-        if (direction === 'pitch') continue; // enumerated by pitch below, not per position
+        if (!isPositionDirection(direction)) continue; // enumerated below, not per position
         for (const notation of notations) {
           ids.push(cardId(direction, string, fret, 'sharp', notation));
           if (direction === 'find' && hasTwoSpellings(noteNameAt(string, fret))) {
@@ -83,13 +93,26 @@ export function scopeIds(settings: Settings): string[] {
   }
   // A `pitch` card is one pitch, not one position, so it is enumerated over the distinct pitches
   // the scope can sound rather than over the grid — several places on the neck answer each one.
-  if (directions.includes('pitch')) {
-    for (const midi of midisInScope(strings, Math.min(settings.maxFret, MAX_FRET))) {
+  // `allPitch` asks about the same pitches and is enumerated with them.
+  for (const direction of ['pitch', 'allPitch'] as const) {
+    if (!directions.includes(direction)) continue;
+    for (const midi of midisInScope(strings, maxFret)) {
       for (const notation of notations) {
-        ids.push(pitchCardId(midi, 'sharp', notation));
+        ids.push(pitchCardId(direction, midi, 'sharp', notation));
         if (hasTwoSpellings(pitchClassOfMidi(midi))) {
-          ids.push(pitchCardId(midi, 'flat', notation));
+          ids.push(pitchCardId(direction, midi, 'flat', notation));
         }
+      }
+    }
+  }
+  // An `allNote` card is one pitch class over the whole scope, so there are at most twelve of
+  // them however wide the neck is — and fewer only when the scope is too narrow to sound all
+  // twelve, which takes fewer than four frets on a single string.
+  if (directions.includes('allNote')) {
+    for (const note of notesInScope(strings, maxFret)) {
+      for (const notation of notations) {
+        ids.push(noteCardId(note, 'sharp', notation));
+        if (hasTwoSpellings(note)) ids.push(noteCardId(note, 'flat', notation));
       }
     }
   }
@@ -197,6 +220,13 @@ export const MIN_POSITION_GAP = 3;
  * card is also held apart from the `name`/`find` cards on that square. The pitch's other squares
  * are not covered, and a leak there is the mild one — a different place, read differently.
  *
+ * The two select-all directions are keyed the same way, on the lowest place they cover: an
+ * `allPitch` card shares its key with the `pitch` card on the same pitch, which is the strongest
+ * case here since the two have the same answer set, and an `allNote` card sits with the lowest
+ * place that sounds its class. Those cards cover most of the neck, so most of what they leak
+ * cannot be keyed away — but the run of squares they have just had you mark is not a run this
+ * function could hold apart without becoming a scheduler of its own.
+ *
  * Greedy: take the first remaining card whose position has not come up in the last `gap`, and
  * fall back to the first remaining card when none qualifies. The fallback is what makes this
  * total — a queue of nothing but one position has no valid arrangement — and it always returns a
@@ -211,7 +241,10 @@ export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string
     if (isPositionKey(key)) return `${key.stringIndex}-${key.fret}`;
     // Keyed on the whole neck rather than the current scope, so the grouping is a property of the
     // card and does not shift when the settings do.
-    const canonical = positionsSounding(key.midi, ALL_STRINGS, MAX_FRET)[0];
+    const canonical =
+      key.direction === 'allNote'
+        ? positionsOfNote(key.note, ALL_STRINGS, MAX_FRET)[0]
+        : positionsSounding(key.midi, ALL_STRINGS, MAX_FRET)[0];
     return canonical ? `${canonical.stringIndex}-${canonical.fret}` : id;
   };
 
@@ -340,8 +373,8 @@ export function requeue(
 
 /**
  * Every card the deck holds that is *about a position*, with that position decoded — for the
- * stats heatmap. `pitch` cards are left out because they are not about one square, and the
- * heatmap is a picture of squares.
+ * stats heatmap. The `pitch`, `allPitch` and `allNote` cards are left out because none of them is
+ * about one square, and the heatmap is a picture of squares.
  */
 export function deckPositions(deck: Deck): { card: Card; key: PositionCardKey }[] {
   return Object.values(deck)

@@ -15,16 +15,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, requeue } from '../../utils/fretboard/deck';
 import { fretFromKey, isAdvanceKey, noteFromKey } from '../../utils/fretboard/keys';
 import {
+  asksEveryPlace,
+  cardNote,
   cardNoteLabel,
   cardNotation,
   displayNotation,
-  fretsSounding,
   isPositionKey,
   noteNameAt,
   parseCardId,
-  pitchClassOfMidi,
   pitchLabel,
-  positionsSounding,
+  positionsAnswering,
   stringLabel,
 } from '../../utils/fretboard/notes';
 import type { Notation, NoteName, Position } from '../../utils/fretboard/notes';
@@ -56,14 +56,32 @@ interface Result {
   ms: number;
   note: NoteName;
   chosenNote: NoteName | null;
-  chosen: Position | null;
+  /** Every place the player pressed: none on a `name` card, one or many on the neck. */
+  chosen: Position[];
   /** Every place that answered the card. A `pitch` card has several, on several strings. */
   answers: Position[];
 }
 
 /** `D 10 / G 5 / B 1` — where the pitch was, for the readout under a wrong answer. */
-function describePositions(positions: Position[], notation: Notation): string {
+function describePositions(positions: readonly Position[], notation: Notation): string {
   return positions.map((p) => `${stringLabel(p.stringIndex, notation)} ${p.fret}`).join(' / ');
+}
+
+const samePlace = (a: Position, b: Position) =>
+  a.stringIndex === b.stringIndex && a.fret === b.fret;
+
+/** What one press does to a selection: adds the place, or takes it back off. */
+function togglePlace(picked: readonly Position[], place: Position): Position[] {
+  return picked.some((p) => samePlace(p, place))
+    ? picked.filter((p) => !samePlace(p, place))
+    : [...picked, place];
+}
+
+/** Whether the selection is exactly the answer — no place missing, none over. */
+function sameSet(picked: readonly Position[], answers: readonly Position[]): boolean {
+  return (
+    picked.length === answers.length && answers.every((a) => picked.some((p) => samePlace(p, a)))
+  );
 }
 
 export default function FretboardSession({
@@ -81,6 +99,10 @@ export default function FretboardSession({
   const [working, setWorking] = useState<Deck>(deck);
   const [events, setEvents] = useState<ReviewEvent[]>([]);
   const [result, setResult] = useState<Result | null>(null);
+  // What has been marked on the neck. Only a select-all card accumulates here — every other card
+  // is answered by the press itself, and the selection is what replaces that press with a gesture
+  // that has to be finished before it means anything.
+  const [picked, setPicked] = useState<Position[]>([]);
 
   const shownAt = useRef(Date.now());
   const introduced = useRef(new Set<string>());
@@ -117,6 +139,7 @@ export default function FretboardSession({
 
   const advance = useCallback(() => {
     setResult(null);
+    setPicked([]);
     setIndex((i) => i + 1);
   }, []);
 
@@ -129,11 +152,18 @@ export default function FretboardSession({
   }, [result, advance]);
 
   const submit = useCallback(
-    (correct: boolean, answered: string, partial: Omit<Result, 'correct' | 'ms'>) => {
+    (
+      correct: boolean,
+      answered: string,
+      partial: Omit<Result, 'correct' | 'ms'>,
+      // How many places the card asked for. The rating's speed thresholds are per place, so a
+      // card wanting six of them is not graded against the budget for one tap.
+      targets = 1
+    ) => {
       if (!cardId || result) return;
       const now = Date.now();
       const ms = Math.max(0, now - shownAt.current);
-      const rating = ratingFromAnswer(correct, ms);
+      const rating = ratingFromAnswer(correct, ms, targets);
       const card = working[cardId] ?? createCard(cardId);
       const updated = rate(card, rating, now, ms);
 
@@ -171,51 +201,55 @@ export default function FretboardSession({
       submit(note === expected, note, {
         note: expected,
         chosenNote: note,
-        chosen: null,
+        chosen: [],
         answers: [{ stringIndex: key.stringIndex, fret: key.fret }],
       });
     },
     [key, submit]
   );
 
+  // Every place in the scope that answers the card: the frets on the asked string for a `find`
+  // card, the places that sound the pitch for a `pitch` one, and the whole set a select-all card
+  // is graded on. One source, so the grader, the marks and the readout cannot disagree.
+  const valid = key ? positionsAnswering(key, settings.strings, settings.maxFret) : [];
+
   const answerPosition = useCallback(
     (stringIndex: number, fret: number) => {
-      if (!key) return;
-      const chosen = { stringIndex, fret };
-      const hit = (valid: Position[]) =>
-        valid.some((p) => p.stringIndex === stringIndex && p.fret === fret);
+      if (!key || result) return;
+      const place = { stringIndex, fret };
 
-      if (key.direction === 'pitch') {
-        // Every place in the scope sounding that exact pitch is right — the card asked for the
-        // note, and which finger you reach it with is not the question. Compared as whole MIDI
-        // numbers, so the octave the card names is the octave that counts.
-        const valid = positionsSounding(key.midi, settings.strings, settings.maxFret);
-        submit(hit(valid), `${stringIndex}-${fret}`, {
-          note: pitchClassOfMidi(key.midi),
-          chosenNote: null,
-          chosen,
-          answers: valid,
-        });
+      // On a select-all card a press is a selection, not an answer: it is `check` that commits,
+      // because the card is about the whole set and any prefix of it would grade as wrong.
+      if (asksEveryPlace(key)) {
+        setPicked((prev) => togglePlace(prev, place));
         return;
       }
 
-      const expected = noteNameAt(key.stringIndex, key.fret);
-      // Any fret on that string sounding the note is right: on a twelve-fret neck the open
-      // string and the twelfth fret are the same note, and marking one of them wrong would be
-      // teaching something false.
-      const valid = fretsSounding(key.stringIndex, expected, settings.maxFret).map((f) => ({
-        stringIndex: key.stringIndex,
-        fret: f,
-      }));
-      submit(hit(valid), String(fret), {
-        note: expected,
+      // Any of them is right on a single-answer card — the card asked for a note, and which
+      // finger you reach it with is not the question. `answered` stays what it has always been
+      // for each direction, since it is written to the log and to the cloud: a bare fret where
+      // the card named the string, the whole place where it did not.
+      const answered = key.direction === 'find' ? String(fret) : `${stringIndex}-${fret}`;
+      submit(valid.some((p) => samePlace(p, place)), answered, {
+        note: cardNote(key),
         chosenNote: null,
-        chosen,
+        chosen: [place],
         answers: valid,
       });
     },
-    [key, settings.maxFret, settings.strings, submit]
+    [key, result, submit, valid]
   );
+
+  /** Commit a select-all selection. All or nothing: a set that is missing one place is wrong. */
+  const submitSelection = useCallback(() => {
+    if (!key || result || picked.length === 0) return;
+    submit(
+      sameSet(picked, valid),
+      picked.map((p) => `${p.stringIndex}-${p.fret}`).join(' '),
+      { note: cardNote(key), chosenNote: null, chosen: picked, answers: valid },
+      valid.length
+    );
+  }, [key, picked, result, submit, valid]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -236,6 +270,16 @@ export default function FretboardSession({
         }
         return;
       }
+      // The selection is made by tapping, but committing it is one action and therefore has a
+      // key: the same one that carries on past a wrong answer, which is the only other thing
+      // this screen asks you to confirm.
+      if (asksEveryPlace(key)) {
+        if (isAdvanceKey(e.key)) {
+          e.preventDefault();
+          submitSelection();
+        }
+        return;
+      }
       // A digit names a fret and a `pitch` card needs a string as well, so there is nothing one
       // keystroke can say there. It is answered by tapping the neck; the advance key still works.
       if (key.direction !== 'find') return;
@@ -247,7 +291,16 @@ export default function FretboardSession({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [advance, answerPosition, answerNote, key, notation, result, settings.maxFret]);
+  }, [
+    advance,
+    answerPosition,
+    answerNote,
+    key,
+    notation,
+    result,
+    settings.maxFret,
+    submitSelection,
+  ]);
 
   // An id this build cannot read is not a card to ask. Settings sync between devices, so a newer
   // build can name a direction this one has never heard of; skipping the card keeps the sitting
@@ -258,28 +311,33 @@ export default function FretboardSession({
 
   if (!key || !cardId) return null;
 
-  // One spelling on a `find` or `pitch` card — asked as "C♯", "D♭", "Cis" or "Des", never as more
-  // than one of them.
+  // One spelling on every direction but `name` — asked as "C♯", "D♭", "Cis" or "Des", never as
+  // more than one of them.
   const askedLabel = cardNoteLabel(key);
-  const askedNote = isPositionKey(key)
-    ? noteNameAt(key.stringIndex, key.fret)
-    : pitchClassOfMidi(key.midi);
+  const askedNote = cardNote(key);
+  const everyPlace = asksEveryPlace(key);
   const stringName = isPositionKey(key) ? stringLabel(key.stringIndex, notation) : '';
   const positionLabel = !isPositionKey(key)
     ? ''
     : key.fret === 0
       ? fill(t.a11yPositionOpen, { string: stringName })
       : fill(t.a11yPosition, { string: stringName, fret: key.fret });
-  const liveStrings = isPositionKey(key) ? [key.stringIndex] : settings.strings;
+  // Only a `find` card names a string, and only it therefore keeps the other five out of reach.
+  const liveStrings = key.direction === 'find' ? [key.stringIndex] : settings.strings;
   const cellLabel = (stringIndex: number, fret: number) => {
     // A `find` card fixes the string and the prompt names it, so the fret is the whole answer;
-    // on a `pitch` card the string is half of it and has to be spoken.
-    if (isPositionKey(key)) return fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret });
+    // everywhere else the string is part of it and has to be spoken.
+    if (key.direction === 'find') return fret === 0 ? t.a11yFretOpen : fill(t.a11yFret, { fret });
     const string = stringLabel(stringIndex, notation);
     return fret === 0
       ? fill(t.a11yPositionOpen, { string })
       : fill(t.a11yPosition, { string, fret });
   };
+  const instruction = everyPlace
+    ? t.tapEvery
+    : key.direction === 'pitch'
+      ? t.tapAnywhere
+      : t.tapFret;
 
   return (
     <div className="fb-session">
@@ -308,7 +366,11 @@ export default function FretboardSession({
         ) : (
           <>
             <span className="fb-prompt-note">{askedLabel}</span>{' '}
-            {key.direction === 'pitch' ? t.anywhere : fill(t.onString, { string: stringName })}
+            {everyPlace
+              ? t.everywhere
+              : key.direction === 'pitch'
+                ? t.anywhere
+                : fill(t.onString, { string: stringName })}
           </>
         )}
       </p>
@@ -336,21 +398,40 @@ export default function FretboardSession({
           />
         </>
       ) : (
-        <div className="fb-stage">
-          <NeckPicker
-            maxFret={settings.maxFret}
-            liveStrings={liveStrings}
-            stringLabels={settings.stringLabels}
-            notation={notation}
-            disabled={result != null}
-            chosen={result?.chosen ?? null}
-            answers={result?.answers ?? null}
-            onPick={answerPosition}
-            label={key.direction === 'pitch' ? t.tapAnywhere : t.tapFret}
-            cellLabel={cellLabel}
-          />
-          {result && <Verdict correct={result.correct} />}
-        </div>
+        <>
+          <div className="fb-stage">
+            <NeckPicker
+              maxFret={settings.maxFret}
+              liveStrings={liveStrings}
+              stringLabels={settings.stringLabels}
+              notation={notation}
+              disabled={result != null}
+              chosen={result?.chosen ?? picked}
+              answers={result?.answers ?? null}
+              onPick={answerPosition}
+              label={instruction}
+              cellLabel={cellLabel}
+              multi={everyPlace}
+            />
+            {result && <Verdict correct={result.correct} />}
+          </div>
+          {/* Outside the stage, because the verdict is drawn over the stage and this button has
+              to stay pressable while the marks it produced are still on the neck. Disabled with
+              nothing selected rather than hidden: it is what the card is waiting for, and a
+              control that appears on the first tap is one nobody knew was coming. */}
+          {everyPlace && (
+            <div className="fb-check-row">
+              <button
+                type="button"
+                className="fb-btn fb-btn--primary"
+                onClick={submitSelection}
+                disabled={result != null || picked.length === 0}
+              >
+                {picked.length === 0 ? t.check : fill(t.checkCount, { count: picked.length })}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <div className="fb-feedback" role="status" aria-live="polite">
@@ -363,11 +444,11 @@ export default function FretboardSession({
               <span className="fb-answer">
                 {key.direction === 'name'
                   ? fill(t.answerWas, { note: pitchLabel(result.note, notation) })
-                  : key.direction === 'pitch'
-                    ? fill(t.positionsWere, {
+                  : key.direction === 'find'
+                    ? fill(t.fretWas, { fret: result.answers.map((p) => p.fret).join(' / ') })
+                    : fill(t.positionsWere, {
                         positions: describePositions(result.answers, notation),
-                      })
-                    : fill(t.fretWas, { fret: result.answers.map((p) => p.fret).join(' / ') })}
+                      })}
               </span>
             )}
             <span className="fb-time">{formatSeconds(result.ms)}</span>
@@ -378,13 +459,7 @@ export default function FretboardSession({
             )}
           </>
         ) : (
-          <span className="fb-hint">
-            {key.direction === 'name'
-              ? t.tapNote
-              : key.direction === 'pitch'
-                ? t.tapAnywhere
-                : t.tapFret}
-          </span>
+          <span className="fb-hint">{key.direction === 'name' ? t.tapNote : instruction}</span>
         )}
       </div>
     </div>

@@ -91,11 +91,18 @@ export function createCard(id: string): Card {
  * The pad answers for you: correctness is objective, and among correct answers the only thing
  * left to grade on is how long it took. Under two seconds the note was known; past five it was
  * counted up from an open string, which is a real answer and a card that should come back soon.
+ *
+ * `targets` is how many places the card asked for, and the thresholds are **per place**: a
+ * select-all card wanting six positions cannot be marked in two seconds by anyone, so measuring
+ * it against the one-tap budget would grade every answer to it `hard` and hold the whole
+ * direction at day one forever. A budget per position asks the same question of both — was each
+ * one recalled or worked out — and leaves the ordinary card, which has one, exactly as it was.
  */
-export function ratingFromAnswer(correct: boolean, elapsedMs: number): Rating {
+export function ratingFromAnswer(correct: boolean, elapsedMs: number, targets = 1): Rating {
   if (!correct) return 'again';
-  if (elapsedMs <= SRS.fastMs) return 'easy';
-  if (elapsedMs <= SRS.slowMs) return 'good';
+  const budget = Math.max(1, targets);
+  if (elapsedMs <= SRS.fastMs * budget) return 'easy';
+  if (elapsedMs <= SRS.slowMs * budget) return 'good';
   return 'hard';
 }
 

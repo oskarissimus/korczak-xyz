@@ -6,6 +6,7 @@
  */
 
 import {
+  asksEveryPlace,
   cardNoteLabel,
   cardNotation,
   isPositionKey,
@@ -50,8 +51,11 @@ function Tile({ label, value }: { label: string; value: string }) {
 export function describeCard(cardId: string, t: Translation, display: Notation): string {
   const key = parseCardId(cardId);
   if (!key) return cardId;
-  // A `pitch` card names no place — several answer it — so the pitch and its octave are the line.
-  if (!isPositionKey(key)) return `${cardNoteLabel(key)} — ${t.anywhereShort}`;
+  // A `pitch` card names no place — several answer it — so the pitch and its octave are the line;
+  // a select-all card wanted all of them, which is a different thing to go back and look at.
+  if (!isPositionKey(key)) {
+    return `${cardNoteLabel(key)} — ${asksEveryPlace(key) ? t.everywhereShort : t.anywhereShort}`;
+  }
   const string = stringLabel(key.stringIndex, cardNotation(key, display));
   const where =
     key.fret === 0

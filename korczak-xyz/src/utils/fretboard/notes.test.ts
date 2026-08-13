@@ -4,30 +4,37 @@ import {
   MAX_FRET,
   PITCH_CLASSES,
   STRING_COUNT,
+  asksEveryPlace,
   cardId,
+  cardNote,
   cardNoteLabel,
   cardNotation,
   displayNotation,
   fretsSounding,
   hasTwoNotations,
   hasTwoSpellings,
+  isPositionDirection,
   isPositionKey,
   midiLabel,
   midisInScope,
+  noteCardId,
   noteLabelAt,
   noteNameAt,
+  notesInScope,
   octaveAt,
   parseCardId,
   pitchCardId,
   pitchLabel,
+  positionsAnswering,
+  positionsOfNote,
   positionsSounding,
   spellingLabel,
   stringLabel,
 } from './notes';
 import type { PositionDirection } from './notes';
 
-const POSITION_DIRECTIONS = DIRECTIONS.filter(
-  (d): d is PositionDirection => d !== 'pitch'
+const POSITION_DIRECTIONS = DIRECTIONS.filter((d): d is PositionDirection =>
+  isPositionDirection(d)
 );
 const ALL_STRINGS = Array.from({ length: STRING_COUNT }, (_, i) => i);
 
@@ -213,8 +220,8 @@ describe('card ids', () => {
   });
 
   it('round-trips a pitch card, which is keyed on the pitch and not on a place', () => {
-    expect(pitchCardId(61)).toBe('pitch:61');
-    expect(pitchCardId(61, 'flat')).toBe('pitch:61:b');
+    expect(pitchCardId('pitch', 61)).toBe('pitch:61');
+    expect(pitchCardId('pitch', 61, 'flat')).toBe('pitch:61:b');
     expect(parseCardId('pitch:61')).toEqual({
       direction: 'pitch',
       midi: 61,
@@ -230,8 +237,8 @@ describe('card ids', () => {
   });
 
   it('splits a pitch card by notation only where the two disagree', () => {
-    expect(pitchCardId(61, 'sharp', 'german')).toBe('pitch:61:de'); // C♯4 / Cis4
-    expect(pitchCardId(60, 'sharp', 'german')).toBe('pitch:60'); // C4 either way
+    expect(pitchCardId('pitch', 61, 'sharp', 'german')).toBe('pitch:61:de'); // C♯4 / Cis4
+    expect(pitchCardId('pitch', 60, 'sharp', 'german')).toBe('pitch:60'); // C4 either way
     expect(parseCardId('pitch:60:de')).toBeNull();
     expect(parseCardId('pitch:61:de')?.notation).toBe('german');
   });
@@ -250,6 +257,131 @@ describe('card ids', () => {
   it('tells a card about a place from a card about a pitch', () => {
     expect(isPositionKey(parseCardId('find:1-4')!)).toBe(true);
     expect(isPositionKey(parseCardId('pitch:61')!)).toBe(false);
+    expect(isPositionKey(parseCardId('allNote:4')!)).toBe(false);
+    expect(isPositionKey(parseCardId('allPitch:61')!)).toBe(false);
+  });
+
+  it('round-trips an `allPitch` card, keyed on the pitch its `pitch` twin is keyed on', () => {
+    expect(pitchCardId('allPitch', 61)).toBe('allPitch:61');
+    expect(pitchCardId('allPitch', 61, 'flat')).toBe('allPitch:61:b');
+    expect(pitchCardId('allPitch', 61, 'sharp', 'german')).toBe('allPitch:61:de');
+    expect(parseCardId('allPitch:61:b')).toEqual({
+      direction: 'allPitch',
+      midi: 61,
+      spelling: 'flat',
+      notation: 'international',
+    });
+    // The same pitch, a different question — and therefore a different schedule.
+    expect(pitchCardId('allPitch', 61)).not.toBe(pitchCardId('pitch', 61));
+  });
+
+  it('round-trips an `allNote` card, which is keyed on the pitch class', () => {
+    expect(noteCardId('E')).toBe('allNote:4');
+    expect(noteCardId('C#')).toBe('allNote:1');
+    expect(noteCardId('C#', 'flat')).toBe('allNote:1:b');
+    expect(noteCardId('C#', 'sharp', 'german')).toBe('allNote:1:de');
+    expect(parseCardId('allNote:1:b:de')).toEqual({
+      direction: 'allNote',
+      note: 'C#',
+      spelling: 'flat',
+      notation: 'german',
+    });
+  });
+
+  it('returns null for an `allNote` id that could never be minted', () => {
+    expect(parseCardId('allNote:12')).toBeNull(); // there are twelve, indexed from zero
+    expect(parseCardId('allNote:4:b')).toBeNull(); // E has one name
+    expect(parseCardId('allNote:0:de')).toBeNull(); // C is C in both notations
+    expect(parseCardId('allNote:')).toBeNull();
+    expect(parseCardId('allNote:2-5')).toBeNull();
+  });
+
+  it('tells the cards that want every place from the ones that want one', () => {
+    expect(asksEveryPlace(parseCardId('allNote:4')!)).toBe(true);
+    expect(asksEveryPlace(parseCardId('allPitch:52')!)).toBe(true);
+    expect(asksEveryPlace(parseCardId('pitch:52')!)).toBe(false);
+    expect(asksEveryPlace(parseCardId('find:1-4')!)).toBe(false);
+    expect(asksEveryPlace(parseCardId('name:1-4')!)).toBe(false);
+  });
+
+  it('names the pitch class a card is about, however the card is keyed', () => {
+    expect(cardNote(parseCardId('name:1-0')!)).toBe('A');
+    expect(cardNote(parseCardId('find:1-4')!)).toBe('C#');
+    expect(cardNote(parseCardId('pitch:52')!)).toBe('E');
+    expect(cardNote(parseCardId('allPitch:52')!)).toBe('E');
+    expect(cardNote(parseCardId('allNote:4')!)).toBe('E');
+  });
+
+  it('labels a select-all card as the pitch or the class it asks for', () => {
+    // `allPitch` carries the octave, exactly as `pitch` does; `allNote` has none to carry.
+    expect(cardNoteLabel(parseCardId('allPitch:52')!)).toBe('E3');
+    expect(cardNoteLabel(parseCardId('allNote:1')!)).toBe('C♯');
+    expect(cardNoteLabel(parseCardId('allNote:1:b')!)).toBe('D♭');
+    expect(cardNoteLabel(parseCardId('allNote:1:de')!)).toBe('Cis');
+    expect(cardNoteLabel(parseCardId('allNote:1:b:de')!)).toBe('Des');
+  });
+});
+
+describe('positionsOfNote', () => {
+  it('finds the class on every string, every twelve frets', () => {
+    // E over the whole neck: both open E strings and their twelfth frets, plus the seventh fret
+    // of the A string, the second of the D and the fifth of the B.
+    expect(positionsOfNote('E', ALL_STRINGS, MAX_FRET)).toEqual([
+      { stringIndex: 0, fret: 0 },
+      { stringIndex: 0, fret: 12 },
+      { stringIndex: 1, fret: 7 },
+      { stringIndex: 2, fret: 2 },
+      { stringIndex: 3, fret: 9 },
+      { stringIndex: 4, fret: 5 },
+      { stringIndex: 5, fret: 0 },
+      { stringIndex: 5, fret: 12 },
+    ]);
+  });
+
+  it('is bounded by the scope, like every other answer here', () => {
+    expect(positionsOfNote('E', [0, 1], 5)).toEqual([{ stringIndex: 0, fret: 0 }]);
+    expect(positionsOfNote('E', [1], 12)).toEqual([{ stringIndex: 1, fret: 7 }]);
+  });
+});
+
+describe('notesInScope', () => {
+  it('is all twelve as soon as the scope can sound them', () => {
+    expect(notesInScope(ALL_STRINGS, MAX_FRET)).toHaveLength(12);
+    // Four frets on one string is four pitch classes and no more.
+    expect(notesInScope([0], 3)).toEqual(['E', 'F', 'F#', 'G']);
+  });
+});
+
+describe('positionsAnswering', () => {
+  it('gives a `find` card its own string and nothing else', () => {
+    // C on the A string: the third fret, and the fifteenth is off a twelve-fret neck.
+    expect(positionsAnswering(parseCardId('find:1-3')!, ALL_STRINGS, MAX_FRET)).toEqual([
+      { stringIndex: 1, fret: 3 },
+    ]);
+  });
+
+  it('gives a `pitch` card every string that reaches the pitch', () => {
+    // E3 lies under three fingers: the twelfth fret of the low E, the seventh of the A and the
+    // second of the D.
+    expect(positionsAnswering(parseCardId('pitch:52')!, ALL_STRINGS, MAX_FRET)).toEqual([
+      { stringIndex: 0, fret: 12 },
+      { stringIndex: 1, fret: 7 },
+      { stringIndex: 2, fret: 2 },
+    ]);
+  });
+
+  it('gives an `allPitch` card the same set — the difference is what is asked of it', () => {
+    expect(positionsAnswering(parseCardId('allPitch:52')!, ALL_STRINGS, MAX_FRET)).toEqual(
+      positionsAnswering(parseCardId('pitch:52')!, ALL_STRINGS, MAX_FRET)
+    );
+  });
+
+  it('gives an `allNote` card the whole class, octaves and all', () => {
+    expect(positionsAnswering(parseCardId('allNote:4')!, ALL_STRINGS, MAX_FRET)).toHaveLength(8);
+  });
+
+  it('gives a `name` card nothing: it is not answered on the neck', () => {
+    expect(positionsAnswering(parseCardId('name:1-3')!, ALL_STRINGS, MAX_FRET)).toEqual([]);
   });
 });
 

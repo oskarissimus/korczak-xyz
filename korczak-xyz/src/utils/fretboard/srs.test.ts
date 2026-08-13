@@ -39,6 +39,17 @@ describe('ratingFromAnswer', () => {
     expect(ratingFromAnswer(true, SRS.slowMs)).toBe('good');
     expect(ratingFromAnswer(true, 12_000)).toBe('hard');
   });
+
+  it('budgets the time per place asked for, so a select-all card is not always `hard`', () => {
+    // Six positions marked in nine seconds is a second and a half each — recalled, not counted
+    // up. Against the one-tap budget it would be the slowest possible answer.
+    expect(ratingFromAnswer(true, 9_000, 6)).toBe('easy');
+    expect(ratingFromAnswer(true, 9_000)).toBe('hard');
+    expect(ratingFromAnswer(true, SRS.slowMs * 6, 6)).toBe('good');
+    expect(ratingFromAnswer(true, SRS.slowMs * 6 + 1, 6)).toBe('hard');
+    // A card asking for nothing is still one answer, not a division by zero.
+    expect(ratingFromAnswer(true, 900, 0)).toBe('easy');
+  });
 });
 
 describe('the learning ladder', () => {

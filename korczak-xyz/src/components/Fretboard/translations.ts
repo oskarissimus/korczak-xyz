@@ -51,6 +51,8 @@ export const translations = {
     dirName: 'Name the note',
     dirFind: 'Find the note',
     dirPitch: 'Find the pitch',
+    dirAllNote: 'Find every note',
+    dirAllPitch: 'Find every pitch',
     sessionLength: 'Session length',
     newPerSession: 'New per session',
     stringLabels: 'String names',
@@ -71,6 +73,10 @@ export const translations = {
     // A `pitch` card names no string, which is the whole of what it asks that `find` does not.
     anywhere: 'anywhere on the neck',
     anywhereShort: 'anywhere',
+    // A select-all card asks for the same note wherever it is, so the prompt says `everywhere`
+    // against the other's `anywhere` — one word carrying the whole difference between the two.
+    everywhere: 'everywhere on the neck',
+    everywhereShort: 'every place',
     correct: 'Correct',
     wrong: 'Not quite',
     answerWas: 'It was {note}',
@@ -84,6 +90,9 @@ export const translations = {
     tapNote: 'Tap the note',
     tapFret: 'Tap the fret on the highlighted string',
     tapAnywhere: 'Tap the note anywhere on the neck',
+    tapEvery: 'Tap every place it sits, then check',
+    check: 'Check',
+    checkCount: 'Check {count}',
     // Spoken descriptions. The diagram is a picture of a question, so these name the position
     // and never the note — reading out the answer would be a strange kind of help.
     a11yPosition: '{string} string, fret {fret}',
@@ -156,6 +165,8 @@ export const translations = {
     dirName: 'Nazwij dźwięk',
     dirFind: 'Znajdź dźwięk',
     dirPitch: 'Znajdź wysokość',
+    dirAllNote: 'Znajdź wszystkie dźwięki',
+    dirAllPitch: 'Znajdź wszystkie wysokości',
     sessionLength: 'Długość sesji',
     newPerSession: 'Nowych na sesję',
     stringLabels: 'Nazwy strun',
@@ -172,6 +183,8 @@ export const translations = {
     onString: 'na strunie {string}',
     anywhere: 'gdziekolwiek na gryfie',
     anywhereShort: 'gdziekolwiek',
+    everywhere: 'wszędzie na gryfie',
+    everywhereShort: 'wszystkie miejsca',
     correct: 'Dobrze',
     wrong: 'Niezupełnie',
     answerWas: 'To było {note}',
@@ -185,6 +198,9 @@ export const translations = {
     tapNote: 'Wybierz dźwięk',
     tapFret: 'Wskaż próg na podświetlonej strunie',
     tapAnywhere: 'Wskaż dźwięk gdziekolwiek na gryfie',
+    tapEvery: 'Wskaż każde miejsce, potem sprawdź',
+    check: 'Sprawdź',
+    checkCount: 'Sprawdź {count}',
     a11yPosition: 'struna {string}, próg {fret}',
     a11yPositionOpen: 'struna {string}, pusta',
     a11yFret: 'Próg {fret}',

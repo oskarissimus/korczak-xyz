@@ -164,13 +164,15 @@ position, drilled **both ways round** on independent schedules: `name` shows the
 what it is called, `find` names the note and a string and asks where it is. Reading a diagram
 and finding G on the A string mid-song are different skills, and the scheduler has no business
 assuming one implies the other. On a black key `find` is split again, once per spelling — see
-below. A third direction, `pitch`, is not about a position at all — see further below. And a card
+below. A third direction, `pitch`, is not about a position at all, and two more — `allNote` and
+`allPitch` — are not about *a* place but about all of them at once; see further below. And a card
 is split once more wherever the two notations call the note different things, so `C♯` and `Cis`
 can both be in the deck rather than one or the other — see *Both notations at once*.
 
-Answers are a tap, never a self-grade. Correctness is objective and the SM-2 rating comes from
-correctness plus how long it took (`≤2s` easy, `≤5s` good, slower hard, wrong again) — which is
-what makes the per-position accuracy and speed on the stats page measurements rather than
+Answers are a tap — a set of taps and a check on the two select-all directions — and never a
+self-grade. Correctness is objective and the SM-2 rating comes from correctness plus how long it
+took (`≤2s` easy, `≤5s` good, slower hard, wrong again, **per place the card asked for**) — which
+is what makes the per-position accuracy and speed on the stats page measurements rather than
 claims. `srs.ts` is Anki's shape: minute-scale learning steps (1m, 10m) before day-scale
 intervals, relearning after a lapse, mature at ≥21 days.
 
@@ -268,6 +270,60 @@ No new direction token can ever be safe backwards, so this is accepted rather th
 service worker is network-first for documents, so the window is a page already open across the
 deploy. What *is* fixed is the forward case: `loadSettings` filters `directions` against
 `DIRECTIONS`, and `FretboardSession` skips a card it cannot read instead of rendering nothing.
+
+### Asking for every place is a question neither of those asks
+
+`find` and `pitch` are satisfied by the first place you think of, so neither ever makes you look
+at the rest — and the rest is the useful part of the neck: a pitch class comes round every twelve
+frets and the same pitch lies under three or four fingers at once. So two more directions ask for
+the **whole set** and grade it all or nothing: `allNote` is *mark every E*, `allPitch` is *mark
+every E3*.
+
+- `allNote:${index}` is keyed on the pitch class — the index into `PITCH_CLASSES`, because a name
+  would have to be spelt and the spelling is already `:b`'s job. Twelve cards (seventeen, with
+  the black keys' flat spellings) however wide the neck is, since the card is the class and not
+  the places that sound it.
+- `allPitch:${midi}` is keyed exactly as its `pitch` twin is, and is a different card on a
+  different schedule: the same answer set, a different question asked of it.
+
+Both split by spelling and by notation for the reasons everything else here does.
+
+**All or nothing.** A set missing one position is wrong, because "every E" is the question and
+partial credit would report a fluency across the neck that was never demonstrated. That makes the
+verdict's job telling the two failures apart: magenta `✕` on a place marked that should not have
+been, an unfilled `○` on one that was missed. Which one got away is most of what there is to
+learn from a missed card here, and a single "not quite" says none of it.
+
+The rating's speed thresholds are **per place asked for** (`ratingFromAnswer`'s `targets`). Six
+positions cannot be marked in two seconds by anyone, so measuring them against the one-tap budget
+would grade every answer `hard` and hold the whole direction at day one forever. A budget per
+place asks both kinds of card the same question — was each one recalled, or counted up.
+
+`positionsAnswering` is the one place the answer set is decided, for every card answered on the
+neck. Three things have to agree about it and they are in three files: the grader, the marks the
+verdict lights up, and the per-place budget above. They disagreed once already, when `find`
+counted the twelfth-fret octave and the readout under it did not. Note that the set moves with
+the scope — widen the fret range and *every E* gains the twelfth frets — which is `fretsSounding`'s
+rule from the beginning: the scope is the neck as far as this deck is concerned.
+
+`NeckPicker` grew a `multi` mode rather than a second component: the cells accumulate a selection
+(cyan, and `aria-pressed`, because nothing has been graded yet and green would read as a verdict),
+and the check button commits it. The button sits *outside* `.fb-stage`, since the verdict is drawn
+over the stage and the button has to stay pressable while the marks it produced are still on the
+neck; it is greyed rather than hidden when nothing is selected, a control that appears on the
+first tap being one nobody knew was coming. `Enter` commits too — the same key that carries on
+past a wrong answer, which is the only other thing this screen asks you to confirm. There are no
+per-cell keys, for `fretFromKey`'s reason: a fret without a string says nothing here.
+
+The heatmap leaves these out exactly as it leaves out `pitch`, and `spreadPositions` keys them on
+the lowest place they cover. Most of what a select-all card leaks about the squares it has just
+had you mark cannot be keyed away by a function with one key per card — holding that run apart
+would be a scheduler of its own.
+
+One more direction token is one more thing a page open across a deploy cannot read; that trade is
+the one the `pitch` section sets out, and it is still accepted rather than fixed for the same
+reason. What protects the forward case protects these too: `loadSettings` filters `directions`
+against `DIRECTIONS`, and `FretboardSession` skips a card it cannot parse.
 
 ### The deck is derived; the answer log is the record
 
