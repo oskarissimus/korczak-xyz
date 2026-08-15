@@ -1,7 +1,7 @@
 ---
-title: Papuga
-slug: papuga
-author: Tradycyjna
+title: Sto psot
+slug: sto-psot
+author: Jacek Skubikowski
 published: true
 language: pl
 dateAdded: 2026-08-15
@@ -87,4 +87,17 @@ Papuga, to papuga!
 Odpowiedź jest niedługa:
     A
 Papuga, papuga!
+
+Ref.:
+    G              D
+Odpowiedź nie jest długa:
+    A          D
+Papuga, to papuga!
+    G             D
+Odpowiedź jest niedługa:
+    A
+Papuga, papuga!
+
+Outro:
+D G D G D h A D
 ```
