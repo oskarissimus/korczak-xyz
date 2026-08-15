@@ -7,13 +7,13 @@ language: pl
 dateAdded: 2026-08-15
 ---
 ```plaintext
-            D
+       D
 1. Sto psot wyprawia kot
    G          D
 Bo koty lubią psoty
-                  e
+
 I żubr, i bóbr, i łoś
-         e      G      A
+    e           A
 Też mogą zbroić coś
      D
 Lecz kto jest mistrzem szkód?
@@ -21,22 +21,22 @@ Lecz kto jest mistrzem szkód?
 Kto szkód odczuwa głód?
 
 Ref.:
-    G              D
+  G                D
 Odpowiedź nie jest długa:
-    A          D
+  A          D
 Papuga, to papuga!
-    G             D
+  G               D
 Odpowiedź jest niedługa:
-    A
+  A
 Papuga, papuga!
 
        D
 2. Być może pies i gęś
-    G        D
+  G          D
 Ponoszą winy część
 
 Lub kiedyś było tak
-   E              A
+   e              A
 Że coś tam zepsuł rak
    D
 No ale, ale, ale
@@ -44,29 +44,29 @@ No ale, ale, ale
 Kto niszczy stale, stale?
 
 Ref.:
-    G              D
+  G                D
 Odpowiedź nie jest długa:
-    A          D
+  A          D
 Papuga, to papuga!
-    G             D
+  G               D
 Odpowiedź jest niedługa:
-    A
+  A
 Papuga, papuga!
 
 Przejście:
 D G D G D h A D
 
-       G            D
-3. Kto ciągle okiem mruga
-     A            D
+    G            D
+Kto ciągle okiem mruga
+  A               D
 Wariata kto wciąż struga
-  G        D
+  G          D
 I czyja to zasługa
    E           A
 Że tata chodzi zły, hm?
 
        D
-4. Być może pies i gęś
+3. Być może pies i gęś
     G        D
 Ponoszą winy część
 
@@ -79,24 +79,25 @@ No ale, ale, ale
 Kto niszczy stale, stale?
 
 Ref.:
-    G              D
+  G                D
 Odpowiedź nie jest długa:
-    A          D
+  A          D
 Papuga, to papuga!
-    G             D
+  G               D
 Odpowiedź jest niedługa:
-    A
+  A
 Papuga, papuga!
 
 Ref.:
-    G              D
+  G                D
 Odpowiedź nie jest długa:
-    A          D
+  A          D
 Papuga, to papuga!
-    G             D
+  G               D
 Odpowiedź jest niedługa:
-    A
+  A
 Papuga, papuga!
+
 
 Outro:
 D G D G D h A D
