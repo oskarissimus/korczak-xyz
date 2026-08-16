@@ -117,10 +117,34 @@
     color: var(--retro-green) !important;
 }
 
-/* Chord line styling - highlighted and bold */
+/* A chord line is positioned in characters: the chord at column N has to land on the
+   character at column N of the lyric line below it. That holds only while the two lines
+   agree on the width of a cell — so nothing here may change the chord line's metrics.
+
+   `font-weight: bold` did. We self-host VT323 at weight 400 only (Layout.astro), so bold
+   is *synthesised*, and WebKit's CoreText backend synthesises it by widening every glyph:
+
+       m_syntheticBoldOffset = syntheticBold() ? size / 36.0f : 0.f;   FontCoreText.cpp
+       setWidth(advance, width(advance) + syntheticBoldOffset);        WidthIterator.cpp
+
+   VT323's cell is 0.40em, so that is 1/14.4 of a cell added per character — a ratio
+   independent of font size. The chord line stretched against the lyrics beneath it and a
+   chord written at column N was drawn at column N x 1.069: half a cell out by column 8,
+   a whole character by column 14, two by column 29. `Sto psot` has D at column 14 of
+   "Bo koty lubia psoty", which is `p`; it drew at 14.97, over the `s`.
+
+   Only Apple devices showed it — Skia and FreeType embolden by stroking the glyph and
+   leave the advance alone, so it was invisible in Chromium and in WebKit on Linux, and
+   visible in Safari and in the installed songbook.
+
+   The weight is kept as paint only. This is what WebKit itself draws for synthetic bold
+   (the glyph again, offset by size/36) minus the part that reaches the layout, so the
+   line looks as it did and measures as the lyrics do. Same trick, same reason, as the
+   boxed marks in chordMarks.css: a glyph's ink may overhang, its advance may not. */
 .blog_post .chord-line {
     color: var(--retro-yellow) !important;
-    font-weight: bold;
+    font-weight: normal;
+    text-shadow: 0.028em 0 currentColor;
 }
 
 /* Remove any prism highlighting backgrounds */
