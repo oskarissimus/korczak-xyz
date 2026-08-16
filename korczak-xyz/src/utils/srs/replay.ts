@@ -19,7 +19,7 @@
  * what distinguishes "these events go on top" from "the fold has to start again".
  */
 
-import { createCard, rate } from './srs';
+import { createCard, rate } from './scheduler';
 import type { Deck, DeckCache, ReviewEvent } from './types';
 
 export function emptyCache(): DeckCache {

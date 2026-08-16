@@ -1,0 +1,30 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import TransposeStats from '../../../../components/Transpose/TransposeStats';
+import TransposeTabs from '../../../../components/Transpose/TransposeTabs.astro';
+import { songLibrary } from '../../../../utils/transpose/collect';
+import { useTranslations } from '../../../../i18n';
+import '../../../../styles/transpose.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+
+const library = await songLibrary();
+---
+
+<Layout title={`${t('Transpose')} | korczak.xyz`} lang={lang} pwa="transpose">
+  <div class="window transpose-window">
+    <div class="title-bar">
+      <span>{t('Transpose')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content transpose-content">
+      <TransposeTabs lang={lang} active="stats" />
+      <TransposeStats client:only="react" lang={lang} library={library} />
+    </div>
+  </div>
+</Layout>

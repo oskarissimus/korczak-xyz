@@ -13,8 +13,8 @@ import {
   spreadPositions,
 } from './deck';
 import { DIRECTIONS, NOTATIONS, parseCardId } from './notes';
-import { DAY, MINUTE, createCard } from './srs';
-import type { Card } from './srs';
+import { DAY, MINUTE, createCard } from '../srs/scheduler';
+import type { Card } from '../srs/scheduler';
 import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 

@@ -1,7 +1,7 @@
 /*
  * Everything the fretboard trainer knows, and how it gets to and from the account.
  *
- * The shape of the sync is described in `src/utils/fretboard/replay.ts`: sittings are immutable
+ * The shape of the sync is described in `src/utils/srs/replay.ts`: sittings are immutable
  * documents, merging them is a union, and the deck is refolded from the result. That leaves this
  * hook with no conflicts to resolve — only an upload queue, a pull, and the bookkeeping that
  * says which sittings have made it.
@@ -16,7 +16,7 @@ import { describeError, log } from '../lib/logger';
 import { loadCloudSettings, pullSessions, pushSession, saveCloudSettings } from '../utils/fretboard/cloud';
 import { cardsInScope, ensureCards, scopeIds } from '../utils/fretboard/deck';
 import type { Notation } from '../utils/fretboard/notes';
-import { emptyCache, reconcileDeck, recordLocal } from '../utils/fretboard/replay';
+import { emptyCache, reconcileDeck, recordLocal } from '../utils/srs/replay';
 import { buildSessionRecord, countBuckets, snapshotMastery } from '../utils/fretboard/stats';
 import {
   addSession,

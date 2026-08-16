@@ -1,0 +1,130 @@
+/*
+ * The two charts on a trainer's progress page — the mastery bands and the accuracy/speed trend —
+ * and the legend that goes under them.
+ *
+ * Shared by the fretboard and transposition trainers the way `tabs.css` is: pulled in by each
+ * game's stylesheet with `@import`, so a page picks it up through the one stylesheet it already
+ * needed. The components live in `src/components/srs/`, which is why the class names are not
+ * either app's prefix.
+ */
+
+.srs-chart {
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 10px 12px;
+}
+
+.srs-chart-grid {
+  stroke: var(--retro-dark-gray);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.srs-chart-axis {
+  stroke: var(--retro-dark-gray);
+  stroke-width: 1;
+}
+
+.srs-chart-tick {
+  fill: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  font-size: 12px;
+}
+
+.srs-band {
+  stroke: none;
+}
+
+/* Both properties on every band: the same class paints an SVG polygon in the
+   chart and an HTML swatch in the legend beneath it, and `fill` does nothing to
+   a <span>. With only `fill` the legend was four empty boxes. */
+.srs-band--mature {
+  fill: #00a000;
+  background-color: #00a000;
+}
+
+.srs-band--young {
+  fill: #0d7d7d;
+  background-color: #0d7d7d;
+}
+
+.srs-band--learning {
+  fill: #8a5a00;
+  background-color: #8a5a00;
+}
+
+.srs-band--new {
+  fill: #2a2a4a;
+  background-color: #2a2a4a;
+}
+
+/* The line is stroked and the markers on it are filled, so the two cannot share a
+   class: one `fill` serves both, and on a <polyline> a fill closes the path back to
+   its first point and floods the area under the trend. `fill="none"` on the element
+   does not save it — a stylesheet beats a presentation attribute — which is how the
+   speed line came to be drawn as a pair of solid yellow triangles. */
+.srs-line {
+  fill: none;
+}
+
+.srs-line--accuracy {
+  stroke: var(--retro-cyan);
+}
+
+.srs-line--speed {
+  stroke: var(--retro-yellow);
+}
+
+.srs-point--accuracy {
+  fill: var(--retro-cyan);
+}
+
+.srs-point--speed {
+  fill: var(--retro-yellow);
+}
+
+.srs-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.srs-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.srs-legend-value {
+  color: var(--retro-black);
+}
+
+.srs-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.srs-swatch--accuracy {
+  background: var(--retro-cyan);
+}
+
+.srs-swatch--speed {
+  background: var(--retro-yellow);
+}
+
+/* The chart panel is black; a legend under it belongs to the panel above, so it
+   keeps the panel's ink rather than the page's. */
+.srs-chart .srs-legend {
+  color: var(--retro-gray);
+}
+
+.srs-chart .srs-legend-value {
+  color: var(--retro-white);
+}

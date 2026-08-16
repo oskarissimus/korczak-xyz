@@ -28,13 +28,13 @@ import {
   stringLabel,
 } from '../../utils/fretboard/notes';
 import type { Notation, NoteName, Position } from '../../utils/fretboard/notes';
-import { createCard, isDueWithin, rate, ratingFromAnswer } from '../../utils/fretboard/srs';
+import { createCard, isDueWithin, rate, ratingFromAnswer } from '../../utils/srs/scheduler';
 import { formatSeconds } from '../../utils/fretboard/stats';
 import type { Deck, ReviewEvent, Settings } from '../../utils/fretboard/types';
 import { NeckPicker } from './NeckGrid';
 import NoteCard from './NoteCard';
 import NotePad from './NotePad';
-import Verdict from './Verdict';
+import Verdict from '../srs/Verdict';
 import { fill, type Translation } from './translations';
 
 /** How long a correct answer stays on screen before the next card. */

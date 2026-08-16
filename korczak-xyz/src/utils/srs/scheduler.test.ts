@@ -8,8 +8,8 @@ import {
   isDue,
   rate,
   ratingFromAnswer,
-} from './srs';
-import type { Card } from './srs';
+} from './scheduler';
+import type { Card } from './scheduler';
 
 const T0 = 1_700_000_000_000;
 

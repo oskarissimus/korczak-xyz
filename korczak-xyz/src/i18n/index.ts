@@ -105,6 +105,8 @@ export const ui = {
     'typing.desc': 'Type through a book',
     'Fretboard': 'Fretboard Trainer',
     'fretboard.desc': 'Learn the notes on the neck',
+    'Transpose': 'Transposition Trainer',
+    'transpose.desc': 'Move chords between keys in your head',
     'TypingStats': 'Typing Stats',
     'TypingKeyStats': 'Key Stats',
     'Solitaire': 'Solitaire',
@@ -155,6 +157,7 @@ export const ui = {
     'pwa.songs.short': 'Songs',
     'pwa.songs.desc': 'Lyrics and chords, available offline',
     'pwa.fretboard.short': 'Fretboard',
+    'pwa.transpose.short': 'Transpose',
     'pwa.babySleep.short': 'Baby Sleep',
     'pwa.offline.title': 'Offline',
     'pwa.offline.heading': 'No connection',
@@ -378,6 +381,8 @@ export const ui = {
     'typing.desc': 'Przepisuj książkę',
     'Fretboard': 'Nuty na gryfie',
     'fretboard.desc': 'Poznaj dźwięki na gryfie',
+    'Transpose': 'Trening transpozycji',
+    'transpose.desc': 'Przenoś akordy między tonacjami w pamięci',
     'TypingStats': 'Statystyki Pisania',
     'TypingKeyStats': 'Statystyki Klawiszy',
     'Solitaire': 'Pasjans',
@@ -429,6 +434,7 @@ export const ui = {
     // "Nuty na gryfie" and "Dziennik snu dziecka" are the full names; iOS truncates a home
     // screen label at about twelve characters, so these two are shortened rather than cut.
     'pwa.fretboard.short': 'Gryf',
+    'pwa.transpose.short': 'Tonacje',
     'pwa.babySleep.short': 'Sen',
     'pwa.offline.title': 'Offline',
     'pwa.offline.heading': 'Brak połączenia',

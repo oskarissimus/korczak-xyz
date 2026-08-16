@@ -53,6 +53,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     shortNameKey: 'pwa.fretboard.short',
     descriptionKey: 'fretboard.desc',
   },
+  transpose: {
+    path: '/games/transpose',
+    nameKey: 'Transpose',
+    shortNameKey: 'pwa.transpose.short',
+    descriptionKey: 'transpose.desc',
+  },
   'baby-sleep': {
     path: '/games/baby-sleep',
     nameKey: 'BabySleep',

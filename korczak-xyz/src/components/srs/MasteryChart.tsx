@@ -10,8 +10,8 @@
  * stood at the end of each day, and a change to the scheduler should not rewrite last month.
  */
 
-import type { Bucket } from '../../utils/fretboard/srs';
-import type { MasterySnapshot } from '../../utils/fretboard/types';
+import type { Bucket } from '../../utils/srs/scheduler';
+import type { MasterySnapshot } from '../../utils/srs/types';
 
 interface MasteryChartProps {
   history: MasterySnapshot[];
@@ -64,12 +64,12 @@ export default function MasteryChart({
   const gridValues = [0.25, 0.5, 0.75, 1].map((f) => f * yMax);
 
   return (
-    <div className="fb-chart">
+    <div className="srs-chart">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={labels.mature}>
         {gridValues.map((v) => (
           <line
             key={v}
-            className="fb-chart-grid"
+            className="srs-chart-grid"
             x1={MARGIN.left}
             x2={WIDTH - MARGIN.right}
             y1={y(v)}
@@ -83,27 +83,27 @@ export default function MasteryChart({
             .map((p, j) => `${x(p.at)},${y(i === 0 ? 0 : edges[j][i - 1])}`)
             .reverse();
           return (
-            <polygon key={band} className={`fb-band fb-band--${band}`} points={[...top, ...bottom].join(' ')} />
+            <polygon key={band} className={`srs-band srs-band--${band}`} points={[...top, ...bottom].join(' ')} />
           );
         })}
 
         <line
-          className="fb-chart-axis"
+          className="srs-chart-axis"
           x1={MARGIN.left}
           x2={WIDTH - MARGIN.right}
           y1={y(0)}
           y2={y(0)}
         />
         {[0, yMax].map((v) => (
-          <text key={v} className="fb-chart-tick" x={MARGIN.left - 6} y={y(v) + 4} textAnchor="end">
+          <text key={v} className="srs-chart-tick" x={MARGIN.left - 6} y={y(v) + 4} textAnchor="end">
             {Math.round(v)}
           </text>
         ))}
-        <text className="fb-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
+        <text className="srs-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
           {formatDate(tMin)}
         </text>
         <text
-          className="fb-chart-tick"
+          className="srs-chart-tick"
           x={WIDTH - MARGIN.right}
           y={HEIGHT - 5}
           textAnchor="end"
@@ -112,12 +112,12 @@ export default function MasteryChart({
         </text>
       </svg>
 
-      <ul className="fb-legend">
+      <ul className="srs-legend">
         {[...BANDS].reverse().map((band) => (
           <li key={band}>
-            <span className={`fb-swatch fb-band--${band}`} aria-hidden="true" />
+            <span className={`srs-swatch srs-band--${band}`} aria-hidden="true" />
             {labels[band]}
-            <span className="fb-legend-value">
+            <span className="srs-legend-value">
               {points[points.length - 1].counts[band] ?? 0}
             </span>
           </li>

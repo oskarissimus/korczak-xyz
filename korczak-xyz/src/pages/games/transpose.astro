@@ -1,0 +1,34 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Transpose from '../../components/Transpose/Transpose';
+import TransposeSkeleton from '../../components/Transpose/skeletons/TransposeSkeleton.astro';
+import TransposeTabs from '../../components/Transpose/TransposeTabs.astro';
+import { songLibrary } from '../../utils/transpose/collect';
+import { useTranslations } from '../../i18n';
+import '../../styles/transpose.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+
+// Read at build time and handed to the island as a prop, so the song texts never ship.
+const library = await songLibrary();
+---
+
+<Layout title={`${t('Transpose')} | korczak.xyz`} lang={lang} pwa="transpose">
+  <div class="window transpose-window">
+    <div class="title-bar">
+      <span>{t('Transpose')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content transpose-content">
+      <TransposeTabs lang={lang} active="practice" />
+      <Transpose client:only="react" lang={lang} library={library}>
+        <TransposeSkeleton slot="fallback" lang={lang} />
+      </Transpose>
+    </div>
+  </div>
+</Layout>

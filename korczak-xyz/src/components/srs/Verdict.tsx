@@ -24,9 +24,9 @@ export default function Verdict({ correct }: VerdictProps) {
   return (
     /* aria-hidden throughout: `.fb-feedback` is the live region, and it says the same thing in
        words. Announcing it twice is worse than not drawing it at all. */
-    <span className="fb-verdict-overlay" aria-hidden="true">
+    <span className="srs-verdict-overlay" aria-hidden="true">
       <svg
-        className={`fb-verdict-mark ${correct ? 'fb-verdict-mark--ok' : 'fb-verdict-mark--bad'}`}
+        className={`srs-verdict-mark ${correct ? 'srs-verdict-mark--ok' : 'srs-verdict-mark--bad'}`}
         viewBox="0 0 100 100"
         focusable="false"
       >

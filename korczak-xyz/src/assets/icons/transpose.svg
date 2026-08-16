@@ -1,0 +1,68 @@
+<!--
+  Home screen icon for the Transposition Trainer web app - "Two keys on glass".
+
+  Source art for scripts/generate-icons.mjs. Same body, bezel and sunken glass as the other three,
+  so the suite reads as one - with the face showing what the app asks: a chord in one key, an arrow,
+  the same chord in another. Two letters and an arrow survive 60px on a home screen where a circle
+  of fifths would collapse into speckle. Full bleed on the same terms as the others, including the
+  note there about keeping this comment short.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="t1-body" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b6bff"/>
+      <stop offset=".5" stop-color="#1220b4"/>
+      <stop offset=".52" stop-color="#000f8c"/>
+      <stop offset="1" stop-color="#00003c"/>
+    </linearGradient>
+    <linearGradient id="t1-bezel" x1="0" y1="64" x2="0" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".22" stop-color="#dcdcdc"/>
+      <stop offset=".75" stop-color="#a8a8a8"/>
+      <stop offset="1" stop-color="#6e6e6e"/>
+    </linearGradient>
+    <linearGradient id="t1-gloss" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".07"/>
+    </linearGradient>
+    <radialGradient id="t1-vig" cx="256" cy="256" r="330" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".4"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#t1-body)"/>
+
+  <rect x="56" y="56" width="400" height="400" rx="52" fill="#000" opacity=".35"/>
+  <rect x="52" y="52" width="400" height="400" rx="52" fill="url(#t1-bezel)"/>
+  <path d="M52 104a52 52 0 0 1 52-52h296a52 52 0 0 1 52 52 40 40 0 0 0-40-32H92a40 40 0 0 0-40 32Z" fill="#fff" opacity=".85"/>
+
+  <rect x="88" y="88" width="328" height="328" rx="32" fill="#040404"/>
+  <path d="M88 128a40 40 0 0 1 40-40h256a40 40 0 0 1 40 40 20 20 0 0 0-20-20H108a20 20 0 0 0-20 20Z" fill="#6a6a6a"/>
+
+  <!--
+    A, then C: the app's own example, in the app's own colours - yellow for the chord you are
+    reading, green for the one you produced. Drawn as paths rather than <text>, because an icon
+    rendered by sharp has no fonts to reach for and a missing VT323 would leave a blank screen.
+  -->
+  <g fill="#ffe14d">
+    <!-- A -->
+    <path d="M139 316 173 158h30l34 158h-33l-6-33h-30l-6 33Zm44-64h20l-10-55Z"/>
+  </g>
+
+  <!-- The arrow: what the whole app is, drawn once. -->
+  <path d="M198 358h84v-22l40 33-40 33v-22h-84Z" fill="#c8c8c8"/>
+
+  <g fill="#22ff44">
+    <!-- C -->
+    <path d="M292 237c0-52 24-83 60-83 33 0 55 26 57 68h-33c-2-24-11-37-24-37-17 0-27 20-27 52s10 52 27 52c13 0 22-13 24-37h33c-2 42-24 68-57 68-36 0-60-31-60-83Z"/>
+  </g>
+
+  <!-- Glass sheen across the screen. -->
+  <path d="M88 120a32 32 0 0 1 32-32h264a32 32 0 0 1 32 32v56c-90 44-238 44-328 0Z" fill="#fff" opacity=".12"/>
+  <rect x="88" y="88" width="328" height="328" rx="32" fill="none" stroke="#000" stroke-opacity=".8" stroke-width="6"/>
+
+  <path d="M0 512h512v-72c-80-72-432-72-512 0Z" fill="#fff" opacity=".07"/>
+  <path d="M0 0h512v206c-90 92-422 92-512 0Z" fill="url(#t1-gloss)"/>
+  <rect width="512" height="512" fill="url(#t1-vig)"/>
+</svg>

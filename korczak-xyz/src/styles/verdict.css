@@ -1,0 +1,71 @@
+/*
+ * The maru/batsu pair drawn over the box a card is answered in.
+ *
+ * Shared by both trainers through `@import`, as `tabs.css` is, because the component that draws it
+ * is (`src/components/srs/Verdict.tsx`). The written verdict beneath a card is a different thing
+ * with different classes and stays with each game.
+ */
+
+.srs-verdict-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The neck under it is still a control — the answer marks are on it, and the
+     next card re-enables its buttons. */
+  pointer-events: none;
+}
+
+/* Sized off the box rather than in pixels, so it is the same gesture on a 320px
+   phone and on a desktop: one mark across the middle of the card. The shadow is
+   what carries it over both the navy and the marks it crosses, the ring being
+   unfilled on purpose.
+
+   Both caps are load-bearing, and the neck is why. It is nearly square at 320px,
+   so a mark sized off its height alone comes out as wide as two frets and sits on
+   the very cells that carry the rest of the answer — which fret was right, which
+   one was pressed. `max-width` bounds it from the other side; the drawing stays
+   circular whatever box it lands in, being an SVG with a viewBox that is centred
+   and scaled to fit rather than stretched. */
+.srs-verdict-mark {
+  flex: none;
+  width: auto;
+  height: 58%;
+  min-height: 60px;
+  max-height: 124px;
+  max-width: 60%;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.85));
+  animation: srs-verdict-pop 140ms ease-out;
+}
+
+.srs-verdict-mark--ok {
+  color: var(--retro-green);
+}
+
+/* Not --retro-red: #ff0000 on #000080 is two dark colours, and the ring reads as
+   muddy at a glance. This is the same hue lifted until it separates from the
+   panel the way the green does. */
+.srs-verdict-mark--bad {
+  color: #ff4d4d;
+}
+
+/* Well over inside the 700ms a correct card stays up: the point is to catch the
+   eye arriving, not to be watched. */
+@keyframes srs-verdict-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .srs-verdict-mark {
+    animation: none;
+  }
+}

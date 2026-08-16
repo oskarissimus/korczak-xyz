@@ -1,0 +1,718 @@
+/* Transposition Trainer — retro theme */
+
+@import './tabs.css';
+@import './verdict.css';
+@import './srsCharts.css';
+
+.transpose-window {
+  margin-bottom: 20px;
+}
+
+/* Same reasoning as the fretboard and typing trainers: this is a property sheet,
+   not a page in a teal window, so the content area is the panel face and the ink
+   has to be reset along with the surface. */
+.transpose-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.tp-start,
+.tp-session,
+.tp-summary,
+.tp-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+  font-family: 'VT323', monospace;
+}
+
+.tp-loading,
+.tp-empty,
+.tp-hint {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.tp-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  font-weight: normal;
+  margin: 0 0 8px;
+  color: var(--retro-black);
+}
+
+/* --- figures ------------------------------------------------------------- */
+
+.tp-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tp-tile {
+  flex: 1 1 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--retro-gray);
+  border: 2px inset var(--retro-white);
+}
+
+.tp-tile-value {
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--retro-black);
+}
+
+.tp-tile-of {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.tp-tile-label {
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+  text-align: center;
+}
+
+/* --- buttons ------------------------------------------------------------- */
+
+.tp-btn {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  /* Win95 buttons size from their box, not their font metrics; VT323's leading
+     otherwise adds a few stray pixels under the label. */
+  line-height: 1;
+  padding: 8px 16px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 3px outset var(--retro-white);
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The button is a flex container, so a whitespace-only text node between its
+     children is not rendered at all — `Check 4/4` came out `Check4/4`. The gap is
+     what puts the space back, and it costs nothing on the buttons with one child. */
+  gap: 6px;
+}
+
+/* Hover is gated on there being a pointer that can hover. A touchscreen has none:
+   it applies `:hover` on tap and holds it until something else is tapped, so a
+   chord button you just pressed goes on looking pressed under the next card. */
+@media (hover: hover) {
+  .tp-btn:hover {
+    background: #a0a0a0;
+  }
+}
+
+.tp-btn:active {
+  border-style: inset;
+}
+
+.tp-btn:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: -6px;
+}
+
+.tp-btn--primary {
+  background: var(--retro-teal);
+  color: var(--retro-white);
+}
+
+@media (hover: hover) {
+  .tp-btn--primary:hover {
+    background: #0a8f8f;
+  }
+}
+
+.tp-btn--big {
+  font-size: 1.5rem;
+  padding: 12px 28px;
+}
+
+.tp-btn--quiet {
+  font-size: 1rem;
+  padding: 4px 10px;
+  border-width: 2px;
+}
+
+/* The check button is disabled at both ends of a card: before enough chords are
+   picked, and again once it is graded. Greyed rather than hidden, the way a Win95
+   dialog greys what is not available yet — a control that appears on the first tap
+   is one nobody knew was coming. It has to outrank `--primary` (which is why it
+   names the class as well) and the global `button:hover` in Layout.astro. */
+.tp-btn:disabled,
+.tp-btn:disabled:hover {
+  background: var(--retro-gray);
+  color: var(--retro-dark-gray);
+  cursor: default;
+}
+
+.tp-check-count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.tp-link {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tp-actions,
+.tp-start-actions,
+.tp-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tp-caught-up {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--retro-black);
+}
+
+.tp-next-due {
+  color: var(--retro-dark-gray);
+}
+
+/* --- the card ------------------------------------------------------------ */
+
+.tp-session-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+.tp-session-bar .tp-btn {
+  margin-left: auto;
+}
+
+.tp-counter strong {
+  color: var(--retro-black);
+  font-weight: normal;
+}
+
+/* The question. Wraps onto its own lines on a phone rather than shrinking, since
+   the chords in it are the thing being read. */
+.tp-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--retro-black);
+}
+
+.tp-prompt-lead {
+  color: var(--retro-dark-gray);
+}
+
+.tp-prompt-key,
+.tp-prompt-degrees {
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--retro-navy);
+}
+
+.tp-prompt-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tp-arrow {
+  font-size: 1.6rem;
+  color: var(--retro-dark-gray);
+}
+
+/* --- the slots ------------------------------------------------------------ */
+
+/* The question row and the answer row are the same object at two moments — a
+   chord in a fixed position in a progression — so they are one component and one
+   base rule, and only the surface differs. */
+.tp-slots {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.tp-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-family: 'VT323', monospace;
+  line-height: 1;
+}
+
+.tp-slot-chord {
+  /* Reserves a line of its own height whether or not there is a chord in it, so
+     filling a slot never moves the row it is in. */
+  min-height: 1em;
+}
+
+.tp-slot-numeral {
+  font-size: 0.9rem;
+  color: var(--retro-dark-gray);
+}
+
+/* The question row is the songbook's own surface — green on navy, sunken — because
+   what it shows is a chord chart, and the songbook is where these came from. */
+.tp-slots--question .tp-slot {
+  min-width: 3.4em;
+  padding: 6px 10px;
+  font-size: 1.7rem;
+  background: var(--retro-navy);
+  border: 3px inset var(--retro-dark-gray);
+  color: var(--retro-green);
+}
+
+/* The answer row is a set of fields: sunken, empty until filled. */
+.tp-slots--answer .tp-slot {
+  min-width: 3.6em;
+  /* A touch target, since a filled slot is how a chord is taken back. */
+  min-height: 56px;
+  padding: 6px 10px;
+  font-size: 1.8rem;
+  background: var(--retro-white);
+  border: 3px inset var(--retro-dark-gray);
+  color: var(--retro-black);
+}
+
+.tp-slots--answer .tp-slot--empty {
+  background: #e4e4e4;
+  color: var(--retro-dark-gray);
+}
+
+/* Which slot the next tap lands in. A dotted inner ring rather than a colour: the
+   colours on this row are reserved for the verdict, and a slot that looked green
+   before anything was graded would read as an answer. */
+.tp-slots--answer .tp-slot--active {
+  outline: 2px dotted var(--retro-navy);
+  outline-offset: -6px;
+}
+
+/* The verdict colours have to name the row as well as the state. The base rule
+   above is `.tp-slots--answer .tp-slot` at (0,2,0), so a bare `.tp-slot--wrong`
+   at (0,1,0) loses to it and every graded slot stayed white — which is the whole
+   of what an all-or-nothing card has to say, since knowing *which* chord went
+   wrong is most of what there is to learn from a missed one.
+
+   Each state then names itself twice more, and the `:hover` twin is not
+   decoration. Layout.astro carries a global `button:hover { background: #a0a0a0 }`
+   and (0,1,1) outranks a single class, so the one slot the pointer was on — the
+   one whose colour *is* the verdict — went flat grey and stayed grey until the
+   mouse moved. It looked right on a phone; on a mouse the verdict was the only
+   thing you could not see. Exactly the pair the fretboard's pad keys carry. */
+.tp-slots--answer .tp-slot--right,
+.tp-slots--answer .tp-slot--right:hover,
+.tp-slots--answer .tp-slot--right .tp-slot-btn,
+.tp-slots--answer .tp-slot--right .tp-slot-btn:hover {
+  background: var(--retro-green);
+  color: var(--retro-black);
+}
+
+.tp-slots--answer .tp-slot--wrong,
+.tp-slots--answer .tp-slot--wrong:hover,
+.tp-slots--answer .tp-slot--wrong .tp-slot-btn,
+.tp-slots--answer .tp-slot--wrong .tp-slot-btn:hover {
+  background: var(--retro-magenta);
+  color: var(--retro-white);
+}
+
+/* The numeral rides the slot's own ink once graded, or it stays grey on magenta. */
+.tp-slots--answer .tp-slot--right .tp-slot-numeral,
+.tp-slots--answer .tp-slot--wrong .tp-slot-numeral {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* The button fills the slot rather than sitting inside it: the whole field is the
+   target, because that is where the mistake you are taking back is. */
+.tp-slot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  margin: -6px -10px;
+  padding: 6px 10px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* --- major / minor -------------------------------------------------------- */
+
+.tp-mode-row {
+  display: flex;
+  gap: 6px;
+}
+
+.tp-mode-key {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  line-height: 1;
+  min-height: 44px;
+  padding: 8px 18px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .tp-mode-key:hover:not(:disabled) {
+    background: #a0a0a0;
+  }
+}
+
+.tp-mode-key--on {
+  border-style: inset;
+  background: var(--retro-cyan);
+  color: var(--retro-black);
+}
+
+.tp-mode-key--right,
+.tp-mode-key--right:hover {
+  background: var(--retro-green);
+  color: var(--retro-black);
+  border-style: inset;
+}
+
+.tp-mode-key--wrong,
+.tp-mode-key--wrong:hover {
+  background: var(--retro-magenta);
+  color: var(--retro-white);
+  border-style: inset;
+}
+
+/* --- the chord pad -------------------------------------------------------- */
+
+.tp-pad {
+  display: grid;
+  /* Six wide on anything roomy, three on a phone — the twelve keys stay a block
+     rather than a ragged wrap, so the same chord is always in the same place. */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+@media (min-width: 480px) {
+  .tp-pad {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+.tp-pad-key {
+  font-family: 'VT323', monospace;
+  font-size: 1.25rem;
+  line-height: 1;
+  /* Comfortably past the 44px touch target: this is the control the whole game is
+     played with. */
+  min-height: 52px;
+  padding: 6px 4px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .tp-pad-key:hover:not(:disabled) {
+    background: #a0a0a0;
+  }
+}
+
+.tp-pad-key:active:not(:disabled) {
+  border-style: inset;
+}
+
+.tp-pad-key:disabled {
+  cursor: default;
+}
+
+/* The `:hover` twins, for the reason spelt out on the slots above. */
+.tp-pad-key--right,
+.tp-pad-key--right:hover {
+  background: var(--retro-green);
+  color: var(--retro-black);
+  border-style: inset;
+}
+
+.tp-pad-key--wrong,
+.tp-pad-key--wrong:hover {
+  background: var(--retro-magenta);
+  color: var(--retro-white);
+  border-style: inset;
+}
+
+/* --- the verdict beside the answer row ------------------------------------ */
+
+.tp-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+}
+
+/* Beside the slots, not over them — the one place this trainer parts company with
+   the fretboard's verdict.
+
+   There the mark is drawn over the neck because the neck is large and the marks
+   under it are small dots. Here the answer row is three or four short fields and
+   *every one of them is the answer*: an all-or-nothing card's whole job is saying
+   which chord went wrong, and a mark centred on a three-slot row lands squarely on
+   the middle one. So the overlay is unpositioned and becomes a flex item at the end
+   of the row, sized in pixels rather than as a share of a box it no longer fills. */
+.tp-stage .srs-verdict-overlay {
+  position: static;
+  flex: none;
+}
+
+.tp-stage .srs-verdict-mark {
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  max-width: none;
+}
+
+/* --- feedback ------------------------------------------------------------- */
+
+/* Reserves its own height: the verdict arrives after the answer, and a row that
+   appears from nothing shifts the pad out from under the thumb that is about to
+   press it again. */
+.tp-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 1.2rem;
+}
+
+.tp-verdict--ok {
+  color: #007000;
+}
+
+.tp-verdict--bad {
+  color: #a00050;
+}
+
+.tp-answer {
+  color: var(--retro-black);
+}
+
+.tp-time {
+  color: var(--retro-dark-gray);
+  margin-left: auto;
+}
+
+/* The songbook line under a graded card. Quiet: it is context, not the answer. */
+.tp-songs {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--retro-dark-gray);
+}
+
+.tp-songs em {
+  color: var(--retro-navy);
+  font-style: normal;
+}
+
+/* --- summary -------------------------------------------------------------- */
+
+.tp-summary-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.8rem;
+  font-weight: normal;
+  margin: 0;
+}
+
+.tp-missed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 1.1rem;
+}
+
+.tp-missed-count {
+  color: var(--retro-dark-gray);
+}
+
+/* --- settings ------------------------------------------------------------- */
+
+.tp-settings {
+  padding: 12px;
+  background: var(--retro-gray);
+  border: 2px groove var(--retro-white);
+}
+
+.tp-setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tp-setting-label {
+  flex: 0 0 auto;
+  min-width: 7.5em;
+  font-size: 1.1rem;
+}
+
+.tp-setting-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tp-choice {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  line-height: 1;
+  min-height: 32px;
+  padding: 6px 10px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 2px outset var(--retro-white);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .tp-choice:hover {
+    background: #a0a0a0;
+  }
+}
+
+/* A pressed button is the state: sunken, and darker so it reads as chosen rather
+   than merely clicked. */
+.tp-choice--on {
+  border-style: inset;
+  background: var(--retro-teal);
+  color: var(--retro-white);
+}
+
+.tp-choice:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: -5px;
+}
+
+/* --- sync ----------------------------------------------------------------- */
+
+.tp-sync {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.tp-sync--quiet {
+  color: var(--retro-dark-gray);
+}
+
+.tp-sync--ok {
+  color: #007000;
+}
+
+.tp-sync--error {
+  color: #a00050;
+}
+
+/* --- stats ---------------------------------------------------------------- */
+
+.tp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.tp-table th,
+.tp-table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid #d0d0d0;
+}
+
+.tp-table th:first-child,
+.tp-table td:first-child {
+  text-align: left;
+}
+
+.tp-table thead th {
+  background: var(--retro-gray);
+  font-weight: normal;
+  color: var(--retro-dark-gray);
+  border-bottom: 2px solid var(--retro-dark-gray);
+}
+
+.tp-table tbody th {
+  font-weight: normal;
+}
+
+.tp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* The bucket chip in the by-key table, in the same four colours the mastery chart
+   bands use — so a row and the chart above it say the same thing the same way. */
+.tp-bucket {
+  display: inline-block;
+  padding: 1px 8px;
+  color: var(--retro-white);
+}
+
+.tp-bucket--new {
+  background: #2a2a4a;
+}
+
+.tp-bucket--learning {
+  background: #8a5a00;
+}
+
+.tp-bucket--young {
+  background: #0d7d7d;
+}
+
+.tp-bucket--mature {
+  background: #00a000;
+}

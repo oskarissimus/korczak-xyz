@@ -7,7 +7,7 @@
  * so the tick labels carry their unit rather than leaving the reader to guess.
  */
 
-import type { DayStats } from '../../utils/fretboard/stats';
+import type { DayStats } from '../../utils/srs/history';
 
 interface TrendChartProps {
   days: DayStats[];
@@ -43,12 +43,12 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
   const showMarkers = days.length <= MAX_MARKERS;
 
   return (
-    <div className="fb-chart">
+    <div className="srs-chart">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={labels.accuracy}>
         {[25, 50, 75, 100].map((v) => (
           <line
             key={v}
-            className="fb-chart-grid"
+            className="srs-chart-grid"
             x1={MARGIN.left}
             x2={WIDTH - MARGIN.right}
             y1={yPct(v)}
@@ -56,7 +56,7 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
           />
         ))}
         <line
-          className="fb-chart-axis"
+          className="srs-chart-axis"
           x1={MARGIN.left}
           x2={WIDTH - MARGIN.right}
           y1={yPct(0)}
@@ -64,14 +64,14 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
         />
 
         {[0, 50, 100].map((v) => (
-          <text key={v} className="fb-chart-tick" x={MARGIN.left - 6} y={yPct(v) + 4} textAnchor="end">
+          <text key={v} className="srs-chart-tick" x={MARGIN.left - 6} y={yPct(v) + 4} textAnchor="end">
             {v}
           </text>
         ))}
         {[0, secondsMax].map((v) => (
           <text
             key={v}
-            className="fb-chart-tick fb-chart-tick--right"
+            className="srs-chart-tick srs-chart-tick--right"
             x={WIDTH - MARGIN.right + 6}
             y={ySec(v) + 4}
             textAnchor="start"
@@ -83,12 +83,12 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
         {!single && (
           <>
             <polyline
-              className="fb-line fb-line--speed"
+              className="srs-line srs-line--speed"
               strokeWidth={2}
               points={speed.map((p) => `${p.x},${p.y}`).join(' ')}
             />
             <polyline
-              className="fb-line fb-line--accuracy"
+              className="srs-line srs-line--accuracy"
               strokeWidth={2}
               points={accuracy.map((p) => `${p.x},${p.y}`).join(' ')}
             />
@@ -97,34 +97,34 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
 
         {showMarkers &&
           speed.map((p) => (
-            <circle key={`s${p.d.day}`} className="fb-point--speed" cx={p.x} cy={p.y} r={3}>
+            <circle key={`s${p.d.day}`} className="srs-point--speed" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${(p.d.avgMs / 1000).toFixed(1)}s`}</title>
             </circle>
           ))}
         {showMarkers &&
           accuracy.map((p) => (
-            <circle key={`a${p.d.day}`} className="fb-point--accuracy" cx={p.x} cy={p.y} r={3}>
+            <circle key={`a${p.d.day}`} className="srs-point--accuracy" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${Math.round(p.d.accuracy * 100)}% (${p.d.answers})`}</title>
             </circle>
           ))}
 
-        <text className="fb-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
+        <text className="srs-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
           {formatDate(tMin)}
         </text>
         {!single && (
-          <text className="fb-chart-tick" x={WIDTH - MARGIN.right} y={HEIGHT - 5} textAnchor="end">
+          <text className="srs-chart-tick" x={WIDTH - MARGIN.right} y={HEIGHT - 5} textAnchor="end">
             {formatDate(tMax)}
           </text>
         )}
       </svg>
 
-      <ul className="fb-legend">
+      <ul className="srs-legend">
         <li>
-          <span className="fb-swatch fb-swatch--accuracy" aria-hidden="true" />
+          <span className="srs-swatch srs-swatch--accuracy" aria-hidden="true" />
           {labels.accuracy}
         </li>
         <li>
-          <span className="fb-swatch fb-swatch--speed" aria-hidden="true" />
+          <span className="srs-swatch srs-swatch--speed" aria-hidden="true" />
           {labels.seconds}
         </li>
       </ul>

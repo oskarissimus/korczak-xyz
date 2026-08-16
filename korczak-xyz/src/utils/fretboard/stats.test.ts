@@ -11,8 +11,8 @@ import {
   snapshotMastery,
   summarizeSession,
 } from './stats';
-import { createCard } from './srs';
-import type { Card } from './srs';
+import { createCard } from '../srs/scheduler';
+import type { Card } from '../srs/scheduler';
 import type { Deck, MasterySnapshot, ReviewEvent, SessionRecord } from './types';
 
 const DAY = 86_400_000;

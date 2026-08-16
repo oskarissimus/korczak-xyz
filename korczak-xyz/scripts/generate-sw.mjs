@@ -45,6 +45,7 @@ const SHELL_ROUTES = ['/', '/pl', '/games/tuner', '/pl/games/tuner', '/songs', '
 const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
   fretboard: /^(\/pl)?\/games\/fretboard(\/|$)/,
+  transpose: /^(\/pl)?\/games\/transpose(\/|$)/,
   'baby-sleep': /^(\/pl)?\/games\/baby-sleep(\/|$)/,
 };
 

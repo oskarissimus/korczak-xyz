@@ -1,11 +1,24 @@
-import type { Direction, Notation } from './notes';
-import type { Bucket, Card, Rating } from './srs';
-
-/**
- * The deck, keyed by card id — `${direction}:${stringIndex}-${fret}`, plus `:b` on a flat card
- * and `:de` on a German-notation one.
+/*
+ * What the fretboard trainer stores, on top of the record shapes every trainer here shares.
+ *
+ * The deck, the review log, the session history and the mastery snapshots are the same shapes in
+ * both trainers and live in `src/utils/srs/types.ts`; they are re-exported so the rest of this
+ * app has one place to import its types from. What is genuinely the fretboard's own is `Settings`
+ * — a scope made of strings and frets, which no other deck has.
  */
-export type Deck = Record<string, Card>;
+
+import type { Direction, Notation } from './notes';
+
+export type {
+  Bucket,
+  Card,
+  Deck,
+  DeckCache,
+  MasterySnapshot,
+  Rating,
+  ReviewEvent,
+  SessionRecord,
+} from '../srs/types';
 
 export interface Settings {
   /** Highest fret in the deck. Everything from the open string up to it is in scope. */
@@ -53,57 +66,5 @@ export function defaultSettings(notation: Notation): Settings {
   return { ...DEFAULT_SETTINGS, notations: [notation] };
 }
 
-/**
- * One answer.
- *
- * These are the record. Card state is a fold of them, which is what lets two devices merge by
- * unioning their logs instead of picking a winner — see `replay.ts`. So an event is immutable
- * once written, and `id` has to be unique across devices: `${sessionId}-${ordinal}`, where the
- * session id already carries a random suffix.
- */
-export interface ReviewEvent {
-  id: string;
-  sessionId: string;
-  cardId: string;
-  at: number; // epoch ms
-  ms: number; // time to answer
-  correct: boolean;
-  rating: Rating;
-  /** What the player chose: a note name for `name` cards, a fret for `find` cards. */
-  answered: string;
-}
 
-/** What a finished sitting is remembered by. */
-export interface SessionRecord {
-  id: string;
-  startedAt: number;
-  endedAt: number;
-  answers: number; // answers given, counting in-session repeats
-  correct: number;
-  totalMs: number; // time spent answering, not wall clock
-  cards: number; // distinct cards seen
-  newIntroduced: number;
-  masteredAfter: number; // mature cards in the deck when the sitting ended
-}
 
-/** A day's end-state, so mastery can be charted without replaying every answer. */
-export interface MasterySnapshot {
-  day: string; // YYYY-MM-DD, local
-  at: number; // epoch ms of the last update that day
-  counts: Record<Bucket, number>;
-}
-
-/**
- * The deck cache.
- *
- * Derived state, kept because the events it was folded from may have been pruned. `foldedThrough`
- * is the timestamp of the newest event already in it — everything newer can be folded on top,
- * and anything older arriving from another device means the fold has to start again.
- */
-export interface DeckCache {
-  version: 1;
-  deck: Deck;
-  foldedThrough: number;
-  /** Whether the local event log still holds every event the deck was folded from. */
-  logComplete: boolean;
-}

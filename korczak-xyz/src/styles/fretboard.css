@@ -2,6 +2,8 @@
 
 @import './tabs.css';
 @import './chordMarks.css';
+@import './verdict.css';
+@import './srsCharts.css';
 
 .fretboard-window {
   margin-bottom: 20px;
@@ -505,70 +507,6 @@
   max-width: 100%;
 }
 
-.fb-verdict-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* The neck under it is still a control — the answer marks are on it, and the
-     next card re-enables its buttons. */
-  pointer-events: none;
-}
-
-/* Sized off the box rather than in pixels, so it is the same gesture on a 320px
-   phone and on a desktop: one mark across the middle of the card. The shadow is
-   what carries it over both the navy and the marks it crosses, the ring being
-   unfilled on purpose.
-
-   Both caps are load-bearing, and the neck is why. It is nearly square at 320px,
-   so a mark sized off its height alone comes out as wide as two frets and sits on
-   the very cells that carry the rest of the answer — which fret was right, which
-   one was pressed. `max-width` bounds it from the other side; the drawing stays
-   circular whatever box it lands in, being an SVG with a viewBox that is centred
-   and scaled to fit rather than stretched. */
-.fb-verdict-mark {
-  flex: none;
-  width: auto;
-  height: 58%;
-  min-height: 60px;
-  max-height: 124px;
-  max-width: 60%;
-  aspect-ratio: 1;
-  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.85));
-  animation: fb-verdict-pop 140ms ease-out;
-}
-
-.fb-verdict-mark--ok {
-  color: var(--retro-green);
-}
-
-/* Not --retro-red: #ff0000 on #000080 is two dark colours, and the ring reads as
-   muddy at a glance. This is the same hue lifted until it separates from the
-   panel the way the green does. */
-.fb-verdict-mark--bad {
-  color: #ff4d4d;
-}
-
-/* Well over inside the 700ms a correct card stays up: the point is to catch the
-   eye arriving, not to be watched. */
-@keyframes fb-verdict-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fb-verdict-mark {
-    animation: none;
-  }
-}
-
 /* --- feedback ------------------------------------------------------------ */
 
 /* Reserves its own height: the verdict arrives after the answer, and a row that
@@ -707,127 +645,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.fb-chart {
-  background: var(--retro-black);
-  border: 2px inset var(--retro-dark-gray);
-  padding: 10px 12px;
-}
-
-.fb-chart-grid {
-  stroke: var(--retro-dark-gray);
-  stroke-width: 1;
-  stroke-dasharray: 2 3;
-}
-
-.fb-chart-axis {
-  stroke: var(--retro-dark-gray);
-  stroke-width: 1;
-}
-
-.fb-chart-tick {
-  fill: var(--retro-gray);
-  font-family: 'VT323', monospace;
-  font-size: 12px;
-}
-
-.fb-band {
-  stroke: none;
-}
-
-/* Both properties on every band: the same class paints an SVG polygon in the
-   chart and an HTML swatch in the legend beneath it, and `fill` does nothing to
-   a <span>. With only `fill` the legend was four empty boxes. */
-.fb-band--mature {
-  fill: #00a000;
-  background-color: #00a000;
-}
-
-.fb-band--young {
-  fill: #0d7d7d;
-  background-color: #0d7d7d;
-}
-
-.fb-band--learning {
-  fill: #8a5a00;
-  background-color: #8a5a00;
-}
-
-.fb-band--new {
-  fill: #2a2a4a;
-  background-color: #2a2a4a;
-}
-
-/* The line is stroked and the markers on it are filled, so the two cannot share a
-   class: one `fill` serves both, and on a <polyline> a fill closes the path back to
-   its first point and floods the area under the trend. `fill="none"` on the element
-   does not save it — a stylesheet beats a presentation attribute — which is how the
-   speed line came to be drawn as a pair of solid yellow triangles. */
-.fb-line {
-  fill: none;
-}
-
-.fb-line--accuracy {
-  stroke: var(--retro-cyan);
-}
-
-.fb-line--speed {
-  stroke: var(--retro-yellow);
-}
-
-.fb-point--accuracy {
-  fill: var(--retro-cyan);
-}
-
-.fb-point--speed {
-  fill: var(--retro-yellow);
-}
-
-.fb-legend {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 6px 0 0;
-  padding: 0;
-  font-size: 1rem;
-  color: var(--retro-dark-gray);
-}
-
-.fb-legend li {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.fb-legend-value {
-  color: var(--retro-black);
-}
-
-.fb-swatch {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--retro-dark-gray);
-}
-
-.fb-swatch--accuracy {
-  background: var(--retro-cyan);
-}
-
-.fb-swatch--speed {
-  background: var(--retro-yellow);
-}
-
-/* The chart panel is black; a legend under it belongs to the panel above, so it
-   keeps the panel's ink rather than the page's. */
-.fb-chart .fb-legend {
-  color: var(--retro-gray);
-}
-
-.fb-chart .fb-legend-value {
-  color: var(--retro-white);
 }
 
 /* --- history table ------------------------------------------------------- */

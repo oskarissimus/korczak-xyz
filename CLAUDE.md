@@ -210,10 +210,18 @@ is what makes the per-position accuracy and speed on the stats page measurements
 claims. `srs.ts` is Anki's shape: minute-scale learning steps (1m, 10m) before day-scale
 intervals, relearning after a lapse, mature at ≥21 days.
 
-- `src/utils/fretboard/` — `notes.ts` (tuning, card ids), `diagram.ts`, `srs.ts`, `deck.ts`
-  (scope and queue), `replay.ts` (sync core), `stats.ts`, `storage.ts`, `cloud.ts`, `keys.ts`
+- `src/utils/srs/` — **shared with the transposition trainer**: `scheduler.ts` (SM-2, was
+  `fretboard/srs.ts`), `replay.ts` (the merge core), `types.ts` (the record shapes), `queue.ts`
+  (selection and running order), `history.ts` (summaries and snapshots), `storage.ts`
+  (`createSrsStorage`), `cloud.ts` (`createSrsCloud`). See *Two trainers, one scheduler* below.
+- `src/utils/fretboard/` — what is about a neck: `notes.ts` (tuning, card ids), `diagram.ts`,
+  `deck.ts` (scope, `spreadPositions`), `stats.ts` (the heatmap), `storage.ts`, `cloud.ts`,
+  `keys.ts`
 - `src/hooks/useFretboardData.ts` — local state, upload queue, pull and merge
 - `src/components/Fretboard/` — the two islands and their parts
+- `src/components/srs/` — `Verdict.tsx`, `MasteryChart.tsx`, `TrendChart.tsx`, shared with the
+  transposition trainer; their styles are `verdict.css` and `srsCharts.css`, pulled in by each
+  game's stylesheet with `@import` the way `tabs.css` is
 
 ### A black key is two `find` cards, one per spelling
 
@@ -575,6 +583,143 @@ The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (
 `.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through
 the one stylesheet it already needed.
 
+## Two trainers, one scheduler
+
+`src/utils/srs/` is what the fretboard and transposition trainers genuinely share, and the line is
+drawn at **what does not know what a card is**. A card id is an opaque string in every file there;
+each app owns its own grammar for it and its own parser, and nothing in that directory ever looks
+inside one.
+
+- `scheduler.ts` — SM-2 with learning steps. Pure, takes `now`, which is what makes the deck a fold.
+- `replay.ts` — union by id, refold. The whole argument is in its header.
+- `queue.ts` — `buildQueue`, `requeue`, `spreadBy`. Selection by due date, order by shuffle.
+- `history.ts` — `summarizeSession` takes a `directionOf` callback rather than a parser, which is
+  the one place the split needed a seam.
+- `storage.ts` / `cloud.ts` — **factories**, not modules of functions. `createSrsStorage(prefix)`
+  is per instance so the two decks cannot evict each other's event log under quota pressure, which
+  a shared `failingKeys` set and a shared eviction target would have let them do.
+
+What stayed with each app is what has an opinion about the material: the scope enumeration, the
+card-id grammar, and the `spread` function that pulls apart cards which would answer each other.
+
+## Transposition Trainer
+
+Spaced-repetition flashcards for moving chords between keys, at `/games/transpose/`. Three
+directions, and they are three skills rather than three ways of asking one thing — the same
+argument that splits the fretboard's `name` from its `find`:
+
+- `transpose` — *A D E, into the key of C*. Move a progression you are looking at. Two valid
+  routes: count three semitones onto each chord, or read the degrees and re-issue them.
+- `degrees` — *I, IV, V in A*. Issue a key's chords from nothing, with no progression to move.
+- `key` — *A D E — what key?* Recognise a set of chords, which is what makes the other two more
+  than arithmetic.
+
+Four patterns: `I IV V`, `I IV V vi`, and the two minor ones the songbook actually plays — `i iv v`
+and `i iv V`, the second raising the seventh, which is `a d E` and `e a H7` and half the library.
+All permutations of source and target key; `Settings.keys` narrows to the seven the songbook uses.
+
+- `src/utils/transpose/` — `theory.ts` (keys, degrees, names), `cards.ts` (card ids, notation
+  canonicalisation), `deck.ts` (scope, `spreadSubjects`), `library.ts` (the songbook index),
+  `keys.ts`, `stats.ts`, `storage.ts`, `cloud.ts`, `collect.ts` (build-time only)
+- `src/hooks/useTransposeData.ts`, `src/components/Transpose/`
+
+### A key spells its own chords
+
+There is no sharp/flat axis here, the way there is on the fretboard's `find` cards, because a key
+is not free to choose: the IV of F is B♭ and never A♯, and the V of B is F♯ and never G♭. Each key
+carries the spelling its signature dictates (`MAJOR_SPELLING`, the circle of fifths — D♭ over C♯,
+F♯ over G♭ on the one genuine tie) and every chord drawn from it is written that way. One fewer
+axis on the deck, and one more thing the deck teaches: you tap a pitch class off a pad offering
+both spellings, and the slot answers with the one the key wants.
+
+### The `key` direction is only answerable because of the patterns
+
+No two of the 48 (tonic, pattern) pairs produce the same set of chords, so *what key is this* has
+one answer. {C, F, G} is C major and nothing else — F major wants a B♭, G major wants an F♯ — and
+the minor patterns cannot collide with the major ones by shape (all-minor, or two-and-one, against
+all-major or three-and-one). That is a property of these four patterns rather than of harmony, so
+`theory.test.ts` asserts it over the whole deck instead of trusting the argument. Add a fifth
+pattern and that test is the thing that will tell you whether the direction still works.
+
+### Three notation systems, not two axes
+
+`polish` (`C#`, `a`, `H`, and `B` for B flat — every chart in `src/content/songs/`), `german` (the
+same with syllables: `Cis`, `Des`, `Es`, `Fis`) and `international` (`C#`, `Am`, `B`, `Bb`).
+`Settings.notations` is a list, either or any, and it is a **deck axis** rather than a display
+setting for the reason the fretboard's is: reading `Es` and reading `E♭` are two acts. The trap the
+first two exist for is the letter B, which is B flat in a Polish chart and B natural in an English
+one with nothing in the context to tell you which.
+
+It was two independent axes first — how a black key is spelt, and what B means — and that is
+**wrong**, because whether minor is written `Am` or `a` belongs to both of them. Four combinations
+produce three readings, so a card printing `C F G a` under three of them got two schedules for one
+question. Naming the systems is what makes the split factor.
+
+A card splits only where its own words differ (`canonicalNotation`, decided by comparing what the
+card would print rather than against a list of pitch classes). `C F G` is one card, `F B C` is two,
+`A D E f#` is three. Suffixes `:de` and `:in`; Polish is the unsuffixed one, and `parseCardId`
+refuses a suffix that could never have been minted.
+
+**`displayNotation` is not `canonicalNotation`, and conflating them is the trap.** The canonical
+notation is what the card is *filed* under and collapses systems the card cannot tell apart:
+`D G A → A♭ D♭ E♭` reads the same in Polish and international, so it is the Polish card either way.
+But the **pad shows all twelve pitch classes**, including ones the card never prints — so drawing
+it canonically put a button labelled `B` in front of a player who had selected international names
+only, where `B` is B natural and here it meant B flat. The app handing over the exact confusion the
+axis exists to drill. `displayNotation` returns the first *selected* system that would have minted
+the card, whose labels are identical to the card's by construction; the keyboard map reads it too,
+since `B` on the keyboard has to mean what the button labelled `B` means. Its fallback is the
+card's own notation and **not** the selection — falling back the other way prints `As Des Es` on a
+card filed as `Ab Db Eb`, which is the same bug with its halves swapped.
+
+### Answers are taps, and all or nothing
+
+A pad of twelve pitch classes and a row of slots. Twelve rather than twenty-four because **the
+pattern fixes each slot's quality** — the vi is minor whatever root you pick — so only roots are
+ever tapped, and a pad of twelve fits across a phone.
+
+A progression with one chord wrong is a wrong progression, so grading is all or nothing and the
+verdict's job is saying *which* slot went wrong. `ratingFromAnswer`'s per-target budget does the
+rest: a four-chord answer is not measured against the clock for one tap.
+
+`transpose` slots are **unlabelled**. Printing `I IV V` under them would hand over the degree
+route, and that route is one of the two ways to answer the card. A `degrees` card labels them,
+because there the numerals are the question.
+
+A `key` card is answered with a tonic and, when a minor pattern is in scope, a mode. Only then: in
+a major-only deck every answer is major and the mode slot is a wasted tap on every card. The card's
+shape therefore moves with the settings, the way *every E* on the fretboard gains the twelfth frets
+when the range widens.
+
+**The verdict is drawn beside the slots, not over them** — the one place this trainer parts company
+with the fretboard's. There the mark goes over the neck because the neck is large and the marks
+under it are dots; here the answer row is three or four short fields and every one of them *is* the
+answer, so a mark centred on a three-slot row lands squarely on the middle one. `.tp-stage`
+unpositions the shared overlay and it becomes a flex item at the end of the row.
+
+### The songbook is where the examples come from
+
+`library.ts` reads the song bodies through the songbook's own grammar — `isChordLine` and
+`parseChord` from `src/utils/chords.ts`, which is what `parseChord` was added for — rather than a
+second copy of the token regex, because a parser that drifted from the one the song pages use would
+quietly disagree with them about what a song is written in.
+
+A song is filed under (tonic, pattern) when it plays all of that pattern's chords **and** no other
+candidate fits better. Two filters in order: diatonic share, then the chord the song opens on.
+Without the first, *Here Comes the Sun* is filed under the four keys it happens to contain a I IV V
+for; without the second, songs whose whole vocabulary sits inside two readings are filed under
+both. Ties surviving both are kept, because a genuine tie is a fact about the song.
+
+It runs at **build time**, in the page, over `getCollection('songs')`, and only the compact index
+crosses into the island — titles and slugs, not the song texts. Not a generated file: one committed
+alongside the songs is one that can fall out of step with them.
+
+Two uses. The verdict names the songs behind the card — **after the answer, never before**, since
+on a `key` card the title gives the answer away — and `Settings.keys = 'songbook'` narrows the deck
+to the keys the library actually uses. As of writing that is C, D, E, F, G, A for `I IV V`, and A,
+D, E, G minor for `i iv V`.
+
+
 ## Baby Sleep Log
 
 At `/games/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
@@ -665,9 +810,9 @@ the sharing rules do nothing until it is run.
 
 ## Installable web apps (PWA)
 
-The site ships **five** installable apps from one origin: the whole site, the guitar tuner
-(`/games/tuner`), the songbook (`/songs`), the fretboard trainer (`/games/fretboard`) and the
-baby sleep log (`/games/baby-sleep`). What qualifies is a thing you reach for away from a desk;
+The site ships **six** installable apps from one origin: the whole site, the guitar tuner
+(`/games/tuner`), the songbook (`/songs`), the fretboard trainer (`/games/fretboard`), the
+transposition trainer (`/games/transpose`) and the baby sleep log (`/games/baby-sleep`). What qualifies is a thing you reach for away from a desk;
 the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
 opening a link outside it leaves the app — which is the point, since most of the site is not
 built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks
@@ -692,18 +837,18 @@ manifests, the icon set, the head tags — follows.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
   only runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
-The four drawn icons are **full bleed**: every platform masks a home screen icon to its own
+The five drawn icons are **full bleed**: every platform masks a home screen icon to its own
 shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
 and the convex read comes from a bounce light, a gloss sweep and a perimeter vignette layered at
 the end of each file. The square-on-navy art this replaced left a visible border on all four
 sides once iOS rounded the corners off the navy. `generate-icons.mjs` therefore picks the
-maskable treatment per source: `bleed` ships those four unscaled, `inset` keeps the old shrink-onto-navy
+maskable treatment per source: `bleed` ships those five unscaled, `inset` keeps the old shrink-onto-navy
 for `logo.png`, whose own square edges a circular mask would clip.
 
-All four are the same Win95 device — navy body, raised bezel, sunken black glass — with only
+All five are the same Win95 device — navy body, raised bezel, sunken black glass — with only
 what is *on* the glass telling them apart, because they sit side by side on one home screen:
 the tuner's dial, the songbook's yellow chords over green lyrics, the fretboard's neck with one
-note lit, the sleep log's crescent and Zs. Green and yellow throughout, the site's own phosphor.
+note lit, the transposition trainer's `A → C`, the sleep log's crescent and Zs. Green and yellow throughout, the site's own phosphor.
 The fretboard icon draws **four** frets where the app draws five: an icon is read at 40px two
 rows down a home screen, where a finer grid stops being a neck and becomes texture — and the
 fret count is not the question the icon is asking.
@@ -804,7 +949,7 @@ takes at most two: the shell, and the one named after the app it belongs to.
   worker cannot tell those apart — iOS gives them the same registration — so `register-sw.js`
   checks `display-mode: standalone` and names the tiers it wants.
 - **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `fretboard` (~64 kB gz),
-  `baby-sleep` (~90 kB gz). Each covers its app's whole subtree, because a tab is a separate
+  `transpose` (~65 kB gz), `baby-sleep` (~90 kB gz). Each covers its app's whole subtree, because a tab is a separate
   document and an uncached tab is a dead link on a dead network.
 
 The per-app split is what stops the shell growing with the app count. Folding the two newest

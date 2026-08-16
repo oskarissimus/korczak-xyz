@@ -8,7 +8,7 @@ import {
   reconcileDeck,
   recordLocal,
 } from './replay';
-import { DAY, MINUTE } from './srs';
+import { DAY, MINUTE } from './scheduler';
 import type { ReviewEvent } from './types';
 
 const T0 = 1_700_000_000_000;

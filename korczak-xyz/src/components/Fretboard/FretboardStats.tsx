@@ -19,10 +19,10 @@ import {
   positionStats,
 } from '../../utils/fretboard/stats';
 import type { PositionStat } from '../../utils/fretboard/stats';
-import MasteryChart from './MasteryChart';
+import MasteryChart from '../srs/MasteryChart';
 import { NeckHeatmap } from './NeckGrid';
 import SyncBadge from './SyncBadge';
-import TrendChart from './TrendChart';
+import TrendChart from '../srs/TrendChart';
 import { defaultNotationFor, translations, type Lang } from './translations';
 
 interface FretboardStatsProps {
@@ -135,10 +135,10 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
           label={t.neckTitle}
           notation={displayNotation(data.settings.notations)}
         />
-        <ul className="fb-legend">
+        <ul className="srs-legend">
           {(['new', 'learning', 'young', 'mature'] as const).map((bucket) => (
             <li key={bucket}>
-              <span className={`fb-swatch fb-heat-${bucket}`} aria-hidden="true" />
+              <span className={`srs-swatch fb-heat-${bucket}`} aria-hidden="true" />
               {bucketLabels[bucket]}
             </li>
           ))}

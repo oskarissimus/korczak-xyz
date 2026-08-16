@@ -58,6 +58,43 @@ export function isChordLine(line: string): boolean {
   });
 }
 
+export interface ParsedChord {
+  /** 0 = C, 11 = B natural (`H`). */
+  pitchClass: number;
+  /** Whether the symbol names a minor chord — a lowercase root, or an `m` that is not `maj`. */
+  minor: boolean;
+  /** Everything after the root and its accidental: `7`, `maj7`, `sus4`, and so on. */
+  quality: string;
+}
+
+/**
+ * Read a chord symbol as a pitch class.
+ *
+ * Exported for the transposition trainer, which reads the songbook to find out which keys and
+ * progressions actually turn up in it. It shares this file's grammar rather than carrying a
+ * second copy of the token regex, because a parser that drifts from the one the song pages use
+ * would quietly disagree with them about what a song is written in.
+ */
+export function parseChord(token: string): ParsedChord | null {
+  const parts = token.match(TOKEN_PARTS);
+  if (!parts) return null;
+
+  const [, root, accidental = '', quality] = parts;
+  let pitchClass = SHARP_NAMES.indexOf(root.toUpperCase());
+  if (pitchClass === -1) return null;
+
+  if (accidental === '#' || accidental === 'is') {
+    pitchClass = (pitchClass + 1) % 12;
+  } else if (accidental === 'b' || accidental === 'es') {
+    pitchClass = (pitchClass + 11) % 12;
+  }
+
+  // A lowercase root is the songbook's own way of writing a minor chord; `m` is everyone else's.
+  // `maj` is not it — `GMaj7` is a major seventh, and the `m` in it belongs to the word.
+  const minor = root === root.toLowerCase() || /m(?!aj)/i.test(quality);
+  return { pitchClass, minor, quality };
+}
+
 export function transposeChord(
   chord: string,
   semitones: number,

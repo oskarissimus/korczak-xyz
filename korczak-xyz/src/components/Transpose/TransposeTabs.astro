@@ -1,0 +1,35 @@
+---
+/**
+ * Navigation between the trainer's two views. Server-rendered rather than part of the islands:
+ * both transpose islands are client:only, so anything inside one is missing until React hydrates —
+ * and the nav is exactly what you want working when hydration is slow or fails.
+ */
+import { translations, type Lang } from './translations';
+
+type View = 'practice' | 'stats';
+
+interface Props {
+  lang: Lang;
+  active: View;
+}
+
+const { lang, active } = Astro.props;
+const t = translations[lang];
+
+const base = lang === 'pl' ? '/pl/games/transpose' : '/games/transpose';
+
+const TABS: { view: View; href: string; label: string }[] = [
+  { view: 'practice', href: `${base}/`, label: t.navPractice },
+  { view: 'stats', href: `${base}/stats/`, label: t.navStats },
+];
+---
+
+<nav class="win-tabs" aria-label={t.navLabel}>
+  {
+    TABS.map(({ view, href, label }) => (
+      <a class="win-tab" href={href} aria-current={view === active ? 'page' : undefined}>
+        {label}
+      </a>
+    ))
+  }
+</nav>
