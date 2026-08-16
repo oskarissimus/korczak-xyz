@@ -27,7 +27,7 @@ Odpowiedź nie jest długa:
 Papuga, to papuga!
   G               D
 Odpowiedź jest niedługa:
-  A
+  A       D
 Papuga, papuga!
 
        D
@@ -50,7 +50,7 @@ Odpowiedź nie jest długa:
 Papuga, to papuga!
   G               D
 Odpowiedź jest niedługa:
-  A
+  A       D
 Papuga, papuga!
 
 Przejście:
@@ -85,7 +85,7 @@ Odpowiedź nie jest długa:
 Papuga, to papuga!
   G               D
 Odpowiedź jest niedługa:
-  A
+  A       D
 Papuga, papuga!
 
 Ref.:
@@ -95,7 +95,7 @@ Odpowiedź nie jest długa:
 Papuga, to papuga!
   G               D
 Odpowiedź jest niedługa:
-  A
+  A       D
 Papuga, papuga!
 
 
