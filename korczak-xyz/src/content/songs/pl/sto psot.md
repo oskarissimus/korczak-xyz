@@ -12,8 +12,9 @@ dateAdded: 2026-08-15
    G          D
 Bo koty lubią psoty
 
+                  e
 I żubr, i bóbr, i łoś
-    e           A
+                A
 Też mogą zbroić coś
      D
 Lecz kto jest mistrzem szkód?
@@ -35,8 +36,9 @@ Papuga, papuga!
   G          D
 Ponoszą winy część
 
+                e
 Lub kiedyś było tak
-   e              A
+                  A
 Że coś tam zepsuł rak
    D
 No ale, ale, ale
@@ -70,8 +72,9 @@ I czyja to zasługa
     G        D
 Ponoszą winy część
 
+                e
 Lub kiedyś było tak
-   E              A
+                  A
 Że coś tam zepsuł rak
    D
 No ale, ale, ale
