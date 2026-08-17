@@ -1,17 +1,20 @@
 /*
- * Scope and session shape, as a Win95 dialog.
+ * The neck deck's scope, as rows of a Win95 dialog.
  *
- * Every control is a row of pressed-or-raised buttons rather than a select or a slider: the
- * option sets are tiny and fixed, and a pressed button says which one is current without being
- * opened. Nothing here can produce an empty deck — the last string and the last direction
- * cannot be switched off, because a deck of nothing is a game that cannot start and an error
- * message nobody needs to read.
+ * Rows and nothing around them: the panel these sit in belongs to the merged app
+ * (`src/components/Flashcards/SettingsPanel.tsx`), which holds the sitting's own settings and the
+ * headings that separate the two decks. **Scope only** — how long a sitting runs is a property of
+ * the sitting, and a sitting mixes this deck with the chord one.
+ *
+ * Nothing here can produce an empty deck — the last string and the last direction cannot be
+ * switched off, because a deck of nothing is a game that cannot start and an error message nobody
+ * needs to read.
  */
 
-import type { ReactNode } from 'react';
 import { STRING_COUNT, displayNotation, stringLabel } from '../../utils/fretboard/notes';
 import type { Direction, Notation } from '../../utils/fretboard/notes';
 import type { Settings } from '../../utils/fretboard/types';
+import { Choice, Row } from '../Flashcards/controls';
 import type { Translation } from './translations';
 
 interface SettingsPanelProps {
@@ -20,55 +23,13 @@ interface SettingsPanelProps {
   t: Translation;
 }
 
-// Exported so `FretboardSkeleton.astro` can lay out the same buttons rather than approximate them.
+// Exported so the pre-hydration stand-in can lay out the same buttons rather than approximate them.
 export const FRET_CHOICES = [3, 5, 7, 12];
-export const LENGTH_CHOICES = [10, 20, 40];
-export const NEW_CHOICES = [3, 6, 10];
 
 /** What the fret-range buttons say. Shared with the stand-in for the same reason. */
 export const fretChoiceLabel = (fret: number) => `0–${fret}`;
 
-/*
- * The row label names the group as well as printing it. Without that it is loose text beside a run
- * of buttons, and several of these rows are single letters: the strings row alone announces `E`,
- * `A`, `D`, `G`, `B` and `e` with nothing said about what they are toggling.
- */
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="fb-setting">
-      <span className="fb-setting-label">{label}</span>
-      <div className="fb-setting-controls" role="group" aria-label={label}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Choice({
-  active,
-  onClick,
-  children,
-  title,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className={`fb-choice${active ? ' fb-choice--on' : ''}`}
-      onClick={onClick}
-      aria-pressed={active}
-      title={title}
-    >
-      {children}
-    </button>
-  );
-}
-
-export default function SettingsPanel({ settings, onChange, t }: SettingsPanelProps) {
+export default function FretboardSettingsRows({ settings, onChange, t }: SettingsPanelProps) {
   const toggleString = (index: number) => {
     const has = settings.strings.includes(index);
     if (has && settings.strings.length === 1) return;
@@ -97,9 +58,7 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
   };
 
   return (
-    <div className="fb-settings">
-      <h3 className="fb-subhead">{t.settings}</h3>
-
+    <>
       <Row label={t.frets}>
         {FRET_CHOICES.map((fret) => (
           <Choice
@@ -161,30 +120,6 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
         </Choice>
       </Row>
 
-      <Row label={t.sessionLength}>
-        {LENGTH_CHOICES.map((length) => (
-          <Choice
-            key={length}
-            active={settings.sessionLength === length}
-            onClick={() => onChange({ ...settings, sessionLength: length })}
-          >
-            {length}
-          </Choice>
-        ))}
-      </Row>
-
-      <Row label={t.newPerSession}>
-        {NEW_CHOICES.map((count) => (
-          <Choice
-            key={count}
-            active={settings.newPerSession === count}
-            onClick={() => onChange({ ...settings, newPerSession: count })}
-          >
-            {count}
-          </Choice>
-        ))}
-      </Row>
-
       <Row label={t.stringLabels}>
         <Choice
           active={settings.stringLabels}
@@ -222,6 +157,6 @@ export default function SettingsPanel({ settings, onChange, t }: SettingsPanelPr
           {t.notationGerman}
         </Choice>
       </Row>
-    </div>
+    </>
   );
 }

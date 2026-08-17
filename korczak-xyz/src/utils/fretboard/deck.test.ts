@@ -15,6 +15,7 @@ import {
 import { DIRECTIONS, NOTATIONS, parseCardId } from './notes';
 import { DAY, MINUTE, createCard } from '../srs/scheduler';
 import type { Card } from '../srs/scheduler';
+import type { QueueShape } from '../srs/queue';
 import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
@@ -22,6 +23,11 @@ const T0 = 1_700_000_000_000;
 
 function settings(overrides: Partial<Settings> = {}): Settings {
   return { ...DEFAULT_SETTINGS, ...overrides };
+}
+
+/** The sitting's shape, which is the merged app's rather than this deck's. */
+function shape(overrides: Partial<QueueShape> = {}): QueueShape {
+  return { sessionLength: 20, newPerSession: 6, ...overrides };
 }
 
 function deckOf(cards: Card[]): Deck {
@@ -237,7 +243,8 @@ describe('interleave', () => {
 });
 
 describe('buildQueue', () => {
-  const scope = settings({ maxFret: 2, strings: [0], directions: ['name'], newPerSession: 2 });
+  const scope = settings({ maxFret: 2, strings: [0], directions: ['name'] });
+  const small = shape({ newPerSession: 2 });
   const rng = () => seeded(7);
 
   it('leads with cards that are mid-acquisition', () => {
@@ -246,7 +253,7 @@ describe('buildQueue', () => {
       { ...createCard('name:0-1'), status: 'learning', due: T0 - MINUTE },
       createCard('name:0-2'),
     ]);
-    expect(buildQueue(deck, scope, T0, { rng: rng() })[0]).toBe('name:0-1');
+    expect(buildQueue(deck, scope, small, T0, { rng: rng() })[0]).toBe('name:0-1');
   });
 
   it('leaves cards that are not due yet alone', () => {
@@ -255,7 +262,7 @@ describe('buildQueue', () => {
       scheduled('name:0-1', T0 - DAY),
       scheduled('name:0-2', T0 + 2 * DAY),
     ]);
-    expect(buildQueue(deck, scope, T0, { rng: rng() })).toEqual(['name:0-1']);
+    expect(buildQueue(deck, scope, small, T0, { rng: rng() })).toEqual(['name:0-1']);
   });
 
   it('takes the most overdue reviews when it cannot take them all', () => {
@@ -266,7 +273,7 @@ describe('buildQueue', () => {
       scheduled('name:0-1', T0 - 3 * DAY),
       scheduled('name:0-2', T0 - 2 * DAY),
     ]);
-    const queue = buildQueue(deck, { ...scope, sessionLength: 2 }, T0, { rng: rng() });
+    const queue = buildQueue(deck, scope, shape({ sessionLength: 2 }), T0, { rng: rng() });
     expect(sorted(queue)).toEqual(['name:0-1', 'name:0-2']);
   });
 
@@ -275,11 +282,13 @@ describe('buildQueue', () => {
     const deck = deckOf(
       Array.from({ length: 12 }, (_, i) => scheduled(`name:${i % 6}-${i % 3}`, T0 - i * MINUTE))
     );
-    const scopeAll = settings({ maxFret: 2, sessionLength: 12 });
+    const scopeAll = settings({ maxFret: 2 });
     const orders = new Set<string>();
     const contents = new Set<string>();
     for (let seed = 1; seed <= 20; seed++) {
-      const queue = buildQueue(deck, scopeAll, T0, { rng: seeded(seed) });
+      const queue = buildQueue(deck, scopeAll, shape({ sessionLength: 12 }), T0, {
+        rng: seeded(seed),
+      });
       orders.add(queue.join(','));
       contents.add(sorted(queue).join(','));
     }
@@ -289,34 +298,45 @@ describe('buildQueue', () => {
   });
 
   it('draws new cards from the whole range, not the first few on the neck', () => {
-    const wide = settings({ maxFret: 12, directions: ['name'], newPerSession: 3 });
+    const wide = settings({ maxFret: 12, directions: ['name'] });
     const deck = ensureCards({}, scopeIds(wide));
     const introduced = new Set<string>();
     for (let seed = 1; seed <= 30; seed++) {
-      for (const id of buildQueue(deck, wide, T0, { rng: seeded(seed) })) introduced.add(id);
+      for (const id of buildQueue(deck, wide, shape({ newPerSession: 3 }), T0, {
+        rng: seeded(seed),
+      })) {
+        introduced.add(id);
+      }
     }
     // Scope order would introduce the same three every time; the range holds 78.
     expect(introduced.size).toBeGreaterThan(20);
   });
 
   it('caps how many unseen cards one sitting introduces', () => {
-    const wide = settings({ maxFret: 12, strings: [0], directions: ['name'], newPerSession: 3 });
-    expect(buildQueue(ensureCards({}, scopeIds(wide)), wide, T0, { rng: rng() })).toHaveLength(3);
+    const wide = settings({ maxFret: 12, strings: [0], directions: ['name'] });
+    const queue = buildQueue(ensureCards({}, scopeIds(wide)), wide, shape({ newPerSession: 3 }), T0, {
+      rng: rng(),
+    });
+    expect(queue).toHaveLength(3);
   });
 
   it('caps the sitting itself', () => {
     const deck = deckOf(
       Array.from({ length: 30 }, (_, i) => scheduled(`name:0-${i % 13}`, T0 - i * MINUTE))
     );
-    const queue = buildQueue(deck, settings({ maxFret: 12, strings: [0], sessionLength: 5 }), T0, {
-      rng: rng(),
-    });
+    const queue = buildQueue(
+      deck,
+      settings({ maxFret: 12, strings: [0] }),
+      shape({ sessionLength: 5 }),
+      T0,
+      { rng: rng() }
+    );
     expect(queue).toHaveLength(5);
   });
 
   it('is empty when nothing is due', () => {
     const deck = deckOf([scheduled('name:0-0', T0 + DAY)]);
-    expect(buildQueue(deck, scope, T0, { rng: rng() })).toEqual([]);
+    expect(buildQueue(deck, scope, small, T0, { rng: rng() })).toEqual([]);
   });
 
   it('draws the nearest cards when asked to practise ahead of schedule', () => {
@@ -326,7 +346,7 @@ describe('buildQueue', () => {
       scheduled('name:0-2', T0 + 2 * DAY),
       scheduled('name:0-3', T0 + 9 * DAY),
     ]);
-    const queue = buildQueue(deck, { ...scope, maxFret: 3, sessionLength: 3 }, T0, {
+    const queue = buildQueue(deck, { ...scope, maxFret: 3 }, shape({ sessionLength: 3 }), T0, {
       ahead: true,
       rng: rng(),
     });
@@ -334,10 +354,12 @@ describe('buildQueue', () => {
   });
 
   it('keeps the two directions of a position apart', () => {
-    const wide = settings({ maxFret: 5, newPerSession: 12, sessionLength: 12 });
+    const wide = settings({ maxFret: 5 });
     const deck = ensureCards({}, scopeIds(wide));
     for (let seed = 1; seed <= 20; seed++) {
-      const queue = buildQueue(deck, wide, T0, { rng: seeded(seed) });
+      const queue = buildQueue(deck, wide, shape({ newPerSession: 12, sessionLength: 12 }), T0, {
+        rng: seeded(seed),
+      });
       const positions = queue.map((id) => id.split(':')[1]);
       for (let i = 1; i < positions.length; i++) {
         expect(positions[i]).not.toBe(positions[i - 1]);

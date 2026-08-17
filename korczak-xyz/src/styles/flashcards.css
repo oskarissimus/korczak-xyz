@@ -1,0 +1,58 @@
+/*
+ * The merged flashcards app — the one stylesheet every page of it imports.
+ *
+ * It is the four shared sheets plus both card surfaces, and it is the only place they are pulled in
+ * from: `fretboard.css` and `transpose.css` used to carry these `@import`s each, and importing one
+ * file from two sheets inlines its rules twice.
+ *
+ * Which prefix means what is set out at the top of `fretboard.css`. Short version: `.fb-*` is the
+ * merged app's chrome as well as the neck cards, `.tp-*` is the chord cards and the chord-progress
+ * page, and collapsing the duplicated generic half of the two into `.fc-*` is a rename still owed.
+ */
+
+@import './tabs.css';
+@import './chordMarks.css';
+@import './verdict.css';
+@import './srsCharts.css';
+@import './fretboard.css';
+@import './transpose.css';
+
+.flashcards-window {
+  margin-bottom: 20px;
+}
+
+/* Same reasoning as the typing trainer: this is a property sheet, not a page in a teal window, so
+   the content area is the panel face and the ink has to be reset along with the surface. */
+.flashcards-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+/*
+ * The per-deck split under the tiles.
+ *
+ * One line of quiet text rather than three more tiles: the tiles are the sitting's figures, and how
+ * they divide between the two decks is a footnote to them. Sized and coloured like `.fb-caught-up`,
+ * which is the other line that sits in this slot.
+ */
+.fb-split {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-dark-gray);
+  margin: -8px 0 0;
+}
+
+/*
+ * The heading over each deck's scope rows.
+ *
+ * Smaller than the panel's own `Settings` heading and set off by a rule, because it divides one
+ * dialog rather than starting a new one — the settings panel is long now (both scopes plus the
+ * sitting's three rows) and a run of eleven identical rows with no landmarks is a wall.
+ */
+.fb-subhead--deck {
+  font-size: 1.15rem;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--retro-dark-gray);
+}

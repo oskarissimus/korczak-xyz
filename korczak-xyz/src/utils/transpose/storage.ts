@@ -58,20 +58,20 @@ function keepKnown<T>(value: unknown, is: (v: unknown) => v is T, fallback: T[])
  * can arrive from one that has. Dropping it here is what stops `scopeIds` minting card ids that
  * `parseCardId` will then refuse — which is a sitting with nothing in it. A record written before
  * a setting existed simply has no key for it, so the spread over the defaults is the migration.
+ *
+ * The result is built field by field rather than returned as the merged object, so a key this build
+ * no longer has — `sessionLength` and `newPerSession`, which moved to
+ * `src/utils/flashcards/settings.ts` — is dropped instead of being carried back to localStorage and
+ * pushed to the account for the rest of time.
  */
 export function sanitizeSettings(stored: Partial<Settings>, notations: Notation[]): Settings {
   const merged = { ...defaultSettings(notations), ...stored };
-  merged.directions = keepKnown(merged.directions, isDirection, DEFAULT_SETTINGS.directions);
-  merged.patterns = keepKnown(merged.patterns, isPatternId, DEFAULT_SETTINGS.patterns);
-  merged.notations = keepKnown(merged.notations, isNotation, notations);
-  if (merged.keys !== 'all' && merged.keys !== 'songbook') merged.keys = DEFAULT_SETTINGS.keys;
-  if (!Number.isFinite(merged.sessionLength) || merged.sessionLength < 1) {
-    merged.sessionLength = DEFAULT_SETTINGS.sessionLength;
-  }
-  if (!Number.isFinite(merged.newPerSession) || merged.newPerSession < 0) {
-    merged.newPerSession = DEFAULT_SETTINGS.newPerSession;
-  }
-  return merged;
+  return {
+    directions: keepKnown(merged.directions, isDirection, DEFAULT_SETTINGS.directions),
+    patterns: keepKnown(merged.patterns, isPatternId, DEFAULT_SETTINGS.patterns),
+    keys: merged.keys === 'all' || merged.keys === 'songbook' ? merged.keys : DEFAULT_SETTINGS.keys,
+    notations: keepKnown(merged.notations, isNotation, notations),
+  };
 }
 
 export function loadSettings(notations: Notation[]): Settings {

@@ -23,7 +23,7 @@ const MAX_MARKERS = 40;
 
 export default function TrendChart({ days, formatDate, labels, emptyLabel }: TrendChartProps) {
   if (days.length === 0) {
-    return <p className="fb-empty">{emptyLabel}</p>;
+    return <p className="srs-empty">{emptyLabel}</p>;
   }
 
   const plotW = WIDTH - MARGIN.left - MARGIN.right;

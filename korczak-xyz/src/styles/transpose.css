@@ -1,21 +1,13 @@
-/* Transposition Trainer — retro theme */
-
-@import './tabs.css';
-@import './verdict.css';
-@import './srsCharts.css';
-
-.transpose-window {
-  margin-bottom: 20px;
-}
-
-/* Same reasoning as the fretboard and typing trainers: this is a property sheet,
-   not a page in a teal window, so the content area is the panel face and the ink
-   has to be reset along with the surface. */
-.transpose-content {
-  background: var(--retro-gray);
-  color: var(--retro-black);
-  padding: 16px;
-}
+/*
+ * The chord cards and the chord-progress page.
+ *
+ * Pulled in by `flashcards.css` and by nothing else, which is why the shared `@import`s and the window
+ * shell moved there: importing one file from two sheets inlines it twice.
+ *
+ * The generic chrome here — `.tp-btn`, `.tp-tile`, `.tp-setting`, `.tp-summary` and the rest — is now
+ * used only by `TransposeStats`; the merged app's own screens draw the `.fb-*` copies of the same
+ * rules. That duplication is what the rename noted at the top of `fretboard.css` would remove.
+ */
 
 .tp-start,
 .tp-session,
@@ -691,6 +683,22 @@
 
 .tp-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/*
+ * Five columns of figures in a 288px content area.
+ *
+ * `width: 100%` cannot shrink a table below its min-content width, so at 320px these two tables ran
+ * about 30px past the panel and took the whole page sideways with them — a horizontal scrollbar on a
+ * page whose content is five short numbers. Tightening the cell padding is enough on its own: it is
+ * the padding, not the figures, that is over budget. Narrow screens only, so the table keeps its air
+ * everywhere it fits.
+ */
+@media (max-width: 420px) {
+  .tp-table th,
+  .tp-table td {
+    padding: 4px 3px;
+  }
 }
 
 /* The bucket chip in the by-key table, in the same four colours the mastery chart

@@ -1,0 +1,27 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import FretboardStats from '../../../../components/Fretboard/FretboardStats';
+import FlashcardsTabs from '../../../../components/Flashcards/FlashcardsTabs.astro';
+import { useTranslations } from '../../../../i18n';
+import '../../../../styles/flashcards.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Flashcards')} | korczak.xyz`} lang={lang} pwa="flashcards">
+  <div class="window flashcards-window">
+    <div class="title-bar">
+      <span>{t('Flashcards')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content flashcards-content">
+      <FlashcardsTabs lang={lang} active="neck" />
+      <FretboardStats client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>

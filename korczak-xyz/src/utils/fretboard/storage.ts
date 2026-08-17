@@ -69,6 +69,11 @@ function migratedNotations(notation: unknown): Notation[] | null {
  *
  * A record written before a setting existed simply has no key for it, so the spread over the
  * defaults is the migration.
+ *
+ * The result is built field by field rather than returned as the merged object, so a key this build
+ * no longer has — `sessionLength` and `newPerSession`, which moved to
+ * `src/utils/flashcards/settings.ts` — is dropped instead of being carried back to localStorage and
+ * pushed to the account for the rest of time.
  */
 export function sanitizeSettings(
   stored: Partial<Settings> & { notation?: unknown },
@@ -76,29 +81,34 @@ export function sanitizeSettings(
 ): Settings {
   const { notation: legacyNotation, ...rest } = stored;
   const merged = { ...defaultSettings(notation), ...rest };
+
   // A scope with no strings or no directions is an empty deck and a game that cannot start.
-  if (!Array.isArray(merged.strings) || merged.strings.length === 0) {
-    merged.strings = DEFAULT_SETTINGS.strings;
-  }
+  const strings =
+    Array.isArray(merged.strings) && merged.strings.length > 0
+      ? merged.strings
+      : DEFAULT_SETTINGS.strings;
+
   // Settings sync between devices, so a direction this build has never heard of can arrive from
   // one that has. Dropping it here is what stops `scopeIds` minting card ids that `parseCardId`
   // will then refuse, which is a sitting with nothing in it.
-  merged.directions = Array.isArray(merged.directions)
-    ? merged.directions.filter(isDirection)
-    : [];
-  if (merged.directions.length === 0) {
-    merged.directions = DEFAULT_SETTINGS.directions;
-  }
+  const kept = Array.isArray(merged.directions) ? merged.directions.filter(isDirection) : [];
+  const directions = kept.length > 0 ? kept : DEFAULT_SETTINGS.directions;
+
   // Read from `rest` rather than `merged`: the defaults always supply a list, so asking the merged
   // record whether it has one would answer yes for every record ever written and the migration
-  // below would never run.
-  merged.notations = Array.isArray(rest.notations)
+  // would never run.
+  const stated = Array.isArray(rest.notations)
     ? [...new Set(rest.notations.filter(isNotation))]
     : (migratedNotations(legacyNotation) ?? []);
-  if (merged.notations.length === 0) {
-    merged.notations = defaultSettings(notation).notations;
-  }
-  return merged;
+  const notations = stated.length > 0 ? stated : defaultSettings(notation).notations;
+
+  return {
+    maxFret: merged.maxFret,
+    strings,
+    directions,
+    stringLabels: merged.stringLabels,
+    notations,
+  };
 }
 
 export function loadSettings(notation: Notation): Settings {

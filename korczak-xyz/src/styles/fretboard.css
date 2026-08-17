@@ -1,22 +1,17 @@
-/* Fretboard Trainer — retro theme */
-
-@import './tabs.css';
-@import './chordMarks.css';
-@import './verdict.css';
-@import './srsCharts.css';
-
-.fretboard-window {
-  margin-bottom: 20px;
-}
-
-/* Same reasoning as the typing trainer: this is a property sheet, not a page in
-   a teal window, so the content area is the panel face and the ink has to be
-   reset along with the surface. */
-.fretboard-content {
-  background: var(--retro-gray);
-  color: var(--retro-black);
-  padding: 16px;
-}
+/*
+ * The neck cards, and the chrome the merged app inherited from when this was the whole game.
+ *
+ * Pulled in by `flashcards.css` and by nothing else, which is why the shared `@import`s and the
+ * window shell moved there: importing one file from two sheets inlines it twice.
+ *
+ * `.fb-*` is therefore two families now. The generic half — buttons, tiles, the start screen, the
+ * session bar, the settings rows, the summary, the sync badge, the feedback line — is the *merged
+ * app's* chrome and is used by the chord cards' screens as much as the neck's. The rest (`.fb-neck-*`,
+ * `.fb-diagram`, `.fb-pad-*`, `.fb-stage`, `.fb-heat-*`) really is about a fretboard. Renaming the
+ * first half to `.fc-*` is the tidy-up this file is waiting for; it is ~40 class names across both
+ * sheets and every component, and it changes no behaviour, so it was not done in the same commit as
+ * the merge.
+ */
 
 .fb-start,
 .fb-session,

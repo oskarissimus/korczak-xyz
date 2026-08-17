@@ -11,6 +11,7 @@ import {
   spreadSubjects,
 } from './deck';
 import type { LibraryIndex } from './library';
+import type { QueueShape } from '../srs/queue';
 import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
@@ -25,6 +26,11 @@ const LIBRARY: LibraryIndex = {
 
 function settings(overrides: Partial<Settings> = {}): Settings {
   return { ...DEFAULT_SETTINGS, ...overrides };
+}
+
+/** The sitting's shape, which is the merged app's rather than this deck's. */
+function shape(overrides: Partial<QueueShape> = {}): QueueShape {
+  return { sessionLength: 20, newPerSession: 6, ...overrides };
 }
 
 /** A seeded generator, so a sitting's order is something a test can pin. */
@@ -129,13 +135,12 @@ describe('buildQueue', () => {
     directions: ['degrees', 'key'],
     patterns: ['145'],
     notations: ['polish'],
-    sessionLength: 10,
-    newPerSession: 4,
   });
+  const sitting = shape({ sessionLength: 10, newPerSession: 4 });
 
   it('introduces no more new cards than the sitting allows', () => {
     const deck = ensureCards({}, scopeIds(scope, NO_LIBRARY));
-    const queue = buildQueue(deck, scope, NO_LIBRARY, 1000, { rng: seeded(7) });
+    const queue = buildQueue(deck, scope, NO_LIBRARY, sitting, 1000, { rng: seeded(7) });
     expect(queue).toHaveLength(4);
   });
 
@@ -147,20 +152,25 @@ describe('buildQueue', () => {
     ids.forEach((id, i) => {
       deck[id] = { ...createCard(id), status: 'review', intervalDays: 1, due: now - i * 86_400_000 };
     });
-    const queue = buildQueue(deck, { ...scope, newPerSession: 0 }, NO_LIBRARY, now, {
-      rng: seeded(3),
-    });
+    const queue = buildQueue(
+      deck,
+      scope,
+      NO_LIBRARY,
+      shape({ sessionLength: 10, newPerSession: 0 }),
+      now,
+      { rng: seeded(3) }
+    );
     // The ten most overdue are the last ten in that list, whatever order they come in.
     expect(new Set(queue)).toEqual(new Set(ids.slice(-10)));
   });
 
   it('is shuffled — a fixed order is a sequence you learn instead of the keys', () => {
     const deck = ensureCards({}, scopeIds(scope, NO_LIBRARY));
-    const a = buildQueue(deck, scope, NO_LIBRARY, 1000, { rng: seeded(1) });
-    const b = buildQueue(deck, scope, NO_LIBRARY, 1000, { rng: seeded(99) });
+    const a = buildQueue(deck, scope, NO_LIBRARY, sitting, 1000, { rng: seeded(1) });
+    const b = buildQueue(deck, scope, NO_LIBRARY, sitting, 1000, { rng: seeded(99) });
     expect(a).not.toEqual(b);
     // Same generator, same order: the randomness is injected, never read from the clock.
-    expect(buildQueue(deck, scope, NO_LIBRARY, 1000, { rng: seeded(1) })).toEqual(a);
+    expect(buildQueue(deck, scope, NO_LIBRARY, sitting, 1000, { rng: seeded(1) })).toEqual(a);
   });
 
   it('draws the cards closest to due when nothing is due and one is asked for anyway', () => {
@@ -169,9 +179,9 @@ describe('buildQueue', () => {
     for (const id of scopeIds(scope, NO_LIBRARY)) {
       deck[id] = { ...createCard(id), status: 'review', intervalDays: 5, due: now + 86_400_000 };
     }
-    expect(buildQueue(deck, scope, NO_LIBRARY, now, { rng: seeded(5) })).toHaveLength(0);
+    expect(buildQueue(deck, scope, NO_LIBRARY, sitting, now, { rng: seeded(5) })).toHaveLength(0);
     expect(
-      buildQueue(deck, scope, NO_LIBRARY, now, { ahead: true, rng: seeded(5) })
+      buildQueue(deck, scope, NO_LIBRARY, sitting, now, { ahead: true, rng: seeded(5) })
     ).toHaveLength(10);
   });
 });

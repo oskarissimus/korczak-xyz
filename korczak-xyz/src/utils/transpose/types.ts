@@ -5,6 +5,9 @@
  * `src/utils/srs/types.ts` and are re-exported so the rest of this app has one place to import
  * from. What is this app's own is `Settings` — a scope made of directions, patterns and notations,
  * where the fretboard's is made of strings and frets.
+ *
+ * A scope and only a scope: the sitting's length and its ration of new cards belong to the sitting,
+ * which mixes this deck with the fretboard's, and live in `src/utils/flashcards/settings.ts`.
  */
 
 import type { Direction } from './cards';
@@ -46,10 +49,6 @@ export interface Settings {
    * differ are split; see `canonicalNotation`.
    */
   notations: Notation[];
-  /** How many cards a sitting aims for, before in-session repeats. */
-  sessionLength: number;
-  /** Ceiling on unseen cards introduced in one sitting. */
-  newPerSession: number;
 }
 
 /**
@@ -70,8 +69,6 @@ export const DEFAULT_SETTINGS: Settings = {
   patterns: ['145', '1456'],
   keys: 'all',
   notations: ['polish', 'german'],
-  sessionLength: 20,
-  newPerSession: 6,
 };
 
 /**

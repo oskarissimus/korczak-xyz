@@ -27,7 +27,7 @@ import {
 import type { CardKey, Direction, Notation, PositionCardKey } from './notes';
 import type { Card } from '../srs/scheduler';
 import { createCard } from '../srs/scheduler';
-import type { QueueOptions } from '../srs/queue';
+import type { QueueOptions, QueueShape } from '../srs/queue';
 import {
   buildQueue as buildQueueFrom,
   ensureCards as ensureCardsIn,
@@ -45,7 +45,7 @@ export {
   requeue,
   shuffle,
 } from '../srs/queue';
-export type { DeckCounts, QueueOptions } from '../srs/queue';
+export type { DeckCounts, QueueOptions, QueueShape } from '../srs/queue';
 
 /**
  * Every card the current scope contains.
@@ -167,23 +167,28 @@ export const MIN_POSITION_GAP = 3;
  */
 const ALL_STRINGS = Array.from({ length: STRING_COUNT }, (_, i) => i);
 
+/**
+ * The square a card is held apart on — its spread key.
+ *
+ * Named and exported because the mixed sitting needs it too: `buildMixedQueue` in
+ * `src/utils/flashcards/mix.ts` spreads one queue drawn from both trainers, and it can only do
+ * that by asking each of them for its own subject. This is the fretboard's answer.
+ */
+export function positionSubject(id: string): string {
+  const key = parseCardId(id);
+  if (!key) return id;
+  if (isPositionKey(key)) return `${key.stringIndex}-${key.fret}`;
+  // Keyed on the whole neck rather than the current scope, so the grouping is a property of
+  // the card and does not shift when the settings do.
+  const canonical =
+    key.direction === 'allNote'
+      ? positionsOfNote(key.note, ALL_STRINGS, MAX_FRET)[0]
+      : positionsSounding(key.midi, ALL_STRINGS, MAX_FRET)[0];
+  return canonical ? `${canonical.stringIndex}-${canonical.fret}` : id;
+}
+
 export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string[] {
-  return spreadBy(
-    queue,
-    (id) => {
-      const key = parseCardId(id);
-      if (!key) return id;
-      if (isPositionKey(key)) return `${key.stringIndex}-${key.fret}`;
-      // Keyed on the whole neck rather than the current scope, so the grouping is a property of
-      // the card and does not shift when the settings do.
-      const canonical =
-        key.direction === 'allNote'
-          ? positionsOfNote(key.note, ALL_STRINGS, MAX_FRET)[0]
-          : positionsSounding(key.midi, ALL_STRINGS, MAX_FRET)[0];
-      return canonical ? `${canonical.stringIndex}-${canonical.fret}` : id;
-    },
-    gap
-  );
+  return spreadBy(queue, positionSubject, gap);
 }
 
 /**
@@ -196,14 +201,20 @@ export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string
  *
  * Deterministic order meant every sitting walked the strings E, A, D, G, B, e in turn, which is a
  * sequence you can answer without reading the card.
+ *
+ * `shape` is passed in rather than read off `settings`, because how long a sitting runs is a
+ * property of the sitting and a sitting may mix this deck with another — see `buildMixedQueue` in
+ * `src/utils/flashcards/mix.ts`, which is what the app actually calls. This remains the way to draw
+ * a queue from this deck alone.
  */
 export function buildQueue(
   deck: Deck,
   settings: Settings,
+  shape: QueueShape,
   now: number,
   options: QueueOptions = {}
 ): string[] {
-  return buildQueueFrom(cardsInScope(deck, settings), settings, now, {
+  return buildQueueFrom(cardsInScope(deck, settings), shape, now, {
     ...options,
     spread: (queue) => spreadPositions(queue),
   });

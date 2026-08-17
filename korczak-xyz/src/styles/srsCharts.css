@@ -128,3 +128,19 @@
 .srs-chart .srs-legend-value {
   color: var(--retro-white);
 }
+
+/*
+ * The empty state both charts draw before there is anything to plot.
+ *
+ * `srs-`, like everything else here, because it belongs to the components in `src/components/srs/`
+ * and not to either app. It was `.fb-empty` for a while — a fretboard class inside a shared
+ * component — which meant an empty chart on the chord-progress page rendered unstyled, since
+ * `fretboard.css` was not loaded there. That is exactly the failure an app prefix in a shared
+ * component produces, and it is invisible until the one page that lacks the sheet has no data.
+ */
+.srs-empty {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}

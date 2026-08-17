@@ -67,8 +67,7 @@ const sources = {
   site: { file: join(siteDir, 'public', 'logo.png'), maskable: 'inset' },
   tuner: { file: join(iconsDir, 'tuner.svg'), maskable: 'bleed' },
   songs: { file: join(iconsDir, 'songs.svg'), maskable: 'bleed' },
-  fretboard: { file: join(iconsDir, 'fretboard.svg'), maskable: 'bleed' },
-  transpose: { file: join(iconsDir, 'transpose.svg'), maskable: 'bleed' },
+  flashcards: { file: join(iconsDir, 'flashcards.svg'), maskable: 'bleed' },
   'baby-sleep': { file: join(iconsDir, 'baby-sleep.svg'), maskable: 'bleed' },
 };
 

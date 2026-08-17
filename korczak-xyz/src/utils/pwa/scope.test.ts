@@ -14,10 +14,11 @@ describe('appForPath', () => {
     expect(appForPath('/pl/songs/arahja/')).toBe('songs');
   });
 
-  it('recognises the fretboard trainer and its stats tab', () => {
-    expect(appForPath('/games/fretboard')).toBe('fretboard');
-    expect(appForPath('/games/fretboard/stats')).toBe('fretboard');
-    expect(appForPath('/pl/games/fretboard/stats/')).toBe('fretboard');
+  it('recognises the flashcards app and both its progress tabs', () => {
+    expect(appForPath('/games/flashcards')).toBe('flashcards');
+    expect(appForPath('/games/flashcards/neck')).toBe('flashcards');
+    expect(appForPath('/games/flashcards/chords')).toBe('flashcards');
+    expect(appForPath('/pl/games/flashcards/neck/')).toBe('flashcards');
   });
 
   it('recognises the baby sleep log and both its tabs', () => {
@@ -38,14 +39,21 @@ describe('appForPath', () => {
     // /songs must not claim /songsheets, or that page would install as the songbook.
     expect(appForPath('/songsheets')).toBe('site');
     expect(appForPath('/games/tuner-old')).toBe('site');
-    expect(appForPath('/games/fretboards')).toBe('site');
+    expect(appForPath('/games/flashcards-old')).toBe('site');
   });
 
-  it('keeps the two guitar apps apart, though one path contains the other word', () => {
-    // Neither claims the other: /games/tuner and /games/fretboard are siblings, and the
-    // fretboard app must not swallow the tuner just by being listed after it.
+  it('keeps the two guitar apps apart', () => {
+    // Neither claims the other: /games/tuner and /games/flashcards are siblings, and the one
+    // listed later must not swallow the one listed first.
     expect(appForPath('/games/tuner')).toBe('tuner');
-    expect(appForPath('/games/fretboard')).toBe('fretboard');
+    expect(appForPath('/games/flashcards')).toBe('flashcards');
+  });
+
+  it('does not answer for the routes the merged app replaced', () => {
+    // /games/fretboard and /games/transpose are 301s now (see public/_redirects) and belong to no
+    // app: a page that still linked one would install the whole site under its name.
+    expect(appForPath('/games/fretboard')).toBe('site');
+    expect(appForPath('/games/transpose')).toBe('site');
   });
 });
 
@@ -65,13 +73,14 @@ describe('crossesAppBoundary', () => {
   });
 
   it('is false between the tabs of one app, so tab clicks stay soft navigations', () => {
-    expect(crossesAppBoundary('/games/fretboard', '/games/fretboard/stats')).toBe(false);
+    expect(crossesAppBoundary('/games/flashcards', '/games/flashcards/neck')).toBe(false);
+    expect(crossesAppBoundary('/games/flashcards/neck', '/games/flashcards/chords')).toBe(false);
     expect(crossesAppBoundary('/games/baby-sleep/stats', '/games/baby-sleep/share')).toBe(false);
   });
 
   it('is true leaving an app for the games index it is listed on', () => {
     expect(crossesAppBoundary('/games/baby-sleep', '/games')).toBe(true);
-    expect(crossesAppBoundary('/games/fretboard', '/games/tuner')).toBe(true);
+    expect(crossesAppBoundary('/games/flashcards', '/games/tuner')).toBe(true);
   });
 
   it('is false between ordinary pages', () => {

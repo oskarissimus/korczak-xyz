@@ -34,7 +34,7 @@ export default function MasteryChart({
   emptyLabel,
 }: MasteryChartProps) {
   if (history.length === 0) {
-    return <p className="fb-empty">{emptyLabel}</p>;
+    return <p className="srs-empty">{emptyLabel}</p>;
   }
 
   // One day of history has no width. Repeating it gives the bands something to span, which

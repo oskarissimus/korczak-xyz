@@ -14,7 +14,7 @@
 
 import { createCard } from '../srs/scheduler';
 import type { Card } from '../srs/scheduler';
-import type { QueueOptions } from '../srs/queue';
+import type { QueueOptions, QueueShape } from '../srs/queue';
 import {
   buildQueue as buildQueueFrom,
   ensureCards as ensureCardsIn,
@@ -30,7 +30,7 @@ import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 export { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, countDeck, nextDueAt, requeue } from '../srs/queue';
-export type { DeckCounts, QueueOptions } from '../srs/queue';
+export type { DeckCounts, QueueOptions, QueueShape } from '../srs/queue';
 
 const ALL_TONICS: PitchClass[] = Array.from({ length: 12 }, (_, i) => i);
 
@@ -110,25 +110,35 @@ export const MIN_SUBJECT_GAP = 3;
  * Keyed on the answer (`subjectOf`), so the two spellings and the two B-namings of one key land
  * together too — those share an answer *and* a shape, which is the sharpest case of all.
  */
-export function spreadSubjects(queue: string[], gap = MIN_SUBJECT_GAP): string[] {
-  return spreadBy(
-    queue,
-    (id) => {
-      const key = parseCardId(id);
-      return key ? subjectOf(key) : id;
-    },
-    gap
-  );
+/**
+ * The key a card is held apart on. Exported for the same reason the fretboard's `positionSubject`
+ * is: a mixed sitting spreads one queue drawn from both trainers and has to ask each of them.
+ */
+export function cardSubject(id: string): string {
+  const key = parseCardId(id);
+  return key ? subjectOf(key) : id;
 }
 
+export function spreadSubjects(queue: string[], gap = MIN_SUBJECT_GAP): string[] {
+  return spreadBy(queue, cardSubject, gap);
+}
+
+/**
+ * A queue drawn from this deck alone.
+ *
+ * `shape` is a parameter rather than a field on `settings`, because a sitting's length belongs to
+ * the sitting and a sitting may mix this deck with the fretboard's — which is what the app does,
+ * through `buildMixedQueue` in `src/utils/flashcards/mix.ts`.
+ */
 export function buildQueue(
   deck: Deck,
   settings: Settings,
   library: LibraryIndex,
+  shape: QueueShape,
   now: number,
   options: QueueOptions = {}
 ): string[] {
-  return buildQueueFrom(cardsInScope(deck, settings, library), settings, now, {
+  return buildQueueFrom(cardsInScope(deck, settings, library), shape, now, {
     ...options,
     spread: (queue) => spreadSubjects(queue),
   });

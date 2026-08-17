@@ -21,7 +21,11 @@ import {
 import type { PositionStat } from '../../utils/fretboard/stats';
 import MasteryChart from '../srs/MasteryChart';
 import { NeckHeatmap } from './NeckGrid';
-import SyncBadge from './SyncBadge';
+// The merged app's badge and the merged app's strings for it: this page is one of three tabs now,
+// and the sync it reports on is the whole account's rather than this deck's. See
+// `src/utils/flashcards/sync.ts` for why one badge over two syncs needs a rule.
+import SyncBadge from '../Flashcards/SyncBadge';
+import { translations as chromeTranslations } from '../Flashcards/translations';
 import TrendChart from '../srs/TrendChart';
 import { defaultNotationFor, translations, type Lang } from './translations';
 
@@ -31,6 +35,7 @@ interface FretboardStatsProps {
 
 export default function FretboardStats({ lang }: FretboardStatsProps) {
   const t = translations[lang];
+  const chrome = chromeTranslations[lang];
   const auth = useAuth();
   const data = useFretboardData(auth.user, defaultNotationFor(lang));
 
@@ -180,7 +185,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
         )}
       </section>
 
-      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={t} />
+      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={chrome} />
     </div>
   );
 }

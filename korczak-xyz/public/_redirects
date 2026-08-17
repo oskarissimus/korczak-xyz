@@ -1,0 +1,21 @@
+# The fretboard trainer and the transposition trainer were merged into one app at
+# /games/flashcards/ — one entrypoint, one installable app, and one sitting drawn from both decks.
+# See the "Flashcards" section of CLAUDE.md.
+#
+# 301 rather than 302 because the old routes are not coming back. Note what this does to an
+# already-installed home-screen app: its start_url redirects out of its own scope, so iOS opens the
+# target in Safari instead of the app. That is what retiring a PWA's routes means, and the fix is
+# deleting the old icon and installing the new one once.
+#
+# The stats tabs land on their own halves rather than on the practice screen: someone with
+# /games/fretboard/stats bookmarked wants a progress page, and the neck heatmap is still one.
+
+/games/fretboard              /games/flashcards          301
+/games/fretboard/stats        /games/flashcards/neck     301
+/games/transpose              /games/flashcards          301
+/games/transpose/stats        /games/flashcards/chords   301
+
+/pl/games/fretboard           /pl/games/flashcards         301
+/pl/games/fretboard/stats     /pl/games/flashcards/neck    301
+/pl/games/transpose           /pl/games/flashcards         301
+/pl/games/transpose/stats     /pl/games/flashcards/chords  301

@@ -1,0 +1,152 @@
+---
+/**
+ * Server-rendered stand-in for <Flashcards client:only="react" />, mirroring the start screen: three
+ * figure tiles, the split line, the start button, and the settings block. Astro swaps it for the real
+ * island the moment React hydrates.
+ *
+ * It stands in for the *start* screen specifically because that is what the island always renders
+ * first — a sitting is something you begin, never something the page loads into.
+ *
+ * The settings rows print the buttons' real labels, from the same constants the panels read. A count
+ * of blank chips is not enough to reserve the right height: what a row costs at 320px is how many
+ * lines it wraps onto, and that is set by the width of the text on the buttons. Three chips of blank
+ * space stood in for `Name the note` / `Find the note` / `Find the pitch` and did not wrap where the
+ * real row wraps onto three lines. So nothing here is a measurement to keep up to date — the
+ * technique `TypingSkeleton.astro` uses for the book picker, and for the same reason.
+ *
+ * It is a longer panel than either trainer's was, because it is both scopes plus the sitting's own
+ * three rows. That is exactly why it has to be printed rather than approximated.
+ */
+import { STRING_COUNT, stringLabel } from '../../../utils/fretboard/notes';
+import { FRET_CHOICES, fretChoiceLabel } from '../../Fretboard/SettingsPanel';
+import {
+  defaultNotationFor,
+  translations as fretboardTranslations,
+} from '../../Fretboard/translations';
+import { DIRECTIONS } from '../../../utils/transpose/cards';
+import { NOTATIONS, PATTERN_IDS, patternLabel } from '../../../utils/transpose/theory';
+import { translations as transposeTranslations } from '../../Transpose/translations';
+import { LENGTH_CHOICES, NEW_CHOICES } from '../SettingsPanel';
+import { translations, type Lang } from '../translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+const fb = fretboardTranslations[lang];
+const tp = transposeTranslations[lang];
+
+const TILES = [t.due, t.fresh, t.mastered];
+
+// The notation is the locale's default, which is what an un-hydrated page has no better guess than.
+const notation = defaultNotationFor(lang);
+
+const TP_DIRECTION_LABELS = { transpose: tp.dirTranspose, degrees: tp.dirDegrees, key: tp.dirKey };
+const TP_NOTATION_SAMPLES = { polish: 'C#·a·H', german: 'Cis·a·H', international: 'C#·Am·B' };
+
+type Row = { label: string; choices: (string | number)[] };
+
+const SITTING_ROWS: Row[] = [
+  { label: t.decks, choices: [t.deckNeck, t.deckChords] },
+  { label: t.sessionLength, choices: LENGTH_CHOICES },
+  { label: t.newPerSession, choices: NEW_CHOICES },
+];
+
+const NECK_ROWS: Row[] = [
+  { label: fb.frets, choices: FRET_CHOICES.map(fretChoiceLabel) },
+  {
+    label: fb.strings,
+    choices: Array.from({ length: STRING_COUNT }, (_, i) =>
+      stringLabel(STRING_COUNT - 1 - i, notation)
+    ),
+  },
+  {
+    label: fb.directions,
+    choices: [fb.dirName, fb.dirFind, fb.dirPitch, fb.dirAllNote, fb.dirAllPitch],
+  },
+  { label: fb.stringLabels, choices: [fb.on, fb.off] },
+  { label: fb.notation, choices: [fb.notationIntl, fb.notationGerman] },
+];
+
+const CHORD_ROWS: Row[] = [
+  { label: tp.directions, choices: DIRECTIONS.map((d) => TP_DIRECTION_LABELS[d]) },
+  { label: tp.patterns, choices: PATTERN_IDS.map(patternLabel) },
+  { label: tp.keysScope, choices: [tp.keysAll, tp.keysSongbook] },
+  { label: tp.notations, choices: NOTATIONS.map((n) => TP_NOTATION_SAMPLES[n]) },
+];
+---
+
+<div class="fb-start" aria-hidden="true">
+  <div class="fb-tiles">
+    {
+      TILES.map((label) => (
+        <div class="fb-tile">
+          <span class="fb-tile-value fb-skel-value">—</span>
+          <span class="fb-tile-label">{label}</span>
+        </div>
+      ))
+    }
+  </div>
+
+  <p class="fb-split">&nbsp;</p>
+
+  <div class="fb-start-actions">
+    <span class="fb-btn fb-btn--primary fb-btn--big">{t.start}</span>
+  </div>
+
+  <p class="fb-sync fb-sync--quiet">&nbsp;</p>
+
+  <div class="fb-settings">
+    <h3 class="fb-subhead">{t.settings}</h3>
+    {
+      SITTING_ROWS.map((row) => (
+        <div class="fb-setting">
+          <span class="fb-setting-label">{row.label}</span>
+          <div class="fb-setting-controls">
+            {row.choices.map((choice) => (
+              <span class="fb-choice">{choice}</span>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+
+    <h4 class="fb-subhead fb-subhead--deck">{t.neckSettings}</h4>
+    {
+      NECK_ROWS.map((row) => (
+        <div class="fb-setting">
+          <span class="fb-setting-label">{row.label}</span>
+          <div class="fb-setting-controls">
+            {row.choices.map((choice) => (
+              <span class="fb-choice">{choice}</span>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+
+    <h4 class="fb-subhead fb-subhead--deck">{t.chordSettings}</h4>
+    {
+      CHORD_ROWS.map((row) => (
+        <div class="fb-setting">
+          <span class="fb-setting-label">{row.label}</span>
+          <div class="fb-setting-controls">
+            {row.choices.map((choice) => (
+              <span class="fb-choice">{choice}</span>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</div>
+
+<style>
+  /* The figures are the one thing the stand-in cannot know. A dash rather than a zero: a zero is a
+     claim, and it would be wrong as often as not. */
+  .fb-skel-value {
+    color: var(--retro-dark-gray);
+  }
+</style>

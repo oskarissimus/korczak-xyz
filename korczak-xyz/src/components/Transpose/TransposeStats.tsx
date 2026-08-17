@@ -30,7 +30,9 @@ import { keyLabel } from '../../utils/transpose/theory';
 import type { Notation } from '../../utils/transpose/theory';
 import MasteryChart from '../srs/MasteryChart';
 import TrendChart from '../srs/TrendChart';
-import SyncBadge from './SyncBadge';
+// The merged app's badge and the merged app's strings for it — see `FretboardStats` for why.
+import SyncBadge from '../Flashcards/SyncBadge';
+import { translations as chromeTranslations } from '../Flashcards/translations';
 import { defaultNotationsFor, translations, type Lang } from './translations';
 
 interface TransposeStatsProps {
@@ -46,6 +48,7 @@ const DIRECTION_LABELS: Record<Direction, 'dirTranspose' | 'dirDegrees' | 'dirKe
 
 export default function TransposeStats({ lang, library }: TransposeStatsProps) {
   const t = translations[lang];
+  const chrome = chromeTranslations[lang];
   const auth = useAuth();
   const defaults = useMemo(() => defaultNotationsFor(lang), [lang]);
   const data = useTransposeData(auth.user, defaults, library);
@@ -244,7 +247,7 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
         )}
       </section>
 
-      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={t} />
+      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={chrome} />
     </div>
   );
 }

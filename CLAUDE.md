@@ -191,9 +191,100 @@ reason, as the boxed marks in `chordMarks.css` — a glyph's ink may overhang, i
 The side layout (`renderSideLayout`) is exempt from all of this: it strips the positioning
 spaces and puts the chords in their own flex column, so `.chord-col` may be bold and is.
 
-## Fretboard Trainer
+## Guitar Flashcards
 
-Spaced-repetition flashcards for the notes on the neck, at `/games/fretboard/`. Most cards are one
+One spaced-repetition app at `/games/flashcards/`, holding two decks: the notes on the neck and
+moving chords between keys. They were two apps — `/games/fretboard/` and `/games/transpose/` — and
+the two sections below still describe their cards, because the cards did not change. What changed is
+that there is now one entrypoint, one installable app, and **one sitting that mixes both decks**.
+
+Three tabs: `Practice`, `Neck stats`, `Chord stats`. The progress pages stay two because they measure
+different skills over separate histories — the neck heatmap and the chord-key table are not two views
+of one number — and folding them behind a switch would hide half the answer behind a click. The old
+routes are 301s in `public/_redirects`.
+
+### Mix the queue, not the data
+
+**No data moved.** `createSrsStorage('fretboard')` and `('transpose')` keep their eight localStorage
+keys each, and `users/{uid}/fretboardSessions` / `transposeSessions` keep their documents. That is
+what makes the two stats pages separate *by construction* rather than by a filter, it is why the merge
+needed no migration and could not lose a schedule, and it is why `useFretboardData` and
+`useTransposeData` are still two near-duplicate hooks (125 diff lines) rather than one parameterised
+one. `useFlashcardsData` mounts both side by side and adds only what belongs to the sitting.
+
+What is merged is the *sitting*. A card id is opaque to `src/utils/srs/`, so both decks fit in one
+queue once their ids are told apart — `fb|find:1-4:b`, `tp|degrees:9:145:de`:
+
+- `src/utils/flashcards/trainers.ts` — `qualify` / `unqualify`. `|` is the separator because neither
+  grammar contains one; `trainers.test.ts` asserts that over the whole of both scopes rather than
+  trusting it, since a grammar that grew a `|` would fail silently as answers filed against ids
+  nobody minted.
+- `src/utils/flashcards/mix.ts` — `buildMixedQueue`. **One `buildQueue` call, not two queues woven
+  together.** Selection there is by due date, so one call means the sitting takes whatever has waited
+  longest across both decks: a deck left alone for a fortnight fills it, a deck that is caught up
+  contributes nothing. Two queues built to their own lengths and interleaved would guarantee each deck
+  a share of every sitting, which sounds fair and is the scheduler being overruled twice. The `spread`
+  key is namespaced by trainer, so each deck's own rule applies to its own run and a neck card is
+  never held apart from a chord card — they cannot give each other away.
+- `src/utils/flashcards/settings.ts` — `trainers`, `sessionLength`, `newPerSession`, at
+  `flashcards-settings` and `users/{uid}/flashcards/settings`. Those last two **left both trainers'
+  `Settings`**: a mixed sitting has one length, and a copy on each deck is two numbers that must agree
+  with nothing to make them. Each `buildQueue` takes a `QueueShape` parameter now. The migration reads
+  whichever trainer had stored a shape, fretboard first.
+- `src/utils/flashcards/sync.ts` — `mergeSync`, one badge over two syncs. One rule matters: **a half
+  that failed is never reported as synced**, so the precedence is `error > syncing > off > idle` and
+  `lastSyncedAt` takes the older of the two.
+
+**A qualified id exists only inside one sitting's queue.** It never reaches a `ReviewEvent`, never
+localStorage, never Firestore. The one place a qualified id is deliberately handed onward is the
+summary, which builds a display-only copy of the events so each missed line can be named by the
+trainer that owns it and `byDirection` reads `neck · find` rather than folding two vocabularies into
+one column.
+
+One sitting produces **two commits under one session id** — `fretboardSessions/{id}` and
+`transposeSessions/{id}`, the same `id`, which is what lets the two records be recognised as its
+halves. `ReviewEvent.id` is `${sessionId}-${ordinal}` with the ordinal counted **once across both**,
+so ids stay unique in each log. A deck that contributed nothing gets no record: `finishSession`
+already returns null and clears its orphan key on zero events, which also means a tab closed
+mid-sitting is recovered independently on each side, by the hooks that always did it.
+
+### The components, and where the seam is
+
+`FlashcardsSession` is the loop both trainers used to keep a copy of — the queue, the working deck,
+the answer log, `requeue`. **Nothing in it knows what a card is.** It reads a trainer off the queued
+id, hands the rest to that trainer's card component, and takes back one submission: right or wrong,
+what was answered, and how many places the card asked for. That last one crosses the seam rather than
+being decided centrally, because the rating's speed thresholds are per place and only the card knows
+how many it wanted.
+
+- `src/components/Flashcards/FretboardCard.tsx`, `TransposeCard.tsx` — parse, the answer surface, the
+  keyboard, and the verdict readout. Each is keyed on the queue position, so a card mounts fresh and
+  has nothing to reset, and each holds its own verdict rather than reading one down through props —
+  the verdict is made of what was pressed and what should have been, facts only the card has.
+- The keyboard is the card's while the card is unanswered and the runner's afterwards, because
+  carrying on past a wrong answer is the runner's business.
+- Each trainer's `SettingsPanel` is now **rows only**, composed by `Flashcards/SettingsPanel.tsx`
+  under a heading. A scope belongs to the deck it describes; the sitting belongs to the app.
+- The two `translations.ts` are **deliberately not merged**. They overlap by about forty keys and
+  disagree on a dozen — `answerWas` is `It was {note}` in one and `Answer: {answer}` in the other,
+  `notationGerman` is the single letter `H` in one and a sentence in the other — so one namespace
+  would silently pick a winner per key and the losing card would print the wrong template. Each card
+  is drawn with its own; `Flashcards/translations.ts` holds only what belongs to neither.
+
+One naming debt, written down so it is not rediscovered: **`.fb-*` is two families now.** The generic
+half — buttons, tiles, the start screen, the session bar, the settings rows, the summary, the sync
+badge, the feedback line — is the *merged app's* chrome and is drawn on the chord cards' screens as
+much as the neck's; only `.fb-neck-*`, `.fb-diagram`, `.fb-pad-*`, `.fb-stage` and `.fb-heat-*` are
+really about a fretboard. `transpose.css` still carries its own copy of the generic half for
+`TransposeStats`. Collapsing both into `.fc-*` is ~40 class names across two sheets and every
+component and changes no behaviour, so it was not done in the same commit as the merge.
+`flashcards.css` is the one sheet every page imports, and it is the only place the four shared sheets
+are pulled in — `fretboard.css` and `transpose.css` used to carry those `@import`s each, and importing
+one file from two sheets inlines it twice.
+
+## The neck cards
+
+Spaced-repetition flashcards for the notes on the neck. Most cards are one
 position, drilled **both ways round** on independent schedules: `name` shows the dot and asks
 what it is called, `find` names the note and a string and asks where it is. Reading a diagram
 and finding G on the A string mid-song are different skills, and the scheduler has no business
@@ -210,18 +301,23 @@ is what makes the per-position accuracy and speed on the stats page measurements
 claims. `srs.ts` is Anki's shape: minute-scale learning steps (1m, 10m) before day-scale
 intervals, relearning after a lapse, mature at ≥21 days.
 
-- `src/utils/srs/` — **shared with the transposition trainer**: `scheduler.ts` (SM-2, was
-  `fretboard/srs.ts`), `replay.ts` (the merge core), `types.ts` (the record shapes), `queue.ts`
-  (selection and running order), `history.ts` (summaries and snapshots), `storage.ts`
-  (`createSrsStorage`), `cloud.ts` (`createSrsCloud`). See *Two trainers, one scheduler* below.
+- `src/utils/srs/` — **shared with the chord cards**: `scheduler.ts` (SM-2, was `fretboard/srs.ts`),
+  `replay.ts` (the merge core), `types.ts` (the record shapes), `queue.ts` (selection and running
+  order), `history.ts` (summaries and snapshots), `storage.ts` (`createSrsStorage`), `cloud.ts`
+  (`createSrsCloud`). See *Two decks, one scheduler* below.
 - `src/utils/fretboard/` — what is about a neck: `notes.ts` (tuning, card ids), `diagram.ts`,
-  `deck.ts` (scope, `spreadPositions`), `stats.ts` (the heatmap), `storage.ts`, `cloud.ts`,
-  `keys.ts`
-- `src/hooks/useFretboardData.ts` — local state, upload queue, pull and merge
-- `src/components/Fretboard/` — the two islands and their parts
-- `src/components/srs/` — `Verdict.tsx`, `MasteryChart.tsx`, `TrendChart.tsx`, shared with the
-  transposition trainer; their styles are `verdict.css` and `srsCharts.css`, pulled in by each
-  game's stylesheet with `@import` the way `tabs.css` is
+  `deck.ts` (scope, `spreadPositions`, `positionSubject`), `stats.ts` (the heatmap), `storage.ts`,
+  `cloud.ts`, `keys.ts`
+- `src/hooks/useFretboardData.ts` — this deck's local state, upload queue, pull and merge; mounted by
+  `useFlashcardsData` alongside the chord one
+- `src/components/Fretboard/` — the neck's own parts: `NeckGrid`, `NoteCard`, `NotePad`,
+  `FretboardStats`, the settings rows, `describeCard`, `translations`. The card that assembles them
+  is `Flashcards/FretboardCard.tsx`.
+- `src/components/srs/` — `Verdict.tsx`, `MasteryChart.tsx`, `TrendChart.tsx`, shared with the chord
+  cards; their styles are `verdict.css` and `srsCharts.css`, pulled in by `flashcards.css` the way
+  `tabs.css` is. Their empty state is `.srs-empty` and not `.fb-empty` — an app prefix in a shared
+  component meant the chord-progress page rendered an unstyled empty chart, which is invisible until
+  the one page that lacks the sheet has no data.
 
 ### A black key is two `find` cards, one per spelling
 
@@ -311,7 +407,8 @@ out of the synced settings mints ids its own `parseCardId` rejects, and a sittin
 No new direction token can ever be safe backwards, so this is accepted rather than fixed — the
 service worker is network-first for documents, so the window is a page already open across the
 deploy. What *is* fixed is the forward case: `loadSettings` filters `directions` against
-`DIRECTIONS`, and `FretboardSession` skips a card it cannot read instead of rendering nothing.
+`DIRECTIONS`, and `FretboardCard` reports the id unreadable so the sitting skips it instead of
+rendering nothing.
 
 ### Asking for every place is a question neither of those asks
 
@@ -365,7 +462,7 @@ would be a scheduler of its own.
 One more direction token is one more thing a page open across a deploy cannot read; that trade is
 the one the `pitch` section sets out, and it is still accepted rather than fixed for the same
 reason. What protects the forward case protects these too: `loadSettings` filters `directions`
-against `DIRECTIONS`, and `FretboardSession` skips a card it cannot parse.
+against `DIRECTIONS`, and `FretboardCard` reports it unreadable so the sitting skips it.
 
 ### The deck is derived; the answer log is the record
 
@@ -526,7 +623,7 @@ once the setting is touched it is stored and synced and follows the account acro
 The songbook's chord transposer (`src/utils/chords.ts`) prints `H` and `B` the same way but keeps
 `#` for the rest, and that is **not** a disagreement to fix: a chord symbol is written `C#m` in
 Poland as everywhere else, while the note under it is called cis. Chord symbols and note names
-are two notations, and only one of them is the fretboard trainer's business.
+are two notations, and only one of them is the neck cards' business.
 
 `PITCH_CLASSES[].name` stays international whichever is picked. It is what an answer is graded
 against and what lands in `ReviewEvent.answered` in localStorage and Firestore, so a notation
@@ -583,12 +680,12 @@ The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (
 `.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through
 the one stylesheet it already needed.
 
-## Two trainers, one scheduler
+## Two decks, one scheduler
 
-`src/utils/srs/` is what the fretboard and transposition trainers genuinely share, and the line is
-drawn at **what does not know what a card is**. A card id is an opaque string in every file there;
-each app owns its own grammar for it and its own parser, and nothing in that directory ever looks
-inside one.
+`src/utils/srs/` is what the two decks genuinely share, and the line is drawn at **what does not know
+what a card is**. A card id is an opaque string in every file there; each deck owns its own grammar
+for it and its own parser, and nothing in that directory ever looks inside one. That is exactly the
+property `src/utils/flashcards/mix.ts` exploits to put both decks in one queue.
 
 - `scheduler.ts` — SM-2 with learning steps. Pure, takes `now`, which is what makes the deck a fold.
 - `replay.ts` — union by id, refold. The whole argument is in its header.
@@ -597,16 +694,17 @@ inside one.
   the one place the split needed a seam.
 - `storage.ts` / `cloud.ts` — **factories**, not modules of functions. `createSrsStorage(prefix)`
   is per instance so the two decks cannot evict each other's event log under quota pressure, which
-  a shared `failingKeys` set and a shared eviction target would have let them do.
+  a shared `failingKeys` set and a shared eviction target would have let them do. It is also what
+  keeps the two histories apart now that one sitting writes to both.
 
-What stayed with each app is what has an opinion about the material: the scope enumeration, the
+What stayed with each deck is what has an opinion about the material: the scope enumeration, the
 card-id grammar, and the `spread` function that pulls apart cards which would answer each other.
 
-## Transposition Trainer
+## The chord cards
 
-Spaced-repetition flashcards for moving chords between keys, at `/games/transpose/`. Three
+Spaced-repetition flashcards for moving chords between keys. Three
 directions, and they are three skills rather than three ways of asking one thing — the same
-argument that splits the fretboard's `name` from its `find`:
+argument that splits the neck cards' `name` from their `find`:
 
 - `transpose` — *A D E, into the key of C*. Move a progression you are looking at. Two valid
   routes: count three semitones onto each chord, or read the degrees and re-issue them.
@@ -619,13 +717,15 @@ and `i iv V`, the second raising the seventh, which is `a d E` and `e a H7` and 
 All permutations of source and target key; `Settings.keys` narrows to the seven the songbook uses.
 
 - `src/utils/transpose/` — `theory.ts` (keys, degrees, names), `cards.ts` (card ids, notation
-  canonicalisation), `deck.ts` (scope, `spreadSubjects`), `library.ts` (the songbook index),
-  `keys.ts`, `stats.ts`, `storage.ts`, `cloud.ts`, `collect.ts` (build-time only)
-- `src/hooks/useTransposeData.ts`, `src/components/Transpose/`
+  canonicalisation), `deck.ts` (scope, `spreadSubjects`, `cardSubject`), `library.ts` (the songbook
+  index), `keys.ts`, `stats.ts`, `storage.ts`, `cloud.ts`, `collect.ts` (build-time only)
+- `src/hooks/useTransposeData.ts` — mounted by `useFlashcardsData` alongside the neck one
+- `src/components/Transpose/` — `AnswerSlots`, `ChordPad`, `TransposeStats`, the settings rows,
+  `describeCard`, `translations`. The card that assembles them is `Flashcards/TransposeCard.tsx`.
 
 ### A key spells its own chords
 
-There is no sharp/flat axis here, the way there is on the fretboard's `find` cards, because a key
+There is no sharp/flat axis here, the way there is on the neck cards' `find` direction, because a key
 is not free to choose: the IV of F is B♭ and never A♯, and the V of B is F♯ and never G♭. Each key
 carries the spelling its signature dictates (`MAJOR_SPELLING`, the circle of fifths — D♭ over C♯,
 F♯ over G♭ on the one genuine tie) and every chord drawn from it is written that way. One fewer
@@ -834,16 +934,21 @@ the sharing rules do nothing until it is run.
 
 ## Installable web apps (PWA)
 
-The site ships **six** installable apps from one origin: the whole site, the guitar tuner
-(`/games/tuner`), the songbook (`/songs`), the fretboard trainer (`/games/fretboard`), the
-transposition trainer (`/games/transpose`) and the baby sleep log (`/games/baby-sleep`). What qualifies is a thing you reach for away from a desk;
+The site ships **five** installable apps from one origin: the whole site, the guitar tuner
+(`/games/tuner`), the songbook (`/songs`), the flashcards (`/games/flashcards`) and the baby sleep log
+(`/games/baby-sleep`). What qualifies is a thing you reach for away from a desk;
 the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
 opening a link outside it leaves the app — which is the point, since most of the site is not
 built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks
 which manifest the page links; iOS reads the manifest of the page you install *from*, so that
 prop is what decides which app "Add to Home Screen" produces. **Every page of a scoped app has
-to set it** — the fretboard and sleep log are several documents each (their tabs), and a tab
+to set it** — the flashcards and sleep log are several documents each (their tabs), and a tab
 that forgets installs the whole site under the app's own name.
+
+It shipped six until the fretboard and transposition trainers became one, and the retiring cost is
+worth knowing before doing it again: an installed app's `start_url` now 301s out of its own scope, so
+iOS opens the target in Safari rather than the app. Deleting the old icon and installing the new one
+is the only fix, and there is no way to hand an existing install a new identity.
 
 Adding an app is: an entry in `PWA_APPS`, a pattern in `SCOPED`, two short names in the i18n
 table, artwork, the `pwa` prop on its pages, and a precache tier. Everything else — both
@@ -861,21 +966,23 @@ manifests, the icon set, the head tags — follows.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
   only runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
-The five drawn icons are **full bleed**: every platform masks a home screen icon to its own
+The four drawn icons are **full bleed**: every platform masks a home screen icon to its own
 shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
 and the convex read comes from a bounce light, a gloss sweep and a perimeter vignette layered at
 the end of each file. The square-on-navy art this replaced left a visible border on all four
 sides once iOS rounded the corners off the navy. `generate-icons.mjs` therefore picks the
-maskable treatment per source: `bleed` ships those five unscaled, `inset` keeps the old shrink-onto-navy
+maskable treatment per source: `bleed` ships those four unscaled, `inset` keeps the old shrink-onto-navy
 for `logo.png`, whose own square edges a circular mask would clip.
 
-All five are the same Win95 device — navy body, raised bezel, sunken black glass — with only
+All four are the same Win95 device — navy body, raised bezel, sunken black glass — with only
 what is *on* the glass telling them apart, because they sit side by side on one home screen:
-the tuner's dial, the songbook's yellow chords over green lyrics, the fretboard's neck with one
-note lit, the transposition trainer's `A → C`, the sleep log's crescent and Zs. Green and yellow throughout, the site's own phosphor.
-The fretboard icon draws **four** frets where the app draws five: an icon is read at 40px two
-rows down a home screen, where a finer grid stops being a neck and becomes texture — and the
-fret count is not the question the icon is asking.
+the tuner's dial, the songbook's yellow chords over green lyrics, the flashcards' stack of cards, the
+sleep log's crescent and Zs. Green and yellow throughout, the site's own phosphor.
+The flashcards icon draws **two** frets where the app draws five, on a card front rather than filling
+the glass: an icon is read at 40px two rows down a home screen, where a finer grid stops being a neck
+and becomes texture — and the fret count is not the question the icon is asking. The card behind the
+front one is yellow, the songbook's chord colour, which is the only thing at that size that says the
+deck holds chords too.
 
 **Icon URLs carry a content hash** (`iconUrl.ts`, used by `PwaHead.astro` and the manifest
 route). `_headers` gives `/icons/*` a week, and Cloudflare's edge honours it: the filenames are
@@ -972,13 +1079,16 @@ takes at most two: the shell, and the one named after the app it belongs to.
   work on a dead network, not something to push at a visitor who opened korczak.xyz once. The
   worker cannot tell those apart — iOS gives them the same registration — so `register-sw.js`
   checks `display-mode: standalone` and names the tiers it wants.
-- **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `fretboard` (~64 kB gz),
-  `transpose` (~65 kB gz), `baby-sleep` (~90 kB gz). Each covers its app's whole subtree, because a tab is a separate
+- **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `flashcards` (~110 kB gz),
+  `baby-sleep` (~92 kB gz). Each covers its app's whole subtree, because a tab is a separate
   document and an uncached tab is a dead link on a dead network.
 
-The per-app split is what stops the shell growing with the app count. Folding the two newest
-apps into the shell instead cost every installed app — including the songbook, which wants
-none of it — an extra 149 kB gz, and each further app would have charged all the others again.
+The per-app split is what stops the shell growing with the app count. Folding the newest apps into the
+shell instead cost every installed app — including the songbook, which wants none of it — an extra
+149 kB gz, and each further app would have charged all the others again. Note that merging two apps
+did *not* halve anything here: the flashcards tier is roughly the two it replaced added together,
+since it caches the same documents and the same island chunks. What the merge saved is one tier's worth
+of bookkeeping in three files, not bytes.
 The tuner and the songbook *index* are still in the shell for the historical reason that they
 were the only two apps when it was written; they are two cheap routes and moving them now would
 only churn the cache.

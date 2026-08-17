@@ -5,6 +5,12 @@
  * both trainers and live in `src/utils/srs/types.ts`; they are re-exported so the rest of this
  * app has one place to import its types from. What is genuinely the fretboard's own is `Settings`
  * — a scope made of strings and frets, which no other deck has.
+ *
+ * A scope and *only* a scope. How long a sitting runs and how many new cards it may introduce used
+ * to live here too, and they belong to the sitting rather than to the material: a sitting mixes
+ * this deck with the transposition trainer's, so there is one length for both and it is
+ * `src/utils/flashcards/settings.ts` that holds it. Keeping a copy here would be two numbers that
+ * have to agree and nothing to make them.
  */
 
 import type { Direction, Notation } from './notes';
@@ -27,10 +33,6 @@ export interface Settings {
   strings: number[];
   /** Which way round positions are asked. Empty is not allowed; the UI keeps at least one. */
   directions: Direction[];
-  /** How many cards a sitting aims for, before in-session repeats. */
-  sessionLength: number;
-  /** Ceiling on unseen cards introduced in one sitting. */
-  newPerSession: number;
   /** Whether the diagram prints the string letters. Off is the harder deck. */
   stringLabels: boolean;
   /**
@@ -48,8 +50,6 @@ export const DEFAULT_SETTINGS: Settings = {
   maxFret: 5,
   strings: [0, 1, 2, 3, 4, 5],
   directions: ['name', 'find'],
-  sessionLength: 20,
-  newPerSession: 6,
   stringLabels: true,
   notations: ['international'],
 };

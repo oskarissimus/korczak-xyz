@@ -65,7 +65,9 @@ describe('precache tiers', () => {
     const paths = [
       '/', '/pl', '/about', '/games', '/games/tuner', '/pl/games/tuner', '/songsheets',
       '/songs', '/songs/warszawa', '/pl/songs', '/pl/songs/arahja/',
-      '/games/fretboard', '/games/fretboard/stats', '/pl/games/fretboard',
+      '/games/flashcards', '/games/flashcards/neck', '/pl/games/flashcards/chords',
+      // The routes the merged app replaced belong to no app and must ask for no tier.
+      '/games/fretboard', '/games/transpose',
       '/games/baby-sleep', '/games/baby-sleep/share', '/pl/games/baby-sleep/stats',
     ];
     for (const path of paths) {
@@ -81,8 +83,8 @@ describe('precache tiers', () => {
     const byTier = new Map(generatorTiers().map((t) => [t.tier, t.pattern]));
     expect(byTier.get('songs')!.test('/songs')).toBe(false);
     expect(byTier.get('songs')!.test('/songs/warszawa')).toBe(true);
-    expect(byTier.get('fretboard')!.test('/games/fretboard')).toBe(true);
-    expect(byTier.get('fretboard')!.test('/pl/games/fretboard/stats')).toBe(true);
+    expect(byTier.get('flashcards')!.test('/games/flashcards')).toBe(true);
+    expect(byTier.get('flashcards')!.test('/pl/games/flashcards/neck')).toBe(true);
     expect(byTier.get('baby-sleep')!.test('/games/baby-sleep')).toBe(true);
     expect(byTier.get('baby-sleep')!.test('/pl/games/baby-sleep/share')).toBe(true);
   });
