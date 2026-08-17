@@ -20,11 +20,18 @@ import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
 import { resolveWindow } from '../../utils/babySleep/days';
 import { formatClock, formatHm, formatSpread } from '../../utils/babySleep/format';
-import { bedtimePoints, computeStats, firstNapPoints, wakePoints } from '../../utils/babySleep/stats';
+import {
+  bedtimePoints,
+  computeStats,
+  firstNapPoints,
+  nightDurationPoints,
+  wakePoints,
+} from '../../utils/babySleep/stats';
 import { loadSettings, saveSettings } from '../../utils/babySleep/storage';
 import type { ClockStat, MeanStat, WindowChoice } from '../../utils/babySleep/types';
 import ClockSpreadChart from './ClockSpreadChart';
 import DailySleepBars from './DailySleepBars';
+import DurationSpreadChart from './DurationSpreadChart';
 import SleepTimeline from './SleepTimeline';
 import SyncBadge from './SyncBadge';
 import WindowPicker from './WindowPicker';
@@ -213,6 +220,22 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
             mean: t.legendMean,
           }}
           ariaLabel={t.totalsAria}
+          emptyLabel={t.chartEmpty}
+        />
+      </section>
+
+      {/* Beneath the totals, because it splits the top bar of each of them in two: the night alone,
+          against its own mean rather than against zero. */}
+      <section className="bs-section">
+        <h2 className="bs-subhead">{t.nightLengthTitle}</h2>
+        <DurationSpreadChart
+          points={nightDurationPoints(stats.days)}
+          stat={stats.nightPerDay}
+          formatDay={formatDay}
+          label={t.nightLengthSeries}
+          meanLabel={t.legendMean}
+          spreadLabel={t.legendSpread}
+          ariaLabel={t.nightLengthAria}
           emptyLabel={t.chartEmpty}
         />
       </section>

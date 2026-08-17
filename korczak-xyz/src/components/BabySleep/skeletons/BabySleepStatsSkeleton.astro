@@ -1,7 +1,7 @@
 ---
 /**
  * Server-rendered stand-in for <BabySleepStats client:only="react" />: the window picker, the tile row
- * and the three chart sections, so the page does not jump by several hundred pixels when the island
+ * and the chart sections, so the page does not jump by several hundred pixels when the island
  * arrives. Nothing here may import `storage.ts` — this runs on the server.
  */
 import { translations, type Lang } from '../translations';
@@ -26,7 +26,7 @@ const TILES = [
   t.tileFirstNap,
 ];
 
-const SECTIONS = [t.timelineTitle, t.totalsTitle, t.bedtimeTitle];
+const SECTIONS = [t.timelineTitle, t.totalsTitle, t.nightLengthTitle, t.bedtimeTitle];
 ---
 
 <div class="bs-stats" aria-hidden="true">

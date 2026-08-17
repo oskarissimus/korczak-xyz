@@ -115,6 +115,10 @@ export const translations = {
     timelineAria: 'Sleep blocks for each day against a midnight-to-midnight clock',
     totalsTitle: 'Total sleep per day',
     totalsAria: 'Night and nap sleep stacked, one bar per day',
+    nightLengthTitle: 'How long the night was',
+    nightLengthAria:
+      'Night sleep duration per day, with the mean and one standard deviation',
+    nightLengthSeries: 'Night sleep',
     bedtimeTitle: 'Falling asleep and waking up',
     bedtimeAria: 'Bedtime and wake-up clock times per day, with the mean and one standard deviation',
     legendNight: 'Night',
@@ -280,6 +284,10 @@ export const translations = {
     timelineAria: 'Bloki snu dla każdego dnia na osi od północy do północy',
     totalsTitle: 'Sen na dobę',
     totalsAria: 'Sen nocny i drzemki jeden na drugim, jeden słupek na dzień',
+    nightLengthTitle: 'Jak długa była noc',
+    nightLengthAria:
+      'Długość snu nocnego dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
+    nightLengthSeries: 'Sen nocny',
     bedtimeTitle: 'Zasypianie i pobudka',
     bedtimeAria:
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',

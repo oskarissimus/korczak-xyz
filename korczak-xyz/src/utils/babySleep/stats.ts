@@ -82,6 +82,13 @@ export interface ClockPoint {
   minutes: number;
 }
 
+/** One dot on a duration chart: which day, and how long the sleep lasted. */
+export interface DurationPoint {
+  /** Local midnight of the day the sleep is attributed to — the chart's x value. */
+  at: number;
+  ms: number;
+}
+
 export function computeStats(entries: SleepEntry[], window: TimeWindow, now: number): SleepStats {
   const days = groupByDay(entries, window, now);
   const settled = days.filter((d) => !d.partial);
@@ -98,7 +105,11 @@ export function computeStats(entries: SleepEntry[], window: TimeWindow, now: num
   return {
     days,
     totalPerDay: meanStat(withNight.map((d) => (d.nightMs ?? 0) + d.napMs)),
-    nightPerDay: meanStat(withNight.map((d) => d.nightMs as number)),
+    // Through the point extractor, not over `withNight`, so the tile and the chart drawn beneath it
+    // are the same population by construction — the clock figures have worked that way from the
+    // start, and a mean over one set of nights beside dots showing another is exactly the kind of
+    // disagreement nobody notices until they add the dots up by hand.
+    nightPerDay: meanStat(nightDurationPoints(days).map((p) => p.ms)),
     nightWakes: meanStat(nights.map((n) => wakeCount(n.blocks))),
     nightAwake: meanStat(nights.map((n) => awakeMs(n.blocks))),
     napPerDay: meanStat(tracked.map((d) => d.napMs)),
@@ -142,6 +153,24 @@ export function wakePoints(days: DayBucket[]): ClockPoint[] {
     const blocks = nightBlocks(d);
     if (!blocks) return [];
     return [{ at: d.start, minutes: minutesOfDay(blocks[blocks.length - 1].end as number) }];
+  });
+}
+
+/**
+ * How long each night was — its blocks added up, one point per night.
+ *
+ * Days still in progress are excluded here, and that is the one place these points part company with
+ * the clock ones above. A bedtime is a complete fact the moment the night starts; a *duration* is
+ * only complete once the night is over, and a day is not settled while more sleep may still be
+ * attributed to it. In practice the difference rarely shows — tonight's night is running, so
+ * `nightBlocks` already refuses it — but the rule is about what the number means, and it is what
+ * keeps this set identical to the one `nightPerDay` averages.
+ */
+export function nightDurationPoints(days: DayBucket[]): DurationPoint[] {
+  return days.flatMap((d) => {
+    if (d.partial) return [];
+    // Every block is closed, so the day's `nightMs` is the whole night.
+    return nightBlocks(d) ? [{ at: d.start, ms: d.nightMs as number }] : [];
   });
 }
 

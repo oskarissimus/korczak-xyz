@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveWindow } from './days';
-import { bedtimePoints, computeStats, firstNapPoints, wakePoints } from './stats';
+import {
+  bedtimePoints,
+  computeStats,
+  firstNapPoints,
+  nightDurationPoints,
+  wakePoints,
+} from './stats';
 import { groupByDay } from './days';
 import type { SleepEntry, SleepKind } from './types';
 
@@ -192,6 +198,7 @@ describe('a night broken by a waking', () => {
     const stats = computeStats(entries, week, T0);
     const day = stats.days.find((d) => d.key === '2026-01-14');
     expect(day?.nightMs).toBe(7 * HOUR);
+    expect(nightDurationPoints(stats.days)).toEqual([]);
     expect(stats.nightPerDay.n).toBe(0);
     expect(stats.bedtime.n).toBe(0);
     expect(stats.wakeTime.n).toBe(0);
@@ -208,6 +215,37 @@ describe('chart points', () => {
       { at: local(13, 0), minutes: 20 * 60 },
     ]);
     expect(wakePoints(days).map((p) => p.minutes)).toEqual([6 * 60, 6 * 60]);
+  });
+
+  it('gives one night-duration point per night, and it is the whole night', () => {
+    expect(nightDurationPoints(days)).toEqual([
+      { at: local(12, 0), ms: 10 * HOUR },
+      { at: local(13, 0), ms: 10 * HOUR },
+    ]);
+    // The blocks of a broken night are one point, not two.
+    const broken = groupByDay(
+      [entry('night', local(13, 20), local(14, 3)), entry('night', local(14, 3, 25), local(14, 6, 30))],
+      week,
+      T0
+    );
+    expect(nightDurationPoints(broken)).toEqual([
+      { at: local(13, 0), ms: 10 * HOUR + 5 * 60_000 },
+    ]);
+  });
+
+  it('plots exactly the nights `nightPerDay` averages', () => {
+    // Whatever is excluded from the mean — a running block, a day still in progress — must be
+    // excluded from the dots too, or the line sits somewhere the points do not explain.
+    const entries = [
+      ...normalDay(12),
+      ...normalDay(13),
+      // Attributed to the 15th, which is today: closed, believable, and still not a settled day.
+      entry('night', local(15, 7), local(15, 9)),
+    ];
+    const stats = computeStats(entries, week, T0);
+    const points = nightDurationPoints(stats.days);
+    expect(points.map((p) => p.ms)).toEqual([10 * HOUR, 10 * HOUR]);
+    expect(stats.nightPerDay).toMatchObject({ mean: 10 * HOUR, n: 2 });
   });
 
   it('gives one first-nap point per day that had a nap', () => {

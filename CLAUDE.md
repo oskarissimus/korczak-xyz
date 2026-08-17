@@ -759,6 +759,30 @@ tidy. `nightMs != null` used to mean "this night is finished", because an unfini
 open entry with no duration. A broken night has a closed first block, so it reports a duration while
 the baby is still asleep — and the old test would have let half of tonight into the averages.
 
+### The spread charts
+
+Four of them: three clock times and the night's length. `SpreadChart.tsx` is the drawing — dots, mean
+line, ±1 SD band, ticks, legend — and the line it is split on is that **it does not know what it is
+plotting**. It takes numbers in the axis's own units and a function that prints one, so
+`ClockSpreadChart` (minutes, circular) and `DurationSpreadChart` (milliseconds, linear) stay one
+chart in two places rather than two that drift.
+
+`y` and `value` are separate on a point for the clock's sake. A bedtime is unwrapped against the
+circular mean before it is plotted — 23:50 and 00:05 are fifteen minutes apart, not twenty-three
+hours — so it may sit at -10 or 1450 minutes on the axis, and a tooltip printing that number would
+name a time nobody experienced. The plotted number and the printed one are different facts.
+
+The duration axis does not start at zero: `DailySleepBars` above it already answers "how much sleep"
+against a zero baseline, and the question here is how much last night differed from the night before,
+which an hour of variation inside a twelve-hour axis cannot show. The three-hour floor stops the zoom
+going the other way and turning twenty minutes of ordinary drift into a mountain range. It does carry
+a `floor` of 0, though, because a duration axis padded past zero prints two gridlines both labelled
+`0m` — reachable from a single ten-minute night.
+
+`nightDurationPoints` is what the chart plots *and* what `nightPerDay` averages, so the tile and the
+dots beneath it are one population by construction. It is the one extractor that skips days still in
+progress: a bedtime is a complete fact the moment the night starts, a duration only once it is over.
+
 ### Sharing
 
 The log can be read and written by a second account, so both parents log against one history. The
