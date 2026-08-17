@@ -1,5 +1,6 @@
 korczak-xyz-astro/interstellar-inclination/.vscode/extensions.json
 korczak-xyz-astro/interstellar-inclination/.vscode/launch.json
+node_modules/
 snapshot-crawler/node_modules/
 .playwright-mcp/
 .DS_Store
