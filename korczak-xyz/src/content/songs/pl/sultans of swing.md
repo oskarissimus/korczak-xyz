@@ -6,8 +6,8 @@ published: true
 language: pl
 dateAdded: 2026-08-17
 chords:
-  d: "x x 0 2 3 1"
-  C: "x 3 2 0 1 0"
+  d: "x 5 7 7 6 5"
+  C: "x 3 5 5 5 3"
   B: "x 1 3 3 3 1"
   A: "x 0 2 2 2 0"
   F: "1 3 3 2 1 1"
