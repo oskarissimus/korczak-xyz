@@ -5,6 +5,13 @@ author: Dire Straits
 published: true
 language: pl
 dateAdded: 2026-08-17
+chords:
+  d: "x x 0 2 3 1"
+  C: "x 3 2 0 1 0"
+  B: "x 1 3 3 3 1"
+  A: "x 0 2 2 2 0"
+  F: "1 3 3 2 1 1"
+  A7: "x 0 2 0 2 0"
 ---
 ```plaintext
 [Wstęp]
@@ -69,4 +76,59 @@ d C B C
 
        d                   C                                     B A
 Then a crowd of young boys they're fooling around in the corner
+d                          C                                            B A
+Drunk and dressed in their best brown baggies and their platform soles
+F                            C
+They don't give a damn about any trumpet playing band
+B                           d  B C
+It ain't what they call, Rock'n'Roll
+               B C
+And the Sultans...
+                     d
+Yeah the Sultans played Creole
+
+[Przejście]
+d C B C
+
+..... Creole
+d C B C
+
+[Solo]
+/solo/
+d d C B A A A A
+
+d d C B A A A A
+
+F F F F C C C C
+
+B B B B d d d B
+
+C C C B C C C C
+
+[Przejście]
+d C B C
+d C B C
+
+d                   C     B                           A
+And then the man he steps right up to the microphone
+d           C            B   A                A7
+And says at last just as the time bell rings
+F                    C
+"Goodnight, now it's time to go home"
+B                             d            B C
+Then he makes it fast with one more thing:
+                  B C
+We are the Sultans...
+                   d
+We are the Sultans of Swing"
+
+[Przejście]
+d C B C
+d C B C
+
+[Zakończenie]
+/solo/
+d C B C
+
+/powtarzać aż do końca/
 ```
