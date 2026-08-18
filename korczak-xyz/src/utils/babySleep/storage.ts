@@ -28,6 +28,20 @@ const KEYS = {
   owner: 'baby-sleep-owner',
 } as const;
 
+/**
+ * The keys holding one particular log's data, as opposed to this browser's preferences. Every one
+ * of them is discarded when a different account signs in — see `adoptOwner`.
+ *
+ * `climateStorage.ts`'s keys are named here rather than imported from it, because it imports
+ * `writeKey` from this module and the cycle would be for two string constants.
+ */
+const CACHED_PER_OWNER = {
+  entries: KEYS.entries,
+  unsynced: KEYS.unsynced,
+  climate: 'baby-sleep-climate',
+  climateUnsynced: 'baby-sleep-climate-unsynced',
+} as const;
+
 /** Roughly a year and a bit of history kept on the device. The cloud keeps everything. */
 export const ENTRY_RETENTION_DAYS = 400;
 
@@ -77,7 +91,11 @@ function evictEntries(): number {
   return 0;
 }
 
-function writeKey(key: string, value: string): boolean {
+/**
+ * Exported so `climateStorage.ts` writes under the same discipline — a reported failure rather than
+ * a swallowed one — without a second copy of the eviction rule.
+ */
+export function writeKey(key: string, value: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
     localStorage.setItem(key, value);
@@ -104,7 +122,7 @@ function writeKey(key: string, value: string): boolean {
   return true;
 }
 
-function readJSON<T>(key: string, fallback: T): T {
+export function readJSON<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
     const stored = localStorage.getItem(key);
@@ -173,9 +191,20 @@ export function clearUnsynced(ids: string[]): boolean {
  * a different log: drop the entries and the push queue and start clean.
  */
 
+/*
+ * Two hooks call this — the sleep log's and the night climate's — and only the first of them can
+ * observe the switch, because it is the one that rewrites the owner key. So the answer is memoised
+ * for this page load: both callers learn that the cache was discarded, and both reload. Without it
+ * the second hook keeps the previous household's rows in memory and pushes them into the new
+ * account on its first write, which is the exact bug this key exists to prevent.
+ */
+let adopted: { uid: string; switched: boolean } | null = null;
+
 /** Returns whether anything was discarded, so the caller can log the interesting case. */
 export function adoptOwner(dataUid: string): boolean {
   if (typeof window === 'undefined') return false;
+  if (adopted && adopted.uid === dataUid) return adopted.switched;
+
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(KEYS.owner);
@@ -183,16 +212,22 @@ export function adoptOwner(dataUid: string): boolean {
     return false;
   }
 
-  if (stored === dataUid) return false;
+  if (stored === dataUid) {
+    adopted = { uid: dataUid, switched: false };
+    return false;
+  }
 
   // Absent: a store written before this key existed, which by definition holds the only log this
   // browser has ever had. Adopt it rather than throwing away real history on the upgrade.
   const switched = stored !== null;
   if (switched) {
-    writeKey(KEYS.entries, JSON.stringify([]));
-    writeKey(KEYS.unsynced, JSON.stringify([]));
+    // Every cache keyed to a log, not just the entries. A key left out here is the household's
+    // data sitting in the next account's browser, waiting for the first sync to push it into the
+    // wrong subtree — which is the whole reason this key exists.
+    for (const key of Object.values(CACHED_PER_OWNER)) writeKey(key, JSON.stringify([]));
   }
   writeKey(KEYS.owner, dataUid);
+  adopted = { uid: dataUid, switched };
   return switched;
 }
 

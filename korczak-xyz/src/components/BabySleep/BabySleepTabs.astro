@@ -6,7 +6,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'log' | 'stats' | 'share';
+type View = 'log' | 'climate' | 'stats' | 'share';
 
 interface Props {
   lang: Lang;
@@ -20,6 +20,7 @@ const base = lang === 'pl' ? '/pl/games/baby-sleep' : '/games/baby-sleep';
 
 const TABS: { view: View; href: string; label: string }[] = [
   { view: 'log', href: `${base}/`, label: t.navLog },
+  { view: 'climate', href: `${base}/climate/`, label: t.navClimate },
   { view: 'stats', href: `${base}/stats/`, label: t.navStats },
   { view: 'share', href: `${base}/share/`, label: t.navShare },
 ];

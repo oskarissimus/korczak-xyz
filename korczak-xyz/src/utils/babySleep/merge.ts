@@ -1,5 +1,5 @@
 /*
- * Reconciling two devices' logs.
+ * Reconciling two devices' sleep logs.
  *
  * This is deliberately *not* the typing trainer's `reconcile.ts`. That machinery — `(rev, writerId)`
  * against a shared bookmark, and a modal asking the human which side to keep — exists because
@@ -9,53 +9,31 @@
  * *same* nap means someone corrected it twice, where the later correction is simply the one they
  * meant. Nothing here can require a dialog.
  *
- * Two rules make that safe:
- *
- *   1. `rev` before `updatedAt`. Comparing wall clocks alone hands every merge, forever, to
- *      whichever device runs fastest — however stale its copy. `rev` counts a device's own edits to
- *      one entry, so it orders causally-related edits correctly and leaves the clock to break ties
- *      between genuinely concurrent ones.
- *   2. **A delete is absorbing.** If either side is a tombstone, the result is a tombstone,
- *      whatever the revisions say. Under plain last-write-wins a concurrent edit can beat a delete
- *      and the row comes back — a phantom nap that quietly poisons every mean, gets deleted again,
- *      and teaches the owner not to trust the app. Nothing ever undeletes (an undo is a new entry
- *      with a new id), so making deletes absorbing costs nothing.
+ * The reconciler itself lives in `versioned.ts`, which is where the two rules that make it safe —
+ * `rev` before the wall clock, and an absorbing delete — are written down. It is generic over the
+ * payload because the night-climate records merge by exactly the same rules; what stays here is
+ * what is about *sleep*: which fields make two copies identical, what order a log reads in, which
+ * entry is the one still running, and what may be dropped under storage pressure.
  */
 
 import type { SleepEntry } from './types';
 import { isStale } from './types';
+import { mergeById, pickVersioned, sameRevision } from './versioned';
 
 /** Which of two versions of the same entry survives. */
 export function pickEntry(a: SleepEntry, b: SleepEntry): SleepEntry {
-  // Absorbing delete. Keep the higher rev among tombstones so the survivor still moves forward.
-  if (a.deleted || b.deleted) {
-    if (a.deleted && b.deleted) return a.rev >= b.rev ? a : b;
-    const gone = a.deleted ? a : b;
-    const live = a.deleted ? b : a;
-    return { ...gone, rev: Math.max(gone.rev, live.rev) };
-  }
-  if (a.rev !== b.rev) return a.rev > b.rev ? a : b;
-  if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b;
-  // Same rev, same millisecond: pick deterministically so both devices land on the same answer.
-  return a.writerId >= b.writerId ? a : b;
+  return pickVersioned(a, b);
 }
 
 /**
  * Whether two copies of an entry are the same version — not merely which one wins.
  *
- * `pickEntry` has to return *something* for two identical copies, and it returns the left one. That
- * is fine for merging and useless for deciding what to push: without this check, every entry the
- * cloud already holds an identical copy of counts as a local win and is re-uploaded on every sync.
+ * Without this check, every entry the cloud already holds an identical copy of counts as a local
+ * win and is re-uploaded on every sync. Every persisted field belongs here.
  */
 function isSameVersion(a: SleepEntry, b: SleepEntry): boolean {
   return (
-    a.rev === b.rev &&
-    a.updatedAt === b.updatedAt &&
-    a.writerId === b.writerId &&
-    Boolean(a.deleted) === Boolean(b.deleted) &&
-    a.kind === b.kind &&
-    a.start === b.start &&
-    a.end === b.end
+    sameRevision(a, b) && a.kind === b.kind && a.start === b.start && a.end === b.end
   );
 }
 
@@ -78,49 +56,10 @@ export interface MergeResult {
   localWins: string[];
 }
 
-/**
- * Union by id, resolved per entry by `pickEntry`.
- *
- * Idempotent and commutative, which is what lets the caller merge in any order and sync in any
- * sequence without tracking what it has already seen.
- */
+/** Union by id, resolved per entry by `pickEntry`. Idempotent and commutative. */
 export function mergeEntries(local: SleepEntry[], remote: SleepEntry[]): MergeResult {
-  const byId = new Map<string, SleepEntry>();
-  for (const entry of local) byId.set(entry.id, entry);
-
-  const remoteById = new Map<string, SleepEntry>();
-  let changed = false;
-  for (const entry of remote) {
-    remoteById.set(entry.id, entry);
-    const mine = byId.get(entry.id);
-    if (!mine) {
-      byId.set(entry.id, entry);
-      changed = true;
-      continue;
-    }
-    const winner = pickEntry(mine, entry);
-    if (winner !== mine) {
-      byId.set(entry.id, winner);
-      changed = true;
-    }
-  }
-
-  const localWins: string[] = [];
-  for (const entry of byId.values()) {
-    const theirs = remoteById.get(entry.id);
-    if (!theirs) {
-      localWins.push(entry.id);
-      continue;
-    }
-    if (isSameVersion(entry, theirs)) continue;
-    if (pickEntry(entry, theirs) !== theirs) localWins.push(entry.id);
-  }
-
-  return {
-    entries: [...byId.values()].sort(byStartDesc),
-    changed,
-    localWins,
-  };
+  const merged = mergeById(local, remote, isSameVersion, byStartDesc);
+  return { entries: merged.records, changed: merged.changed, localWins: merged.localWins };
 }
 
 /** Live entries, newest first. Tombstones are storage's business and no caller's. */

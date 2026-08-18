@@ -883,6 +883,74 @@ a `floor` of 0, though, because a duration axis padded past zero prints two grid
 dots beneath it are one population by construction. It is the one extractor that skips days still in
 progress: a bedtime is a complete fact the moment the night starts, a duration only once it is over.
 
+### The climate tab
+
+`/games/baby-sleep/climate/` answers one question the log could not: **how low can the overnight
+temperature go before the window has to be shut.** Two facts a night, learnt at the two moments you
+know them — the forecast low and the window before bed, the verdict (`cold` / `ok` / `warm`) in the
+morning — and a chart that puts the boundary between them where you can read it off.
+
+**A night is two records, not one.** `{tempC, window}` at 21:00 and `{verdict}` at 07:00 are two
+separate acts hours apart, and on a shared log usually two people on two phones. One record per
+night makes those halves compete in a whole-record last-write-wins merge, so a phone offline across
+the gap silently drops one of them — and the row still looks fine. Two records never compete: the
+union-by-id merge keeps both without being told anything, and no new merge rule exists to get wrong.
+It is the argument that makes a broken night two sleep entries rather than one entry with a
+`wakes: [...]` array, applied again.
+
+The id is `${night}-${part}` (`2026-08-18-eve`, `2026-08-18-am`), derived rather than a `uuid()`, so
+two devices logging the same evening converge on one document instead of racing to create two. It
+splits at the **last** hyphen — a `yyyy-mm-dd` key carries two of its own, the trap
+`parseManifestParam` documents. `normalizeClimate` takes the id as the truth and normalises the rest
+away: an evening record cannot hold a verdict and a morning record cannot hold a temperature,
+whatever a stray document claims, because that separation is the whole point of the split.
+
+- `src/utils/babySleep/versioned.ts` — the reconciler, **lifted out of `merge.ts`**. It is generic
+  because nothing in it knows what a row is: an id, a `rev`, a `writerId` and a tombstone is the
+  whole contract. `merge.ts` keeps its exported names as thin wrappers, so the sleep log is
+  unchanged and `merge.test.ts` passes untouched. The two rules that make merging without a dialog
+  safe — `rev` before the wall clock, an absorbing delete — moved with the code.
+- `climate.ts` (records, `currentNightKey`, `parseTemp`), `climateStats.ts` (the join and the
+  threshold), `climateStorage.ts`, `climateCloud.ts`, `src/hooks/useNightClimate.ts`.
+
+`currentNightKey` is **not** `sleepDayKey`: `NIGHT_CUTOFF_HOUR = 6` files an 07:00 event under
+today, which is right for a sleep starting at 07:00 and wrong for a verdict on the night that just
+ended. Before noon is yesterday's night, after noon is tonight — noon because nothing about a night
+is logged at midday, so no real entry sits near enough to be filed wrongly.
+
+`windowThreshold` is the min and max of the two populations (`okFloor`, `coldCeiling`) rather than a
+fitted cutoff, because it is explainable from the dots — *the coldest night that was fine, the
+warmest that was not* — and where they overlap that overlap is a fact about the nights, shown rather
+than smoothed into a false precision. No cold night at all is *settled*: you simply have not found
+the floor yet. `warm` counts as not-cold; the question is only ever about the bottom end.
+
+`ClimateChart` is deliberately **not** a `SpreadChart` wrapper. The other charts plot a value per
+day against time; here temperature runs along X, the two window states are two lanes, and the
+verdict is the dot's colour — so the boundary between the colours in the top lane *is* the answer.
+Dots sharing a lane and a temperature are stacked by their position within that group, not by a hash
+of the night key: consecutive dates hash to consecutive numbers, so a hash put every dot at nearly
+the same height and two nights at 12° drew as one.
+
+The list's colours are **not** the chart's. The chart draws on near-black where cyan and a light
+blue read cleanly; the same values on the dialog grey are barely there, so the rows carry dark
+variants. And each verdict button names its colour twice, the second time with `:hover` — the same
+`button:hover { background: #a0a0a0 }` at (0,1,1) in `Layout.astro` that `.fb-neck-cell--right`
+guards against, which otherwise greys out the one button the pointer is resting on.
+
+`adoptOwner` clears **every** per-owner cache, the climate keys included, and its answer is now
+memoised for the page load: two hooks call it and only the first can observe the switch, so without
+the memo the second keeps the previous household's rows in memory and pushes them into the new
+account on its first write.
+
+`firestore.rules` needs its own `users/{uid}/babySleepClimate/{recordId}` block — rules are a
+permissive union, so the `babySleep` block says nothing at all about this path. As ever it is
+deployed by hand (`firebase deploy --only firestore:rules`), so the *shared* half of this feature
+does nothing until that is run; the owner's own access comes from the `users/{uid}/{document=**}`
+catch-all and works immediately.
+
+No PWA work was needed: `APP_TIERS['baby-sleep']` already claims the whole subtree in both
+`generate-sw.mjs` and `register-sw.js`, so the tab precached itself.
+
 ### Sharing
 
 The log can be read and written by a second account, so both parents log against one history. The

@@ -766,3 +766,165 @@ a.bs-action {
 .bs-big.bs-skel {
   color: var(--retro-gray);
 }
+
+/* --- climate -------------------------------------------------------------- */
+
+.bs-climate {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* The temperature and its unit read as one control, so the unit sits inside the field's row rather
+   than under a label of its own. */
+.bs-temp-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bs-temp {
+  width: 6em;
+}
+
+.bs-temp-unit {
+  color: var(--retro-dark-gray);
+}
+
+/* Confirmation of a write that produced no other visible change — the fields keep the values they
+   already had, so without this nothing on screen says the tap landed. */
+.bs-saved {
+  align-self: center;
+  color: var(--retro-green);
+}
+
+/* --- the verdict buttons --------------------------------------------------- */
+
+/*
+ * Each verdict names its own colour, and names it again with `:hover`. `Layout.astro` has a global
+ * `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a single class — so the one button
+ * the pointer happens to be resting on goes flat grey and the colour that *is* the answer
+ * disappears. Same rule, same reason, as `.fb-neck-cell--right`.
+ */
+.bs-verdicts {
+  flex-wrap: wrap;
+}
+
+.bs-verdict--cold.bs-toggle-btn--on,
+.bs-verdict--cold.bs-toggle-btn--on:hover {
+  background: #4a6ee0;
+  color: #fff;
+}
+
+.bs-verdict--ok.bs-toggle-btn--on,
+.bs-verdict--ok.bs-toggle-btn--on:hover {
+  background: #17803a;
+  color: #fff;
+}
+
+.bs-verdict--warm.bs-toggle-btn--on,
+.bs-verdict--warm.bs-toggle-btn--on:hover {
+  background: #b35a17;
+  color: #fff;
+}
+
+/* --- the climate chart ------------------------------------------------------ */
+
+.bs-lane-label {
+  fill: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+}
+
+/* The coldest night that was still alright, in the open lane only — the answer the chart exists to
+   give, so it is the one line drawn solid and in the accent colour. */
+.bs-threshold,
+.bs-swatch--threshold {
+  stroke: var(--retro-yellow);
+  stroke-width: 2;
+  fill: none;
+  background-color: var(--retro-yellow);
+}
+
+.bs-swatch--threshold {
+  width: 4px;
+  border: 0;
+}
+
+/*
+ * The three verdicts, on the dots and in the legend. Blue for cold and orange for warm is the
+ * temperature reading everyone already has; green is the one you are looking for. All three carry
+ * `fill` *and* `background-color` for the reason written above the timeline colours: one class
+ * paints an SVG circle and an HTML span, and `fill` does nothing to a span.
+ */
+.bs-dot--cold,
+.bs-swatch--cold {
+  fill: #4a6ee0;
+  background-color: #4a6ee0;
+}
+
+.bs-dot--ok,
+.bs-swatch--ok {
+  fill: #35d05a;
+  background-color: #35d05a;
+}
+
+.bs-dot--warm,
+.bs-swatch--warm {
+  fill: #ff9d3c;
+  background-color: #ff9d3c;
+}
+
+/* --- the night history ------------------------------------------------------ */
+
+/*
+ * One night per row. `flex-wrap` rather than a grid because the four facts are short and unequal,
+ * and at 320px the actions have to be allowed to drop to their own line — a grid column wide enough
+ * for "Za ciepło" and one wide enough for "—" cannot both be right.
+ */
+.bs-climate-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.bs-climate-date {
+  min-width: 7em;
+}
+
+/*
+ * Dark on the dialog grey, not the chart's own colours. The chart draws on near-black, where cyan
+ * and a light blue read cleanly; the same values on `--retro-gray` are barely there. The list and
+ * the chart are two backgrounds and therefore two palettes, and the row is the one that has to be
+ * legible at arm's length at six in the morning.
+ */
+.bs-climate-temp {
+  min-width: 3.5em;
+  font-weight: bold;
+}
+
+.bs-climate-window {
+  min-width: 5em;
+  color: var(--retro-dark-gray);
+}
+
+/* The verdict is what the row is *for*, so it is the one field that carries a colour. A night with
+   no verdict says so in grey, because an unanswered morning is the thing the list is prompting
+   about. */
+.bs-climate-verdict {
+  flex: 1 1 6em;
+  color: var(--retro-dark-gray);
+}
+
+.bs-climate-row--cold .bs-climate-verdict {
+  color: #2748b8;
+}
+
+.bs-climate-row--ok .bs-climate-verdict {
+  color: #10662b;
+}
+
+.bs-climate-row--warm .bs-climate-verdict {
+  color: #a24f00;
+}

@@ -134,6 +134,57 @@ export const translations = {
     statsNote:
       'Averages count only days that finished with a night logged, so today never drags them down. A sleep still running, or one left running far too long, is drawn but never counted. A night broken by a waking counts as one night: its blocks are added up, and the time awake is reported on its own.',
 
+    // Climate — the tab
+    navClimate: 'Climate',
+    climateTitle: 'Tonight',
+    climateIntro:
+      'Two things, at the two moments you know them: the forecast low and the window before bed, and in the morning whether it was too cold. After a couple of weeks the chart below says how low you can go with the window open.',
+    climateNight: 'Night of',
+    climateTemp: 'Forecast low',
+    climateTempUnit: '°C',
+    climateTempHint: 'The overnight low outside, as forecast.',
+    climateWindow: 'Window',
+    windowOpen: 'Open',
+    windowClosed: 'Closed',
+    climateVerdict: 'In the morning',
+    verdictCold: 'Too cold',
+    verdictOk: 'Alright',
+    verdictWarm: 'Too warm',
+    verdictClear: 'Clear',
+    climateSave: 'Save',
+    climateSaved: 'Saved.',
+    climateErrTemp: 'That is not a temperature.',
+    climateErrRange: 'A forecast low is somewhere between −40 and 45 °C.',
+    climateEveningMissing: 'No temperature logged for this night.',
+    climateVerdictMissing: 'No verdict yet.',
+
+    // Climate — the history
+    climateHistoryTitle: 'Recent nights',
+    climateEmpty: 'Nothing logged yet. Fill in tonight above.',
+    climateEdit: 'Edit',
+    climateClear: 'Clear',
+    climateNotLogged: '—',
+
+    // Climate — the chart
+    climateChartTitle: 'How cold has been alright',
+    climateChartAria:
+      'Each night as a dot at its forecast low, in a lane for whether the window was open, coloured by how the morning went',
+    climateLaneOpen: 'Window open',
+    climateLaneClosed: 'Window closed',
+    climateThresholdSettled: 'Window open: alright down to {ok} °C, too cold at {cold} °C and below.',
+    climateThresholdOnlyOk: 'Window open: alright down to {ok} °C so far — no night has been too cold yet.',
+    climateThresholdMixed:
+      'Window open: mixed between {cold} °C and {ok} °C. A few more nights should settle it.',
+    climateThresholdSameTemp:
+      'Window open: {temp} °C has gone both ways. Something other than the forecast is deciding it.',
+    climateThresholdThin: 'Only {count} complete {nights} with the window open — not enough to say yet.',
+    climateNightOne: 'night',
+    climateNightMany: 'nights',
+    climateThresholdMark: 'Coldest alright',
+    climateChartEmpty:
+      'No complete nights yet. A night counts once it has a temperature, a window state and a verdict.',
+    climateDot: '{date}: {temp} °C, window {window}, {verdict}',
+
     // Sync
     syncSignedOut: 'This device only',
     syncSynced: 'Synced',
@@ -303,6 +354,60 @@ export const translations = {
     wakeSeries: 'Wstaje',
     statsNote:
       'Średnie liczą tylko dni zakończone zapisaną nocą, więc dzisiejszy dzień ich nie zaniża. Sen, który trwa — albo taki, który trwa o wiele za długo — jest rysowany, ale nigdy liczony. Noc przerwana pobudką liczy się jako jedna noc: jej części się sumują, a czas czuwania podawany jest osobno.',
+
+    // Climate — the tab
+    navClimate: 'Klimat',
+    climateTitle: 'Dzisiejsza noc',
+    climateIntro:
+      'Dwie rzeczy, w dwóch momentach, w których się je wie: prognoza minimalnej temperatury i okno przed snem, a rano — czy nie było za zimno. Po kilkunastu nocach wykres poniżej powie, jak nisko można zejść przy otwartym oknie.',
+    climateNight: 'Noc z',
+    climateTemp: 'Prognoza minimum',
+    climateTempUnit: '°C',
+    climateTempHint: 'Prognozowana minimalna temperatura na zewnątrz w nocy.',
+    climateWindow: 'Okno',
+    windowOpen: 'Otwarte',
+    windowClosed: 'Zamknięte',
+    climateVerdict: 'Rano',
+    verdictCold: 'Za zimno',
+    verdictOk: 'W porządku',
+    verdictWarm: 'Za ciepło',
+    verdictClear: 'Wyczyść',
+    climateSave: 'Zapisz',
+    climateSaved: 'Zapisano.',
+    climateErrTemp: 'To nie jest temperatura.',
+    climateErrRange: 'Prognozowane minimum mieści się między −40 a 45 °C.',
+    climateEveningMissing: 'Brak temperatury dla tej nocy.',
+    climateVerdictMissing: 'Brak oceny.',
+
+    // Climate — the history
+    climateHistoryTitle: 'Ostatnie noce',
+    climateEmpty: 'Nic jeszcze nie zapisano. Uzupełnij dzisiejszą noc powyżej.',
+    climateEdit: 'Edytuj',
+    climateClear: 'Usuń',
+    climateNotLogged: '—',
+
+    // Climate — the chart
+    climateChartTitle: 'Przy jakim chłodzie było w porządku',
+    climateChartAria:
+      'Każda noc jako punkt przy prognozowanym minimum, w pasie odpowiadającym temu, czy okno było otwarte, w kolorze oceny poranka',
+    climateLaneOpen: 'Okno otwarte',
+    climateLaneClosed: 'Okno zamknięte',
+    climateThresholdSettled:
+      'Okno otwarte: w porządku do {ok} °C, za zimno przy {cold} °C i poniżej.',
+    climateThresholdOnlyOk:
+      'Okno otwarte: jak dotąd w porządku do {ok} °C — żadna noc nie była za zimna.',
+    climateThresholdMixed:
+      'Okno otwarte: różnie między {cold} °C a {ok} °C. Jeszcze kilka nocy powinno to rozstrzygnąć.',
+    climateThresholdSameTemp:
+      'Okno otwarte: {temp} °C wypadło i tak, i tak. Decyduje coś innego niż prognoza.',
+    climateThresholdThin:
+      'Tylko {count} {nights} z kompletem danych przy otwartym oknie — za mało, żeby cokolwiek powiedzieć.',
+    climateNightOne: 'noc',
+    climateNightMany: 'nocy',
+    climateThresholdMark: 'Najchłodniej i w porządku',
+    climateChartEmpty:
+      'Brak kompletnych nocy. Noc liczy się, gdy ma temperaturę, stan okna i ocenę poranka.',
+    climateDot: '{date}: {temp} °C, okno {window}, {verdict}',
 
     // Sync
     syncSignedOut: 'Tylko na tym urządzeniu',
