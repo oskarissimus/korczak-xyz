@@ -5,6 +5,11 @@
  * Lifted whole out of the old `TransposeSession`, minus the queue, the log and the scheduler — those
  * are `FlashcardsSession`'s now, and shared with the neck cards.
  *
+ * The order the chords come in is the card's, not this component's: `promptChords` and
+ * `answerChords` both apply `key.order`, and they apply the *same* one — so on a `transpose` card
+ * slot `i` answers prompt chord `i`, and on a `degrees` card the numeral printed under a slot is
+ * the numeral that slot is graded against. Nothing here shuffles anything.
+ *
  * **Every answer here is all-or-nothing.** A progression with one chord wrong is a wrong
  * progression: it is the set of chords that is the answer, and partial credit would report a fluency
  * that was never demonstrated. So the verdict's job is telling you *which* slot went wrong, which is
@@ -22,11 +27,10 @@ import {
   parseCardId,
   promptChords,
 } from '../../utils/transpose/cards';
-import type { CardKey } from '../../utils/transpose/cards';
 import type { LibraryIndex } from '../../utils/transpose/library';
 import { songsFor } from '../../utils/transpose/library';
 import { formatSeconds } from '../../utils/transpose/stats';
-import { chordLabel, chordsOf, keyLabel, keyOf, keySpelling, patternMode } from '../../utils/transpose/theory';
+import { chordLabel, keyLabel, keyOf, keySpelling, patternMode } from '../../utils/transpose/theory';
 import type { Mode, PitchClass } from '../../utils/transpose/theory';
 import type { Settings } from '../../utils/transpose/types';
 import Verdict from '../srs/Verdict';
@@ -180,7 +184,7 @@ export default function TransposeCard({
           quality: c.quality,
           // Only a `degrees` card names its degrees: on a `transpose` card the numerals would hand
           // over one of the two routes to the answer.
-          numeral: key.direction === 'degrees' ? expectedNumeral(key, i) : undefined,
+          numeral: key.direction === 'degrees' ? c.numeral : undefined,
           state: result ? (picked[i] === result.expected[i] ? 'right' : 'wrong') : undefined,
         }));
 
@@ -211,9 +215,7 @@ export default function TransposeCard({
         {key.direction === 'degrees' ? (
           <>
             <span className="tp-prompt-degrees">
-              {answerChords(key)
-                .map((_, i) => expectedNumeral(key, i))
-                .join(' ')}
+              {expected.map((c) => c.numeral).join(' ')}
             </span>{' '}
             <span className="tp-prompt-lead">{t.askDegrees}</span>{' '}
             <span className="tp-prompt-key">{keyLabel(answerKeyOf, notation)}</span>
@@ -339,15 +341,4 @@ export default function TransposeCard({
       )}
     </>
   );
-}
-
-/**
- * The Roman numeral of the card's `i`th degree — the question on a `degrees` card.
- *
- * Through `chordsOf` rather than a second table, so the numerals printed under the slots and the
- * chords they are graded against cannot come apart.
- */
-function expectedNumeral(key: CardKey, i: number): string {
-  const tonic = key.direction === 'transpose' ? key.to : key.tonic;
-  return chordsOf(tonic, key.pattern)[i]?.numeral ?? '';
 }

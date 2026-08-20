@@ -11,7 +11,7 @@
  */
 
 import type { Direction } from './cards';
-import type { Notation, PatternId } from './theory';
+import type { Notation, PatternId, PitchClass } from './theory';
 
 export type {
   Bucket,
@@ -28,10 +28,15 @@ export type {
  * Which keys the deck draws from.
  *
  * `songbook` narrows it to the keys the songs on this site are actually written in — seven of the
- * twelve, and the ones a guitar is happiest in. `all` is every key, which is what was asked for
- * and what makes the deck complete rather than comfortable.
+ * twelve, and the ones a guitar is happiest in. `all` is every key, which is what makes the deck
+ * complete rather than comfortable. A **list of tonics** is neither: the keys you have decided to
+ * work on, which is the only setting that keeps the deck a manageable size now that every ordering
+ * of a pattern is its own card.
+ *
+ * The two words stay words rather than becoming presets that fill a list, because `songbook`
+ * resolves per pattern — see `tonicsFor` in `deck.ts` — and a flat list of tonics cannot say that.
  */
-export type KeyScope = 'all' | 'songbook';
+export type KeyScope = 'all' | 'songbook' | PitchClass[];
 
 export interface Settings {
   /** Which of the three questions are asked. Empty is not allowed; the UI keeps at least one. */

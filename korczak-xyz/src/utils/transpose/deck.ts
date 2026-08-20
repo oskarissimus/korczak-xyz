@@ -20,11 +20,11 @@ import {
   ensureCards as ensureCardsIn,
   spreadBy,
 } from '../srs/queue';
-import { cardId, parseCardId, subjectOf } from './cards';
+import { cardId, orderingsOf, parseCardId, subjectOf } from './cards';
 import type { CardKey, Direction } from './cards';
 import type { LibraryIndex } from './library';
 import { libraryTonics } from './library';
-import type { Notation, PitchClass } from './theory';
+import type { Notation, PatternId, PitchClass } from './theory';
 import { PATTERN_IDS, patternMode } from './theory';
 import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
@@ -36,6 +36,47 @@ const ALL_TONICS: PitchClass[] = Array.from({ length: 12 }, (_, i) => i);
 
 function notationsOf(settings: Settings): Notation[] {
   return settings.notations.length > 0 ? settings.notations : DEFAULT_SETTINGS.notations;
+}
+
+/**
+ * Which keys this pattern is drilled in.
+ *
+ * Three cases, and `songbook` is the reason the setting is not simply a list of tonics: it
+ * resolves **per pattern** — C D E F G A for `I IV V`, A D E G for `i iv V` — because it means
+ * "the keys the songs on this site are written in" and the songs do not use the same keys for
+ * major and minor progressions. A flat list cannot say that, so it stays a live mode with the
+ * explicit list beside it rather than a preset that fills one.
+ *
+ * An explicit list that has somehow ended up empty falls back to the default, the way
+ * `keepKnown` protects the other three scope settings: a scope of nothing is a game that cannot
+ * start.
+ */
+export function tonicsFor(
+  settings: Settings,
+  pattern: PatternId,
+  library: LibraryIndex
+): PitchClass[] {
+  const { keys } = settings;
+  if (keys === 'songbook') return libraryTonics(library, pattern);
+  if (keys === 'all') return ALL_TONICS;
+  return keys.length > 0 ? keys : ALL_TONICS;
+}
+
+/**
+ * Every key the current scope touches, across the patterns selected.
+ *
+ * The settings panel's business: its twelve key buttons have to show what a preset resolves to,
+ * and `songbook` resolves differently per pattern. A union rather than an intersection, because
+ * the row is answering "which keys will this deck ask about".
+ */
+export function effectiveTonics(settings: Settings, library: LibraryIndex): PitchClass[] {
+  const patterns = settings.patterns.length > 0 ? settings.patterns : DEFAULT_SETTINGS.patterns;
+  const seen = new Set<PitchClass>();
+  for (const pattern of patterns) {
+    if (!PATTERN_IDS.includes(pattern)) continue;
+    for (const tonic of tonicsFor(settings, pattern, library)) seen.add(tonic);
+  }
+  return [...seen].sort((a, b) => a - b);
 }
 
 /**
@@ -51,6 +92,10 @@ function notationsOf(settings: Settings): Notation[] {
  *
  * A `transpose` card from a key to itself is skipped: "move C F G into C" is not a question, and
  * `parseCardId` refuses the id for the same reason.
+ *
+ * The innermost loop is the ordering axis, and it is what makes this enumeration expensive: `n!`
+ * per card, so six for the three-chord patterns and twenty-four for `I IV V vi`. `Settings.keys`
+ * is the control — see `tonicsFor`.
  */
 export function scopeIds(settings: Settings, library: LibraryIndex): string[] {
   const ids: string[] = [];
@@ -62,20 +107,22 @@ export function scopeIds(settings: Settings, library: LibraryIndex): string[] {
 
   for (const pattern of patterns) {
     if (!PATTERN_IDS.includes(pattern)) continue;
-    const tonics =
-      settings.keys === 'songbook' ? libraryTonics(library, pattern) : ALL_TONICS;
+    const tonics = tonicsFor(settings, pattern, library);
+    const orders = orderingsOf(pattern);
 
     for (const notation of notations) {
       for (const direction of directions) {
-        if (direction === 'transpose') {
-          for (const from of tonics) {
-            for (const to of tonics) {
-              if (from === to) continue;
-              push({ direction, from, to, pattern, notation });
+        for (const order of orders) {
+          if (direction === 'transpose') {
+            for (const from of tonics) {
+              for (const to of tonics) {
+                if (from === to) continue;
+                push({ direction, from, to, pattern, notation, order });
+              }
             }
+          } else {
+            for (const tonic of tonics) push({ direction, tonic, pattern, notation, order });
           }
-        } else {
-          for (const tonic of tonics) push({ direction, tonic, pattern, notation });
         }
       }
     }

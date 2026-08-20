@@ -12,6 +12,7 @@
  */
 
 import type { Settings as FretboardSettings } from '../../utils/fretboard/types';
+import type { LibraryIndex } from '../../utils/transpose/library';
 import type { Settings as TransposeSettings } from '../../utils/transpose/types';
 import { TRAINERS, type TrainerId } from '../../utils/flashcards/trainers';
 import type { Settings } from '../../utils/flashcards/settings';
@@ -33,6 +34,8 @@ interface SettingsPanelProps {
   onFretboardChange: (next: FretboardSettings) => void;
   transposeSettings: TransposeSettings;
   onTransposeChange: (next: TransposeSettings) => void;
+  /** The chord rows' key picker draws `songbook` as the keys it resolves to, which only this knows. */
+  library: LibraryIndex;
   t: Translation;
   fretboardT: FretboardTranslation;
   transposeT: TransposeTranslation;
@@ -50,6 +53,7 @@ export default function SettingsPanel({
   onFretboardChange,
   transposeSettings,
   onTransposeChange,
+  library,
   t,
   fretboardT,
   transposeT,
@@ -119,6 +123,7 @@ export default function SettingsPanel({
       <TransposeSettingsRows
         settings={transposeSettings}
         onChange={onTransposeChange}
+        library={library}
         t={transposeT}
       />
     </div>

@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { createCard, rate } from '../srs/scheduler';
-import { parseCardId } from './cards';
+import { orderingsOf, parseCardId } from './cards';
 import {
   asksMode,
   buildQueue,
   cardsInScope,
   countDeck,
+  effectiveTonics,
   ensureCards,
   scopeIds,
   spreadSubjects,
+  tonicsFor,
 } from './deck';
 import type { LibraryIndex } from './library';
 import type { QueueShape } from '../srs/queue';
@@ -16,6 +18,9 @@ import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 
 const NO_LIBRARY: LibraryIndex = {};
+
+/** How many cards one (tonic, pattern, direction, notation) is worth, now that ordering is an axis. */
+const ORDERS_145 = 6;
 
 /** A library with I IV V in C, G and A only — enough to tell the two scopes apart. */
 const LIBRARY: LibraryIndex = {
@@ -48,9 +53,10 @@ describe('scopeIds', () => {
       settings({ directions: ['transpose'], patterns: ['145'], notations: ['polish'] }),
       NO_LIBRARY
     );
-    // 12 keys into the other 11, and never into itself.
-    expect(ids).toHaveLength(12 * 11);
+    // 12 keys into the other 11, never into itself, and every ordering of each.
+    expect(ids).toHaveLength(12 * 11 * ORDERS_145);
     expect(ids).not.toContain('transpose:3-3:145');
+    expect(ids).not.toContain('transpose:3-3:145:o201');
   });
 
   it('mints one card per key for the other two directions', () => {
@@ -58,7 +64,32 @@ describe('scopeIds', () => {
       settings({ directions: ['degrees', 'key'], patterns: ['145'], notations: ['polish'] }),
       NO_LIBRARY
     );
-    expect(ids).toHaveLength(24);
+    expect(ids).toHaveLength(24 * ORDERS_145);
+  });
+
+  it('mints every ordering of a card, and only orderings of the right length', () => {
+    const ids = scopeIds(
+      settings({ directions: ['key'], patterns: ['145', '1456'], notations: ['polish'] }),
+      NO_LIBRARY
+    );
+    const of145 = ids.filter((id) => parseCardId(id)!.pattern === '145');
+    const of1456 = ids.filter((id) => parseCardId(id)!.pattern === '1456');
+    expect(of145).toHaveLength(12 * 6);
+    expect(of1456).toHaveLength(12 * 24);
+
+    // The identity is in there unsuffixed — the card every stored deck already names.
+    expect(of145).toContain('key:0:145');
+    expect(of145).toContain('key:0:145:o201');
+    expect(of145).not.toContain('key:0:145:o012');
+  });
+
+  it('leads with degree order, so the deck someone already has comes first', () => {
+    expect(orderingsOf('145')[0]).toEqual([0, 1, 2]);
+    const ids = scopeIds(
+      settings({ directions: ['key'], patterns: ['145'], notations: ['polish'], keys: [0] }),
+      NO_LIBRARY
+    );
+    expect(ids[0]).toBe('key:0:145');
   });
 
   it('is stable and free of duplicates', () => {
@@ -78,9 +109,9 @@ describe('scopeIds', () => {
     );
     // Twelve keys, and only the ones printing a black key gain a German card. `I IV V` in C, D, E,
     // F, G, A and B prints none, so those seven stay single.
-    expect(one).toHaveLength(12);
-    expect(two.length).toBeGreaterThan(12);
-    expect(two.length).toBeLessThan(24);
+    expect(one).toHaveLength(12 * ORDERS_145);
+    expect(two.length).toBeGreaterThan(12 * ORDERS_145);
+    expect(two.length).toBeLessThan(24 * ORDERS_145);
     expect(one.every((id) => two.includes(id))).toBe(true);
   });
 
@@ -98,8 +129,31 @@ describe('scopeIds', () => {
       }),
       LIBRARY
     );
-    expect(all).toHaveLength(12);
-    expect(songbook.sort()).toEqual(['degrees:0:145', 'degrees:7:145', 'degrees:9:145']);
+    expect(all).toHaveLength(12 * ORDERS_145);
+    expect(songbook).toHaveLength(3 * ORDERS_145);
+    expect(new Set(songbook.map((id) => id.split(':')[1]))).toEqual(new Set(['0', '7', '9']));
+  });
+
+  it('narrows to the keys picked, in every direction', () => {
+    const picked = settings({
+      directions: ['degrees', 'key', 'transpose'],
+      patterns: ['145'],
+      notations: ['polish'],
+      keys: [0, 5, 7],
+    });
+    const ids = scopeIds(picked, NO_LIBRARY);
+    // Three keys: three `degrees`, three `key`, and the six ordered pairs between them.
+    expect(ids).toHaveLength((3 + 3 + 3 * 2) * ORDERS_145);
+    for (const id of ids) {
+      const key = parseCardId(id)!;
+      const tonics = key.direction === 'transpose' ? [key.from, key.to] : [key.tonic];
+      for (const tonic of tonics) expect([0, 5, 7], id).toContain(tonic);
+    }
+  });
+
+  it('never empties the deck on a key list that arrives empty', () => {
+    // The panel refuses to empty it; a record from elsewhere might not have.
+    expect(scopeIds(settings({ keys: [] }), NO_LIBRARY).length).toBeGreaterThan(0);
   });
 
   it('falls back rather than emptying the deck when a scope is switched off entirely', () => {
@@ -117,16 +171,16 @@ describe('ensureCards', () => {
   it('adds what is missing and keeps what is out of scope', () => {
     const narrow = settings({ directions: ['degrees'], patterns: ['145'], notations: ['polish'] });
     const deck = ensureCards({}, scopeIds(narrow, NO_LIBRARY));
-    expect(Object.keys(deck)).toHaveLength(12);
+    expect(Object.keys(deck)).toHaveLength(12 * ORDERS_145);
 
     const wider = settings({ directions: ['degrees', 'key'], patterns: ['145'], notations: ['polish'] });
     const grown = ensureCards(deck, scopeIds(wider, NO_LIBRARY));
-    expect(Object.keys(grown)).toHaveLength(24);
+    expect(Object.keys(grown)).toHaveLength(24 * ORDERS_145);
 
     // Narrowing again leaves the schedule earnt on the cards now out of scope.
     const narrowed = ensureCards(grown, scopeIds(narrow, NO_LIBRARY));
-    expect(Object.keys(narrowed)).toHaveLength(24);
-    expect(cardsInScope(narrowed, narrow, NO_LIBRARY)).toHaveLength(12);
+    expect(Object.keys(narrowed)).toHaveLength(24 * ORDERS_145);
+    expect(cardsInScope(narrowed, narrow, NO_LIBRARY)).toHaveLength(12 * ORDERS_145);
   });
 });
 
@@ -226,14 +280,37 @@ describe('countDeck', () => {
     const scope = settings({ directions: ['degrees'], patterns: ['145'], notations: ['polish'] });
     const deck = ensureCards({}, scopeIds(scope, NO_LIBRARY));
     const cards = cardsInScope(deck, scope, NO_LIBRARY);
-    expect(countDeck(cards, now)).toMatchObject({ total: 12, fresh: 12, due: 0 });
+    expect(countDeck(cards, now)).toMatchObject({
+      total: 12 * ORDERS_145,
+      fresh: 12 * ORDERS_145,
+      due: 0,
+    });
 
     // One card answered `easy` four times running is a mature card and no longer due.
     let card = deck['degrees:0:145'];
     for (let i = 0; i < 8; i++) card = rate(card, 'easy', now, 800);
     const answered = { ...deck, 'degrees:0:145': card };
     const counts = countDeck(cardsInScope(answered, scope, NO_LIBRARY), now);
-    expect(counts.fresh).toBe(11);
+    expect(counts.fresh).toBe(12 * ORDERS_145 - 1);
     expect(counts.buckets.mature).toBe(1);
+  });
+});
+
+describe('which keys the deck draws from', () => {
+  it('reads the songbook per pattern, which is why it is not a list of tonics', () => {
+    const scope = settings({ patterns: ['145', 'm14V'], keys: 'songbook' });
+    expect(tonicsFor(scope, '145', LIBRARY)).toEqual([0, 7, 9]);
+    expect(tonicsFor(scope, 'm14V', LIBRARY)).toEqual([]);
+  });
+
+  it('takes an explicit list as written', () => {
+    expect(tonicsFor(settings({ keys: [2, 9] }), '145', LIBRARY)).toEqual([2, 9]);
+  });
+
+  it('unions the patterns for the settings panel to draw', () => {
+    const scope = settings({ patterns: ['145', 'm14V'], keys: 'songbook' });
+    expect(effectiveTonics(scope, LIBRARY)).toEqual([0, 7, 9]);
+    expect(effectiveTonics(settings({ keys: [9, 2] }), LIBRARY)).toEqual([2, 9]);
+    expect(effectiveTonics(settings({ keys: 'all' }), LIBRARY)).toHaveLength(12);
   });
 });

@@ -13,8 +13,10 @@
 
 import { DIRECTIONS } from '../../utils/transpose/cards';
 import type { Direction } from '../../utils/transpose/cards';
-import { NOTATIONS, PATTERN_IDS, patternLabel } from '../../utils/transpose/theory';
-import type { Notation, PatternId } from '../../utils/transpose/theory';
+import { effectiveTonics } from '../../utils/transpose/deck';
+import type { LibraryIndex } from '../../utils/transpose/library';
+import { NOTATIONS, PATTERN_IDS, patternLabel, pitchClassLabel } from '../../utils/transpose/theory';
+import type { Notation, PatternId, PitchClass } from '../../utils/transpose/theory';
 import type { KeyScope, Settings } from '../../utils/transpose/types';
 import { Choice, Row } from '../Flashcards/controls';
 import type { Translation } from './translations';
@@ -22,8 +24,11 @@ import type { Translation } from './translations';
 interface SettingsPanelProps {
   settings: Settings;
   onChange: (next: Settings) => void;
+  library: LibraryIndex;
   t: Translation;
 }
+
+const TONICS: PitchClass[] = Array.from({ length: 12 }, (_, i) => i);
 
 /**
  * What each notation button says: a sample of the thing itself.
@@ -50,7 +55,17 @@ const DIRECTION_LABELS: Record<Direction, keyof Translation> = {
   key: 'dirKey',
 };
 
-export default function TransposeSettingsRows({ settings, onChange, t }: SettingsPanelProps) {
+export default function TransposeSettingsRows({ settings, onChange, library, t }: SettingsPanelProps) {
+  /*
+   * What the key row is currently showing as chosen, and what the labels on it say.
+   *
+   * The notation is the first the player has selected rather than the card's, because this row is
+   * not a card — it is the same picture the `ChordPad` draws, and `pitchClassLabel` offers both
+   * spellings where they differ for the reason it does there: a pitch class has no key to spell it.
+   */
+  const resolved = effectiveTonics(settings, library);
+  const padNotation: Notation = settings.notations[0] ?? 'polish';
+
   /** Toggle one value of a list setting, refusing to empty it. */
   function toggle<T>(list: T[], value: T, order: T[]): T[] | null {
     const has = list.includes(value);
@@ -94,7 +109,7 @@ export default function TransposeSettingsRows({ settings, onChange, t }: Setting
       <Row label={t.keysScope}>
         {(['all', 'songbook'] as KeyScope[]).map((scope) => (
           <Choice
-            key={scope}
+            key={String(scope)}
             active={settings.keys === scope}
             onClick={() => onChange({ ...settings, keys: scope })}
             title={scope === 'all' ? t.keysAllTitle : t.keysSongbookTitle}
@@ -102,6 +117,37 @@ export default function TransposeSettingsRows({ settings, onChange, t }: Setting
             {scope === 'all' ? t.keysAll : t.keysSongbook}
           </Choice>
         ))}
+      </Row>
+
+      {/* The keys themselves, under the two presets rather than instead of them. A preset draws
+          here as what it resolves to — `songbook` resolves per pattern, so there is no list to
+          show it by — and touching any key turns that resolved set into an explicit one, which is
+          what makes the row an edit of what you were already practising rather than a fresh start.
+
+          This is the control that pays for the ordering axis: every ordering of a pattern is its
+          own card, so the deck is `n!` per key and narrowing to a few is how it stays a deck you
+          can finish. The start screen's `/{total}` tile prints the consequence. */}
+      <Row label={t.keysPick}>
+        {TONICS.map((tonic) => {
+          const chosen = Array.isArray(settings.keys) ? settings.keys : resolved;
+          const active = chosen.includes(tonic);
+          return (
+            <Choice
+              key={tonic}
+              active={active}
+              onClick={() => {
+                if (active && chosen.length === 1) return;
+                const next = active
+                  ? chosen.filter((pc) => pc !== tonic)
+                  : [...chosen, tonic].sort((a, b) => a - b);
+                onChange({ ...settings, keys: next });
+              }}
+              title={t.keysPickTitle}
+            >
+              {pitchClassLabel(tonic, padNotation)}
+            </Choice>
+          );
+        })}
       </Row>
 
       <Row label={t.notations}>

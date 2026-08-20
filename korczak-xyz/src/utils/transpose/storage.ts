@@ -11,8 +11,8 @@
 import { createSrsStorage } from '../srs/storage';
 import { isDirection } from './cards';
 import { isNotation, isPatternId } from './theory';
-import type { Notation } from './theory';
-import type { Settings } from './types';
+import type { Notation, PitchClass } from './theory';
+import type { KeyScope, Settings } from './types';
 import { DEFAULT_SETTINGS, defaultSettings } from './types';
 
 export type { CurrentSitting } from '../srs/storage';
@@ -46,6 +46,26 @@ function keepKnown<T>(value: unknown, is: (v: unknown) => v is T, fallback: T[])
   return kept.length > 0 ? kept : fallback;
 }
 
+function isPitchClass(value: unknown): value is PitchClass {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 12;
+}
+
+/**
+ * The key scope, which is two words or a list of tonics.
+ *
+ * Sorted and deduped rather than taken as written, so a list is a *set* of keys however it arrives
+ * — the panel builds one by toggling, another device may have built the same one in another order,
+ * and two records that mean the same scope should not differ.
+ */
+function keepKeys(value: unknown): KeyScope {
+  if (value === 'all' || value === 'songbook') return value;
+  if (Array.isArray(value)) {
+    const kept = [...new Set(value.filter(isPitchClass))].sort((a, b) => a - b);
+    if (kept.length > 0) return kept;
+  }
+  return DEFAULT_SETTINGS.keys;
+}
+
 /**
  * Fill in what a stored or synced record is missing, and repair what it should not contain.
  *
@@ -69,7 +89,7 @@ export function sanitizeSettings(stored: Partial<Settings>, notations: Notation[
   return {
     directions: keepKnown(merged.directions, isDirection, DEFAULT_SETTINGS.directions),
     patterns: keepKnown(merged.patterns, isPatternId, DEFAULT_SETTINGS.patterns),
-    keys: merged.keys === 'all' || merged.keys === 'songbook' ? merged.keys : DEFAULT_SETTINGS.keys,
+    keys: keepKeys(merged.keys),
     notations: keepKnown(merged.notations, isNotation, notations),
   };
 }

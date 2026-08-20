@@ -714,7 +714,9 @@ argument that splits the neck cards' `name` from their `find`:
 
 Four patterns: `I IV V`, `I IV V vi`, and the two minor ones the songbook actually plays — `i iv v`
 and `i iv V`, the second raising the seventh, which is `a d E` and `e a H7` and half the library.
-All permutations of source and target key; `Settings.keys` narrows to the seven the songbook uses.
+All permutations of source and target key, and **every ordering of the chords within one** — see
+below. `Settings.keys` narrows the deck: `all`, `songbook` (the keys the songs here are written in),
+or a list of tonics you pick off a row of twelve.
 
 - `src/utils/transpose/` — `theory.ts` (keys, degrees, names), `cards.ts` (card ids, notation
   canonicalisation), `deck.ts` (scope, `spreadSubjects`, `cardSubject`), `library.ts` (the songbook
@@ -722,6 +724,73 @@ All permutations of source and target key; `Settings.keys` narrows to the seven 
 - `src/hooks/useTransposeData.ts` — mounted by `useFlashcardsData` alongside the neck one
 - `src/components/Transpose/` — `AnswerSlots`, `ChordPad`, `TransposeStats`, the settings rows,
   `describeCard`, `translations`. The card that assembles them is `Flashcards/TransposeCard.tsx`.
+
+### Every ordering of a pattern is its own card
+
+`chordsOf` returns a pattern's chords in degree order and, for a long time, nothing anywhere
+reordered them — so every card in this trainer printed its tonic first, and all three directions
+leaked their answer because of it:
+
+- `key` — *H E F# — which key?* is answered by reading the first chord. The other two are never
+  looked at. This is the card that prompted the change.
+- `transpose` — *A D E → into C* can be answered without reading the source progression at all:
+  take the target key off the prompt and spell its I IV V. The chords you were asked to move are
+  decoration.
+- `degrees` — always *I, IV, V in A*, in that order, so the row is answered by counting 0, 5, 7 up
+  from the tonic once rather than by knowing each degree on its own.
+
+Shuffling the order per appearance would have fixed all three, and more cheaply. It is a **deck
+axis** instead — `Order` in `cards.ts`, a permutation of the degree positions — because reading
+`F# H E` as B major is a thing to have learnt, and a thing learnt gets a schedule here, by the
+argument that splits a black key's `find` card by spelling and every card by notation.
+
+`promptChords` and `answerChords` apply the *same* permutation, which is what keeps a `transpose`
+card gradeable slot by slot: slot `i` answers prompt chord `i`. `answerChords` carries the numeral
+with each chord for the same reason — the degree printed under a `degrees` slot and the chord that
+slot is graded against now come out of one list, where they used to be two independent `chordsOf`
+calls and two places to apply an ordering.
+
+The suffix is `:o201`, written **after** the notation one (`degrees:9:1456:de:o1203`), and **degree
+order is unsuffixed**. That is the migration `:b` and `:de` both made: `key:11:145` is what every
+stored deck and every logged answer already names, so it keeps the schedule it earnt and the other
+orderings arrive as the new material they are. `parseCardId` reads the two suffixes as a bag and
+lets the existing round-trip reject the rest — a pair written the wrong way round, a repeat, a
+permutation of the wrong length, and an explicitly written `:o012`.
+
+`cardLabels` stays in degree order, and that is load-bearing rather than an oversight: permuting
+cannot add or remove a word, so the notation axis cannot depend on the ordering axis — which is
+what lets `canonicalNotation` be **memoised** on a cache key with the order stripped out. Without
+the memo `scopeIds` builds tens of thousands of label arrays, and it runs on every `buildQueue` and
+every stats render.
+
+**The cost is `n!`** — six cards for a three-chord pattern, twenty-four for `I IV V vi`. At the
+default scope that is ~530 cards becoming ~8,000, about 1.6 MB of the ~5 MB origin budget, and the
+deck cache is the one thing `createSrsStorage` never evicts. Which is why the key picker exists,
+and why the start screen's `/{total}` tile is the number to watch.
+
+Two things needed nothing for this. `subjectOf` is still the card's *answer*, so every ordering of
+one key shares one and `spreadSubjects` holds them apart — back to back, `H E F#` and `E F# H` are
+one question asked twice, which is the giveaway arriving by another route. And `keysProducing`
+compares chord *sets*, so the `key` direction stays answerable under any permutation.
+
+What did change is that `spreadBy` can no longer always separate them: a chord subject now holds a
+dozen cards where it held two, and a sitting can run out of subjects before it runs out of cards.
+Its fallback is what makes it total, and `mix.test.ts` asserts the real guarantee rather than the
+old one — a repeat may appear only where *every card still to be placed* shared a subject with the
+last few, which is to say where there was nothing else to put there.
+
+### Picking the keys
+
+`Settings.keys` is `'all' | 'songbook' | PitchClass[]`. The two words stay words rather than
+becoming presets that fill a list, because `songbook` resolves **per pattern** — C D E F G A for
+`I IV V`, A D E G for `i iv V` — and a flat list of tonics cannot say that. `tonicsFor` resolves
+the three cases; `effectiveTonics` unions them across the selected patterns, which is what the
+panel's twelve key buttons draw their lit state from, so a preset shows what it resolves to rather
+than an empty row. Touching any key turns that resolved set into an explicit one.
+
+`sanitizeSettings` is the single choke point for both localStorage and the cloud copy, so the list
+is validated, deduped and sorted there — two records meaning the same scope should not differ — and
+an empty or unrecognised one falls back to the default the way `keepKnown` protects the other three.
 
 ### A key spells its own chords
 

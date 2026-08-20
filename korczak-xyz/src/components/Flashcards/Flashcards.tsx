@@ -339,6 +339,7 @@ export default function Flashcards({ lang, library }: FlashcardsProps) {
         onFretboardChange={fretboard.updateSettings}
         transposeSettings={transpose.settings}
         onTransposeChange={transpose.updateSettings}
+        library={library}
         t={t}
         fretboardT={fretboardT}
         transposeT={transposeT}

@@ -104,24 +104,68 @@ describe('buildMixedQueue', () => {
     expect(trainers(queue).every((t) => t === 'fretboard')).toBe(true);
   });
 
+  /*
+   * `name:0-3` and `find:0-3` are the case `spreadPositions` exists for, and mixing must not lose
+   * it — a subject arriving from the other deck is not an excuse to put them side by side.
+   *
+   * What is asserted is `spreadBy`'s actual guarantee rather than "no two ever touch", because the
+   * latter stopped being true of this deck and was never true of the algorithm. A chord card's
+   * subject is its *answer*, so every ordering of one key shares one and the chord deck holds a
+   * dozen cards per subject where it used to hold two; a sitting can now run out of subjects before
+   * it runs out of cards. When it does, `spreadBy` falls back — and the fallback is what makes it
+   * total. So: a repeated subject may only appear where **every card still to be placed** had a
+   * subject already in the last `MIN_MIXED_GAP`, which is to say where there was nothing else left
+   * to put there.
+   */
   it('holds apart cards about the same place, within a trainer', () => {
-    // `name:0-3` and `find:0-3` are the case `spreadPositions` exists for, and mixing must not
-    // lose it — a subject arriving from the other deck is not an excuse to put them side by side.
-    const queue = buildMixedQueue(
-      [neck(NECK.map(createCard)), chords(CHORDS.map(createCard))],
-      shape({ sessionLength: 40, newPerSession: 40 }),
-      T0,
-      { rng: seeded(11) }
-    );
-    const subjects = queue.map((id) => {
-      const split = unqualify(id)!;
-      const own = split.trainer === 'fretboard' ? positionSubject : cardSubject;
-      return `${split.trainer}|${own(split.cardId)}`;
-    });
-    for (let i = 1; i < subjects.length; i++) {
-      expect(subjects[i]).not.toBe(subjects[i - 1]);
+    const subjectsOf = (queue: string[]) =>
+      queue.map((id) => {
+        const split = unqualify(id)!;
+        const own = split.trainer === 'fretboard' ? positionSubject : cardSubject;
+        return `${split.trainer}|${own(split.cardId)}`;
+      });
+
+    for (let seed = 1; seed <= 60; seed++) {
+      const subjects = subjectsOf(
+        buildMixedQueue(
+          [neck(NECK.map(createCard)), chords(CHORDS.map(createCard))],
+          shape({ sessionLength: 40, newPerSession: 40 }),
+          T0,
+          { rng: seeded(seed) }
+        )
+      );
+      for (let i = 1; i < subjects.length; i++) {
+        if (subjects[i] !== subjects[i - 1]) continue;
+        const recent = subjects.slice(Math.max(0, i - MIN_MIXED_GAP), i);
+        const left = subjects.slice(i);
+        expect(
+          left.every((subject) => recent.includes(subject)),
+          `seed ${seed}: a repeat at ${i} with another subject still to place`
+        ).toBe(true);
+      }
     }
     expect(MIN_MIXED_GAP).toBe(3);
+  });
+
+  it('still separates them outright when the sitting has subjects to spare', () => {
+    // The everyday case: a sitting far shorter than the deck has plenty to choose from, and
+    // nothing repeats at all.
+    for (let seed = 1; seed <= 60; seed++) {
+      const queue = buildMixedQueue(
+        [neck(NECK.map(createCard)), chords(CHORDS.slice(0, 12).map(createCard))],
+        shape({ sessionLength: 12, newPerSession: 12 }),
+        T0,
+        { rng: seeded(seed) }
+      );
+      const subjects = queue.map((id) => {
+        const split = unqualify(id)!;
+        const own = split.trainer === 'fretboard' ? positionSubject : cardSubject;
+        return `${split.trainer}|${own(split.cardId)}`;
+      });
+      for (let i = 1; i < subjects.length; i++) {
+        expect(subjects[i], `seed ${seed}`).not.toBe(subjects[i - 1]);
+      }
+    }
   });
 
   /*
