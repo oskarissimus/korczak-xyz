@@ -151,6 +151,38 @@ describe('scopeIds', () => {
     }
   });
 
+  it('draws only the orderings asked for', () => {
+    const base = { directions: ['key'] as const, patterns: ['145'] as const, notations: ['polish'] as const, keys: [9] as const };
+    const both = scopeIds(settings({ ...base, orders: ['degree', 'shuffled'] }), NO_LIBRARY);
+    const ordered = scopeIds(settings({ ...base, orders: ['degree'] }), NO_LIBRARY);
+    const shuffled = scopeIds(settings({ ...base, orders: ['shuffled'] }), NO_LIBRARY);
+
+    expect(both).toHaveLength(ORDERS_145);
+    // `degree` alone is the deck as it was before the ordering axis: one card per question, and
+    // the very card every stored schedule was earnt on.
+    expect(ordered).toEqual(['key:9:145']);
+    expect(shuffled).toHaveLength(ORDERS_145 - 1);
+    expect(shuffled).not.toContain('key:9:145');
+    expect([...ordered, ...shuffled].sort()).toEqual([...both].sort());
+  });
+
+  it('is a scope and not a deletion — the cards parked keep their ids', () => {
+    // `ensureCards` never removes, so switching `shuffled` off and on again finds the work there.
+    const wide = settings({
+      directions: ['key'], patterns: ['145'], notations: ['polish'], keys: [9],
+      orders: ['degree', 'shuffled'],
+    });
+    const narrow = settings({ ...wide, orders: ['degree'] });
+    const deck = ensureCards({}, scopeIds(wide, NO_LIBRARY));
+    expect(cardsInScope(deck, narrow, NO_LIBRARY)).toHaveLength(1);
+    expect(Object.keys(ensureCards(deck, scopeIds(narrow, NO_LIBRARY)))).toHaveLength(ORDERS_145);
+    expect(cardsInScope(deck, wide, NO_LIBRARY)).toHaveLength(ORDERS_145);
+  });
+
+  it('falls back rather than emptying the deck when the orderings are switched off entirely', () => {
+    expect(scopeIds(settings({ orders: [] }), NO_LIBRARY).length).toBeGreaterThan(0);
+  });
+
   it('never empties the deck on a key list that arrives empty', () => {
     // The panel refuses to empty it; a record from elsewhere might not have.
     expect(scopeIds(settings({ keys: [] }), NO_LIBRARY).length).toBeGreaterThan(0);

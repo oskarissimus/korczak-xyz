@@ -587,6 +587,12 @@ over the navy instead. Both size caps earn their place: the neck is nearly squar
 mark sized off height alone came out two frets wide and sat on the answer cells, and `max-width`
 bounds it from the other side while the viewBox keeps it circular in the non-square box.
 
+`.fb-choice--on` is the same rule a third time. Its sheet's own `.fb-choice:hover` is (0,2,0) and
+beats a bare `.fb-choice--on` at (0,1,0), so every settings row across both trainers greyed out the
+one button the pointer was resting on — which on a settings row is the button you are about to
+click, so the row could not be read while it was being used. Invisible on a phone, which has no
+hover at all.
+
 The answer states beneath it (`.fb-neck-cell--right`/`--wrong`, `.fb-pad-key--right`/`--wrong`)
 each name themselves **twice**, the second time with `:hover`. `Layout.astro` has a global
 `button:hover { background: #a0a0a0 }`, and (0,1,1) beats a single class; the enabled cell is
@@ -765,8 +771,21 @@ every stats render.
 
 **The cost is `n!`** — six cards for a three-chord pattern, twenty-four for `I IV V vi`. At the
 default scope that is ~530 cards becoming ~8,000, about 1.6 MB of the ~5 MB origin budget, and the
-deck cache is the one thing `createSrsStorage` never evicts. Which is why the key picker exists,
-and why the start screen's `/{total}` tile is the number to watch.
+deck cache is the one thing `createSrsStorage` never evicts. Which is why the key picker and
+`Settings.orders` both exist, and why the start screen's `/{total}` tile is the number to watch.
+
+`Settings.orders` is that second control, and it is a different question from the axis itself.
+The axis says every ordering *is* a card; `OrderScope` (`'degree' | 'shuffled'`, either or both,
+the `Chord order` row) says which of them to be asked right now — because `i iv v` in one key is a
+thing you sit down to work on, and you may want it as it is written, which is how you play it, or
+only scrambled, which is what makes you read it. `degree` alone is precisely the deck as it stood
+before the axis existed: one card per question, and the very cards every stored schedule was
+earnt on. A **scope**, so `ensureCards` parks the rest rather than deleting them and switching
+`shuffled` back on finds the work still there.
+
+A record written before the setting existed has no key for it, so spreading it over
+`DEFAULT_SETTINGS` supplies both and a deck stored by the build that shipped the axis is
+unchanged.
 
 Two things needed nothing for this. `subjectOf` is still the card's *answer*, so every ordering of
 one key shares one and `spreadSubjects` holds them apart — back to back, `H E F#` and `E F# H` are

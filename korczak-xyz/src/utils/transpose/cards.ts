@@ -123,6 +123,37 @@ export function degreeOrder(pattern: PatternId): Order {
   return orderingsOf(pattern)[0];
 }
 
+/** Whether this is the pattern's own degree order — the card that carries no `:o` suffix. */
+export function isDegreeOrder(order: Order): boolean {
+  return isIdentity(order);
+}
+
+/**
+ * Which orderings the deck draws, as a scope setting.
+ *
+ * The axis above says every ordering *is* a card; this says which of them you want to be asked
+ * right now. Two different questions, and the second is the one you answer when `i iv v` in one
+ * key is the thing you are working on: `degree` alone is the progression as it is written, which
+ * is what you play; `shuffled` alone is the `n! - 1` cards that make you read it rather than
+ * recognise its shape. Both is the default and is what shipped.
+ *
+ * A scope and not a filter on the cards themselves — `ensureCards` never removes, so turning
+ * `shuffled` off parks those schedules rather than losing them, and turning it back on finds the
+ * work still there.
+ */
+export type OrderScope = 'degree' | 'shuffled';
+
+export const ORDER_SCOPES: OrderScope[] = ['degree', 'shuffled'];
+
+export function isOrderScope(value: unknown): value is OrderScope {
+  return ORDER_SCOPES.includes(value as OrderScope);
+}
+
+/** Which scope an ordering belongs to. */
+export function orderScopeOf(order: Order): OrderScope {
+  return isDegreeOrder(order) ? 'degree' : 'shuffled';
+}
+
 interface CardKeyBase {
   pattern: PatternId;
   notation: Notation;

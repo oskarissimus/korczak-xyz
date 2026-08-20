@@ -20,7 +20,7 @@ import {
   ensureCards as ensureCardsIn,
   spreadBy,
 } from '../srs/queue';
-import { cardId, orderingsOf, parseCardId, subjectOf } from './cards';
+import { cardId, orderScopeOf, orderingsOf, parseCardId, subjectOf } from './cards';
 import type { CardKey, Direction } from './cards';
 import type { LibraryIndex } from './library';
 import { libraryTonics } from './library';
@@ -95,20 +95,23 @@ export function effectiveTonics(settings: Settings, library: LibraryIndex): Pitc
  *
  * The innermost loop is the ordering axis, and it is what makes this enumeration expensive: `n!`
  * per card, so six for the three-chord patterns and twenty-four for `I IV V vi`. `Settings.keys`
- * is the control — see `tonicsFor`.
+ * and `Settings.orders` are the two controls — see `tonicsFor`, and `OrderScope` in `cards.ts`.
+ * Dropping `shuffled` puts the deck back to the one card per question it held before the axis
+ * existed, which is also the deck every stored schedule was earnt on.
  */
 export function scopeIds(settings: Settings, library: LibraryIndex): string[] {
   const ids: string[] = [];
   const directions = settings.directions.length > 0 ? settings.directions : DEFAULT_SETTINGS.directions;
   const patterns = settings.patterns.length > 0 ? settings.patterns : DEFAULT_SETTINGS.patterns;
   const notations = notationsOf(settings);
+  const orderScopes = settings.orders.length > 0 ? settings.orders : DEFAULT_SETTINGS.orders;
 
   const push = (key: CardKey) => ids.push(cardId(key));
 
   for (const pattern of patterns) {
     if (!PATTERN_IDS.includes(pattern)) continue;
     const tonics = tonicsFor(settings, pattern, library);
-    const orders = orderingsOf(pattern);
+    const orders = orderingsOf(pattern).filter((order) => orderScopes.includes(orderScopeOf(order)));
 
     for (const notation of notations) {
       for (const direction of directions) {

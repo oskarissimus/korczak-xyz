@@ -5,6 +5,21 @@ import { DEFAULT_SETTINGS } from './types';
 const NOTATIONS = DEFAULT_SETTINGS.notations;
 
 describe('sanitizeSettings', () => {
+  it('leaves a record written before the ordering scope existed drawing both', () => {
+    // The migration: no key for it means the spread over the defaults supplies both, so a deck
+    // stored by the build that shipped the ordering axis is unchanged by this one.
+    expect(sanitizeSettings({}, NOTATIONS).orders).toEqual(['degree', 'shuffled']);
+  });
+
+  it('keeps the orderings asked for, and never none', () => {
+    expect(sanitizeSettings({ orders: ['degree'] }, NOTATIONS).orders).toEqual(['degree']);
+    expect(sanitizeSettings({ orders: ['shuffled'] }, NOTATIONS).orders).toEqual(['shuffled']);
+    expect(sanitizeSettings({ orders: [] }, NOTATIONS).orders).toEqual(DEFAULT_SETTINGS.orders);
+    expect(sanitizeSettings({ orders: ['sorted'] as never }, NOTATIONS).orders).toEqual(
+      DEFAULT_SETTINGS.orders
+    );
+  });
+
   it('keeps the two scope words', () => {
     expect(sanitizeSettings({ keys: 'all' }, NOTATIONS).keys).toBe('all');
     expect(sanitizeSettings({ keys: 'songbook' }, NOTATIONS).keys).toBe('songbook');

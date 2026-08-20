@@ -7,6 +7,8 @@ import {
   canonicalNotation,
   degreeOrder,
   displayNotation,
+  isDegreeOrder,
+  orderScopeOf,
   orderingsOf,
   parseCardId,
   promptChords,
@@ -130,6 +132,19 @@ describe('the ordering axis', () => {
           .pc === 11
     );
     expect(leading).toHaveLength(2); // [0,1,2] and [0,2,1]
+  });
+
+  it('sorts an ordering into the scope that draws it', () => {
+    expect(isDegreeOrder(degreeOrder('145'))).toBe(true);
+    expect(orderScopeOf(degreeOrder('1456'))).toBe('degree');
+    expect(orderingsOf('145').map(orderScopeOf)).toEqual([
+      'degree',
+      'shuffled',
+      'shuffled',
+      'shuffled',
+      'shuffled',
+      'shuffled',
+    ]);
   });
 
   it('holds every ordering of one card under one subject, so a sitting spreads them', () => {

@@ -11,8 +11,8 @@
  * error message nobody needs to read.
  */
 
-import { DIRECTIONS } from '../../utils/transpose/cards';
-import type { Direction } from '../../utils/transpose/cards';
+import { DIRECTIONS, ORDER_SCOPES } from '../../utils/transpose/cards';
+import type { Direction, OrderScope } from '../../utils/transpose/cards';
 import { effectiveTonics } from '../../utils/transpose/deck';
 import type { LibraryIndex } from '../../utils/transpose/library';
 import { NOTATIONS, PATTERN_IDS, patternLabel, pitchClassLabel } from '../../utils/transpose/theory';
@@ -53,6 +53,11 @@ const DIRECTION_LABELS: Record<Direction, keyof Translation> = {
   transpose: 'dirTranspose',
   degrees: 'dirDegrees',
   key: 'dirKey',
+};
+
+const ORDER_LABELS: Record<OrderScope, { label: keyof Translation; title: keyof Translation }> = {
+  degree: { label: 'orderDegree', title: 'orderDegreeTitle' },
+  shuffled: { label: 'orderShuffled', title: 'orderShuffledTitle' },
 };
 
 export default function TransposeSettingsRows({ settings, onChange, library, t }: SettingsPanelProps) {
@@ -148,6 +153,26 @@ export default function TransposeSettingsRows({ settings, onChange, library, t }
             </Choice>
           );
         })}
+      </Row>
+
+      {/* Which orderings the deck draws. Every ordering is its own card either way — this is the
+          scope, so switching `shuffled` off parks those schedules rather than losing them. It is
+          what lets one progression in one key be drilled as it is written, which is how you play
+          it, without the other five orderings in the way. */}
+      <Row label={t.orders}>
+        {ORDER_SCOPES.map((scope) => (
+          <Choice
+            key={scope}
+            active={settings.orders.includes(scope)}
+            onClick={() => {
+              const next = toggle(settings.orders, scope, ORDER_SCOPES);
+              if (next) onChange({ ...settings, orders: next });
+            }}
+            title={t[ORDER_LABELS[scope].title]}
+          >
+            {t[ORDER_LABELS[scope].label]}
+          </Choice>
+        ))}
       </Row>
 
       <Row label={t.notations}>

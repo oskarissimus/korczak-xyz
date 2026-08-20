@@ -610,6 +610,17 @@
   color: var(--retro-white);
 }
 
+/* Named a second time under `:hover`, the way `.fb-neck-cell--right` is and for the same reason:
+   `.fb-choice:hover` above is (0,2,0) and beats a bare `.fb-choice--on` at (0,1,0), so the one
+   button the pointer was resting on went flat grey and stopped reading as chosen until the mouse
+   moved. On a settings row that is the button you are about to click, so on a mouse the row could
+   not be read while it was being used. Invisible on a phone, which has no hover at all. */
+@media (hover: hover) {
+  .fb-choice--on:hover {
+    background: var(--retro-teal);
+  }
+}
+
 .fb-choice:focus-visible {
   outline: 1px dotted var(--retro-black);
   outline-offset: -5px;

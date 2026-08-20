@@ -9,7 +9,7 @@
  */
 
 import { createSrsStorage } from '../srs/storage';
-import { isDirection } from './cards';
+import { isDirection, isOrderScope } from './cards';
 import { isNotation, isPatternId } from './theory';
 import type { Notation, PitchClass } from './theory';
 import type { KeyScope, Settings } from './types';
@@ -90,6 +90,7 @@ export function sanitizeSettings(stored: Partial<Settings>, notations: Notation[
     directions: keepKnown(merged.directions, isDirection, DEFAULT_SETTINGS.directions),
     patterns: keepKnown(merged.patterns, isPatternId, DEFAULT_SETTINGS.patterns),
     keys: keepKeys(merged.keys),
+    orders: keepKnown(merged.orders, isOrderScope, DEFAULT_SETTINGS.orders),
     notations: keepKnown(merged.notations, isNotation, notations),
   };
 }

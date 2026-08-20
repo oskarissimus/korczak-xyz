@@ -10,7 +10,7 @@
  * which mixes this deck with the fretboard's, and live in `src/utils/flashcards/settings.ts`.
  */
 
-import type { Direction } from './cards';
+import type { Direction, OrderScope } from './cards';
 import type { Notation, PatternId, PitchClass } from './theory';
 
 export type {
@@ -45,6 +45,15 @@ export interface Settings {
   patterns: PatternId[];
   keys: KeyScope;
   /**
+   * Which orderings of a pattern's chords are asked — `degree`, `shuffled`, or both. Empty is not
+   * allowed either.
+   *
+   * Every ordering is its own card (see `Order` in `cards.ts`); this is which of them the deck
+   * draws. It is what lets one progression in one key be practised as it is written, or only
+   * scrambled, rather than always both at once.
+   */
+  orders: OrderScope[];
+  /**
    * Which sets of chord names the deck asks under — `polish`, `german`, `international`, or any
    * combination. Empty is not allowed.
    *
@@ -73,6 +82,9 @@ export const DEFAULT_SETTINGS: Settings = {
   directions: ['transpose', 'degrees', 'key'],
   patterns: ['145', '1456'],
   keys: 'all',
+  // Both, which is what the ordering axis shipped as. A record written before this setting existed
+  // has no key for it, so the spread over these defaults leaves such a deck exactly as it was.
+  orders: ['degree', 'shuffled'],
   notations: ['polish', 'german'],
 };
 
