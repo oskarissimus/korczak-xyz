@@ -24,6 +24,33 @@ export const translations = {
     wokeUp: 'Woke up',
     liveHint: 'Tap when the baby falls asleep.',
 
+    // Bedtime routine
+    routineStart: 'Routine started',
+    routineInCrib: 'In crib',
+    routineRunning: 'Routine since {time}',
+    routineSpan: 'Routine {from} – {to}',
+    routineWaiting: 'In crib since {time}',
+    routineAsleepAfter: 'fell asleep after {duration}',
+    routineClear: 'Clear',
+    routineStaleTitle: 'Routine running for {duration}',
+    routineStaleBody:
+      'This looks like a routine nobody closed. Set the crib time below, or clear it — it is left out of every average until you do.',
+    routineAdd: 'Add routine',
+    routineEdit: 'Routine',
+    routineNone: 'No routine logged',
+    routineFormTitle: 'Bedtime routine',
+    routineFormOf: 'Night of {day}',
+    routineFormHint:
+      'One routine a night. The gap between the crib and falling asleep is what the stats call time to fall asleep.',
+    routineStartLabel: 'Routine started',
+    routineEndLabel: 'In crib',
+    routineOpen: 'Still in the routine',
+    routineRemove: 'Remove',
+    errRoutineNoStart: 'Set a time the routine started.',
+    errRoutineOrder: 'The crib time has to be after the routine started.',
+    errRoutineFuture: 'That is in the future.',
+    errRoutineTooLong: 'Longer than four hours — check the times.',
+
     // The forgotten timer
     staleTitle: 'Still running after {duration}',
     staleBody:
@@ -104,6 +131,9 @@ export const translations = {
     tileBedtime: 'Falls asleep',
     tileWake: 'Wakes up',
     tileFirstNap: 'First nap',
+    tileRoutineLength: 'Routine length',
+    tileSettle: 'Time to fall asleep',
+    tileRoutineStart: 'Routine starts',
     overDays: 'over {count} day',
     overDaysPlural: 'over {count} days',
     fromNaps: 'from {count} nap',
@@ -119,6 +149,10 @@ export const translations = {
     nightLengthAria:
       'Night sleep duration per day, with the mean and one standard deviation',
     nightLengthSeries: 'Night sleep',
+    settleTitle: 'How long he took to fall asleep',
+    settleAria:
+      'Time from going into the crib to falling asleep, per night, with the mean and one standard deviation',
+    settleSeries: 'Time to fall asleep',
     bedtimeTitle: 'Falling asleep and waking up',
     bedtimeAria: 'Bedtime and wake-up clock times per day, with the mean and one standard deviation',
     legendNight: 'Night',
@@ -244,6 +278,33 @@ export const translations = {
     wokeUp: 'Obudziło się',
     liveHint: 'Naciśnij, gdy dziecko zaśnie.',
 
+    // Bedtime routine
+    routineStart: 'Rytuał rozpoczęty',
+    routineInCrib: 'W łóżeczku',
+    routineRunning: 'Rytuał od {time}',
+    routineSpan: 'Rytuał {from} – {to}',
+    routineWaiting: 'W łóżeczku od {time}',
+    routineAsleepAfter: 'zasnęło po {duration}',
+    routineClear: 'Wyczyść',
+    routineStaleTitle: 'Rytuał trwa już {duration}',
+    routineStaleBody:
+      'To wygląda na rytuał, którego nikt nie zamknął. Ustaw godzinę położenia do łóżeczka poniżej albo wyczyść wpis — do tego czasu nie liczy się do żadnej średniej.',
+    routineAdd: 'Dodaj rytuał',
+    routineEdit: 'Rytuał',
+    routineNone: 'Brak rytuału',
+    routineFormTitle: 'Rytuał przed snem',
+    routineFormOf: 'Noc z {day}',
+    routineFormHint:
+      'Jeden rytuał na noc. Odstęp między położeniem do łóżeczka a zaśnięciem to w statystykach czas zasypiania.',
+    routineStartLabel: 'Początek rytuału',
+    routineEndLabel: 'W łóżeczku',
+    routineOpen: 'Rytuał wciąż trwa',
+    routineRemove: 'Usuń',
+    errRoutineNoStart: 'Podaj godzinę rozpoczęcia rytuału.',
+    errRoutineOrder: 'Godzina położenia do łóżeczka musi być po rozpoczęciu rytuału.',
+    errRoutineFuture: 'To jest w przyszłości.',
+    errRoutineTooLong: 'Dłużej niż cztery godziny — sprawdź godziny.',
+
     // The forgotten timer
     staleTitle: 'Wciąż liczy od {duration}',
     staleBody:
@@ -324,6 +385,9 @@ export const translations = {
     tileBedtime: 'Zasypia',
     tileWake: 'Wstaje',
     tileFirstNap: 'Pierwsza drzemka',
+    tileRoutineLength: 'Długość rytuału',
+    tileSettle: 'Czas zasypiania',
+    tileRoutineStart: 'Początek rytuału',
     overDays: 'z {count} dnia',
     overDaysPlural: 'z {count} dni',
     fromNaps: 'z {count} drzemki',
@@ -339,6 +403,10 @@ export const translations = {
     nightLengthAria:
       'Długość snu nocnego dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
     nightLengthSeries: 'Sen nocny',
+    settleTitle: 'Jak długo zasypiało',
+    settleAria:
+      'Czas od położenia do łóżeczka do zaśnięcia, noc po nocy, ze średnią i jednym odchyleniem standardowym',
+    settleSeries: 'Czas zasypiania',
     bedtimeTitle: 'Zasypianie i pobudka',
     bedtimeAria:
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',

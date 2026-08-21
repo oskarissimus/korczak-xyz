@@ -77,5 +77,13 @@ service cloud.firestore {
     match /users/{uid}/babySleepClimate/{recordId} {
       allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
     }
+
+    // The bedtime routine records — when the routine started and when he went into the crib — which
+    // are part of the same shared log and are written by whichever parent is doing bedtime. Another
+    // separate collection, so another copy of the rule, for the reason above: rules are a permissive
+    // union, and neither block above says anything at all about this path.
+    match /users/{uid}/babySleepRoutines/{recordId} {
+      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+    }
   }
 }

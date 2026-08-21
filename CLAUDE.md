@@ -947,6 +947,64 @@ tidy. `nightMs != null` used to mean "this night is finished", because an unfini
 open entry with no duration. A broken night has a closed first block, so it reports a duration while
 the baby is still asleep — and the old test would have let half of tonight into the averages.
 
+### The bedtime routine
+
+Two more facts a night, at the two moments they are known: **when the routine started** and **when he
+went into the crib**. The gap between them is the routine; the gap from the crib to `entry.start` is
+the part that actually moves — sitting beside him while he falls asleep — and it is what the stats
+tab calls *time to fall asleep*.
+
+**Not two fields on the entry.** The entry does not exist yet: it is created by the "night sleep" tap
+forty minutes later, so a "routine started" button would have nowhere to write. And the two halves are
+two separate acts twenty minutes apart, on a shared log often by two people on two phones — the case
+`climate.ts` sets out, where a whole-record last-write-wins merge silently drops one half. So it is
+climate's design again: one document a night, reconciled by `versioned.ts`, its own localStorage keys,
+its own push queue, its own collection (`users/{uid}/babySleepRoutines`), its own hook.
+
+The id **is** the night key. There is one record a night rather than climate's two, so there is no
+`-part` suffix to split off and `parseClimateId`'s last-hyphen trap does not arise. The join key is
+**`sleepDayKey(t, 'night')`** and deliberately *not* `currentNightKey`: a routine is logged at the
+start of the night exactly as a night entry's `start` is, so it must go through the same
+`NIGHT_CUTOFF_HOUR` rule, or a routine begun at 00:10 files itself a day after the sleep that follows
+it. Two things fall out of keying on the night rather than on the entry — `split.ts` needed nothing at
+all, since cutting a night in two leaves the routine alone, and correcting an entry's times cannot
+orphan one.
+
+- `routine.ts` (the record, `routineNightKey`, `validateRoutine`, `normalizeRoutine`),
+  `routineStats.ts` (the merge, the join, the point extractors), `routineStorage.ts`,
+  `routineCloud.ts`, `src/hooks/useNightRoutine.ts`
+- `RoutineLive.tsx` — the strip above `LiveControls`, which never learns about routines. It ticks
+  only while something is counting up, and it is gone by breakfast: after 06:00 `routineNightKey`
+  names the coming night, which has no routine yet.
+- `RoutineForm.tsx` — reachable from the routine line on any day in the history. Its own form and not
+  a fieldset in `EntryForm`, because a broken night is several entries and one routine: folded in, it
+  would ask the same question once per block, and `EntryForm`'s validated `onSubmit` contract would
+  have to carry a second draft it has no use for.
+
+Two rules in `routineStats.ts` differ from `stats.ts`'s. **Today is included** — these follow the
+clock-point rule, not the duration rule, because a settling time is complete the moment he falls
+asleep, so tonight's shows immediately. And **the night's first block is read directly, never through
+`nightBlocks`**, which returns null while any block is running: only the first block's start is needed
+and it is known the instant the night begins, so going through `nightBlocks` would hide tonight's
+figure until morning. Nothing is clamped — a routine logged as ending after he was already asleep is a
+mis-log and is excluded, not pinned to zero.
+
+`DurationSpreadChart` grew optional `minSpan`/`tickSteps` for this. Its three-hour floor is right for
+a night and flattens a settling time into a straight line along the bottom; the settle chart passes
+30 minutes and 5/10/15/30-minute ticks. The defaults are still the night's.
+
+`storage.ts`'s `CACHED_PER_OWNER` gains both routine keys — miss that and the previous household's
+routines stay cached and get pushed into the new account on the first write. `firestore.rules` needs
+its own `users/{uid}/babySleepRoutines/{recordId}` block, deployed by hand as ever, so the *shared*
+half does nothing until `firebase deploy --only firestore:rules` is run. The log tab and the stats tab
+now each mount two hooks, so they show one badge over two syncs via `mergeSync` from
+`src/utils/flashcards/sync.ts` — pure, and it knows nothing about flashcards. The one rule that
+matters there: a half that failed is never reported as synced.
+
+The routine button is the plain raised grey, not a colour. Navy is the night, teal is a nap and
+yellow is waking, so every colour on that screen is already spoken for and a coloured routine button
+would read as one of the three things it is not.
+
 ### The spread charts
 
 Four of them: three clock times and the night's length. `SpreadChart.tsx` is the drawing — dots, mean

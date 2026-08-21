@@ -10,6 +10,11 @@
  * last night differed from the night before — and an hour of variation inside a twelve-hour axis is
  * a flat line. The three-hour floor is what stops the zoom going the other way and turning twenty
  * minutes of ordinary drift into a mountain range.
+ *
+ * That floor is right for a night and wrong for everything shorter, so `minSpan` and `tickSteps` are
+ * overridable. A settling time is minutes where a night is hours: the same three-hour floor that
+ * stops one chart exaggerating flattens the other into a straight line along the bottom. The
+ * defaults are the night's, because that is the chart this was written for.
  */
 
 import { formatHm } from '../../utils/babySleep/format';
@@ -21,6 +26,10 @@ interface DurationSpreadChartProps {
   points: DurationPoint[];
   stat: MeanStat;
   formatDay: (t: number) => string;
+  /** Never zoom in tighter than this. Defaults to three hours — a whole night's scale. */
+  minSpan?: number;
+  /** Candidate gridline gaps, ascending. Defaults to the night's. */
+  tickSteps?: number[];
   label: string;
   meanLabel: string;
   spreadLabel: string;
@@ -33,10 +42,16 @@ const HOUR = 60 * MINUTE;
 const MIN_SPAN = 3 * HOUR;
 const TICK_STEPS = [30 * MINUTE, HOUR, 2 * HOUR];
 
+/** For a chart of minutes rather than hours — the crib-to-sleep gap. */
+export const SHORT_MIN_SPAN = 30 * MINUTE;
+export const SHORT_TICK_STEPS = [5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE];
+
 export default function DurationSpreadChart({
   points,
   stat,
   formatDay,
+  minSpan = MIN_SPAN,
+  tickSteps = TICK_STEPS,
   ...labels
 }: DurationSpreadChartProps) {
   const band =
@@ -53,8 +68,8 @@ export default function DurationSpreadChart({
       band={band}
       formatValue={formatHm}
       formatDay={formatDay}
-      tickSteps={TICK_STEPS}
-      minSpan={MIN_SPAN}
+      tickSteps={tickSteps}
+      minSpan={minSpan}
       floor={0}
       {...labels}
     />

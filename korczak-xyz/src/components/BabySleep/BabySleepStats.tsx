@@ -18,6 +18,8 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
+import { useNightRoutine } from '../../hooks/useNightRoutine';
+import { mergeSync } from '../../utils/flashcards/sync';
 import { resolveWindow } from '../../utils/babySleep/days';
 import { formatClock, formatHm, formatSpread } from '../../utils/babySleep/format';
 import {
@@ -27,11 +29,15 @@ import {
   nightDurationPoints,
   wakePoints,
 } from '../../utils/babySleep/stats';
+import { computeRoutineStats, routinesByNight, settlePoints } from '../../utils/babySleep/routineStats';
 import { loadSettings, saveSettings } from '../../utils/babySleep/storage';
 import type { ClockStat, MeanStat, WindowChoice } from '../../utils/babySleep/types';
 import ClockSpreadChart from './ClockSpreadChart';
 import DailySleepBars from './DailySleepBars';
-import DurationSpreadChart from './DurationSpreadChart';
+import DurationSpreadChart, {
+  SHORT_MIN_SPAN,
+  SHORT_TICK_STEPS,
+} from './DurationSpreadChart';
 import SleepTimeline from './SleepTimeline';
 import SyncBadge from './SyncBadge';
 import WindowPicker from './WindowPicker';
@@ -79,6 +85,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
   const auth = useAuth();
   const owner = useDataOwner(auth.user);
   const data = useBabySleepData(auth.user, owner);
+  const routines = useNightRoutine(auth.user, owner);
 
   const [stored] = useState(() => loadSettings());
   const [choice, setChoice] = useState<WindowChoice>(() =>
@@ -112,6 +119,15 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
     () => computeStats(data.entries, window, now),
     [data.entries, window] // eslint-disable-line react-hooks/exhaustive-deps
   );
+  /*
+   * The routine figures are folded over the same day buckets, so every tile on this page — sleep and
+   * routine alike — is drawn from one grouping of one window.
+   */
+  const routineStats = useMemo(
+    () => computeRoutineStats(stats.days, routines.records),
+    [stats.days, routines.records]
+  );
+  const routineByNight = useMemo(() => routinesByNight(routines.records), [routines.records]);
 
   const clockTile = (label: string, stat: ClockStat) => (
     <Tile
@@ -133,7 +149,14 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
     />
   );
 
-  if (!data.ready) return <div className="bs-loading" />;
+  if (!data.ready || !routines.ready) return <div className="bs-loading" />;
+
+  // One badge over two syncs: a half that failed is never reported as synced. See `mergeSync`.
+  const sync = mergeSync(data.sync, routines.sync);
+  const retrySync = () => {
+    data.retrySync();
+    routines.retrySync();
+  };
 
   return (
     <div className="bs-stats">
@@ -176,6 +199,10 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         {clockTile(t.tileBedtime, stats.bedtime)}
         {clockTile(t.tileWake, stats.wakeTime)}
         {clockTile(t.tileFirstNap, stats.firstNapStart)}
+        {/* The routine last: it is what happens before the night, and the three read together. */}
+        {clockTile(t.tileRoutineStart, routineStats.routineStart)}
+        {durationTile(t.tileRoutineLength, routineStats.routineLength)}
+        {durationTile(t.tileSettle, routineStats.settle)}
       </div>
 
       <p className="bs-note">{t.statsNote}</p>
@@ -240,6 +267,24 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         />
       </section>
 
+      {/* Beside the night's length, because it is the other duration a bedtime produces — and on an
+          axis of minutes rather than hours, or twenty minutes of drift draws as a flat line. */}
+      <section className="bs-section">
+        <h2 className="bs-subhead">{t.settleTitle}</h2>
+        <DurationSpreadChart
+          points={settlePoints(stats.days, routineByNight)}
+          stat={routineStats.settle}
+          minSpan={SHORT_MIN_SPAN}
+          tickSteps={SHORT_TICK_STEPS}
+          formatDay={formatDay}
+          label={t.settleSeries}
+          meanLabel={t.legendMean}
+          spreadLabel={t.legendSpread}
+          ariaLabel={t.settleAria}
+          emptyLabel={t.chartEmpty}
+        />
+      </section>
+
       <section className="bs-section">
         <h2 className="bs-subhead">{t.bedtimeTitle}</h2>
         <ClockSpreadChart
@@ -274,7 +319,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         />
       </section>
 
-      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={t} />
+      <SyncBadge sync={sync} onRetry={retrySync} t={t} />
     </div>
   );
 }

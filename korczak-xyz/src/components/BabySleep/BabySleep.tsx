@@ -12,10 +12,16 @@ import { useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
+import { useNightRoutine } from '../../hooks/useNightRoutine';
+import { mergeSync } from '../../utils/flashcards/sync';
+import { dayKeyOf, dayStart } from '../../utils/babySleep/days';
+import { routineNightKey } from '../../utils/babySleep/routine';
 import type { EntryDraft, SleepEntry } from '../../utils/babySleep/types';
 import EntryForm from './EntryForm';
 import EntryList from './EntryList';
 import LiveControls from './LiveControls';
+import RoutineForm from './RoutineForm';
+import RoutineLive from './RoutineLive';
 import SplitForm from './SplitForm';
 import SyncBadge from './SyncBadge';
 import { fill, localeOf, plural, translations, type Lang } from './translations';
@@ -27,11 +33,22 @@ interface BabySleepProps {
 /** How many days of history the log shows. The stats tab is where a longer view lives. */
 const HISTORY_DAYS = 14;
 
+/** When the night attributed to `night` began — its earliest block. Null if none has. */
+function firstNightStart(entries: SleepEntry[], night: string): number | null {
+  let first: number | null = null;
+  for (const entry of entries) {
+    if (entry.kind !== 'night' || dayKeyOf(entry) !== night) continue;
+    if (first == null || entry.start < first) first = entry.start;
+  }
+  return first;
+}
+
 export default function BabySleep({ lang }: BabySleepProps) {
   const t = translations[lang];
   const auth = useAuth();
   const owner = useDataOwner(auth.user);
   const data = useBabySleepData(auth.user, owner);
+  const routines = useNightRoutine(auth.user, owner);
   const [editingId, setEditingId] = useState<string | null>(null);
   /*
    * Which sleep is having a wake period added to it. Mutually exclusive with `editingId` — both
@@ -39,6 +56,8 @@ export default function BabySleep({ lang }: BabySleepProps) {
    * in two is two answers to the same question.
    */
   const [splittingId, setSplittingId] = useState<string | null>(null);
+  /** Which night's routine is being edited. The third occupant of the one form slot. */
+  const [routineNight, setRoutineNight] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   const locale = localeOf(lang);
@@ -71,13 +90,22 @@ export default function BabySleep({ lang }: BabySleepProps) {
 
   const beginEdit = (entry: SleepEntry) => {
     setSplittingId(null);
+    setRoutineNight(null);
     setEditingId(entry.id);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
   const beginSplit = (entry: SleepEntry) => {
     setEditingId(null);
+    setRoutineNight(null);
     setSplittingId(entry.id);
+    formRef.current?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const beginRoutine = (night: string) => {
+    setEditingId(null);
+    setSplittingId(null);
+    setRoutineNight(night);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
@@ -90,10 +118,46 @@ export default function BabySleep({ lang }: BabySleepProps) {
     }
   };
 
-  if (!data.ready) return <div className="bs-loading" />;
+  if (!data.ready || !routines.ready) return <div className="bs-loading" />;
+
+  /*
+   * The routine the live strip is about, and the night it leads into. `routineNightKey` is
+   * `sleepDayKey(_, 'night')`, the same rule the entries are filed by, so the two agree across the
+   * 06:00 cutoff without either being told about the other.
+   */
+  const tonight = routineNightKey(now);
+  const tonightRoutine = routines.byNight.get(tonight) ?? null;
+
+  /*
+   * One badge over two syncs, and one rule that matters: a half that failed is never reported as
+   * synced. `mergeSync` is pure and knows nothing about flashcards — it is the same two-collections,
+   * one-account problem the merged trainers had.
+   */
+  const sync = mergeSync(data.sync, routines.sync);
+  const retrySync = () => {
+    data.retrySync();
+    routines.retrySync();
+  };
 
   return (
     <div className="bs-log">
+      <RoutineLive
+        routine={tonightRoutine}
+        asleepAt={firstNightStart(data.entries, tonight)}
+        formatTime={formatTime}
+        onStart={() => routines.logRoutine(tonight, { start: Date.now(), end: null })}
+        onInCrib={() =>
+          tonightRoutine &&
+          routines.logRoutine(tonight, { start: tonightRoutine.start, end: Date.now() })
+        }
+        onClear={() => {
+          if (routineNight === tonight) setRoutineNight(null);
+          routines.clearRoutine(tonight);
+        }}
+        onFixStale={() => beginRoutine(tonight)}
+        t={t}
+      />
+
       <LiveControls
         open={data.open}
         formatTime={formatTime}
@@ -116,7 +180,24 @@ export default function BabySleep({ lang }: BabySleepProps) {
       )}
 
       <div ref={formRef}>
-        {splitting ? (
+        {routineNight ? (
+          <RoutineForm
+            night={routineNight}
+            routine={routines.byNight.get(routineNight)}
+            asleepAt={firstNightStart(data.entries, routineNight)}
+            dayLabel={formatDay(dayStart(routineNight))}
+            onSubmit={(draft) => {
+              routines.logRoutine(routineNight, draft);
+              setRoutineNight(null);
+            }}
+            onRemove={() => {
+              routines.clearRoutine(routineNight);
+              setRoutineNight(null);
+            }}
+            onCancel={() => setRoutineNight(null)}
+            t={t}
+          />
+        ) : splitting ? (
           <SplitForm
             entry={splitting}
             formatTime={formatTime}
@@ -151,10 +232,12 @@ export default function BabySleep({ lang }: BabySleepProps) {
           if (entry.id === splittingId) setSplittingId(null);
           data.removeEntry(entry.id);
         }}
+        routines={routines.byNight}
+        onRoutine={beginRoutine}
         t={t}
       />
 
-      <SyncBadge sync={data.sync} onRetry={data.retrySync} t={t} />
+      <SyncBadge sync={sync} onRetry={retrySync} t={t} />
     </div>
   );
 }

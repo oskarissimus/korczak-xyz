@@ -136,6 +136,84 @@
   color: var(--retro-black);
 }
 
+/* --- the bedtime routine -------------------------------------------------- */
+
+/* Its own strip above the live controls, because a routine is not a sleep: it is its own record
+   keyed by the night, and it neither starts nor ends an entry. */
+.bs-routine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.bs-routine-line {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.bs-routine-timer {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1rem;
+  color: var(--retro-navy);
+}
+
+.bs-routine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+/* Smaller than `.bs-big`, and deliberately the plain raised grey rather than a colour: the routine
+   is tapped at seven in the evening with the lights on, not at three in the morning without
+   looking. Every colour in this palette is already spoken for on this screen — navy is the night,
+   teal is a nap, yellow is waking — so a coloured routine button would read as one of the three
+   things it is not. Grey needs no `:hover` twin either, the global `button:hover` being the ordinary
+   press feedback here rather than something that erases a meaning. */
+.bs-routine-btn {
+  min-height: 40px;
+  padding: 6px 14px;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  border: 3px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.bs-routine-btn:active {
+  border-style: inset;
+}
+
+/* One row per day group in the history, above the entries — a routine belongs to the night, not to
+   any one block of it, so a broken night still shows exactly one. */
+.bs-routine-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 1.05rem;
+  border-top: 1px solid var(--retro-dark-gray);
+}
+
+.bs-routine-label {
+  color: var(--retro-dark-gray);
+}
+
+.bs-routine-value {
+  flex: 1 1 auto;
+}
+
+.bs-routine-none {
+  color: var(--retro-dark-gray);
+}
+
 /* --- the forgotten timer -------------------------------------------------- */
 
 .bs-warn {

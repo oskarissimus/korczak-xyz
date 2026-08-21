@@ -9,6 +9,7 @@
 
 import { dayKeyAt, dayKeyOf, dayStart, durationOf } from '../../utils/babySleep/days';
 import { authorLabel, formatHm } from '../../utils/babySleep/format';
+import type { RoutineRecord } from '../../utils/babySleep/routine';
 import { canSplit } from '../../utils/babySleep/split';
 import type { SleepEntry } from '../../utils/babySleep/types';
 import { isPlausible } from '../../utils/babySleep/types';
@@ -33,6 +34,13 @@ interface EntryListProps {
    */
   onSplit: (entry: SleepEntry) => void;
   onDelete: (entry: SleepEntry) => void;
+  /**
+   * The bedtime routines by night key. A routine belongs to the night, not to any one entry — a
+   * broken night is several rows and still one routine — so it is drawn once per day group rather
+   * than on a row.
+   */
+  routines: Map<string, RoutineRecord>;
+  onRoutine: (night: string) => void;
   t: Translation;
 }
 
@@ -40,6 +48,16 @@ interface Group {
   key: string;
   at: number;
   entries: SleepEntry[];
+}
+
+/** When the night attributed to a day began — its earliest block. Null on a day of naps only. */
+function firstNightStart(entries: SleepEntry[]): number | null {
+  let first: number | null = null;
+  for (const entry of entries) {
+    if (entry.kind !== 'night') continue;
+    if (first == null || entry.start < first) first = entry.start;
+  }
+  return first;
 }
 
 function groupEntries(entries: SleepEntry[]): Group[] {
@@ -62,6 +80,8 @@ export default function EntryList({
   onEdit,
   onSplit,
   onDelete,
+  routines,
+  onRoutine,
   t,
 }: EntryListProps) {
   const viewerKey = viewer?.toLowerCase() ?? null;
@@ -85,6 +105,14 @@ export default function EntryList({
         const total = group.entries.reduce((sum, e) => sum + (durationOf(e) ?? 0), 0);
         const label =
           group.key === today ? t.today : group.key === yesterday ? t.yesterday : formatDay(group.at);
+        const routine = routines.get(group.key);
+        // The settling is measured from the *first* block of the night: a waking at three in the
+        // morning starts a second entry, and the routine has nothing to do with it.
+        const asleepAt = firstNightStart(group.entries);
+        const settle =
+          routine && routine.end != null && asleepAt != null && asleepAt >= routine.end
+            ? asleepAt - routine.end
+            : null;
 
         return (
           <div className="bs-day" key={group.key}>
@@ -96,6 +124,30 @@ export default function EntryList({
                 {fill(t.dayTotal, { total: formatHm(total) })}
               </span>
             </h3>
+            <p className="bs-routine-row">
+              <span className="bs-routine-label">{t.routineEdit}</span>
+              <span className="bs-routine-value">
+                {routine ? (
+                  <>
+                    {formatTime(routine.start)}
+                    {' – '}
+                    {routine.end == null ? (
+                      <em className="bs-entry-running">{t.running}</em>
+                    ) : (
+                      formatTime(routine.end)
+                    )}
+                    {settle != null && (
+                      <> {' · '}{fill(t.routineAsleepAfter, { duration: formatHm(settle) })}</>
+                    )}
+                  </>
+                ) : (
+                  <span className="bs-routine-none">{t.routineNone}</span>
+                )}
+              </span>
+              <button type="button" className="bs-link" onClick={() => onRoutine(group.key)}>
+                {routine ? t.edit : t.routineAdd}
+              </button>
+            </p>
             <ul className="bs-entries">
               {group.entries.map((entry) => {
                 const ms = durationOf(entry);

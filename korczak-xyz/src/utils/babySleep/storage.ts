@@ -32,14 +32,17 @@ const KEYS = {
  * The keys holding one particular log's data, as opposed to this browser's preferences. Every one
  * of them is discarded when a different account signs in — see `adoptOwner`.
  *
- * `climateStorage.ts`'s keys are named here rather than imported from it, because it imports
- * `writeKey` from this module and the cycle would be for two string constants.
+ * `climateStorage.ts`'s and `routineStorage.ts`'s keys are named here rather than imported from
+ * them, because they import `writeKey` from this module and the cycle would be for four string
+ * constants.
  */
 const CACHED_PER_OWNER = {
   entries: KEYS.entries,
   unsynced: KEYS.unsynced,
   climate: 'baby-sleep-climate',
   climateUnsynced: 'baby-sleep-climate-unsynced',
+  routines: 'baby-sleep-routines',
+  routinesUnsynced: 'baby-sleep-routines-unsynced',
 } as const;
 
 /** Roughly a year and a bit of history kept on the device. The cloud keeps everything. */
