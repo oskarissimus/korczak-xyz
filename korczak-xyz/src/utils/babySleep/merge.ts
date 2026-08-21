@@ -18,7 +18,7 @@
 
 import type { SleepEntry } from './types';
 import { isStale } from './types';
-import { mergeById, pickVersioned, sameRevision } from './versioned';
+import { applyLocal, mergeById, pickVersioned, sameRevision } from './versioned';
 
 /** Which of two versions of the same entry survives. */
 export function pickEntry(a: SleepEntry, b: SleepEntry): SleepEntry {
@@ -60,6 +60,11 @@ export interface MergeResult {
 export function mergeEntries(local: SleepEntry[], remote: SleepEntry[]): MergeResult {
   const merged = mergeById(local, remote, isSameVersion, byStartDesc);
   return { entries: merged.records, changed: merged.changed, localWins: merged.localWins };
+}
+
+/** This device's own write to an entry, applied to its own copy. */
+export function applyLocalEntries(entries: SleepEntry[], changed: SleepEntry[]): SleepEntry[] {
+  return applyLocal(entries, changed, byStartDesc);
 }
 
 /** Live entries, newest first. Tombstones are storage's business and no caller's. */

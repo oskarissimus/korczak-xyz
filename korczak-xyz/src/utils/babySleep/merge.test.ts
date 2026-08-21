@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeEntries, pickEntry, pruneEntries, resolveOpen, visibleEntries } from './merge';
+import {
+  applyLocalEntries,
+  mergeEntries,
+  pickEntry,
+  pruneEntries,
+  resolveOpen,
+  visibleEntries,
+} from './merge';
 import type { SleepEntry, SleepKind } from './types';
 import { editEntry, newEntry, normalizeEntry, tombstone } from './types';
 
@@ -47,18 +54,21 @@ describe('pickEntry', () => {
     expect(pickEntry(a, b)).toBe(pickEntry(b, a));
   });
 
-  it('lets a delete win against a higher-revision live edit', () => {
-    // Absorbing, or a phantom nap comes back and poisons every mean.
-    const gone = make({ id: 'x', rev: 1, deleted: true });
+  it('lets a delete win against an edit made without seeing it', () => {
+    // Absorbing at the same rev, or a phantom nap comes back and poisons every mean.
+    const gone = make({ id: 'x', rev: 5, deleted: true });
     const edited = make({ id: 'x', rev: 5, start: T0 - 2 * HOUR });
     expect(pickEntry(gone, edited).deleted).toBe(true);
     expect(pickEntry(edited, gone).deleted).toBe(true);
   });
 
-  it('carries the losing edit’s revision forward, so the tombstone keeps moving', () => {
-    const gone = make({ id: 'x', rev: 1, deleted: true });
-    const edited = make({ id: 'x', rev: 5 });
-    expect(pickEntry(gone, edited).rev).toBe(5);
+  it('lets a write made on top of the tombstone win', () => {
+    // Past the tombstone's own rev the writer has seen the delete and is writing the row again.
+    // Unreachable for a `uuid()` id, and the whole ballgame for one derived from a night.
+    const gone = make({ id: 'x', rev: 5, deleted: true });
+    const relogged = make({ id: 'x', rev: 6, start: T0 - 2 * HOUR });
+    expect(pickEntry(gone, relogged)).toBe(relogged);
+    expect(pickEntry(relogged, gone)).toBe(relogged);
   });
 
   it('keeps the further-along tombstone when both sides deleted it', () => {
@@ -120,7 +130,7 @@ describe('mergeEntries', () => {
   });
 
   it('keeps a delete deleted however the merge is ordered', () => {
-    const local = [make({ id: 'a', rev: 1, deleted: true })];
+    const local = [make({ id: 'a', rev: 9, deleted: true })];
     const remote = [make({ id: 'a', rev: 9 })];
     expect(mergeEntries(local, remote).entries[0].deleted).toBe(true);
     expect(mergeEntries(remote, local).entries[0].deleted).toBe(true);
@@ -262,5 +272,32 @@ describe('authorEmail', () => {
     const older = make({ id: 'x', rev: 1, authorEmail: 'me@example.com' });
     const newer = make({ id: 'x', rev: 2 });
     expect(mergeEntries([older], [newer]).entries[0].authorEmail).toBeUndefined();
+  });
+});
+
+describe('applyLocalEntries', () => {
+  /*
+   * A local write is not a concurrent one. The human at the form is replacing what is on their own
+   * screen, so `pickVersioned`'s tiebreaks — and above all its absorbing delete — have no conflict
+   * to resolve here and must not be consulted. Sleep entries carry `uuid()` ids, so they can never
+   * meet a tombstone of their own; the rule is stated here anyway because it is the same `commit`.
+   */
+  it('takes the local write whatever the stored copy says', () => {
+    const gone = make({ id: 'x', deleted: true, rev: 5 });
+    const back = make({ id: 'x', rev: 6, kind: 'night' });
+    const [entry] = applyLocalEntries([gone], [back]);
+    expect(entry.deleted).toBeUndefined();
+    expect(entry.kind).toBe('night');
+  });
+
+  it('still lets a local delete through', () => {
+    const live = make({ id: 'x' });
+    expect(applyLocalEntries([live], [tombstone(live, T0)])[0].deleted).toBe(true);
+  });
+
+  it('keeps the newest-first order when a new entry arrives', () => {
+    const older = make({ id: 'a', start: T0 - 2 * HOUR, end: T0 - HOUR });
+    const newer = make({ id: 'b', start: T0 - HOUR, end: T0 });
+    expect(applyLocalEntries([older], [newer]).map((e) => e.id)).toEqual(['b', 'a']);
   });
 });

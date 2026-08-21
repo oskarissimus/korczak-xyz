@@ -919,6 +919,12 @@ branching document two devices edit into a conflict, so `merge.ts` is a CRDT-ish
 **pulls before it pushes**, unlike `useFretboardData`, because a blind `setDoc` would land on top of
 a correction made elsewhere.
 
+**A local write does not go through any of that.** `commit` applies it by id (`applyLocal`), because
+the human at the form is not a concurrent device: they are looking at the record and replacing it,
+and there is nobody to arbitrate with. Routing it through the reconciler anyway is losable rather
+than safe — see below, where it silently ate every routine logged for a night that had been deleted
+once.
+
 ### Night wakings
 
 A night broken by a waking is **two entries with a gap between them**, not one entry carrying a list
@@ -1056,6 +1062,18 @@ whatever a stray document claims, because that separation is the whole point of 
   whole contract. `merge.ts` keeps its exported names as thin wrappers, so the sleep log is
   unchanged and `merge.test.ts` passes untouched. The two rules that make merging without a dialog
   safe — `rev` before the wall clock, an absorbing delete — moved with the code.
+
+  **The delete absorbs only what it is level with or ahead of**, and that qualifier was bought the
+  hard way. It was unconditional at first, on the stated grounds that nothing ever undeletes — an
+  undo being a new row with a new id. True of the `uuid()`-keyed sleep entries; **false of every row
+  keyed on its night**, which is both of the collections above. Re-logging such a night necessarily
+  reuses the id of whatever was deleted there, so the tombstone swallowed the new record, kept its
+  own values, and moved `rev` forward — no error, `-unsynced` drained, the badge reading Synced. And
+  no retry could ever come out differently, the id being a function of the night, so one delete made
+  that night unloggable for good. Past the tombstone's own `rev` the writer has demonstrably seen the
+  delete, so a live record there wins; at or below it the tombstone still absorbs, which is the
+  phantom-nap case the rule was written for. Both halves were needed: fixing only `commit` leaves the
+  *other* phone's tombstone absorbing the re-logged night and **pushing it back**.
 - `climate.ts` (records, `currentNightKey`, `parseTemp`), `climateStats.ts` (the join and the
   threshold), `climateStorage.ts`, `climateCloud.ts`, `src/hooks/useNightClimate.ts`.
 

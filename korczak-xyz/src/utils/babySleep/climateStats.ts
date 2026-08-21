@@ -8,7 +8,7 @@
 
 import { dayStart } from './days';
 import { climateId, type ClimateRecord, type NightVerdict, type WindowState } from './climate';
-import { mergeById, sameRevision } from './versioned';
+import { applyLocal, mergeById, sameRevision } from './versioned';
 
 // --- merging ------------------------------------------------------------------------------------
 
@@ -37,6 +37,14 @@ export function mergeClimate(
   remote: ClimateRecord[]
 ): ClimateMergeResult {
   return mergeById(local, remote, isSameVersion, byNightDesc);
+}
+
+/** This device's own write to a night's climate record, applied to its own copy. */
+export function applyLocalClimate(
+  records: ClimateRecord[],
+  changed: ClimateRecord[]
+): ClimateRecord[] {
+  return applyLocal(records, changed, byNightDesc);
 }
 
 export function visibleClimate(records: ClimateRecord[]): ClimateRecord[] {

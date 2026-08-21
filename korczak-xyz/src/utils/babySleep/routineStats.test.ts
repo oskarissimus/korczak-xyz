@@ -4,6 +4,7 @@ import { groupByDay } from './days';
 import type { RoutineRecord } from './routine';
 import { MAX_SETTLE_MS } from './routine';
 import {
+  applyLocalRoutines,
   computeRoutineStats,
   firstNightBlockStart,
   mergeRoutines,
@@ -193,5 +194,34 @@ describe('mergeRoutines', () => {
 
   it('hides tombstones from the UI', () => {
     expect(visibleRoutines([routine({ deleted: true })])).toEqual([]);
+  });
+});
+
+describe('applyLocalRoutines', () => {
+  /*
+   * The bug this exists for. A routine is keyed on its night, so re-logging a night that was once
+   * deleted mints the *same id* as its tombstone. Routed through `mergeRoutines`, the absorbing
+   * delete swallowed the new record and kept the tombstone — no error, nothing saved, and the night
+   * unloggable forever, since every retry meets the same tombstone again.
+   */
+  it('lets a re-logged night overwrite its own tombstone', () => {
+    const gone = routine({ deleted: true, rev: 5 });
+    const back = routine({ rev: 6, start: at(15, 18, 50), end: at(15, 19, 30) });
+    const [record] = applyLocalRoutines([gone], [back]);
+    expect(record.deleted).toBeUndefined();
+    expect(record.start).toBe(at(15, 18, 50));
+    expect(record.end).toBe(at(15, 19, 30));
+  });
+
+  it('still lets a local delete through', () => {
+    const live = routine();
+    const gone = routine({ deleted: true, rev: 1 });
+    expect(applyLocalRoutines([live], [gone])[0].deleted).toBe(true);
+  });
+
+  it('adds a night it has never seen and leaves the others alone', () => {
+    const other = routine({ id: '2026-01-14', night: '2026-01-14' });
+    const records = applyLocalRoutines([other], [routine()]);
+    expect(records.map((r) => r.id)).toEqual([NIGHT, '2026-01-14']);
   });
 });

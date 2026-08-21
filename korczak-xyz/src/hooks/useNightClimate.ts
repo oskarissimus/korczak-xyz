@@ -31,7 +31,12 @@ import {
   saveClimate,
 } from '../utils/babySleep/climateStorage';
 import type { NightObservation } from '../utils/babySleep/climateStats';
-import { groupByNight, mergeClimate, recordsFor } from '../utils/babySleep/climateStats';
+import {
+  applyLocalClimate,
+  groupByNight,
+  mergeClimate,
+  recordsFor,
+} from '../utils/babySleep/climateStats';
 import { adoptOwner } from '../utils/babySleep/storage';
 import type { SyncState } from '../utils/babySleep/types';
 import type { AuthUser } from './useAuth';
@@ -96,9 +101,9 @@ export function useNightClimate(user: AuthUser | null, owner: DataOwner): NightC
   const commit = useCallback(
     (changed: ClimateRecord[]) => {
       if (changed.length === 0) return;
-      const merged = mergeClimate(recordsRef.current, changed);
-      publish(merged.records);
-      saveClimate(merged.records);
+      const next = applyLocalClimate(recordsRef.current, changed);
+      publish(next);
+      saveClimate(next);
       markClimateUnsynced(changed.map((r) => r.id));
       setSync((s) => ({ ...s, pending: loadClimateUnsynced().length }));
       void runSyncRef.current?.();

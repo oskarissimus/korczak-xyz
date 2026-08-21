@@ -29,7 +29,7 @@ import type { RoutineRecord } from './routine';
 import { MAX_SETTLE_MS, routineLength, routineStartMinutes } from './routine';
 import type { ClockPoint, DurationPoint } from './stats';
 import type { ClockStat, DayBucket, MeanStat, SleepEntry } from './types';
-import { mergeById, sameRevision } from './versioned';
+import { applyLocal, mergeById, sameRevision } from './versioned';
 
 // --- merging ------------------------------------------------------------------------------------
 
@@ -53,6 +53,14 @@ export function mergeRoutines(
   remote: RoutineRecord[]
 ): RoutineMergeResult {
   return mergeById(local, remote, isSameVersion, byNightDesc);
+}
+
+/** This device's own write to a night's routine, applied to its own copy. */
+export function applyLocalRoutines(
+  records: RoutineRecord[],
+  changed: RoutineRecord[]
+): RoutineRecord[] {
+  return applyLocal(records, changed, byNightDesc);
 }
 
 export function visibleRoutines(records: RoutineRecord[]): RoutineRecord[] {

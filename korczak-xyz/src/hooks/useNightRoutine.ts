@@ -26,7 +26,11 @@ import {
   markRoutineUnsynced,
   saveRoutines,
 } from '../utils/babySleep/routineStorage';
-import { mergeRoutines, routinesByNight } from '../utils/babySleep/routineStats';
+import {
+  applyLocalRoutines,
+  mergeRoutines,
+  routinesByNight,
+} from '../utils/babySleep/routineStats';
 import { adoptOwner } from '../utils/babySleep/storage';
 import type { SyncState } from '../utils/babySleep/types';
 import type { AuthUser } from './useAuth';
@@ -91,9 +95,9 @@ export function useNightRoutine(user: AuthUser | null, owner: DataOwner): NightR
   const commit = useCallback(
     (changed: RoutineRecord[]) => {
       if (changed.length === 0) return;
-      const merged = mergeRoutines(recordsRef.current, changed);
-      publish(merged.records);
-      saveRoutines(merged.records);
+      const next = applyLocalRoutines(recordsRef.current, changed);
+      publish(next);
+      saveRoutines(next);
       markRoutineUnsynced(changed.map((r) => r.id));
       setSync((s) => ({ ...s, pending: loadRoutinesUnsynced().length }));
       void runSyncRef.current?.();

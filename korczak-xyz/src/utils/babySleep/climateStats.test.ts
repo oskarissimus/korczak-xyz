@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { climateId, type ClimateRecord, type NightVerdict, type WindowState } from './climate';
 import {
+  applyLocalClimate,
   groupByNight,
   isComplete,
   mergeClimate,
@@ -74,9 +75,20 @@ describe('mergeClimate', () => {
   });
 
   it('lets a delete absorb a concurrent edit', () => {
-    const gone = evening('2026-01-15', 11, 'open', { rev: 1, deleted: true });
+    const gone = evening('2026-01-15', 11, 'open', { rev: 2, deleted: true });
     const edited = evening('2026-01-15', 12, 'open', { rev: 2 });
     expect(mergeClimate([gone], [edited]).records[0].deleted).toBe(true);
+  });
+
+  it('lets the other phone accept a night re-logged on top of its tombstone', () => {
+    // Without this the tombstone absorbs the new reading *and is pushed back*, so a night deleted
+    // once could never be logged again on any device — the id being derived from the night itself.
+    const gone = evening('2026-01-15', 11, 'open', { rev: 2, deleted: true, writerId: 'phone' });
+    const relogged = evening('2026-01-15', 12, 'open', { rev: 3 });
+    const merged = mergeClimate([gone], [relogged]);
+    expect(merged.records[0].deleted).toBeUndefined();
+    expect(merged.records[0].tempC).toBe(12);
+    expect(merged.localWins).toEqual([]);
   });
 
   it('does not re-push a record the cloud already holds identically', () => {
@@ -267,5 +279,24 @@ describe('windowThreshold', () => {
       night('2026-01-14', 14, 'open', 'ok'),
     ];
     expect(windowThreshold(nights, 'open')).toMatchObject({ n: 1, okFloor: 14 });
+  });
+});
+
+describe('applyLocalClimate', () => {
+  // The routine bug's twin: a climate id is derived from the night too, so re-logging an evening
+  // that was deleted meets its own tombstone and the absorbing delete swallows it.
+  it('lets a re-logged evening overwrite its own tombstone', () => {
+    const gone = evening('2026-01-15', null, null, { deleted: true, rev: 3 });
+    const back = evening('2026-01-15', 12, 'open', { rev: 4 });
+    const [record] = applyLocalClimate([gone], [back]);
+    expect(record.deleted).toBeUndefined();
+    expect(record.tempC).toBe(12);
+    expect(record.window).toBe('open');
+  });
+
+  it('still lets a local delete through', () => {
+    const live = evening('2026-01-15', 12, 'open');
+    const gone = evening('2026-01-15', 12, 'open', { deleted: true, rev: 1 });
+    expect(applyLocalClimate([live], [gone])[0].deleted).toBe(true);
   });
 });

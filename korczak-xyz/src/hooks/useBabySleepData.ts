@@ -22,7 +22,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
 import { pullEntries, pushEntry } from '../utils/babySleep/cloud';
-import { mergeEntries, resolveOpen, visibleEntries } from '../utils/babySleep/merge';
+import {
+  applyLocalEntries,
+  mergeEntries,
+  resolveOpen,
+  visibleEntries,
+} from '../utils/babySleep/merge';
 import { splitEntry } from '../utils/babySleep/split';
 import {
   adoptOwner,
@@ -110,9 +115,9 @@ export function useBabySleepData(user: AuthUser | null, owner: DataOwner): BabyS
   const commit = useCallback(
     (changed: SleepEntry[]) => {
       if (changed.length === 0) return;
-      const merged = mergeEntries(entriesRef.current, changed);
-      publish(merged.entries);
-      saveEntries(merged.entries);
+      const next = applyLocalEntries(entriesRef.current, changed);
+      publish(next);
+      saveEntries(next);
       markUnsynced(changed.map((e) => e.id));
       setSync((s) => ({ ...s, pending: loadUnsynced().length }));
       void runSyncRef.current?.();

@@ -13,11 +13,18 @@
  *      whichever device runs fastest — however stale its copy. `rev` counts a device's own edits to
  *      one row, so it orders causally-related edits correctly and leaves the clock to break ties
  *      between genuinely concurrent ones.
- *   2. **A delete is absorbing.** If either side is a tombstone, the result is a tombstone,
- *      whatever the revisions say. Under plain last-write-wins a concurrent edit can beat a delete
- *      and the row comes back — a phantom that quietly poisons every mean, gets deleted again, and
- *      teaches the owner not to trust the app. Nothing ever undeletes (an undo is a new row with a
- *      new id), so making deletes absorbing costs nothing.
+ *   2. **A delete absorbs every edit it is level with or ahead of.** Under plain last-write-wins a
+ *      concurrent edit beats a delete and the row comes back — a phantom that quietly poisons every
+ *      mean, gets deleted again, and teaches the owner not to trust the app. So at an equal or lower
+ *      `rev` the tombstone wins whatever the clock says.
+ *
+ *      It was once absorbing outright, on the grounds that nothing ever undeletes — an undo being a
+ *      new row with a new id. That is true of the `uuid()`-keyed sleep entries and **false of every
+ *      row whose id is derived**: a routine and a climate reading are both keyed on their night, so
+ *      writing that night again necessarily reuses the id of anything deleted there before. The
+ *      unconditional rule made such a row unwritable for good — silently, since a swallowed write
+ *      raises nothing — and no retry could ever differ, the id being a function of the night. Hence
+ *      the causal test: past the tombstone's own `rev`, the writer has seen the delete and means it.
  */
 
 export interface Versioned {
@@ -42,7 +49,16 @@ export function pickVersioned<T extends Versioned>(a: T, b: T): T {
     if (a.deleted && b.deleted) return a.rev >= b.rev ? a : b;
     const gone = a.deleted ? a : b;
     const live = a.deleted ? b : a;
-    return { ...gone, rev: Math.max(gone.rev, live.rev) };
+    /*
+     * ...but only over what it is causally at or ahead of. `rev` counts edits to *this row*, so a
+     * live record at a strictly higher rev was written on top of a copy the tombstone had already
+     * reached: its writer saw the delete and is deliberately writing the row again. That is a
+     * re-logging, not the stale edge the absorbing rule exists to stop, and a delete that outranked
+     * it would make the row unwritable forever wherever ids are derived rather than minted — see
+     * `applyLocal`, and the night the whole household could not log a routine for.
+     */
+    if (live.rev > gone.rev) return live;
+    return gone;
   }
   if (a.rev !== b.rev) return a.rev > b.rev ? a : b;
   if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b;
@@ -118,4 +134,38 @@ export function mergeById<T extends Versioned>(
   }
 
   return { records: [...byId.values()].sort(order), changed, localWins };
+}
+
+/**
+ * Apply this device's own writes to its own copy: replace by id, unconditionally.
+ *
+ * **Not `mergeById`, and the difference is the whole point.** Everything above resolves two
+ * *concurrent* copies of a row, where the writers cannot see each other and the rules have to guess
+ * safely. A local write is not that: the human is looking at the record and replacing it, now, and
+ * there is nobody to arbitrate with. Consulting `pickVersioned` here does not make the write safer,
+ * it makes it losable.
+ *
+ * Concretely, it was the absorbing delete that ate them. A row whose id is *derived* — a routine, a
+ * climate reading, both keyed on the night — mints the same id every time it is written, so
+ * re-logging a night that was once deleted meets its own tombstone, the delete absorbs it, and the
+ * new value is dropped with no error anywhere: the write "succeeded", the queue drained, the badge
+ * said Synced. And because the id can never differ, every retry lost the same way, so a single
+ * delete made that night unloggable for good. The `uuid()`-keyed sleep entries were spared only by
+ * accident — an undo there is a new row, which is exactly the assumption stated at the top of this
+ * file, and it holds for one of the three collections.
+ *
+ * The caller has already read the record it is superseding and moved `rev` past it, which is what
+ * keeps the *cloud* merge correct afterwards: what goes out is a live row with the higher revision,
+ * and the other device's absorbing delete stays intact for the concurrent case it was written for.
+ */
+export function applyLocal<T extends Versioned>(
+  records: T[],
+  changed: T[],
+  order: (a: T, b: T) => number
+): T[] {
+  if (changed.length === 0) return records;
+  const byId = new Map<string, T>();
+  for (const record of records) byId.set(record.id, record);
+  for (const record of changed) byId.set(record.id, record);
+  return [...byId.values()].sort(order);
 }
