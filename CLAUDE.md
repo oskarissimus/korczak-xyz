@@ -885,6 +885,17 @@ under it are dots; here the answer row is three or four short fields and every o
 answer, so a mark centred on a three-slot row lands squarely on the middle one. `.tp-stage`
 unpositions the shared overlay and it becomes a flex item at the end of the row.
 
+It also drops the shadow, and for two reasons worth keeping apart. A filter's region is the
+element's own box, so a shadow with no room left around the drawing is **clipped square**: the ring
+is 91% of the viewBox whatever the box measures, so a 5px blur on the 56px mark this row pins it to
+spills about 5px past every edge and comes back with corners — a soft dark square behind a circle.
+Over the neck the mark is up to 124px on navy and the cut edge falls where nothing can see it. The
+second reason is why removing it is right rather than merely cheap: the shadow exists so an unfilled
+ring stays legible over the neck and the answer marks beneath it, and this mark is beside the slots
+on bare panel with nothing under it at all. What it needed instead was a colour that reads on grey —
+`#00ff00` on `#c0c0c0` is 1.3:1, which is what the shadow had been standing in for — so it takes
+`.tp-verdict--ok`/`--bad`'s own ink and matches the words it is drawn next to.
+
 ### The songbook is where the examples come from
 
 `library.ts` reads the song bodies through the songbook's own grammar — `isChordLine` and
