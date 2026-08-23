@@ -50,6 +50,30 @@ service cloud.firestore {
       allow update, delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
     }
 
+    /*
+     * The event corpus, and the collector's health.
+     *
+     * Written only by the scheduled Cloud Function, which runs on the Admin SDK and bypasses rules
+     * entirely — so `write: if false` costs the collector nothing and is a statement about the
+     * client: nothing in a browser may touch this. Readable by any signed-in account, because it is
+     * public listings data scraped from public pages and holds nothing belonging to a person. What
+     * IS personal — which of these matched an interest, and what was pushed — lives under
+     * users/{uid} and is covered by the catch-all below.
+     *
+     * These two are the only new blocks the events app needed. A top-level collection is outside
+     * the `users/{uid}/{document=**}` wildcard, so until this is deployed the feed reads nothing —
+     * which looks exactly like a collector that has not run yet.
+     */
+    match /events/{eventId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /eventSources/{sourceId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     // Covers progress, sessions, and the frontend diagnostic log batches written to
     // users/{uid}/logs.
     //

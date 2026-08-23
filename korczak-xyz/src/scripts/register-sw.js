@@ -36,6 +36,7 @@
     { tier: 'songs', pattern: /^(\/pl)?\/songs(\/|$)/ },
     { tier: 'flashcards', pattern: /^(\/pl)?\/apps\/flashcards(\/|$)/ },
     { tier: 'baby-sleep', pattern: /^(\/pl)?\/apps\/baby-sleep(\/|$)/ },
+    { tier: 'events', pattern: /^(\/pl)?\/apps\/events(\/|$)/ },
   ];
 
   /**

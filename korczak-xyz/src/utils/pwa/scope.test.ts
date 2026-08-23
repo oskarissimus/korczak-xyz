@@ -26,6 +26,9 @@ describe('appForPath', () => {
     expect(appForPath('/apps/baby-sleep/stats')).toBe('baby-sleep');
     expect(appForPath('/apps/baby-sleep/share')).toBe('baby-sleep');
     expect(appForPath('/pl/apps/baby-sleep')).toBe('baby-sleep');
+    expect(appForPath('/apps/events')).toBe('events');
+    expect(appForPath('/apps/events/interests')).toBe('events');
+    expect(appForPath('/pl/apps/events/alerts')).toBe('events');
   });
 
   it('treats everything else as the site', () => {
@@ -106,5 +109,6 @@ describe('manifestIdentity', () => {
   it('names one whose app id contains a hyphen, which the manifest route has to unpick', () => {
     expect(manifestIdentity('/apps/baby-sleep')).toBe('baby-sleep-en');
     expect(manifestIdentity('/pl/apps/baby-sleep/share')).toBe('baby-sleep-pl');
+    expect(manifestIdentity('/apps/events/alerts')).toBe('events-en');
   });
 });

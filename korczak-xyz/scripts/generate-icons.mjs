@@ -69,6 +69,7 @@ const sources = {
   songs: { file: join(iconsDir, 'songs.svg'), maskable: 'bleed' },
   flashcards: { file: join(iconsDir, 'flashcards.svg'), maskable: 'bleed' },
   'baby-sleep': { file: join(iconsDir, 'baby-sleep.svg'), maskable: 'bleed' },
+  events: { file: join(iconsDir, 'events.svg'), maskable: 'bleed' },
 };
 
 /**

@@ -1,0 +1,30 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import EventsFeed from '../../../components/Events/EventsFeed';
+import EventsTabs from '../../../components/Events/EventsTabs.astro';
+import EventsFeedSkeleton from '../../../components/Events/skeletons/EventsFeedSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/events.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Events')} | korczak.xyz`} lang={lang} pwa="events">
+  <div class="window events-window">
+    <div class="title-bar">
+      <span>{t('Events')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content events-content">
+      <EventsTabs lang={lang} active="feed" />
+      <EventsFeed client:only="react" lang={lang}>
+        <EventsFeedSkeleton slot="fallback" lang={lang} />
+      </EventsFeed>
+    </div>
+  </div>
+</Layout>

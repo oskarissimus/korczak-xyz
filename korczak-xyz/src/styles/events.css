@@ -1,0 +1,427 @@
+/* Event Watch — retro theme */
+
+@import './tabs.css';
+
+.events-window {
+  margin-bottom: 20px;
+}
+
+/* A property sheet rather than a page in a teal window, so the content area is the panel face and
+   the ink is reset along with the surface — the same call the other apps make. */
+.events-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.ev-feed,
+.ev-interests,
+.ev-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+/* Reserves roughly what the island will occupy, so the tab strip above it does not jump when
+   React arrives. Rendered instead of a disabled form while auth is still resolving. */
+.ev-loading {
+  min-height: 420px;
+}
+
+.ev-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.35rem;
+  margin: 0 0 8px;
+  color: var(--retro-black);
+}
+
+.ev-hint,
+.ev-note {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.ev-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
+.ev-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ev-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- buttons ------------------------------------------------------------------------------- */
+
+/* Every interactive rule here names itself twice, the second time with :hover. Layout.astro has a
+   global `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a single class — so
+   without the pair, the one control the pointer is resting on (the one about to be clicked) goes
+   flat grey and stays grey. Invisible on a phone, and on a mouse it is the only thing you cannot
+   read. Same trap the fretboard cells and the climate verdict buttons document. */
+.ev-action,
+.ev-action:hover {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  padding: 8px 18px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.ev-action:active {
+  border-style: inset;
+}
+
+.ev-action:disabled,
+.ev-action:disabled:hover {
+  color: var(--retro-dark-gray);
+  cursor: default;
+}
+
+.ev-action--primary,
+.ev-action--primary:hover {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.ev-link,
+.ev-link:hover {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ev-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ev-error {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 1.05rem;
+  background: var(--retro-red);
+  color: var(--retro-white);
+  border: 2px inset var(--retro-white);
+}
+
+/* --- the feed ------------------------------------------------------------------------------ */
+
+.ev-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ev-group-head {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  margin: 0;
+  padding-bottom: 2px;
+  border-bottom: 2px groove var(--retro-white);
+  color: var(--retro-dark-gray);
+}
+
+.ev-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.ev-card-top {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.ev-card-when {
+  font-size: 1.1rem;
+  color: var(--retro-navy);
+  font-weight: normal;
+  /* The date column does not shrink below its content, so a long title wraps instead of squeezing
+     the one number the row is scanned for. */
+  flex: 0 0 auto;
+}
+
+.ev-card-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  margin: 0;
+  flex: 1 1 12ch;
+  min-width: 0;
+  /* Titles arrive from scrapes and can be a whole sentence with no spaces in the wrong place. */
+  overflow-wrap: anywhere;
+}
+
+.ev-card-sub {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.ev-card-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.ev-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.95rem;
+  background: var(--retro-white);
+  border: 1px solid var(--retro-dark-gray);
+  color: var(--retro-black);
+}
+
+.ev-chip--sale {
+  background: var(--retro-navy);
+  border-color: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.ev-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 1.15rem;
+  color: var(--retro-dark-gray);
+  border: 2px inset var(--retro-white);
+}
+
+.ev-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+/* --- interests ----------------------------------------------------------------------------- */
+
+.ev-interest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.ev-interest--muted {
+  /* Dimmed rather than hidden: a muted interest still feeds the list, and the point is that you
+     can see it is muted without opening it. */
+  opacity: 0.72;
+}
+
+.ev-interest-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.ev-interest-name {
+  font-family: 'VT323', monospace;
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.ev-interest-rules {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ev-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.ev-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ev-field-label {
+  font-size: 1.1rem;
+  color: var(--retro-black);
+}
+
+.ev-input,
+.ev-textarea {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  padding: 6px 8px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  color: var(--retro-black);
+  /* Without this a long keyword list pushes the panel wider than the window on a phone. */
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ev-textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+
+.ev-number {
+  width: 7ch;
+}
+
+/* --- alerts -------------------------------------------------------------------------------- */
+
+.ev-push {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+/* The install instructions are the one state that must be unmissable: on iOS nothing works until
+   the app is on the home screen, and a page cannot detect the tap that puts it there. */
+.ev-push--install {
+  border: 2px solid var(--retro-navy);
+}
+
+.ev-push-state {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.ev-push-steps {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ev-devices,
+.ev-sources,
+.ev-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ev-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  font-size: 1.05rem;
+  background: var(--retro-white);
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.ev-row-main {
+  flex: 1 1 14ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ev-row-meta {
+  color: var(--retro-dark-gray);
+  font-size: 1rem;
+}
+
+.ev-row--bad {
+  background: #ffd9d9;
+}
+
+/* --- sync badge ---------------------------------------------------------------------------- */
+
+.ev-sync {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.ev-sync--bad {
+  color: var(--retro-red);
+}
+
+/* --- the pre-hydration stand-in ------------------------------------------------------------ */
+
+/* Blocks, not words: it is aria-hidden and exists to hold the window's shape. The heights are the
+   islands' rough first screen, so nothing jumps when React replaces it. */
+.ev-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 420px;
+}
+
+.ev-skel-head {
+  height: 26px;
+  width: 40%;
+  background: var(--retro-dark-gray);
+  opacity: 0.28;
+}
+
+.ev-skel-card {
+  height: 64px;
+  background: var(--retro-dark-gray);
+  opacity: 0.18;
+}
+
+.ev-skel-card--short {
+  height: 40px;
+}

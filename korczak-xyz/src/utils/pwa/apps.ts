@@ -53,6 +53,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     shortNameKey: 'pwa.flashcards.short',
     descriptionKey: 'flashcards.desc',
   },
+  events: {
+    path: '/apps/events',
+    nameKey: 'Events',
+    shortNameKey: 'pwa.events.short',
+    descriptionKey: 'events.desc',
+  },
   'baby-sleep': {
     path: '/apps/baby-sleep',
     nameKey: 'BabySleep',

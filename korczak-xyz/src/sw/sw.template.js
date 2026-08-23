@@ -216,3 +216,75 @@ self.addEventListener('fetch', (event) => {
   if (kind === 'bypass') return;
   event.respondWith(kind === 'document' ? handleDocument(request, url) : handleAsset(request));
 });
+
+/**
+ * Push.
+ *
+ * Exactly one shape, with no early return and no branch that can skip showNotification: **iOS
+ * unsubscribes the app if a push event completes without showing a notification**, and it does so
+ * silently — the next thing anyone notices is that notifications stopped working a month ago. So
+ * `parsePushPayload` is total (see push.js) and this handler never asks whether the payload was
+ * any good.
+ *
+ * The tag is the notice id, which also makes this idempotent against Declarative Web Push: on
+ * Safari 18.4+ the OS renders the payload's own `notification` object before this runs, and a
+ * showNotification with the same tag replaces that banner instead of adding a second one.
+ */
+self.addEventListener('push', (event) => {
+  let text = '';
+  try {
+    text = event.data ? event.data.text() : '';
+  } catch {
+    // Not decodable as text. The defaults stand; showing something generic beats showing nothing.
+  }
+  const payload = parsePushPayload(text);
+  event.waitUntil(
+    self.registration.showNotification(payload.title, notificationOptions(payload)),
+  );
+});
+
+/**
+ * Opening what the notification was about.
+ *
+ * One worker serves every installed app on this origin, so `matchAll` hands back the songbook's
+ * window as readily as this app's — `pickClientToFocus` is what keeps a tap from focusing the
+ * wrong app. The payload carries a path rather than a URL, and `sameOriginPath` has already
+ * reduced it to one, so nothing here can navigate off-origin.
+ */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const path = sameOriginPath(data.url);
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const index = pickClientToFocus(
+        windows.map((client) => client.url),
+        path,
+      );
+      if (index === null) {
+        await self.clients.openWindow(path);
+        return;
+      }
+      const client = windows[index];
+      await client.focus();
+      try {
+        await client.navigate(path);
+      } catch {
+        // navigate() is not implemented everywhere and rejects across a scope boundary. A focused
+        // window on the right app's wrong tab beats an exception that leaves the tap looking dead.
+      }
+    })(),
+  );
+});
+
+/*
+ * There is deliberately NO `pushsubscriptionchange` handler.
+ *
+ * iOS never fires it, which is the platform this app exists for; and on the platforms that do, the
+ * worker could not act on it anyway — it has no auth, no Firestore SDK, and possibly no client to
+ * postMessage. A handler here would be code that looks like a safety net and is not. The real
+ * mitigation is re-verifying the subscription on every launch, in `useWebPush`, which covers every
+ * platform including the one that would never have called this.
+ */
