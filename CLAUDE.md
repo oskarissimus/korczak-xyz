@@ -1073,8 +1073,22 @@ bug and the opera over-tagging; run it after touching an adapter.
 ### Deploying it
 
 `firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the
-`users/{uid}` wildcard, so until `firebase deploy --only firestore:rules` is run the feed reads
-nothing and looks exactly like a collector that has not run yet. Rules are still not deployed by CI.
+`users/{uid}` wildcard, so a feed that reads nothing usually means the rules have not gone out.
+
+**Rules and functions now deploy from CI** (`.github/workflows/firebase-deploy.yml`), which is the
+one place this repo's "deployed by hand" note no longer holds. It is path-filtered to `functions/`,
+`firestore.rules`, `firebase.json` and `korczak-xyz/src/utils/events/**` — that last one because
+`functions/tsconfig.json` compiles the matcher in from there rather than keeping a copy, so a change
+to it changes the backend. Auth is Workload Identity Federation, so there is no long-lived service
+account key in GitHub; the security boundary is the provider's `attribute-condition` pinning it to
+this repository, and without that any repo on GitHub could mint a token for the pool. The workflow
+holds a `concurrency` group because two concurrent function deploys race to create the same source
+bucket and one loses with a 409.
+
+One trap in `firebase.json`: the predeploy hook calls `./node_modules/.bin/tsc` directly rather than
+`npm run build`. The firebase CLI is a bundled binary shipping its own node 20 and npm 8, and that
+npm throws `Cannot read properties of undefined (reading 'stdin')` *after* the build has already
+succeeded — failing a deploy whose output was perfectly good.
 
 The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `TICKETMASTER_API_KEY`
 as secrets, and the public key **also** in Netlify's build environment as `PUBLIC_VAPID_PUBLIC_KEY`.

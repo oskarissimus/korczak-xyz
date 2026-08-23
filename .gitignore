@@ -7,3 +7,7 @@ snapshot-crawler/node_modules/
 
 # Local Netlify folder
 .netlify
+
+# Local secrets. The VAPID pair lives here so it can be re-read without regenerating —
+# regenerating the public key would silently invalidate every push subscription on every device.
+.secrets/

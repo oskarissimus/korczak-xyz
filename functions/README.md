@@ -23,7 +23,61 @@ and every installed app — and FCM's web SDK wants its own `firebase-messaging-
 `web-push` is about forty lines here and adds nothing at all to the browser bundle, since
 `PushManager.subscribe` is a platform API.
 
-## Setting it up (once, by hand)
+## Current state
+
+Everything below is **already done** for `korczak-xyz-501720`. It is kept as a record of what was
+set up and how to redo it, not as a to-do list.
+
+| Thing | State |
+|---|---|
+| Billing | Blaze, billing account `01AB98-…` |
+| APIs | cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
+| `TICKETMASTER_API_KEY` | `none` — the documented sentinel for "not configured yet"; see below |
+| `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
+| Firestore rules | deployed |
+| `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
+| Artifact cleanup | images older than 3 days deleted, so old containers do not accumulate a bill |
+| CI deploy | `.github/workflows/firebase-deploy.yml`, keyless via Workload Identity Federation |
+
+### The Ticketmaster sentinel
+
+Secret Manager rejects an empty payload (`400 Secret Payload cannot be empty`) and a secret declared
+in a function's `secrets` array must exist for the deploy to succeed — so "no key yet" needs *some*
+value. `none` is that value, and `secretReader` in `index.ts` reads it back as `undefined`, which the
+adapter handles by returning `[]`. It must not be a plausible-looking placeholder: anything sent as a
+real `apikey` earns a 401, which is reported as a broken source and puts a red row on the Alerts tab
+that no amount of fixing the code would clear.
+
+To set a real key later — get one free at developer.ticketmaster.com, then:
+
+```sh
+printf 'YOUR_KEY' | firebase functions:secrets:set TICKETMASTER_API_KEY --data-file -
+firebase deploy --only functions      # or just push; CI does it
+```
+
+### Redeploying by hand
+
+```sh
+firebase deploy --only firestore:rules,functions --project korczak-xyz-501720
+```
+
+CI does this on any push to `main` touching `functions/`, `firestore.rules`, `firebase.json` or
+`korczak-xyz/src/utils/events/`. Note that last path: `tsconfig.json` compiles the matcher in from
+the site rather than keeping a copy, so a change there is a change to the backend.
+
+### Triggering a collection run now
+
+```sh
+gcloud scheduler jobs run firebase-schedule-collectEvents-europe-central2 \
+  --location=europe-central2 --project=korczak-xyz-501720
+firebase functions:log --only collectEvents
+```
+
+The idempotency property is the one worth re-checking after touching an adapter: run it twice and
+the second run must report `"created":0`.
+
+## Setting it up from scratch (for reference)
 
 ```sh
 # 1. The project must be on the Blaze plan. Set a budget alert while you are there.

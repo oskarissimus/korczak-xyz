@@ -21,17 +21,36 @@ import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
 const SECRETS = [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, TICKETMASTER_API_KEY];
 
+/**
+ * The sentinel for "this source is deliberately not configured".
+ *
+ * Secret Manager rejects an empty payload outright (`400 Secret Payload cannot be empty`), and a
+ * secret declared in a function's `secrets` array has to exist for the deploy to succeed. So a
+ * source we have no key for yet needs *some* value, and it must not be one that reaches the API —
+ * a placeholder sent as a real `apikey` earns a 401, which the adapter reports as a broken source
+ * and puts a red row on the alerts tab that no amount of fixing the code would clear.
+ *
+ * Read here rather than in the adapter because this function is already the seam that turns a
+ * secret into "undefined if unset"; the adapter's job is to know what to do about that, not to
+ * know how the absence is spelt.
+ */
+const UNSET = 'none';
+
 function secretReader(): (name: string) => string | undefined {
-  return (name) => {
-    // `.value()` throws when a secret was never set; an unset Ticketmaster key is a configuration
-    // state the collector handles by skipping that source, not an error worth failing the run for.
+  const read = (param: { value: () => string }): string | undefined => {
+    // `.value()` throws when a secret was never set at all.
     try {
-      if (name === 'TICKETMASTER_API_KEY') return TICKETMASTER_API_KEY.value() || undefined;
-      if (name === 'VAPID_PUBLIC_KEY') return VAPID_PUBLIC_KEY.value() || undefined;
-      if (name === 'VAPID_PRIVATE_KEY') return VAPID_PRIVATE_KEY.value() || undefined;
+      const value = param.value().trim();
+      return value && value !== UNSET ? value : undefined;
     } catch {
       return undefined;
     }
+  };
+
+  return (name) => {
+    if (name === 'TICKETMASTER_API_KEY') return read(TICKETMASTER_API_KEY);
+    if (name === 'VAPID_PUBLIC_KEY') return read(VAPID_PUBLIC_KEY);
+    if (name === 'VAPID_PRIVATE_KEY') return read(VAPID_PRIVATE_KEY);
     return undefined;
   };
 }

@@ -1,0 +1,82 @@
+# Deploys the Firestore rules and the Event Watch collector.
+#
+# Separate from node.js.yml because it is path-filtered: the site deploys on every push via
+# Netlify, but redeploying Cloud Functions on a commit that only touched a song chart would take
+# three minutes and change nothing. The paths below are exactly what can affect the backend —
+# note that `korczak-xyz/src/utils/events/**` is in the list, because functions/tsconfig.json
+# compiles that directory into the deploy bundle rather than keeping a copy of it.
+#
+# Auth is Workload Identity Federation, so there is no long-lived service account key in GitHub.
+# The security boundary is the provider's attribute-condition, which pins it to this repository —
+# without that, any repo on GitHub could mint a token for the pool.
+name: Deploy Firebase
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "functions/**"
+      - "firestore.rules"
+      - "firebase.json"
+      - "korczak-xyz/src/utils/events/**"
+      - ".github/workflows/firebase-deploy.yml"
+  # So rules can be pushed out without waiting for a code change to ride along.
+  workflow_dispatch:
+
+# One deploy at a time. Two concurrent `firebase deploy --only functions` runs race to create the
+# same source bucket and one of them loses with a 409 — which is exactly how the first manual
+# deploy of these two functions failed.
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for the OIDC token WIF exchanges. Without it the auth step fails with a
+      # not-obviously-related "unable to get ACTIONS_ID_TOKEN_REQUEST_URL".
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: "npm"
+          cache-dependency-path: "functions/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: functions
+
+      # Deliberately before the deploy, not in a separate workflow: nothing should be able to
+      # reach the collector that has not typechecked and passed its tests. The build also
+      # typechecks the site's src/utils/events, which this bundle compiles in.
+      - name: Build
+        run: npm run build
+        working-directory: functions
+
+      - name: Test
+        # LIVE is unset, so the smoke test that hits teatrwielki.pl and python.org stays skipped —
+        # a deploy must not depend on somebody else's website being up.
+        run: npm test
+        working-directory: functions
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy rules and functions
+        # Rules first and in the same step, because the collector writes documents the rules
+        # describe: a function live against stale rules is the window worth closing.
+        #
+        # The predeploy hook in firebase.json calls ./node_modules/.bin/tsc directly rather than
+        # `npm run build` — the firebase CLI ships its own bundled node 20 / npm 8, and that npm
+        # throws `Cannot read properties of undefined (reading 'stdin')` after the script has
+        # already succeeded, failing a perfectly good deploy.
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
