@@ -99,8 +99,8 @@ export const ui = {
     'Login': 'Login',
     'Logout': 'Logout',
 
-    // Games
-    'Games': 'Games',
+    // Apps
+    'Apps': 'Apps',
     'Typing': 'Typing Trainer',
     'typing.desc': 'Type through a book',
     'Flashcards': 'Guitar Flashcards',
@@ -372,8 +372,8 @@ export const ui = {
     'Login': 'Logowanie',
     'Logout': 'Wyloguj',
 
-    // Games
-    'Games': 'Gry',
+    // Apps
+    'Apps': 'Aplikacje',
     'Typing': 'Trening Pisania',
     'typing.desc': 'Przepisuj książkę',
     'Flashcards': 'Fiszki gitarowe',

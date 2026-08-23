@@ -109,7 +109,7 @@ export default function AdminPanel({ lang }: AdminPanelProps) {
       </div>
 
       <div className="admin-back-link">
-        <a href={lang === 'pl' ? '/pl/games/anesthesia' : '/games/anesthesia'}>
+        <a href={lang === 'pl' ? '/pl/apps/anesthesia' : '/apps/anesthesia'}>
           ← {t('anesthesia.backToQuiz')}
         </a>
       </div>

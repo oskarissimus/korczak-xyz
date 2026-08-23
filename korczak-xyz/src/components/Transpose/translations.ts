@@ -1,7 +1,7 @@
 /*
  * Strings for the transposition trainer, kept beside the game the way the fretboard trainer keeps
  * its own — there are too many of them, and they are too specific, to belong in the site-wide
- * table. The game's name and one-line description do live there, because the games index and the
+ * table. The app's name and one-line description do live there, because the apps index and the
  * manifests show them.
  *
  * Chord names are not in here. Which systems the deck asks under is a *setting* — see `Notation` in

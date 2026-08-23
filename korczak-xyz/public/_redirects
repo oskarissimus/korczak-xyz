@@ -1,21 +1,37 @@
-# The fretboard trainer and the transposition trainer were merged into one app at
-# /games/flashcards/ — one entrypoint, one installable app, and one sitting drawn from both decks.
-# See the "Flashcards" section of CLAUDE.md.
+# The section that was /games/ is /apps/. Most of what lives there is not a game — the typing
+# trainer, the guitar flashcards, the tuner, the sleep log — and the ones that are lose nothing by
+# sitting under a heading that no longer claims to describe them.
 #
 # 301 rather than 302 because the old routes are not coming back. Note what this does to an
-# already-installed home-screen app: its start_url redirects out of its own scope, so iOS opens the
-# target in Safari instead of the app. That is what retiring a PWA's routes means, and the fix is
-# deleting the old icon and installing the new one once.
+# already-installed home-screen app: its start_url redirects out of its own scope, so iOS opens
+# the target in Safari instead of the app. That is what renaming a PWA's routes means, and the
+# fix is deleting the old icon and installing the new one once.
 #
-# The stats tabs land on their own halves rather than on the practice screen: someone with
-# /games/fretboard/stats bookmarked wants a progress page, and the neck heatmap is still one.
+# The old fretboard/transpose routes are listed before the catch-all, because first match wins
+# and /games/fretboard must reach the flashcards rather than a /apps/fretboard that does not
+# exist. The stats tabs land on their own halves rather than on the practice screen: someone
+# with /games/fretboard/stats bookmarked wants a progress page, and the neck heatmap is still
+# one. See the "Flashcards" section of CLAUDE.md.
 
-/games/fretboard              /games/flashcards          301
-/games/fretboard/stats        /games/flashcards/neck     301
-/games/transpose              /games/flashcards          301
-/games/transpose/stats        /games/flashcards/chords   301
+/games/fretboard              /apps/flashcards           301
+/games/fretboard/stats        /apps/flashcards/neck      301
+/games/transpose              /apps/flashcards           301
+/games/transpose/stats        /apps/flashcards/chords    301
 
-/pl/games/fretboard           /pl/games/flashcards         301
-/pl/games/fretboard/stats     /pl/games/flashcards/neck    301
-/pl/games/transpose           /pl/games/flashcards         301
-/pl/games/transpose/stats     /pl/games/flashcards/chords  301
+/pl/games/fretboard           /pl/apps/flashcards        301
+/pl/games/fretboard/stats     /pl/apps/flashcards/neck   301
+/pl/games/transpose           /pl/apps/flashcards        301
+/pl/games/transpose/stats     /pl/apps/flashcards/chords 301
+
+/apps/fretboard               /apps/flashcards           301
+/apps/fretboard/stats         /apps/flashcards/neck      301
+/apps/transpose               /apps/flashcards           301
+/apps/transpose/stats         /apps/flashcards/chords    301
+
+/pl/apps/fretboard            /pl/apps/flashcards        301
+/pl/apps/fretboard/stats      /pl/apps/flashcards/neck   301
+/pl/apps/transpose            /pl/apps/flashcards        301
+/pl/apps/transpose/stats      /pl/apps/flashcards/chords 301
+
+/games/*                      /apps/:splat               301
+/pl/games/*                   /pl/apps/:splat            301

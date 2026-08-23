@@ -36,7 +36,7 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     descriptionKey: 'pwa.site.desc',
   },
   tuner: {
-    path: '/games/tuner',
+    path: '/apps/tuner',
     nameKey: 'tuner.title',
     shortNameKey: 'pwa.tuner.short',
     descriptionKey: 'tuner.desc',
@@ -48,13 +48,13 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     descriptionKey: 'pwa.songs.desc',
   },
   flashcards: {
-    path: '/games/flashcards',
+    path: '/apps/flashcards',
     nameKey: 'Flashcards',
     shortNameKey: 'pwa.flashcards.short',
     descriptionKey: 'flashcards.desc',
   },
   'baby-sleep': {
-    path: '/games/baby-sleep',
+    path: '/apps/baby-sleep',
     nameKey: 'BabySleep',
     shortNameKey: 'pwa.babySleep.short',
     descriptionKey: 'babySleep.desc',

@@ -17,7 +17,7 @@ interface Props {
 const { lang, active } = Astro.props;
 const t = translations[lang];
 
-const base = lang === 'pl' ? '/pl/games/typing' : '/games/typing';
+const base = lang === 'pl' ? '/pl/apps/typing' : '/apps/typing';
 
 const TABS: { view: View; href: string; label: string }[] = [
   { view: 'practice', href: `${base}/`, label: t.navPractice },

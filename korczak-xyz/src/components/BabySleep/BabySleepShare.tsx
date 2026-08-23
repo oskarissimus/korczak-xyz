@@ -160,8 +160,8 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
   if (!auth.user) {
     const loginPath =
       lang === 'en'
-        ? '/login/?redirect=/games/baby-sleep/share/'
-        : '/pl/login/?redirect=/pl/games/baby-sleep/share/';
+        ? '/login/?redirect=/apps/baby-sleep/share/'
+        : '/pl/login/?redirect=/pl/apps/baby-sleep/share/';
     return (
       <div className="bs-share">
         <section className="bs-section">

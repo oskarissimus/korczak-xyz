@@ -16,10 +16,10 @@ export type PwaApp = 'site' | 'tuner' | 'songs' | 'flashcards' | 'baby-sleep';
  * and for crossesAppBoundary, which would otherwise make every tab click a full page load.
  */
 const SCOPED: ReadonlyArray<{ app: PwaApp; pattern: RegExp }> = [
-  { app: 'tuner', pattern: /^(\/pl)?\/games\/tuner(\/|$)/ },
+  { app: 'tuner', pattern: /^(\/pl)?\/apps\/tuner(\/|$)/ },
   { app: 'songs', pattern: /^(\/pl)?\/songs(\/|$)/ },
-  { app: 'flashcards', pattern: /^(\/pl)?\/games\/flashcards(\/|$)/ },
-  { app: 'baby-sleep', pattern: /^(\/pl)?\/games\/baby-sleep(\/|$)/ },
+  { app: 'flashcards', pattern: /^(\/pl)?\/apps\/flashcards(\/|$)/ },
+  { app: 'baby-sleep', pattern: /^(\/pl)?\/apps\/baby-sleep(\/|$)/ },
 ];
 
 function normalize(pathname: string): string {

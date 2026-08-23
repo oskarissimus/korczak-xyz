@@ -34,8 +34,8 @@
    */
   var APP_TIERS = [
     { tier: 'songs', pattern: /^(\/pl)?\/songs(\/|$)/ },
-    { tier: 'flashcards', pattern: /^(\/pl)?\/games\/flashcards(\/|$)/ },
-    { tier: 'baby-sleep', pattern: /^(\/pl)?\/games\/baby-sleep(\/|$)/ },
+    { tier: 'flashcards', pattern: /^(\/pl)?\/apps\/flashcards(\/|$)/ },
+    { tier: 'baby-sleep', pattern: /^(\/pl)?\/apps\/baby-sleep(\/|$)/ },
   ];
 
   /**

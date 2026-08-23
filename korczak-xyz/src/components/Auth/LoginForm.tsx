@@ -46,7 +46,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
   const { enabled, user, loading, error, signIn, signOut } = useAuth();
   const t = translations[lang];
   const homePath = lang === 'en' ? '/' : '/pl/';
-  const typingPath = lang === 'en' ? '/games/typing/' : '/pl/games/typing/';
+  const typingPath = lang === 'en' ? '/apps/typing/' : '/pl/apps/typing/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

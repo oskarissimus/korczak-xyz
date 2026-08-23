@@ -26,7 +26,7 @@ const swDir = join(siteDir, 'src', 'sw');
  * two routes whose chunks the shell largely already carries — and moving them now would only
  * churn the cache. New apps go in APP_TIERS.
  */
-const SHELL_ROUTES = ['/', '/pl', '/games/tuner', '/pl/games/tuner', '/songs', '/pl/songs', '/offline'];
+const SHELL_ROUTES = ['/', '/pl', '/apps/tuner', '/pl/apps/tuner', '/songs', '/pl/songs', '/offline'];
 
 /**
  * Opt-in tiers, one per app, fetched only by a page that is running as that installed app.
@@ -44,8 +44,8 @@ const SHELL_ROUTES = ['/', '/pl', '/games/tuner', '/pl/games/tuner', '/songs', '
  */
 const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
-  flashcards: /^(\/pl)?\/games\/flashcards(\/|$)/,
-  'baby-sleep': /^(\/pl)?\/games\/baby-sleep(\/|$)/,
+  flashcards: /^(\/pl)?\/apps\/flashcards(\/|$)/,
+  'baby-sleep': /^(\/pl)?\/apps\/baby-sleep(\/|$)/,
 };
 
 /**

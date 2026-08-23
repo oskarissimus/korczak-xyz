@@ -57,7 +57,7 @@ describe('classifyRequest', () => {
 
   it('treats navigations as documents however they are labelled', () => {
     expect(classifyRequest(get({ mode: 'navigate', pathname: '/songs' }))).toBe('document');
-    expect(classifyRequest(get({ destination: 'document', pathname: '/games/tuner' }))).toBe('document');
+    expect(classifyRequest(get({ destination: 'document', pathname: '/apps/tuner' }))).toBe('document');
   });
 
   // The soft-navigation case. ClientRouter fetches the next page's markup with a bare fetch(),
@@ -89,7 +89,7 @@ describe('looksLikeDocumentPath', () => {
     expect(looksLikeDocumentPath('/')).toBe(true);
     expect(looksLikeDocumentPath('/songs')).toBe(true);
     expect(looksLikeDocumentPath('/songs/barka/')).toBe(true);
-    expect(looksLikeDocumentPath('/pl/games/tuner')).toBe(true);
+    expect(looksLikeDocumentPath('/pl/apps/tuner')).toBe(true);
     expect(looksLikeDocumentPath('/offline')).toBe(true);
     // A slug may carry a dash; only a dot in the final segment means a file.
     expect(looksLikeDocumentPath('/songs/spider-man')).toBe(true);

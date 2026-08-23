@@ -9,12 +9,12 @@ subproject.
 
 ## Solitaire Game
 
-The solitaire game is at `/games/solitaire/`. A JavaScript debug interface is available at
+The solitaire game is at `/apps/solitaire/`. A JavaScript debug interface is available at
 `window.solitaire` when the game is loaded — see the `solitaire-debug` skill.
 
 ## Typing Trainer
 
-The trainer is at `/games/typing/`. Progress syncs to Firestore under `users/{uid}/progress/{bookId}`
+The trainer is at `/apps/typing/`. Progress syncs to Firestore under `users/{uid}/progress/{bookId}`
 when signed in, and to localStorage always.
 
 ### Sync
@@ -193,8 +193,9 @@ spaces and puts the chords in their own flex column, so `.chord-col` may be bold
 
 ## Guitar Flashcards
 
-One spaced-repetition app at `/games/flashcards/`, holding two decks: the notes on the neck and
-moving chords between keys. They were two apps — `/games/fretboard/` and `/games/transpose/` — and
+One spaced-repetition app at `/apps/flashcards/`, holding two decks: the notes on the neck and
+moving chords between keys. They were two apps — `/games/fretboard/` and `/games/transpose/`, back
+when the section was `/games/` — and
 the two sections below still describe their cards, because the cards did not change. What changed is
 that there is now one entrypoint, one installable app, and **one sitting that mixes both decks**.
 
@@ -683,7 +684,7 @@ whenever German is in the deck at all, that being the marked case.
 key, which is the same-answer case the spellings already were.
 
 The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (`.win-tabs` /
-`.win-tab`), pulled in by each game's stylesheet with `@import`, so a page picks it up through
+`.win-tab`), pulled in by each app's stylesheet with `@import`, so a page picks it up through
 the one stylesheet it already needed.
 
 ## Two decks, one scheduler
@@ -921,7 +922,7 @@ D, E, G minor for `i iv V`.
 
 ## Baby Sleep Log
 
-At `/games/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
+At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
 `src/utils/babySleep/` holds the shapes and the pure logic, `useBabySleepData` the state and sync.
 
 The reconciliation is **not** the typing trainer's: these documents are mutable but they are not a
@@ -1081,7 +1082,7 @@ progress: a bedtime is a complete fact the moment the night starts, a duration o
 
 ### The climate tab
 
-`/games/baby-sleep/climate/` answers one question the log could not: **how low can the overnight
+`/apps/baby-sleep/climate/` answers one question the log could not: **how low can the overnight
 temperature go before the window has to be shut.** Two facts a night, learnt at the two moments you
 know them — the forecast low and the window before bed, the verdict (`cold` / `ok` / `warm`) in the
 morning — and a chart that puts the boundary between them where you can read it off.
@@ -1208,11 +1209,36 @@ truncating a long name. Sign-up being off is a console setting, not a file.
 `firestore.rules` is not deployed by CI — `firebase deploy --only firestore:rules` is manual, and
 the sharing rules do nothing until it is run.
 
+## The section is `/apps/`, and was `/games/`
+
+Everything under it used to live at `/games/`. Most of it is not a game — the typing trainer, the
+guitar flashcards, the tuner, the baby sleep log, the pregnancy calendar, the anesthesia quiz — and
+the heading was picking the wrong word for six of nine things. The three that really are games
+(solitaire, minesweeper, pipes) lose nothing by sitting under one that does not claim to describe
+them.
+
+The move is the paths and the label, nothing else. Local storage keys, Firestore collections and
+every card id are untouched, because none of them ever carried the section name; so nobody's
+progress, schedule or sleep log noticed. Inside the games the word stays the word — `gameState`,
+`New Game`, `solitaire.newGame` are about a game and are still right.
+
+`public/_redirects` 301s `/games/*` to `/apps/:splat` in both locales. The four old
+fretboard/transpose rules are listed **before** that catch-all, because first match wins and
+`/games/fretboard` has to reach the flashcards rather than an `/apps/fretboard` that does not
+exist; each of those four is also written a second time under `/apps/`, for the bookmark that
+comes back through the catch-all.
+
+The cost is the one the flashcards merge already paid, and it is worth knowing before renaming a
+route again: **an installed app's `start_url` now 301s out of its own scope**, so iOS opens the
+tuner, the flashcards and the sleep log in Safari rather than in the app. There is no way to hand
+an existing install a new identity — deleting the icon and installing once from the new URL is the
+whole fix. The songbook and the site app are unaffected, their paths not having moved.
+
 ## Installable web apps (PWA)
 
 The site ships **five** installable apps from one origin: the whole site, the guitar tuner
-(`/games/tuner`), the songbook (`/songs`), the flashcards (`/games/flashcards`) and the baby sleep log
-(`/games/baby-sleep`). What qualifies is a thing you reach for away from a desk;
+(`/apps/tuner`), the songbook (`/songs`), the flashcards (`/apps/flashcards`) and the baby sleep log
+(`/apps/baby-sleep`). What qualifies is a thing you reach for away from a desk;
 the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
 opening a link outside it leaves the app — which is the point, since most of the site is not
 built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks

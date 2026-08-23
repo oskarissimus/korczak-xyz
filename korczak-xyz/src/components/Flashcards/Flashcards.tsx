@@ -215,7 +215,7 @@ export default function Flashcards({ lang, library }: FlashcardsProps) {
     [chordScoped, fretboard, neckScoped, session, transpose]
   );
 
-  const base = lang === 'pl' ? '/pl/games/flashcards' : '/games/flashcards';
+  const base = lang === 'pl' ? '/pl/apps/flashcards' : '/apps/flashcards';
 
   if (!data.ready) {
     return <p className="fb-loading">{t.loading}</p>;

@@ -2,7 +2,7 @@
  * The two things every localStorage writer on this origin needs to know: how full the store is,
  * and whether the exception it just caught means "full".
  *
- * Both games share one ~5 MB budget, so neither can answer the first question by looking only at
+ * Both apps share one ~5 MB budget, so neither can answer the first question by looking only at
  * its own keys — which is why `storageBytes` walks the whole store. See the storage-budget note
  * in CLAUDE.md for what happens when nobody checks.
  */

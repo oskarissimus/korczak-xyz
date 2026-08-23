@@ -1,6 +1,6 @@
 ---
 name: solitaire-debug
-description: Use when debugging or inspecting the solitaire game at /games/solitaire/ - the window.solitaire console API for reading state, executing moves, getting hints, and serializing game states without going through the UI.
+description: Use when debugging or inspecting the solitaire game at /apps/solitaire/ - the window.solitaire console API for reading state, executing moves, getting hints, and serializing game states without going through the UI.
 ---
 
 # Solitaire Debug Console

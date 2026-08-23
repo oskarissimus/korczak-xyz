@@ -1,7 +1,7 @@
 /*
  * Strings for the baby sleep log, kept beside the game the way the fretboard and typing trainers
  * keep theirs — there are too many of them, and they are too specific, to belong in the site-wide
- * table. The game's name and one-line description do live there, because the games index shows them.
+ * table. The app's name and one-line description do live there, because the apps index shows them.
  */
 
 export type Lang = 'en' | 'pl';

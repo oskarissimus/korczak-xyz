@@ -1,0 +1,156 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageContent from '../../../components/PageContent.astro';
+import { useTranslations } from '../../../i18n';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Apps')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('Apps')}>
+    <ul class="apps-list">
+      <li>
+        <a href="/pl/apps/typing/" class="app-link">
+          <span class="app-icon">{'⌨'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Typing')}</span>
+            <span class="app-desc">{t('typing.desc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/flashcards/" class="app-link">
+          <span class="app-icon">{'\u{1F3BC}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Flashcards')}</span>
+            <span class="app-desc">{t('flashcards.desc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/solitaire/" class="app-link">
+          <span class="app-icon">♠</span>
+          <span class="app-info">
+            <span class="app-title">{t('Solitaire')}</span>
+            <span class="app-desc">Klondike</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/minesweeper/" class="app-link">
+          <span class="app-icon">{'\u{1F4A3}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Minesweeper')}</span>
+            <span class="app-desc">{t('minesweeper.classicPuzzle')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/pipes/" class="app-link">
+          <span class="app-icon">{'\u{1FAA0}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Pipes')}</span>
+            <span class="app-desc">{t('pipes.screensaver')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/tuner/" class="app-link">
+          <span class="app-icon">{'\u{1F3B8}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Tuner')}</span>
+            <span class="app-desc">{t('tuner.desc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/anesthesia/" class="app-link">
+          <span class="app-icon">{'\u{1FA7A}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('AnesthesiaQuiz')}</span>
+            <span class="app-desc">{t('anesthesia.quizDesc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/baby-sleep/" class="app-link">
+          <span class="app-icon">{'\u{1F319}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('BabySleep')}</span>
+            <span class="app-desc">{t('babySleep.desc')}</span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <a href="/pl/apps/pregnancy-calendar/" class="app-link">
+          <span class="app-icon">{'\u{1F930}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('PregnancyCalendar')}</span>
+            <span class="app-desc">{t('pregnancy.desc')}</span>
+          </span>
+        </a>
+      </li>
+    </ul>
+  </PageContent>
+</Layout>
+
+<style>
+  .apps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .app-link {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--retro-gray);
+    border: 3px outset var(--retro-white);
+    text-decoration: none;
+    color: var(--retro-black);
+    font-family: 'VT323', monospace;
+    transition: none;
+  }
+
+  .app-link:hover {
+    background: #a0a0a0;
+  }
+
+  .app-link:active {
+    border-style: inset;
+  }
+
+  .app-icon {
+    font-size: 2.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--retro-teal);
+    border: 2px inset var(--retro-dark-gray);
+    color: var(--retro-white);
+  }
+
+  .app-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .app-title {
+    font-size: 1.4rem;
+    color: var(--retro-black);
+  }
+
+  .app-desc {
+    font-size: 1rem;
+    color: var(--retro-dark-gray);
+  }
+</style>

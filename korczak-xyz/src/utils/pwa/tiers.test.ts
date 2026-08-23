@@ -63,12 +63,12 @@ describe('precache tiers', () => {
     const tiers = registerTiers();
     const withTier = new Set(tiers.map((t) => t.tier));
     const paths = [
-      '/', '/pl', '/about', '/games', '/games/tuner', '/pl/games/tuner', '/songsheets',
+      '/', '/pl', '/about', '/apps', '/apps/tuner', '/pl/apps/tuner', '/songsheets',
       '/songs', '/songs/warszawa', '/pl/songs', '/pl/songs/arahja/',
-      '/games/flashcards', '/games/flashcards/neck', '/pl/games/flashcards/chords',
+      '/apps/flashcards', '/apps/flashcards/neck', '/pl/apps/flashcards/chords',
       // The routes the merged app replaced belong to no app and must ask for no tier.
-      '/games/fretboard', '/games/transpose',
-      '/games/baby-sleep', '/games/baby-sleep/share', '/pl/games/baby-sleep/stats',
+      '/apps/fretboard', '/apps/transpose',
+      '/apps/baby-sleep', '/apps/baby-sleep/share', '/pl/apps/baby-sleep/stats',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);
@@ -83,9 +83,9 @@ describe('precache tiers', () => {
     const byTier = new Map(generatorTiers().map((t) => [t.tier, t.pattern]));
     expect(byTier.get('songs')!.test('/songs')).toBe(false);
     expect(byTier.get('songs')!.test('/songs/warszawa')).toBe(true);
-    expect(byTier.get('flashcards')!.test('/games/flashcards')).toBe(true);
-    expect(byTier.get('flashcards')!.test('/pl/games/flashcards/neck')).toBe(true);
-    expect(byTier.get('baby-sleep')!.test('/games/baby-sleep')).toBe(true);
-    expect(byTier.get('baby-sleep')!.test('/pl/games/baby-sleep/share')).toBe(true);
+    expect(byTier.get('flashcards')!.test('/apps/flashcards')).toBe(true);
+    expect(byTier.get('flashcards')!.test('/pl/apps/flashcards/neck')).toBe(true);
+    expect(byTier.get('baby-sleep')!.test('/apps/baby-sleep')).toBe(true);
+    expect(byTier.get('baby-sleep')!.test('/pl/apps/baby-sleep/share')).toBe(true);
   });
 });

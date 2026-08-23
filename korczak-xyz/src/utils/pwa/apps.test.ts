@@ -45,9 +45,9 @@ describe('the app registry', () => {
   });
 
   it('localises the start URL, so /pl installs the Polish app', () => {
-    expect(startUrl('flashcards', 'en')).toBe('/games/flashcards');
-    expect(startUrl('flashcards', 'pl')).toBe('/pl/games/flashcards');
-    expect(startUrl('baby-sleep', 'pl')).toBe('/pl/games/baby-sleep');
+    expect(startUrl('flashcards', 'en')).toBe('/apps/flashcards');
+    expect(startUrl('flashcards', 'pl')).toBe('/pl/apps/flashcards');
+    expect(startUrl('baby-sleep', 'pl')).toBe('/pl/apps/baby-sleep');
     expect(startUrl('site', 'en')).toBe('/');
   });
 });

@@ -3,7 +3,7 @@
  * and the legend that goes under them.
  *
  * Shared by the fretboard and transposition trainers the way `tabs.css` is: pulled in by each
- * game's stylesheet with `@import`, so a page picks it up through the one stylesheet it already
+ * app's stylesheet with `@import`, so a page picks it up through the one stylesheet it already
  * needed. The components live in `src/components/srs/`, which is why the class names are not
  * either app's prefix.
  */

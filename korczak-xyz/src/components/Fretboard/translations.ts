@@ -1,7 +1,7 @@
 /*
  * Strings for the fretboard trainer, kept beside the game the way the typing trainer keeps its
  * own — there are too many of them, and they are too specific, to belong in the site-wide table.
- * The game's name and one-line description do live there, because the games index shows them.
+ * The app's name and one-line description do live there, because the apps index shows them.
  *
  * Note names are not in here. Which notations the deck asks under is a setting — see `Notation`
  * in `src/utils/fretboard/notes.ts` — because it is a property of the player and not of the

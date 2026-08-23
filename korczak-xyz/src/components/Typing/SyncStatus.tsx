@@ -79,7 +79,7 @@ export default function SyncStatus({ auth, sync, lang, onRetry }: SyncStatusProp
     // when auth settles either way.
     if (loading) return <div className="typing-sync-slot" aria-hidden="true" />;
     const loginPath =
-      lang === 'en' ? '/login/?redirect=/games/typing/' : '/pl/login/?redirect=/pl/games/typing/';
+      lang === 'en' ? '/login/?redirect=/apps/typing/' : '/pl/login/?redirect=/pl/apps/typing/';
     return (
       <div className="typing-sync-slot">
         <a className="typing-sync typing-sync-link" href={loginPath}>
