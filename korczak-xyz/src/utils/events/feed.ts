@@ -8,6 +8,7 @@
 
 import type { EventRecord, Interest } from './types';
 import { matchingInterests, scoreMatch } from './match';
+import { foldText } from './normalize';
 import { daysUntil } from './normalize';
 
 export interface FeedItem {
@@ -119,4 +120,46 @@ function bestScore(item: FeedItem): number {
     best = Math.max(best, scoreMatch(item.event, interest));
   }
   return best;
+}
+
+/**
+ * Where an event is, without saying it twice.
+ *
+ * Venue and city are separate fields because some sources give both — but an iCal `LOCATION` is one
+ * free-text line ("Brisbane, Australia") that the adapter also extracts a city from, so printing the
+ * pair joined reads "Brisbane, Australia, Brisbane". The city is dropped whenever the venue already
+ * contains it, compared folded so "Kraków" matches "Krakow".
+ */
+export function placeLabel(event: { venue?: string; city?: string }): string {
+  const venue = event.venue?.trim();
+  const city = event.city?.trim();
+  if (!venue) return city ?? '';
+  if (!city || foldText(venue).includes(foldText(city))) return venue;
+  return `${venue}, ${city}`;
+}
+
+/**
+ * The date, or the source's own words when it gave prose nobody could parse.
+ *
+ * Never blank: a card with no date at all reads as a bug, and "Premiera: jesień 2027" is genuinely
+ * what the theatre said.
+ *
+ * An all-day event gets no clock. iCal's `VALUE=DATE` carries no time, so it lands on midnight UTC
+ * and printing that in Warsaw produced "Thu 27 Aug, 02:00" for a conference that starts whenever
+ * the doors open — a precision the source never claimed, and one that would read differently either
+ * side of a daylight-saving change.
+ */
+export function whenLabel(
+  event: { startsAt: number | null; dateText?: string; allDay?: boolean },
+  locale: string,
+  timeZone = 'Europe/Warsaw',
+): string {
+  if (event.startsAt === null) return event.dateText ?? '—';
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'short',
+    ...(event.allDay ? {} : { hour: '2-digit' as const, minute: '2-digit' as const }),
+    timeZone,
+  }).format(new Date(event.startsAt));
 }

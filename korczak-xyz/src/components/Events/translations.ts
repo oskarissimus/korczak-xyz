@@ -214,7 +214,14 @@ export const translations = {
   },
 } as const;
 
-export type Translation = (typeof translations)['en'];
+/**
+ * The shape of one locale's table, with every value widened to `string`.
+ *
+ * Not `(typeof translations)['en']`: `as const` gives each entry a *literal* type, so that alias
+ * describes only the English table and the Polish one is not assignable to it. Every helper taking
+ * a `Translation` then rejects `translations['pl']` — which is every helper, on every Polish page.
+ */
+export type Translation = { [K in keyof (typeof translations)['en']]: string };
 
 /** `fill('{n} min ago', { n: 5 })`. The sleep log's helper, copied rather than shared: it is four
  *  lines, and importing it would tie this app's strings to that app's. */

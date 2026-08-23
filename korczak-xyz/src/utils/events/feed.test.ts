@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeed, dedupeByFingerprint, groupOf } from './feed';
+import { buildFeed, dedupeByFingerprint, groupOf, placeLabel, whenLabel } from './feed';
 import { fingerprintOf, haystackOf } from './normalize';
 import type { EventRecord, Interest } from './types';
 
@@ -14,7 +14,6 @@ function ev(p: Partial<EventRecord> & { title: string }): EventRecord {
     source: 'feed',
     sourceKey: p.title,
     sourceName: 'test',
-    title: p.title,
     haystack: p.haystack ?? haystackOf({ title: p.title }),
     url: 'https://example.test/e',
     startsAt: 'startsAt' in p ? p.startsAt! : Date.parse(`${day}T18:00:00Z`),
@@ -117,5 +116,59 @@ describe('buildFeed', () => {
     const klezmer: Interest = { ...ALL, id: 'k', label: 'Klezmer', keywords: ['klezmer*'] };
     const sections = buildFeed([ev({ title: 'Koncert klezmerski' })], [ALL, klezmer], NOW);
     expect(sections[0].items[0].matched.map((i) => i.label)).toEqual(['Everything', 'Klezmer']);
+  });
+});
+
+describe('placeLabel', () => {
+  it('does not say the city twice', () => {
+    // An iCal LOCATION is one free-text line that the adapter also extracts a city from, so the
+    // pair joined naively reads "Brisbane, Australia, Brisbane". Seen on the live feed.
+    expect(placeLabel({ venue: 'Brisbane, Australia', city: 'Brisbane' })).toBe('Brisbane, Australia');
+  });
+
+  it('compares folded, so Kraków matches Krakow', () => {
+    expect(placeLabel({ venue: 'Kraków, Poland', city: 'Krakow' })).toBe('Kraków, Poland');
+  });
+
+  it('keeps both when the venue genuinely does not name the city', () => {
+    expect(placeLabel({ venue: 'Teatr Wielki – Opera Narodowa', city: 'Warszawa' })).toBe(
+      'Teatr Wielki – Opera Narodowa, Warszawa',
+    );
+  });
+
+  it('copes with either half missing', () => {
+    expect(placeLabel({ city: 'Warszawa' })).toBe('Warszawa');
+    expect(placeLabel({ venue: 'Torwar' })).toBe('Torwar');
+    expect(placeLabel({})).toBe('');
+  });
+});
+
+describe('whenLabel', () => {
+  const dated = { startsAt: Date.parse('2026-11-22T18:00:00Z') };
+
+  it('prints a clock for an event that has one', () => {
+    expect(whenLabel(dated, 'en-GB')).toMatch(/19:00/);
+  });
+
+  it('prints NO clock for an all-day event', () => {
+    /*
+     * iCal's VALUE=DATE carries no time, so it lands on midnight UTC and rendering it in Warsaw
+     * produced "Thu 27 Aug, 02:00" for a conference that starts whenever the doors open — a
+     * precision the source never claimed, and one that would differ either side of a DST change.
+     */
+    const allDay = { startsAt: Date.parse('2026-08-27T00:00:00Z'), allDay: true };
+    expect(whenLabel(allDay, 'en-GB')).not.toMatch(/\d\d:\d\d/);
+    expect(whenLabel(allDay, 'en-GB')).toMatch(/27/);
+  });
+
+  it('falls back to the source’s own words when the date could not be parsed', () => {
+    // "Premiera: jesień 2027" is genuinely what the theatre said, and a blank reads as a bug.
+    expect(whenLabel({ startsAt: null, dateText: 'Premiera: jesień 2027' }, 'en-GB')).toBe(
+      'Premiera: jesień 2027',
+    );
+  });
+
+  it('is never blank', () => {
+    expect(whenLabel({ startsAt: null }, 'en-GB')).toBe('—');
   });
 });

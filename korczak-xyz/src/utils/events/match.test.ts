@@ -6,7 +6,9 @@ import type { EventRecord, Interest } from './types';
 
 const NOW = Date.parse('2026-08-23T12:00:00Z');
 
-function ev(partial: Partial<EventRecord> & { title: string }): EventRecord {
+// `description` is not on EventRecord — it is an adapter input that gets folded into the
+// haystack — so the helper takes it separately rather than pretending the record carries it.
+function ev(partial: Partial<EventRecord> & { title: string; description?: string }): EventRecord {
   const day = partial.day ?? '2026-10-01';
   return {
     id: partial.id ?? `x_${partial.title}`,
@@ -22,7 +24,7 @@ function ev(partial: Partial<EventRecord> & { title: string }): EventRecord {
         subtitle: partial.subtitle,
         venue: partial.venue,
         city: partial.city,
-        description: partial.description as string | undefined,
+        description: partial.description,
       }),
     url: partial.url ?? 'https://example.test/e',
     ticketUrl: partial.ticketUrl,

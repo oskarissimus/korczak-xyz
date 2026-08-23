@@ -11,9 +11,22 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
 import { useEventInterests } from '../../hooks/useEventInterests';
 import { useWebPush } from '../../hooks/useWebPush';
-import { buildFeed, type FeedGroup, type FeedItem } from '../../utils/events/feed';
+import {
+  buildFeed,
+  placeLabel,
+  whenLabel,
+  type FeedGroup,
+  type FeedItem,
+} from '../../utils/events/feed';
 import EventsGate from './EventsGate';
-import { fill, localeOf, relativeTime, translations, type Lang } from './translations';
+import {
+  fill,
+  localeOf,
+  relativeTime,
+  translations,
+  type Lang,
+  type Translation,
+} from './translations';
 
 interface Props {
   lang: Lang;
@@ -85,7 +98,7 @@ function FeedPanel({ lang }: Props) {
   );
 }
 
-function groupLabel(group: FeedGroup, t: (typeof translations)['en']): string {
+function groupLabel(group: FeedGroup, t: Translation): string {
   if (group === 'week') return t.groupThisWeek;
   if (group === 'month') return t.groupThisMonth;
   if (group === 'later') return t.groupLater;
@@ -99,7 +112,7 @@ function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: numbe
   return (
     <li className="ev-card">
       <div className="ev-card-top">
-        <span className="ev-card-when">{whenLabel(event.startsAt, event.dateText, lang)}</span>
+        <span className="ev-card-when">{whenLabel(event, localeOf(lang))}</span>
         <h4 className="ev-card-title">{event.title}</h4>
       </div>
 
@@ -112,9 +125,7 @@ function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: numbe
             {t.matchedBy} {item.matched.map((i) => i.label).join(', ')}
           </span>
         ) : null}
-        {[event.venue, event.city].filter(Boolean).length > 0 ? (
-          <span>{[event.venue, event.city].filter(Boolean).join(', ')}</span>
-        ) : null}
+        {placeLabel(event) ? <span>{placeLabel(event)}</span> : null}
         <span>{event.sourceName}</span>
         <span>{fill(t.announcedAgo, { when: relativeTime(event.firstSeenAt, now, t) })}</span>
       </div>
@@ -134,20 +145,4 @@ function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: numbe
   );
 }
 
-/**
- * The date, or the source's own words when it gave prose we could not parse.
- *
- * Never blank: a card with no date at all reads as a bug, and "Premiera: jesień 2027" is genuinely
- * what the theatre said.
- */
-function whenLabel(startsAt: number | null, dateText: string | undefined, lang: Lang): string {
-  if (startsAt === null) return dateText ?? '—';
-  return new Intl.DateTimeFormat(localeOf(lang), {
-    day: 'numeric',
-    month: 'short',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Warsaw',
-  }).format(new Date(startsAt));
-}
+
