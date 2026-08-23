@@ -1006,6 +1006,23 @@ and it is known the instant the night begins, so going through `nightBlocks` wou
 figure until morning. Nothing is clamped — a routine logged as ending after he was already asleep is a
 mis-log and is excluded, not pinned to zero.
 
+`SleepTimeline` draws it too, on the row the *clock* puts it on: a slim orchid bar half the row's
+height, bath at its left edge, the crib a pale full-height tick at its right, and the gap from there
+to the night block is the settling time the tiles report. Half height because a routine is not a
+sleep and a bar of equal weight beside the night reads as one; drawn before the sleeps, so where a
+mis-log overlaps one the sleep is what you see. Orchid because the other three colours on that chart
+are spoken for — blue is the night, teal a nap, yellow a sleep still running — which is the same
+argument that keeps the *log* screen's routine button plain grey, reaching the opposite conclusion
+because a chart has room for a fourth series and a row of coloured buttons does not.
+
+`routineSegmentsForDay` joins by **time and not by `day.key` against `routine.night`**. Those agree
+on every ordinary evening and part company at exactly the case the clipping exists for: a routine
+begun at 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would
+put a bar a whole day left of the moment it happened. It also drops what no figure counts — a
+tombstone, a stale timer, an impossible length — which is `segmentsForDay`'s rule for implausible
+entries and holds for its reason. A routine still running is drawn as far as `now` and has **no crib
+tick**, the missing mark being what says nobody is in the crib yet.
+
 `DurationSpreadChart` grew optional `minSpan`/`tickSteps` for this. Its three-hour floor is right for
 a night and flattens a settling time into a straight line along the bottom; the settle chart passes
 30 minutes and 5/10/15/30-minute ticks. The defaults are still the night's.

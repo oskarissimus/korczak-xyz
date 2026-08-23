@@ -25,8 +25,14 @@
  */
 
 import { circularStat, linearStat } from './circular';
+import { clipSegment } from './days';
 import type { RoutineRecord } from './routine';
-import { MAX_SETTLE_MS, routineLength, routineStartMinutes } from './routine';
+import {
+  MAX_SETTLE_MS,
+  isStaleRoutine,
+  routineLength,
+  routineStartMinutes,
+} from './routine';
 import type { ClockPoint, DurationPoint } from './stats';
 import type { ClockStat, DayBucket, MeanStat, SleepEntry } from './types';
 import { applyLocal, mergeById, sameRevision } from './versioned';
@@ -102,6 +108,60 @@ export function settleMs(routine: RoutineRecord, asleepAt: number | null): numbe
   if (routine.end == null || asleepAt == null) return null;
   const ms = asleepAt - routine.end;
   return ms >= 0 && ms <= MAX_SETTLE_MS ? ms : null;
+}
+
+// --- drawing --------------------------------------------------------------------------------------
+
+/** A routine, or the part of one, as a single row of the timeline draws it. */
+export interface RoutineSegment {
+  routine: RoutineRecord;
+  start: number;
+  end: number;
+  /** Nobody is in the crib yet, so this bar has no end to mark — only a right edge at `now`. */
+  running: boolean;
+  /**
+   * The crib moment falls inside this row. A routine begun at 23:50 is clipped across two rows the
+   * way a night is, and the tick belongs on the row that actually contains it — not on both, and
+   * not on the one that only holds the beginning.
+   */
+  endsHere: boolean;
+}
+
+/**
+ * What a single day's row of the timeline draws for the bedtime routine.
+ *
+ * The join is by *time*, deliberately not by `day.key` against `routine.night`: those agree on every
+ * ordinary evening and part company at exactly the case this clipping exists for. A routine begun at
+ * 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would put a bar
+ * a whole day left of the moment it happened.
+ *
+ * Routines no figure counts are not drawn, which is `segmentsForDay`'s rule for implausible entries
+ * and holds for the same reason: a timer nobody stopped must not smear a bar across the chart while
+ * being excluded from every average beside it.
+ */
+export function routineSegmentsForDay(
+  records: RoutineRecord[],
+  day: { start: number; end: number },
+  now: number
+): RoutineSegment[] {
+  const segments: RoutineSegment[] = [];
+  for (const routine of records) {
+    if (routine.deleted) continue;
+    if (isStaleRoutine(routine, now)) continue;
+    const running = routine.end == null;
+    if (!running && routineLength(routine) == null) continue;
+    const end = routine.end ?? Math.max(routine.start, now);
+    const seg = clipSegment(routine.start, end, day.start, day.end);
+    if (!seg) continue;
+    segments.push({
+      routine,
+      start: seg.start,
+      end: seg.end,
+      running,
+      endsHere: !running && end <= day.end,
+    });
+  }
+  return segments.sort((a, b) => a.start - b.start);
 }
 
 // --- the points ------------------------------------------------------------------------------------

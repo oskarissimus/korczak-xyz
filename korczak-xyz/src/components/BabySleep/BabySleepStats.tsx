@@ -212,9 +212,17 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         <SleepTimeline
           days={stats.days}
           entries={data.entries}
+          routines={routines.records}
           now={now}
           formatDay={formatDay}
           formatTime={formatTime}
+          /* The tooltip is built here, out of the keys the live strip already prints, so the chart
+             itself never learns about the translation table. */
+          routineLabel={(from, to) =>
+            to == null
+              ? fill(t.routineRunning, { time: from })
+              : fill(t.routineSpan, { from, to })
+          }
           ariaLabel={t.timelineAria}
           emptyLabel={t.chartEmpty}
         />
@@ -226,6 +234,14 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           <li>
             <span className="bs-swatch bs-swatch--nap" aria-hidden="true" />
             {t.legendNap}
+          </li>
+          <li>
+            <span className="bs-swatch bs-swatch--routine" aria-hidden="true" />
+            {t.legendRoutine}
+          </li>
+          <li>
+            <span className="bs-swatch bs-swatch--crib" aria-hidden="true" />
+            {t.legendCrib}
           </li>
           <li>
             <span className="bs-swatch bs-swatch--running" aria-hidden="true" />

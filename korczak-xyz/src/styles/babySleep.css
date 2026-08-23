@@ -634,6 +634,22 @@
   background-color: var(--retro-yellow);
 }
 
+/* The bedtime routine. Orchid because every other colour on this chart is spoken for — blue is the
+   night, teal a nap, yellow a sleep still running — and a routine is none of those three. It reads
+   against #1a1a2e at the six pixels the bar is tall, which pure magenta beside the blue does not. */
+.bs-block--routine,
+.bs-swatch--routine {
+  fill: #c86bd6;
+  background-color: #c86bd6;
+}
+
+/* The crib moment: paler than the bar, so at two pixels wide it is still a mark and not a shadow. */
+.bs-crib-tick,
+.bs-swatch--crib {
+  fill: #efc0f5;
+  background-color: #efc0f5;
+}
+
 /* --- daily totals --------------------------------------------------------- */
 
 .bs-bar--night {
@@ -710,6 +726,12 @@
 .bs-swatch--mean {
   height: 4px;
   border: 0;
+}
+
+/* The crib is a two-pixel tick on the chart, so its swatch is a tick too — a 14px square of the same
+   colour would read as another block. */
+.bs-swatch--crib {
+  width: 5px;
 }
 
 .bs-legend-value {

@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { groupByDay } from './days';
 import type { RoutineRecord } from './routine';
-import { MAX_SETTLE_MS } from './routine';
+import { MAX_ROUTINE_MS, MAX_SETTLE_MS } from './routine';
 import {
   applyLocalRoutines,
   computeRoutineStats,
   firstNightBlockStart,
   mergeRoutines,
   routineLengthPoints,
+  routineSegmentsForDay,
   routineStartPoints,
   routinesByNight,
   settleMs,
@@ -137,6 +138,49 @@ describe('the points', () => {
   it('ignore a tombstoned routine', () => {
     const byNight = routinesByNight([routine({ deleted: true })]);
     expect(routineStartPoints(days(entries), byNight)).toHaveLength(0);
+  });
+});
+
+describe('routineSegmentsForDay', () => {
+  const dayOf = (key: string) => days([]).find((d) => d.key === key)!;
+
+  it('draws a routine on the row holding the clock time, not the row it is keyed to', () => {
+    // Begun at 00:10, so `routineNightKey` files it under the 15th — but it happened on the 16th.
+    const late = routine({
+      id: NIGHT,
+      night: NIGHT,
+      start: at(16, 0, 10),
+      end: at(16, 0, 40),
+    });
+    expect(routineSegmentsForDay([late], dayOf(NIGHT), NOW)).toEqual([]);
+    expect(routineSegmentsForDay([late], dayOf('2026-01-16'), NOW)).toEqual([
+      { routine: late, start: at(16, 0, 10), end: at(16, 0, 40), running: false, endsHere: true },
+    ]);
+  });
+
+  it('clips a routine that crosses midnight, and ticks the crib only where it falls', () => {
+    const across = routine({ start: at(15, 23, 50), end: at(16, 0, 20) });
+    const [before] = routineSegmentsForDay([across], dayOf(NIGHT), NOW);
+    const [after] = routineSegmentsForDay([across], dayOf('2026-01-16'), NOW);
+    expect(before).toMatchObject({ start: at(15, 23, 50), end: at(16, 0), endsHere: false });
+    expect(after).toMatchObject({ start: at(16, 0), end: at(16, 0, 20), endsHere: true });
+  });
+
+  it('draws a running routine as far as now, with no crib to mark', () => {
+    const running = routine({ start: NOW - 15 * 60_000, end: null });
+    expect(routineSegmentsForDay([running], dayOf('2026-01-16'), NOW)).toEqual([
+      { routine: running, start: NOW - 15 * 60_000, end: NOW, running: true, endsHere: false },
+    ]);
+  });
+
+  it('leaves out what no figure counts: a tombstone, a stale timer, an impossible length', () => {
+    const day = dayOf(NIGHT);
+    expect(routineSegmentsForDay([routine({ deleted: true })], day, NOW)).toEqual([]);
+    // Started yesterday evening and never closed: the forgotten-timer case.
+    expect(routineSegmentsForDay([routine({ end: null })], day, NOW)).toEqual([]);
+    expect(
+      routineSegmentsForDay([routine({ end: at(15, 19, 0) + MAX_ROUTINE_MS + 60_000 })], day, NOW)
+    ).toEqual([]);
   });
 });
 

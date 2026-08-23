@@ -142,7 +142,8 @@ export const translations = {
 
     // Stats — charts
     timelineTitle: 'Nights and naps, day by day',
-    timelineAria: 'Sleep blocks for each day against a midnight-to-midnight clock',
+    timelineAria:
+      'Sleep blocks and the bedtime routine for each day against a midnight-to-midnight clock',
     totalsTitle: 'Total sleep per day',
     totalsAria: 'Night and nap sleep stacked, one bar per day',
     nightLengthTitle: 'How long the night was',
@@ -157,6 +158,8 @@ export const translations = {
     bedtimeAria: 'Bedtime and wake-up clock times per day, with the mean and one standard deviation',
     legendNight: 'Night',
     legendNap: 'Nap',
+    legendRoutine: 'Routine',
+    legendCrib: 'In crib',
     legendRunning: 'Still asleep',
     legendIncomplete: 'Day in progress',
     legendMean: 'Mean',
@@ -396,7 +399,7 @@ export const translations = {
 
     // Stats — charts
     timelineTitle: 'Noce i drzemki, dzień po dniu',
-    timelineAria: 'Bloki snu dla każdego dnia na osi od północy do północy',
+    timelineAria: 'Bloki snu i rytuał przed snem dla każdego dnia na osi od północy do północy',
     totalsTitle: 'Sen na dobę',
     totalsAria: 'Sen nocny i drzemki jeden na drugim, jeden słupek na dzień',
     nightLengthTitle: 'Jak długa była noc',
@@ -412,6 +415,8 @@ export const translations = {
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
     legendNight: 'Noc',
     legendNap: 'Drzemka',
+    legendRoutine: 'Rytuał',
+    legendCrib: 'W łóżeczku',
     legendRunning: 'Nadal śpi',
     legendIncomplete: 'Dzień w toku',
     legendMean: 'Średnia',
