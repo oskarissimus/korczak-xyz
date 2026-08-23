@@ -138,7 +138,6 @@ describe('haystackOf', () => {
       title: 'Jarmark Średniowieczny',
       venue: 'Zamek Chudów',
       city: 'Gliwice',
-      tags: ['festival'],
     });
     expect(hay).toContain('jarmark sredniowieczny');
     expect(hay).toContain('zamek chudow');
@@ -147,5 +146,17 @@ describe('haystackOf', () => {
   it('caps a source that pastes a whole press release', () => {
     const hay = haystackOf({ title: 'X', description: 'word '.repeat(500) });
     expect(hay.length).toBeLessThan(700);
+  });
+
+  it('does NOT read tags — they are matched structurally, not as keywords', () => {
+    /*
+     * Regression. Tags used to be folded in here, which made any tag a source applies feed-wide a
+     * blanket keyword hit for every row it produced: tagging the Jewish Culture Festival's feed
+     * `klezmer` made the Klezmer interest match all 67 of its articles, one of which was about
+     * Ted Kaczynski. Keywords ask what an event says; tags ask what it is.
+     */
+    const hay = haystackOf({ title: 'Ted Kaczynski, the Unabomber' });
+    expect(hay).not.toContain('klezmer');
+    expect(haystackOf({ title: 'X' })).toBe('x');
   });
 });

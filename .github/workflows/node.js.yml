@@ -22,6 +22,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
         working-directory: korczak-xyz
+      - name: Test
+        # The events app is the first thing here whose failure mode is "wakes you up at 7am", so
+        # the pure decision layers — the matcher, the notice planner, the service worker bundle —
+        # are worth a gate rather than a habit.
+        run: npm test
+        working-directory: korczak-xyz
       - name: Build
         run: npm run build
         working-directory: korczak-xyz
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: "npm"
+          cache-dependency-path: "functions/package-lock.json"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: functions
+      # Typechecks the collector AND the site's src/utils/events, which tsconfig.json compiles in
+      # from the sibling directory — so a change there that breaks the backend fails here rather
+      # than at deploy.
+      - name: Build
+        run: npm run build
+        working-directory: functions
+      - name: Test
+        # LIVE is unset, so the smoke test that hits teatrwielki.pl and python.org stays skipped.
+        run: npm test
+        working-directory: functions

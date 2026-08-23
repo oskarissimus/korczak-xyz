@@ -22,7 +22,6 @@ function ev(partial: Partial<EventRecord> & { title: string }): EventRecord {
         subtitle: partial.subtitle,
         venue: partial.venue,
         city: partial.city,
-        tags: partial.tags,
         description: partial.description as string | undefined,
       }),
     url: partial.url ?? 'https://example.test/e',

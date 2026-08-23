@@ -139,7 +139,14 @@ export function daysUntil(at: number, now: number, timeZone: string = WARSAW): n
 }
 
 /**
- * Everything the matcher will read about an event, folded into one string.
+ * Everything the *keywords* will be matched against, folded into one string.
+ *
+ * **Tags are deliberately not in here.** They are matched structurally, by `interest.tags`, and
+ * folding them into the keyword text makes the two mechanisms one — with the result that any
+ * tag a source applies feed-wide becomes a blanket keyword hit for every row it produces. That
+ * is not hypothetical: tagging the Jewish Culture Festival's feed `klezmer` made the Klezmer
+ * interest match all 67 of its articles, Ted Kaczynski included, because the word was in every
+ * haystack. Keywords ask what an event *says*; tags ask what it *is*.
  *
  * The description is capped: a source that pastes a whole press release would otherwise let a
  * keyword match on a word mentioned once in the ninth paragraph, and would bloat every document
@@ -150,7 +157,6 @@ export function haystackOf(parts: {
   subtitle?: string;
   venue?: string;
   city?: string;
-  tags?: string[];
   description?: string;
 }): string {
   return foldText(
@@ -159,7 +165,6 @@ export function haystackOf(parts: {
       parts.subtitle ?? '',
       parts.venue ?? '',
       parts.city ?? '',
-      (parts.tags ?? []).join(' '),
       (parts.description ?? '').slice(0, 600),
     ].join(' '),
   );

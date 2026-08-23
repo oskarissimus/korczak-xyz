@@ -15,7 +15,7 @@ function ev(p: Partial<EventRecord> & { title: string }): EventRecord {
     sourceKey: p.title,
     sourceName: 'test',
     title: p.title,
-    haystack: p.haystack ?? haystackOf({ title: p.title, tags: p.tags }),
+    haystack: p.haystack ?? haystackOf({ title: p.title }),
     url: 'https://example.test/e',
     startsAt: 'startsAt' in p ? p.startsAt! : Date.parse(`${day}T18:00:00Z`),
     day,

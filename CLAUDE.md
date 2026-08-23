@@ -920,6 +920,173 @@ to the keys the library actually uses. As of writing that is C, D, E, F, G, A fo
 D, E, G minor for `i iv V`.
 
 
+## Event Watch
+
+At `/apps/events/` — three tabs (Feed, Interests, Alerts) over a shared corpus of scraped listings,
+with web push when something matching an interest is announced, goes on sale, or gets close. The
+first app here that watches the outside world rather than recording what I did, which is why it is
+**signed-in only**: the collecting happens on a server and the notifications have to know where to go.
+
+Two halves. `korczak-xyz/src/utils/events/` and `src/components/Events/` are the client;
+`functions/` is a scheduled Cloud Function that collects and sends.
+
+### One matcher, two runtimes
+
+`src/utils/events/` is compiled **twice** — by Astro for the browser, and by `tsc` into the Cloud
+Functions bundle, via `rootDir: ".."` and an `include` of `../korczak-xyz/src/utils/events/*.ts` in
+`functions/tsconfig.json`. The feed and the collector both ask "does this event match this
+interest?", and if they ever answer differently the feed shows things you were never told about and
+pushes arrive for things the feed does not list.
+
+This repo's usual idiom for one fact in two files is to read one as text and assert agreement
+(`tiers.test.ts`, `chordAlignment.test.ts`) — but that is for cases where an import is *impossible*.
+Here it is possible, and a copy plus an agreement test would only be identical until the first bug
+fix. The price is that nothing in that directory may import outside itself: no DOM, no
+`import.meta.env`, no `firebase/*`, no React. `portable.test.ts` enforces it, and the **`browser/`
+subdirectory** holds the modules that cannot obey (localStorage, the Firestore client). `readdirSync`
+does not recurse and the tsconfig `include` uses a single `*`, so the two agree by construction
+rather than by a list.
+
+### Keywords ask what an event says; tags ask what it is
+
+Keyword matching is on **word boundaries**, because `'floyd'` inside "Floydwear" is an interest you
+turn off, and `'opera'` inside "operacja" is worse. But whole-word alone is wrong for Polish, which
+inflects everything: `klezmer` never reaches "koncert klezmerski", `rycerski` never reaches "turniej
+rycerskiego". Loosening to a prefix match everywhere brings Floydwear straight back, so the choice is
+**explicit rather than guessed**: a keyword ending in `*` is a prefix, anything else is a whole word.
+The seeded Polish stems use it (`klezmer*`, `sredniowieczn*`, `rycersk*`); `floyd` and `opera`
+deliberately do not.
+
+**An empty keyword list means NO constraint, not "matches nothing".** The Opera Narodowa seed is
+`tags: ['opera']` with no keywords at all, because "tell me when new repertoire is announced" is not
+a keyword search. Reading empty as unsatisfiable makes that interest silently dead — matching
+nothing forever, with nothing in the UI to say why. It is the first test in `match.test.ts`.
+
+`haystackOf` deliberately does **not** read tags. It used to, and the result was that any tag a
+source applies feed-wide became a blanket keyword hit for every row: tagging the Jewish Culture
+Festival's feed `klezmer` made the Klezmer interest match all 67 of its articles, one of which was
+about Ted Kaczynski. Tags are matched all-of and structurally, by `interest.tags`. That live run also
+found `tagsFor` in the Teatr Wielki adapter falling through to `opera` for anything that was not
+ballet, which handed the keyword-less Opera interest the entire season, galas included.
+
+### What may wake me up
+
+`notices.ts` is pure, so the whole "should this push fire?" question is reachable from a unit test
+rather than from a phone at 7am. Three guards against the flood, and all three are needed:
+
+- **`armedAt`** — written when notifications are first armed. Nothing already in the corpus at that
+  moment can ever be `announced`. Without it, arming replays the entire corpus into the lock screen.
+- **`interest.createdAt`** — a field of its own, *not* `Versioned.updatedAt`. Adding an interest
+  surfaces its backlog in the feed and pushes about nothing; if this were `updatedAt`, editing one
+  keyword would re-arm the whole backlog.
+- **`maxPerRun`** (3) — the overflow becomes one summary, and the suppressed notices are still
+  latched so they never fire individually later. This is what saves you when a scrape's markup
+  shifts, every synthesised key changes, and an entire opera season looks new. `onsale` is exempt
+  (capped separately at 10): tickets going on sale is the thing that was asked for, and it is not
+  noise.
+
+`soon` uses **`max`** of the matching interests' `leadDays`, not min — leadDays means "how much
+warning I want". One notice per kind per fingerprint, never one per interest: the interests are *why*
+it fired, not *what* fired.
+
+**The notice document is a lock taken before sending, not a receipt written after.** `create()` fails
+on an existing document, which is the atomic latch. Written after the send, a crash between sending
+and writing repeats the push on the next run — the worst thing this app can do. Written before, a
+crash loses one, which is invisible and recoverable. Lose one rather than send two.
+
+Notice ids are `${slugKey(fingerprint)}|${kind}`. The separator is `|` because event ids contain
+hyphens, and the key is the **fingerprint** rather than the event id so one concert listed by two
+sources notifies once.
+
+### The service worker, and why a name collision there is expensive
+
+`generate-sw.mjs` now inlines **two** pure modules (`routing.js`, `push.js`) rather than one. They
+share a single top-level scope after concatenation, and there is exactly one service worker for every
+installed app on this origin — so a name declared in both is a SyntaxError that takes the songbook,
+the tuner and the sleep log offline along with this app, until the next deploy. `swBundle.test.js`
+parses the concatenation with `new Function` (which never touches `self` or `caches`) and names the
+culprit file on a collision.
+
+**iOS unsubscribes the app if a push event completes without showing a notification**, silently. So
+`parsePushPayload` is total by construction — malformed JSON, an empty payload, a schema from a
+future build all yield a showable title and body — and the handler has exactly one shape with no
+early return. The sender emits a Declarative Web Push envelope (`web_push: 8030`) with the flat
+fields alongside: on Safari 18.4+ the OS renders it even if our JS throws, and still dispatches the
+push event, so the same tag collapses the two into one banner.
+
+There is deliberately **no `pushsubscriptionchange` handler**. iOS never fires it, and on platforms
+that do the worker could not act on it — no auth, no SDK, possibly no client to postMessage. It would
+be code that looks like a safety net and is not.
+
+### Keeping the subscription alive
+
+iOS reports no `expirationTime` and fires no event when it drops a subscription after a few weeks of
+the app not being opened. The only defence is looking on every launch: `useWebPush` calls
+`getSubscription()` and, with permission already granted, re-subscribes **silently** (no gesture is
+needed once granted). That check runs from the **Feed** island as well as Alerts, because the Feed is
+the tab the icon opens — hanging it off Alerts alone means it never runs.
+
+`Notification.requestPermission()` is the **first statement** in the click handler, before any
+`await`. Put `await navigator.serviceWorker.ready` ahead of it and the gesture chain breaks on iOS:
+the prompt never appears and nothing reports why.
+
+Subscriptions are keyed by `sha256(endpoint)` so re-arming updates a row instead of adding one, and
+the previous row is retired explicitly — iOS hands out fresh endpoints often, and a stale one is an
+endpoint the collector pushes to until it earns a 410 that may never come. On the sending side,
+**404 and 410 are the only codes that delete a subscription**: a 403 is a VAPID key mismatch, and
+deleting on that would wipe every device the first time a secret is fumbled.
+
+### The sources, and why three of the four are generic
+
+Four adapter *types*, not four scrapers — `rss` and `ical` are driven by URL lists, so watching one
+more festival blog is a line in `FEEDS`, not code. An adapter returns `RawEvent[]` and **nothing
+derived**: the id, the haystack, the fingerprint and the day are computed by `upsert.ts`, so a new
+adapter cannot get normalisation subtly different.
+
+- **teatrwielki.pl** is the one bespoke scrape, and the source the app was really asked for. Note
+  `/kalendarium/` is useless — a TYPO3 shell whose calendar is drawn by JavaScript, containing
+  `data-day` attributes and no events. The **season page** (`/repertuar/sezon-2026/27/`) is plain
+  server-rendered markup carrying title, genre, composer, premiere date and a stable slug. Titles
+  contain inner tags (`<h2>COPP<span>É</span>LIA</h2>`), so they must be stripped. Individual
+  performance nights stay behind the JS calendar; that is an accepted gap, since the question is
+  whether Figaro is programmed, not which Tuesday. A **committed HTML fixture** is what turns the
+  inevitable redesign into a red build rather than a silently empty feed.
+- **python.org** is an iCal feed — 874 VEVENTs, mostly historical, so `collect.ts` drops anything
+  already past. Geography is deliberately *not* filtered there: PyCon US may still be worth knowing
+  about, and deciding that is the interest's job. RFC 5545 line unfolding is the one parsing bug
+  worth naming: miss it and every long `SUMMARY` truncates at 75 octets, which looks like the feed
+  having short titles.
+- **RSS feeds** leave `startsAt` null on purpose. A feed item is an *article*: putting its `pubDate`
+  in `startsAt` would file every post as happening today and then let `soon` fire about it.
+- **Ticketmaster** can never produce an `onsale` transition — its listing *is* its ticket page. That
+  is correct, not a gap. No API key is a configuration state, not a failure, so it returns `[]`.
+
+`eventSources/{id}` records health, and **zero is a failure only when the source used to return
+something**. Without that table the theatre could redesign, the scrape return `[]`, and the app go on
+looking perfectly healthy while never announcing another opera — the most likely way this fails and
+the least likely way anyone notices.
+
+`functions/src/smoke.live.test.ts` runs every adapter against the real network under `LIVE=1`
+(skipped otherwise, so CI and an offline laptop are unaffected). It is what caught both the haystack
+bug and the opera over-tagging; run it after touching an adapter.
+
+### Deploying it
+
+`firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the
+`users/{uid}` wildcard, so until `firebase deploy --only firestore:rules` is run the feed reads
+nothing and looks exactly like a collector that has not run yet. Rules are still not deployed by CI.
+
+The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `TICKETMASTER_API_KEY`
+as secrets, and the public key **also** in Netlify's build environment as `PUBLIC_VAPID_PUBLIC_KEY`.
+The VAPID public key can never change: rotating it invalidates every subscription on every device,
+silently. Full sequence in `functions/README.md`.
+
+Push works only from an app installed to the Home Screen — not from a Safari tab, ever. That is what
+the `needs-install` state on the Alerts tab exists to explain, and why it is checked before
+permission: on iOS in a tab there is nothing useful to say about permission, and a button that
+silently does nothing looks exactly like a bug in the app.
+
+
 ## Baby Sleep Log
 
 At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
@@ -1236,9 +1403,10 @@ whole fix. The songbook and the site app are unaffected, their paths not having 
 
 ## Installable web apps (PWA)
 
-The site ships **five** installable apps from one origin: the whole site, the guitar tuner
-(`/apps/tuner`), the songbook (`/songs`), the flashcards (`/apps/flashcards`) and the baby sleep log
-(`/apps/baby-sleep`). What qualifies is a thing you reach for away from a desk;
+The site ships **six** installable apps from one origin: the whole site, the guitar tuner
+(`/apps/tuner`), the songbook (`/songs`), the flashcards (`/apps/flashcards`), the baby sleep log
+(`/apps/baby-sleep`) and Event Watch (`/apps/events`). What qualifies is a thing you reach for away
+from a desk;
 the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
 opening a link outside it leaves the app — which is the point, since most of the site is not
 built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks
@@ -1268,18 +1436,18 @@ manifests, the icon set, the head tags — follows.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
   only runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
-The four drawn icons are **full bleed**: every platform masks a home screen icon to its own
+The five drawn icons are **full bleed**: every platform masks a home screen icon to its own
 shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
 and the convex read comes from a bounce light, a gloss sweep and a perimeter vignette layered at
 the end of each file. The square-on-navy art this replaced left a visible border on all four
 sides once iOS rounded the corners off the navy. `generate-icons.mjs` therefore picks the
-maskable treatment per source: `bleed` ships those four unscaled, `inset` keeps the old shrink-onto-navy
+maskable treatment per source: `bleed` ships those five unscaled, `inset` keeps the old shrink-onto-navy
 for `logo.png`, whose own square edges a circular mask would clip.
 
-All four are the same Win95 device — navy body, raised bezel, sunken black glass — with only
+All five are the same Win95 device — navy body, raised bezel, sunken black glass — with only
 what is *on* the glass telling them apart, because they sit side by side on one home screen:
 the tuner's dial, the songbook's yellow chords over green lyrics, the flashcards' stack of cards, the
-sleep log's crescent and Zs. Green and yellow throughout, the site's own phosphor.
+sleep log's crescent and Zs, Event Watch's yellow ticket over a green calendar bar. Green and yellow throughout, the site's own phosphor.
 The flashcards icon draws **two** frets where the app draws five, on a card front rather than filling
 the glass: an icon is read at 40px two rows down a home screen, where a finer grid stops being a neck
 and becomes texture — and the fret count is not the question the icon is asking. The card behind the
@@ -1382,8 +1550,8 @@ takes at most two: the shell, and the one named after the app it belongs to.
   worker cannot tell those apart — iOS gives them the same registration — so `register-sw.js`
   checks `display-mode: standalone` and names the tiers it wants.
 - **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `flashcards` (~110 kB gz),
-  `baby-sleep` (~92 kB gz). Each covers its app's whole subtree, because a tab is a separate
-  document and an uncached tab is a dead link on a dead network.
+  `baby-sleep` (~92 kB gz), `events`. Each covers its app's whole subtree, because a tab is a
+  separate document and an uncached tab is a dead link on a dead network.
 
 The per-app split is what stops the shell growing with the app count. Folding the newest apps into the
 shell instead cost every installed app — including the songbook, which wants none of it — an extra
