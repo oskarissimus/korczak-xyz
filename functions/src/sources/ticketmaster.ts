@@ -53,7 +53,15 @@ export function tagsOf(event: TmEvent): string[] {
     if (segment.includes('music')) tags.add('music');
     if (segment.includes('arts') || segment.includes('theatre')) tags.add('theatre');
     if (segment.includes('sports')) tags.add('sports');
-    if (genre.includes('classical') || genre.includes('opera')) tags.add('opera');
+    /*
+     * `opera` only where they really say opera. Mapping `classical` onto it as well was wrong twice
+     * over: a Chopin recital by candlelight is not opera, and the Opera Narodowa interest is
+     * keyword-less by design (`tags: ['opera']`, no constraint), so every classical listing in the
+     * country landed in it — 202 matches where 7 were the opera house. Their Polish catalogue has
+     * no `opera` genre at all as of Aug 2026, so this mapping never bought anything either.
+     * `classical` still reaches the feed: the raw genre slug is added below.
+     */
+    if (genre.includes('opera') || sub.includes('opera')) tags.add('opera');
     if (genre.includes('rock')) tags.add('rock');
     if (genre.includes('folk') || genre.includes('world')) tags.add('folk');
 

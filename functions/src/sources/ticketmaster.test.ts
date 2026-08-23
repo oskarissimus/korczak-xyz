@@ -53,11 +53,23 @@ describe('toRawEvent', () => {
 
 describe('tagsOf', () => {
   it('maps their tree onto the vocabulary the other sources use', () => {
-    // So an interest asking for `opera` matches a Ticketmaster listing and a Teatr Wielki one alike.
     expect(tagsOf({ classifications: [{ segment: { name: 'Music' }, genre: { name: 'Classical' } }] }))
-      .toEqual(expect.arrayContaining(['music', 'opera']));
+      .toEqual(expect.arrayContaining(['music', 'classical']));
     expect(tagsOf({ classifications: [{ segment: { name: 'Arts & Theatre' } }] }))
       .toContain('theatre');
+  });
+
+  /*
+   * The Opera Narodowa interest is keyword-less by design, so `opera` on a listing is the whole of
+   * what puts it in front of me. Classical is not opera: mapping it across gave that interest 202
+   * matches, 195 of them candlelight Chopin recitals.
+   */
+  it('does not call classical music opera', () => {
+    expect(tagsOf({ classifications: [{ genre: { name: 'Classical' }, subGenre: { name: 'Classical/Vocal' } }] }))
+      .not.toContain('opera');
+    expect(tagsOf({ classifications: [{ genre: { name: 'Opera' } }] })).toContain('opera');
+    expect(tagsOf({ classifications: [{ genre: { name: 'Classical' }, subGenre: { name: 'Opera' } }] }))
+      .toContain('opera');
   });
 
   it('keeps the raw genre too, so a keyword can reach what the fixed vocabulary missed', () => {

@@ -33,7 +33,7 @@ set up and how to redo it, not as a to-do list.
 | Billing | Blaze, billing account `01AB98-…` |
 | APIs | cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
-| `TICKETMASTER_API_KEY` | `none` — the documented sentinel for "not configured yet"; see below |
+| `TICKETMASTER_API_KEY` | real Discovery API key (v2, 23 Aug 2026). v1 was the `none` sentinel; see below |
 | `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
@@ -71,11 +71,16 @@ adapter handles by returning `[]`. It must not be a plausible-looking placeholde
 real `apikey` earns a 401, which is reported as a broken source and puts a red row on the Alerts tab
 that no amount of fixing the code would clear.
 
-To set a real key later — get one free at developer.ticketmaster.com, then:
+**A real key is set** as of 23 Aug 2026 (version 2 of the secret) — a free Discovery API key from
+developer.ticketmaster.com, 5000 calls/day at 5 a second. The sentinel is documented above because it
+is what the code still does when the secret is absent, which is the state a fresh clone or a new
+project is in. To replace the key:
 
 ```sh
 printf 'YOUR_KEY' | firebase functions:secrets:set TICKETMASTER_API_KEY --data-file -
-firebase deploy --only functions      # or just push; CI does it
+firebase deploy --only functions      # a secret version change does NOT trigger CI: nothing
+                                      # under functions/ changed, and the path filter is what
+                                      # decides. Deploy by hand or push an unrelated change.
 ```
 
 ### Redeploying by hand
