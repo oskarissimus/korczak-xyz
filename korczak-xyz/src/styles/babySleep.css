@@ -643,6 +643,22 @@
   background-color: #c86bd6;
 }
 
+/* Crib to asleep. The routine's own colour dimmed, which is `.bs-bar--partial`'s idiom for the same
+   thing carrying a lesser status: it is still the bedtime, and it is the half nobody is doing
+   anything in. Drawn at all — rather than left as the bare row — because an empty stretch is also
+   what an evening with no routine logged looks like.
+
+   Dimmed to 0.7 and not to `--partial`'s 0.45: this bar is a few pixels wide on a near-black row,
+   where 0.45 came out as a smudge you had to know was there, while a whole bar of a day's totals at
+   the same value is unmissable. The pair is only ever read against each other, and 0.7 is far enough
+   from the solid bar beside it to say which is which. */
+.bs-block--settle,
+.bs-swatch--settle {
+  fill: #c86bd6;
+  background-color: #c86bd6;
+  opacity: 0.7;
+}
+
 /* The crib moment: paler than the bar, so at two pixels wide it is still a mark and not a shadow. */
 .bs-crib-tick,
 .bs-swatch--crib {

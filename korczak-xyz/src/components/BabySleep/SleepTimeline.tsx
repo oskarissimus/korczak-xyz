@@ -10,11 +10,13 @@
  * Both halves of a clipped night carry the *same* `<title>`, naming the whole block. The split is an
  * artefact of drawing on a 24-hour axis and must not read as two separate sleeps.
  *
- * The bedtime routine is drawn on the same rows, as a slim bar half the row's height: bath at its
- * left edge, the crib at its right, and the gap from there to the night block is the settling time
- * the stats tab reports. It is deliberately *not* full height — a routine is not a sleep, and a bar
- * of the same weight beside the night would read as one. It is drawn first, so where a mis-log
- * overlaps a sleep the sleep is what you see.
+ * The bedtime routine is drawn on the same rows as two slim bars half the row's height, meeting at
+ * the crib: bath to crib solid, crib to asleep dimmed, and a tick where they meet. The second is the
+ * settling time the tiles report, drawn rather than left as a gap because a gap is also what an
+ * unlogged evening looks like — an empty stretch says nothing about whether anyone was sitting in
+ * the dark for it. Half height because a routine is not a sleep, and a bar of the same weight beside
+ * the night would read as one. Drawn first, so where a mis-log overlaps a sleep the sleep is what
+ * you see.
  *
  * Two deliberate departures from the house chart style:
  *   - `HEIGHT` is computed from the row count rather than fixed, so thirty days grows the viewBox
@@ -26,6 +28,7 @@
 import { effectiveEnd, segmentsForDay } from '../../utils/babySleep/days';
 import { formatHm } from '../../utils/babySleep/format';
 import type { RoutineRecord } from '../../utils/babySleep/routine';
+import type { RoutineSegment } from '../../utils/babySleep/routineStats';
 import { routineSegmentsForDay } from '../../utils/babySleep/routineStats';
 import type { DayBucket, SleepEntry } from '../../utils/babySleep/types';
 
@@ -38,11 +41,14 @@ interface SleepTimelineProps {
   entries: SleepEntry[];
   /** Every routine record, live or not — `routineSegmentsForDay` decides which are drawable. */
   routines: RoutineRecord[];
+  /** When each night began, by night key: what ends the settling. See `asleepByNight`. */
+  asleep: Map<string, number>;
   now: number;
   formatDay: (t: number) => string;
   formatTime: (t: number) => string;
-  /** The routine's tooltip, built by the caller so this chart needs no translation table. */
+  /** The two tooltips, built by the caller so this chart needs no translation table. */
   routineLabel: (from: string, to: string | null) => string;
+  settleLabel: (from: string, duration: string | null) => string;
   ariaLabel: string;
   emptyLabel: string;
 }
@@ -58,15 +64,30 @@ export default function SleepTimeline({
   days,
   entries,
   routines,
+  asleep,
   now,
   formatDay,
   formatTime,
   routineLabel,
+  settleLabel,
   ariaLabel,
   emptyLabel,
 }: SleepTimelineProps) {
   const rowSegments = days.map((day) => segmentsForDay(entries, day, now));
-  const rowRoutines = days.map((day) => routineSegmentsForDay(routines, day, now));
+  const rowRoutines = days.map((day) => routineSegmentsForDay(routines, asleep, day, now));
+
+  /* Each bar names the stretch it is, so the settling one is not read as more routine. A settle
+     still running has no duration to print — nobody has fallen asleep yet. */
+  const titleOf = (seg: RoutineSegment) =>
+    seg.phase === 'routine'
+      ? routineLabel(
+          formatTime(seg.routine.start),
+          seg.routine.end == null ? null : formatTime(seg.routine.end)
+        )
+      : settleLabel(
+          formatTime(seg.routine.end as number),
+          seg.running ? null : formatHm(seg.end - (seg.routine.end as number))
+        );
 
   /* A window holding routines and no sleep at all is still a chart worth drawing. */
   if (
@@ -136,14 +157,11 @@ export default function SleepTimeline({
               {rowRoutines[i].map((seg) => {
                 const x1 = xIn(day, seg.start);
                 const x2 = xIn(day, seg.end);
-                const title = routineLabel(
-                  formatTime(seg.routine.start),
-                  seg.routine.end == null ? null : formatTime(seg.routine.end)
-                );
+                const title = titleOf(seg);
                 return (
-                  <g key={`routine-${seg.routine.id}-${day.key}`}>
+                  <g key={`${seg.phase}-${seg.routine.id}-${day.key}`}>
                     <rect
-                      className="bs-block--routine"
+                      className={`bs-block--${seg.phase}`}
                       x={x1}
                       y={y + (ROW_H - ROUTINE_H) / 2}
                       width={Math.max(1, x2 - x1)}
@@ -151,8 +169,8 @@ export default function SleepTimeline({
                     >
                       <title>{title}</title>
                     </rect>
-                    {/* The crib, full height, so the gap to the night block beside it is the
-                        settling time and reads as one. A routine still running has no such moment
+                    {/* The crib, full height, so that the two bars either side of it read as the two
+                        halves of the evening they are. A routine still running has no such moment
                         yet, and the missing tick is what says so. */}
                     {seg.endsHere && (
                       <rect className="bs-crib-tick" x={x2 - 1} y={y} width={2} height={ROW_H}>

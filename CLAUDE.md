@@ -1006,22 +1006,38 @@ and it is known the instant the night begins, so going through `nightBlocks` wou
 figure until morning. Nothing is clamped — a routine logged as ending after he was already asleep is a
 mis-log and is excluded, not pinned to zero.
 
-`SleepTimeline` draws it too, on the row the *clock* puts it on: a slim orchid bar half the row's
-height, bath at its left edge, the crib a pale full-height tick at its right, and the gap from there
-to the night block is the settling time the tiles report. Half height because a routine is not a
-sleep and a bar of equal weight beside the night reads as one; drawn before the sleeps, so where a
-mis-log overlaps one the sleep is what you see. Orchid because the other three colours on that chart
-are spoken for — blue is the night, teal a nap, yellow a sleep still running — which is the same
-argument that keeps the *log* screen's routine button plain grey, reaching the opposite conclusion
-because a chart has room for a fourth series and a row of coloured buttons does not.
+`SleepTimeline` draws it too, on the row the *clock* puts it on: two slim bars half the row's height
+meeting at the crib, which is a pale full-height tick. Bath to crib is solid orchid; crib to asleep
+is the same orchid dimmed, and it ends where the night block begins — so the settling time the tiles
+report is drawn rather than left as a gap. That is the point of drawing it at all: an empty stretch
+of row is also what an evening with no routine logged looks like, and it says nothing about whether
+anyone was sitting in the dark for it. Half height because a routine is not a sleep and a bar of
+equal weight beside the night reads as one; drawn before the sleeps, so where a mis-log overlaps one
+the sleep is what you see. Orchid because the other three colours on that chart are spoken for —
+blue is the night, teal a nap, yellow a sleep still running — which is the same argument that keeps
+the *log* screen's routine button plain grey, reaching the opposite conclusion because a chart has
+room for a fourth series and a row of coloured buttons does not.
 
-`routineSegmentsForDay` joins by **time and not by `day.key` against `routine.night`**. Those agree
-on every ordinary evening and part company at exactly the case the clipping exists for: a routine
-begun at 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would
-put a bar a whole day left of the moment it happened. It also drops what no figure counts — a
-tombstone, a stale timer, an impossible length — which is `segmentsForDay`'s rule for implausible
-entries and holds for its reason. A routine still running is drawn as far as `now` and has **no crib
-tick**, the missing mark being what says nobody is in the crib yet.
+The dimming is 0.7 and not `.bs-bar--partial`'s 0.45. These bars are a few pixels wide on a
+near-black row, where 0.45 is a smudge you have to know is there, while a whole bar of a day's
+totals at the same value is unmissable; the pair is only ever read against each other, and 0.7 is
+far enough from the solid bar beside it to say which is which.
+
+`routineSegmentsForDay` joins each bar to a *row* by **time and not by `day.key` against
+`routine.night`**. Those agree on every ordinary evening and part company at exactly the case the
+clipping exists for: a routine begun at 00:10 is keyed to the night before by `routineNightKey`, and
+drawing it on that row would put a bar a whole day left of the moment it happened. What ends the
+settling is joined by night key instead, through `asleepByNight` — which is `firstNightBlockStart`
+over the same day buckets the settle tile is computed from, so the band on the chart and the figure
+above it cannot come to disagree about when he fell asleep.
+
+It draws nothing no figure counts, which is `segmentsForDay`'s rule for implausible entries and
+holds for its reason: a tombstone, a stale timer, an impossible routine length, and — for the
+settling specifically — `settleMs`'s own rejections, a crib logged after he was already asleep or a
+gap past four hours. Two things still running are drawn as far as `now`: a routine with no crib yet,
+which has **no tick** (the missing mark is what says nobody is in the crib), and the settling on a
+night nobody has tapped yet, which is what the live strip is counting up. `MAX_SETTLE_MS` is what
+stops that second one smearing a band across the chart on an evening whose night was never logged.
 
 `DurationSpreadChart` grew optional `minSpan`/`tickSteps` for this. Its three-hour floor is right for
 a night and flattens a settling time into a straight line along the bottom; the settle chart passes

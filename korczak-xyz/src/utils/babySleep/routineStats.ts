@@ -112,54 +112,102 @@ export function settleMs(routine: RoutineRecord, asleepAt: number | null): numbe
 
 // --- drawing --------------------------------------------------------------------------------------
 
-/** A routine, or the part of one, as a single row of the timeline draws it. */
+/** Which stretch of the evening a bar on the timeline is. */
+export type RoutinePhase = 'routine' | 'settle';
+
+/** One stretch of an evening's routine, as a single row of the timeline draws it. */
 export interface RoutineSegment {
   routine: RoutineRecord;
+  /** `routine` is bath to crib; `settle` is crib to asleep — the wait the tiles report. */
+  phase: RoutinePhase;
   start: number;
   end: number;
-  /** Nobody is in the crib yet, so this bar has no end to mark — only a right edge at `now`. */
+  /** Nothing has ended this stretch yet, so its right edge is `now` and not a logged moment. */
   running: boolean;
   /**
-   * The crib moment falls inside this row. A routine begun at 23:50 is clipped across two rows the
-   * way a night is, and the tick belongs on the row that actually contains it — not on both, and
-   * not on the one that only holds the beginning.
+   * The crib moment falls inside this row, so this row draws the tick for it. A routine begun at
+   * 23:50 is clipped across two rows the way a night is, and the mark belongs on the row that
+   * actually contains it — not on both, and not on the one holding only the beginning. Never set on
+   * a `settle`: what ends that stretch is the night block drawn beside it.
    */
   endsHere: boolean;
 }
 
 /**
- * What a single day's row of the timeline draws for the bedtime routine.
+ * When the night each of these days holds began, by night key.
  *
- * The join is by *time*, deliberately not by `day.key` against `routine.night`: those agree on every
- * ordinary evening and part company at exactly the case this clipping exists for. A routine begun at
- * 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would put a bar
- * a whole day left of the moment it happened.
+ * Built out of the same `firstNightBlockStart` the settle tile is, so the band drawn on the chart
+ * and the figure printed above it cannot come to disagree about when he fell asleep.
+ */
+export function asleepByNight(days: DayBucket[]): Map<string, number> {
+  const asleep = new Map<string, number>();
+  for (const day of days) {
+    const start = firstNightBlockStart(day);
+    if (start != null) asleep.set(day.key, start);
+  }
+  return asleep;
+}
+
+/**
+ * What a single day's row of the timeline draws for the bedtime routine: up to two bars, bath to
+ * crib and crib to asleep.
  *
- * Routines no figure counts are not drawn, which is `segmentsForDay`'s rule for implausible entries
+ * The join to a *row* is by time, deliberately not by `day.key` against `routine.night`: those agree
+ * on every ordinary evening and part company at exactly the case this clipping exists for. A routine
+ * begun at 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would
+ * put a bar a whole day left of the moment it happened. The join to a *night* — which sleep ends the
+ * settling — is by night key, because that is the pairing every routine figure is computed over.
+ *
+ * Stretches no figure counts are not drawn, which is `segmentsForDay`'s rule for implausible entries
  * and holds for the same reason: a timer nobody stopped must not smear a bar across the chart while
  * being excluded from every average beside it.
  */
 export function routineSegmentsForDay(
   records: RoutineRecord[],
+  asleep: Map<string, number>,
   day: { start: number; end: number },
   now: number
 ): RoutineSegment[] {
   const segments: RoutineSegment[] = [];
-  for (const routine of records) {
-    if (routine.deleted) continue;
-    if (isStaleRoutine(routine, now)) continue;
-    const running = routine.end == null;
-    if (!running && routineLength(routine) == null) continue;
-    const end = routine.end ?? Math.max(routine.start, now);
-    const seg = clipSegment(routine.start, end, day.start, day.end);
-    if (!seg) continue;
+  const add = (
+    routine: RoutineRecord,
+    phase: RoutinePhase,
+    from: number,
+    to: number,
+    running: boolean
+  ) => {
+    const seg = clipSegment(from, to, day.start, day.end);
+    if (!seg) return;
     segments.push({
       routine,
+      phase,
       start: seg.start,
       end: seg.end,
       running,
-      endsHere: !running && end <= day.end,
+      endsHere: phase === 'routine' && !running && to <= day.end,
     });
+  };
+
+  for (const routine of records) {
+    if (routine.deleted) continue;
+    if (isStaleRoutine(routine, now)) continue;
+    const open = routine.end == null;
+    if (!open && routineLength(routine) == null) continue;
+    add(routine, 'routine', routine.start, routine.end ?? Math.max(routine.start, now), open);
+    if (routine.end == null) continue;
+
+    /* Crib to asleep, ending where the night block beside it starts. While nobody has fallen asleep
+       yet it runs to `now` instead — that is the figure the live strip is counting up, and it is the
+       only stretch of the evening in progress once the routine itself is over. `MAX_SETTLE_MS` is
+       what stops a routine whose night was never logged from smearing a band across the chart. */
+    const asleepAt = asleep.get(routine.night) ?? null;
+    const settled = settleMs(routine, asleepAt);
+    if (settled != null) {
+      add(routine, 'settle', routine.end, routine.end + settled, false);
+    } else if (asleepAt == null) {
+      const waited = now - routine.end;
+      if (waited > 0 && waited <= MAX_SETTLE_MS) add(routine, 'settle', routine.end, now, true);
+    }
   }
   return segments.sort((a, b) => a.start - b.start);
 }

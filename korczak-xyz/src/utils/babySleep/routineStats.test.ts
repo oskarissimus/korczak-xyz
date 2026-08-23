@@ -5,6 +5,7 @@ import type { RoutineRecord } from './routine';
 import { MAX_ROUTINE_MS, MAX_SETTLE_MS } from './routine';
 import {
   applyLocalRoutines,
+  asleepByNight,
   computeRoutineStats,
   firstNightBlockStart,
   mergeRoutines,
@@ -142,7 +143,8 @@ describe('the points', () => {
 });
 
 describe('routineSegmentsForDay', () => {
-  const dayOf = (key: string) => days([]).find((d) => d.key === key)!;
+  const dayOf = (key: string, entries: SleepEntry[] = []) => days(entries).find((d) => d.key === key)!;
+  const NONE = new Map<string, number>();
 
   it('draws a routine on the row holding the clock time, not the row it is keyed to', () => {
     // Begun at 00:10, so `routineNightKey` files it under the 15th — but it happened on the 16th.
@@ -152,34 +154,97 @@ describe('routineSegmentsForDay', () => {
       start: at(16, 0, 10),
       end: at(16, 0, 40),
     });
-    expect(routineSegmentsForDay([late], dayOf(NIGHT), NOW)).toEqual([]);
-    expect(routineSegmentsForDay([late], dayOf('2026-01-16'), NOW)).toEqual([
-      { routine: late, start: at(16, 0, 10), end: at(16, 0, 40), running: false, endsHere: true },
+    expect(routineSegmentsForDay([late], NONE, dayOf(NIGHT), NOW)).toEqual([]);
+    expect(routineSegmentsForDay([late], NONE, dayOf('2026-01-16'), NOW)).toEqual([
+      {
+        routine: late,
+        phase: 'routine',
+        start: at(16, 0, 10),
+        end: at(16, 0, 40),
+        running: false,
+        endsHere: true,
+      },
     ]);
   });
 
   it('clips a routine that crosses midnight, and ticks the crib only where it falls', () => {
     const across = routine({ start: at(15, 23, 50), end: at(16, 0, 20) });
-    const [before] = routineSegmentsForDay([across], dayOf(NIGHT), NOW);
-    const [after] = routineSegmentsForDay([across], dayOf('2026-01-16'), NOW);
+    const [before] = routineSegmentsForDay([across], NONE, dayOf(NIGHT), NOW);
+    const [after] = routineSegmentsForDay([across], NONE, dayOf('2026-01-16'), NOW);
     expect(before).toMatchObject({ start: at(15, 23, 50), end: at(16, 0), endsHere: false });
     expect(after).toMatchObject({ start: at(16, 0), end: at(16, 0, 20), endsHere: true });
   });
 
   it('draws a running routine as far as now, with no crib to mark', () => {
     const running = routine({ start: NOW - 15 * 60_000, end: null });
-    expect(routineSegmentsForDay([running], dayOf('2026-01-16'), NOW)).toEqual([
-      { routine: running, start: NOW - 15 * 60_000, end: NOW, running: true, endsHere: false },
+    expect(routineSegmentsForDay([running], NONE, dayOf('2026-01-16'), NOW)).toEqual([
+      {
+        routine: running,
+        phase: 'routine',
+        start: NOW - 15 * 60_000,
+        end: NOW,
+        running: true,
+        endsHere: false,
+      },
     ]);
+  });
+
+  it('carries the settling on from the crib to the moment the night began', () => {
+    const entries = [night(at(15, 19, 45), at(16, 6, 30))];
+    const asleep = asleepByNight(days(entries));
+    const segments = routineSegmentsForDay([routine()], asleep, dayOf(NIGHT, entries), NOW);
+    expect(segments.map((s) => [s.phase, s.start, s.end, s.running, s.endsHere])).toEqual([
+      ['routine', at(15, 19, 0), at(15, 19, 25), false, true],
+      ['settle', at(15, 19, 25), at(15, 19, 45), false, false],
+    ]);
+  });
+
+  it('runs the settling to now while nobody has fallen asleep yet', () => {
+    // In the crib twenty minutes ago, and tonight's night entry has not been tapped.
+    const tonight = routine({
+      id: '2026-01-16',
+      night: '2026-01-16',
+      start: NOW - 45 * 60_000,
+      end: NOW - 20 * 60_000,
+    });
+    const [, settling] = routineSegmentsForDay([tonight], NONE, dayOf('2026-01-16'), NOW);
+    expect(settling).toMatchObject({
+      phase: 'settle',
+      start: NOW - 20 * 60_000,
+      end: NOW,
+      running: true,
+    });
+  });
+
+  it('draws no settling where the figure would be excluded', () => {
+    const day = dayOf(NIGHT);
+    const phases = (records: RoutineRecord[], asleep: Map<string, number>) =>
+      routineSegmentsForDay(records, asleep, day, NOW).map((s) => s.phase);
+
+    // He was already asleep when the crib was logged: a mis-log, not a settling of zero.
+    const backwards = [night(at(15, 19, 0), at(16, 6, 0))];
+    expect(phases([routine()], asleepByNight(days(backwards)))).toEqual(['routine']);
+
+    // A night that never got logged, an evening old: the four-hour ceiling stops the band smearing.
+    expect(phases([routine()], NONE)).toEqual(['routine']);
+
+    // Past the ceiling in the other direction — asleep six hours after the crib.
+    const late = [night(at(16, 1, 30), at(16, 6, 0))];
+    expect(phases([routine()], asleepByNight(days(late)))).toEqual(['routine']);
   });
 
   it('leaves out what no figure counts: a tombstone, a stale timer, an impossible length', () => {
     const day = dayOf(NIGHT);
-    expect(routineSegmentsForDay([routine({ deleted: true })], day, NOW)).toEqual([]);
+    expect(routineSegmentsForDay([routine({ deleted: true })], NONE, day, NOW)).toEqual([]);
     // Started yesterday evening and never closed: the forgotten-timer case.
-    expect(routineSegmentsForDay([routine({ end: null })], day, NOW)).toEqual([]);
+    expect(routineSegmentsForDay([routine({ end: null })], NONE, day, NOW)).toEqual([]);
     expect(
-      routineSegmentsForDay([routine({ end: at(15, 19, 0) + MAX_ROUTINE_MS + 60_000 })], day, NOW)
+      routineSegmentsForDay(
+        [routine({ end: at(15, 19, 0) + MAX_ROUTINE_MS + 60_000 })],
+        NONE,
+        day,
+        NOW
+      )
     ).toEqual([]);
   });
 });
