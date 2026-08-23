@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { getApp } from 'firebase/app';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { describeError, log } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useWebPush } from '../../hooks/useWebPush';
 import { pullNotices, pullSourceHealth } from '../../utils/events/browser/cloud';
@@ -40,17 +41,44 @@ function AlertsPanel({ lang }: Props) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [sources, setSources] = useState<SourceHealth[]>([]);
   const [test, setTest] = useState<'idle' | 'sending' | 'sent' | string>('idle');
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.user) return;
+    const uid = auth.user?.uid;
+    if (!uid) return;
+    let cancelled = false;
+
+    /*
+     * Two independent reads, settled independently.
+     *
+     * They were a `Promise.all` behind an empty `catch`, which is the same shape of mistake the
+     * feed had: either half failing lost both, and the swallowed rejection meant the screen said
+     * "has not run yet" — a sentence about the collector — when the truth was that a query had
+     * failed. A panel whose whole job is telling you what is broken must not be the quietest thing
+     * on the page.
+     */
     void (async () => {
-      const [n, s] = await Promise.all([pullNotices(auth.user!.uid), pullSourceHealth()]);
-      setNotices(n);
-      setSources(s);
-    })().catch(() => {
-      // The history and the source table are both nice-to-have; a failure here must not take the
-      // arming UI down with it, which is the part somebody came to this screen to use.
-    });
+      const [noticesResult, sourcesResult] = await Promise.allSettled([
+        pullNotices(uid),
+        pullSourceHealth(),
+      ]);
+      if (cancelled) return;
+
+      if (noticesResult.status === 'fulfilled') setNotices(noticesResult.value);
+      else log.warn('events.notices.pull.failed', describeError(noticesResult.reason));
+
+      if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value);
+      else log.warn('events.sources.pull.failed', describeError(sourcesResult.reason));
+
+      const failed = [noticesResult, sourcesResult].find((r) => r.status === 'rejected');
+      setPanelError(
+        failed ? String(describeError((failed as PromiseRejectedResult).reason).message ?? 'load failed') : null,
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [auth.user]);
 
   const sendTest = async () => {
@@ -123,6 +151,11 @@ function AlertsPanel({ lang }: Props) {
 
       <section className="ev-section">
         <h3 className="ev-subhead">{t.sourcesHeading}</h3>
+        {panelError ? (
+          <p className="ev-error" role="alert">
+            {panelError}
+          </p>
+        ) : null}
         {sources.length === 0 ? (
           <p className="ev-hint">{t.sourceNever}</p>
         ) : (

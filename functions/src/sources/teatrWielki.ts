@@ -56,7 +56,7 @@ const BLOCK = /<li class="page">([\s\S]*?)<\/li>/g;
  * Exported and pure so `teatrWielki.test.ts` can run it against a committed fixture. When the
  * theatre redesigns — and it will — that test is what turns a silent empty feed into a red build.
  */
-export function parseSeasonPage(html: string, season: string): RawEvent[] {
+export function parseSeasonPage(html: string): RawEvent[] {
   const out: RawEvent[] = [];
 
   for (const match of html.matchAll(BLOCK)) {
@@ -66,6 +66,19 @@ export function parseSeasonPage(html: string, season: string): RawEvent[] {
     // Inner tags: COPP<span>É</span>LIA.
     const title = stripTags(/<h2[^>]*>([\s\S]*?)<\/h2>/.exec(block)?.[1] ?? '');
     if (!href || !title) continue;
+
+    /*
+     * A production, and not one of the education tiles the season page also carries.
+     *
+     * Two of the sixty-four blocks link outside /kalendarium/ — "PRÓBY OTWARTE" (open rehearsals)
+     * and "WYCIECZKI PO TEATRZE" (guided tours). They are things the house does, not things it has
+     * programmed, and they were previously kept with a key synthesised from the season page's own
+     * URL: `teatr-wielki_https-teatrwielki-pl-repertuar-sezon-2026-27-WYCIECZKI-PO-TEATRZE`. That
+     * is stable enough not to re-announce, and still wrong — the slug is the theatre's own
+     * identifier for a production, so its absence is the signal that this is not one.
+     */
+    const slug = slugOf(href);
+    if (!slug) continue;
 
     const paragraphs = [...block.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)]
       .map((p) => stripTags(p[1]))
@@ -82,7 +95,7 @@ export function parseSeasonPage(html: string, season: string): RawEvent[] {
     out.push({
       // The slug is the id. It survives a redesign of everything around it, and it is what the
       // theatre itself uses to identify the production.
-      sourceKey: slugOf(href) ?? `${season}/${title}`,
+      sourceKey: slug,
       title,
       subtitle: composer,
       url: href.startsWith('http') ? href : `${HOST}${href}`,
@@ -144,7 +157,7 @@ export const teatrWielki: EventSource = {
         continue;
       }
       reached += 1;
-      out.push(...parseSeasonPage(html, url));
+      out.push(...parseSeasonPage(html));
     }
 
     // Every page unreachable is different from "the current season has nothing on", and only the

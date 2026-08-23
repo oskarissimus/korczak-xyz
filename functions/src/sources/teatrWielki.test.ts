@@ -10,7 +10,7 @@ import { parseSeasonPage, seasonPaths, slugOf, tagsFor } from './teatrWielki';
  * a green light at the end, instead of an afternoon wondering why no opera has been announced.
  */
 const html = readFileSync(new URL('./fixtures/teatr-wielki-season.html', import.meta.url), 'utf8');
-const events = parseSeasonPage(html, '2026-2027');
+const events = parseSeasonPage(html);
 
 describe('parseSeasonPage', () => {
   it('finds the productions', () => {
@@ -40,6 +40,24 @@ describe('parseSeasonPage', () => {
     expect(events.find((e) => e.title === 'SALOME')!.sourceKey).toBe('2026-2027/salome');
   });
 
+  it('skips the education tiles, which are not repertoire', () => {
+    /*
+     * Two of the season page's blocks link outside /kalendarium/ — open rehearsals and guided
+     * tours. They are things the house does rather than things it has programmed, and they used
+     * to be kept under a key synthesised from the season page's own URL.
+     */
+    const titles = events.map((e) => e.title);
+    expect(titles).not.toContain('WYCIECZKI PO TEATRZE');
+    expect(titles).not.toContain('PRÓBY OTWARTE');
+  });
+
+  it('keys every event on the production slug, never on the page URL', () => {
+    for (const event of events) {
+      expect(event.sourceKey).toMatch(/^\d{4}-\d{4}\//);
+      expect(event.sourceKey).not.toContain('http');
+    }
+  });
+
   it('tags operas so the keyword-less Opera Narodowa interest can match them', () => {
     // That interest has NO keywords — the tag is the entire reason it works.
     const salome = events.find((e) => e.title === 'SALOME')!;
@@ -54,12 +72,12 @@ describe('parseSeasonPage', () => {
   it('returns nothing rather than garbage for mangled markup', () => {
     // A redesign should produce an empty source (which the health table reports), never rows made
     // of navigation chrome.
-    expect(parseSeasonPage('<div>completely different</div>', 'x')).toEqual([]);
-    expect(parseSeasonPage('', 'x')).toEqual([]);
+    expect(parseSeasonPage('<div>completely different</div>')).toEqual([]);
+    expect(parseSeasonPage('')).toEqual([]);
   });
 
   it('skips a block with no title or no link', () => {
-    expect(parseSeasonPage('<li class="page"><div class="teaser"></div></li>', 'x')).toEqual([]);
+    expect(parseSeasonPage('<li class="page"><div class="teaser"></div></li>')).toEqual([]);
   });
 });
 
