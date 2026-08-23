@@ -38,7 +38,29 @@ set up and how to redo it, not as a to-do list.
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
 | Artifact cleanup | images older than 3 days deleted, so old containers do not accumulate a bill |
+| Firestore indexes | `firestore.indexes.json`, deployed — the undated-events query needs a composite |
 | CI deploy | `.github/workflows/firebase-deploy.yml`, keyless via Workload Identity Federation |
+| Verified | VAPID pair derives correctly; all three copies of the public key agree; `sendTestPush` reachable (`allUsers` → `run.invoker`) and returning its own auth error; collector idempotent (`created: 0` on a second run) |
+
+### The VAPID pair
+
+`.secrets/vapid.json` (gitignored) holds both halves. Keep it: **the public key can never change.**
+Rotating it invalidates every push subscription on every device, silently — each one keeps its
+endpoint, the sender keeps getting 403, and 403 is deliberately not a code that prunes a
+subscription, so nothing self-heals and nothing says why.
+
+Three copies must agree, and it is worth re-checking after touching any of them:
+
+```sh
+node -e "
+const c=require('crypto'),k=require('./.secrets/vapid.json');
+const u=b=>b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const d=s=>Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4),'base64');
+const e=c.createECDH('prime256v1'); e.setPrivateKey(d(k.privateKey));
+console.log(u(e.getPublicKey())===k.publicKey ? 'pair OK' : 'PAIR MISMATCH');"
+firebase functions:secrets:access VAPID_PUBLIC_KEY
+netlify env:get PUBLIC_VAPID_PUBLIC_KEY --context production
+```
 
 ### The Ticketmaster sentinel
 
