@@ -10,8 +10,9 @@
 import { dayKeyAt, dayKeyOf, dayStart, durationOf } from '../../utils/babySleep/days';
 import { authorLabel, formatHm } from '../../utils/babySleep/format';
 import type { RoutineRecord } from '../../utils/babySleep/routine';
+import { asleepFor, settleMs } from '../../utils/babySleep/routineStats';
 import { canSplit } from '../../utils/babySleep/split';
-import type { SleepEntry } from '../../utils/babySleep/types';
+import type { SleepEntry, SleepKind } from '../../utils/babySleep/types';
 import { isPlausible } from '../../utils/babySleep/types';
 import { fill, plural, type Translation } from './translations';
 
@@ -35,12 +36,13 @@ interface EntryListProps {
   onSplit: (entry: SleepEntry) => void;
   onDelete: (entry: SleepEntry) => void;
   /**
-   * The bedtime routines by night key. A routine belongs to the night, not to any one entry — a
-   * broken night is several rows and still one routine — so it is drawn once per day group rather
-   * than on a row.
+   * The routines by sleep-day, night first then the naps in order. A routine belongs to the sleep it
+   * leads into, not to any one entry — a broken night is several rows and still one routine — so
+   * they are drawn as their own rows under the day heading rather than on an entry's row.
    */
-  routines: Map<string, RoutineRecord>;
-  onRoutine: (night: string) => void;
+  routines: Map<string, RoutineRecord[]>;
+  onEditRoutine: (routine: RoutineRecord) => void;
+  onAddRoutine: (day: string, kind: SleepKind) => void;
   t: Translation;
 }
 
@@ -48,16 +50,6 @@ interface Group {
   key: string;
   at: number;
   entries: SleepEntry[];
-}
-
-/** When the night attributed to a day began — its earliest block. Null on a day of naps only. */
-function firstNightStart(entries: SleepEntry[]): number | null {
-  let first: number | null = null;
-  for (const entry of entries) {
-    if (entry.kind !== 'night') continue;
-    if (first == null || entry.start < first) first = entry.start;
-  }
-  return first;
 }
 
 function groupEntries(entries: SleepEntry[]): Group[] {
@@ -71,6 +63,60 @@ function groupEntries(entries: SleepEntry[]): Group[] {
   return [...groups.values()].sort((a, b) => b.at - a.at);
 }
 
+/**
+ * One routine's row under a day heading — the night's, or one nap's.
+ *
+ * `settle` comes from `settleMs`, the same rule the chart and the tiles use, so this row cannot go
+ * on reporting a gap the figures have already excluded: it used to compute its own and forgot
+ * `MAX_SETTLE_MS`.
+ */
+function RoutineRow({
+  routine,
+  label,
+  settle,
+  formatTime,
+  onEdit,
+  onAdd,
+  addLabel,
+  t,
+}: {
+  routine: RoutineRecord | undefined;
+  label: string;
+  settle: number | null;
+  formatTime: (t: number) => string;
+  onEdit: () => void;
+  onAdd: () => void;
+  addLabel: string;
+  t: Translation;
+}) {
+  return (
+    <p className="bs-routine-row">
+      <span className="bs-routine-label">{label}</span>
+      <span className="bs-routine-value">
+        {routine ? (
+          <>
+            {formatTime(routine.start)}
+            {' – '}
+            {routine.end == null ? (
+              <em className="bs-entry-running">{t.running}</em>
+            ) : (
+              formatTime(routine.end)
+            )}
+            {settle != null && (
+              <> {' · '}{fill(t.routineAsleepAfter, { duration: formatHm(settle) })}</>
+            )}
+          </>
+        ) : (
+          <span className="bs-routine-none">{t.routineNone}</span>
+        )}
+      </span>
+      <button type="button" className="bs-link" onClick={routine ? onEdit : onAdd}>
+        {routine ? t.edit : addLabel}
+      </button>
+    </p>
+  );
+}
+
 export default function EntryList({
   entries,
   now,
@@ -81,7 +127,8 @@ export default function EntryList({
   onSplit,
   onDelete,
   routines,
-  onRoutine,
+  onEditRoutine,
+  onAddRoutine,
   t,
 }: EntryListProps) {
   const viewerKey = viewer?.toLowerCase() ?? null;
@@ -105,14 +152,15 @@ export default function EntryList({
         const total = group.entries.reduce((sum, e) => sum + (durationOf(e) ?? 0), 0);
         const label =
           group.key === today ? t.today : group.key === yesterday ? t.yesterday : formatDay(group.at);
-        const routine = routines.get(group.key);
-        // The settling is measured from the *first* block of the night: a waking at three in the
-        // morning starts a second entry, and the routine has nothing to do with it.
-        const asleepAt = firstNightStart(group.entries);
-        const settle =
-          routine && routine.end != null && asleepAt != null && asleepAt >= routine.end
-            ? asleepAt - routine.end
-            : null;
+        /* One row for the night's routine and one for each nap's — a day holds several now. The
+           settling of each is `asleepFor`'s join, so the row agrees with the chart by construction:
+           the night's is measured from the *first* block, because a waking at three in the morning
+           starts a second entry the routine had nothing to do with, and a nap's from the next nap
+           after the crib. */
+        const dayRoutines = routines.get(group.key) ?? [];
+        const nightRoutine = dayRoutines.find((r) => r.kind === 'night');
+        const napRoutines = dayRoutines.filter((r) => r.kind === 'nap');
+        const settleOf = (routine: RoutineRecord) => settleMs(routine, asleepFor(routine, entries));
 
         return (
           <div className="bs-day" key={group.key}>
@@ -124,28 +172,38 @@ export default function EntryList({
                 {fill(t.dayTotal, { total: formatHm(total) })}
               </span>
             </h3>
-            <p className="bs-routine-row">
-              <span className="bs-routine-label">{t.routineEdit}</span>
-              <span className="bs-routine-value">
-                {routine ? (
-                  <>
-                    {formatTime(routine.start)}
-                    {' – '}
-                    {routine.end == null ? (
-                      <em className="bs-entry-running">{t.running}</em>
-                    ) : (
-                      formatTime(routine.end)
-                    )}
-                    {settle != null && (
-                      <> {' · '}{fill(t.routineAsleepAfter, { duration: formatHm(settle) })}</>
-                    )}
-                  </>
-                ) : (
-                  <span className="bs-routine-none">{t.routineNone}</span>
-                )}
-              </span>
-              <button type="button" className="bs-link" onClick={() => onRoutine(group.key)}>
-                {routine ? t.edit : t.routineAdd}
+            <RoutineRow
+              routine={nightRoutine}
+              label={t.routineEdit}
+              settle={nightRoutine ? settleOf(nightRoutine) : null}
+              formatTime={formatTime}
+              onEdit={() => nightRoutine && onEditRoutine(nightRoutine)}
+              onAdd={() => onAddRoutine(group.key, 'night')}
+              addLabel={t.routineAdd}
+              t={t}
+            />
+            {napRoutines.map((routine) => (
+              <RoutineRow
+                key={routine.id}
+                routine={routine}
+                label={t.routineNapEdit}
+                settle={settleOf(routine)}
+                formatTime={formatTime}
+                onEdit={() => onEditRoutine(routine)}
+                onAdd={() => onAddRoutine(group.key, 'nap')}
+                addLabel={t.routineNapAdd}
+                t={t}
+              />
+            ))}
+            {/* The way in for one more. Its own row rather than a second button on the night's:
+                which routine an `Add` belongs to has to be readable at a glance. */}
+            <p className="bs-routine-row bs-routine-row--add">
+              <button
+                type="button"
+                className="bs-link"
+                onClick={() => onAddRoutine(group.key, 'nap')}
+              >
+                {t.routineNapAdd}
               </button>
             </p>
             <ul className="bs-entries">

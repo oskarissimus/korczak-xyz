@@ -5,6 +5,8 @@ import {
   MAX_ROUTINE_MS,
   isStaleRoutine,
   normalizeRoutine,
+  parseRoutineId,
+  routineKey,
   routineLength,
   routineNightKey,
   setRoutine,
@@ -18,11 +20,13 @@ const NIGHT = '2026-01-15';
 const T0 = new Date(2026, 0, 15, 19, 0, 0, 0).getTime();
 const CRIB = new Date(2026, 0, 15, 19, 25, 0, 0).getTime();
 const NOW = new Date(2026, 0, 15, 20, 0, 0, 0).getTime();
+const NIGHT_KEY = { id: NIGHT, night: NIGHT, kind: 'night' } as const;
 
 function routine(overrides: Partial<RoutineRecord> = {}): RoutineRecord {
   return {
     id: NIGHT,
     night: NIGHT,
+    kind: 'night',
     start: T0,
     end: CRIB,
     rev: 0,
@@ -55,6 +59,66 @@ describe('routineNightKey', () => {
 
   it('is back on today once the cutoff has passed', () => {
     expect(routineNightKey(new Date(2026, 0, 16, 7, 0, 0, 0).getTime())).toBe('2026-01-16');
+  });
+});
+
+describe('routineKey', () => {
+  it('mints the bare night key for a night, unchanged since routines were night-only', () => {
+    expect(routineKey('night', T0)).toEqual({ id: NIGHT, night: NIGHT, kind: 'night' });
+  });
+
+  it('mints a nap id carrying the day and the hh:mm it started', () => {
+    const noon = new Date(2026, 0, 15, 12, 30, 0, 0).getTime();
+    expect(routineKey('nap', noon)).toEqual({
+      id: '2026-01-15-nap-1230',
+      night: NIGHT,
+      kind: 'nap',
+    });
+  });
+
+  it('pads the time, so an id is one length and sorts by it', () => {
+    expect(routineKey('nap', new Date(2026, 0, 15, 9, 5, 0, 0).getTime()).id).toBe(
+      '2026-01-15-nap-0905'
+    );
+  });
+
+  it('applies the 06:00 cutoff to a night and never to a nap', () => {
+    // The cutoff is nights only — shifting a nap back six hours would file a 9am one under
+    // yesterday, and the morning nap is the commonest kind.
+    const small = new Date(2026, 0, 16, 5, 0, 0, 0).getTime();
+    expect(routineKey('night', small).night).toBe(NIGHT);
+    expect(routineKey('nap', small).night).toBe('2026-01-16');
+  });
+
+  it('gives two taps in the same minute the same id, and two a minute apart two', () => {
+    // The convergence the derived id exists for, and the duplicate that is its accepted cost.
+    const at = (h: number, m: number, sec: number) =>
+      routineKey('nap', new Date(2026, 0, 15, h, m, sec, 0).getTime()).id;
+    expect(at(12, 30, 5)).toBe(at(12, 30, 55));
+    expect(at(12, 30, 5)).not.toBe(at(12, 31, 5));
+  });
+});
+
+describe('parseRoutineId', () => {
+  it('round-trips both grammars', () => {
+    for (const key of [routineKey('night', T0), routineKey('nap', T0)]) {
+      expect(parseRoutineId(key.id)).toEqual(key);
+    }
+  });
+
+  it('refuses an id this app could never have minted', () => {
+    for (const id of [
+      '2026-01-15-nap-2500', // no such hour
+      '2026-01-15-nap-1260', // no such minute
+      '2026-01-15-nap-930', // unpadded, so not what `routineKey` writes
+      '2026-01-15-nap',
+      '2026-01-15-nap-1230-1',
+      '2026-01-15-eve', // a climate id, which is a different collection
+      'nope',
+      '',
+    ]) {
+      expect(parseRoutineId(id)).toBeNull();
+    }
   });
 });
 
@@ -107,13 +171,13 @@ describe('isStaleRoutine / routineLength', () => {
 
 describe('setRoutine', () => {
   it('starts a new record at rev 0 and keeps the author', () => {
-    const first = setRoutine(NIGHT, { start: T0, end: null }, T0, undefined, 'a@b.c');
+    const first = setRoutine(NIGHT_KEY, { start: T0, end: null }, T0, undefined, 'a@b.c');
     expect(first).toMatchObject({ id: NIGHT, night: NIGHT, rev: 0, authorEmail: 'a@b.c' });
   });
 
   it('advances rev on an edit and leaves the author alone', () => {
-    const first = setRoutine(NIGHT, { start: T0, end: null }, T0, undefined, 'a@b.c');
-    const second = setRoutine(NIGHT, { start: T0, end: CRIB }, CRIB, first, 'other@b.c');
+    const first = setRoutine(NIGHT_KEY, { start: T0, end: null }, T0, undefined, 'a@b.c');
+    const second = setRoutine(NIGHT_KEY, { start: T0, end: CRIB }, CRIB, first, 'other@b.c');
     expect(second.rev).toBe(1);
     expect(second.end).toBe(CRIB);
     expect(second.authorEmail).toBe('a@b.c');
@@ -121,7 +185,7 @@ describe('setRoutine', () => {
 
   it('revives a tombstone rather than carrying the flag forward', () => {
     const gone = tombstoneRoutine(routine(), NOW);
-    const back = setRoutine(NIGHT, { start: T0, end: CRIB }, NOW, gone);
+    const back = setRoutine(NIGHT_KEY, { start: T0, end: CRIB }, NOW, gone);
     expect(back.deleted).toBeUndefined();
     expect('deleted' in back).toBe(false);
     expect(back.rev).toBe(gone.rev + 1);
@@ -133,10 +197,20 @@ describe('normalizeRoutine', () => {
     expect(normalizeRoutine(routine())).toEqual(routine());
   });
 
-  it('rejects an id that is not a night key', () => {
+  it('rejects an id it could never have minted', () => {
     expect(normalizeRoutine({ ...routine(), id: '2026-01-15-eve' })).toBeNull();
     expect(normalizeRoutine({ ...routine(), id: 'nope' })).toBeNull();
     expect(normalizeRoutine({ ...routine(), id: '' })).toBeNull();
+  });
+
+  it('reads a nap id back into its day and its kind', () => {
+    const nap = normalizeRoutine({ ...routine(), id: '2026-01-15-nap-1230' });
+    expect(nap).toMatchObject({ id: '2026-01-15-nap-1230', night: NIGHT, kind: 'nap' });
+  });
+
+  it('takes the id as the truth when `kind` disagrees with it', () => {
+    // A stray document claiming to be a nap under a bare night key is a night routine.
+    expect(normalizeRoutine({ ...routine(), kind: 'nap' })?.kind).toBe('night');
   });
 
   it('takes the id as the truth when `night` disagrees with it', () => {

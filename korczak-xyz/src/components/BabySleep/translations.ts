@@ -24,11 +24,14 @@ export const translations = {
     wokeUp: 'Woke up',
     liveHint: 'Tap when the baby falls asleep.',
 
-    // Bedtime routine
-    routineStart: 'Routine started',
+    // The routine before a sleep
+    routineStartNight: 'Night routine',
+    routineStartNap: 'Nap routine',
     routineInCrib: 'In crib',
     routineRunning: 'Routine since {time}',
     routineSpan: 'Routine {from} – {to}',
+    routineNapRunning: 'Nap routine since {time}',
+    routineNapSpan: 'Nap routine {from} – {to}',
     routineWaiting: 'In crib since {time}',
     routineAsleepAfter: 'fell asleep after {duration}',
     routineClear: 'Clear',
@@ -37,11 +40,17 @@ export const translations = {
       'This looks like a routine nobody closed. Set the crib time below, or clear it — it is left out of every average until you do.',
     routineAdd: 'Add routine',
     routineEdit: 'Routine',
+    routineNapEdit: 'Nap routine',
+    routineNapAdd: 'Add nap routine',
     routineNone: 'No routine logged',
     routineFormTitle: 'Bedtime routine',
     routineFormOf: 'Night of {day}',
     routineFormHint:
       'One routine a night. The gap between the crib and falling asleep is what the stats call time to fall asleep.',
+    routineNapFormTitle: 'Nap routine',
+    routineNapFormOf: 'Nap on {day}',
+    routineNapFormHint:
+      'One routine per nap. It is joined to the next nap after the crib; nap routines are drawn on the timeline and left out of the tiles, which are about bedtime.',
     routineStartLabel: 'Routine started',
     routineEndLabel: 'In crib',
     routineOpen: 'Still in the routine',
@@ -282,11 +291,14 @@ export const translations = {
     wokeUp: 'Obudziło się',
     liveHint: 'Naciśnij, gdy dziecko zaśnie.',
 
-    // Bedtime routine
-    routineStart: 'Rytuał rozpoczęty',
+    // The routine before a sleep
+    routineStartNight: 'Rytuał na noc',
+    routineStartNap: 'Rytuał przed drzemką',
     routineInCrib: 'W łóżeczku',
     routineRunning: 'Rytuał od {time}',
     routineSpan: 'Rytuał {from} – {to}',
+    routineNapRunning: 'Rytuał przed drzemką od {time}',
+    routineNapSpan: 'Rytuał przed drzemką {from} – {to}',
     routineWaiting: 'W łóżeczku od {time}',
     routineAsleepAfter: 'zasnęło po {duration}',
     routineClear: 'Wyczyść',
@@ -295,11 +307,17 @@ export const translations = {
       'To wygląda na rytuał, którego nikt nie zamknął. Ustaw godzinę położenia do łóżeczka poniżej albo wyczyść wpis — do tego czasu nie liczy się do żadnej średniej.',
     routineAdd: 'Dodaj rytuał',
     routineEdit: 'Rytuał',
+    routineNapEdit: 'Rytuał przed drzemką',
+    routineNapAdd: 'Dodaj rytuał przed drzemką',
     routineNone: 'Brak rytuału',
     routineFormTitle: 'Rytuał przed snem',
     routineFormOf: 'Noc z {day}',
     routineFormHint:
       'Jeden rytuał na noc. Odstęp między położeniem do łóżeczka a zaśnięciem to w statystykach czas zasypiania.',
+    routineNapFormTitle: 'Rytuał przed drzemką',
+    routineNapFormOf: 'Drzemka dnia {day}',
+    routineNapFormHint:
+      'Jeden rytuał na drzemkę. Łączy się z pierwszą drzemką po położeniu do łóżeczka; rytuały przed drzemką rysujemy na osi czasu, ale nie liczą się do kafelków, które dotyczą wieczoru.',
     routineStartLabel: 'Początek rytuału',
     routineEndLabel: 'W łóżeczku',
     routineOpen: 'Rytuał wciąż trwa',

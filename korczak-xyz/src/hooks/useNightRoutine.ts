@@ -1,5 +1,5 @@
 /*
- * The bedtime routine records' state, and their cloud sync.
+ * The routine records' state, and their cloud sync.
  *
  * Structurally this is `useNightClimate` — refs beside a `publish` that writes the ref and calls
  * `setState` together, a single-flight `runSync`, localStorage as the always-available store with
@@ -16,8 +16,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
-import type { RoutineDraft, RoutineRecord } from '../utils/babySleep/routine';
-import { setRoutine, tombstoneRoutine } from '../utils/babySleep/routine';
+import type { RoutineDraft, RoutineKey, RoutineRecord } from '../utils/babySleep/routine';
+import { routineKey, setRoutine, tombstoneRoutine } from '../utils/babySleep/routine';
 import { pullRoutines, pushRoutine } from '../utils/babySleep/routineCloud';
 import {
   clearRoutineUnsynced,
@@ -29,10 +29,12 @@ import {
 import {
   applyLocalRoutines,
   mergeRoutines,
-  routinesByNight,
+  napRoutinesByDay,
+  nightRoutinesByDay,
+  routinesByDay,
 } from '../utils/babySleep/routineStats';
 import { adoptOwner } from '../utils/babySleep/storage';
-import type { SyncState } from '../utils/babySleep/types';
+import type { SleepKind, SyncState } from '../utils/babySleep/types';
 import type { AuthUser } from './useAuth';
 import type { DataOwner } from './useDataOwner';
 
@@ -40,13 +42,22 @@ export interface NightRoutineData {
   ready: boolean;
   /** Every stored record, tombstones included — the stats fold them, the UI must not see them. */
   records: RoutineRecord[];
-  /** The live routines by night key, which is what every screen actually looks up by. */
-  byNight: Map<string, RoutineRecord>;
+  /** The live night routines by night key. At most one a night, by construction. */
+  nightByDay: Map<string, RoutineRecord>;
+  /** The live nap routines by day, earliest first. One per nap. */
+  napsByDay: Map<string, RoutineRecord[]>;
+  /** Every live routine by day, night first — what the history rows draw. */
+  byDay: Map<string, RoutineRecord[]>;
   sync: SyncState;
-  /** Write, or correct, one night's routine. */
-  logRoutine: (night: string, draft: RoutineDraft) => void;
-  /** Tombstone it. A night with no routine record is simply a night nobody logged one for. */
-  clearRoutine: (night: string) => void;
+  /**
+   * Write a routine, or correct one.
+   *
+   * With a `key` it edits that record, so an id never moves under an edit; without one it mints the
+   * id from the draft's own `start`, which is the single path the live tap and the form both take.
+   */
+  logRoutine: (draft: RoutineDraft, kind: SleepKind, key?: RoutineKey) => void;
+  /** Tombstone it. An occasion with no routine record is simply one nobody logged a routine for. */
+  clearRoutine: (id: string) => void;
   retrySync: () => void;
 }
 
@@ -106,16 +117,17 @@ export function useNightRoutine(user: AuthUser | null, owner: DataOwner): NightR
   );
 
   const logRoutine = useCallback(
-    (night: string, draft: RoutineDraft) => {
-      const prev = recordsRef.current.find((r) => r.id === night);
-      commit([setRoutine(night, draft, Date.now(), prev, authorRef.current)]);
+    (draft: RoutineDraft, kind: SleepKind, key?: RoutineKey) => {
+      const target = key ?? routineKey(kind, draft.start);
+      const prev = recordsRef.current.find((r) => r.id === target.id);
+      commit([setRoutine(target, draft, Date.now(), prev, authorRef.current)]);
     },
     [commit]
   );
 
   const clearRoutine = useCallback(
-    (night: string) => {
-      const prev = recordsRef.current.find((r) => r.id === night);
+    (id: string) => {
+      const prev = recordsRef.current.find((r) => r.id === id);
       if (!prev || prev.deleted) return;
       commit([tombstoneRoutine(prev, Date.now())]);
     },
@@ -221,7 +233,19 @@ export function useNightRoutine(user: AuthUser | null, owner: DataOwner): NightR
 
   const retrySync = useCallback(() => void runSync(true), [runSync]);
 
-  const byNight = useMemo(() => routinesByNight(records), [records]);
+  const nightByDay = useMemo(() => nightRoutinesByDay(records), [records]);
+  const napsByDay = useMemo(() => napRoutinesByDay(records), [records]);
+  const byDay = useMemo(() => routinesByDay(records), [records]);
 
-  return { ready, records, byNight, sync, logRoutine, clearRoutine, retrySync };
+  return {
+    ready,
+    records,
+    nightByDay,
+    napsByDay,
+    byDay,
+    sync,
+    logRoutine,
+    clearRoutine,
+    retrySync,
+  };
 }

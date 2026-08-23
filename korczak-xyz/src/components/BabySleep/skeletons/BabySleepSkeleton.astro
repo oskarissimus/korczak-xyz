@@ -20,9 +20,14 @@ const t = translations[lang];
 
 <div class="bs-log" aria-hidden="true">
   {/* The no-routine state, for the skeleton's usual reason: whether one is running is in
-      localStorage, and this runs on the server. */}
+      localStorage, and this runs on the server. Both slots idle, which is the two buttons. */}
   <div class="bs-routine">
-    <span class="bs-routine-btn bs-skel">{t.routineStart}</span>
+    <div class="bs-routine-slot bs-routine-slot--idle">
+      <span class="bs-routine-btn bs-skel">{t.routineStartNight}</span>
+    </div>
+    <div class="bs-routine-slot bs-routine-slot--idle">
+      <span class="bs-routine-btn bs-skel">{t.routineStartNap}</span>
+    </div>
   </div>
 
   <div class="bs-live">

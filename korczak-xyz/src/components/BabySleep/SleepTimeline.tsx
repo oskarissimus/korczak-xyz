@@ -10,10 +10,12 @@
  * Both halves of a clipped night carry the *same* `<title>`, naming the whole block. The split is an
  * artefact of drawing on a 24-hour axis and must not read as two separate sleeps.
  *
- * The bedtime routine is drawn on the same rows as two slim bars half the row's height, meeting at
- * the crib: bath to crib solid, crib to asleep dimmed, and a tick where they meet. The second is the
- * settling time the tiles report, drawn rather than left as a gap because a gap is also what an
- * unlogged evening looks like — an empty stretch says nothing about whether anyone was sitting in
+ * A routine is drawn on the same rows as two slim bars half the row's height, meeting at the crib:
+ * bath to crib solid, crib to asleep dimmed, and a tick where they meet. Nap routines are drawn the
+ * same way and in the same orchid, with no legend entry of their own: each bar sits directly beside
+ * the teal nap it leads into, which is what says which it is, and a fourth colour would be spent on
+ * a distinction the row already makes. The second bar is the settling time the *night* tiles report,
+ * drawn rather than left as a gap because a gap is also what an unlogged evening looks like — an empty stretch says nothing about whether anyone was sitting in
  * the dark for it. Half height because a routine is not a sleep, and a bar of the same weight beside
  * the night would read as one. Drawn first, so where a mis-log overlaps a sleep the sleep is what
  * you see.
@@ -41,7 +43,7 @@ interface SleepTimelineProps {
   entries: SleepEntry[];
   /** Every routine record, live or not — `routineSegmentsForDay` decides which are drawable. */
   routines: RoutineRecord[];
-  /** When each night began, by night key: what ends the settling. See `asleepByNight`. */
+  /** When each routine's sleep began, by routine id: what ends the settling. See `asleepByRoutine`. */
   asleep: Map<string, number>;
   now: number;
   formatDay: (t: number) => string;

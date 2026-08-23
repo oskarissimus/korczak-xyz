@@ -138,15 +138,32 @@
 
 /* --- the bedtime routine -------------------------------------------------- */
 
-/* Its own strip above the live controls, because a routine is not a sleep: it is its own record
-   keyed by the night, and it neither starts nor ends an entry. */
+/* Its own strip above the live controls, because a routine is not a sleep: it is its own record,
+   and it neither starts nor ends an entry. Two slots, one per kind.
+
+   A row rather than a column, so two idle slots put their buttons side by side the way the two big
+   sleep buttons below them are. A slot with a line in it takes the whole row instead — the flex
+   basis is what says which, and it is on the slot rather than on the strip because the two slots
+   are rarely in the same state. */
 .bs-routine {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
   background: var(--retro-gray);
   border: 2px outset var(--retro-white);
+}
+
+.bs-routine-slot {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bs-routine-slot--idle {
+  flex: 0 1 auto;
 }
 
 .bs-routine-line {
@@ -189,8 +206,9 @@
   border-style: inset;
 }
 
-/* One row per day group in the history, above the entries — a routine belongs to the night, not to
-   any one block of it, so a broken night still shows exactly one. */
+/* Routine rows per day group in the history, above the entries — the night's, then one per nap. A
+   routine belongs to the sleep it leads into and not to any one block of it, so a broken night
+   still shows exactly one row. */
 .bs-routine-row {
   display: flex;
   flex-wrap: wrap;
@@ -212,6 +230,12 @@
 
 .bs-routine-none {
   color: var(--retro-dark-gray);
+}
+
+/* The row that is only a way in for one more nap routine: no label and no value, so the link sits
+   where the other rows' links do rather than at the left margin. */
+.bs-routine-row--add {
+  justify-content: flex-end;
 }
 
 /* --- the forgotten timer -------------------------------------------------- */

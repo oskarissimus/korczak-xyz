@@ -14,9 +14,11 @@ import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
 import { useNightRoutine } from '../../hooks/useNightRoutine';
 import { mergeSync } from '../../utils/flashcards/sync';
-import { dayKeyOf, dayStart } from '../../utils/babySleep/days';
-import { routineNightKey } from '../../utils/babySleep/routine';
-import type { EntryDraft, SleepEntry } from '../../utils/babySleep/types';
+import { dayKeyAt, dayStart } from '../../utils/babySleep/days';
+import type { RoutineKey, RoutineRecord } from '../../utils/babySleep/routine';
+import { routineKey, routineNightKey } from '../../utils/babySleep/routine';
+import { asleepFor } from '../../utils/babySleep/routineStats';
+import type { EntryDraft, SleepEntry, SleepKind } from '../../utils/babySleep/types';
 import EntryForm from './EntryForm';
 import EntryList from './EntryList';
 import LiveControls from './LiveControls';
@@ -33,15 +35,13 @@ interface BabySleepProps {
 /** How many days of history the log shows. The stats tab is where a longer view lives. */
 const HISTORY_DAYS = 14;
 
-/** When the night attributed to `night` began — its earliest block. Null if none has. */
-function firstNightStart(entries: SleepEntry[], night: string): number | null {
-  let first: number | null = null;
-  for (const entry of entries) {
-    if (entry.kind !== 'night' || dayKeyOf(entry) !== night) continue;
-    if (first == null || entry.start < first) first = entry.start;
-  }
-  return first;
-}
+/**
+ * Which routine the form is addressing: an existing record, or a new one for a day and a kind.
+ *
+ * A new one carries no id, because the id is minted from the start time the form has not been given
+ * yet. `logRoutine` does that minting, in the one place the live tap uses too.
+ */
+type RoutineTarget = { day: string; kind: SleepKind; key?: RoutineKey };
 
 export default function BabySleep({ lang }: BabySleepProps) {
   const t = translations[lang];
@@ -56,8 +56,8 @@ export default function BabySleep({ lang }: BabySleepProps) {
    * in two is two answers to the same question.
    */
   const [splittingId, setSplittingId] = useState<string | null>(null);
-  /** Which night's routine is being edited. The third occupant of the one form slot. */
-  const [routineNight, setRoutineNight] = useState<string | null>(null);
+  /** Which routine is being edited or added. The third occupant of the one form slot. */
+  const [routineTarget, setRoutineTarget] = useState<RoutineTarget | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   const locale = localeOf(lang);
@@ -80,6 +80,10 @@ export default function BabySleep({ lang }: BabySleepProps) {
     [data.entries, cutoff]
   );
 
+  /** When the sleep a routine led into began — one rule for both kinds, from `routineStats`. */
+  const asleepAtOf = (routine: RoutineRecord | null) =>
+    routine ? asleepFor(routine, data.entries) : null;
+
   const editing = editingId ? data.entries.find((e) => e.id === editingId) : undefined;
   /*
    * Looked up on every render rather than held in state, so the form is following the live entry. It
@@ -87,27 +91,37 @@ export default function BabySleep({ lang }: BabySleepProps) {
    * leaving it addressing a sleep that no longer has those times.
    */
   const splitting = splittingId ? data.entries.find((e) => e.id === splittingId) : undefined;
+  /*
+   * Looked up live for the same reason: a routine cleared on the other parent's phone must not leave
+   * the form addressing a record that is gone. A target with no key is a new routine and has none.
+   */
+  const editingRoutine = routineTarget?.key
+    ? routines.records.find((r) => r.id === routineTarget.key?.id && !r.deleted)
+    : undefined;
 
   const beginEdit = (entry: SleepEntry) => {
     setSplittingId(null);
-    setRoutineNight(null);
+    setRoutineTarget(null);
     setEditingId(entry.id);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
   const beginSplit = (entry: SleepEntry) => {
     setEditingId(null);
-    setRoutineNight(null);
+    setRoutineTarget(null);
     setSplittingId(entry.id);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
-  const beginRoutine = (night: string) => {
+  const beginRoutine = (target: RoutineTarget) => {
     setEditingId(null);
     setSplittingId(null);
-    setRoutineNight(night);
+    setRoutineTarget(target);
     formRef.current?.scrollIntoView({ block: 'nearest' });
   };
+
+  const editRoutine = (routine: RoutineRecord) =>
+    beginRoutine({ day: routine.night, kind: routine.kind, key: routine });
 
   const submit = (draft: EntryDraft) => {
     if (editing) {
@@ -121,12 +135,35 @@ export default function BabySleep({ lang }: BabySleepProps) {
   if (!data.ready || !routines.ready) return <div className="bs-loading" />;
 
   /*
-   * The routine the live strip is about, and the night it leads into. `routineNightKey` is
-   * `sleepDayKey(_, 'night')`, the same rule the entries are filed by, so the two agree across the
-   * 06:00 cutoff without either being told about the other.
+   * The two routines the live strip is about.
+   *
+   * The night's is `routineNightKey(now)` — `sleepDayKey(_, 'night')`, the same rule the entries are
+   * filed by, so the two agree across the 06:00 cutoff without either being told about the other,
+   * and the line is gone by breakfast.
+   *
+   * The nap's is the *latest* of today's, shown until the calendar day ends. Same argument: the last
+   * reading is the one worth looking at, and the `Nap routine` button sits beside it for the next
+   * one. A nap never crosses the 06:00 cutoff, so its day is the plain calendar one.
    */
   const tonight = routineNightKey(now);
-  const tonightRoutine = routines.byNight.get(tonight) ?? null;
+  const nightRoutine = routines.nightByDay.get(tonight) ?? null;
+  const todaysNaps = routines.napsByDay.get(dayKeyAt(now)) ?? [];
+  const napRoutine = todaysNaps.length > 0 ? todaysNaps[todaysNaps.length - 1] : null;
+
+  const slots = [
+    {
+      kind: 'night' as const,
+      routine: nightRoutine,
+      asleepAt: asleepAtOf(nightRoutine),
+      canRestart: false,
+    },
+    {
+      kind: 'nap' as const,
+      routine: napRoutine,
+      asleepAt: asleepAtOf(napRoutine),
+      canRestart: true,
+    },
+  ];
 
   /*
    * One badge over two syncs, and one rule that matters: a half that failed is never reported as
@@ -142,19 +179,17 @@ export default function BabySleep({ lang }: BabySleepProps) {
   return (
     <div className="bs-log">
       <RoutineLive
-        routine={tonightRoutine}
-        asleepAt={firstNightStart(data.entries, tonight)}
+        slots={slots}
         formatTime={formatTime}
-        onStart={() => routines.logRoutine(tonight, { start: Date.now(), end: null })}
-        onInCrib={() =>
-          tonightRoutine &&
-          routines.logRoutine(tonight, { start: tonightRoutine.start, end: Date.now() })
+        onStart={(kind) => routines.logRoutine({ start: Date.now(), end: null }, kind)}
+        onInCrib={(routine) =>
+          routines.logRoutine({ start: routine.start, end: Date.now() }, routine.kind, routine)
         }
-        onClear={() => {
-          if (routineNight === tonight) setRoutineNight(null);
-          routines.clearRoutine(tonight);
+        onClear={(routine) => {
+          if (routineTarget?.key?.id === routine.id) setRoutineTarget(null);
+          routines.clearRoutine(routine.id);
         }}
-        onFixStale={() => beginRoutine(tonight)}
+        onFixStale={editRoutine}
         t={t}
       />
 
@@ -180,21 +215,22 @@ export default function BabySleep({ lang }: BabySleepProps) {
       )}
 
       <div ref={formRef}>
-        {routineNight ? (
+        {routineTarget ? (
           <RoutineForm
-            night={routineNight}
-            routine={routines.byNight.get(routineNight)}
-            asleepAt={firstNightStart(data.entries, routineNight)}
-            dayLabel={formatDay(dayStart(routineNight))}
+            day={routineTarget.day}
+            kind={routineTarget.kind}
+            routine={editingRoutine}
+            asleepAt={asleepAtOf(editingRoutine ?? null)}
+            dayLabel={formatDay(dayStart(routineTarget.day))}
             onSubmit={(draft) => {
-              routines.logRoutine(routineNight, draft);
-              setRoutineNight(null);
+              routines.logRoutine(draft, routineTarget.kind, routineTarget.key);
+              setRoutineTarget(null);
             }}
             onRemove={() => {
-              routines.clearRoutine(routineNight);
-              setRoutineNight(null);
+              if (routineTarget.key) routines.clearRoutine(routineTarget.key.id);
+              setRoutineTarget(null);
             }}
-            onCancel={() => setRoutineNight(null)}
+            onCancel={() => setRoutineTarget(null)}
             t={t}
           />
         ) : splitting ? (
@@ -232,8 +268,9 @@ export default function BabySleep({ lang }: BabySleepProps) {
           if (entry.id === splittingId) setSplittingId(null);
           data.removeEntry(entry.id);
         }}
-        routines={routines.byNight}
-        onRoutine={beginRoutine}
+        routines={routines.byDay}
+        onEditRoutine={editRoutine}
+        onAddRoutine={(day, kind) => beginRoutine({ day, kind })}
         t={t}
       />
 

@@ -1,5 +1,5 @@
 /*
- * Reading the routines back against the nights they led into.
+ * Reading the routines back against the sleeps they led into.
  *
  * Three figures come out of it, and they are three different questions:
  *
@@ -22,10 +22,15 @@
  * Nothing here reads the clock, and nothing is silently clamped: an impossible settling — a routine
  * logged as ending after he was already asleep — is excluded rather than pinned to zero, because a
  * fabricated zero is worse than a gap.
+ *
+ * **The three figures stay night-only.** A nap routine is logged, synced and drawn on the timeline,
+ * and contributes to no tile and no chart: "does bedtime drift later" is a question about bedtime,
+ * and pooling a twelve-minute nap settling with a forty-minute evening one would answer neither. So
+ * the point extractors read `nightRoutinesByDay` rather than every routine of the day.
  */
 
 import { circularStat, linearStat } from './circular';
-import { clipSegment } from './days';
+import { clipSegment, dayKeyOf } from './days';
 import type { RoutineRecord } from './routine';
 import {
   MAX_SETTLE_MS,
@@ -73,11 +78,57 @@ export function visibleRoutines(records: RoutineRecord[]): RoutineRecord[] {
   return records.filter((r) => !r.deleted).sort(byNightDesc);
 }
 
-/** The live routines by night key — what the list, the live strip and an edit all look up by. */
-export function routinesByNight(records: RoutineRecord[]): Map<string, RoutineRecord> {
+/**
+ * The live *night* routines by night key — what the point extractors and the night slot look up by.
+ *
+ * There is at most one, by construction: a night routine's id *is* its night key, so a second one
+ * for the same evening is the same document.
+ */
+export function nightRoutinesByDay(records: RoutineRecord[]): Map<string, RoutineRecord> {
   const byNight = new Map<string, RoutineRecord>();
-  for (const record of visibleRoutines(records)) byNight.set(record.night, record);
+  for (const record of visibleRoutines(records)) {
+    if (record.kind === 'night') byNight.set(record.night, record);
+  }
   return byNight;
+}
+
+/**
+ * Every live routine by sleep-day: the night's first, then the naps in the order they happened.
+ *
+ * What the history rows read. Night first because that is the row that is always drawn — a day with
+ * no night routine still shows its empty row, and the naps follow it.
+ */
+export function routinesByDay(records: RoutineRecord[]): Map<string, RoutineRecord[]> {
+  const byDay = new Map<string, RoutineRecord[]>();
+  for (const record of visibleRoutines(records)) {
+    const list = byDay.get(record.night) ?? [];
+    list.push(record);
+    byDay.set(record.night, list);
+  }
+  for (const list of byDay.values()) {
+    list.sort((a, b) =>
+      a.kind === b.kind ? a.start - b.start : a.kind === 'night' ? -1 : 1
+    );
+  }
+  return byDay;
+}
+
+/**
+ * The live *nap* routines by day, earliest first.
+ *
+ * A list rather than a single record: a day holds one routine per nap, and each is keyed on the
+ * minute it started.
+ */
+export function napRoutinesByDay(records: RoutineRecord[]): Map<string, RoutineRecord[]> {
+  const byDay = new Map<string, RoutineRecord[]>();
+  for (const record of visibleRoutines(records)) {
+    if (record.kind !== 'nap') continue;
+    const list = byDay.get(record.night) ?? [];
+    list.push(record);
+    byDay.set(record.night, list);
+  }
+  for (const list of byDay.values()) list.sort((a, b) => a.start - b.start);
+  return byDay;
 }
 
 // --- joining --------------------------------------------------------------------------------------
@@ -98,9 +149,46 @@ export function firstNightBlockStart(bucket: DayBucket): number | null {
 }
 
 /**
- * How long from the crib to sleep, for one night, or null when the pair says nothing.
+ * The sleep a routine led into, or null when nothing has been logged for it yet.
  *
- * Null when the routine is still running (there is no crib time yet), when no night has begun, and
+ * One rule for both kinds, replacing the three copies of "the first block of the night" that had
+ * grown up in `routineStats.ts`, `EntryList.tsx` and `BabySleep.tsx` — and, with naps, would have
+ * grown to five.
+ *
+ *   - **night** — the earliest night entry filed under the routine's own night key. Identical to
+ *     `firstNightBlockStart` over that day's bucket, since a bucket is keyed by `dayKeyOf`; the
+ *     settling is measured from the *first* block, because a waking at three in the morning starts
+ *     a second entry the routine had nothing to do with.
+ *   - **nap** — the earliest nap starting at or after the crib, within `MAX_SETTLE_MS`. A nap
+ *     routine has no key to join on — there are several a day and the nap does not exist when the
+ *     routine begins — so it joins to the next nap in *time*. That also makes the midnight edge
+ *     free: the search is over the entries, not over one day's bucket.
+ *
+ * Null while the routine is still running: there is no crib time yet to measure from.
+ */
+export function asleepFor(routine: RoutineRecord, entries: SleepEntry[]): number | null {
+  if (routine.kind === 'night') {
+    let first: number | null = null;
+    for (const entry of entries) {
+      if (entry.kind !== 'night' || dayKeyOf(entry) !== routine.night) continue;
+      if (first == null || entry.start < first) first = entry.start;
+    }
+    return first;
+  }
+  const crib = routine.end;
+  if (crib == null) return null;
+  let next: number | null = null;
+  for (const entry of entries) {
+    if (entry.kind !== 'nap' || entry.start < crib) continue;
+    if (next == null || entry.start < next) next = entry.start;
+  }
+  return next != null && next - crib <= MAX_SETTLE_MS ? next : null;
+}
+
+/**
+ * How long from the crib to sleep, for one routine, or null when the pair says nothing.
+ *
+ * Null when the routine is still running (there is no crib time yet), when no sleep has begun, and
  * when the two disagree — a negative gap means the routine was logged as ending after he was already
  * asleep, which is a mis-log and not a settling of zero.
  */
@@ -134,16 +222,20 @@ export interface RoutineSegment {
 }
 
 /**
- * When the night each of these days holds began, by night key.
+ * When the sleep each routine led into began, by **routine id**.
  *
- * Built out of the same `firstNightBlockStart` the settle tile is, so the band drawn on the chart
- * and the figure printed above it cannot come to disagree about when he fell asleep.
+ * Built out of the same `asleepFor` the history rows and the live strip use, so the band drawn on
+ * the chart and the figure printed beside it cannot come to disagree about when he fell asleep.
+ * Folded over the buckets' entries rather than the raw log, so only a believable sleep can end a
+ * settling — a timer left running for thirty hours is excluded here exactly as it is everywhere.
  */
-export function asleepByNight(days: DayBucket[]): Map<string, number> {
+export function asleepByRoutine(days: DayBucket[], records: RoutineRecord[]): Map<string, number> {
+  const entries = days.flatMap((day) => day.entries);
   const asleep = new Map<string, number>();
-  for (const day of days) {
-    const start = firstNightBlockStart(day);
-    if (start != null) asleep.set(day.key, start);
+  for (const routine of records) {
+    if (routine.deleted) continue;
+    const start = asleepFor(routine, entries);
+    if (start != null) asleep.set(routine.id, start);
   }
   return asleep;
 }
@@ -155,8 +247,8 @@ export function asleepByNight(days: DayBucket[]): Map<string, number> {
  * The join to a *row* is by time, deliberately not by `day.key` against `routine.night`: those agree
  * on every ordinary evening and part company at exactly the case this clipping exists for. A routine
  * begun at 00:10 is keyed to the night before by `routineNightKey`, and drawing it on that row would
- * put a bar a whole day left of the moment it happened. The join to a *night* — which sleep ends the
- * settling — is by night key, because that is the pairing every routine figure is computed over.
+ * put a bar a whole day left of the moment it happened. The join to a *sleep* — which one ends the
+ * settling — is `asleepFor`'s, looked up here by routine id.
  *
  * Stretches no figure counts are not drawn, which is `segmentsForDay`'s rule for implausible entries
  * and holds for the same reason: a timer nobody stopped must not smear a bar across the chart while
@@ -196,11 +288,11 @@ export function routineSegmentsForDay(
     add(routine, 'routine', routine.start, routine.end ?? Math.max(routine.start, now), open);
     if (routine.end == null) continue;
 
-    /* Crib to asleep, ending where the night block beside it starts. While nobody has fallen asleep
+    /* Crib to asleep, ending where the sleep beside it starts. While nobody has fallen asleep
        yet it runs to `now` instead — that is the figure the live strip is counting up, and it is the
        only stretch of the evening in progress once the routine itself is over. `MAX_SETTLE_MS` is
        what stops a routine whose night was never logged from smearing a band across the chart. */
-    const asleepAt = asleep.get(routine.night) ?? null;
+    const asleepAt = asleep.get(routine.id) ?? null;
     const settled = settleMs(routine, asleepAt);
     if (settled != null) {
       add(routine, 'settle', routine.end, routine.end + settled, false);
@@ -213,6 +305,12 @@ export function routineSegmentsForDay(
 }
 
 // --- the points ------------------------------------------------------------------------------------
+
+/*
+ * The three extractors below take the *night* routines only — see the header. Each reads
+ * `byNight.get(day.key)`, so a nap routine cannot reach a tile even by accident: it is not in the
+ * map.
+ */
 
 export function routineLengthPoints(
   days: DayBucket[],
@@ -269,7 +367,7 @@ export function computeRoutineStats(
   days: DayBucket[],
   records: RoutineRecord[]
 ): RoutineStats {
-  const byNight = routinesByNight(records);
+  const byNight = nightRoutinesByDay(records);
   return {
     routineLength: meanStat(routineLengthPoints(days, byNight).map((p) => p.ms)),
     settle: meanStat(settlePoints(days, byNight).map((p) => p.ms)),

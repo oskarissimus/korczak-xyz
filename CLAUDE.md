@@ -1156,39 +1156,93 @@ tidy. `nightMs != null` used to mean "this night is finished", because an unfini
 open entry with no duration. A broken night has a closed first block, so it reports a duration while
 the baby is still asleep — and the old test would have let half of tonight into the averages.
 
-### The bedtime routine
+### The routine before a sleep
 
-Two more facts a night, at the two moments they are known: **when the routine started** and **when he
-went into the crib**. The gap between them is the routine; the gap from the crib to `entry.start` is
-the part that actually moves — sitting beside him while he falls asleep — and it is what the stats
-tab calls *time to fall asleep*.
+Two more facts, at the two moments they are known: **when the routine started** and **when he went
+into the crib**. The gap between them is the routine; the gap from the crib to `entry.start` is the
+part that actually moves — sitting beside him while he falls asleep — and it is what the stats tab
+calls *time to fall asleep*.
+
+It is not only a *bedtime* routine. A nap is led into the same way, so a routine carries a `kind`
+exactly as a sleep entry does, and the day holds one per nap alongside the night's.
 
 **Not two fields on the entry.** The entry does not exist yet: it is created by the "night sleep" tap
 forty minutes later, so a "routine started" button would have nowhere to write. And the two halves are
 two separate acts twenty minutes apart, on a shared log often by two people on two phones — the case
 `climate.ts` sets out, where a whole-record last-write-wins merge silently drops one half. So it is
-climate's design again: one document a night, reconciled by `versioned.ts`, its own localStorage keys,
-its own push queue, its own collection (`users/{uid}/babySleepRoutines`), its own hook.
+climate's design again: one document per routine, reconciled by `versioned.ts`, its own localStorage
+keys, its own push queue, its own collection (`users/{uid}/babySleepRoutines`), its own hook.
 
-The id **is** the night key. There is one record a night rather than climate's two, so there is no
-`-part` suffix to split off and `parseClimateId`'s last-hyphen trap does not arise. The join key is
-**`sleepDayKey(t, 'night')`** and deliberately *not* `currentNightKey`: a routine is logged at the
-start of the night exactly as a night entry's `start` is, so it must go through the same
-`NIGHT_CUTOFF_HOUR` rule, or a routine begun at 00:10 files itself a day after the sleep that follows
-it. Two things fall out of keying on the night rather than on the entry — `split.ts` needed nothing at
-all, since cutting a night in two leaves the routine alone, and correcting an entry's times cannot
-orphan one.
-
-- `routine.ts` (the record, `routineNightKey`, `validateRoutine`, `normalizeRoutine`),
+- `routine.ts` (the record, `routineKey`, `parseRoutineId`, `validateRoutine`, `normalizeRoutine`),
   `routineStats.ts` (the merge, the join, the point extractors), `routineStorage.ts`,
   `routineCloud.ts`, `src/hooks/useNightRoutine.ts`
-- `RoutineLive.tsx` — the strip above `LiveControls`, which never learns about routines. It ticks
-  only while something is counting up, and it is gone by breakfast: after 06:00 `routineNightKey`
-  names the coming night, which has no routine yet.
-- `RoutineForm.tsx` — reachable from the routine line on any day in the history. Its own form and not
+- `RoutineLive.tsx` — the strip above `LiveControls`, which never learns about routines. Two slots,
+  one per kind, each showing its live routine or the button that starts one. It ticks only while
+  something is counting up, and each slot is gone by its own clock.
+- `RoutineForm.tsx` — reachable from the routine rows on any day in the history. Its own form and not
   a fieldset in `EntryForm`, because a broken night is several entries and one routine: folded in, it
   would ask the same question once per block, and `EntryForm`'s validated `onSubmit` contract would
   have to carry a second draft it has no use for.
+
+#### The id says which occasion
+
+```
+night   2026-08-18            the sleep-day key
+nap     2026-08-18-nap-1230   the same key, plus the hh:mm the routine started
+```
+
+The night's grammar is the bare key it always was, and that is a migration and not a preference:
+`2026-08-18` is what every stored record and every Firestore document already names, so it keeps its
+meaning and nap routines arrive as the new material they are — `:b`, `:de` and `:o201` again.
+
+The day part is **`sleepDayKey(t, kind)`** and deliberately *not* `currentNightKey`: a routine is
+logged at the start of the sleep exactly as an entry's `start` is, so it must go through the same
+`NIGHT_CUTOFF_HOUR` rule, or a night routine begun at 00:10 files itself a day after the sleep that
+follows it. A nap does not go through it, which is that rule's own documented asymmetry. Two things
+fall out of keying on the occasion rather than on the entry — `split.ts` needed nothing at all, since
+cutting a night in two leaves the routine alone, and correcting an entry's times cannot orphan one.
+
+The nap's suffix is a **time and not an ordinal**, and that is the whole of why it is safe. Derived
+rather than a `uuid()`, so two phones tapping in the same minute converge on one document instead of
+racing to create two; derived from the clock rather than from a count, so a phone that has been
+offline since yesterday cannot mint `-nap1` for the afternoon and silently overwrite the morning's.
+A minute apart makes two records, which is visible in the history and clearable. Duplicate rather
+than lose. The id is minted once, from the draft's own `start`, in `logRoutine` — the one path the
+live tap and the form both take — and `setRoutine` carries `prev.id` through an edit, so correcting a
+start time does not move a document.
+
+`kind` and `night` are **derived from the id, never believed from the field**, which is the rule
+`normalizeRoutine` already followed for `night` rather than a second one beside it. The stored field
+is still called `night` for both kinds, and renaming it is not the tidy-up it looks like:
+`pullRoutines` reads with `orderBy('night', 'desc')`, and a Firestore `orderBy` on a field a document
+lacks **excludes that document from the result** — so the rename would make every routine written
+before it invisible to the pull.
+
+#### What ends the settling
+
+`asleepFor` is the one rule, replacing the three copies of "the first block of the night" that had
+grown up in `routineStats.ts`, `EntryList.tsx` and `BabySleep.tsx`:
+
+- **night** — the earliest night entry filed under the routine's own night key. The *first* block,
+  because a waking at three in the morning starts a second entry the routine had nothing to do with.
+- **nap** — the earliest nap starting at or after the crib, within `MAX_SETTLE_MS`. A nap routine has
+  no key to join on — there are several a day and the nap does not exist when the routine begins — so
+  it joins to the next nap in *time*. That also makes the midnight edge free: the search is over the
+  entries, not over one day's bucket.
+
+`asleepByRoutine` folds it over the day buckets and keys the result by **routine id**, so the band
+drawn on the chart, the figure in the history row and the live strip's countdown cannot come to
+disagree. The row join stays what it was — by time, via `clipSegment` — because a routine begun at
+00:10 is keyed to the night before and drawing it on that row would put a bar a whole day left of
+the moment it happened.
+
+#### The figures stay night-only
+
+A nap routine is logged, synced and drawn, and reaches no tile and no chart. "Has bedtime been
+drifting later" is a question about bedtime, and pooling a ten-minute nap settling with a forty-minute
+evening one would answer neither. The three extractors read `nightRoutinesByDay`, so a nap routine
+cannot reach a tile even by accident — it is not in the map — and `routineStats.test.ts` asserts the
+guarantee directly: the same day with and without its nap routines computes identical stats.
 
 Two rules in `routineStats.ts` differ from `stats.ts`'s. **Today is included** — these follow the
 clock-point rule, not the duration rule, because a settling time is complete the moment he falls
@@ -1198,52 +1252,63 @@ and it is known the instant the night begins, so going through `nightBlocks` wou
 figure until morning. Nothing is clamped — a routine logged as ending after he was already asleep is a
 mis-log and is excluded, not pinned to zero.
 
-`SleepTimeline` draws it too, on the row the *clock* puts it on: two slim bars half the row's height
-meeting at the crib, which is a pale full-height tick. Bath to crib is solid orchid; crib to asleep
-is the same orchid dimmed, and it ends where the night block begins — so the settling time the tiles
-report is drawn rather than left as a gap. That is the point of drawing it at all: an empty stretch
-of row is also what an evening with no routine logged looks like, and it says nothing about whether
-anyone was sitting in the dark for it. Half height because a routine is not a sleep and a bar of
-equal weight beside the night reads as one; drawn before the sleeps, so where a mis-log overlaps one
-the sleep is what you see. Orchid because the other three colours on that chart are spoken for —
-blue is the night, teal a nap, yellow a sleep still running — which is the same argument that keeps
-the *log* screen's routine button plain grey, reaching the opposite conclusion because a chart has
-room for a fourth series and a row of coloured buttons does not.
+#### On the screens
+
+The live strip's two buttons are `Night routine` and `Nap routine`, mirroring the `night sleep` / `nap`
+pair below. The kind is explicit at the tap rather than inferred from the clock, because a
+late-afternoon nap and an early bedtime are the same hour and the id is fixed by that first write.
+Two idle slots put their buttons side by side; a slot with a line takes the whole row, and the flex
+basis on the slot is what says which.
+
+A finished **nap** line keeps its button beneath it (`canRestart`), because the day holds one routine
+per nap and the afternoon's has to be startable while the morning's reading is still on the screen.
+A finished night line does not: a night's id *is* its night key, so a second tap would overwrite the
+evening just recorded rather than begin anything.
+
+The history draws one row per routine under each day heading — the night's, then the naps in order,
+then a row carrying only `Add nap routine`. Each row's settling comes from `settleMs(routine,
+asleepFor(...))` rather than a subtraction of its own, which is how it stopped being the one place
+that forgot `MAX_SETTLE_MS`.
+
+`SleepTimeline` draws them all on the row the *clock* puts them on: two slim bars half the row's
+height meeting at the crib, which is a pale full-height tick. Bath to crib is solid orchid; crib to
+asleep is the same orchid dimmed, and it ends where the sleep beside it begins — so the settling time
+is drawn rather than left as a gap. That is the point of drawing it at all: an empty stretch of row is
+also what an evening with no routine logged looks like, and it says nothing about whether anyone was
+sitting in the dark for it. Half height because a routine is not a sleep and a bar of equal weight
+beside the night reads as one; drawn before the sleeps, so where a mis-log overlaps one the sleep is
+what you see. Orchid because the other three colours on that chart are spoken for — blue is the night,
+teal a nap, yellow a sleep still running — which is the same argument that keeps the *log* screen's
+routine buttons plain grey, reaching the opposite conclusion because a chart has room for a fourth
+series and a row of coloured buttons does not. **Nap routines take the same orchid and get no legend
+entry**: each bar sits directly beside the teal nap it leads into, which is what says which it is.
 
 The dimming is 0.7 and not `.bs-bar--partial`'s 0.45. These bars are a few pixels wide on a
 near-black row, where 0.45 is a smudge you have to know is there, while a whole bar of a day's
 totals at the same value is unmissable; the pair is only ever read against each other, and 0.7 is
 far enough from the solid bar beside it to say which is which.
 
-`routineSegmentsForDay` joins each bar to a *row* by **time and not by `day.key` against
-`routine.night`**. Those agree on every ordinary evening and part company at exactly the case the
-clipping exists for: a routine begun at 00:10 is keyed to the night before by `routineNightKey`, and
-drawing it on that row would put a bar a whole day left of the moment it happened. What ends the
-settling is joined by night key instead, through `asleepByNight` — which is `firstNightBlockStart`
-over the same day buckets the settle tile is computed from, so the band on the chart and the figure
-above it cannot come to disagree about when he fell asleep.
-
-It draws nothing no figure counts, which is `segmentsForDay`'s rule for implausible entries and
-holds for its reason: a tombstone, a stale timer, an impossible routine length, and — for the
-settling specifically — `settleMs`'s own rejections, a crib logged after he was already asleep or a
-gap past four hours. Two things still running are drawn as far as `now`: a routine with no crib yet,
-which has **no tick** (the missing mark is what says nobody is in the crib), and the settling on a
-night nobody has tapped yet, which is what the live strip is counting up. `MAX_SETTLE_MS` is what
-stops that second one smearing a band across the chart on an evening whose night was never logged.
+`routineSegmentsForDay` draws nothing no figure counts, which is `segmentsForDay`'s rule for
+implausible entries and holds for its reason: a tombstone, a stale timer, an impossible routine
+length, and — for the settling specifically — `settleMs`'s own rejections, a crib logged after he was
+already asleep or a gap past four hours. Two things still running are drawn as far as `now`: a routine
+with no crib yet, which has **no tick** (the missing mark is what says nobody is in the crib), and the
+settling on a sleep nobody has tapped yet, which is what the live strip is counting up.
+`MAX_SETTLE_MS` is what stops that second one smearing a band across the chart.
 
 `DurationSpreadChart` grew optional `minSpan`/`tickSteps` for this. Its three-hour floor is right for
 a night and flattens a settling time into a straight line along the bottom; the settle chart passes
 30 minutes and 5/10/15/30-minute ticks. The defaults are still the night's.
 
 `storage.ts`'s `CACHED_PER_OWNER` gains both routine keys — miss that and the previous household's
-routines stay cached and get pushed into the new account on the first write. `firestore.rules` needs
-its own `users/{uid}/babySleepRoutines/{recordId}` block, deployed by hand as ever, so the *shared*
-half does nothing until `firebase deploy --only firestore:rules` is run. The log tab and the stats tab
-now each mount two hooks, so they show one badge over two syncs via `mergeSync` from
-`src/utils/flashcards/sync.ts` — pure, and it knows nothing about flashcards. The one rule that
-matters there: a half that failed is never reported as synced.
+routines stay cached and get pushed into the new account on the first write. `firestore.rules` needed
+nothing for naps: its `users/{uid}/babySleepRoutines/{recordId}` block already wildcards the document
+id, so no manual deploy is involved in this half. The log tab and the stats tab each mount two hooks,
+so they show one badge over two syncs via `mergeSync` from `src/utils/flashcards/sync.ts` — pure, and
+it knows nothing about flashcards. The one rule that matters there: a half that failed is never
+reported as synced.
 
-The routine button is the plain raised grey, not a colour. Navy is the night, teal is a nap and
+The routine buttons are the plain raised grey, not a colour. Navy is the night, teal is a nap and
 yellow is waking, so every colour on that screen is already spoken for and a coloured routine button
 would read as one of the three things it is not.
 

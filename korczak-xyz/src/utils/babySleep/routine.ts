@@ -1,10 +1,13 @@
 /*
- * The bedtime routine that leads into a night, and the part of it that matters.
+ * The routine that leads into a sleep, and the part of it that matters.
  *
  * The log records when the baby *fell asleep*. Two facts before that are worth having and cannot be
  * recovered afterwards: when the routine began — bath, pyjamas, a book — and when it ended, which is
  * the moment he goes into the crib. The first gap is the routine; the second, from the crib to
  * sleep, is the time spent sitting beside him, and it is the number this whole module exists for.
+ *
+ * It is not only a *bedtime* routine. A nap is led into the same way and the settling before it is
+ * the same measurement, so a routine carries a `kind` exactly as a sleep entry does.
  *
  * ## A routine is its own record, not two fields on the entry
  *
@@ -14,17 +17,35 @@
  * is the case `climate.ts` sets out at length: a single record makes those halves compete in a
  * whole-record last-write-wins merge, and a phone offline across the gap silently drops one of them.
  *
- * So this is `climate.ts`'s shape again. One document a night, reconciled by `versioned.ts`, which
- * knows nothing about what a row is. Two things fall out of keying on the night rather than on the
- * entry: `split.ts` needs nothing at all — cutting a night in two leaves the routine alone — and
- * correcting an entry's times cannot orphan a routine.
+ * So this is `climate.ts`'s shape again. One document per routine, reconciled by `versioned.ts`,
+ * which knows nothing about what a row is. Two things fall out of keying on the *occasion* rather
+ * than on the entry: `split.ts` needs nothing at all — cutting a night in two leaves the routine
+ * alone — and correcting an entry's times cannot orphan a routine.
  *
- * ## The id is the night key
+ * ## The id says which occasion, and the night keeps the bare key
  *
- * Derived, not a `uuid()`, so two devices logging the same evening converge on one document instead
- * of racing to create two. There is one record per night rather than climate's two, so there is no
- * `-part` suffix to split off and `parseClimateId`'s last-hyphen trap does not arise here: the whole
- * id is the key.
+ *   night   2026-08-18            the sleep-day key, unchanged since routines were night-only
+ *   nap     2026-08-18-nap-1230   the same key, plus the hh:mm the routine started
+ *
+ * The night's grammar is left alone deliberately — it is what every stored record and every
+ * Firestore document already names, so it keeps its meaning and nap routines arrive as the new
+ * material they are. The same migration `:b`, `:de` and `:o201` make in the flashcards deck.
+ *
+ * The day part is `sleepDayKey(t, kind)`, so a night goes through `NIGHT_CUTOFF_HOUR` and a nap does
+ * not — which is exactly the asymmetry that rule is documented to have.
+ *
+ * The nap's suffix is a **time and not an ordinal**, and that is the whole of why it is safe.
+ * Derived rather than a `uuid()`, so two phones tapping in the same minute converge on one document
+ * instead of racing to create two; and derived from the clock rather than from a count, so a phone
+ * that has been offline since yesterday cannot mint `-nap1` for the afternoon and silently overwrite
+ * the morning's. A minute apart makes two records, which is visible in the history and clearable.
+ * Duplicate rather than lose.
+ *
+ * The id is minted once, from the draft's `start`, and never again: `setRoutine` carries `prev.id`
+ * through an edit, so correcting a routine's start time does not move its document.
+ *
+ * `kind` and `night` are **derived from the id, never believed from the field** — the rule
+ * `normalizeRoutine` already followed for `night`, extended rather than joined by a second one.
  *
  * Nothing here reads the clock. `now` is always a parameter.
  */
@@ -32,11 +53,30 @@
 import { getClientId } from '../../lib/clientId';
 import { isNightKey } from './climate';
 import { dayStart, minutesOfDay, sleepDayKey } from './days';
+import type { SleepKind } from './types';
 import type { Versioned } from './versioned';
 
-export interface RoutineRecord extends Versioned {
-  /** Local `yyyy-mm-dd` of the night this routine leads into. Also the id. */
+/**
+ * Which occasion a routine is about: its document id, the sleep-day it is filed under, and whether
+ * it leads into a night or a nap. A `RoutineRecord` is one of these, so a record can be passed
+ * wherever a key is wanted.
+ */
+export interface RoutineKey {
+  id: string;
+  /**
+   * Local `yyyy-mm-dd` of the sleep this routine leads into — the night key for a night, the plain
+   * calendar day for a nap.
+   *
+   * The field is called `night` for both kinds, and renaming it is not the tidy-up it looks like:
+   * `pullRoutines` reads the collection with `orderBy('night', 'desc')`, and a Firestore `orderBy`
+   * on a field a document lacks **excludes that document from the result**. Renaming it would make
+   * every routine written before the rename invisible to the pull.
+   */
   night: string;
+  kind: SleepKind;
+}
+
+export interface RoutineRecord extends Versioned, RoutineKey {
   /** Epoch ms the routine began. */
   start: number;
   /** Epoch ms he went into the crib, or null while the routine is still running. */
@@ -55,7 +95,9 @@ export interface RoutineDraft {
   end: number | null;
 }
 
-// --- ids and nights ------------------------------------------------------------------------------
+// --- ids and days --------------------------------------------------------------------------------
+
+const NAP_ID = /^(\d{4}-\d{2}-\d{2})-nap-(\d{2})(\d{2})$/;
 
 /**
  * Which night a routine at this instant belongs to.
@@ -70,15 +112,42 @@ export function routineNightKey(t: number): string {
   return sleepDayKey(t, 'night');
 }
 
+/** The occasion a routine of this kind, started at this instant, is about. */
+export function routineKey(kind: SleepKind, t: number): RoutineKey {
+  const night = sleepDayKey(t, kind);
+  if (kind === 'night') return { id: night, night, kind };
+  const d = new Date(t);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return { id: `${night}-nap-${hh}${mm}`, night, kind };
+}
+
+/**
+ * Read an id back, or null if it is not one this app could ever have minted.
+ *
+ * Matched whole rather than split at a separator, so `parseClimateId`'s last-hyphen trap does not
+ * arise: a `yyyy-mm-dd` key carries two hyphens of its own and the suffix carries two more.
+ */
+export function parseRoutineId(id: string): RoutineKey | null {
+  if (isNightKey(id)) return { id, night: id, kind: 'night' };
+  const m = NAP_ID.exec(id);
+  if (!m) return null;
+  const [, night, hh, mm] = m;
+  if (!isNightKey(night) || Number(hh) > 23 || Number(mm) > 59) return null;
+  return { id, night, kind: 'nap' };
+}
+
 export function isRoutineId(id: string): boolean {
-  return isNightKey(id);
+  return parseRoutineId(id) != null;
 }
 
 // --- what is believable --------------------------------------------------------------------------
 
 /**
  * Beyond this a "routine" is a timer nobody stopped. Four hours is far longer than any bedtime and
- * comfortably short of the night that follows it.
+ * comfortably short of the night that follows it — and it is the ceiling for a nap routine too,
+ * where it is merely generous: these bounds exist to catch a forgotten timer, not to police how
+ * long a routine is allowed to take.
  */
 export const MAX_ROUTINE_MS = 4 * 60 * 60_000;
 
@@ -124,10 +193,9 @@ export function routineStartMinutes(record: RoutineRecord): number {
 
 // --- constructing and editing --------------------------------------------------------------------
 
-function blank(night: string, now: number, author?: string): RoutineRecord {
+function blank(key: RoutineKey, now: number, author?: string): RoutineRecord {
   return {
-    id: night,
-    night,
+    ...key,
     start: now,
     end: null,
     rev: 0,
@@ -138,23 +206,24 @@ function blank(night: string, now: number, author?: string): RoutineRecord {
 }
 
 /**
- * A night's routine, new or revised.
+ * One occasion's routine, new or revised.
  *
- * `prev` is whatever the log already holds for that night, so the id and the author survive an edit
- * and `rev` moves forward — which is what makes the revision, not the wall clock, decide the merge.
+ * `prev` is whatever the log already holds for it, so the id and the author survive an edit and
+ * `rev` moves forward — which is what makes the revision, not the wall clock, decide the merge.
+ * A `RoutineRecord` is itself a `RoutineKey`, so an edit passes the record it is editing.
  *
  * `deleted` is dropped rather than set to false: a tombstone written to again is alive, the human
  * having just entered a value into it, and an explicit `undefined` is the one thing `setDoc`
  * rejects.
  */
 export function setRoutine(
-  night: string,
+  key: RoutineKey,
   draft: RoutineDraft,
   now: number,
   prev?: RoutineRecord,
   author?: string
 ): RoutineRecord {
-  const base = prev ?? blank(night, now, author);
+  const base = prev ?? blank(key, now, author);
   const { deleted: _gone, ...live } = base;
   return {
     ...live,
@@ -181,7 +250,11 @@ export function tombstoneRoutine(prev: RoutineRecord, now: number): RoutineRecor
 export function normalizeRoutine(raw: unknown): RoutineRecord | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (typeof r.id !== 'string' || !isRoutineId(r.id)) return null;
+  if (typeof r.id !== 'string') return null;
+  // The id is the truth: it is the document name, and `night` and `kind` are it read out. A record
+  // whose fields disagree with its own id is taken at its id.
+  const key = parseRoutineId(r.id);
+  if (!key) return null;
   if (typeof r.start !== 'number' || !Number.isFinite(r.start)) return null;
   const end = r.end;
   if (end != null && (typeof end !== 'number' || !Number.isFinite(end))) return null;
@@ -189,12 +262,9 @@ export function normalizeRoutine(raw: unknown): RoutineRecord | null {
   const updatedAt =
     typeof r.updatedAt === 'number' && Number.isFinite(r.updatedAt)
       ? (r.updatedAt as number)
-      : dayStart(r.id);
+      : dayStart(key.night);
   return {
-    id: r.id,
-    // The id is the truth: it is the document name, and `night` is it written out for readability.
-    // A record whose field disagrees with its own id is taken at its id.
-    night: r.id,
+    ...key,
     start: r.start,
     end: end == null ? null : (end as number),
     rev,

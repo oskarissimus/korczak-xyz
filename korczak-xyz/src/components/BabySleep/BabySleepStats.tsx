@@ -30,9 +30,9 @@ import {
   wakePoints,
 } from '../../utils/babySleep/stats';
 import {
-  asleepByNight,
+  asleepByRoutine,
   computeRoutineStats,
-  routinesByNight,
+  nightRoutinesByDay,
   settlePoints,
 } from '../../utils/babySleep/routineStats';
 import { loadSettings, saveSettings } from '../../utils/babySleep/storage';
@@ -132,10 +132,14 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
     () => computeRoutineStats(stats.days, routines.records),
     [stats.days, routines.records]
   );
-  const routineByNight = useMemo(() => routinesByNight(routines.records), [routines.records]);
-  /* The timeline's settling bands end where this says the night began — the same source the settle
-     tile and the chart beneath it are computed from, so the three cannot disagree. */
-  const asleep = useMemo(() => asleepByNight(stats.days), [stats.days]);
+  const routineByNight = useMemo(() => nightRoutinesByDay(routines.records), [routines.records]);
+  /* The timeline's settling bands end where this says the sleep began — the same `asleepFor` the
+     history rows and the live strip use, so none of them can come to disagree. Keyed by routine id
+     rather than by night: a day holds several routines now. */
+  const asleep = useMemo(
+    () => asleepByRoutine(stats.days, routines.records),
+    [stats.days, routines.records]
+  );
 
   const clockTile = (label: string, stat: ClockStat) => (
     <Tile
