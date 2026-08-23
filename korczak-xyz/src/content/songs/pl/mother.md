@@ -18,16 +18,16 @@ G                                      C
 Mother, do you think they'll like this song?
 C                                            G
 Mother, do you think they'll try to break my balls?
-D        C                                G
+D         C                           G
 Oooooooo aaaaa Mother, should I build the wall?
 
-G                        C       G
+G                              C      G
 Mother, should I run for President?
-G                          C       G
+G                                C      G
 Mother, should I trust the government?
-C                                      G
+C                                   G
 Mother, will they put me in the firing line?
-D          C                           G
+D         C                       G
 Oooooooooo aaaaa Is it just a waste of time?
 
 Ref.:
@@ -37,46 +37,46 @@ F                             C
 Mama's gonna make all of your nightmares come true.
 F                           C
 Mama's gonna put all of her fears into you.
-F                                C
+F                                 C
 Mama's gonna keep you right here under her wing.
-     F                         C
+    F                          C
 She won't let you fly, but she might let you sing.
-F                      C        G
+F                        C        G
 Mama's gonna keep Baby cozy and warm.
 
 D    C
 Oooo Babe.
 D    C
 Oooo Babe.
-D         C
+D            C
 ooo Babe, of course Mamma's gonna help buuuiild the wall.
 
 Solo:
 G C G C G C D C G
 
-G                               C
+G                                C
 Mother, do you think she's good enough.
 G
 For me?
-G                          C
+G                               C
 Mother, do you think she's dangerous.
 G
 Tell me...?
-C                                      G
+C                                          G
 Mother will she tear your little booyyy apart?
-D          C                             G
+D         C                             G
 Oooooooooo aaa Mother, will she break my heart?
 
 Ref.:
-G                              C
+G                             C
 Hush, now baby, Baby don't you cry.
 F                               C
 Mama's gonna check out all your girlfriends for you.
 F                        C
 Mama won't let anyooonne dirty get through.
-F                         C
+F                       C
 Mama's gonna wait up until you get in.
-F                         C
+F                     C
 Mama will always find out where you been.
 F                      C           G
 Mama's gonna keep Baby healthy and clean.
@@ -88,6 +88,6 @@ Oooo Babe.
 D                C                 G
 Ooo Babe, you'll always be Baby to me.
 
-G                            C
+G                           C
 Mother, did it need to be so high?
 ```
