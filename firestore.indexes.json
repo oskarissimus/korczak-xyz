@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "//": "For pullUndatedEvents: where('startsAt','==',null) + orderBy('firstSeenAt','desc'). An equality filter plus an order on a DIFFERENT field is not covered by the automatic single-field indexes, unlike the dated query (a range and an order on startsAt itself), which is why only this one needs declaring. Missing it does not fail quietly: the feed reads nothing and shows the raw Firestore error.",
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "startsAt", "order": "ASCENDING" },
+        { "fieldPath": "firstSeenAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

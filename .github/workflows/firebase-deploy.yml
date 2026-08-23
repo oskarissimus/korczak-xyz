@@ -17,6 +17,7 @@ on:
     paths:
       - "functions/**"
       - "firestore.rules"
+      - "firestore.indexes.json"
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
       - ".github/workflows/firebase-deploy.yml"
@@ -72,11 +73,12 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy rules and functions
-        # Rules first and in the same step, because the collector writes documents the rules
-        # describe: a function live against stale rules is the window worth closing.
+        # Rules and indexes first and in the same step, because the collector writes documents the
+        # rules describe and the feed reads through the indexes: a function live against stale rules,
+        # or a client querying without an index, is the window worth closing.
         #
         # The predeploy hook in firebase.json calls ./node_modules/.bin/tsc directly rather than
         # `npm run build` — the firebase CLI ships its own bundled node 20 / npm 8, and that npm
         # throws `Cannot read properties of undefined (reading 'stdin')` after the script has
         # already succeeded, failing a perfectly good deploy.
-        run: npx --yes firebase-tools@15 deploy --only firestore:rules,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force

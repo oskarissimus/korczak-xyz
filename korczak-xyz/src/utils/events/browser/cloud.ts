@@ -85,9 +85,10 @@ export async function pushInterest(uid: string, interest: Interest): Promise<voi
 /**
  * Upcoming events, oldest first.
  *
- * A single-field range plus an order on the same field, so Firestore's automatic index covers it
- * and no `firestore.indexes.json` is needed. Resist `array-contains-any` on tags: it forces a
- * composite index and still cannot express what an interest actually is.
+ * A single-field range plus an order on the *same* field, so Firestore's automatic index covers
+ * this one — unlike `pullUndatedEvents` below, which needed a declared composite. Resist
+ * `array-contains-any` on tags: it forces a composite index too and still cannot express what an
+ * interest actually is.
  *
  * The window starts two days back so something happening tonight does not vanish at midnight.
  */
@@ -111,6 +112,11 @@ export async function pullEvents(now: number): Promise<EventRecord[]> {
  *
  * A separate query because `where('startsAt', '>=', …)` excludes nulls outright, and these are
  * exactly the Teatr Wielki repertoire announcements the app exists for. Small, so no window.
+ *
+ * This one DOES need a declared index (`firestore.indexes.json`): an equality filter plus an order
+ * on a different field is not something the automatic single-field indexes cover. Missing it is not
+ * quiet — the feed renders "nothing matches your interests yet" over a raw Firestore error, which
+ * is a sentence about the interests and a lie about the index.
  */
 export async function pullUndatedEvents(): Promise<EventRecord[]> {
   if (!getDb()) return [];

@@ -48,12 +48,35 @@ export function useEventFeed(user: AuthUser | null): EventFeedData {
        * Two queries, because `where('startsAt', '>=', …)` excludes nulls outright — and the undated
        * rows are exactly the Teatr Wielki repertoire announcements this app exists for. A season
        * announced with no nights scheduled yet would otherwise never appear.
+       *
+       * `allSettled`, not `all`: these ask for two independent halves of the feed, and one of them
+       * failing is not a reason to show neither. That is not hypothetical — the undated query needs
+       * a composite index the dated one does not, and while it was missing `Promise.all` turned a
+       * half-answer into an empty screen reading "nothing matches your interests yet", which is a
+       * sentence about the interests and was a lie about the index.
        */
-      const [dated, undated] = await Promise.all([pullEvents(Date.now()), pullUndatedEvents()]);
-      const merged = [...undated, ...dated];
+      const [dated, undated] = await Promise.allSettled([
+        pullEvents(Date.now()),
+        pullUndatedEvents(),
+      ]);
+
+      const failures = [dated, undated].filter((r) => r.status === 'rejected');
+      if (failures.length === 2) throw (failures[0] as PromiseRejectedResult).reason;
+
+      const merged = [
+        ...(undated.status === 'fulfilled' ? undated.value : []),
+        ...(dated.status === 'fulfilled' ? dated.value : []),
+      ];
       setEvents(merged);
       setFresh(true);
-      setError(null);
+      // Half an answer is still an answer, but it must not read as a whole one.
+      if (failures.length > 0) {
+        const reason = (failures[0] as PromiseRejectedResult).reason;
+        log.warn('events.feed.pull.partial', describeError(reason));
+        setError(String(describeError(reason).message ?? 'some events could not be loaded'));
+      } else {
+        setError(null);
+      }
       saveFeedCache(merged);
     } catch (e) {
       // Offline is the ordinary case here, not an exception: the cached rows stay on screen and the
