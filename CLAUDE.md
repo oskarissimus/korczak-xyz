@@ -969,6 +969,16 @@ about Ted Kaczynski. Tags are matched all-of and structurally, by `interest.tags
 found `tagsFor` in the Teatr Wielki adapter falling through to `opera` for anything that was not
 ballet, which handed the keyword-less Opera interest the entire season, galas included.
 
+**A keyword-less interest has no second filter, so a generous tag is the whole of what reaches it**
+— which is why that mistake keeps arriving from a new direction. The third time was Ticketmaster's
+`tagsOf` mapping `genre.includes('classical')` onto `opera`, on the reasonable-sounding grounds
+that an interest asking for opera should reach a ticketed listing and a Teatr Wielki one alike:
+switching the real API key on took Opera Narodowa from 7 matches to 202, the other 195 being
+candlelight Chopin recitals. It bought nothing either — their Polish catalogue has no `opera` genre
+or subGenre at all, so the branch only ever fired on classical. The rule to apply when mapping a
+source's vocabulary onto ours: **widen a tag only as far as the narrowest interest that uses it can
+bear**, and let the raw genre slug carry the rest, which is what it is there for.
+
 ### What may wake me up
 
 `notices.ts` is pure, so the whole "should this push fire?" question is reachable from a unit test
