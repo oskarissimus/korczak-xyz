@@ -1,0 +1,28 @@
+{
+  // Why this file exists.
+  //
+  // This directory is compiled by two projects: Astro for the browser, and `tsc` into the Cloud
+  // Functions bundle (functions/tsconfig.json includes it by path rather than keeping a copy, so
+  // the feed and the collector cannot disagree about what matches an interest).
+  //
+  // Vite resolves a tsconfig by walking UP from the file it is transforming. Without this file that
+  // walk reaches korczak-xyz/tsconfig.json, which `extends: "astro/tsconfigs/strict"` — resolvable
+  // only where the site's node_modules are installed. On a CI runner that installed only the
+  // functions' dependencies it is not, and the functions' tests died with
+  // `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, naming a file that has
+  // nothing wrong with it. Stopping the walk here is what makes these modules genuinely portable
+  // rather than portable-if-the-site-happens-to-be-installed.
+  //
+  // Nothing here may need an Astro or React setting: that is the same constraint portable.test.ts
+  // enforces on the imports, stated once more in the shape the compiler reads.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["*.ts"]
+}
