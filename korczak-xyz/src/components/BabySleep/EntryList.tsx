@@ -172,40 +172,46 @@ export default function EntryList({
                 {fill(t.dayTotal, { total: formatHm(total) })}
               </span>
             </h3>
-            <RoutineRow
-              routine={nightRoutine}
-              label={t.routineEdit}
-              settle={nightRoutine ? settleOf(nightRoutine) : null}
-              formatTime={formatTime}
-              onEdit={() => nightRoutine && onEditRoutine(nightRoutine)}
-              onAdd={() => onAddRoutine(group.key, 'night')}
-              addLabel={t.routineAdd}
-              t={t}
-            />
-            {napRoutines.map((routine) => (
+            {/* The routines are one block, wrapped rather than merely adjacent to the entries: the
+                boundary between leading a sleep and the sleep itself is drawn on this element, and
+                without it the rules between rows opened a section above `Add nap routine` and closed
+                none below it — so the link read as belonging to the first sleep under it. */}
+            <div className="bs-day-routines">
               <RoutineRow
-                key={routine.id}
-                routine={routine}
-                label={t.routineNapEdit}
-                settle={settleOf(routine)}
+                routine={nightRoutine}
+                label={t.routineEdit}
+                settle={nightRoutine ? settleOf(nightRoutine) : null}
                 formatTime={formatTime}
-                onEdit={() => onEditRoutine(routine)}
-                onAdd={() => onAddRoutine(group.key, 'nap')}
-                addLabel={t.routineNapAdd}
+                onEdit={() => nightRoutine && onEditRoutine(nightRoutine)}
+                onAdd={() => onAddRoutine(group.key, 'night')}
+                addLabel={t.routineAdd}
                 t={t}
               />
-            ))}
-            {/* The way in for one more. Its own row rather than a second button on the night's:
-                which routine an `Add` belongs to has to be readable at a glance. */}
-            <p className="bs-routine-row bs-routine-row--add">
-              <button
-                type="button"
-                className="bs-link"
-                onClick={() => onAddRoutine(group.key, 'nap')}
-              >
-                {t.routineNapAdd}
-              </button>
-            </p>
+              {napRoutines.map((routine) => (
+                <RoutineRow
+                  key={routine.id}
+                  routine={routine}
+                  label={t.routineNapEdit}
+                  settle={settleOf(routine)}
+                  formatTime={formatTime}
+                  onEdit={() => onEditRoutine(routine)}
+                  onAdd={() => onAddRoutine(group.key, 'nap')}
+                  addLabel={t.routineNapAdd}
+                  t={t}
+                />
+              ))}
+              {/* The way in for one more. Its own row rather than a second button on the night's:
+                  which routine an `Add` belongs to has to be readable at a glance. */}
+              <p className="bs-routine-row bs-routine-row--add">
+                <button
+                  type="button"
+                  className="bs-link"
+                  onClick={() => onAddRoutine(group.key, 'nap')}
+                >
+                  {t.routineNapAdd}
+                </button>
+              </p>
+            </div>
             <ul className="bs-entries">
               {group.entries.map((entry) => {
                 const ms = durationOf(entry);

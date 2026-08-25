@@ -217,7 +217,15 @@
   margin: 0;
   padding: 6px 8px;
   font-size: 1.05rem;
-  border-top: 1px solid var(--retro-dark-gray);
+  border-top: 1px solid var(--retro-white);
+}
+
+/* The rules inside the block are the highlight and not the shadow, so they stay lighter than the one
+   closing the block off from the sleeps below it: two rows of one section separated as strongly as
+   the section itself is what let the eye group `Add nap routine` with the sleep under it. The first
+   needs none at all — the day heading is already an edge. */
+.bs-routine-row:first-child {
+  border-top: 0;
 }
 
 .bs-routine-label {
@@ -232,10 +240,31 @@
   color: var(--retro-dark-gray);
 }
 
-/* The row that is only a way in for one more nap routine: no label and no value, so the link sits
-   where the other rows' links do rather than at the left margin. */
+/* The row that is only a way in for one more nap routine: no label and no value.
+
+   No rule above it and left-aligned, both of which tie it upward to the routine it adds one beside.
+   It was right-aligned, on the grounds that the link should sit where the other rows' links do — but
+   those rows wrap on a phone and their `Edit` lands at the left margin, so the argument only held on
+   a desktop while on a phone the link floated in the whitespace beside the sleep below it. Its own
+   `border-top` made that worse: a rule above and none below (`.bs-entry:first-child` removes the
+   entries' first one) drew a box that began above the link and ran on through the first sleep. */
 .bs-routine-row--add {
-  justify-content: flex-end;
+  justify-content: flex-start;
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* The routine rows and their `Add` as one block, closed off from the sleeps by the engraved line
+   Win95 puts between two sections — dark above, highlight below — which is visibly more than the
+   highlight rules between the rows and so reads as a break rather than as another row. The highlight half is
+   on the adjacent sibling and not on `.bs-entries` itself: the climate list wears that class too and
+   has no routines above it. */
+.bs-day-routines {
+  border-bottom: 2px solid var(--retro-dark-gray);
+}
+
+.bs-day-routines + .bs-entries {
+  border-top: 1px solid var(--retro-white);
 }
 
 /* --- the forgotten timer -------------------------------------------------- */
