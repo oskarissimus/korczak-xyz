@@ -1085,8 +1085,8 @@ bug and the opera over-tagging; run it after touching an adapter.
 `firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the
 `users/{uid}` wildcard, so a feed that reads nothing usually means the rules have not gone out.
 
-**Rules and functions now deploy from CI** (`.github/workflows/firebase-deploy.yml`), which is the
-one place this repo's "deployed by hand" note no longer holds. It is path-filtered to `functions/`,
+**Rules and functions deploy from CI** (`.github/workflows/firebase-deploy.yml`) — the site is
+Netlify's on every push, and the backend is this workflow's. It is path-filtered to `functions/`,
 `firestore.rules`, `firebase.json` and `korczak-xyz/src/utils/events/**` — that last one because
 `functions/tsconfig.json` compiles the matcher in from there rather than keeping a copy, so a change
 to it changes the backend. Auth is Workload Identity Federation, so there is no long-lived service
@@ -1304,7 +1304,7 @@ a night and flattens a settling time into a straight line along the bottom; the 
 `storage.ts`'s `CACHED_PER_OWNER` gains both routine keys — miss that and the previous household's
 routines stay cached and get pushed into the new account on the first write. `firestore.rules` needed
 nothing for naps: its `users/{uid}/babySleepRoutines/{recordId}` block already wildcards the document
-id, so no manual deploy is involved in this half. The log tab and the stats tab each mount two hooks,
+id, so no rules change is involved in this half. The log tab and the stats tab each mount two hooks,
 so they show one badge over two syncs via `mergeSync` from `src/utils/flashcards/sync.ts` — pure, and
 it knows nothing about flashcards. The one rule that matters there: a half that failed is never
 reported as synced.
@@ -1353,11 +1353,14 @@ The field is committed by a button and not on change: a `<input type="time">` fi
 keystroke and every spin of a native picker, and each of those would be a document the other parent's
 phone pulls.
 
-`firestore.rules` needs its own `users/{uid}/babySleepTargets/{recordId}` block and, as ever, that is
-`firebase deploy --only firestore:rules` by hand — so the *shared* half does nothing until it is run,
-while the owner's own access comes from the `users/{uid}/{document=**}` catch-all and works
-immediately. `CACHED_PER_OWNER` gains both keys, or the previous household's target stays cached and
-is pushed into the next account on its first write.
+`firestore.rules` needs its own `users/{uid}/babySleepTargets/{recordId}` block, rules being a
+permissive union: the blocks above say nothing at all about this path, so without it the *shared*
+half is dead. The owner's own access comes from the `users/{uid}/{document=**}` catch-all and works
+whatever this collection's rules say — which is exactly what makes a forgotten block invisible to
+the person most likely to notice. It goes out with the push, `.github/workflows/firebase-deploy.yml`
+being path-filtered on `firestore.rules`; there is nothing to run by hand.
+`CACHED_PER_OWNER` gains both keys, or the previous household's target stays cached and is pushed
+into the next account on its first write.
 
 #### Where the target shows up
 
@@ -1480,10 +1483,10 @@ the memo the second keeps the previous household's rows in memory and pushes the
 account on its first write.
 
 `firestore.rules` needs its own `users/{uid}/babySleepClimate/{recordId}` block — rules are a
-permissive union, so the `babySleep` block says nothing at all about this path. As ever it is
-deployed by hand (`firebase deploy --only firestore:rules`), so the *shared* half of this feature
-does nothing until that is run; the owner's own access comes from the `users/{uid}/{document=**}`
-catch-all and works immediately.
+permissive union, so the `babySleep` block says nothing at all about this path. It deploys from CI
+on the push that changes it, so the *shared* half is live as soon as the commit is; the owner's own
+access comes from the `users/{uid}/{document=**}` catch-all and would work even with the block
+missing, which is what makes a forgotten one hard to notice.
 
 No PWA work was needed: `APP_TIERS['baby-sleep']` already claims the whole subtree in both
 `generate-sw.mjs` and `register-sw.js`, so the tab precached itself.
@@ -1534,8 +1537,10 @@ Note there has never been an email whitelist in this repo, despite how the restr
 described: the single occurrence of the owner's address is a comment in `NavAuth.tsx` about
 truncating a long name. Sign-up being off is a console setting, not a file.
 
-`firestore.rules` is not deployed by CI — `firebase deploy --only firestore:rules` is manual, and
-the sharing rules do nothing until it is run.
+`firestore.rules` deploys from CI (`.github/workflows/firebase-deploy.yml`, path-filtered on the
+file itself), so the sharing rules go out with the commit that changes them. It was manual when
+sharing was built and three sections of this file went on saying so afterwards, which is how a
+target block came to be pushed with a note telling the next reader to deploy it by hand.
 
 ## The section is `/apps/`, and was `/games/`
 
