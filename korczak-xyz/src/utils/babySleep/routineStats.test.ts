@@ -8,6 +8,7 @@ import {
   asleepByRoutine,
   asleepFor,
   computeRoutineStats,
+  cribPoints,
   firstNightBlockStart,
   mergeRoutines,
   napRoutinesByDay,
@@ -319,6 +320,30 @@ describe('routineSegmentsForDay', () => {
   });
 });
 
+describe('cribPoints', () => {
+  const pointsFor = (records: RoutineRecord[], entries: SleepEntry[] = []) =>
+    cribPoints(days(entries), nightRoutinesByDay(records));
+
+  it('is the clock time the routine ended, one point a night', () => {
+    expect(pointsFor([routine()])).toEqual([
+      { at: at(15, 0), minutes: 19 * 60 + 25 },
+    ]);
+  });
+
+  it('says nothing for a routine still running — there is no crib time yet', () => {
+    expect(pointsFor([routine({ end: null })])).toEqual([]);
+  });
+
+  it('leaves out a length past believing, the way every other figure does', () => {
+    const forgotten = routine({ end: at(15, 19, 0) + MAX_ROUTINE_MS + 60_000 });
+    expect(pointsFor([forgotten])).toEqual([]);
+  });
+
+  it('leaves the nap routines out — the target is a bedtime', () => {
+    expect(pointsFor([routine(), napRoutine()])).toEqual(pointsFor([routine()]));
+  });
+});
+
 describe('computeRoutineStats', () => {
   it('averages each figure over the nights that have it', () => {
     const entries = [
@@ -336,6 +361,8 @@ describe('computeRoutineStats', () => {
     expect(stats.routineLength.mean).toBe(22.5 * 60_000);
     expect(stats.routineStart.n).toBe(2);
     expect(stats.routineStart.mean).toBeCloseTo(19 * 60, 6);
+    expect(stats.cribTime.n).toBe(2);
+    expect(stats.cribTime.mean).toBeCloseTo(19 * 60 + 22.5, 6);
   });
 
   it('leaves the nap routines out entirely — the figures are about bedtime', () => {
@@ -356,6 +383,7 @@ describe('computeRoutineStats', () => {
     expect(stats.settle).toEqual({ mean: null, sd: null, n: 0 });
     expect(stats.routineLength.n).toBe(0);
     expect(stats.routineStart.n).toBe(0);
+    expect(stats.cribTime.n).toBe(0);
   });
 });
 

@@ -143,6 +143,7 @@ export const translations = {
     tileRoutineLength: 'Routine length',
     tileSettle: 'Time to fall asleep',
     tileRoutineStart: 'Routine starts',
+    tileCrib: 'Goes into crib',
     overDays: 'over {count} day',
     overDaysPlural: 'over {count} days',
     fromNaps: 'from {count} nap',
@@ -163,6 +164,11 @@ export const translations = {
     settleAria:
       'Time from going into the crib to falling asleep, per night, with the mean and one standard deviation',
     settleSeries: 'Time to fall asleep',
+    cribTitle: 'When he went into the crib',
+    cribAria:
+      'Clock time of going into the crib per night, with the mean, one standard deviation and the target',
+    cribSeries: 'In crib',
+    cribNoTarget: 'No target set. The Config tab draws one on this chart and on the timeline above.',
     bedtimeTitle: 'Falling asleep and waking up',
     bedtimeAria: 'Bedtime and wake-up clock times per day, with the mean and one standard deviation',
     legendNight: 'Night',
@@ -174,6 +180,7 @@ export const translations = {
     legendIncomplete: 'Day in progress',
     legendMean: 'Mean',
     legendSpread: '±1 SD',
+    legendTarget: 'Target',
     chartEmpty: 'Nothing logged in this window.',
     meanLine: 'Mean {value}',
     bedtimeSeries: 'Falls asleep',
@@ -273,6 +280,21 @@ export const translations = {
       'The log is still working on this device and nothing has been lost, but it is not syncing until this is settled — writing to the wrong account would be worse than waiting.',
     shareRetry: 'Try again',
     shareWorking: 'Saving…',
+
+    // Config — the tab
+    navConfig: 'Config',
+    configIntro:
+      'What bedtime is aiming at. Everything here belongs to the log rather than to this device, so it syncs to the account and to whoever the log is shared with.',
+    configTargetTitle: 'Targets',
+    configCribTarget: 'In crib by',
+    configCribHint:
+      'The end of the bedtime routine — the moment he goes into the crib, not the moment he falls asleep.',
+    configNote:
+      'Drawn on the stats page: a line down the timeline and across the in-crib chart, so each night can be read against it. Nothing is counted or graded against it, and no average changes.',
+    configClear: 'No target',
+    configSaved: 'Target cleared.',
+    configSavedAt: 'Target saved: {time}.',
+    configErrTime: 'Set a time, or clear the target.',
   },
   pl: {
     // Tabs
@@ -410,6 +432,7 @@ export const translations = {
     tileRoutineLength: 'Długość rytuału',
     tileSettle: 'Czas zasypiania',
     tileRoutineStart: 'Początek rytuału',
+    tileCrib: 'Ląduje w łóżeczku',
     overDays: 'z {count} dnia',
     overDaysPlural: 'z {count} dni',
     fromNaps: 'z {count} drzemki',
@@ -429,6 +452,12 @@ export const translations = {
     settleAria:
       'Czas od położenia do łóżeczka do zaśnięcia, noc po nocy, ze średnią i jednym odchyleniem standardowym',
     settleSeries: 'Czas zasypiania',
+    cribTitle: 'O której trafiało do łóżeczka',
+    cribAria:
+      'Godzina położenia do łóżeczka dla każdej nocy, ze średnią, jednym odchyleniem standardowym i celem',
+    cribSeries: 'W łóżeczku',
+    cribNoTarget:
+      'Nie ustawiono celu. Zakładka Ustawienia rysuje go na tym wykresie i na osi czasu powyżej.',
     bedtimeTitle: 'Zasypianie i pobudka',
     bedtimeAria:
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
@@ -441,6 +470,7 @@ export const translations = {
     legendIncomplete: 'Dzień w toku',
     legendMean: 'Średnia',
     legendSpread: '±1 SD',
+    legendTarget: 'Cel',
     chartEmpty: 'Brak wpisów w tym zakresie.',
     meanLine: 'Średnia {value}',
     bedtimeSeries: 'Zasypia',
@@ -543,6 +573,21 @@ export const translations = {
       'Dziennik nadal działa na tym urządzeniu i nic nie zginęło, ale nie synchronizuje się, dopóki to się nie wyjaśni — zapis na złe konto byłby gorszy niż czekanie.',
     shareRetry: 'Spróbuj ponownie',
     shareWorking: 'Zapisywanie…',
+
+    // Config — the tab
+    navConfig: 'Ustawienia',
+    configIntro:
+      'Do czego dąży wieczór. Wszystko tutaj należy do dziennika, a nie do tego urządzenia, więc synchronizuje się z kontem i z osobą, której dziennik udostępniono.',
+    configTargetTitle: 'Cele',
+    configCribTarget: 'W łóżeczku do',
+    configCribHint:
+      'Koniec wieczornego rytuału — moment położenia do łóżeczka, a nie moment zaśnięcia.',
+    configNote:
+      'Rysowany na stronie statystyk: linia w poprzek osi czasu i wykresu położenia do łóżeczka, żeby każdą noc dało się do niego przyłożyć. Nic nie jest według niego liczone ani oceniane i żadna średnia się nie zmienia.',
+    configClear: 'Bez celu',
+    configSaved: 'Cel usunięty.',
+    configSavedAt: 'Zapisano cel: {time}.',
+    configErrTime: 'Ustaw godzinę albo usuń cel.',
   },
 } as const;
 

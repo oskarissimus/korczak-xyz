@@ -109,5 +109,14 @@ service cloud.firestore {
     match /users/{uid}/babySleepRoutines/{recordId} {
       allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
     }
+
+    // The targets — one document, holding the crib time bedtime is aiming at. Part of the same
+    // shared log: it is a household's decision rather than a viewer's preference, which is the whole
+    // reason it is synced at all, so both parents' charts have to be able to read it. Yet another
+    // copy of the rule, for the reason above: rules are a permissive union, and no block above says
+    // anything at all about this path.
+    match /users/{uid}/babySleepTargets/{recordId} {
+      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+    }
   }
 }

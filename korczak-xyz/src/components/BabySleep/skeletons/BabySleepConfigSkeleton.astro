@@ -1,0 +1,32 @@
+---
+/**
+ * Server-rendered stand-in for <BabySleepConfig client:only="react" />: the intro line and the one
+ * field, so the page does not jump when the island arrives. Nothing here may import
+ * `targetsStorage.ts` — this runs on the server, where there is no localStorage and no target.
+ *
+ * The field is deliberately left blank rather than filled with a default. The stored target is the
+ * reader's own and lives on their device; a placeholder time drawn here would be a number nobody
+ * set, shown for as long as hydration takes.
+ */
+import { translations, type Lang } from '../translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+---
+
+<div class="bs-config" aria-hidden="true">
+  <p class="bs-hint">{t.configIntro}</p>
+
+  <div class="bs-form">
+    <h2 class="bs-subhead">{t.configTargetTitle}</h2>
+    <div class="bs-field">
+      <span class="bs-field-label">{t.configCribTarget}</span>
+      <div class="bs-skel-field"></div>
+    </div>
+    <p class="bs-hint">{t.configCribHint}</p>
+  </div>
+</div>

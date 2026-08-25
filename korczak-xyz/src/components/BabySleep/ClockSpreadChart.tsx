@@ -28,6 +28,9 @@ interface ClockSpreadChartProps {
   points: ClockPoint[];
   stat: ClockStat;
   formatDay: (t: number) => string;
+  /** A goal clock time, in minutes after midnight, or null where the chart has none. */
+  target?: number | null;
+  targetLabel?: string;
   label: string;
   meanLabel: string;
   spreadLabel: string;
@@ -43,6 +46,8 @@ export default function ClockSpreadChart({
   points,
   stat,
   formatDay,
+  target,
+  targetLabel,
   ...labels
 }: ClockSpreadChartProps) {
   // With no mean direction — times spread right around the clock — there is nothing to centre on but
@@ -61,6 +66,14 @@ export default function ClockSpreadChart({
       }))}
       mean={stat.mean}
       band={band}
+      /* Unwrapped against the same centre as the dots, for the reason they are: a target of 19:15
+         drawn on raw minutes beneath a run of bedtimes near midnight would sit a whole axis away
+         from the points it is the goal for. */
+      target={
+        target != null && targetLabel
+          ? { value: unwrapAround(target, center), label: targetLabel }
+          : null
+      }
       formatValue={formatClock}
       formatDay={formatDay}
       tickSteps={TICK_STEPS}

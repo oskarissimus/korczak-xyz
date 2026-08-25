@@ -80,6 +80,23 @@ export function toTimeInputValue(t: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * `hh:mm` as minutes after midnight, or null if it is missing or malformed.
+ *
+ * The counterpart of `formatClock`, which already prints a `<input type="time">` value: a target is
+ * a time of day and not a moment, so it never goes near a date. An empty field is null rather than
+ * zero — 00:00 is a time somebody could mean.
+ */
+export function minutesFromTimeInput(time: string): number | null {
+  const parts = time.split(':').map(Number);
+  if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [h, m] = parts;
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h > 23 || h < 0 || m > 59 || m < 0) {
+    return null;
+  }
+  return h * 60 + m;
+}
+
 /** `yyyy-mm-dd` + `hh:mm` as an epoch, or null if either is missing or malformed. */
 export function fromDateTimeInputs(date: string, time: string): number | null {
   const dateParts = date.split('-').map(Number);

@@ -6,7 +6,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'log' | 'climate' | 'stats' | 'share';
+type View = 'log' | 'climate' | 'stats' | 'config' | 'share';
 
 interface Props {
   lang: Lang;
@@ -22,6 +22,8 @@ const TABS: { view: View; href: string; label: string }[] = [
   { view: 'log', href: `${base}/`, label: t.navLog },
   { view: 'climate', href: `${base}/climate/`, label: t.navClimate },
   { view: 'stats', href: `${base}/stats/`, label: t.navStats },
+  // After the stats and before the share: it is what the charts on that page are drawn against.
+  { view: 'config', href: `${base}/config/`, label: t.navConfig },
   { view: 'share', href: `${base}/share/`, label: t.navShare },
 ];
 ---

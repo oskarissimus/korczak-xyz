@@ -1,0 +1,30 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import BabySleepConfig from '../../../components/BabySleep/BabySleepConfig';
+import BabySleepTabs from '../../../components/BabySleep/BabySleepTabs.astro';
+import BabySleepConfigSkeleton from '../../../components/BabySleep/skeletons/BabySleepConfigSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/babySleep.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('BabySleep')} | korczak.xyz`} lang={lang} pwa="baby-sleep">
+  <div class="window baby-sleep-window">
+    <div class="title-bar">
+      <span>{t('BabySleep')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content baby-sleep-content">
+      <BabySleepTabs lang={lang} active="config" />
+      <BabySleepConfig client:only="react" lang={lang}>
+        <BabySleepConfigSkeleton slot="fallback" lang={lang} />
+      </BabySleepConfig>
+    </div>
+  </div>
+</Layout>

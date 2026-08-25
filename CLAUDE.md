@@ -1113,7 +1113,8 @@ silently does nothing looks exactly like a bug in the app.
 
 ## Baby Sleep Log
 
-At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab and a share tab.
+At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab, a config tab and a
+share tab.
 `src/utils/babySleep/` holds the shapes and the pure logic, `useBabySleepData` the state and sync.
 
 The reconciliation is **not** the typing trainer's: these documents are mutable but they are not a
@@ -1312,9 +1313,80 @@ The routine buttons are the plain raised grey, not a colour. Navy is the night, 
 yellow is waking, so every colour on that screen is already spoken for and a coloured routine button
 would read as one of the three things it is not.
 
+### The config tab, and the one intention in the log
+
+`/apps/baby-sleep/config/` holds what bedtime is **aiming at**, as opposed to what it did: the clock
+time he should be in the crib by, which is the moment the routine ends. Everything else in this app
+is an observation; this is the only target, and nothing is graded against it — no average moves, no
+tile counts hits and misses. It is drawn, and reading the dots against it is the whole feature.
+
+Its own tab rather than a control on the stats page, because that page answers what happened and a
+knob that moves the goalposts sitting among the measurements invites moving it until they look
+better.
+
+**It is synced, and that is the reason it is a record at all.** `BabySleepSettings` in `storage.ts` —
+which window the stats page was last showing — is genuinely this browser's and stays there. A target
+is the household's: it has to survive a reinstall and reach the other parent's phone, or the two
+charts disagree about the goal in silence. So it is `climate.ts`'s shape again — a `Versioned` record
+reconciled by `versioned.ts`, its own localStorage keys, its own push queue, its own collection —
+with one difference: it is a **singleton**, `users/{uid}/babySleepTargets/targets`, one document with
+a fixed id. There is no occasion to key on, so the union by id is a single `pickVersioned` call and
+`mergeTargets` is that call.
+
+- `targets.ts` (the record, `setCribTarget`, `mergeTargets`, `normalizeTargets`), `targetsStorage.ts`,
+  `targetsCloud.ts`, `src/hooks/useSleepTargets.ts`, `BabySleepConfig.tsx`
+
+**Clearing a target is a null field, never a tombstone.** The id is fixed, so setting one again after
+clearing necessarily reuses the id of what was deleted — which is precisely the case `versioned.ts`
+documents as having once made a night unloggable for good. Its causal rule handles that now; the
+simpler answer is available here and is taken, there being nothing to delete and only a field to
+empty.
+
+`cribMinutes` is minutes after local midnight, because a target is a time of day and not a moment: it
+is the same 19:15 every evening. It is **night-only**, for the reason the routine tiles are — a nap is
+led into at whatever hour the morning worked out to, and a clock target for one is a number nobody
+could hit or miss. `normalizeTargets` takes an unreadable `cribMinutes` as *no target* rather than
+rejecting the record, so a future build writing a shape this one cannot read still leaves this one a
+revision to move forward from.
+
+The field is committed by a button and not on change: a `<input type="time">` fires on every
+keystroke and every spin of a native picker, and each of those would be a document the other parent's
+phone pulls.
+
+`firestore.rules` needs its own `users/{uid}/babySleepTargets/{recordId}` block and, as ever, that is
+`firebase deploy --only firestore:rules` by hand — so the *shared* half does nothing until it is run,
+while the owner's own access comes from the `users/{uid}/{document=**}` catch-all and works
+immediately. `CACHED_PER_OWNER` gains both keys, or the previous household's target stays cached and
+is pushed into the next account on its first write.
+
+#### Where the target shows up
+
+Two charts, because they answer different questions about the same line:
+
+- **The timeline** takes it as a vertical line down every row (`targetMinutes`), which is what this
+  chart can say and the spread chart cannot: not how far the mean was off, but *which nights* were
+  the late ones. Placed off the plain 24-hour fraction, the same approximation the hour ticks use, so
+  the two stay in column on the twice-yearly 23- and 25-hour rows.
+- **A new in-crib chart** — `cribPoints` in `routineStats.ts`, the clock time each night's routine
+  *ended*, with `cribTime` as its tile. This is the population the target is set against, and it did
+  not exist before: the deck of clock charts measured falling asleep, waking and the first nap, and
+  the crib is the moment you can act on where falling asleep is the one that happens to you.
+
+`SpreadChart` grew an optional `target` and draws it **solid where the mean is dashed**, in green —
+the one colour these charts had left, navy being the night, teal a nap, orchid the routine, yellow
+the mean and cyan the dots. The two lines can sit on top of each other for weeks, so what it *was*
+must never be mistaken for what it is *meant to be*. The target widens the axis like any other
+value: a target the dots are nowhere near is exactly the case worth seeing, and a line that quietly
+falls off the top reads as no target at all. On the clock axis it goes through `unwrapAround` against
+the same centre the dots do, or a 19:15 target drawn on raw minutes beneath a run of near-midnight
+bedtimes sits a whole axis away from the points it is the goal for.
+
+With no target set the in-crib chart carries a line of prose saying where to set one, since an
+absent line and a feature nobody has heard of look identical.
+
 ### The spread charts
 
-Four of them: three clock times and the night's length. `SpreadChart.tsx` is the drawing — dots, mean
+Five of them: four clock times and the night's length. `SpreadChart.tsx` is the drawing — dots, mean
 line, ±1 SD band, ticks, legend — and the line it is split on is that **it does not know what it is
 plotting**. It takes numbers in the axis's own units and a function that prints one, so
 `ClockSpreadChart` (minutes, circular) and `DurationSpreadChart` (milliseconds, linear) stay one

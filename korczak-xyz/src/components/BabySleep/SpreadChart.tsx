@@ -39,6 +39,15 @@ interface SpreadChartProps {
    * negative minutes are last night.
    */
   floor?: number;
+  /**
+   * A goal in axis units, set by the human rather than computed from the dots — see `targets.ts`.
+   *
+   * Solid where the mean is dashed, because the two lines answer different questions and a reader
+   * glancing at the chart has to be able to tell what it *was* from what it is *meant to be*. It
+   * widens the axis like any other value: a target the dots are nowhere near is exactly the case
+   * worth seeing, and a line that quietly falls off the top reads as no target at all.
+   */
+  target?: { value: number; label: string } | null;
   label: string;
   meanLabel: string;
   spreadLabel: string;
@@ -65,6 +74,7 @@ export default function SpreadChart({
   tickSteps,
   minSpan,
   floor,
+  target,
   label,
   meanLabel,
   spreadLabel,
@@ -82,7 +92,11 @@ export default function SpreadChart({
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-  const spread = [...points.map((p) => p.y), ...(band ? [band.lo, band.hi] : [])];
+  const spread = [
+    ...points.map((p) => p.y),
+    ...(band ? [band.lo, band.hi] : []),
+    ...(target ? [target.value] : []),
+  ];
   const rawLo = Math.min(...spread);
   const rawHi = Math.max(...spread);
   const pad = Math.max(minSpan / 9, (rawHi - rawLo) * 0.15);
@@ -141,6 +155,20 @@ export default function SpreadChart({
           </g>
         ))}
 
+        {/* Under the mean line and over the gridlines: where the two coincide, the mean is the fact
+            and the target is the intention, and it is the fact that must stay readable. */}
+        {target && (
+          <line
+            className="bs-target-line"
+            x1={MARGIN.left}
+            x2={WIDTH - MARGIN.right}
+            y1={y(target.value)}
+            y2={y(target.value)}
+          >
+            <title>{`${target.label} ${formatValue(target.value)}`}</title>
+          </line>
+        )}
+
         {mean != null && (
           <line
             className="bs-mean-line"
@@ -183,6 +211,13 @@ export default function SpreadChart({
           <li>
             <span className="bs-swatch bs-swatch--band" aria-hidden="true" />
             {spreadLabel}
+          </li>
+        )}
+        {target && (
+          <li>
+            <span className="bs-swatch bs-swatch--target" aria-hidden="true" />
+            {target.label}
+            <span className="bs-legend-value">{formatValue(target.value)}</span>
           </li>
         )}
       </ul>

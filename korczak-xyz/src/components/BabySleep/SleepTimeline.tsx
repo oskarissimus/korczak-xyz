@@ -51,6 +51,13 @@ interface SleepTimelineProps {
   /** The two tooltips, built by the caller so this chart needs no translation table. */
   routineLabel: (from: string, to: string | null) => string;
   settleLabel: (from: string, duration: string | null) => string;
+  /**
+   * The crib target as minutes after midnight, or null when none is set — a single vertical line
+   * every row's crib tick can be read against, which is what this chart can say that the spread
+   * chart cannot: not how far off the mean was, but which nights were the late ones.
+   */
+  targetMinutes?: number | null;
+  targetLabel?: string;
   ariaLabel: string;
   emptyLabel: string;
 }
@@ -72,6 +79,8 @@ export default function SleepTimeline({
   formatTime,
   routineLabel,
   settleLabel,
+  targetMinutes,
+  targetLabel,
   ariaLabel,
   emptyLabel,
 }: SleepTimelineProps) {
@@ -209,6 +218,22 @@ export default function SleepTimeline({
             </g>
           );
         })}
+
+        {/* Drawn after the rows so it lies over them — a goal line the day's own background paints
+            out is not a goal line. Placed off the plain 24-hour fraction, the same approximation the
+            hour ticks above use, so the two stay in column on the twice-yearly 23- and 25-hour
+            rows; the bars themselves are scaled by each row's real span. */}
+        {targetMinutes != null && targetLabel && (
+          <line
+            className="bs-target-line"
+            x1={MARGIN.left + (targetMinutes / 1440) * plotW}
+            x2={MARGIN.left + (targetMinutes / 1440) * plotW}
+            y1={MARGIN.top - 4}
+            y2={height - MARGIN.bottom}
+          >
+            <title>{targetLabel}</title>
+          </line>
+        )}
 
         <line
           className="bs-chart-axis"

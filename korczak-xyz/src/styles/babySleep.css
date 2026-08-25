@@ -724,6 +724,18 @@
   fill: var(--retro-yellow);
 }
 
+/* The crib target. Solid where the mean is dashed, and green rather than yellow, because the two
+   lines can sit on top of each other for weeks at a time and "what it was" must never be mistaken
+   for "what it is meant to be". Green is otherwise unspoken for on these charts — navy is the
+   night, teal a nap, orchid the routine, yellow the mean and cyan the dots. */
+.bs-target-line,
+.bs-swatch--target {
+  stroke: var(--retro-green);
+  stroke-width: 1.5;
+  fill: none;
+  background-color: var(--retro-green);
+}
+
 /* --- clock spread --------------------------------------------------------- */
 
 .bs-spread-band,
@@ -764,6 +776,13 @@
 }
 
 .bs-swatch--mean {
+  height: 4px;
+  border: 0;
+}
+
+/* A line on the chart, so a line in the legend — but upright on the timeline and flat on the spread
+   chart, and one swatch cannot be both. Flat, matching the mean it is read against. */
+.bs-swatch--target {
   height: 4px;
   border: 0;
 }
@@ -909,7 +928,8 @@ a.bs-action {
 
 /* --- climate -------------------------------------------------------------- */
 
-.bs-climate {
+.bs-climate,
+.bs-config {
   display: flex;
   flex-direction: column;
   gap: 18px;

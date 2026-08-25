@@ -19,7 +19,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
 import { useNightRoutine } from '../../hooks/useNightRoutine';
-import { mergeSync } from '../../utils/flashcards/sync';
+import { useSleepTargets } from '../../hooks/useSleepTargets';
+import { mergeAllSync } from '../../utils/flashcards/sync';
 import { resolveWindow } from '../../utils/babySleep/days';
 import { formatClock, formatHm, formatSpread } from '../../utils/babySleep/format';
 import {
@@ -32,6 +33,7 @@ import {
 import {
   asleepByRoutine,
   computeRoutineStats,
+  cribPoints,
   nightRoutinesByDay,
   settlePoints,
 } from '../../utils/babySleep/routineStats';
@@ -91,6 +93,9 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
   const owner = useDataOwner(auth.user);
   const data = useBabySleepData(auth.user, owner);
   const routines = useNightRoutine(auth.user, owner);
+  /* The one thing on this page that is not a measurement: the crib time the household is aiming at,
+     drawn on the timeline and on the in-crib chart. Set on the config tab. */
+  const targets = useSleepTargets(auth.user, owner);
 
   const [stored] = useState(() => loadSettings());
   const [choice, setChoice] = useState<WindowChoice>(() =>
@@ -161,13 +166,20 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
     />
   );
 
-  if (!data.ready || !routines.ready) return <div className="bs-loading" />;
+  /* The target's own label, built here so neither chart learns about the translation table. */
+  const targetLabel =
+    targets.cribMinutes == null
+      ? null
+      : `${t.legendTarget} · ${t.tileCrib} ${formatClock(targets.cribMinutes)}`;
 
-  // One badge over two syncs: a half that failed is never reported as synced. See `mergeSync`.
-  const sync = mergeSync(data.sync, routines.sync);
+  if (!data.ready || !routines.ready || !targets.ready) return <div className="bs-loading" />;
+
+  // One badge over three syncs: a half that failed is never reported as synced. See `mergeSync`.
+  const sync = mergeAllSync([data.sync, routines.sync, targets.sync]);
   const retrySync = () => {
     data.retrySync();
     routines.retrySync();
+    targets.retrySync();
   };
 
   return (
@@ -211,9 +223,11 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         {clockTile(t.tileBedtime, stats.bedtime)}
         {clockTile(t.tileWake, stats.wakeTime)}
         {clockTile(t.tileFirstNap, stats.firstNapStart)}
-        {/* The routine last: it is what happens before the night, and the three read together. */}
+        {/* The routine last, in the order the evening happens: it is what comes before the night,
+            and the four read together. */}
         {clockTile(t.tileRoutineStart, routineStats.routineStart)}
         {durationTile(t.tileRoutineLength, routineStats.routineLength)}
+        {clockTile(t.tileCrib, routineStats.cribTime)}
         {durationTile(t.tileSettle, routineStats.settle)}
       </div>
 
@@ -242,6 +256,8 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
               ? waiting
               : `${waiting} · ${fill(t.routineAsleepAfter, { duration })}`;
           }}
+          targetMinutes={targets.cribMinutes}
+          targetLabel={targetLabel ?? undefined}
           ariaLabel={t.timelineAria}
           emptyLabel={t.chartEmpty}
         />
@@ -270,6 +286,13 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
             <span className="bs-swatch bs-swatch--running" aria-hidden="true" />
             {t.legendRunning}
           </li>
+          {targets.cribMinutes != null && (
+            <li>
+              <span className="bs-swatch bs-swatch--target" aria-hidden="true" />
+              {t.legendTarget}
+              <span className="bs-legend-value">{formatClock(targets.cribMinutes)}</span>
+            </li>
+          )}
         </ul>
       </section>
 
@@ -320,6 +343,26 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           meanLabel={t.legendMean}
           spreadLabel={t.legendSpread}
           ariaLabel={t.settleAria}
+          emptyLabel={t.chartEmpty}
+        />
+      </section>
+
+      {/* Before the bedtime charts, in the order the evening happens — and on its own rather than
+          inside that section, because it is the one chart with a goal drawn on it and the sentence
+          under the heading is about the goal. */}
+      <section className="bs-section">
+        <h2 className="bs-subhead">{t.cribTitle}</h2>
+        {targets.cribMinutes == null && <p className="bs-note">{t.cribNoTarget}</p>}
+        <ClockSpreadChart
+          points={cribPoints(stats.days, routineByNight)}
+          stat={routineStats.cribTime}
+          target={targets.cribMinutes}
+          targetLabel={t.legendTarget}
+          formatDay={formatDay}
+          label={t.cribSeries}
+          meanLabel={t.legendMean}
+          spreadLabel={t.legendSpread}
+          ariaLabel={t.cribAria}
           emptyLabel={t.chartEmpty}
         />
       </section>

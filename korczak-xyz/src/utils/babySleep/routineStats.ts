@@ -30,7 +30,7 @@
  */
 
 import { circularStat, linearStat } from './circular';
-import { clipSegment, dayKeyOf } from './days';
+import { clipSegment, dayKeyOf, minutesOfDay } from './days';
 import type { RoutineRecord } from './routine';
 import {
   MAX_SETTLE_MS,
@@ -346,12 +346,33 @@ export function routineStartPoints(
   });
 }
 
+/**
+ * The clock time he went into the crib, one point a night — the figure the target is set against.
+ *
+ * A routine still running has no crib time yet and contributes nothing; so does one whose length is
+ * past believing, which is `routineLengthPoints`'s rule and holds for its reason. Note this is the
+ * *end* of the routine and not the start of the sleep: what a target is aimed at is the moment you
+ * can act on, which is putting him down, not the moment he happens to fall asleep afterwards.
+ */
+export function cribPoints(
+  days: DayBucket[],
+  byNight: Map<string, RoutineRecord>
+): ClockPoint[] {
+  return days.flatMap((day) => {
+    const routine = byNight.get(day.key);
+    if (!routine || routine.end == null || routineLength(routine) == null) return [];
+    return [{ at: day.start, minutes: minutesOfDay(routine.end) }];
+  });
+}
+
 // --- the figures -------------------------------------------------------------------------------------
 
 export interface RoutineStats {
   routineLength: MeanStat;
   settle: MeanStat;
   routineStart: ClockStat;
+  /** When he actually went into the crib — what the target on the charts is read against. */
+  cribTime: ClockStat;
 }
 
 function meanStat(values: number[]): MeanStat {
@@ -372,5 +393,6 @@ export function computeRoutineStats(
     routineLength: meanStat(routineLengthPoints(days, byNight).map((p) => p.ms)),
     settle: meanStat(settlePoints(days, byNight).map((p) => p.ms)),
     routineStart: circularStat(routineStartPoints(days, byNight).map((p) => p.minutes)),
+    cribTime: circularStat(cribPoints(days, byNight).map((p) => p.minutes)),
   };
 }
