@@ -8,6 +8,14 @@
  * the verdict is the dot's colour. Read left to right, the boundary between the colours in the top
  * lane *is* the answer.
  *
+ * The verdict is a **shape** as well as a colour, and on this chart that matters more than
+ * anywhere else on the site. The claim above — that the boundary between the verdicts in the top
+ * lane *is* the answer — was true only in colour: `ok` and `warm` were grayscale 182 and 180, a
+ * contrast of 1.02, so on an e-ink screen or a print the lane was one undifferentiated row of dots.
+ * They were also the classic green-against-orange pair, ΔE 5.8 under simulated deuteranopia, which
+ * is below the floor at which two marks can be told apart at all. So cold is a square, ok a disc
+ * and warm a triangle; the re-stepped colours in `babySleep.css` are the second half of the fix.
+ *
  * Dots at the same temperature are stacked within their lane rather than drawn on top of one
  * another, and the stacking is by *position among the dots sharing that temperature* rather than by
  * a hash of the night key. A hash looked right and was not: consecutive dates hash to consecutive
@@ -16,6 +24,7 @@
  * picture every time.
  */
 
+import { Mark, SeriesSwatch, type MarkShape } from '../charts/ChartMarks';
 import type { NightObservation } from '../../utils/babySleep/climateStats';
 import { isComplete } from '../../utils/babySleep/climateStats';
 import type { NightVerdict, WindowState } from '../../utils/babySleep/climate';
@@ -81,6 +90,17 @@ const VERDICT_CLASS: Record<NightVerdict, string> = {
   cold: 'bs-dot--cold',
   ok: 'bs-dot--ok',
   warm: 'bs-dot--warm',
+};
+
+/*
+ * Square, disc, triangle — the three that stay apart at five pixels. A diamond was the obvious
+ * fourth and is not used here: against a disc of the same area it is a disc with corners, and this
+ * chart is read by scanning a lane for where the marks change.
+ */
+const VERDICT_SHAPE: Record<NightVerdict, MarkShape> = {
+  cold: 'square',
+  ok: 'disc',
+  warm: 'triangle',
 };
 
 export default function ClimateChart({
@@ -188,8 +208,9 @@ export default function ClimateChart({
         )}
 
         {complete.map((night) => (
-          <circle
+          <Mark
             key={night.night}
+            shape={VERDICT_SHAPE[night.verdict]}
             className={`bs-dot ${VERDICT_CLASS[night.verdict]}`}
             cx={x(night.tempC)}
             cy={laneMid(LANES.indexOf(night.window)) + (offsets.get(night.night) ?? 0)}
@@ -203,21 +224,22 @@ export default function ClimateChart({
                 verdict: verdictLabel(night.verdict).toLowerCase(),
               })}
             </title>
-          </circle>
+          </Mark>
         ))}
       </svg>
 
       <ul className="bs-legend">
+        {/* Points, not lines, so the swatch draws the mark alone — the same one the lane carries. */}
         <li>
-          <span className="bs-swatch bs-swatch--cold" aria-hidden="true" />
+          <SeriesSwatch className="bs-dot--cold" shape={VERDICT_SHAPE.cold} line={false} />
           {t.verdictCold}
         </li>
         <li>
-          <span className="bs-swatch bs-swatch--ok" aria-hidden="true" />
+          <SeriesSwatch className="bs-dot--ok" shape={VERDICT_SHAPE.ok} line={false} />
           {t.verdictOk}
         </li>
         <li>
-          <span className="bs-swatch bs-swatch--warm" aria-hidden="true" />
+          <SeriesSwatch className="bs-dot--warm" shape={VERDICT_SHAPE.warm} line={false} />
           {t.verdictWarm}
         </li>
         {markAt != null && (

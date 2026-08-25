@@ -20,6 +20,11 @@
  * the night would read as one. Drawn first, so where a mis-log overlaps a sleep the sleep is what
  * you see.
  *
+ * The night and the nap are the two full-height series and were told apart by hue alone, at 1.74
+ * grayscale contrast. The nap's teal was re-stepped to 195 and it carries the diagonal texture; the
+ * night stays flat, being the anchor and the one you already know by where it sits on the row. The
+ * routine bars need neither — half height is a shape channel already.
+ *
  * Two deliberate departures from the house chart style:
  *   - `HEIGHT` is computed from the row count rather than fixed, so thirty days grows the viewBox
  *     instead of squashing each row to three pixels.
@@ -27,6 +32,7 @@
  *     phone's width runs out.
  */
 
+import ChartTextures, { TEXTURE, texture } from '../charts/ChartTextures';
 import { effectiveEnd, segmentsForDay } from '../../utils/babySleep/days';
 import { formatHm } from '../../utils/babySleep/format';
 import type { RoutineRecord } from '../../utils/babySleep/routine';
@@ -132,6 +138,7 @@ export default function SleepTimeline({
   return (
     <div className="bs-chart">
       <svg viewBox={`0 0 ${WIDTH} ${height}`} width="100%" role="img" aria-label={ariaLabel}>
+        <ChartTextures />
         {hours.map((h) => {
           const x = MARGIN.left + (h / 24) * plotW;
           return (
@@ -203,16 +210,29 @@ export default function SleepTimeline({
                   running ? '…' : formatTime(entry.end as number)
                 } · ${formatHm(end - entry.start)}`;
                 return (
-                  <rect
-                    key={`${entry.id}-${day.key}`}
-                    className={`bs-block bs-block--${entry.kind}${running ? ' bs-block--running' : ''}`}
-                    x={x1}
-                    y={y}
-                    width={Math.max(1, x2 - x1)}
-                    height={ROW_H}
-                  >
-                    <title>{whole}</title>
-                  </rect>
+                  <g key={`${entry.id}-${day.key}`}>
+                    <rect
+                      className={`bs-block bs-block--${entry.kind}${running ? ' bs-block--running' : ''}`}
+                      x={x1}
+                      y={y}
+                      width={Math.max(1, x2 - x1)}
+                      height={ROW_H}
+                    >
+                      <title>{whole}</title>
+                    </rect>
+                    {/* Only a finished nap: a running one is already the yellow that says so, and
+                        laying a texture over it would blur the one state this chart shows live. */}
+                    {entry.kind === 'nap' && !running && (
+                      <rect
+                        className="chart-tex"
+                        x={x1}
+                        y={y}
+                        width={Math.max(1, x2 - x1)}
+                        height={ROW_H}
+                        fill={texture(TEXTURE.diagonal)}
+                      />
+                    )}
+                  </g>
                 );
               })}
             </g>

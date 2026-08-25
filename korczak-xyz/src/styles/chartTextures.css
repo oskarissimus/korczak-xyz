@@ -1,0 +1,100 @@
+/*
+ * What the charts share so that none of them depends on hue alone.
+ *
+ * Pulled in by each app's stylesheet with `@import`, the way `tabs.css` and `chordMarks.css` are,
+ * so a page picks it up through the one stylesheet it already needed. The class names carry no app
+ * prefix because the components live in `src/components/charts/` and belong to none of them — the
+ * mistake `.fb-empty` made inside a shared `srs/` component, which shipped an unstyled empty chart
+ * on the one page that did not load `fretboard.css`.
+ *
+ * The rule this file serves is written up in `ChartTextures.tsx`: every series carries a channel
+ * that survives the colour being taken away. Here that is the texture ink, the marker fills, and
+ * the legend swatch that draws the same mark.
+ */
+
+/*
+ * The texture ink. White rather than the series' own colour so one set of patterns serves every
+ * chart on the site, and semi-transparent so it lightens the bar it is laid over instead of
+ * replacing it — a texture must not cost the colour reader the hue it is standing in for.
+ *
+ * 0.38 was chosen against the darkest thing it is drawn on (`--srs-bucket-new`, #2c2c4c, and the
+ * timeline's #1a1a2e rows): below about 0.3 the stripes vanish there, and above about 0.45 they
+ * wash a pale bar towards white and take the luminance separation the texture was added to protect.
+ */
+.chart-tex-ink {
+  fill: #ffffff;
+  opacity: 0.38;
+}
+
+/*
+ * The overlay carrying a texture. `pointer-events: none` is load-bearing: the shape underneath owns
+ * the `<title>` that is the bar's tooltip, and a lid drawn over it is a bar you cannot hover.
+ */
+.chart-tex {
+  pointer-events: none;
+  stroke: none;
+}
+
+/* --- markers -------------------------------------------------------------- */
+
+/*
+ * Marks carry no colour of their own — every one of them is filled by the series class beside it,
+ * which is why `MarkShape` has no hollow member. See the note on it in `ChartMarks.tsx`: a stroked
+ * shape would need `fill: none` here to beat a series class of equal specificity imported later in
+ * the sheet, and losing that race silently floods the mark.
+ *
+ * `stroke: none` so a mark cannot inherit an outline from a `<g>` it is nested in — the trend
+ * chart's markers sit inside the same group as its polylines.
+ */
+.chart-mark {
+  stroke: none;
+}
+
+/* --- the legend swatch ---------------------------------------------------- */
+
+/*
+ * The swatch is an `<svg>` rather than a `<span>` with a background, because it draws the series'
+ * real marker. `overflow: visible` because a marker sized to the row can sit a hair proud of the
+ * 24×12 box, and clipping it would make the shape — which is the whole point of the swatch — the
+ * one thing that does not survive.
+ */
+.chart-swatch {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+/*
+ * Textured swatches for the area and bar series, whose channel is a texture rather than a marker
+ * and whose legend entries stay `<span>`s. These gradients restate `chart-tex-diagonal` and
+ * `chart-tex-crosshatch` in CSS: the same 45°, the same duty cycle, the same ink. Two declarations
+ * of one texture is a thing that can drift, and `chartContrast.test.ts` is what stops it — it reads
+ * the tile geometry out of `ChartTextures.tsx` and asserts these still agree with it.
+ */
+.chart-swatch-tex--diagonal {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.38) 0,
+    rgba(255, 255, 255, 0.38) 3px,
+    transparent 3px,
+    transparent 8px
+  );
+}
+
+.chart-swatch-tex--crosshatch {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.38) 0,
+      rgba(255, 255, 255, 0.38) 2px,
+      transparent 2px,
+      transparent 8px
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.38) 0,
+      rgba(255, 255, 255, 0.38) 2px,
+      transparent 2px,
+      transparent 8px
+    );
+}

@@ -1799,6 +1799,82 @@ character cell — losing VT323's metrics misaligns every chord chart, so a syst
 is not graceful degradation here. `latin-ext` is not optional: every Polish diacritic except
 `ó` lives there. See `public/fonts/README.md`.
 
+## The charts, and why none of them is read by colour alone
+
+Every chart on this site draws on a black panel in the CRT phosphor palette, and that palette is
+almost flat in luminance at the bright end: converted to 8-bit gray, green is 220, cyan 229 and
+yellow 247. So a chart that tells two series apart by those hues tells them apart by **nothing** on
+an e-ink reader, in a grayscale phone mode, on a monochrome print, or to a reader who cannot
+separate the red-green axis. Most of them did. Measured, worst pair per chart, before:
+
+| Chart | Worst pair | Gray contrast | CVD ΔE |
+|---|---|---|---|
+| `ClimateChart` | ok / warm | **1.02** | **5.8** deutan — below the 6.0 floor |
+| Typing `StatsChart` | wpm / trend | **1.09** | **3.5** protan — far below it |
+| `SpreadChart` legend | dot / target | **1.09** | passes |
+| `TrendChart` | accuracy / speed | **1.17** | passes (22.0) |
+| `MasteryChart` + `.fb-heat-*` | young / learning | **1.20** | passes |
+| `SleepTimeline` / `DailySleepBars` | night / nap | 1.74 | passes |
+
+Two different faults, one rule. Climate and typing failed for colour-blind readers as well; the SRS
+trend and the bucket ramp passed CVD and failed only in grayscale.
+
+**No series may be told apart by hue alone.** Each carries a second channel that survives the colour
+being taken away, and the legend carries the same channel:
+
+- **lines** → a dash pattern *and* a marker shape
+- **areas and bars** → a texture overlay, plus a luminance ramp where the data is sequential
+- **categorical points** → a marker shape
+- **annotations** (a trend fit) → neutral ink, never a series hue
+
+`src/components/charts/` is the shared machinery — `ChartTextures.tsx` (three SVG patterns) and
+`ChartMarks.tsx` (`Mark`, `SeriesSwatch`), with `src/styles/chartTextures.css` `@import`ed by the
+three app sheets the way `tabs.css` is. No app prefix on those class names: they belong to none of
+the four apps, which is the `.fb-empty`-in-a-shared-component lesson.
+
+Three things about them are worth knowing before touching one:
+
+- **A texture is an overlay, not a fill.** The shape is drawn once in its colour and again on top
+  with the pattern, whose ink is white at 0.38 — so the colour reader loses no hue. A pattern
+  carrying the base colour as a full-tile background rect would be one element instead of two, and
+  was rejected: full-coverage tiles show hairline seams under anti-aliasing, which on a near-black
+  panel read as a grid ruled across the data. The overlay is `pointer-events: none`, because the
+  shape beneath owns the `<title>` that is the bar's tooltip.
+- **Every `MarkShape` is filled, and there is deliberately no hollow ring.** A stroked mark cannot
+  take its colour from the `fill` every series class declares, and `fill: none` would have to beat a
+  series class of equal specificity imported later in the sheet. Losing that race floods the mark
+  silently. Four filled shapes separate fine at four pixels.
+- **A marker wearing its line's class inherits that class's `stroke`.** Hence `.typing-chart-point`,
+  which resets it — and which replaced a `circle.…` selector that stopped matching the moment a
+  marker could be a square or a triangle.
+
+Hues stayed in the phosphor family; only lightness was re-stepped where two series collided. The
+four scheduler buckets are the clearest case and are now named once, as `--srs-bucket-*` in
+`srsCharts.css`, read by `fretboard.css` for the neck heatmap — they had been two copies of the same
+four hexes. That ramp is monotonic in luminance (47 / 88 / 132 / 186, neighbours ~1.9 apart), which
+is the right encoding anyway for a sequence a card walks one way along.
+
+The typing trend fit left the palette altogether. It was yellow drawn along the green wpm line it
+fits, which is the one pair here a protanope cannot separate at all; it is `--retro-gray` now, and a
+least-squares fit is an annotation over the data rather than a fourth measurement, so neutral ink is
+what it should always have worn.
+
+`src/styles/chartContrast.test.ts` guards all of it, reading the stylesheets as text the way
+`chordAlignment.test.ts` and `pwa/tiers.test.ts` do. It has to: **a rendering test can never catch
+this.** A headless Chromium draws the colour version perfectly, and the failure exists only for a
+reader whose display or vision removes a channel the test environment has. The test also checks the
+CSS gradients that restate the textures for the legend swatches still agree with the SVG patterns'
+geometry, since two declarations of one texture drift invisibly.
+
+What it does **not** assert is that hue separation is ever sufficient. It is not; the second channel
+is the point, and it lives in the components.
+
+To check a change by eye, temporarily add an Astro page under `src/pages/` that renders the chart
+components with synthetic props, build, and screenshot it with `html { filter: grayscale(1) }`
+injected. Note that a page whose filename starts with `_` is one Astro will not build, and that
+there is no JSX transform in this project's vitest — the 61 test files are all logic and text, and
+server-rendering a component from a test is not available without adding config.
+
 ## Localization (i18n)
 
 The site supports English (default) and Polish. All user-facing strings should be localized —

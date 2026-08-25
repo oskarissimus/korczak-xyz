@@ -1,6 +1,7 @@
 /* Touch-Typing Trainer — retro theme */
 
 @import './tabs.css';
+@import './chartTextures.css';
 
 .typing-window {
   margin-bottom: 20px;
@@ -540,35 +541,63 @@
   font-size: 13px;
 }
 
+/*
+ * The three data lines, and the one place on this site where the phosphor palette was actively
+ * dangerous rather than merely flat. Green, cyan and yellow are grayscale 220, 229 and 247: wpm and
+ * accuracy sat 1.09 apart, which is one line drawn twice with the colour gone. And green against
+ * yellow measured ΔE 3.5 under simulated protanopia — not merely below the 8.0 target but below the
+ * 6.0 floor, so a reader with the commonest colour deficiency could not separate the wpm line from
+ * the trend fit drawn along it.
+ *
+ * Three things fix it, and all three were needed. The hues stay in the phosphor family but are
+ * re-stepped into a luminance ladder — wpm bright at 218, accuracy 165, time 108. Each line takes a
+ * dash pattern. Each carries a marker shape (`shape` on `StatsSeries`). Together the three data
+ * series now measure ΔE 16.3 at worst, and read as three distinct lines in pure grayscale.
+ *
+ * The trend fit left the palette altogether — see `--trend` below.
+ *
+ * `.typing-chart-point` is what separates a marker's fill from its line's stroke. It used to be the
+ * element name, `circle.…`, which stopped working the moment a marker could be a square or a
+ * triangle. It must not be the bare series class either: a `fill` on the class would reach the
+ * `<polyline>`, and a fill on a polyline closes the path back to its first point and floods the
+ * area under the line — the trap written up in `srsCharts.css`, whose `fill="none"` attribute a
+ * stylesheet beats.
+ */
 .typing-chart-line--wpm {
-  stroke: var(--retro-green);
+  stroke: #00fd00;
 }
 
 .typing-chart-line--accuracy {
-  stroke: var(--retro-cyan);
-}
-
-circle.typing-chart-line--wpm {
-  fill: var(--retro-green);
-  stroke: none;
-}
-
-circle.typing-chart-line--accuracy {
-  fill: var(--retro-cyan);
-  stroke: none;
+  stroke: #00b8b8;
+  stroke-dasharray: 7 4;
 }
 
 .typing-chart-line--time {
-  stroke: var(--retro-magenta);
+  stroke: #c000c0;
+  stroke-dasharray: 2 4;
 }
 
-circle.typing-chart-line--time {
-  fill: var(--retro-magenta);
+/* A marker wears its series' line class too, so it inherits that class's `stroke` — which on a
+   filled mark is a 1px outline growing it by a pixel all round. Declared after the line rules, so
+   it wins on order at equal specificity. */
+.typing-chart-point {
   stroke: none;
 }
 
+.typing-chart-point.typing-chart-line--wpm {
+  fill: #00fd00;
+}
+
+.typing-chart-point.typing-chart-line--accuracy {
+  fill: #00b8b8;
+}
+
+.typing-chart-point.typing-chart-line--time {
+  fill: #c000c0;
+}
+
 .typing-chart-tick--right {
-  fill: var(--retro-magenta);
+  fill: #c000c0;
 }
 
 /* Loading skeleton + reveal animation */
@@ -695,45 +724,52 @@ circle.typing-chart-line--time {
   border: 1px solid var(--retro-black);
 }
 
+/* The legend entries are toggle buttons on the panel face, not on the chart's black, so they keep a
+   filled chip rather than becoming `SeriesSwatch`es: a 1.5px dashed line in a 14px box on grey is
+   not a thing anyone can read, and the shape channel these series carry is on their markers. The
+   chips are the lines' own colours, so the luminance ladder above is what separates them here too —
+   218 / 165 / 108, with the trend's neutral grey last. */
 .typing-legend-item--wpm .typing-legend-swatch {
-  background: var(--retro-green);
+  background: #00fd00;
 }
 
 .typing-legend-item--accuracy .typing-legend-swatch {
-  background: var(--retro-cyan);
+  background: #00b8b8;
 }
 
 .typing-legend-item--time .typing-legend-swatch {
-  background: var(--retro-magenta);
+  background: #c000c0;
 }
 
 .typing-legend-item--trend .typing-legend-swatch {
-  background: var(--retro-yellow);
+  background: var(--retro-gray);
 }
 
 /* Per-key stats page */
 
+/* The only data line on the per-key page, so it has no pair to be confused with and keeps its
+   yellow. The trend fit beside it is grey and dashed. */
 .typing-chart-line--keywpm {
   stroke: var(--retro-yellow);
 }
 
-circle.typing-chart-line--keywpm {
+.typing-chart-point.typing-chart-line--keywpm {
   fill: var(--retro-yellow);
-  stroke: none;
 }
 
 /* Least-squares fit through the per-day points — dashed and thinner so it reads
-   as an annotation over the data, not a second measurement. */
+   as an annotation over the data, not a second measurement.
+
+   Neutral grey rather than a series hue, and that is the fix for the worst colour pair on the site
+   as well as the more correct thing in its own right. It was yellow on the over-time chart, drawn
+   along the green wpm line it fits: ΔE 3.5 under protanopia, and 1.09 in grayscale. A fit is an
+   annotation over the data rather than a fourth measurement, so it wears the ink the tick labels
+   wear; being the only achromatic line on the panel is itself what identifies it. That also frees
+   the per-key page from needing its own override — one rule now serves both charts. */
 .typing-chart-line--trend {
-  stroke: var(--retro-cyan);
+  stroke: var(--retro-gray);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
-}
-
-/* On the over-time chart cyan is already the accuracy series; yellow is the one
-   palette slot none of the three data lines there uses. */
-.typing-chart-line--trend-wpm {
-  stroke: var(--retro-yellow);
 }
 
 /* Let the sort buttons wrap on narrow screens (also harmless on the
@@ -1030,11 +1066,7 @@ circle.typing-chart-line--keywpm {
   height: 9px;
   vertical-align: middle;
   background: var(--retro-black);
-  border-top: 2px dashed var(--retro-cyan);
-}
-
-.typing-trend-swatch--wpm {
-  border-top-color: var(--retro-yellow);
+  border-top: 2px dashed var(--retro-gray);
 }
 
 /* The VGA-bright green and red are for the black chart panels; on gray they

@@ -7,10 +7,17 @@
  * two places rather than two charts that drift apart. `ClockSpreadChart` and `DurationSpreadChart`
  * are the two thin wrappers that do know.
  *
+ * The chart itself never depended on hue — dots, a dashed mean and a solid target are three
+ * different marks — but its legend did: three solid squares at grayscale 229, 247 and 220, which is
+ * one square printed three times. So the legend draws the real mark instead, `SeriesSwatch` giving
+ * each entry the line style and dash it has in the plot.
+ *
  * `y` and `value` are separate for the clock's sake: an unwrapped bedtime may be plotted at -20 or
  * 1470 minutes so the axis reads in order across midnight, and a tooltip printing that number would
  * name a time nobody experienced. The plotted number and the printed one are different facts.
  */
+
+import { SeriesSwatch } from '../charts/ChartMarks';
 
 interface SpreadPoint {
   /** Local midnight of the day — the x value. */
@@ -197,16 +204,18 @@ export default function SpreadChart({
 
       <ul className="bs-legend">
         <li>
-          <span className="bs-swatch bs-swatch--dot" aria-hidden="true" />
+          <SeriesSwatch className="bs-dot" shape="disc" line={false} />
           {label}
         </li>
         {mean != null && (
           <li>
-            <span className="bs-swatch bs-swatch--mean" aria-hidden="true" />
+            <SeriesSwatch className="bs-mean-line" />
             {meanLabel}
             <span className="bs-legend-value">{formatValue(mean)}</span>
           </li>
         )}
+        {/* The band is an area and keeps its filled square — there is no line or mark to draw, and
+            its job in the legend is to name a colour the reader has already seen behind the dots. */}
         {band && (
           <li>
             <span className="bs-swatch bs-swatch--band" aria-hidden="true" />
@@ -215,7 +224,7 @@ export default function SpreadChart({
         )}
         {target && (
           <li>
-            <span className="bs-swatch bs-swatch--target" aria-hidden="true" />
+            <SeriesSwatch className="bs-target-line" />
             {target.label}
             <span className="bs-legend-value">{formatValue(target.value)}</span>
           </li>

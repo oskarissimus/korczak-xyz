@@ -470,20 +470,26 @@
   background-image: none;
 }
 
+/* The four bucket colours are `--srs-bucket-*`, declared in `srsCharts.css`, not a second copy of
+   the same hexes here — the heatmap and the mastery chart are two pictures of one scheduler and had
+   no business holding two sets of values. The ramp is monotonic in luminance, which is what makes
+   this heatmap readable with the colour taken away: a heatmap is sequential data, so lightness is
+   the encoding, and hue is only there to say which app you are looking at. No texture here — these
+   squares are ~19px on a phone, where a hatch stops being a texture and becomes noise. */
 .fb-heat-new {
-  background-color: #2a2a4a;
+  background-color: var(--srs-bucket-new);
 }
 
 .fb-heat-learning {
-  background-color: #8a5a00;
+  background-color: var(--srs-bucket-learning);
 }
 
 .fb-heat-young {
-  background-color: #0d7d7d;
+  background-color: var(--srs-bucket-young);
 }
 
 .fb-heat-mature {
-  background-color: #00a000;
+  background-color: var(--srs-bucket-mature);
 }
 
 /* --- the verdict over the card ------------------------------------------- */

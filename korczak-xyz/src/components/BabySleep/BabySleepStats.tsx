@@ -267,7 +267,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
             {t.legendNight}
           </li>
           <li>
-            <span className="bs-swatch bs-swatch--nap" aria-hidden="true" />
+            <span className="bs-swatch bs-swatch--nap chart-swatch-tex--diagonal" aria-hidden="true" />
             {t.legendNap}
           </li>
           <li>

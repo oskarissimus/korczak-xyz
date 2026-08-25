@@ -31,6 +31,31 @@
   font-size: 12px;
 }
 
+/*
+ * The four scheduler buckets, named once here and read from `fretboard.css` too, so the mastery
+ * chart's bands and the neck heatmap's squares cannot come to disagree about what "young" looks
+ * like. They were two copies of the same four hexes, and drifting was only ever a matter of time.
+ *
+ * The ramp is **monotonic in luminance**, new darkest to mature lightest, and that is the whole
+ * point of these particular values. This is sequential data — a card walks new → learning → young →
+ * mature and never sideways — so the honest encoding is lightness, and lightness is the one channel
+ * that survives the colour being taken away. The hues are the ones they always were; only the
+ * values moved. What they were: 137 / 112 / 100 / 45 in grayscale, so mature and young sat 1.42
+ * apart and young and learning 1.20 — four bands that stacked into one gray smear on an e-ink
+ * screen or a print. They are 47 / 88 / 132 / 186 now, every neighbour about 1.9 apart, which is a
+ * ladder you can count the rungs of.
+ *
+ * `new` is deliberately the one that barely clears the black panel behind it (1.57:1). It is the
+ * "not started" band, it is what the chart is trying to eat into, and giving it the weight of a
+ * measurement would be the chart arguing with itself.
+ */
+:root {
+  --srs-bucket-new: #2c2c4c;
+  --srs-bucket-learning: #794f00;
+  --srs-bucket-young: #0f9393;
+  --srs-bucket-mature: #00d800;
+}
+
 .srs-band {
   stroke: none;
 }
@@ -39,23 +64,23 @@
    chart and an HTML swatch in the legend beneath it, and `fill` does nothing to
    a <span>. With only `fill` the legend was four empty boxes. */
 .srs-band--mature {
-  fill: #00a000;
-  background-color: #00a000;
+  fill: var(--srs-bucket-mature);
+  background-color: var(--srs-bucket-mature);
 }
 
 .srs-band--young {
-  fill: #0d7d7d;
-  background-color: #0d7d7d;
+  fill: var(--srs-bucket-young);
+  background-color: var(--srs-bucket-young);
 }
 
 .srs-band--learning {
-  fill: #8a5a00;
-  background-color: #8a5a00;
+  fill: var(--srs-bucket-learning);
+  background-color: var(--srs-bucket-learning);
 }
 
 .srs-band--new {
-  fill: #2a2a4a;
-  background-color: #2a2a4a;
+  fill: var(--srs-bucket-new);
+  background-color: var(--srs-bucket-new);
 }
 
 /* The line is stroked and the markers on it are filled, so the two cannot share a
@@ -67,12 +92,25 @@
   fill: none;
 }
 
+/*
+ * Accuracy and speed were cyan and yellow and nothing else, which is two series that are the same
+ * series to anyone not reading them in colour: 229 and 247 out of 255 in grayscale, a contrast of
+ * 1.17. (They separate perfectly well under simulated colour blindness — ΔE 22 — so this pair is a
+ * monochrome failure specifically, not a CVD one.) Three things fix it: accuracy stays solid with
+ * disc markers, speed goes dashed with square markers, and speed's yellow drops to #9b9b00, gray
+ * 150, which takes the pair to 2.2.
+ *
+ * Speed is the one that moves because accuracy is the number the page is about: on a black panel
+ * the brighter line is the one the eye lands on first, and that should be the headline rather than
+ * the qualifier. Speed is likewise the dashed one for the same reason.
+ */
 .srs-line--accuracy {
   stroke: var(--retro-cyan);
 }
 
 .srs-line--speed {
-  stroke: var(--retro-yellow);
+  stroke: #9b9b00;
+  stroke-dasharray: 7 4;
 }
 
 .srs-point--accuracy {
@@ -80,7 +118,7 @@
 }
 
 .srs-point--speed {
-  fill: var(--retro-yellow);
+  fill: #9b9b00;
 }
 
 .srs-legend {
@@ -104,19 +142,51 @@
   color: var(--retro-black);
 }
 
+/* The band swatches. The trend chart's two series carry a line and a marker instead, so they use
+   `SeriesSwatch` from `src/components/charts/ChartMarks.tsx` and have no rule here. */
 .srs-swatch {
   display: inline-block;
   width: 12px;
   height: 12px;
   border: 1px solid var(--retro-dark-gray);
+  /* A textured swatch's gradient is measured from the padding box by default, which puts its tile a
+     pixel out of phase with the chart's. */
+  background-origin: border-box;
 }
 
-.srs-swatch--accuracy {
-  background: var(--retro-cyan);
+/*
+ * The two middle bands take a texture on top of the ramp. They are the pair with the least room —
+ * 88 and 132, a contrast of 1.92, which is plenty for two bars side by side and less than it sounds
+ * for two stacked areas sharing an edge that moves. The outer two stay flat: mature is the baseline
+ * with the axis under it, and new is the top edge against the panel, so both already have a
+ * straight line to be read against.
+ */
+.srs-swatch.srs-band--learning {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.38) 0,
+    rgba(255, 255, 255, 0.38) 3px,
+    transparent 3px,
+    transparent 8px
+  );
 }
 
-.srs-swatch--speed {
-  background: var(--retro-yellow);
+.srs-swatch.srs-band--young {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.38) 0,
+      rgba(255, 255, 255, 0.38) 2px,
+      transparent 2px,
+      transparent 8px
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.38) 0,
+      rgba(255, 255, 255, 0.38) 2px,
+      transparent 2px,
+      transparent 8px
+    );
 }
 
 /* The chart panel is black; a legend under it belongs to the panel above, so it

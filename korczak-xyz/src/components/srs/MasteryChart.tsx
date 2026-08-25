@@ -8,8 +8,16 @@
  *
  * Drawn from the daily snapshots rather than replayed from the log: this is where the deck
  * stood at the end of each day, and a change to the scheduler should not rewrite last month.
+ *
+ * Four stacked bands is the hardest shape on this site to keep readable without colour: there is no
+ * marker to give a shape to and no line to dash, and the bands share edges that move rather than
+ * sitting apart. Two things carry it. The bucket ramp in `srsCharts.css` is monotonic in luminance,
+ * which is the right encoding anyway for a sequence a card walks one way along — so flattened to
+ * gray the stack still reads bottom to top as a ladder. And the two middle bands, the pair with the
+ * least room between them, take a texture on top of that.
  */
 
+import ChartTextures, { TEXTURE, texture, type TextureName } from '../charts/ChartTextures';
 import type { Bucket } from '../../utils/srs/scheduler';
 import type { MasterySnapshot } from '../../utils/srs/types';
 
@@ -26,6 +34,17 @@ const MARGIN = { top: 8, right: 10, bottom: 20, left: 32 };
 
 // Bottom to top. Mastered is the baseline: it is the number the chart is about.
 const BANDS: Bucket[] = ['mature', 'young', 'learning', 'new'];
+
+/*
+ * Only the middle two. `mature` sits on the axis and `new` against the panel, so each already has a
+ * straight edge to be read against; the pair in the middle has neither, and is also the closest
+ * pair on the ramp (88 and 132 in grayscale, 1.92 apart). Texturing all four would make the chart
+ * an argument between four patterns rather than a stack of four quantities.
+ */
+const BAND_TEXTURE: Partial<Record<Bucket, TextureName>> = {
+  young: TEXTURE.crosshatch,
+  learning: TEXTURE.diagonal,
+};
 
 export default function MasteryChart({
   history,
@@ -66,6 +85,7 @@ export default function MasteryChart({
   return (
     <div className="srs-chart">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={labels.mature}>
+        <ChartTextures />
         {gridValues.map((v) => (
           <line
             key={v}
@@ -82,8 +102,15 @@ export default function MasteryChart({
           const bottom = points
             .map((p, j) => `${x(p.at)},${y(i === 0 ? 0 : edges[j][i - 1])}`)
             .reverse();
+          const shape = [...top, ...bottom].join(' ');
+          const tex = BAND_TEXTURE[band];
           return (
-            <polygon key={band} className={`srs-band srs-band--${band}`} points={[...top, ...bottom].join(' ')} />
+            <g key={band}>
+              <polygon className={`srs-band srs-band--${band}`} points={shape} />
+              {/* The same polygon again, carrying the texture — see `ChartTextures.tsx` for why the
+                  texture is laid over the colour rather than replacing it. */}
+              {tex && <polygon className="chart-tex" points={shape} fill={texture(tex)} />}
+            </g>
           );
         })}
 

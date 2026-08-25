@@ -1,11 +1,18 @@
 /*
  * Total sleep per day, night and nap stacked, with the window's mean drawn across it.
  *
- * A day still in progress is hatched rather than dropped: today's bar is real data and worth seeing,
+ * A day still in progress is dimmed rather than dropped: today's bar is real data and worth seeing,
  * but it is short only because the day is not over, and an unmarked short bar reads as a bad night.
  * The mean line comes from `stats.totalPerDay`, which excludes those days for the same reason.
+ * (This note said "hatched" for a long time and the stylesheet said `opacity: 0.45`; the stylesheet
+ * was the truth. Hatching is now what tells the *nap* from the night, which is a different job.)
+ *
+ * The two stacked segments are the night and the nap, and they used to be told apart by hue alone —
+ * grayscale 118 against 160, a contrast of 1.74 across an edge that moves from bar to bar. The nap
+ * carries the diagonal texture now, and its teal was re-stepped to 195.
  */
 
+import ChartTextures, { TEXTURE, texture } from '../charts/ChartTextures';
 import { formatHm } from '../../utils/babySleep/format';
 import type { DayBucket, MeanStat } from '../../utils/babySleep/types';
 
@@ -62,6 +69,7 @@ export default function DailySleepBars({
   return (
     <div className="bs-chart">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel}>
+        <ChartTextures />
         {ticks.map((v) => (
           <g key={v}>
             <line
@@ -98,15 +106,27 @@ export default function DailySleepBars({
                 </rect>
               )}
               {day.napMs > 0 && (
-                <rect
-                  className={`bs-bar bs-bar--nap${day.partial ? ' bs-bar--partial' : ''}`}
-                  x={x}
-                  y={y(total)}
-                  width={barW}
-                  height={Math.max(0, y(night) - y(total))}
-                >
-                  <title>{title}</title>
-                </rect>
+                <>
+                  <rect
+                    className={`bs-bar bs-bar--nap${day.partial ? ' bs-bar--partial' : ''}`}
+                    x={x}
+                    y={y(total)}
+                    width={barW}
+                    height={Math.max(0, y(night) - y(total))}
+                  >
+                    <title>{title}</title>
+                  </rect>
+                  {/* The texture rides the dimming of a partial day, or today's nap would come back
+                      to full strength while the night beneath it faded. */}
+                  <rect
+                    className={`chart-tex${day.partial ? ' bs-bar--partial' : ''}`}
+                    x={x}
+                    y={y(total)}
+                    width={barW}
+                    height={Math.max(0, y(night) - y(total))}
+                    fill={texture(TEXTURE.diagonal)}
+                  />
+                </>
               )}
               {i % labelEvery === 0 && (
                 <text
@@ -157,7 +177,7 @@ export default function DailySleepBars({
           {labels.night}
         </li>
         <li>
-          <span className="bs-swatch bs-swatch--nap" aria-hidden="true" />
+          <span className="bs-swatch bs-swatch--nap chart-swatch-tex--diagonal" aria-hidden="true" />
           {labels.nap}
         </li>
         <li>

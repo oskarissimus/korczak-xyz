@@ -5,8 +5,15 @@
  * answers get slower is a deck you are working out rather than recalling, and one line alone
  * would call that progress. Speed is on the right and inverted in spirit — lower is better —
  * so the tick labels carry their unit rather than leaving the reader to guess.
+ *
+ * The two lines were cyan and yellow and nothing else, which is one line drawn twice to anyone not
+ * reading them in colour — 1.17 grayscale contrast. So accuracy is solid with discs and speed is
+ * dashed with squares, and the legend under them draws the real line and the real marker rather
+ * than a colour chip. The colours in `srsCharts.css` moved too; the shapes are what make it
+ * readable at a glance.
  */
 
+import { Mark, SeriesSwatch } from '../charts/ChartMarks';
 import type { DayStats } from '../../utils/srs/history';
 
 interface TrendChartProps {
@@ -97,15 +104,15 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
 
         {showMarkers &&
           speed.map((p) => (
-            <circle key={`s${p.d.day}`} className="srs-point--speed" cx={p.x} cy={p.y} r={3}>
+            <Mark key={`s${p.d.day}`} shape="square" className="srs-point--speed" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${(p.d.avgMs / 1000).toFixed(1)}s`}</title>
-            </circle>
+            </Mark>
           ))}
         {showMarkers &&
           accuracy.map((p) => (
-            <circle key={`a${p.d.day}`} className="srs-point--accuracy" cx={p.x} cy={p.y} r={3}>
+            <Mark key={`a${p.d.day}`} shape="disc" className="srs-point--accuracy" cx={p.x} cy={p.y} r={3}>
               <title>{`${formatDate(p.d.at)} — ${Math.round(p.d.accuracy * 100)}% (${p.d.answers})`}</title>
-            </circle>
+            </Mark>
           ))}
 
         <text className="srs-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
@@ -120,11 +127,19 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
 
       <ul className="srs-legend">
         <li>
-          <span className="srs-swatch srs-swatch--accuracy" aria-hidden="true" />
+          <SeriesSwatch
+            className="srs-point--accuracy"
+            lineClassName="srs-line srs-line--accuracy"
+            shape="disc"
+          />
           {labels.accuracy}
         </li>
         <li>
-          <span className="srs-swatch srs-swatch--speed" aria-hidden="true" />
+          <SeriesSwatch
+            className="srs-point--speed"
+            lineClassName="srs-line srs-line--speed"
+            shape="square"
+          />
           {labels.seconds}
         </li>
       </ul>

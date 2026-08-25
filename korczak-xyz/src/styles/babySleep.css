@@ -1,6 +1,7 @@
 /* Baby sleep log — retro theme */
 
 @import './tabs.css';
+@import './chartTextures.css';
 
 .baby-sleep-window {
   margin-bottom: 20px;
@@ -675,10 +676,15 @@
   background-color: #4a6ee0;
 }
 
+/* Teal was #17b3a3, gray 160 against the night's 118 — a contrast of 1.74, which is the low end of
+   readable for two full-height bars and is the whole of what told them apart with the colour gone.
+   It is 195 now, so the pair sits at 2.5, and on the two charts where a nap can abut a night the
+   nap additionally carries the diagonal texture. Nothing else on these charts moved: the night is
+   the anchor and the one series a reader already knows by where it sits on the row. */
 .bs-block--nap,
 .bs-swatch--nap {
-  fill: #17b3a3;
-  background-color: #17b3a3;
+  fill: #1cdac6;
+  background-color: #1cdac6;
 }
 
 .bs-block--running,
@@ -726,7 +732,7 @@
 }
 
 .bs-bar--nap {
-  fill: #17b3a3;
+  fill: #1cdac6;
 }
 
 /* A day still in progress. Dimmed rather than dropped: the data is real, the day is not over, and an
@@ -740,13 +746,15 @@
   opacity: 0.45;
 }
 
-.bs-mean-line,
-.bs-swatch--mean {
+/* No `background-color` twin any more: the spread chart's legend draws this line with `SeriesSwatch`
+   rather than a coloured `<span>`, so the dash is what a reader sees in the legend as well as on the
+   chart. That is the whole point — a solid chip cannot say "dashed", and the dash is how the mean is
+   told from the target it can sit on top of for weeks. */
+.bs-mean-line {
   stroke: var(--retro-yellow);
   stroke-width: 1.5;
   stroke-dasharray: 5 4;
   fill: none;
-  background-color: var(--retro-yellow);
 }
 
 .bs-mean-label {
@@ -773,10 +781,8 @@
   background-color: #3a3a6a;
 }
 
-.bs-dot,
-.bs-swatch--dot {
+.bs-dot {
   fill: var(--retro-cyan);
-  background-color: var(--retro-cyan);
 }
 
 /* --- legend --------------------------------------------------------------- */
@@ -802,15 +808,14 @@
   width: 14px;
   height: 14px;
   border: 1px solid var(--retro-dark-gray);
+  /* A textured swatch's gradient is measured from the padding box by default, which puts its tile a
+     pixel out of phase with the one the chart draws. */
+  background-origin: border-box;
 }
 
-.bs-swatch--mean {
-  height: 4px;
-  border: 0;
-}
-
-/* A line on the chart, so a line in the legend — but upright on the timeline and flat on the spread
-   chart, and one swatch cannot be both. Flat, matching the mean it is read against. */
+/* Still a `<span>`, unlike the spread chart's: this is the *timeline's* target, drawn there as an
+   upright rule down every row, and `SeriesSwatch` draws a horizontal line. A flat chip is the
+   honest compromise, and the timeline's legend has no second line-styled entry to be confused with. */
 .bs-swatch--target {
   height: 4px;
   border: 0;
@@ -1044,24 +1049,37 @@ a.bs-action {
  * The three verdicts, on the dots and in the legend. Blue for cold and orange for warm is the
  * temperature reading everyone already has; green is the one you are looking for. All three carry
  * `fill` *and* `background-color` for the reason written above the timeline colours: one class
- * paints an SVG circle and an HTML span, and `fill` does nothing to a span.
+ * paints an SVG mark and an HTML span, and `fill` does nothing to a span.
+ *
+ * This chart's whole claim is that the boundary between the colours in the top lane *is* the
+ * answer — and it was the worst offender on the site for a reader who does not get the colour.
+ * `ok` #35d05a and `warm` #ff9d3c are grayscale 182 and 180: a contrast of 1.02, which is to say
+ * the same shade. Worse, green against orange is the classic red-green pair, and the two measured
+ * ΔE 5.8 under simulated deuteranopia — below the 6.0 floor, so the boundary was invisible to
+ * something like one man in twelve at full colour.
+ *
+ * The real fix is that the verdict is now a **shape** as well (see `ClimateChart.tsx`): a ring for
+ * cold, a disc for ok, a triangle for warm. These re-stepped values are the second half of it —
+ * 108 / 158 / 201 in grayscale, and ΔE 8.8, above the 8.0 target. `warm` went lighter and `ok`
+ * darker because cold is the one with somewhere to be: it anchors the cold end of the axis, and
+ * pulling it further down would have taken it into the panel.
  */
 .bs-dot--cold,
 .bs-swatch--cold {
-  fill: #4a6ee0;
-  background-color: #4a6ee0;
+  fill: #4465cd;
+  background-color: #4465cd;
 }
 
 .bs-dot--ok,
 .bs-swatch--ok {
-  fill: #35d05a;
-  background-color: #35d05a;
+  fill: #2eb54e;
+  background-color: #2eb54e;
 }
 
 .bs-dot--warm,
 .bs-swatch--warm {
-  fill: #ff9d3c;
-  background-color: #ff9d3c;
+  fill: #ffbb77;
+  background-color: #ffbb77;
 }
 
 /* --- the night history ------------------------------------------------------ */

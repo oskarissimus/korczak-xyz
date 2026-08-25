@@ -197,6 +197,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       key: 'wpm',
       points: wpmPoints,
       lineClass: 'typing-chart-line--wpm',
+      shape: 'disc' as const,
       formatValue: (v) => `${Math.round(v)} ${t.wpm}`,
       formatLabel: (v) => String(Math.round(v)),
     });
@@ -206,7 +207,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
     series.push({
       key: 'trend',
       points: trend.endpoints,
-      lineClass: 'typing-chart-line--trend typing-chart-line--trend-wpm',
+      lineClass: 'typing-chart-line--trend',
       markers: false, // an annotation, not measurements
       formatValue: (v) => String(Math.round(v)),
       formatLabel: (v) => String(Math.round(v)),
@@ -217,6 +218,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       key: 'accuracy',
       points: points.map((p) => ({ t: p.t, value: p.accuracy })),
       lineClass: 'typing-chart-line--accuracy',
+      shape: 'square' as const,
       formatValue: (v) => `${Math.round(v)}%`,
       formatLabel: (v) => `${Math.round(v)}%`,
     });
@@ -226,6 +228,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       key: 'time',
       points: points.map((p) => ({ t: p.t, value: p.timeMs / 60000 })),
       lineClass: 'typing-chart-line--time',
+      shape: 'triangle' as const,
       axis: 'right',
       formatValue: formatDuration,
       formatLabel: formatDuration,

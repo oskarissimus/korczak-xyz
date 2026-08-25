@@ -3,6 +3,14 @@
 // An optional right axis (time spent, in minutes) appears only while a series
 // is bound to it; its ticks are tinted the series color so the axis-to-series
 // binding stays unambiguous.
+//
+// No series is identified by colour alone. Each carries a dash pattern (declared with its stroke in
+// typing.css) and a marker shape, because the phosphor palette these lines are drawn in is nearly
+// flat in luminance — see the note above .typing-chart-line--wpm for the measurements. The shape is
+// a prop rather than a class because it is geometry rather than paint, and a stylesheet cannot turn
+// a circle into a triangle.
+
+import { Mark, type MarkShape } from '../charts/ChartMarks';
 
 export interface StatsPoint {
   t: number; // epoch ms
@@ -13,6 +21,9 @@ export interface StatsSeries {
   key: string;
   points: StatsPoint[]; // sorted ascending by t
   lineClass: string;
+  // The marker drawn at each point, and the series' second channel after its dash. Omitted for a
+  // series with markers off, where there is nothing to shape.
+  shape?: MarkShape;
   axis?: 'left' | 'right'; // which y-axis the values are scaled against
   // Point markers, labels and tooltips. Off for annotation lines (a trend fit,
   // say), whose endpoints aren't measurements anyone would want to read off.
@@ -162,7 +173,13 @@ export default function StatsChart({
               s.points.length <= MAX_MARKERS &&
               s.points.map((p, i) => (
                 <g key={`${p.t}-${i}`}>
-                  <circle className={s.lineClass} cx={x(p.t)} cy={yOf(s, p.value)} r={3} />
+                  <Mark
+                    shape={s.shape ?? 'disc'}
+                    className={`typing-chart-point ${s.lineClass}`}
+                    cx={x(p.t)}
+                    cy={yOf(s, p.value)}
+                    r={3}
+                  />
                   {showLabels && (
                     <text
                       className="typing-chart-label"
