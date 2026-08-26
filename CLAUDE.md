@@ -1944,6 +1944,37 @@ the Polish readout is two lines at 320px, and the reserved two lines are why not
 One thing this does not do is give the keyboard a way in. Arrow-key traversal of a chart is a real
 feature and a separate one; `role="img"`, the `aria-label` and the `<title>`s are untouched.
 
+### The numbers printed on the typing chart thin out; they do not switch off
+
+`StatsChart` draws a direct value label above each point in day and week mode, and those labels lived
+**inside the marker loop** — so `MAX_MARKERS`, the cap that drops markers past 40 points because they
+become clutter, took every number down with them. A daily chart gains a point a day, so it printed
+its numbers for forty days and then, on the forty-first, printed none at all, with nothing on the
+screen to say why. That is a decision about markers being applied to labels, and it is the kind of
+threshold nobody crosses twice: the chart looked fine the day before.
+
+Room for a label is a matter of **pixels**, so `src/utils/charts/labels.ts` works out a stride and
+the chart labels every nth point instead of abandoning them. Four things about it:
+
+- **The stride is per series**, from the widest label that series actually prints. `1h 05m` needs
+  three times the room `44` does, and one stride shared across the three would size the wpm numbers
+  for the time series' worst case.
+- **A slot is one and a half labels wide.** The labels at the two ends are anchored to the plot's
+  edges rather than centred on their points, which puts each of them half a label further in than the
+  stride assumed; sizing for the middle alone leaves the last two numbers of a long chart printed on
+  top of each other, at the end of the chart that is read most.
+- **The stride counts back from the newest point**, so the last day is always labelled — a stride
+  anchored at the left drops it whenever the count is not a multiple of the stride.
+- **A labelled point keeps its marker** even past `MAX_MARKERS`, or the number floats over a line of
+  a hundred vertices with nothing saying which one it belongs to.
+
+The label's font size is stated twice — `LABEL_FONT_SIZE` in `StatsChart.tsx`, which the stride is
+measured with, and `font-size` on `.typing-chart-label`, which is what gets drawn. Nothing makes a
+TypeScript constant and a CSS declaration agree by construction, so `labels.test.ts` reads both files
+as text and compares them, the way `chordAlignment.test.ts` and `pwa/tiers.test.ts` do. The width
+itself is arithmetic on VT323's 0.40em cell — the same cell the songbook aligns chords on — and it is
+exact: measured in Chromium, every label comes out at 5.2 units per character at 13px.
+
 ## Localization (i18n)
 
 The site supports English (default) and Polish. All user-facing strings should be localized —

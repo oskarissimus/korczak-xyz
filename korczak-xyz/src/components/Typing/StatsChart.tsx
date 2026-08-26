@@ -14,6 +14,7 @@ import ChartReadout from '../charts/ChartReadout';
 import { Mark, type MarkShape } from '../charts/ChartMarks';
 import { useChartPointer } from '../charts/useChartPointer';
 import { nearestIndex } from '../../utils/charts/hitTest';
+import { isLabelled, labelStride, labelWidth } from '../../utils/charts/labels';
 
 export interface StatsPoint {
   t: number; // epoch ms
@@ -55,6 +56,14 @@ const HEIGHT = 240;
 const MARGIN = { top: 10, right: 12, bottom: 22, left: 40 };
 // Above this many points per series the markers become clutter; draw line only.
 const MAX_MARKERS = 40;
+// `.typing-chart-label`'s font-size in typing.css, which is what the label stride below measures
+// against. Nothing can make a TypeScript constant and a CSS declaration agree by construction, and
+// the disagreement is silent both ways — overlapping numbers, or a chart thinning out numbers it
+// had room for — so `labels.test.ts` reads the two files and compares them.
+const LABEL_FONT_SIZE = 13;
+// Clear air left between two labels, on top of their own width — most of a VT323 cell, which is all
+// a monospace number needs to read as its own.
+const LABEL_GAP = 4;
 
 export default function StatsChart({
   series,
@@ -107,6 +116,29 @@ export default function StatsChart({
       xTickPoints.splice(1, 0, mid);
     }
   }
+
+  /*
+   * Direct labels thin out; they do not disappear. They used to be nested inside the marker loop,
+   * so the density cap that drops markers past MAX_MARKERS dropped every number with them — a
+   * chart in day mode gained a point a day, printed its numbers until the fortieth, and then
+   * printed none at all, which is a decision about markers being applied to labels.
+   *
+   * Room for a label is a matter of pixels, so each series' stride comes from the widest label that
+   * series actually prints: `1h 05m` needs three times the room `44` does, and one stride shared
+   * across the three would size the wpm numbers for the time series' worst case.
+   *
+   * The slot is one and a half labels wide, not one: the labels at the two ends are anchored to the
+   * plot's edges rather than centred on their points (they would spill out of it otherwise), which
+   * puts each of them half a label further in than a centred one. Sizing every slot for that is a
+   * slightly sparser chart; sizing it for the middle instead leaves the last two numbers of the
+   * densest chart printed on top of each other, which is the one place they are read most.
+   */
+  const strideOf = (s: StatsSeries) => {
+    if (!showLabels || s.markers === false || s.points.length === 0) return 0;
+    const chars = Math.max(...s.points.map((p) => s.formatLabel(p.value).length));
+    const slot = labelWidth(chars, LABEL_FONT_SIZE) * 1.5 + LABEL_GAP;
+    return labelStride(s.points.length, plotW, slot);
+  };
 
   // The series share their dates, so one x picks one day and every series reports what it had that
   // day — which is the comparison this chart exists for. A series with markers off is a fit rather
@@ -214,54 +246,68 @@ export default function StatsChart({
             </text>
           ))}
         {!loading &&
-          series.map((s) => (
-          <g key={s.key} className={animate ? 'typing-chart-markers--in' : undefined}>
-            {s.points.length > 1 && (
-              <polyline
-                className={`${s.lineClass}${animate ? ' typing-chart-line--draw' : ''}`}
-                pathLength={1}
-                points={s.points.map((p) => `${x(p.t)},${yOf(s, p.value)}`).join(' ')}
-                fill="none"
-                strokeWidth={2}
-              />
-            )}
-            {s.markers !== false &&
-              s.points.length <= MAX_MARKERS &&
-              s.points.map((p, i) => (
-                <g key={`${p.t}-${i}`}>
-                  <Mark
-                    shape={s.shape ?? 'disc'}
-                    className={`typing-chart-point ${s.lineClass}`}
-                    cx={x(p.t)}
-                    cy={yOf(s, p.value)}
-                    r={3}
+          series.map((s) => {
+            const stride = strideOf(s);
+            return (
+              <g key={s.key} className={animate ? 'typing-chart-markers--in' : undefined}>
+                {s.points.length > 1 && (
+                  <polyline
+                    className={`${s.lineClass}${animate ? ' typing-chart-line--draw' : ''}`}
+                    pathLength={1}
+                    points={s.points.map((p) => `${x(p.t)},${yOf(s, p.value)}`).join(' ')}
+                    fill="none"
+                    strokeWidth={2}
                   />
-                  {showLabels && (
-                    <text
-                      className="typing-chart-label"
-                      x={x(p.t)}
-                      y={yOf(s, p.value) - 8}
-                      // Edge points anchor inward so labels stay inside the
-                      // plot and clear of the right-axis tick gutter.
-                      textAnchor={
-                        x(p.t) - MARGIN.left < 16
-                          ? 'start'
-                          : WIDTH - marginRight - x(p.t) < 16
-                            ? 'end'
-                            : 'middle'
-                      }
-                    >
-                      {s.formatLabel(p.value)}
-                    </text>
-                  )}
-                  {/* Oversized invisible hit target carrying the native tooltip. */}
-                  <circle cx={x(p.t)} cy={yOf(s, p.value)} r={10} fill="transparent">
-                    <title>{`${formatDate(p.t)} — ${s.formatValue(p.value)}`}</title>
-                  </circle>
-                </g>
-              ))}
-          </g>
-        ))}
+                )}
+                {s.markers !== false &&
+                  s.points.map((p, i) => {
+                    const labelled = isLabelled(i, s.points.length, stride);
+                    // Past the density cap the markers are clutter — except under a label, which
+                    // needs a point to belong to or it is a number floating over a line of a
+                    // hundred vertices.
+                    if (s.points.length > MAX_MARKERS && !labelled) return null;
+                    const label = s.formatLabel(p.value);
+                    // Edge points anchor inward so labels stay inside the plot and clear of the
+                    // right-axis tick gutter — but only once a centred one would really spill,
+                    // which is half its own width. The fixed 16 units this replaced flipped labels
+                    // that had room to stay centred, and every anchor costs the neighbour half a
+                    // label of the room the stride above measured out for it.
+                    const half = labelWidth(label.length, LABEL_FONT_SIZE) / 2;
+                    return (
+                      <g key={`${p.t}-${i}`}>
+                        <Mark
+                          shape={s.shape ?? 'disc'}
+                          className={`typing-chart-point ${s.lineClass}`}
+                          cx={x(p.t)}
+                          cy={yOf(s, p.value)}
+                          r={3}
+                        />
+                        {labelled && (
+                          <text
+                            className="typing-chart-label"
+                            x={x(p.t)}
+                            y={yOf(s, p.value) - 8}
+                            textAnchor={
+                              x(p.t) - MARGIN.left < half
+                                ? 'start'
+                                : WIDTH - marginRight - x(p.t) < half
+                                  ? 'end'
+                                  : 'middle'
+                            }
+                          >
+                            {label}
+                          </text>
+                        )}
+                        {/* Oversized invisible hit target carrying the native tooltip. */}
+                        <circle cx={x(p.t)} cy={yOf(s, p.value)} r={10} fill="transparent">
+                          <title>{`${formatDate(p.t)} — ${s.formatValue(p.value)}`}</title>
+                        </circle>
+                      </g>
+                    );
+                  })}
+              </g>
+            );
+          })}
 
         {hitValues.map(({ series: s, point }) => (
           <Mark
