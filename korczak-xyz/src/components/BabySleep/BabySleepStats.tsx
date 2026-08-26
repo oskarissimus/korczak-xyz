@@ -37,6 +37,7 @@ import {
   nightRoutinesByDay,
   settlePoints,
 } from '../../utils/babySleep/routineStats';
+import { movingAverage, NIGHT_AVERAGE_WINDOW } from '../../utils/babySleep/movingAverage';
 import { loadSettings, saveSettings } from '../../utils/babySleep/storage';
 import type { ClockStat, MeanStat, WindowChoice } from '../../utils/babySleep/types';
 import ClockSpreadChart from './ClockSpreadChart';
@@ -138,6 +139,10 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
     [stats.days, routines.records]
   );
   const routineByNight = useMemo(() => nightRoutinesByDay(routines.records), [routines.records]);
+  /* Held in one place because the chart plots these, the trailing average is folded over them, and
+     `nightPerDay` is the mean of them — three readings of one population, which is the whole reason
+     `computeStats` goes through this extractor rather than over the day buckets. */
+  const nightPoints = useMemo(() => nightDurationPoints(stats.days), [stats.days]);
   /* The timeline's settling bands end where this says the sleep began — the same `asleepFor` the
      history rows and the live strip use, so none of them can come to disagree. Keyed by routine id
      rather than by night: a day holds several routines now. */
@@ -260,6 +265,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           targetLabel={targetLabel ?? undefined}
           ariaLabel={t.timelineAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
         <ul className="bs-legend">
           <li>
@@ -310,6 +316,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           }}
           ariaLabel={t.totalsAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
       </section>
 
@@ -318,7 +325,9 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
       <section className="bs-section">
         <h2 className="bs-subhead">{t.nightLengthTitle}</h2>
         <DurationSpreadChart
-          points={nightDurationPoints(stats.days)}
+          points={nightPoints}
+          average={movingAverage(nightPoints, NIGHT_AVERAGE_WINDOW)}
+          averageLabel={t.legendAverage}
           stat={stats.nightPerDay}
           formatDay={formatDay}
           label={t.nightLengthSeries}
@@ -326,6 +335,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.nightLengthAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
       </section>
 
@@ -344,6 +354,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.settleAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
       </section>
 
@@ -364,6 +375,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.cribAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
       </section>
 
@@ -378,6 +390,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.bedtimeAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
         <ClockSpreadChart
           points={wakePoints(stats.days)}
@@ -388,6 +401,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.bedtimeAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
         <ClockSpreadChart
           points={firstNapPoints(stats.days)}
@@ -398,6 +412,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           spreadLabel={t.legendSpread}
           ariaLabel={t.bedtimeAria}
           emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
         />
       </section>
 

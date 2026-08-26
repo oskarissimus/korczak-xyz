@@ -26,6 +26,9 @@ interface DurationSpreadChartProps {
   points: DurationPoint[];
   stat: MeanStat;
   formatDay: (t: number) => string;
+  /** A trailing mean through the dots, already smoothed — see `movingAverage.ts`. */
+  average?: DurationPoint[];
+  averageLabel?: string;
   /** Never zoom in tighter than this. Defaults to three hours — a whole night's scale. */
   minSpan?: number;
   /** Candidate gridline gaps, ascending. Defaults to the night's. */
@@ -35,6 +38,8 @@ interface DurationSpreadChartProps {
   spreadLabel: string;
   ariaLabel: string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const MINUTE = 60_000;
@@ -50,6 +55,8 @@ export default function DurationSpreadChart({
   points,
   stat,
   formatDay,
+  average,
+  averageLabel,
   minSpan = MIN_SPAN,
   tickSteps = TICK_STEPS,
   ...labels
@@ -64,6 +71,11 @@ export default function DurationSpreadChart({
   return (
     <SpreadChart
       points={points.map((p) => ({ at: p.at, y: p.ms, value: p.ms }))}
+      average={
+        average && average.length > 0 && averageLabel
+          ? { points: average.map((p) => ({ at: p.at, value: p.ms })), label: averageLabel }
+          : null
+      }
       mean={stat.mean}
       band={band}
       formatValue={formatHm}

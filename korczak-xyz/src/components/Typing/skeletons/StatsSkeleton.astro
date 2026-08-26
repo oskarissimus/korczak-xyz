@@ -56,6 +56,8 @@ const GRIDLINES = [0, 1, 2, 3, 4];
     <div class="typing-skel-chart">
       {GRIDLINES.map(() => <span class="typing-skel typing-skel--on-dark" style="--skel-h: 1px" />)}
     </div>
+    <!-- The readout line the hydrated chart carries — reserved so nothing jumps at mount. -->
+    <p class="chart-readout chart-readout--idle"></p>
   </div>
 
   <p class="typing-message">

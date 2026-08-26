@@ -69,7 +69,10 @@ const SECTIONS = [
     SECTIONS.map((title) => (
       <section class="bs-section">
         <h2 class="bs-subhead">{title}</h2>
-        <div class="bs-chart bs-chart--skeleton" />
+        <div class="bs-chart bs-chart--skeleton">
+          <!-- The readout line the hydrated chart carries — reserved so nothing jumps at mount. -->
+          <p class="chart-readout chart-readout--idle"></p>
+        </div>
       </section>
     ))
   }

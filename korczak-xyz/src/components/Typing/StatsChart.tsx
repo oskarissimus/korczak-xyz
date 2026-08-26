@@ -10,7 +10,10 @@
 // a prop rather than a class because it is geometry rather than paint, and a stylesheet cannot turn
 // a circle into a triangle.
 
+import ChartReadout from '../charts/ChartReadout';
 import { Mark, type MarkShape } from '../charts/ChartMarks';
+import { useChartPointer } from '../charts/useChartPointer';
+import { nearestIndex } from '../../utils/charts/hitTest';
 
 export interface StatsPoint {
   t: number; // epoch ms
@@ -30,6 +33,9 @@ export interface StatsSeries {
   markers?: boolean; // default true
   formatValue: (v: number) => string; // for the point tooltip
   formatLabel: (v: number) => string; // compact direct label above the point
+  // What to call this series in the readout. A series with markers off never appears there, so it
+  // needs none.
+  name?: string;
 }
 
 interface StatsChartProps {
@@ -41,6 +47,7 @@ interface StatsChartProps {
   showLabels?: boolean; // direct value labels above each point (day mode)
   loading?: boolean; // render an empty grid skeleton while data is being fetched
   animate?: boolean; // play the one-shot line-draw animation on this render
+  hintLabel: string; // what the readout says when nothing is being pointed at
 }
 
 const WIDTH = 600;
@@ -58,7 +65,10 @@ export default function StatsChart({
   showLabels = false,
   loading = false,
   animate = false,
+  hintLabel,
 }: StatsChartProps) {
+  const { svgRef, at, handlers } = useChartPointer();
+
   const hasRightAxis = yDomainRight != null && series.some((s) => s.axis === 'right');
   const marginRight = hasRightAxis ? 46 : MARGIN.right; // room for "1h 05m" ticks
   const plotW = WIDTH - MARGIN.left - marginRight;
@@ -98,9 +108,55 @@ export default function StatsChart({
     }
   }
 
+  // The series share their dates, so one x picks one day and every series reports what it had that
+  // day — which is the comparison this chart exists for. A series with markers off is a fit rather
+  // than a measurement and stays out of it, exactly as it stays out of the tooltips.
+  const readable = series.filter((s) => s.markers !== false);
+  const stamps = [...new Set(readable.flatMap((s) => s.points.map((p) => p.t)))].sort(
+    (a, b) => a - b
+  );
+  const hit = at == null || loading ? null : nearestIndex(stamps.map(x), at.x);
+  const hitT = hit == null ? null : stamps[hit];
+  const hitValues =
+    hitT == null
+      ? []
+      : readable.flatMap((s) => {
+          const point = s.points.find((p) => p.t === hitT);
+          return point ? [{ series: s, point }] : [];
+        });
+  const readout =
+    hitT == null || hitValues.length === 0
+      ? null
+      : [
+          formatDate(hitT),
+          ...hitValues.map(
+            ({ series: s, point }) =>
+              `${s.name ? `${s.name} ` : ''}${s.formatValue(point.value)}`
+          ),
+        ].join(' · ');
+
   return (
     <div className={`typing-chart-panel${loading ? ' typing-chart-panel--loading' : ''}`}>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label="Typing stats">
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label="Typing stats"
+        {...handlers}
+      >
+        {/* Under everything, so the whole panel is pointable and not just the markers. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
+        {hitT != null && (
+          <line
+            className="chart-guide"
+            x1={x(hitT)}
+            x2={x(hitT)}
+            y1={MARGIN.top}
+            y2={MARGIN.top + plotH}
+          />
+        )}
         {gridValues.map((v) => (
           <line
             key={v}
@@ -206,7 +262,20 @@ export default function StatsChart({
               ))}
           </g>
         ))}
+
+        {hitValues.map(({ series: s, point }) => (
+          <Mark
+            key={`hit-${s.key}`}
+            shape={s.shape ?? 'disc'}
+            className={`typing-chart-point ${s.lineClass} chart-hit`}
+            cx={x(point.t)}
+            cy={yOf(s, point.value)}
+            r={4}
+          />
+        ))}
       </svg>
+
+      <ChartReadout text={readout} hint={hintLabel} />
     </div>
   );
 }

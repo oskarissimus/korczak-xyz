@@ -5,7 +5,9 @@
  * in the axis's own units and a function that turns one into a string, so a clock time (minutes,
  * circular, unwrapped by its caller) and a sleep duration (milliseconds, linear) draw as one chart in
  * two places rather than two charts that drift apart. `ClockSpreadChart` and `DurationSpreadChart`
- * are the two thin wrappers that do know.
+ * are the two thin wrappers that do know. The `average` series arrives the same way: already
+ * smoothed, already in axis units, so the trailing mean of a duration and a trailing mean of
+ * anything else would both draw here without this file learning a thing.
  *
  * The chart itself never depended on hue — dots, a dashed mean and a solid target are three
  * different marks — but its legend did: three solid squares at grayscale 229, 247 and 220, which is
@@ -17,7 +19,10 @@
  * name a time nobody experienced. The plotted number and the printed one are different facts.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import { SeriesSwatch } from '../charts/ChartMarks';
+import { useChartPointer } from '../charts/useChartPointer';
+import { nearestIndex } from '../../utils/charts/hitTest';
 
 interface SpreadPoint {
   /** Local midnight of the day — the x value. */
@@ -55,11 +60,22 @@ interface SpreadChartProps {
    * worth seeing, and a line that quietly falls off the top reads as no target at all.
    */
   target?: { value: number; label: string } | null;
+  /**
+   * A smoothed series through the dots — a trailing mean, in axis units, one value for some of the
+   * days rather than all of them.
+   *
+   * It answers the question the flat `mean` line cannot: not how much this varies, but which way it
+   * is going. Its points widen the axis like every other value, and it is drawn over the mean it
+   * refines and under the dots it is derived from.
+   */
+  average?: { points: { at: number; value: number }[]; label: string } | null;
   label: string;
   meanLabel: string;
   spreadLabel: string;
   ariaLabel: string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const WIDTH = 600;
@@ -82,12 +98,17 @@ export default function SpreadChart({
   minSpan,
   floor,
   target,
+  average,
   label,
   meanLabel,
   spreadLabel,
   ariaLabel,
   emptyLabel,
+  hintLabel,
 }: SpreadChartProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   if (points.length === 0) {
     return (
       <div className="bs-chart bs-chart--empty">
@@ -99,10 +120,12 @@ export default function SpreadChart({
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
 
+  const averagePoints = average?.points ?? [];
   const spread = [
     ...points.map((p) => p.y),
     ...(band ? [band.lo, band.hi] : []),
     ...(target ? [target.value] : []),
+    ...averagePoints.map((p) => p.value),
   ];
   const rawLo = Math.min(...spread);
   const rawHi = Math.max(...spread);
@@ -132,9 +155,41 @@ export default function SpreadChart({
   const ticks: number[] = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
 
+  const hit = at == null ? null : nearestIndex(points.map((p) => x(p.at)), at.x);
+  const hitPoint = hit == null ? null : points[hit];
+  /* The average is one value per *night*, not per pixel, so it is looked up by the day the dot is
+     filed under rather than by the pointer's own x — the two lines are read together or the
+     smoothed number belongs to a different night than the raw one beside it. */
+  const hitAverage =
+    hitPoint == null ? null : (averagePoints.find((p) => p.at === hitPoint.at)?.value ?? null);
+
+  const readout =
+    hitPoint == null
+      ? null
+      : [
+          `${formatDay(hitPoint.at)} · ${label} ${formatValue(hitPoint.value)}`,
+          hitAverage == null || average == null
+            ? null
+            : `${average.label} ${formatValue(hitAverage)}`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
   return (
     <div className="bs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label={ariaLabel}
+        {...handlers}
+      >
+        {/* First, so it is under everything: the empty parts of the panel are most of it, and a
+            pointer that only exists over a 4px dot is a pointer nobody can aim. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
+
         {band && (
           <rect
             className="bs-spread-band"
@@ -162,6 +217,16 @@ export default function SpreadChart({
           </g>
         ))}
 
+        {hitPoint && (
+          <line
+            className="chart-guide"
+            x1={x(hitPoint.at)}
+            x2={x(hitPoint.at)}
+            y1={MARGIN.top}
+            y2={MARGIN.top + plotH}
+          />
+        )}
+
         {/* Under the mean line and over the gridlines: where the two coincide, the mean is the fact
             and the target is the intention, and it is the fact that must stay readable. */}
         {target && (
@@ -186,11 +251,29 @@ export default function SpreadChart({
           />
         )}
 
+        {/* Over the flat mean it refines, under the dots it is made of. */}
+        {averagePoints.length > 0 && (
+          <polyline
+            className="bs-avg-line"
+            fill="none"
+            points={averagePoints.map((p) => `${x(p.at)},${y(p.value)}`).join(' ')}
+          />
+        )}
+
         {points.map((p) => (
           <circle key={`${p.at}-${p.value}`} className="bs-dot" cx={x(p.at)} cy={y(p.y)} r={4}>
             <title>{`${formatDay(p.at)} · ${label} ${formatValue(p.value)}`}</title>
           </circle>
         ))}
+
+        {hitPoint && (
+          <circle
+            className="bs-dot chart-hit"
+            cx={x(hitPoint.at)}
+            cy={y(hitPoint.y)}
+            r={5}
+          />
+        )}
 
         <text className="bs-chart-tick" x={MARGIN.left} y={HEIGHT - 8} textAnchor="start">
           {formatDay(tMin)}
@@ -202,6 +285,8 @@ export default function SpreadChart({
         )}
       </svg>
 
+      <ChartReadout text={readout} hint={hintLabel} />
+
       <ul className="bs-legend">
         <li>
           <SeriesSwatch className="bs-dot" shape="disc" line={false} />
@@ -212,6 +297,12 @@ export default function SpreadChart({
             <SeriesSwatch className="bs-mean-line" />
             {meanLabel}
             <span className="bs-legend-value">{formatValue(mean)}</span>
+          </li>
+        )}
+        {averagePoints.length > 0 && average && (
+          <li>
+            <SeriesSwatch className="bs-avg-line" />
+            {average.label}
           </li>
         )}
         {/* The band is an area and keeps its filled square — there is no line or mark to draw, and

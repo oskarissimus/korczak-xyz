@@ -17,7 +17,10 @@
  * least room between them, take a texture on top of that.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import ChartTextures, { TEXTURE, texture, type TextureName } from '../charts/ChartTextures';
+import { useChartPointer } from '../charts/useChartPointer';
+import { nearestIndex } from '../../utils/charts/hitTest';
 import type { Bucket } from '../../utils/srs/scheduler';
 import type { MasterySnapshot } from '../../utils/srs/types';
 
@@ -26,6 +29,8 @@ interface MasteryChartProps {
   labels: Record<Bucket, string>;
   formatDate: (t: number) => string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const WIDTH = 600;
@@ -51,7 +56,11 @@ export default function MasteryChart({
   labels,
   formatDate,
   emptyLabel,
+  hintLabel,
 }: MasteryChartProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   if (history.length === 0) {
     return <p className="srs-empty">{emptyLabel}</p>;
   }
@@ -82,10 +91,34 @@ export default function MasteryChart({
 
   const gridValues = [0.25, 0.5, 0.75, 1].map((f) => f * yMax);
 
+  /* This chart had no tooltip of any kind: the legend prints the *latest* day's four counts and
+     nothing said what any earlier day held, on any device. The bands are the only thing here, and a
+     band is not a mark you can point at, so the readout is the whole of the answer. */
+  const hit = at == null ? null : nearestIndex(points.map((p) => x(p.at)), at.x);
+  const readout =
+    hit == null
+      ? null
+      : [
+          formatDate(points[hit].at),
+          ...[...BANDS]
+            .reverse()
+            .map((band) => `${labels[band]} ${points[hit].counts[band] ?? 0}`),
+        ].join(' · ');
+
   return (
     <div className="srs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={labels.mature}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label={labels.mature}
+        {...handlers}
+      >
         <ChartTextures />
+        {/* Under everything, so the empty space above the stack is pointable too. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
         {gridValues.map((v) => (
           <line
             key={v}
@@ -126,6 +159,16 @@ export default function MasteryChart({
             {Math.round(v)}
           </text>
         ))}
+        {hit != null && (
+          <line
+            className="chart-guide"
+            x1={x(points[hit].at)}
+            x2={x(points[hit].at)}
+            y1={MARGIN.top}
+            y2={y(0)}
+          />
+        )}
+
         <text className="srs-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
           {formatDate(tMin)}
         </text>
@@ -138,6 +181,8 @@ export default function MasteryChart({
           {formatDate(tMax)}
         </text>
       </svg>
+
+      <ChartReadout text={readout} hint={hintLabel} />
 
       <ul className="srs-legend">
         {[...BANDS].reverse().map((band) => (

@@ -5,6 +5,7 @@ export const translations = {
     book: 'Book',
     wpm: 'WPM',
     accuracy: 'Accuracy',
+    chartHint: 'Point at the chart, or tap it, for the values.',
     progress: 'Progress',
     // On the line under the progress bar, beside "Progress: 42%": lifetime time on this book
     // and what is left of it. One word each — the column they sit on has no min-width floor,
@@ -120,6 +121,7 @@ export const translations = {
     book: 'Książka',
     wpm: 'WPM',
     accuracy: 'Celność',
+    chartHint: 'Najedź na wykres lub dotknij go, aby zobaczyć wartości.',
     progress: 'Postęp',
     timeInBook: 'Czas',
     timeLeft: 'Zostało',

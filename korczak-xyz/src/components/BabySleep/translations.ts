@@ -181,7 +181,9 @@ export const translations = {
     legendMean: 'Mean',
     legendSpread: '±1 SD',
     legendTarget: 'Target',
+    legendAverage: '7-night average',
     chartEmpty: 'Nothing logged in this window.',
+    chartHint: 'Point at the chart, or tap it, for the values.',
     meanLine: 'Mean {value}',
     bedtimeSeries: 'Falls asleep',
     wakeSeries: 'Wakes up',
@@ -237,7 +239,7 @@ export const translations = {
     climateThresholdMark: 'Coldest alright',
     climateChartEmpty:
       'No complete nights yet. A night counts once it has a temperature, a window state and a verdict.',
-    climateDot: '{date}: {temp} °C, window {window}, {verdict}',
+    climateDot: '{date}: {temp} °C, {window}, {verdict}',
 
     // Sync
     syncSignedOut: 'This device only',
@@ -471,7 +473,9 @@ export const translations = {
     legendMean: 'Średnia',
     legendSpread: '±1 SD',
     legendTarget: 'Cel',
+    legendAverage: 'Średnia z 7 nocy',
     chartEmpty: 'Brak wpisów w tym zakresie.',
+    chartHint: 'Najedź na wykres lub dotknij go, aby zobaczyć wartości.',
     meanLine: 'Średnia {value}',
     bedtimeSeries: 'Zasypia',
     wakeSeries: 'Wstaje',
@@ -530,7 +534,7 @@ export const translations = {
     climateThresholdMark: 'Najchłodniej i w porządku',
     climateChartEmpty:
       'Brak kompletnych nocy. Noc liczy się, gdy ma temperaturę, stan okna i ocenę poranka.',
-    climateDot: '{date}: {temp} °C, okno {window}, {verdict}',
+    climateDot: '{date}: {temp} °C, {window}, {verdict}',
 
     // Sync
     syncSignedOut: 'Tylko na tym urządzeniu',

@@ -198,6 +198,8 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       points: wpmPoints,
       lineClass: 'typing-chart-line--wpm',
       shape: 'disc' as const,
+      // No `name`: this series' `formatValue` already ends in "WPM", and naming it as well reads
+      // "WPM 44 WPM". A series whose value says what it is does not need saying twice.
       formatValue: (v) => `${Math.round(v)} ${t.wpm}`,
       formatLabel: (v) => String(Math.round(v)),
     });
@@ -219,6 +221,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       points: points.map((p) => ({ t: p.t, value: p.accuracy })),
       lineClass: 'typing-chart-line--accuracy',
       shape: 'square' as const,
+      name: t.accuracy,
       formatValue: (v) => `${Math.round(v)}%`,
       formatLabel: (v) => `${Math.round(v)}%`,
     });
@@ -229,6 +232,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
       points: points.map((p) => ({ t: p.t, value: p.timeMs / 60000 })),
       lineClass: 'typing-chart-line--time',
       shape: 'triangle' as const,
+      name: t.timeSpent,
       axis: 'right',
       formatValue: formatDuration,
       formatLabel: formatDuration,
@@ -319,6 +323,7 @@ export default function TypingStats({ lang }: TypingStatsProps) {
             </p>
           )}
           <StatsChart
+            hintLabel={t.chartHint}
             series={loading ? [] : series}
             yDomain={loading ? LOADING_Y_DOMAIN : yDomain}
             yDomainRight={loading ? LOADING_YR_DOMAIN : yDomainRight}

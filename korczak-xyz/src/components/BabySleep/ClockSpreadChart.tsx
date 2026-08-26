@@ -36,6 +36,8 @@ interface ClockSpreadChartProps {
   spreadLabel: string;
   ariaLabel: string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 /** Minutes. Never zoom in tighter than three hours, or a tidy routine looks like chaos. */

@@ -127,6 +127,7 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
       <section className="tp-section">
         <h2 className="tp-subhead">{t.masteryOverTime}</h2>
         <MasteryChart
+          hintLabel={t.chartHint}
           history={data.mastery}
           labels={bucketLabels}
           formatDate={formatDate}
@@ -137,6 +138,7 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
       <section className="tp-section">
         <h2 className="tp-subhead">{t.trend}</h2>
         <TrendChart
+          hintLabel={t.chartHint}
           days={days}
           formatDate={formatDate}
           labels={{ accuracy: t.legendAccuracy, seconds: t.legendSpeed }}

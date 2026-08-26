@@ -152,6 +152,31 @@ describe('charts stay readable in monochrome', () => {
   it('keeps the typing trend fit achromatic', () => {
     expect(declared(typingCss, '.typing-chart-line--trend', 'stroke')).toBe('var(--retro-gray)');
   });
+
+  /*
+   * The spread chart is the one place here where hue separation is *not* the guarantee, and this
+   * test exists to say so rather than to hide it. Its target's green against its dots' cyan is 1.09
+   * in grayscale and always has been: the three lines are told apart by their marks — dashed mean,
+   * solid target, dash-dot average — which is the second channel every chart on this site is
+   * required to carry. So what has to hold is that the three patterns are three, and that the
+   * average did not arrive wearing one of the other two.
+   *
+   * `.bs-target-line` deliberately declares no `stroke-dasharray` at all; solid is its pattern.
+   */
+  it('draws the night chart\'s three lines with three different dashes', () => {
+    const mean = declared(babyCss, '.bs-mean-line', 'stroke-dasharray');
+    const average = declared(babyCss, '.bs-avg-line', 'stroke-dasharray');
+
+    expect(average).not.toBe(mean);
+    expect(() => declared(babyCss, '.bs-target-line', 'stroke-dasharray')).toThrow();
+  });
+
+  it('gives the moving average its own ink', () => {
+    const average = declared(babyCss, '.bs-avg-line', 'stroke');
+    expect(average).not.toBe(declared(babyCss, '.bs-mean-line', 'stroke'));
+    expect(average).not.toBe(declared(babyCss, '.bs-target-line', 'stroke'));
+    expect(average).not.toBe(declared(babyCss, '.bs-dot', 'fill'));
+  });
 });
 
 /*

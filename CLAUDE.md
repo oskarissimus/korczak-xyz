@@ -1411,6 +1411,36 @@ a `floor` of 0, though, because a duration axis padded past zero prints two grid
 dots beneath it are one population by construction. It is the one extractor that skips days still in
 progress: a bedtime is a complete fact the moment the night starts, a duration only once it is over.
 
+#### The trailing average on the night's length
+
+The mean is one flat line across the whole window, so it answers *how much does this vary* and
+cannot answer *is it getting better*: a fortnight of slow improvement and a fortnight of noise draw
+the same picture under it. `movingAverage.ts` is the second line — a trailing mean of the last seven
+nights, `average` on `SpreadChart`, in axis units like everything else it takes, so that file still
+does not know what it is plotting.
+
+Three rules, and each is the kind a later change reverses quietly:
+
+- **The window counts logged nights, not calendar days.** A night nobody logged is not a night of
+  zero sleep, and a window in days would have to invent one or silently shorten itself. Counting
+  points also makes DST irrelevant, which a millisecond window would not be — these day buckets are
+  local midnights, and two a year are not 24 hours apart.
+- **Full windows only.** Under seven points it draws nothing, and the line starts at the seventh
+  night. Every point on it is then a mean of seven, which is what the legend beside it claims; a line
+  averaging one night at its left end and seven at its right is noisier on the left than it looks and
+  says so nowhere. On the 3d and 7d windows it is simply absent.
+- **A point sits at the *last* night of its window.** Centring it would draw the line three days left
+  of the data it summarises and leave the three most recent nights — the ones being looked at — with
+  no line over them.
+
+Magenta, and a dash-dot. Every other colour on that panel is spoken for (navy the night, teal a nap,
+orchid the routine, yellow the mean, green the target, cyan the dots), and in grayscale magenta
+clears all three it shares the panel with — 2.50 against cyan, 2.92 against yellow, 2.29 against
+green, on a floor of 1.5. But the **dash** is what carries it: this chart tells its lines apart by
+mark rather than by hue, the target's green against the dots' cyan being 1.09 and always having been.
+So the third pattern has to be a third pattern, and `chartContrast.test.ts` holds the three apart —
+it does *not* put them in its grayscale table, which that green/cyan pair would rightly fail.
+
 ### The climate tab
 
 `/apps/baby-sleep/climate/` answers one question the log could not: **how low can the overnight
@@ -1872,8 +1902,47 @@ is the point, and it lives in the components.
 To check a change by eye, temporarily add an Astro page under `src/pages/` that renders the chart
 components with synthetic props, build, and screenshot it with `html { filter: grayscale(1) }`
 injected. Note that a page whose filename starts with `_` is one Astro will not build, and that
-there is no JSX transform in this project's vitest — the 61 test files are all logic and text, and
+there is no JSX transform in this project's vitest — the test files are all logic and text, and
 server-rendering a component from a test is not available without adding config.
+
+### Reading a value off a chart
+
+Every value tooltip here was an SVG `<title>`: a native hover tooltip on a desktop, and **nothing at
+all** on a phone. There is no hover on a touch screen, so a dot's value was unreadable on the device
+the sleep log is actually used from, and `MasteryChart` — which had no `<title>` anywhere — could not
+be queried on any device at all. All eleven charts now carry a pointer readout instead.
+
+The seam is the one the rest of this file keeps drawing: **the shared piece never learns what is
+plotted.** `useChartPointer` reports where the pointer is and stops there; each chart maps that to
+its own datum. Three things about it are load-bearing:
+
+- **The conversion goes through `getScreenCTM()`**, not arithmetic on `getBoundingClientRect()`.
+  These charts are drawn at `width: 100%` into a fixed viewBox, inside a panel that scrolls, on a
+  page that zooms. The CTM already accounts for all of it; a scale factor worked out by hand accounts
+  for whichever of them was remembered.
+- **`pointerleave` clears for a mouse only.** A finger fires it the instant it lifts, so clearing
+  there blanks the reading the tap was for — which is the entire feature on touch. A tapped value
+  stays until the next tap. `touch-action: pan-y` is what keeps the page scrolling under a vertical
+  drag while a horizontal one scrubs.
+- **The hit-testing maths is pure and lives in `src/utils/charts/hitTest.ts`**, for `comboKeys.ts`'s
+  reason: there is no jsdom here, so a `pointermove` handler is not a state a test can reach.
+  `nearestIndex` / `nearestPoint` / `bandIndex` / `rowIndex` / `spanAt` are the five shapes the
+  eleven charts need — a line, a jittered scatter, a bar's slot, a timeline's row, a bar within it.
+
+Each chart gains a transparent `.chart-surface` rect as its **first** child, so the empty parts of a
+panel are pointable and not just the pixels a 4px mark covers. Being at the bottom of the paint order
+it takes nothing away: every existing `<title>` above it still fires, so the desktop tooltips are
+kept rather than replaced. Where a readout and a `<title>` say the same thing they are built from one
+function, so the two cannot come to disagree.
+
+`ChartReadout` is the line itself, and it reserves its height whether or not it has anything to say —
+a row that grows and shrinks moves the chart under the finger scrubbing it, the typing sync slot's
+rule again. Idle shows a **hint, not data**: an empty reserved line and a broken feature look
+identical, and on a phone nothing else says the chart can be asked. It wraps rather than truncating;
+the Polish readout is two lines at 320px, and the reserved two lines are why nothing shifts there.
+
+One thing this does not do is give the keyboard a way in. Arrow-key traversal of a chart is a real
+feature and a separate one; `role="img"`, the `aria-label` and the `<title>`s are untouched.
 
 ## Localization (i18n)
 

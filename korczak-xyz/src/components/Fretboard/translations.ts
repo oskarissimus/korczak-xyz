@@ -103,6 +103,7 @@ export const translations = {
     // Summary
     summaryTitle: 'Session complete',
     accuracy: 'Accuracy',
+    chartHint: 'Point at the chart, or tap it, for the values.',
     avgTime: 'Average',
     fastest: 'Fastest',
     cardsSeen: 'Cards',
@@ -208,6 +209,7 @@ export const translations = {
 
     summaryTitle: 'Sesja zakończona',
     accuracy: 'Skuteczność',
+    chartHint: 'Najedź na wykres lub dotknij go, aby zobaczyć wartości.',
     avgTime: 'Średnio',
     fastest: 'Najszybciej',
     cardsSeen: 'Karty',

@@ -37,7 +37,11 @@ const FIELDS = [t.climateNight, t.climateTemp, t.climateWindow, t.climateVerdict
 
   <section class="bs-section">
     <h2 class="bs-subhead">{t.climateChartTitle}</h2>
-    <div class="bs-chart bs-chart--skeleton"></div>
+    <div class="bs-chart bs-chart--skeleton">
+      <!-- The readout line the hydrated chart carries. Reserved here too, or every chart on the
+           page jumps down by its height the moment the island mounts. -->
+      <p class="chart-readout chart-readout--idle"></p>
+    </div>
   </section>
 
   <section class="bs-section">

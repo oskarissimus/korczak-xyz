@@ -2,6 +2,7 @@
 
 @import './tabs.css';
 @import './chartTextures.css';
+@import './chartReadout.css';
 
 .typing-window {
   margin-bottom: 20px;

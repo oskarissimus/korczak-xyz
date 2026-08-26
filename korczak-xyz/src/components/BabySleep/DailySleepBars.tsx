@@ -12,7 +12,10 @@
  * carries the diagonal texture now, and its teal was re-stepped to 195.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import ChartTextures, { TEXTURE, texture } from '../charts/ChartTextures';
+import { useChartPointer } from '../charts/useChartPointer';
+import { bandIndex } from '../../utils/charts/hitTest';
 import { formatHm } from '../../utils/babySleep/format';
 import type { DayBucket, MeanStat } from '../../utils/babySleep/types';
 
@@ -23,6 +26,8 @@ interface DailySleepBarsProps {
   labels: { night: string; nap: string; incomplete: string; mean: string };
   ariaLabel: string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const WIDTH = 600;
@@ -38,7 +43,11 @@ export default function DailySleepBars({
   labels,
   ariaLabel,
   emptyLabel,
+  hintLabel,
 }: DailySleepBarsProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   const totals = days.map((d) => (d.nightMs ?? 0) + d.napMs);
   if (days.length === 0 || totals.every((v) => v === 0)) {
     return (
@@ -66,10 +75,32 @@ export default function DailySleepBars({
 
   const labelEvery = Math.ceil(days.length / MAX_DAY_LABELS);
 
+  /* One sentence, read by the `<title>` and by the readout alike, so the two can never come to
+     disagree about a day. */
+  const describe = (day: DayBucket) =>
+    `${formatDay(day.start)} · ${labels.night} ${formatHm(day.nightMs ?? 0)} · ${
+      labels.nap
+    } ${formatHm(day.napMs)}${day.partial ? ` · ${labels.incomplete}` : ''}`;
+
+  /* A day owns its slot, gap included: the space between two bars is still one of the two days, and
+     asking the reader to hit a 38px bar with a thumb is asking them not to bother. */
+  const hit = at == null ? null : bandIndex(at.x, MARGIN.left, slot, days.length);
+  const hitDay = hit == null ? null : days[hit];
+
   return (
     <div className="bs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label={ariaLabel}
+        {...handlers}
+      >
         <ChartTextures />
+        {/* Under everything, so the gaps between the bars are pointable too. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
         {ticks.map((v) => (
           <g key={v}>
             <line
@@ -89,9 +120,7 @@ export default function DailySleepBars({
           const night = day.nightMs ?? 0;
           const total = night + day.napMs;
           const x = barX(i);
-          const title = `${formatDay(day.start)} · ${labels.night} ${formatHm(night)} · ${
-            labels.nap
-          } ${formatHm(day.napMs)}${day.partial ? ` · ${labels.incomplete}` : ''}`;
+          const title = describe(day);
           return (
             <g key={day.key}>
               {night > 0 && (
@@ -169,7 +198,22 @@ export default function DailySleepBars({
           y1={y(0)}
           y2={y(0)}
         />
+
+        {/* An outline rather than a fill: the bar's own two colours are the answer, and covering
+            them to say "this one" would hide what was asked for. */}
+        {hitDay && hit != null && (
+          <rect
+            className="chart-hit"
+            fill="none"
+            x={barX(hit) - 1}
+            y={y((hitDay.nightMs ?? 0) + hitDay.napMs) - 1}
+            width={barW + 2}
+            height={Math.max(2, y(0) - y((hitDay.nightMs ?? 0) + hitDay.napMs) + 2)}
+          />
+        )}
       </svg>
+
+      <ChartReadout text={hitDay ? describe(hitDay) : null} hint={hintLabel} />
 
       <ul className="bs-legend">
         <li>

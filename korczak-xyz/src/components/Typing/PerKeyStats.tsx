@@ -408,6 +408,7 @@ export default function PerKeyStats({ lang }: PerKeyStatsProps) {
                         </p>
                       )}
                       <StatsChart
+                        hintLabel={t.chartHint}
                         series={detailSeries}
                         yDomain={detailYDomain}
                         formatDate={formatDate}

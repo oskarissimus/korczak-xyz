@@ -32,7 +32,10 @@
  *     phone's width runs out.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import ChartTextures, { TEXTURE, texture } from '../charts/ChartTextures';
+import { useChartPointer } from '../charts/useChartPointer';
+import { rowIndex, spanAt } from '../../utils/charts/hitTest';
 import { effectiveEnd, segmentsForDay } from '../../utils/babySleep/days';
 import { formatHm } from '../../utils/babySleep/format';
 import type { RoutineRecord } from '../../utils/babySleep/routine';
@@ -66,6 +69,8 @@ interface SleepTimelineProps {
   targetLabel?: string;
   ariaLabel: string;
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const WIDTH = 600;
@@ -89,7 +94,11 @@ export default function SleepTimeline({
   targetLabel,
   ariaLabel,
   emptyLabel,
+  hintLabel,
 }: SleepTimelineProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   const rowSegments = days.map((day) => segmentsForDay(entries, day, now));
   const rowRoutines = days.map((day) => routineSegmentsForDay(routines, asleep, day, now));
 
@@ -105,6 +114,13 @@ export default function SleepTimeline({
           formatTime(seg.routine.end as number),
           seg.running ? null : formatHm(seg.end - (seg.routine.end as number))
         );
+
+  /* Both halves of a night name the *whole* block. The split is an artefact of drawing a 24-hour
+     axis and must not read as two separate sleeps. */
+  const wholeOf = (entry: SleepEntry) =>
+    `${formatTime(entry.start)} – ${
+      entry.end == null ? '…' : formatTime(entry.end)
+    } · ${formatHm(effectiveEnd(entry, now) - entry.start)}`;
 
   /* A window holding routines and no sleep at all is still a chart worth drawing. */
   if (
@@ -135,10 +151,53 @@ export default function SleepTimeline({
 
   const labelEvery = Math.ceil(rows / MAX_ROW_LABELS);
 
+  /* The pointer picks a row, then a bar within it. The gap between two rows belongs to neither —
+     it is a fifth of this chart's height, and handing it to the row above would put the readout a
+     day out for all of it. */
+  const hitRow = at == null ? null : rowIndex(at.y, MARGIN.top, ROW_H, ROW_GAP, rows);
+  const hitDay = hitRow == null ? null : days[hitRow];
+  /* In drawing order — routines first, sleeps over them — because `spanAt` takes the last one that
+     covers the pointer, and where a mis-logged routine overlaps the sleep it led into, the sleep is
+     what is actually on the screen. */
+  const hitSpans =
+    hitRow == null || hitDay == null
+      ? []
+      : [
+          ...rowRoutines[hitRow].map((seg) => ({
+            from: xIn(hitDay, seg.start),
+            to: xIn(hitDay, seg.end),
+            text: titleOf(seg),
+          })),
+          ...rowSegments[hitRow].map((seg) => ({
+            from: xIn(hitDay, seg.start),
+            to: xIn(hitDay, seg.end),
+            text: wholeOf(seg.entry),
+          })),
+        ];
+  const hitSpan = at == null ? null : spanAt(hitSpans, at.x);
+  /* A row with nothing under the pointer still names its day: the empty stretches of a row are most
+     of it, and "nothing logged here" is a reading too. */
+  const readout =
+    hitDay == null
+      ? null
+      : [formatDay(hitDay.start), hitSpan == null ? null : hitSpans[hitSpan].text]
+          .filter(Boolean)
+          .join(' · ');
+
   return (
     <div className="bs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${height}`} width="100%" role="img" aria-label={ariaLabel}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${height}`}
+        width="100%"
+        role="img"
+        aria-label={ariaLabel}
+        {...handlers}
+      >
         <ChartTextures />
+        {/* Under everything, so the empty parts of a row are pointable too. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={height} />
         {hours.map((h) => {
           const x = MARGIN.left + (h / 24) * plotW;
           return (
@@ -203,12 +262,7 @@ export default function SleepTimeline({
                 const x1 = xIn(day, seg.start);
                 const x2 = xIn(day, seg.end);
                 const running = entry.end == null;
-                const end = effectiveEnd(entry, now);
-                /* Both halves of a night name the *whole* block. The split is an artefact of drawing
-                   a 24-hour axis and must not read as two separate sleeps. */
-                const whole = `${formatTime(entry.start)} – ${
-                  running ? '…' : formatTime(entry.end as number)
-                } · ${formatHm(end - entry.start)}`;
+                const whole = wholeOf(entry);
                 return (
                   <g key={`${entry.id}-${day.key}`}>
                     <rect
@@ -262,7 +316,22 @@ export default function SleepTimeline({
           y1={height - MARGIN.bottom + 2}
           y2={height - MARGIN.bottom + 2}
         />
+
+        {/* An outline: the bar's colour is which kind of sleep it was, and a fill would take that
+            away at the moment it is being asked about. */}
+        {hitRow != null && hitSpan != null && (
+          <rect
+            className="chart-hit"
+            fill="none"
+            x={hitSpans[hitSpan].from - 1}
+            y={rowY(hitRow) - 1}
+            width={Math.max(2, hitSpans[hitSpan].to - hitSpans[hitSpan].from) + 2}
+            height={ROW_H + 2}
+          />
+        )}
       </svg>
+
+      <ChartReadout text={readout} hint={hintLabel} />
     </div>
   );
 }

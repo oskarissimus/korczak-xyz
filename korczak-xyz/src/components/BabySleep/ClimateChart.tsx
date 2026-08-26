@@ -24,7 +24,10 @@
  * picture every time.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import { Mark, SeriesSwatch, type MarkShape } from '../charts/ChartMarks';
+import { useChartPointer } from '../charts/useChartPointer';
+import { nearestPoint } from '../../utils/charts/hitTest';
 import type { NightObservation } from '../../utils/babySleep/climateStats';
 import { isComplete } from '../../utils/babySleep/climateStats';
 import type { NightVerdict, WindowState } from '../../utils/babySleep/climate';
@@ -57,6 +60,8 @@ function stepFor(span: number, steps: number[]): number {
 
 /** How far apart two dots at the same temperature sit, before the lane runs out of room. */
 const STACK_GAP = 13;
+/** How far the pointer may be from a dot and still mean it, in viewBox units. */
+const HIT_REACH = 26;
 
 /**
  * Vertical offset from the lane's line for each night, in the order given.
@@ -110,6 +115,9 @@ export default function ClimateChart({
   formatTemp,
   t,
 }: ClimateChartProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   const complete = nights.filter(isComplete);
 
   if (complete.length === 0) {
@@ -150,9 +158,42 @@ export default function ClimateChart({
   const verdictLabel = (verdict: NightVerdict) =>
     verdict === 'cold' ? t.verdictCold : verdict === 'ok' ? t.verdictOk : t.verdictWarm;
 
+  /* Where each dot ended up, jitter included, computed once: it is what the marks are drawn at and
+     what the pointer is measured against, and two copies of that sum would eventually disagree. */
+  const dots = complete.map((night) => ({
+    x: x(night.tempC),
+    y: laneMid(LANES.indexOf(night.window)) + (offsets.get(night.night) ?? 0),
+  }));
+
+  /* The narrowed shape `isComplete` produces: a chart of nights that have all three facts. */
+  type CompleteNight = (typeof complete)[number];
+
+  const describe = (night: CompleteNight) =>
+    fill(t.climateDot, {
+      date: formatDay(night.at),
+      temp: formatTemp(night.tempC),
+      window: laneLabel(night.window).toLowerCase(),
+      verdict: verdictLabel(night.verdict).toLowerCase(),
+    });
+
+  /* Two dimensions, unlike every other chart here: a temperature names a *column* of dots — two
+     lanes, and several nights stacked within one — so x alone cannot say which night was meant.
+     The reach is generous because the dots are 5px and a thumb is not. */
+  const hit = at == null ? null : nearestPoint(dots, at, HIT_REACH);
+
   return (
     <div className="bs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={t.climateChartAria}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label={t.climateChartAria}
+        {...handlers}
+      >
+        {/* Under everything, so the empty parts of a lane are pointable too. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
         {ticks.map((v) => (
           <g key={v}>
             <line
@@ -207,26 +248,31 @@ export default function ClimateChart({
           </g>
         )}
 
-        {complete.map((night) => (
+        {complete.map((night, i) => (
           <Mark
             key={night.night}
             shape={VERDICT_SHAPE[night.verdict]}
             className={`bs-dot ${VERDICT_CLASS[night.verdict]}`}
-            cx={x(night.tempC)}
-            cy={laneMid(LANES.indexOf(night.window)) + (offsets.get(night.night) ?? 0)}
+            cx={dots[i].x}
+            cy={dots[i].y}
             r={5}
           >
-            <title>
-              {fill(t.climateDot, {
-                date: formatDay(night.at),
-                temp: formatTemp(night.tempC),
-                window: laneLabel(night.window).toLowerCase(),
-                verdict: verdictLabel(night.verdict).toLowerCase(),
-              })}
-            </title>
+            <title>{describe(night)}</title>
           </Mark>
         ))}
+
+        {hit != null && (
+          <Mark
+            shape={VERDICT_SHAPE[complete[hit].verdict]}
+            className={`bs-dot ${VERDICT_CLASS[complete[hit].verdict]} chart-hit`}
+            cx={dots[hit].x}
+            cy={dots[hit].y}
+            r={6}
+          />
+        )}
       </svg>
+
+      <ChartReadout text={hit == null ? null : describe(complete[hit])} hint={t.chartHint} />
 
       <ul className="bs-legend">
         {/* Points, not lines, so the swatch draws the mark alone — the same one the lane carries. */}

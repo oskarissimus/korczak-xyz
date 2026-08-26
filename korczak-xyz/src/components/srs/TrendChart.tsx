@@ -13,7 +13,10 @@
  * readable at a glance.
  */
 
+import ChartReadout from '../charts/ChartReadout';
 import { Mark, SeriesSwatch } from '../charts/ChartMarks';
+import { useChartPointer } from '../charts/useChartPointer';
+import { nearestIndex } from '../../utils/charts/hitTest';
 import type { DayStats } from '../../utils/srs/history';
 
 interface TrendChartProps {
@@ -21,6 +24,8 @@ interface TrendChartProps {
   formatDate: (t: number) => string;
   labels: { accuracy: string; seconds: string };
   emptyLabel: string;
+  /** What the readout says when nothing is being pointed at. */
+  hintLabel: string;
 }
 
 const WIDTH = 600;
@@ -28,7 +33,16 @@ const HEIGHT = 220;
 const MARGIN = { top: 10, right: 40, bottom: 20, left: 32 };
 const MAX_MARKERS = 40;
 
-export default function TrendChart({ days, formatDate, labels, emptyLabel }: TrendChartProps) {
+export default function TrendChart({
+  days,
+  formatDate,
+  labels,
+  emptyLabel,
+  hintLabel,
+}: TrendChartProps) {
+  // Above the empty guard, because a hook cannot sit behind a return.
+  const { svgRef, at, handlers } = useChartPointer();
+
   if (days.length === 0) {
     return <p className="srs-empty">{emptyLabel}</p>;
   }
@@ -49,9 +63,40 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
   const speed = days.map((d) => ({ x: x(d.at), y: ySec(d.avgMs / 1000), d }));
   const showMarkers = days.length <= MAX_MARKERS;
 
+  /* One x picks one day and both series report it, which is the comparison this chart is for: a day
+     that got faster and less accurate is the thing worth noticing, and reading the two lines a few
+     pixels apart is how that gets missed. */
+  const hit = at == null ? null : nearestIndex(accuracy.map((p) => p.x), at.x);
+  const hitDay = hit == null ? null : days[hit];
+  const readout =
+    hitDay == null
+      ? null
+      : `${formatDate(hitDay.at)} · ${labels.accuracy} ${Math.round(hitDay.accuracy * 100)}% (${
+          hitDay.answers
+        }) · ${labels.seconds} ${(hitDay.avgMs / 1000).toFixed(1)}s`;
+
   return (
     <div className="srs-chart">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={labels.accuracy}>
+      <svg
+        ref={svgRef}
+        className="chart-interactive"
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        width="100%"
+        role="img"
+        aria-label={labels.accuracy}
+        {...handlers}
+      >
+        {/* Under everything, so the whole panel is pointable and not just the 3px markers. */}
+        <rect className="chart-surface" x={0} y={0} width={WIDTH} height={HEIGHT} />
+        {hit != null && (
+          <line
+            className="chart-guide"
+            x1={accuracy[hit].x}
+            x2={accuracy[hit].x}
+            y1={MARGIN.top}
+            y2={MARGIN.top + plotH}
+          />
+        )}
         {[25, 50, 75, 100].map((v) => (
           <line
             key={v}
@@ -115,6 +160,27 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
             </Mark>
           ))}
 
+        {/* Drawn whether or not the markers are: past 40 days there is nothing to highlight, and a
+            day the reader has just pointed at is exactly when a mark is wanted. */}
+        {hit != null && (
+          <>
+            <Mark
+              shape="square"
+              className="srs-point--speed chart-hit"
+              cx={speed[hit].x}
+              cy={speed[hit].y}
+              r={4}
+            />
+            <Mark
+              shape="disc"
+              className="srs-point--accuracy chart-hit"
+              cx={accuracy[hit].x}
+              cy={accuracy[hit].y}
+              r={4}
+            />
+          </>
+        )}
+
         <text className="srs-chart-tick" x={MARGIN.left} y={HEIGHT - 5} textAnchor="start">
           {formatDate(tMin)}
         </text>
@@ -124,6 +190,8 @@ export default function TrendChart({ days, formatDate, labels, emptyLabel }: Tre
           </text>
         )}
       </svg>
+
+      <ChartReadout text={readout} hint={hintLabel} />
 
       <ul className="srs-legend">
         <li>

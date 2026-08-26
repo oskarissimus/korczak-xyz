@@ -2,6 +2,7 @@
 
 @import './tabs.css';
 @import './chartTextures.css';
+@import './chartReadout.css';
 
 .baby-sleep-window {
   margin-bottom: 20px;
@@ -635,7 +636,12 @@
   margin: 0;
 }
 
-.bs-chart--skeleton {
+/* The height goes on a spacer rather than on the box, because the box now also holds the readout
+   line the hydrated chart carries: a `min-height` on the container would swallow the readout's own
+   height instead of adding to it, and the page would still jump at mount by exactly that much. */
+.bs-chart--skeleton::before {
+  content: '';
+  display: block;
   min-height: 200px;
 }
 
@@ -771,6 +777,22 @@
   stroke-width: 1.5;
   fill: none;
   background-color: var(--retro-green);
+}
+
+/* The trailing 7-night mean on the night-length chart. Magenta because every other colour on that
+   panel is spoken for — navy the night, teal a nap, orchid the routine, yellow the mean, green the
+   target, cyan the dots — and because in grayscale it clears all three it shares the panel with:
+   2.50 against cyan, 2.92 against yellow, 2.29 against green, on a floor of 1.5.
+
+   The dash-dot is what actually carries it, though. This chart tells its three lines apart by mark
+   rather than by hue — the target's green against the dots' cyan is 1.09 and always was — so the
+   pattern has to be a third distinct one, not the mean's `5 4` and not the target's solid.
+   `chartContrast.test.ts` holds all three apart. */
+.bs-avg-line {
+  stroke: var(--retro-magenta);
+  stroke-width: 2;
+  stroke-dasharray: 9 3 2 3;
+  fill: none;
 }
 
 /* --- clock spread --------------------------------------------------------- */

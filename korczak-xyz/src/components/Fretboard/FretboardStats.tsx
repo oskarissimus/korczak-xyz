@@ -114,6 +114,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
       <section className="fb-section">
         <h2 className="fb-subhead">{t.masteryTitle}</h2>
         <MasteryChart
+          hintLabel={t.chartHint}
           history={data.mastery}
           labels={bucketLabels}
           formatDate={formatDate}
@@ -124,6 +125,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
       <section className="fb-section">
         <h2 className="fb-subhead">{t.trendTitle}</h2>
         <TrendChart
+          hintLabel={t.chartHint}
           days={days}
           formatDate={formatDate}
           labels={{ accuracy: t.accuracy, seconds: t.seconds }}
