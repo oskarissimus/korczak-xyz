@@ -5,9 +5,13 @@
  * evening it belongs to here as well. If the list grouped by raw calendar date and the charts did not,
  * the two would disagree about which night was which and there would be no way to tell which was
  * right.
+ *
+ * A day is listed when it holds a sleep **or** a routine — `groupHistory` takes both — because a
+ * routine is a record of its own and a day may hold nothing else. Grouped by the entries alone, such
+ * a day had no heading, so its routine rows were never drawn and the record could not be reached.
  */
 
-import { dayKeyAt, dayKeyOf, dayStart, durationOf } from '../../utils/babySleep/days';
+import { dayKeyAt, dayStart, durationOf, groupHistory } from '../../utils/babySleep/days';
 import { authorLabel, formatHm } from '../../utils/babySleep/format';
 import type { RoutineRecord } from '../../utils/babySleep/routine';
 import { asleepFor, settleMs } from '../../utils/babySleep/routineStats';
@@ -44,23 +48,6 @@ interface EntryListProps {
   onEditRoutine: (routine: RoutineRecord) => void;
   onAddRoutine: (day: string, kind: SleepKind) => void;
   t: Translation;
-}
-
-interface Group {
-  key: string;
-  at: number;
-  entries: SleepEntry[];
-}
-
-function groupEntries(entries: SleepEntry[]): Group[] {
-  const groups = new Map<string, Group>();
-  for (const entry of entries) {
-    const key = dayKeyOf(entry);
-    const group = groups.get(key) ?? { key, at: dayStart(key), entries: [] };
-    group.entries.push(entry);
-    groups.set(key, group);
-  }
-  return [...groups.values()].sort((a, b) => b.at - a.at);
 }
 
 /**
@@ -132,7 +119,8 @@ export default function EntryList({
   t,
 }: EntryListProps) {
   const viewerKey = viewer?.toLowerCase() ?? null;
-  if (entries.length === 0) {
+  // Nothing logged at all — a day holding only a routine is not nothing, and still gets a heading.
+  if (entries.length === 0 && routines.size === 0) {
     return (
       <section className="bs-history">
         <h2 className="bs-subhead">{t.historyTitle}</h2>
@@ -147,7 +135,7 @@ export default function EntryList({
   return (
     <section className="bs-history">
       <h2 className="bs-subhead">{t.historyTitle}</h2>
-      {groupEntries(entries).map((group) => {
+      {groupHistory(entries, routines.keys()).map((group) => {
         const naps = group.entries.filter((e) => e.kind === 'nap' && e.end != null).length;
         const total = group.entries.reduce((sum, e) => sum + (durationOf(e) ?? 0), 0);
         const label =
@@ -212,55 +200,59 @@ export default function EntryList({
                 </button>
               </p>
             </div>
-            <ul className="bs-entries">
-              {group.entries.map((entry) => {
-                const ms = durationOf(entry);
-                const suspect = !isPlausible(entry, now);
-                const author =
-                  entry.authorEmail && entry.authorEmail.toLowerCase() !== viewerKey
-                    ? authorLabel(entry.authorEmail)
-                    : '';
-                return (
-                  <li
-                    key={entry.id}
-                    className={`bs-entry bs-entry--${entry.kind}${suspect ? ' bs-entry--suspect' : ''}`}
-                  >
-                    <span className={`bs-swatch bs-swatch--${entry.kind}`} aria-hidden="true" />
-                    <span className="bs-entry-kind">
-                      {entry.kind === 'night' ? t.kindNight : t.kindNap}
-                    </span>
-                    <span className="bs-entry-span">
-                      {formatTime(entry.start)}
-                      {' – '}
-                      {entry.end == null ? (
-                        <em className="bs-entry-running">{t.running}</em>
-                      ) : (
-                        formatTime(entry.end)
-                      )}
-                    </span>
-                    <span className="bs-entry-dur">{ms == null ? '' : formatHm(ms)}</span>
-                    {author && (
-                      <span className="bs-entry-author" title={entry.authorEmail}>
-                        {fill(t.loggedBy, { name: author })}
+            {/* Only when there are sleeps: an empty list would still draw the rule
+                `.bs-day-routines + .bs-entries` puts above it, under nothing. */}
+            {group.entries.length > 0 && (
+              <ul className="bs-entries">
+                {group.entries.map((entry) => {
+                  const ms = durationOf(entry);
+                  const suspect = !isPlausible(entry, now);
+                  const author =
+                    entry.authorEmail && entry.authorEmail.toLowerCase() !== viewerKey
+                      ? authorLabel(entry.authorEmail)
+                      : '';
+                  return (
+                    <li
+                      key={entry.id}
+                      className={`bs-entry bs-entry--${entry.kind}${suspect ? ' bs-entry--suspect' : ''}`}
+                    >
+                      <span className={`bs-swatch bs-swatch--${entry.kind}`} aria-hidden="true" />
+                      <span className="bs-entry-kind">
+                        {entry.kind === 'night' ? t.kindNight : t.kindNap}
                       </span>
-                    )}
-                    <span className="bs-entry-actions">
-                      <button type="button" className="bs-link" onClick={() => onEdit(entry)}>
-                        {t.edit}
-                      </button>
-                      {canSplit(entry, now) && (
-                        <button type="button" className="bs-link" onClick={() => onSplit(entry)}>
-                          {t.splitAction}
-                        </button>
+                      <span className="bs-entry-span">
+                        {formatTime(entry.start)}
+                        {' – '}
+                        {entry.end == null ? (
+                          <em className="bs-entry-running">{t.running}</em>
+                        ) : (
+                          formatTime(entry.end)
+                        )}
+                      </span>
+                      <span className="bs-entry-dur">{ms == null ? '' : formatHm(ms)}</span>
+                      {author && (
+                        <span className="bs-entry-author" title={entry.authorEmail}>
+                          {fill(t.loggedBy, { name: author })}
+                        </span>
                       )}
-                      <button type="button" className="bs-link" onClick={() => onDelete(entry)}>
-                        {t.remove}
-                      </button>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+                      <span className="bs-entry-actions">
+                        <button type="button" className="bs-link" onClick={() => onEdit(entry)}>
+                          {t.edit}
+                        </button>
+                        {canSplit(entry, now) && (
+                          <button type="button" className="bs-link" onClick={() => onSplit(entry)}>
+                            {t.splitAction}
+                          </button>
+                        )}
+                        <button type="button" className="bs-link" onClick={() => onDelete(entry)}>
+                          {t.remove}
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         );
       })}

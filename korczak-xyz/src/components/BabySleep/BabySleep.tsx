@@ -14,11 +14,12 @@ import { useBabySleepData } from '../../hooks/useBabySleepData';
 import { useDataOwner } from '../../hooks/useDataOwner';
 import { useNightRoutine } from '../../hooks/useNightRoutine';
 import { mergeSync } from '../../utils/flashcards/sync';
-import { dayKeyAt, dayStart } from '../../utils/babySleep/days';
+import { dayKeyAt, dayStart, sleepDayKey } from '../../utils/babySleep/days';
 import type { RoutineKey, RoutineRecord } from '../../utils/babySleep/routine';
 import { routineKey, routineNightKey } from '../../utils/babySleep/routine';
 import { asleepFor } from '../../utils/babySleep/routineStats';
 import type { EntryDraft, SleepEntry, SleepKind } from '../../utils/babySleep/types';
+import AddChoice, { type AddChoiceValue } from './AddChoice';
 import EntryForm from './EntryForm';
 import EntryList from './EntryList';
 import LiveControls from './LiveControls';
@@ -56,8 +57,14 @@ export default function BabySleep({ lang }: BabySleepProps) {
    * in two is two answers to the same question.
    */
   const [splittingId, setSplittingId] = useState<string | null>(null);
-  /** Which routine is being edited or added. The third occupant of the one form slot. */
+  /** Which routine is being edited or added *from a history row*. The third occupant of the slot. */
   const [routineTarget, setRoutineTarget] = useState<RoutineTarget | null>(null);
+  /*
+   * What the resting state of the slot is adding. Before this it was always a sleep, so a routine
+   * that had already finished had no way in: the live buttons stamp `Date.now()` and the history row
+   * is the long way round. `'nap'` is `EntryForm`'s own default kind, so nothing moves on first load.
+   */
+  const [adding, setAdding] = useState<AddChoiceValue>({ what: 'sleep', kind: 'nap' });
   const formRef = useRef<HTMLDivElement>(null);
 
   const locale = localeOf(lang);
@@ -79,6 +86,20 @@ export default function BabySleep({ lang }: BabySleepProps) {
     () => data.entries.filter((e) => e.start >= cutoff || e.end == null),
     [data.entries, cutoff]
   );
+  /*
+   * The routines over the same window, because the history now lists a day that holds one and no
+   * sleep at all — unfiltered, a routine-only day from months ago would appear under a heading
+   * called "Recent sleeps". A routine still running is kept however old it is, exactly as an open
+   * entry is above: it is the forgotten timer, and hiding it is how it stays forgotten.
+   */
+  const recentRoutines = useMemo(() => {
+    const from = dayStart(dayKeyAt(cutoff));
+    return new Map(
+      [...routines.byDay].filter(
+        ([day, list]) => dayStart(day) >= from || list.some((r) => r.end == null)
+      )
+    );
+  }, [routines.byDay, cutoff]);
 
   /** When the sleep a routine led into began — one rule for both kinds, from `routineStats`. */
   const asleepAtOf = (routine: RoutineRecord | null) =>
@@ -170,6 +191,20 @@ export default function BabySleep({ lang }: BabySleepProps) {
    * synced. `mergeSync` is pure and knows nothing about flashcards — it is the same two-collections,
    * one-account problem the merged trainers had.
    */
+  /*
+   * The occasion the resting routine form is about: today's, for the kind the row has selected.
+   *
+   * A **night** adopts the record already logged for tonight, because a night routine's id *is* its
+   * day key — without this, saving would overwrite tonight's times with the form's defaults instead
+   * of correcting them. A **nap** is always a new record: a day holds one per nap. That is the same
+   * split `canRestart` makes on the live strip.
+   */
+  const addRoutineDay = sleepDayKey(now, adding.kind);
+  const addRoutine = adding.kind === 'night' ? routines.nightByDay.get(addRoutineDay) : undefined;
+  const addChoice = <AddChoice value={adding} onChange={setAdding} t={t} />;
+  /** Back to the sleep form once a routine is written: a second save would file a second record. */
+  const doneAdding = () => setAdding({ what: 'sleep', kind: adding.kind });
+
   const sync = mergeSync(data.sync, routines.sync);
   const retrySync = () => {
     data.retrySync();
@@ -244,9 +279,30 @@ export default function BabySleep({ lang }: BabySleepProps) {
             onCancel={() => setSplittingId(null)}
             t={t}
           />
+        ) : !editing && adding.what === 'routine' ? (
+          <RoutineForm
+            day={addRoutineDay}
+            kind={adding.kind}
+            routine={addRoutine}
+            asleepAt={asleepAtOf(addRoutine ?? null)}
+            dayLabel={formatDay(dayStart(addRoutineDay))}
+            header={addChoice}
+            onSubmit={(draft) => {
+              routines.logRoutine(draft, adding.kind, addRoutine);
+              doneAdding();
+            }}
+            onRemove={() => {
+              if (addRoutine) routines.clearRoutine(addRoutine.id);
+              doneAdding();
+            }}
+            onCancel={doneAdding}
+            t={t}
+          />
         ) : (
           <EntryForm
             editing={editing}
+            header={editing ? undefined : addChoice}
+            kind={adding.kind}
             others={data.entries}
             onSubmit={submit}
             onCancel={editing ? () => setEditingId(null) : undefined}
@@ -268,7 +324,7 @@ export default function BabySleep({ lang }: BabySleepProps) {
           if (entry.id === splittingId) setSplittingId(null);
           data.removeEntry(entry.id);
         }}
-        routines={routines.byDay}
+        routines={recentRoutines}
         onEditRoutine={editRoutine}
         onAddRoutine={(day, kind) => beginRoutine({ day, kind })}
         t={t}

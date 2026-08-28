@@ -227,3 +227,36 @@ export function groupByDay(entries: SleepEntry[], window: TimeWindow, now: numbe
   }
   return [...buckets.values()].sort((a, b) => a.start - b.start);
 }
+
+/** One day of the history list: its key, its midnight, and the sleeps filed under it. */
+export interface HistoryGroup {
+  key: string;
+  at: number;
+  entries: SleepEntry[];
+}
+
+/**
+ * The history's day groups, newest first.
+ *
+ * `days` is the extra keys that must appear whether or not a sleep was logged under them — the days
+ * that hold a routine. Grouping by the entries alone made a routine-only day **invisible**: no
+ * entry, so no group, so nothing drew its routine rows, and the record was stored and synced with
+ * no way to reach it. Logging a nap first was the only way in.
+ *
+ * It takes day keys rather than routines so this module needs no `RoutineRecord` import: what it
+ * knows is which days exist, not what is on them.
+ *
+ * Grouping is `dayKeyOf`, the same rule `groupByDay` and the stats use, so a bedtime past midnight
+ * appears under the evening it belongs to here as well.
+ */
+export function groupHistory(entries: SleepEntry[], days: Iterable<string>): HistoryGroup[] {
+  const groups = new Map<string, HistoryGroup>();
+  const ensure = (key: string): HistoryGroup => {
+    const group = groups.get(key) ?? { key, at: dayStart(key), entries: [] };
+    groups.set(key, group);
+    return group;
+  };
+  for (const entry of entries) ensure(dayKeyOf(entry)).entries.push(entry);
+  for (const key of days) ensure(key);
+  return [...groups.values()].sort((a, b) => b.at - a.at);
+}

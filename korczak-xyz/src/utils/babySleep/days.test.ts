@@ -8,6 +8,7 @@ import {
   eachDay,
   endOfDay,
   groupByDay,
+  groupHistory,
   minutesOfDay,
   resolveWindow,
   segmentsForDay,
@@ -350,5 +351,39 @@ describe('groupByDay', () => {
     ];
     const day = groupByDay(entries, window, T0).find((d) => d.key === '2026-01-14');
     expect(day?.entries.map((e) => e.kind)).toEqual(['nap', 'night']);
+  });
+});
+
+describe('groupHistory', () => {
+  it('lists a day that holds only a routine', () => {
+    // The bug this exists to prevent: grouped by the entries alone, a day with a routine and no
+    // sleep had no heading at all, so its routine rows were never drawn and the record — stored and
+    // synced — could not be reached. Logging a nap first was the only way in.
+    const groups = groupHistory([], ['2026-01-14']);
+    expect(groups.map((g) => g.key)).toEqual(['2026-01-14']);
+    expect(groups[0].entries).toEqual([]);
+    expect(groups[0].at).toBe(local(2026, 1, 14));
+  });
+
+  it('does not duplicate a day that holds both', () => {
+    const nap = entry('nap', local(2026, 1, 14, 9), local(2026, 1, 14, 10));
+    const groups = groupHistory([nap], ['2026-01-14']);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].entries).toEqual([nap]);
+  });
+
+  it('keeps every day newest first, routine-only days among them', () => {
+    const entries = [
+      entry('nap', local(2026, 1, 13, 9), local(2026, 1, 13, 10)),
+      entry('night', local(2026, 1, 15, 20), local(2026, 1, 16, 6)),
+    ];
+    const groups = groupHistory(entries, ['2026-01-14', '2026-01-13']);
+    expect(groups.map((g) => g.key)).toEqual(['2026-01-15', '2026-01-14', '2026-01-13']);
+  });
+
+  it('files a bedtime past midnight under the evening it began', () => {
+    // `dayKeyOf`'s rule, so the list and the charts cannot disagree about which night is which.
+    const late = entry('night', local(2026, 1, 15, 0, 30), local(2026, 1, 15, 7));
+    expect(groupHistory([late], []).map((g) => g.key)).toEqual(['2026-01-14']);
   });
 });

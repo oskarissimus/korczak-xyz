@@ -269,6 +269,12 @@
   border-top: 1px solid var(--retro-white);
 }
 
+/* A day holding only a routine has no list under the block, so there is nothing for that line to
+   close off from — and a rule hanging under the last row reads as a row that failed to render. */
+.bs-day-routines:last-child {
+  border-bottom: 0;
+}
+
 /* --- the forgotten timer -------------------------------------------------- */
 
 .bs-warn {

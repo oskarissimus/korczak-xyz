@@ -1271,6 +1271,48 @@ then a row carrying only `Add nap routine`. Each row's settling comes from `sett
 asleepFor(...))` rather than a subtraction of its own, which is how it stopped being the one place
 that forgot `MAX_SETTLE_MS`.
 
+**A day is listed when it holds a sleep *or* a routine.** `EntryList` grouped by the entries alone, so
+a day with a routine and no sleep had no heading — and therefore no routine rows, no `Edit`, no way in
+at all. The record was stored and synced and simply unreachable; logging a nap first was the only way
+to get at it. `groupHistory` in `days.ts` takes the entries and the extra day keys and unions them —
+day keys rather than routines, so that module still needs no `RoutineRecord` import. The entry `<ul>`
+is drawn only when there are entries, and `.bs-day-routines:last-child` drops the rule that would
+otherwise close the block off from nothing.
+
+The routines are windowed with the entries, not with the whole log: `recentRoutines` in `BabySleep`
+applies `HISTORY_DAYS` to the map before passing it down, or a routine-only day from months ago would
+appear under a heading that says *Recent sleeps*. A routine still **running** is kept however old, the
+same exemption an open entry has above it — that is the forgotten timer, and hiding it is how it stays
+forgotten.
+
+#### Adding one that has already finished
+
+The form slot's resting state used to be `EntryForm` alone, so a routine that had already ended had
+nowhere to go: the live buttons stamp `Date.now()`, and the history row is the long way round. Its
+first field is now `AddChoice`, one row of four — `Night sleep`, `Nap`, `Night routine`, `Nap routine`
+— mirroring the live strip's four one-to-one, so what can be logged after the fact is exactly what can
+be tapped as it happens. The labels are the live strip's own strings, so the row needed nothing
+translated.
+
+It is a **`ReactNode` handed to whichever form is mounted**, not a field either form owns. The two
+forms stay separate for the reason `RoutineForm`'s header sets out — `EntryForm`'s validated
+`onSubmit` carries an `EntryDraft` and has no use for a routine's — so the row is the typing trainer's
+`syncStatus` slot again: the form never learns what it switches between. Where the row is present it
+*is* the type picker, and `EntryForm` draws no kind row of its own; two controls setting one field is
+two answers to the same question. Editing an entry has no row and keeps the plain `Night`/`Nap`
+toggle, because there the kind is the entry's own.
+
+Picking a kind must not throw away times already typed, so the header moves `fields.kind` alone rather
+than re-seeding the form. `RoutineForm` is the exception and re-seeds on purpose: its defaults are a
+19:00 or 13:00 anchor, which genuinely differ by kind.
+
+**A night adopts tonight's record; a nap never does.** A night routine's id *is* its day key, so
+picking `Night routine` when one is already logged has to load and correct it — otherwise Save writes
+the form's defaults over the evening just recorded. A nap is always a new record, a day holding one
+per nap. That is `canRestart`'s split on the live strip, reached a second time by the same argument.
+Saving returns the slot to the sleep form, since a second Save would file a second record a minute
+along.
+
 `SleepTimeline` draws them all on the row the *clock* puts them on: two slim bars half the row's
 height meeting at the crib, which is a pale full-height tick. Bath to crib is solid orchid; crib to
 asleep is the same orchid dimmed, and it ends where the sleep beside it begins — so the settling time

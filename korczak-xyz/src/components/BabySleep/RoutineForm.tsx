@@ -17,7 +17,7 @@
  * past midnight is a real routine, and a time alone would then be ambiguous by a day.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { dayStart } from '../../utils/babySleep/days';
 import {
@@ -37,6 +37,11 @@ interface RoutineFormProps {
   kind: SleepKind;
   /** What the log already holds for it, or undefined when adding one. */
   routine?: RoutineRecord;
+  /**
+   * The `AddChoice` row, drawn when this form is the resting state of the add slot. Absent when it
+   * was opened from a history row, where the day and the kind are fixed by the row that opened it.
+   */
+  header?: ReactNode;
   /** When the sleep it leads into began, for the defaults. Null when it has not yet. */
   asleepAt: number | null;
   dayLabel: string;
@@ -98,6 +103,7 @@ export default function RoutineForm({
   day,
   kind,
   routine,
+  header,
   asleepAt,
   dayLabel,
   onSubmit,
@@ -147,6 +153,9 @@ export default function RoutineForm({
       <h2 className="bs-subhead">
         {kind === 'night' ? t.routineFormTitle : t.routineNapFormTitle}
       </h2>
+
+      {header}
+
       <p className="bs-split-of">
         {fill(kind === 'night' ? t.routineFormOf : t.routineNapFormOf, { day: dayLabel })}
       </p>

@@ -11,7 +11,7 @@
  * "longer than five hours" is a plausible night and an implausible nap.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import {
   fromDateTimeInputs,
@@ -25,6 +25,14 @@ import type { Translation } from './translations';
 interface EntryFormProps {
   /** The entry being corrected, or undefined when adding a new one. */
   editing?: SleepEntry;
+  /**
+   * The `AddChoice` row, drawn while adding. When it is present **it** is the type picker — this
+   * form draws no kind row of its own and takes `kind` from the prop below, because two controls
+   * setting one field is two answers to the same question.
+   */
+  header?: ReactNode;
+  /** The kind the header has selected. Ignored while editing, where the kind is the entry's own. */
+  kind?: SleepKind;
   /** Live entries the draft must not collide with. The one being edited is excluded by id. */
   others: SleepEntry[];
   onSubmit: (draft: EntryDraft) => void;
@@ -41,11 +49,11 @@ interface Fields {
   open: boolean;
 }
 
-function fieldsFor(entry: SleepEntry | undefined, now: number): Fields {
+function fieldsFor(entry: SleepEntry | undefined, now: number, kind: SleepKind): Fields {
   const start = entry?.start ?? now;
   const end = entry?.end ?? now;
   return {
-    kind: entry?.kind ?? 'nap',
+    kind: entry?.kind ?? kind,
     startDate: toDateInputValue(start),
     startTime: toTimeInputValue(start),
     endDate: toDateInputValue(end),
@@ -71,16 +79,30 @@ function messageFor(error: DraftError, kind: SleepKind, t: Translation): string 
   }
 }
 
-export default function EntryForm({ editing, others, onSubmit, onCancel, t }: EntryFormProps) {
-  const [fields, setFields] = useState<Fields>(() => fieldsFor(editing, Date.now()));
+export default function EntryForm({
+  editing,
+  header,
+  kind = 'nap',
+  others,
+  onSubmit,
+  onCancel,
+  t,
+}: EntryFormProps) {
+  const [fields, setFields] = useState<Fields>(() => fieldsFor(editing, Date.now(), kind));
   const [error, setError] = useState<DraftError | null>(null);
 
   // Switching which entry is being edited has to reload the fields; the form is not remounted,
   // because it keeps its place on the page while the list above it changes.
   useEffect(() => {
-    setFields(fieldsFor(editing, Date.now()));
+    setFields(fieldsFor(editing, Date.now(), kind));
     setError(null);
-  }, [editing?.id]);
+  }, [editing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The header owns the kind while adding. Only the kind moves: re-seeding the whole form would
+  // throw away times already typed, and flipping Night/Nap is not a decision to start over from.
+  useEffect(() => {
+    setFields((f) => (f.kind === kind ? f : { ...f, kind }));
+  }, [kind]);
 
   const set = <K extends keyof Fields>(key: K, value: Fields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
@@ -111,29 +133,33 @@ export default function EntryForm({ editing, others, onSubmit, onCancel, t }: En
     }
     setError(null);
     onSubmit(draft);
-    if (!editing) setFields(fieldsFor(undefined, Date.now()));
+    if (!editing) setFields(fieldsFor(undefined, Date.now(), fields.kind));
   };
 
   return (
     <form className="bs-form" onSubmit={submit}>
       <h2 className="bs-subhead">{editing ? t.editTitle : t.addTitle}</h2>
 
-      <div className="bs-field">
-        <span className="bs-field-label">{t.kind}</span>
-        <div className="bs-toggle">
-          {(['night', 'nap'] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className={`bs-toggle-btn${fields.kind === kind ? ' bs-toggle-btn--on' : ''}`}
-              aria-pressed={fields.kind === kind}
-              onClick={() => set('kind', kind)}
-            >
-              {kind === 'night' ? t.kindNight : t.kindNap}
-            </button>
-          ))}
+      {header}
+
+      {!header && (
+        <div className="bs-field">
+          <span className="bs-field-label">{t.kind}</span>
+          <div className="bs-toggle">
+            {(['night', 'nap'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`bs-toggle-btn${fields.kind === option ? ' bs-toggle-btn--on' : ''}`}
+                aria-pressed={fields.kind === option}
+                onClick={() => set('kind', option)}
+              >
+                {option === 'night' ? t.kindNight : t.kindNap}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <fieldset className="bs-field">
         <legend className="bs-field-label">{t.fellAsleep}</legend>
