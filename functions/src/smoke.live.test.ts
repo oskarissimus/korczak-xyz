@@ -5,7 +5,8 @@ import { isWorthKeeping } from './collect';
 import { seedInterests } from '../../korczak-xyz/src/utils/events/interests';
 import { matchingInterests } from '../../korczak-xyz/src/utils/events/match';
 import { buildFeed } from '../../korczak-xyz/src/utils/events/feed';
-import type { EventRecord } from '../../korczak-xyz/src/utils/events/types';
+import { classifyEvents } from './classify';
+import type { EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
 
 /*
  * Hits the real network. Opt-in via LIVE=1, so CI and an offline laptop are unaffected — this is a
@@ -65,4 +66,87 @@ maybe('live sources', () => {
     }
     expect(collected.length).toBeGreaterThan(0);
   });
+});
+
+/*
+ * The classifier against real listings, which is the only way to check the premise this feature
+ * rests on: that a model can tell PyCon NL from EuroPython when nothing in either listing says so.
+ *
+ * Needs a key: `GEMINI_API_KEY=... LIVE=1 npx vitest run smoke.live`. It prints every verdict, so a
+ * disagreement is something to read rather than something to infer from a red assertion.
+ */
+maybe('live classifier', () => {
+  const now = Date.now();
+
+  const cases: Array<{ title: string; city?: string; country?: string; expect: Reach }> = [
+    { title: 'PyCon NL 2026', city: 'Utrecht', expect: 'national' },
+    { title: 'PyCon Cameroon 2026', city: 'Yaoundé', expect: 'national' },
+    { title: 'PyCon Greece 2026', city: 'Athens', expect: 'national' },
+    { title: 'EuroPython 2026', city: 'Prague', expect: 'international' },
+    { title: 'PyCon US 2026', city: 'Pittsburgh', expect: 'international' },
+    { title: 'Wesele Figara', city: 'Warszawa', country: 'PL', expect: 'local' },
+  ];
+
+  it(
+    'tells a national conference from one people fly to',
+    async () => {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.log('  no GEMINI_API_KEY set — skipping');
+        return;
+      }
+
+      const records = cases.map((c, i) =>
+        toRecord(
+          {
+            sourceKey: `smoke-${i}`,
+            title: c.title,
+            url: 'https://example.test/e',
+            startsAt: now + 30 * 86400000,
+            city: c.city,
+            country: c.country,
+            tags: ['tech'],
+          },
+          'python-org',
+          'python.org events',
+          now,
+        ),
+      );
+
+      const written = new Map<string, Partial<EventRecord>>();
+      const { outcome } = await classifyEvents(records, {
+        now,
+        secret: (name) => (name === 'GEMINI_API_KEY' ? apiKey : undefined),
+        write: async (id, update) => {
+          written.set(id, update);
+        },
+      });
+
+      console.log(`\n  classified ${outcome.classified}, unlabelled ${outcome.missing}`);
+      let agreed = 0;
+      for (let i = 0; i < records.length; i++) {
+        const update = written.get(records[i].id);
+        const got = update?.reach ?? '—';
+        const mark = got === cases[i].expect ? '✓' : '✗';
+        if (got === cases[i].expect) agreed += 1;
+        console.log(
+          `    ${mark} ${cases[i].title.padEnd(22)} ${String(update?.country ?? '—').padEnd(7)}` +
+            ` ${String(got).padEnd(14)} want ${cases[i].expect}` +
+            (update?.reachReason ? `  — ${update.reachReason}` : ''),
+        );
+      }
+
+      // Every one of them has to come back labelled: a parse that silently drops rows is the
+      // failure this is really watching for.
+      expect(outcome.classified).toBe(records.length);
+
+      /*
+       * Not an exact-match assertion on all six. A judgement is allowed to differ at the margins —
+       * that is what the verdicts printed above are for — but a model that agrees with four of six
+       * is not doing the job this feature is built on, and the run should say so.
+       */
+      expect(agreed).toBeGreaterThanOrEqual(5);
+    },
+    120000,
+  );
 });

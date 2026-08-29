@@ -7,7 +7,7 @@
  */
 
 import type { EventRecord, Interest } from './types';
-import { matchingInterests, scoreMatch } from './match';
+import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
 
@@ -15,7 +15,26 @@ export interface FeedItem {
   event: EventRecord;
   /** Why it is here. Empty when the reader asked to see everything. */
   matched: Interest[];
+  /**
+   * Which interests turned it away on the `places` rule alone. Only ever populated in
+   * `rejected-place` mode, where it is the whole point of the row.
+   */
+  rejectedBy?: Interest[];
 }
+
+/**
+ * What the feed is being asked for.
+ *
+ * `rejected-place` is the verification view: events that satisfied everything an interest asked
+ * about their *content* and were turned away only for where they are or who they are for. It
+ * exists because a geography filter is otherwise unfalsifiable from the outside — a thing that
+ * stopped appearing and a thing that was never announced look identical, and the whole question
+ * being asked of this feature is which of the two just happened.
+ *
+ * Built from the same `matchReason` call the real filter makes, so this view cannot show a
+ * different set from the one being filtered on. See `matchReason`'s header.
+ */
+export type FeedMode = 'matched' | 'rejected-place' | 'all';
 
 export type FeedGroup = 'week' | 'month' | 'later' | 'undated';
 
@@ -62,14 +81,28 @@ export function buildFeed(
   events: EventRecord[],
   interests: Interest[],
   now: number,
-  opts: { matchedOnly: boolean } = { matchedOnly: true },
+  opts: { mode: FeedMode } = { mode: 'matched' },
 ): FeedSection[] {
   const items: FeedItem[] = [];
   for (const event of dedupeByFingerprint(events)) {
     // Something that finished yesterday is not "coming up", whatever matched it.
     if (event.startsAt !== null && daysUntil(event.startsAt, now) < 0) continue;
     const matched = matchingInterests(event, interests, { forPush: false });
-    if (opts.matchedOnly && matched.length === 0) continue;
+
+    if (opts.mode === 'rejected-place') {
+      /*
+       * An event another interest already lets through is not something the filter is keeping from
+       * you, so it does not belong in a list of what the filter removed — however near a miss it
+       * was for this one.
+       */
+      if (matched.length > 0) continue;
+      const rejectedBy = interestsRejectingFor(event, interests, 'places', { forPush: false });
+      if (rejectedBy.length === 0) continue;
+      items.push({ event, matched, rejectedBy });
+      continue;
+    }
+
+    if (opts.mode === 'matched' && matched.length === 0) continue;
     items.push({ event, matched });
   }
 
@@ -120,6 +153,45 @@ function bestScore(item: FeedItem): number {
     best = Math.max(best, scoreMatch(item.event, interest));
   }
   return best;
+}
+
+/**
+ * How many of each country are in a list, commonest first.
+ *
+ * Drawn over the rejected view, where it answers the question the cards cannot: not "what was
+ * removed" one at a time, but *what shape* the removal has. Four national PyCons in four countries
+ * reads very differently from forty rows all filed under one — the second is a classifier getting
+ * a country wrong at scale, and it is the failure this line exists to make visible at a glance.
+ *
+ * `?` for a record with no country, so the tally is total and the unplaced are countable rather
+ * than merely absent.
+ */
+export function countryTally(events: EventRecord[]): Array<{ code: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const event of events) {
+    const code = event.country ?? '?';
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  // Count first, then code, so the line does not reshuffle between renders on a tie.
+  return [...counts]
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+}
+
+/**
+ * How much of the corpus has been through the classifier.
+ *
+ * The other half of verifying this, and the half the rejected list structurally cannot show: an
+ * unclassified event **passes** the places rule, so it is never in that list. Without this number
+ * a classifier that has quietly stopped looks exactly like a filter with nothing to remove.
+ */
+export function classificationCoverage(events: EventRecord[]): {
+  classified: number;
+  total: number;
+} {
+  let classified = 0;
+  for (const event of events) if (event.reach !== undefined) classified += 1;
+  return { classified, total: events.length };
 }
 
 /**

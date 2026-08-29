@@ -99,6 +99,41 @@ describe('editing', () => {
     expect(i.tags).toBeUndefined();
   });
 
+  it('normalises the country list to codes at the one choke point', () => {
+    /*
+     * The matcher compares `Interest.countries` against `EventRecord.country` as codes. A stored
+     * 'Polska' would be a filter that never fires, and an empty feed is its only symptom — so the
+     * normalisation has to happen where every write passes, not at whichever call site remembered.
+     */
+    const i = newInterest(
+      { label: 'X', keywords: ['a'], countries: ['Polska', 'pl', 'Germany', 'nonsense'], leadDays: 5 },
+      { ...CTX, id: 'i' },
+    );
+    expect(i.countries).toEqual(['DE', 'PL']);
+  });
+
+  it('stores no country list at all rather than an empty one', () => {
+    const i = newInterest(
+      { label: 'X', keywords: ['a'], countries: ['nonsense'], leadDays: 5 },
+      { ...CTX, id: 'i' },
+    );
+    expect(i.countries).toBeUndefined();
+    expect(i.internationalAnywhere).toBeUndefined();
+  });
+
+  it('carries the international flag only when it is on', () => {
+    const on = newInterest(
+      { label: 'X', keywords: ['a'], countries: ['PL'], internationalAnywhere: true, leadDays: 5 },
+      { ...CTX, id: 'i' },
+    );
+    expect(on.internationalAnywhere).toBe(true);
+    const off = newInterest(
+      { label: 'X', keywords: ['a'], countries: ['PL'], internationalAnywhere: false, leadDays: 5 },
+      { ...CTX, id: 'i' },
+    );
+    expect(off.internationalAnywhere).toBeUndefined();
+  });
+
   it('clamps a nonsense lead time', () => {
     const mk = (leadDays: number) =>
       newInterest({ label: 'X', keywords: ['a'], leadDays }, { ...CTX, id: 'i' }).leadDays;

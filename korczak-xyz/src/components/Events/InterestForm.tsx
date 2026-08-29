@@ -44,6 +44,10 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
   const [exclude, setExclude] = useState(lines(existing?.excludeKeywords));
   const [tags, setTags] = useState(lines(existing?.tags));
   const [cities, setCities] = useState(lines(existing?.cities));
+  const [countries, setCountries] = useState(lines(existing?.countries));
+  const [internationalAnywhere, setInternationalAnywhere] = useState(
+    existing?.internationalAnywhere ?? false,
+  );
   const [leadDays, setLeadDays] = useState(String(existing?.leadDays ?? DEFAULT_LEAD_DAYS));
   const [error, setError] = useState<DraftError | null>(null);
 
@@ -55,6 +59,8 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
       excludeKeywords: parseKeywords(exclude),
       tags: parseKeywords(tags),
       cities: parseKeywords(cities),
+      countries: parseKeywords(countries),
+      internationalAnywhere,
       leadDays: Number(leadDays),
       muted: existing?.muted,
     };
@@ -134,6 +140,35 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
           autoComplete="off"
         />
         <p className="ev-hint">{t.fieldCitiesHint}</p>
+      </div>
+
+      <div className="ev-field">
+        <label className="ev-field-label" htmlFor="ev-countries">
+          {t.fieldCountries}
+        </label>
+        <input
+          id="ev-countries"
+          className="ev-input"
+          value={countries}
+          onChange={(e) => setCountries(e.target.value)}
+          autoComplete="off"
+        />
+        <p className="ev-hint">{t.fieldCountriesHint}</p>
+
+        {/*
+          * Inside the countries field rather than beside it, because it is not a second constraint:
+          * the two are read as one rule with an OR between them. Made into a field of its own it
+          * would look like "in these countries AND international", which keeps nothing.
+          */}
+        <label className="ev-check">
+          <input
+            type="checkbox"
+            checked={internationalAnywhere}
+            onChange={(e) => setInternationalAnywhere(e.target.checked)}
+          />
+          <span>{t.fieldInternational}</span>
+        </label>
+        <p className="ev-hint">{t.fieldInternationalHint}</p>
       </div>
 
       <div className="ev-field">

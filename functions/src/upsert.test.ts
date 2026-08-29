@@ -76,6 +76,39 @@ describe('mergeRecord', () => {
     expect(merged.record.onSaleSeenAt).toBe(500);
   });
 
+  /*
+   * The one that would cost real money. `batch.set` replaces the whole document and
+   * `stripUndefined` drops absent fields, so a field no source has heard of is *deleted* on the
+   * next run unless mergeRecord names it — and the classifier would then re-answer the same
+   * question about every event every six hours, for ever.
+   */
+  it('carries the classifier fields forward, which no source can supply', () => {
+    const before = stored({
+      country: 'NL',
+      reach: 'national',
+      reachReason: 'Dutch community conference',
+      classifiedAt: 1000,
+      classifyHash: 'abc123',
+    });
+    const incoming = toRecord(raw(), 's', 'S', LATER);
+    const merged = mergeRecord(incoming, before, LATER);
+    expect(merged.record.reach).toBe('national');
+    expect(merged.record.reachReason).toBe('Dutch community conference');
+    expect(merged.record.classifyHash).toBe('abc123');
+    expect(merged.record.classifiedAt).toBe(1000);
+  });
+
+  it('lets a source that knows the country overrule the stored one', () => {
+    // Ticketmaster is queried countryCode=PL and Teatr Wielki is in Warsaw: those are facts, and
+    // they outrank whatever the classifier guessed before the source started saying so.
+    const before = stored({ country: 'DE' });
+    const incoming = { ...toRecord(raw(), 's', 'S', LATER), country: 'PL' };
+    expect(mergeRecord(incoming, before, LATER).record.country).toBe('PL');
+    // ...but a source with no opinion does not erase what is known.
+    const silent = toRecord(raw(), 's', 'S', LATER);
+    expect(mergeRecord(silent, before, LATER).record.country).toBe('DE');
+  });
+
   it('does not call a brand-new ticketed event an onsale transition', () => {
     // There was no "before" in which it had no tickets. Announcing it is the whole story, and
     // firing both would be two buzzes for one piece of news.

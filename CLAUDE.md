@@ -1162,6 +1162,130 @@ the least likely way anyone notices.
 (skipped otherwise, so CI and an offline laptop are unaffected). It is what caught both the haystack
 bug and the opera over-tagging; run it after touching an adapter.
 
+### Where an event is, and who it is for
+
+The feed's first real complaint was four PyCons — Cameroon, Africa, Greece, NL — none of them
+attendable, all of them matched by `python`/`pycon`. The app had **no axis for where** at all beyond
+`Interest.cities`, which is any-of over free text: saying "in Poland" would have meant listing every
+Polish city, against a `cityOf` that guesses at the second-from-last comma-separated field.
+
+A country whitelist alone does not answer it either, and that is the whole shape of this feature.
+The question is not *which country* but **does this pull people in from outside** — PyCon US and
+EuroPython are to be kept and PyCon NL dropped, and nothing in a listing distinguishes them. They can
+be in the same country in the same year. So two fields, and only one of them is scrapable:
+
+- `EventRecord.country` — ISO-2, or `ONLINE`. Supplied by the adapter **where the source knows it
+  for free** (`teatr-wielki` is in Warsaw, `ticketmaster` is queried `countryCode=PL`, each `FEEDS`
+  entry is a Polish publication), and by the classifier otherwise. One field, never two derivations:
+  the string-splitting heuristic that `cityOf` is was deliberately not written a second time.
+- `EventRecord.reach` — `local` / `national` / `international`. A judgement, and the one thing here a
+  language model decides.
+
+`src/utils/events/countries.ts` normalises both sides to codes, and it is load-bearing rather than
+tidy: the matcher compares `Interest.countries` against `EventRecord.country`, so a stored `Polska`
+would be a filter that never fires with an empty feed as its only symptom. `newInterest` is the one
+choke point, the way `sanitizeSettings` is for the chord cards.
+
+#### One rule with two ways to pass, not two constraints
+
+`Interest.countries` and `Interest.internationalAnywhere` are read together, joined by **OR**:
+
+```
+countries empty                                    → no constraint
+country ∈ countries                                → passes
+internationalAnywhere && reach === 'international' → passes
+```
+
+AND-ed the way `tags` and `cities` are, it would read "in Poland *and* international", which keeps
+nothing. "Conferences in Poland, plus the ones worth flying to" is one thought, and the checkbox
+sits inside the countries field for that reason rather than beside it.
+
+**An unclassified event passes**, per axis. It follows the undated-event rule directly above it in
+`matchReason` — not excluded, simply no answer yet — and it decides which way this fails when the
+model is down: the noise comes back visibly rather than the feed quietly emptying, and a silently
+empty feed is the one outcome here indistinguishable from everything working. Per axis because a
+record can know where it is and not yet who it is for: every scraped Polish row is `PL` from the
+moment it lands, with `reach` arriving later.
+
+#### The classifier runs in exactly one place
+
+`functions/src/classify.ts`, in the Cloud Function. The browser never calls a model and neither does
+the matcher; what crosses into `src/utils/events/` is the *result*, as two ordinary fields. So the
+feed and the collector still answer "does this match?" with one pure function and `portable.test.ts`
+has nothing new to police. `gemini-2.5-flash-lite` via `@google/genai`, `GEMINI_API_KEY` as a secret
+on the Ticketmaster pattern — **no key is a configuration state, not a failure**.
+
+Four things about it are load-bearing:
+
+- **The reply is keyed by the id the model echoes back, never by position.** A reply one element
+  short would file every verdict after the gap against the wrong event, silently, producing a corpus
+  of confident wrong countries with nothing anywhere to say so.
+- **`classifyHash` is a digest of only the fields the prompt shows.** Over the whole record it would
+  include `updatedAt`, which moves every run — so nothing would ever match its stored hash and the
+  entire corpus would be re-labelled every six hours. It is written even for a half-verdict, or an
+  event the model has no country for goes back in the queue for the rest of its life.
+- **`mergeRecord` carries the classification fields forward.** `batch.set` replaces the whole
+  document and `stripUndefined` drops absent fields, so a field no source has heard of is *deleted*
+  on the next upsert unless it is named there. Same reason `firstSeenAt` is named there.
+- **`CLASSIFIER_VERSION` is the only lever for re-labelling**, bumped in the code when the prompt
+  changes. There is deliberately no button: "the prompt changed" is a fact about a build, and a
+  re-run nobody can date afterwards is worse than no re-run.
+
+The order in `runCollection` is `fetch → upsert → classify → notify`, and it is the point rather
+than an implementation detail: `notifyAccount` decides pushes with the same `matchReason`, an
+unclassified event passes the places rule, so notifying first would push about exactly the national
+conferences this exists to stop pushing about. It also made `upsertEvents` return the **merged**
+records, which the notifier now receives instead of freshly built ones — so `firstSeenAt` is the
+real one (`announced` no longer fires every run for every match, held back only by the notice latch)
+and `onSaleSeenAt` is visible to the planner for the first time, which is what `onsale` always
+needed to work at all.
+
+`eventSources/classifier` carries its health beside the scrapes, but **not** through `recordHealth`:
+that reads "nothing after previously returning something" as a failure, which for a classifier is
+the normal steady state — once the corpus is labelled there is nothing to do, and a green row has to
+be able to say so.
+
+#### The filter has to be falsifiable from the outside
+
+A geography filter is otherwise unprovable: a thing that stopped appearing and a thing that was
+never announced look identical, which is the whole reason this half exists. So the Feed's one
+`Show everything` link became three states — `Matched` / `Filtered out` / `Everything` — where the
+middle one lists events that satisfied everything an interest asked about their *content* and were
+turned away only on `places`.
+
+**It is built from the same call the real filter makes.** `matchesInterest` is now
+`matchReason(...) === null`, `matchReason` returning the first failing rule, and the rejected view
+asks for `'places'`. A second near-miss matcher written beside it would be identical until the first
+bug fix — the argument that compiles this whole directory into the Cloud Function rather than
+copying it. A reason is *the first thing wrong*, which is what keeps the view readable: an event
+that also fails the keywords is not a near miss on geography, and every concert in the country is
+also "not a Python conference in Poland".
+
+Three things are drawn, and they answer three different questions:
+
+- **The country-and-reach chip is on every card in every view**, not only the rejected ones. Without
+  it there is no telling whether something stayed because the filter judged it right or because it
+  has not been judged at all — and `?` / *not labelled yet* is its own state for exactly that.
+- **The tally** over the rejected list says what shape the removal has. Four countries once each
+  reads very differently from forty rows filed under one, which is a classifier getting a country
+  wrong at scale.
+- **The coverage line** (`{classified} of {total} labelled`) is the half the rejected list
+  structurally *cannot* show: an unclassified event passes the places rule, so it is never in that
+  list, and a classifier that has quietly stopped looks exactly like a filter with nothing to remove.
+
+The model's own sentence (`reachReason`) is printed under each rejected card, so a verdict can be
+argued with rather than only obeyed. There is no per-event override: a wrong rejection is corrected
+with a second interest naming the event, a wrong admission with the `excludeKeywords` that already
+exist.
+
+The countries also join the interest row's rule summary (`@PL`, and `+international` for the OR
+clause) — left off, an interest quietly dropping four conferences a week would look exactly like one
+that constrains nothing, which is this feature's own failure mode reappearing one screen along.
+
+`SEED_INTERESTS` is untouched: `withMissingSeeds` is keyed by id and never edits an existing row, so
+an account's own `Python & dev` is set by hand in the editor, which is also the first real test of
+the toggle.
+
 ### Deploying it
 
 `firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the
@@ -1182,8 +1306,11 @@ One trap in `firebase.json`: the predeploy hook calls `./node_modules/.bin/tsc` 
 npm throws `Cannot read properties of undefined (reading 'stdin')` *after* the build has already
 succeeded — failing a deploy whose output was perfectly good.
 
-The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `TICKETMASTER_API_KEY`
-as secrets, and the public key **also** in Netlify's build environment as `PUBLIC_VAPID_PUBLIC_KEY`.
+The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
+`TICKETMASTER_API_KEY` / `GEMINI_API_KEY` as secrets, and the public key **also** in Netlify's build
+environment as `PUBLIC_VAPID_PUBLIC_KEY`. A missing `GEMINI_API_KEY` is a configuration state and not
+a failure — nothing is classified, everything stays unlabelled, and an unlabelled event passes the
+places rule, so the feed is what it was before the classifier existed.
 The VAPID public key can never change: rotating it invalidates every subscription on every device,
 silently. Full sequence in `functions/README.md`.
 

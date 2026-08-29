@@ -34,6 +34,7 @@ set up and how to redo it, not as a to-do list.
 | APIs | cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
 | `TICKETMASTER_API_KEY` | real Discovery API key (v2, 23 Aug 2026). v1 was the `none` sentinel; see below |
+| `GEMINI_API_KEY` | Gemini Developer API key, for the event classifier; see below |
 | `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
@@ -83,6 +84,41 @@ firebase deploy --only functions      # a secret version change does NOT trigger
                                       # decides. Deploy by hand or push an unrelated change.
 ```
 
+### The classifier key
+
+`GEMINI_API_KEY` is a Gemini Developer API key from
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey). It labels every event with a
+country and a reach (`local` / `national` / `international`) — the judgement that separates PyCon NL
+from EuroPython, which no listing states. See `src/classify.ts`.
+
+Absent, it is a configuration state and not a failure, exactly as the Ticketmaster key is: nothing
+is classified, every event stays unlabelled, and an unlabelled event passes the places rule — so the
+feed is what it was before the classifier existed.
+
+The cost is small enough to be worth stating so nobody has to guess. `gemini-2.5-flash-lite` at
+\$0.10 / \$0.40 per million tokens, ~120 input tokens an event, 25 events a request: labelling the
+whole ~1,150-event corpus once is a few cents, and after that only genuinely new events are sent.
+`MAX_CLASSIFY_PER_RUN` (400) spreads the first backfill over about three runs so it cannot exhaust
+the function's 540-second timeout.
+
+Two things about re-running it:
+
+- The verdict is cached on the event under `classifyHash`, a digest of the fields the prompt shows.
+  Nothing re-classifies while those fields are unchanged — a new ticket link or a moved `updatedAt`
+  costs nothing.
+- **`CLASSIFIER_VERSION` in `src/classify.ts` is the only lever for re-labelling the corpus.** Bump
+  it when the prompt changes; every stored hash is invalidated at once and the backlog drains over
+  the next few runs. There is deliberately no button for this in the app: "the prompt changed" is a
+  fact about a build, and a re-run nobody can date afterwards is worse than no re-run.
+
+`eventSources/classifier` carries its health, beside the scrapes, so a model that has quietly
+stopped answering shows on the Alerts tab rather than looking like a filter with nothing to remove.
+
+```sh
+printf 'YOUR_KEY' | firebase functions:secrets:set GEMINI_API_KEY --data-file -
+firebase deploy --only functions      # as above: a secret version change does not trigger CI
+```
+
 ### Redeploying by hand
 
 ```sh
@@ -116,6 +152,7 @@ npx web-push generate-vapid-keys
 firebase functions:secrets:set VAPID_PUBLIC_KEY
 firebase functions:secrets:set VAPID_PRIVATE_KEY
 firebase functions:secrets:set TICKETMASTER_API_KEY   # developer.ticketmaster.com, free
+firebase functions:secrets:set GEMINI_API_KEY         # aistudio.google.com/apikey
 
 # 4. The public key ALSO goes in the site's build environment, as PUBLIC_VAPID_PUBLIC_KEY
 #    (Netlify → Site settings → Environment variables, and your local .env).

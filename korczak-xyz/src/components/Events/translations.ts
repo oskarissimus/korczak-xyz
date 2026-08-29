@@ -39,8 +39,21 @@ export const translations = {
     announcedAgo: 'Announced {when}',
     onSaleNow: 'On sale',
     showingCount: '{shown} of {total} upcoming',
-    allEvents: 'Show everything',
-    matchedOnly: 'Matched only',
+    viewMatched: 'Matched',
+    viewRejected: 'Filtered out',
+    viewAll: 'Everything',
+    rejectedIntro:
+      'Events that matched an interest on everything except where they are, or who they are for. This is what the country filter is keeping from you.',
+    rejectedEmpty: 'Nothing is being filtered out by place.',
+    rejectedEmptyHint:
+      'Either no interest limits where, or nothing was turned away by it. Set the countries on an interest to see what it removes.',
+    rejectedBy: 'Filtered out of',
+    placesTally: 'By country:',
+    classifiedCount: '{classified} of {total} labelled',
+    reachLocal: 'local',
+    reachNational: 'national',
+    reachInternational: 'international',
+    reachUnknown: 'not labelled yet',
 
     // Interests
     interestsHeading: 'What to watch for',
@@ -62,6 +75,12 @@ export const translations = {
     fieldTagsHint: 'All of these must be present. Try opera, music, theatre, tech, festival.',
     fieldCities: 'Cities',
     fieldCitiesHint: 'Any of these. Leave empty for anywhere.',
+    fieldCountries: 'Countries',
+    fieldCountriesHint:
+      'Any of these — codes or names, PL, DE, Poland, Czechy. Use ONLINE for events held nowhere. Leave empty for anywhere.',
+    fieldInternational: 'Also keep events that draw people from other countries',
+    fieldInternationalHint:
+      'What a country list alone cannot say. On, a conference people fly in for is kept wherever it is held, while one the host country attends is not — so EuroPython stays and PyCon NL does not.',
     fieldLead: 'Remind me this many days ahead',
     save: 'Save',
     cancel: 'Cancel',
@@ -141,8 +160,21 @@ export const translations = {
     announcedAgo: 'Ogłoszone {when}',
     onSaleNow: 'W sprzedaży',
     showingCount: '{shown} z {total} nadchodzących',
-    allEvents: 'Pokaż wszystko',
-    matchedOnly: 'Tylko pasujące',
+    viewMatched: 'Pasujące',
+    viewRejected: 'Odrzucone',
+    viewAll: 'Wszystko',
+    rejectedIntro:
+      'Wydarzenia, które pasowały do zainteresowania pod każdym względem oprócz tego, gdzie się odbywają i dla kogo są. To właśnie zatrzymuje filtr krajów.',
+    rejectedEmpty: 'Nic nie odpada ze względu na miejsce.',
+    rejectedEmptyHint:
+      'Albo żadne zainteresowanie nie ogranicza miejsca, albo nic się o nie nie potknęło. Ustaw kraje w zainteresowaniu, żeby zobaczyć, co odrzuca.',
+    rejectedBy: 'Odrzucone przez',
+    placesTally: 'Wg krajów:',
+    classifiedCount: 'opisane: {classified} z {total}',
+    reachLocal: 'lokalne',
+    reachNational: 'krajowe',
+    reachInternational: 'międzynarodowe',
+    reachUnknown: 'jeszcze nieopisane',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:
@@ -163,6 +195,12 @@ export const translations = {
     fieldTagsHint: 'Wszystkie muszą wystąpić. Np. opera, music, theatre, tech, festival.',
     fieldCities: 'Miasta',
     fieldCitiesHint: 'Wystarczy jedno. Puste pole znaczy: gdziekolwiek.',
+    fieldCountries: 'Kraje',
+    fieldCountriesHint:
+      'Wystarczy jeden — kody albo nazwy: PL, DE, Polska, Czechy. ONLINE dla wydarzeń bez miejsca. Puste pole znaczy: gdziekolwiek.',
+    fieldInternational: 'Przepuszczaj też wydarzenia, na które ludzie przyjeżdżają z innych krajów',
+    fieldInternationalHint:
+      'Tego sama lista krajów nie powie. Włączone — konferencja, na którą się lata, zostaje niezależnie od kraju, a taka, na którą przychodzą mieszkańcy, nie. Czyli EuroPython zostaje, a PyCon NL odpada.',
     fieldLead: 'Przypomnij tyle dni wcześniej',
     save: 'Zapisz',
     cancel: 'Anuluj',

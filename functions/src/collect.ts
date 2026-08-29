@@ -12,6 +12,7 @@ import type { EventRecord, PushSub, SourceHealth } from '../../korczak-xyz/src/u
 import { SOURCES } from './sources';
 import type { EventSource, SourceContext } from './sources/types';
 import { toRecord, upsertEvents } from './upsert';
+import { classifyEvents, type ClassifyOutcome } from './classify';
 import { listAccounts, notifyAccount } from './notify';
 import { sendToAll } from './push';
 
@@ -25,10 +26,22 @@ export interface RunSummary {
   written: number;
   created: number;
   newlyOnSale: number;
+  classified: ClassifyOutcome;
   accounts: number;
   delivered: number;
   brokenSources: string[];
 }
+
+/**
+ * The classifier's row in `eventSources`.
+ *
+ * It sits beside the scrapes because it fails the same way they do — quietly, by producing nothing
+ * — and the Alerts tab already draws whatever is in that collection. It cannot go through
+ * `recordHealth`, though: that treats "returned nothing after previously returning something" as a
+ * failure, which for a classifier is the *normal* steady state. Once the corpus is labelled there
+ * is nothing to do, and a green row has to be able to say so.
+ */
+const CLASSIFIER_HEALTH_ID = 'classifier';
 
 /**
  * Whether an event is worth storing.
@@ -118,12 +131,33 @@ export async function runCollection(
 
   const upserted = await upsertEvents(db, unique, now);
 
+  /*
+   * Classify before notifying, and this order is the point rather than an implementation detail.
+   *
+   * `notifyAccount` decides pushes with the same `matchReason` the feed filters with, and that
+   * reads `country` and `reach`. An unclassified event passes the places rule — deliberately, so a
+   * dead classifier cannot empty the feed — so notifying first would push about exactly the
+   * national conferences this exists to stop pushing about, once each, before the labels arrived.
+   *
+   * It works from the *merged* records for the same reason it must: a freshly built `toRecord`
+   * carries no `classifyHash`, so every event would look unclassified and the corpus would be
+   * re-labelled every six hours.
+   */
+  const { records: labelled, outcome: classified } = await classifyEvents(upserted.records, {
+    now,
+    secret: ctx.secret,
+    write: async (id, update) => {
+      await db.collection('events').doc(id).update(update);
+    },
+  });
+  await recordClassifierHealth(db, now, classified);
+
   // Notify from what was just collected, not from a re-read: this is the exact set the run knows
   // about, and a re-read would only add rows no source produced this time.
   const accounts = await listAccounts(db);
   let delivered = 0;
   for (const uid of accounts) {
-    const result = await notifyAccount(db, uid, unique, now);
+    const result = await notifyAccount(db, uid, labelled, now);
     delivered += result.delivered;
     if (result.claimed > 0) {
       console.log(`notified ${uid}: ${result.claimed} claimed, ${result.delivered} delivered`);
@@ -137,10 +171,46 @@ export async function runCollection(
     written: upserted.written,
     created: upserted.created,
     newlyOnSale: upserted.newlyOnSale,
+    classified,
     accounts: accounts.length,
     delivered,
     brokenSources,
   };
+}
+
+/**
+ * The classifier's health row.
+ *
+ * A failure is the model erroring, or every event asked about coming back unusable. Nothing left
+ * to classify is a success with a count of zero — the opposite of the rule for a scrape, and the
+ * reason this is its own function rather than a call to `recordHealth`.
+ */
+async function recordClassifierHealth(
+  db: Firestore,
+  now: number,
+  outcome: ClassifyOutcome,
+): Promise<void> {
+  const ref = db.collection('eventSources').doc(CLASSIFIER_HEALTH_ID);
+  const snap = await ref.get();
+  const previous = snap.exists ? (snap.data() as SourceHealth) : null;
+
+  const failed = outcome.error !== undefined || (outcome.classified === 0 && outcome.missing > 0);
+  const health: SourceHealth = {
+    id: CLASSIFIER_HEALTH_ID,
+    label: 'Event classifier',
+    lastRunAt: now,
+    lastOkAt: failed ? (previous?.lastOkAt ?? null) : now,
+    lastCount: outcome.classified,
+    consecutiveFailures: failed ? (previous?.consecutiveFailures ?? 0) + 1 : 0,
+    ...(failed
+      ? {
+          lastError: (
+            outcome.error ?? `${outcome.missing} events came back unlabelled`
+          ).slice(0, 300),
+        }
+      : {}),
+  };
+  await ref.set(health);
 }
 
 /** A source that has failed three times running is worth a notification of its own. */

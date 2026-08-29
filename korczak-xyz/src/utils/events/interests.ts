@@ -5,6 +5,7 @@
  */
 
 import type { Interest } from './types';
+import { toCountryCodes } from './countries';
 
 /** A new interest's defaults. `leadDays` of 14 is a fortnight's warning, which suits most tickets. */
 export const DEFAULT_LEAD_DAYS = 14;
@@ -15,6 +16,9 @@ export interface InterestDraft {
   excludeKeywords?: string[];
   tags?: string[];
   cities?: string[];
+  /** Written however the editor's field was typed; normalised to ISO-2 by `newInterest`. */
+  countries?: string[];
+  internationalAnywhere?: boolean;
   fromDay?: string;
   toDay?: string;
   leadDays: number;
@@ -134,6 +138,14 @@ export function newInterest(
     excludeKeywords: optionalList(draft.excludeKeywords),
     tags: optionalList(draft.tags),
     cities: optionalList(draft.cities),
+    /*
+     * Normalised here rather than at match time, and this is the one choke point for both
+     * localStorage and the cloud copy — `sanitizeSettings`' argument in the chord cards. The
+     * matcher compares `Interest.countries` against `EventRecord.country` as codes, so a stored
+     * 'Polska' would be a filter that never fires, with an empty feed as its only symptom.
+     */
+    countries: optionalCountries(draft.countries),
+    internationalAnywhere: draft.internationalAnywhere || undefined,
     fromDay: draft.fromDay || undefined,
     toDay: draft.toDay || undefined,
     leadDays: clampLead(draft.leadDays),
@@ -201,6 +213,11 @@ function cleanList(list: string[] | undefined): string[] {
 function optionalList(list: string[] | undefined): string[] | undefined {
   const cleaned = cleanList(list);
   return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function optionalCountries(list: string[] | undefined): string[] | undefined {
+  const codes = toCountryCodes(list);
+  return codes.length > 0 ? codes : undefined;
 }
 
 function clampLead(days: number): number {

@@ -236,6 +236,88 @@
   color: var(--retro-dark-gray);
 }
 
+/*
+ * The three-state view picker.
+ *
+ * Named twice, and the pressed state named twice again. `Layout.astro` carries a global
+ * `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a bare `.ev-view` at (0,1,0) — so
+ * the button under the pointer would go flat grey, and on a row of three that is the one you are
+ * about to click. `.ev-view--on` then has to clear `.ev-view:hover` for the same arithmetic, which
+ * is the bug `.fb-choice--on` was written up for: without it, hovering the row hides which view
+ * you are in.
+ */
+.ev-views {
+  display: flex;
+}
+
+.ev-view,
+.ev-view:hover {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 6px 12px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.ev-view + .ev-view {
+  margin-left: -2px;
+}
+
+.ev-view--on,
+.ev-view--on:hover {
+  border-style: inset;
+  background: var(--retro-white);
+}
+
+/*
+ * The two verification lines above the rejected list.
+ *
+ * Deliberately plain: this is instrumentation, and it is read once to answer a question rather
+ * than looked at every visit.
+ */
+.ev-verify {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.ev-tally {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  /* A long tally wraps rather than pushing the panel wide; nothing is anchored to its right edge. */
+  overflow-wrap: anywhere;
+}
+
+.ev-tally-head {
+  color: var(--retro-black);
+}
+
+/*
+ * Where an event is and who it is for, on every card.
+ *
+ * Its own colour, because it is the app's own reading rather than anything a source said — the
+ * neighbouring `ev-chip--sale` is a fact from a listing, and these two should not look like the
+ * same kind of claim.
+ */
+.ev-chip--place {
+  background: var(--retro-gray);
+  border-color: var(--retro-dark-gray);
+  color: var(--retro-dark-gray);
+}
+
+.ev-reason {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
 /* --- interests ----------------------------------------------------------------------------- */
 
 .ev-interest {
@@ -424,4 +506,29 @@
 
 .ev-skel-card--short {
   height: 40px;
+}
+
+/*
+ * The checkbox under the countries field.
+ *
+ * A row rather than a block, so the label sits beside the box and the whole thing is one tap
+ * target — on a phone a checkbox on its own line reads as a separate control from the words next
+ * to it.
+ */
+.ev-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 1.1rem;
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.ev-check input {
+  /* The native box is tiny in this font size, and it is the one control here that is not drawn. */
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
 }

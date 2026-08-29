@@ -14,6 +14,7 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@google/genai": "^2.19.0",
     "firebase-admin": "^13.0.2",
     "firebase-functions": "^6.3.0",
     "web-push": "^3.6.7"

@@ -25,6 +25,15 @@ export interface UpsertResult {
   written: number;
   created: number;
   newlyOnSale: number;
+  /**
+   * What is now stored, merged.
+   *
+   * Returned because everything downstream needs the *merged* copy rather than the one the source
+   * just produced. A fresh `toRecord` carries `firstSeenAt: now` for an event first seen a year
+   * ago, has no `onSaleSeenAt`, and knows nothing of the classifier's fields — so a caller working
+   * from it re-classifies the whole corpus every run and treats every event as newly announced.
+   */
+  records: EventRecord[];
 }
 
 /** Everything derived, computed in one place so no adapter can get it subtly different. */
@@ -60,6 +69,7 @@ export function toRecord(
     dateText: raw.dateText,
     city: raw.city,
     venue: raw.venue,
+    country: raw.country,
     tags: raw.tags ?? [],
     onSaleAt: raw.onSaleAt,
     fingerprint: fingerprintOf({ title: raw.title, day, city: raw.city }),
@@ -95,6 +105,22 @@ export function mergeRecord(
       // Never rewritten. This is what "announced" means.
       firstSeenAt: stored.firstSeenAt,
       onSaleSeenAt: newlyOnSale ? now : stored.onSaleSeenAt,
+      /*
+       * The classifier's fields, carried forward.
+       *
+       * `batch.set` replaces the whole document and `stripUndefined` drops an absent field, so a
+       * field the source has never heard of is *deleted* on the next run unless it is named here.
+       * The classifier would then re-answer the same question every six hours, for every event,
+       * for ever — which is the one way this feature could cost real money.
+       *
+       * `country` is the exception, because a source can legitimately know it: an incoming value
+       * wins, and the stored one (usually the classifier's) fills in when the source has none.
+       */
+      country: incoming.country ?? stored.country,
+      reach: stored.reach,
+      reachReason: stored.reachReason,
+      classifiedAt: stored.classifiedAt,
+      classifyHash: stored.classifyHash,
       updatedAt: now,
     },
     created: false,
@@ -115,6 +141,7 @@ export async function upsertEvents(
   let created = 0;
   let newlyOnSale = 0;
   let written = 0;
+  const merged: EventRecord[] = [];
 
   // Firestore caps a batch at 500 writes, and getAll at a practical few hundred reads.
   const CHUNK = 200;
@@ -126,14 +153,15 @@ export async function upsertEvents(
     const batch = db.batch();
     for (let j = 0; j < chunk.length; j++) {
       const stored = snapshots[j].exists ? (snapshots[j].data() as EventRecord) : null;
-      const merged = mergeRecord(chunk[j], stored, now);
-      if (merged.created) created += 1;
-      if (merged.newlyOnSale) newlyOnSale += 1;
-      batch.set(refs[j], stripUndefined(merged.record));
+      const outcome = mergeRecord(chunk[j], stored, now);
+      if (outcome.created) created += 1;
+      if (outcome.newlyOnSale) newlyOnSale += 1;
+      merged.push(outcome.record);
+      batch.set(refs[j], stripUndefined(outcome.record));
       written += 1;
     }
     await batch.commit();
   }
 
-  return { written, created, newlyOnSale };
+  return { written, created, newlyOnSale, records: merged };
 }

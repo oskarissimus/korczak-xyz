@@ -19,6 +19,8 @@ export const REGION = 'europe-central2';
 export const VAPID_PUBLIC_KEY = defineSecret('VAPID_PUBLIC_KEY');
 export const VAPID_PRIVATE_KEY = defineSecret('VAPID_PRIVATE_KEY');
 export const TICKETMASTER_API_KEY = defineSecret('TICKETMASTER_API_KEY');
+/** Gemini, for the one judgement in this app no listing states: where an event is and who it is for. */
+export const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
 /**
  * Who the push service should contact about a misbehaving sender.

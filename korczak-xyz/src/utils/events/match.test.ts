@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { containsWord, isInterestActive, matchesInterest, matchingInterests } from './match';
+import {
+  containsWord,
+  interestsRejectingFor,
+  isInterestActive,
+  matchReason,
+  matchesInterest,
+  matchingInterests,
+} from './match';
 import { fingerprintOf, haystackOf } from './normalize';
 import { seedInterests } from './interests';
 import type { EventRecord, Interest } from './types';
@@ -32,6 +39,8 @@ function ev(partial: Partial<EventRecord> & { title: string; description?: strin
     day,
     city: partial.city,
     venue: partial.venue,
+    country: partial.country,
+    reach: partial.reach,
     tags: partial.tags ?? [],
     fingerprint: fingerprintOf({ title: partial.title, day, city: partial.city }),
     firstSeenAt: partial.firstSeenAt ?? NOW,
@@ -158,6 +167,168 @@ describe('matchesInterest', () => {
     const i = interest({ id: 'i', fromDay: '2026-09-01', toDay: '2026-09-30' });
     const undated = { ...ev({ title: 'Sezon 2027/28' }), day: null, startsAt: null };
     expect(matchesInterest(undated, i)).toBe(true);
+  });
+});
+
+describe('the places rule', () => {
+  // The screenshot that started this: four national PyCons in the feed, none of them attendable.
+  const pyconNL = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
+  const pyconCM = ev({ title: 'PyCon Cameroon 2026', country: 'CM', reach: 'national' });
+  const europython = ev({ title: 'EuroPython 2026', country: 'CZ', reach: 'international' });
+  const pyconUS = ev({ title: 'PyCon US 2026', country: 'US', reach: 'international' });
+  const pyconPL = ev({ title: 'PyCon Polska 2026', country: 'PL', reach: 'national' });
+
+  it('is no constraint at all when no country is asked for', () => {
+    const anywhere = interest({ id: 'i', keywords: ['pycon', 'europython'] });
+    for (const event of [pyconNL, pyconCM, europython, pyconPL]) {
+      expect(matchesInterest(event, anywhere)).toBe(true);
+    }
+  });
+
+  it('takes the countries as any-of', () => {
+    const region = interest({ id: 'i', keywords: ['pycon', 'europython'], countries: ['PL', 'CZ'] });
+    expect(matchesInterest(pyconPL, region)).toBe(true);
+    expect(matchesInterest(europython, region)).toBe(true);
+    expect(matchesInterest(pyconNL, region)).toBe(false);
+  });
+
+  /*
+   * The whole point of the axis. Read as two AND-ed constraints this would mean "in Poland AND
+   * international", which keeps nothing — so the two halves have to be OR-ed, and this is the test
+   * that says so.
+   */
+  it('keeps an international event outside the wanted countries, and drops a national one', () => {
+    const mine = interest({
+      id: 'i',
+      keywords: ['pycon', 'europython'],
+      countries: ['PL'],
+      internationalAnywhere: true,
+    });
+    expect(matchesInterest(pyconPL, mine)).toBe(true);
+    expect(matchesInterest(europython, mine)).toBe(true);
+    expect(matchesInterest(pyconUS, mine)).toBe(true);
+    expect(matchesInterest(pyconNL, mine)).toBe(false);
+    expect(matchesInterest(pyconCM, mine)).toBe(false);
+  });
+
+  it('does not let international in when it was not asked for', () => {
+    const strict = interest({ id: 'i', keywords: ['pycon', 'europython'], countries: ['PL'] });
+    expect(matchesInterest(europython, strict)).toBe(false);
+    expect(matchesInterest(pyconPL, strict)).toBe(true);
+  });
+
+  /*
+   * Which way this fails when the classifier is down. Pending passes, so the noise comes back
+   * where it can be seen, rather than the feed silently emptying — an empty feed looks exactly
+   * like everything working.
+   */
+  it('lets an unclassified event through, per axis', () => {
+    const mine = interest({
+      id: 'i',
+      keywords: ['pycon'],
+      countries: ['PL'],
+      internationalAnywhere: true,
+    });
+    // Neither axis known yet.
+    expect(matchesInterest(ev({ title: 'PyCon Somewhere' }), mine)).toBe(true);
+    // Where it is is known, who it is for is not — the case for every scraped PL row before its
+    // first classification, and for any event whose reach the model failed to return.
+    expect(matchesInterest(ev({ title: 'PyCon NL', country: 'NL' }), mine)).toBe(true);
+  });
+
+  it('reads an unknown reach as not-international once reach is not being asked about', () => {
+    const strict = interest({ id: 'i', keywords: ['pycon'], countries: ['PL'] });
+    expect(matchesInterest(ev({ title: 'PyCon NL', country: 'NL' }), strict)).toBe(false);
+  });
+
+  it('compares codes case-insensitively, so a stored lowercase one still filters', () => {
+    const region = interest({ id: 'i', keywords: ['pycon'], countries: ['pl'] });
+    expect(matchesInterest(ev({ title: 'PyCon Polska', country: 'pl' }), region)).toBe(true);
+    expect(matchesInterest(pyconPL, region)).toBe(true);
+  });
+});
+
+describe('matchReason', () => {
+  it('is null exactly when matchesInterest is true', () => {
+    const i = interest({ id: 'i', keywords: ['pycon'], countries: ['PL'] });
+    for (const event of [
+      ev({ title: 'PyCon Polska', country: 'PL' }),
+      ev({ title: 'PyCon NL', country: 'NL', reach: 'national' }),
+      ev({ title: 'Koncert klezmerski', country: 'PL' }),
+    ]) {
+      expect(matchReason(event, i) === null).toBe(matchesInterest(event, i));
+    }
+  });
+
+  /*
+   * A reason is "the first thing wrong", and the rejected view depends on it: an event that also
+   * fails the keywords is not a near miss on geography, and listing it as one would fill that view
+   * with things nobody was ever going to see.
+   */
+  it('names the first failing rule, not every failing one', () => {
+    const i = interest({
+      id: 'i',
+      keywords: ['pycon'],
+      tags: ['tech'],
+      countries: ['PL'],
+    });
+    // Wrong country AND the wrong subject altogether.
+    expect(matchReason(ev({ title: 'Koncert klezmerski', country: 'NL' }), i)).toBe('keywords');
+    // Wrong country AND missing the tag.
+    expect(matchReason(ev({ title: 'PyCon NL', country: 'NL', reach: 'national' }), i)).toBe('tags');
+    // Only the country is wrong. This is the near miss.
+    expect(
+      matchReason(
+        ev({ title: 'PyCon NL', country: 'NL', reach: 'national', tags: ['tech'] }),
+        i,
+      ),
+    ).toBe('places');
+  });
+
+  it('names each of the other rules', () => {
+    const base = { id: 'i', keywords: ['pycon'] };
+    expect(
+      matchReason(ev({ title: 'PyCon NL' }), interest({ ...base, excludeKeywords: ['pycon'] })),
+    ).toBe('exclude');
+    expect(
+      matchReason(ev({ title: 'PyCon NL', city: 'Utrecht' }), interest({ ...base, cities: ['Kraków'] })),
+    ).toBe('cities');
+    expect(
+      matchReason(ev({ title: 'PyCon NL', day: '2026-10-01' }), interest({ ...base, toDay: '2026-09-01' })),
+    ).toBe('dates');
+  });
+});
+
+describe('interestsRejectingFor', () => {
+  const mine = interest({
+    id: 'python',
+    keywords: ['pycon'],
+    countries: ['PL'],
+    internationalAnywhere: true,
+  });
+  const opera = interest({ id: 'opera', keywords: [], tags: ['opera'] });
+
+  it('names only the interests that turned the event away for that reason', () => {
+    const event = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
+    expect(
+      interestsRejectingFor(event, [mine, opera], 'places', { forPush: false }).map((i) => i.id),
+    ).toEqual(['python']);
+  });
+
+  it('does not name an interest that failed on something sooner', () => {
+    // The opera interest rejects this on tags, not on geography — a keyword miss is not a near
+    // miss, and the verification view must not fill up with them.
+    const event = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
+    expect(interestsRejectingFor(event, [opera], 'places', { forPush: false })).toEqual([]);
+    expect(
+      interestsRejectingFor(event, [opera], 'tags', { forPush: false }).map((i) => i.id),
+    ).toEqual(['opera']);
+  });
+
+  it('skips a tombstoned interest exactly as matchingInterests does', () => {
+    const event = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
+    const dead = { ...mine, deleted: true };
+    expect(interestsRejectingFor(event, [dead], 'places', { forPush: false })).toEqual([]);
   });
 });
 

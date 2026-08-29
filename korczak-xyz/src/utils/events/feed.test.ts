@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeed, dedupeByFingerprint, groupOf, placeLabel, whenLabel } from './feed';
+import {
+  buildFeed,
+  classificationCoverage,
+  countryTally,
+  dedupeByFingerprint,
+  groupOf,
+  placeLabel,
+  whenLabel,
+} from './feed';
 import { fingerprintOf, haystackOf } from './normalize';
 import type { EventRecord, Interest } from './types';
 
@@ -88,7 +96,7 @@ describe('buildFeed', () => {
 
   it('shows unmatched events when asked to show everything', () => {
     const narrow: Interest = { ...ALL, keywords: ['klezmer'] };
-    const sections = buildFeed([ev({ title: 'Techno' })], [narrow], NOW, { matchedOnly: false });
+    const sections = buildFeed([ev({ title: 'Techno' })], [narrow], NOW, { mode: 'all' });
     expect(sections[0].items[0].matched).toEqual([]);
   });
 
@@ -170,5 +178,96 @@ describe('whenLabel', () => {
 
   it('is never blank', () => {
     expect(whenLabel({ startsAt: null }, 'en-GB')).toBe('—');
+  });
+});
+
+describe('buildFeed in rejected-place mode', () => {
+  // The screenshot that started this, plus the one that has to survive it.
+  const pyconNL = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
+  const pyconCM = ev({ title: 'PyCon Cameroon 2026', country: 'CM', reach: 'national' });
+  const europython = ev({ title: 'EuroPython 2026', country: 'CZ', reach: 'international' });
+  const klezmer = ev({ title: 'Koncert klezmerski', country: 'PL', reach: 'local' });
+
+  const dev: Interest = {
+    id: 'dev', rev: 0, updatedAt: NOW, writerId: 'w', createdAt: 0,
+    label: 'Python & dev', keywords: ['pycon', 'europython'], leadDays: 14,
+    countries: ['PL'], internationalAnywhere: true,
+  };
+
+  const corpus = [pyconNL, pyconCM, europython, klezmer];
+  const titles = (mode: 'matched' | 'rejected-place' | 'all') =>
+    buildFeed(corpus, [dev], NOW, { mode })
+      .flatMap((s) => s.items)
+      .map((i) => i.event.title)
+      .sort();
+
+  it('lists exactly what the places rule removed', () => {
+    expect(titles('rejected-place')).toEqual(['PyCon Cameroon 2026', 'PyCon NL 2026']);
+  });
+
+  it('is the complement of what matched, over the events any interest reaches', () => {
+    // The two views must not overlap and must not both miss something: an event in neither is one
+    // this feature quietly lost.
+    expect(titles('matched')).toEqual(['EuroPython 2026']);
+    expect(titles('all').length).toBe(4);
+  });
+
+  /*
+   * A keyword miss is not a near miss. Without this the verification view fills up with the whole
+   * corpus — every concert in the country is also "not a Python conference in Poland" — and the
+   * one question it is meant to answer becomes unreadable.
+   */
+  it('never lists an event that failed on something before the places rule', () => {
+    expect(titles('rejected-place')).not.toContain('Koncert klezmerski');
+  });
+
+  it('does not list an event another interest already lets through', () => {
+    const everything: Interest = { ...ALL, id: 'all' };
+    const shown = buildFeed(corpus, [dev, everything], NOW, { mode: 'rejected-place' });
+    expect(shown).toEqual([]);
+  });
+
+  it('carries the interests that did the rejecting, so the card can name them', () => {
+    const items = buildFeed(corpus, [dev], NOW, { mode: 'rejected-place' }).flatMap((s) => s.items);
+    expect(items.every((i) => i.rejectedBy?.map((r) => r.id).includes('dev'))).toBe(true);
+  });
+
+  it('is empty while no interest constrains where, so nothing vanishes unexplained', () => {
+    const anywhere: Interest = { ...dev, countries: undefined, internationalAnywhere: undefined };
+    expect(buildFeed(corpus, [anywhere], NOW, { mode: 'rejected-place' })).toEqual([]);
+  });
+});
+
+describe('countryTally', () => {
+  it('counts by country, commonest first, with the unplaced countable', () => {
+    expect(
+      countryTally([
+        ev({ title: 'a', country: 'NL' }),
+        ev({ title: 'b', country: 'NL' }),
+        ev({ title: 'c', country: 'CM' }),
+        ev({ title: 'd' }),
+      ]),
+    ).toEqual([
+      { code: 'NL', count: 2 },
+      { code: '?', count: 1 },
+      { code: 'CM', count: 1 },
+    ]);
+  });
+});
+
+describe('classificationCoverage', () => {
+  /*
+   * The half the rejected list structurally cannot show: an unclassified event passes the places
+   * rule, so it is never in that list, and a classifier that has stopped looks exactly like a
+   * filter with nothing to remove.
+   */
+  it('counts what has a reach, not what has a country', () => {
+    expect(
+      classificationCoverage([
+        ev({ title: 'a', country: 'PL', reach: 'local' }),
+        ev({ title: 'b', country: 'PL' }),
+        ev({ title: 'c' }),
+      ]),
+    ).toEqual({ classified: 1, total: 3 });
   });
 });

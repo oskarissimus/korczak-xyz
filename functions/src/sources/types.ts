@@ -33,6 +33,14 @@ export interface RawEvent {
   dateText?: string;
   city?: string;
   venue?: string;
+  /**
+   * ISO-3166-1 alpha-2, where the source knows it for certain.
+   *
+   * Only where it is a fact rather than a reading: Teatr Wielki is in Warsaw, and Ticketmaster is
+   * queried `countryCode=PL`. Left absent otherwise — the classifier fills it in, and one field
+   * with two derivations is how the app comes to disagree with itself about where something is.
+   */
+  country?: string;
   tags?: string[];
   ticketUrl?: string;
   onSaleAt?: number;

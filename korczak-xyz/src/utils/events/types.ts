@@ -15,6 +15,18 @@
 /** Which adapter produced a record. Also the first half of its id. */
 export type SourceId = 'ticketmaster' | 'teatr-wielki' | 'python-org' | 'feed';
 
+/**
+ * How far an event pulls its audience from.
+ *
+ * `local` is a night at the opera or a town's medieval fair; `national` is a conference the host
+ * country attends, which is what PyCon NL and PyCon Cameroon are; `international` is one people
+ * fly in for, which is what EuroPython and PyCon US are. Nothing in a listing states this — it is
+ * a judgement, which is why it is the one field here a language model produces.
+ */
+export type Reach = 'local' | 'national' | 'international';
+
+export const REACHES: readonly Reach[] = ['local', 'national', 'international'];
+
 export interface EventRecord {
   /** `${source}_${slugKey(sourceKey)}` — derived, never random, so two runs converge. */
   id: string;
@@ -51,6 +63,29 @@ export interface EventRecord {
   dateText?: string;
   city?: string;
   venue?: string;
+  /**
+   * ISO-3166-1 alpha-2, or `ONLINE`. Supplied by the adapter where the source knows it for free
+   * (Teatr Wielki is in Warsaw; Ticketmaster is queried `countryCode=PL`) and by the classifier
+   * otherwise. Absent means nobody has worked it out yet — which is a third state, not a fourth
+   * country, and `matchesInterest` treats it as such.
+   */
+  country?: string;
+  /**
+   * Who this draws. Set by the classifier and by nothing else.
+   *
+   * The distinction a country cannot make: PyCon NL and EuroPython can be in the same country in
+   * the same year and are not the same kind of event, and no field a scrape produces says which is
+   * which. Absent means unclassified.
+   */
+  reach?: Reach;
+  /** The classifier's one line of reasoning, so its verdict can be argued with rather than obeyed. */
+  reachReason?: string;
+  classifiedAt?: number;
+  /**
+   * What the classification was computed from — see `classifyHashOf` in `functions/src/classify.ts`.
+   * Unchanged hash, no second call; that is what keeps a run over 1,100 events costing nothing.
+   */
+  classifyHash?: string;
   /** Normalised topics, folded lowercase: 'music', 'opera', 'theatre', 'tech', 'festival'. */
   tags: string[];
   onSaleAt?: number;
@@ -100,6 +135,22 @@ export interface Interest {
   tags?: string[];
   /** Any-of against `EventRecord.city`. Absent or empty means anywhere. */
   cities?: string[];
+  /**
+   * Any-of against `EventRecord.country`, as ISO-2 codes. Absent or empty means anywhere.
+   *
+   * Read together with `internationalAnywhere` as **one** rule rather than as two constraints —
+   * see the `places` case in `matchReason`. Two independent all-of constraints would mean "in
+   * Poland AND international", which is nobody's question.
+   */
+  countries?: string[];
+  /**
+   * Whether an `international` event passes wherever it is held.
+   *
+   * This is the half `countries` cannot express. "Conferences in Poland, plus the ones worth
+   * flying to" is a single thought, and a country list alone answers it by dropping EuroPython
+   * along with PyCon NL.
+   */
+  internationalAnywhere?: boolean;
   /** `YYYY-MM-DD` window, compared lexically against `EventRecord.day`. */
   fromDay?: string;
   toDay?: string;

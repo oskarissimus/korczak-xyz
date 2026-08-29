@@ -22,6 +22,14 @@ interface Feed {
   /** Applied to everything from this feed, so an interest can narrow by them. */
   tags: string[];
   city?: string;
+  /**
+   * ISO-2, where the feed is unambiguously about one country's events.
+   *
+   * Both of these are Polish publications writing about Polish events, so it is a fact about the
+   * feed rather than about any one item — which is what makes it belong here beside `city` and not
+   * in a per-item guess.
+   */
+  country?: string;
 }
 
 /**
@@ -42,6 +50,7 @@ export const FEEDS: Feed[] = [
      * the ratio working as intended. Tagging it `festival` would have claimed every article was one.
      */
     tags: ['history'],
+    country: 'PL',
   },
   {
     url: 'https://www.jewishfestival.pl/feed/',
@@ -54,6 +63,7 @@ export const FEEDS: Feed[] = [
      */
     tags: ['music', 'festival'],
     city: 'Kraków',
+    country: 'PL',
   },
 ];
 
@@ -98,6 +108,7 @@ export function parseFeed(xml: string, feed: Feed): RawEvent[] {
        */
       startsAt: null,
       city: feed.city,
+      country: feed.country,
       tags: feed.tags,
       description: summary ? stripTags(summary).slice(0, 600) : undefined,
     });

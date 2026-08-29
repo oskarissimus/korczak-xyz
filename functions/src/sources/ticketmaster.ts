@@ -97,6 +97,8 @@ export function toRawEvent(event: TmEvent): RawEvent | null {
     startsAt: Number.isFinite(startsAt) ? (startsAt as number) : null,
     allDay: start?.noSpecificTime === true,
     city: venue?.city?.name,
+    // The query is `countryCode=PL`, so this is the request's own constraint read back, not a guess.
+    country: 'PL',
     venue: venue?.name,
     tags: tagsOf(event),
     // A Ticketmaster listing is its own ticket page.

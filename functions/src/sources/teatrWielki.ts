@@ -104,6 +104,7 @@ export function parseSeasonPage(html: string): RawEvent[] {
       // card with no date at all reads as a bug.
       dateText: premiereLine,
       city: 'Warszawa',
+      country: 'PL',
       venue: 'Teatr Wielki – Opera Narodowa',
       tags: tagsFor(genre),
       description: [genre, composer].filter(Boolean).join(' '),
