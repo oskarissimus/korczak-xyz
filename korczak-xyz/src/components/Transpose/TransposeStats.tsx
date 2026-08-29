@@ -28,7 +28,9 @@ import {
 } from '../../utils/transpose/stats';
 import { keyLabel } from '../../utils/transpose/theory';
 import type { Notation } from '../../utils/transpose/theory';
+import { totalPracticeMs } from '../../utils/srs/practice';
 import MasteryChart from '../srs/MasteryChart';
+import PracticeChart from '../srs/PracticeChart';
 import TrendChart from '../srs/TrendChart';
 // The merged app's badge and the merged app's strings for it — see `FretboardStats` for why.
 import SyncBadge from '../Flashcards/SyncBadge';
@@ -65,6 +67,7 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
     [data.events, data.sessions, now]
   );
   const days = useMemo(() => dailyStats(data.events), [data.events]);
+  const practiceMs = useMemo(() => totalPracticeMs(data.sessions), [data.sessions]);
   const keys = useMemo(() => keyStats(data.deck), [data.deck]);
   const byDirection = useMemo(() => directionStats(data.deck), [data.deck]);
   const counts = useMemo(
@@ -111,7 +114,9 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
           <span className="tp-tile-label">{t.accuracy}</span>
         </div>
         <div className="tp-tile">
-          <span className="tp-tile-value">{formatDuration(overall.totalMs)}</span>
+          {/* From the sittings, not `overall.totalMs` — see `FretboardStats` and
+              `src/utils/srs/practice.ts` for why the answer log is the wrong source for a total. */}
+          <span className="tp-tile-value">{formatDuration(practiceMs)}</span>
           <span className="tp-tile-label">{t.totalTime}</span>
         </div>
         <div className="tp-tile">
@@ -143,6 +148,24 @@ export default function TransposeStats({ lang, library }: TransposeStatsProps) {
           formatDate={formatDate}
           labels={{ accuracy: t.legendAccuracy, seconds: t.legendSpeed }}
           emptyLabel={t.noData}
+        />
+      </section>
+
+      <section className="tp-section">
+        <h2 className="tp-subhead">{chrome.practiceTimeTitle}</h2>
+        <PracticeChart
+          sessions={data.sessions}
+          formatDate={formatDate}
+          labels={{
+            perDay: chrome.perDay,
+            perWeek: chrome.perWeek,
+            groupBy: chrome.groupBy,
+            practiceTime: chrome.practiceTime,
+            sessions: chrome.sessionsLabel,
+            total: chrome.total,
+          }}
+          emptyLabel={chrome.noPractice}
+          hintLabel={t.chartHint}
         />
       </section>
 

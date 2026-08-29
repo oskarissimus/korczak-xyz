@@ -142,6 +142,16 @@ minutes stale and pushed it over the cloud. Hence:
 `storage.test.ts` fakes a `localStorage` with a byte ceiling — there is no jsdom in this project,
 so "the store is full" is otherwise not a reachable state in a test.
 
+### The progress page's lifetime total
+
+Two tiles above the chart: every minute typed across every book, and the sitting count. The total is
+`activeTypingMs` summed per sitting and never across the join — the same measure as the per-book
+`Spent:` on the practice screen and as the chart's own time series, so the three cannot disagree.
+Summed over the sittings themselves rather than over the charted points, which drop anything under
+`MIN_CHAR_EVENTS`: a twenty-character sitting produces a meaningless WPM and still took the time it
+took. It shows `…` until a signed-in reader's cloud sittings have landed, a total that jumps being
+worse than one that waits, and `StatsSkeleton.astro` prints the same two tiles with a dash.
+
 ### Frontend logging
 
 Structured logs buffer in localStorage and upload in batches to `users/{uid}/logs`, reachable at
@@ -248,6 +258,47 @@ halves. `ReviewEvent.id` is `${sessionId}-${ordinal}` with the ordinal counted *
 so ids stay unique in each log. A deck that contributed nothing gets no record: `finishSession`
 already returns null and clears its orphan key on zero events, which also means a tab closed
 mid-sitting is recovered independently on each side, by the hooks that always did it.
+
+### Time spent is read off the sittings, not the answer log
+
+`src/utils/srs/practice.ts` is the one definition of "time spent practising", the way
+`activeTypingMs` is the typing trainer's, and everything that reports it — the `Time` tile on each
+progress page, the `Practice time` tile on the start screen, the bars in `PracticeChart` — goes
+through it. Four things it settles:
+
+- **It reads `SessionRecord[]`, not `events`.** Everything else on a progress page is recomputed
+  from the log, and for the deck and the accuracy that is right. It is wrong for a lifetime total:
+  `EVENT_CAP` keeps the newest 2000 answers and `createSrsStorage` surrenders the older half under
+  quota pressure, so a total folded from the log **shrinks as the log is pruned** — a year of
+  practice quietly becomes three months of it, with nothing on the screen to say so. The sitting
+  record is written once, capped at `SESSION_CAP` *sittings* rather than answers, pulled back from
+  the account, and already carries `totalMs`.
+- **The app-wide total is a plain sum of the two decks'.** A mixed sitting writes two records under
+  one session id, each holding only its own half's answering time — so there is nothing to join on
+  and nothing counted twice. Every deck is counted, including one currently switched off: turning
+  the chord cards off for a fortnight does not unspend the hours already spent on them. The tiles
+  beside it are the opposite question — what to do now — and are scoped.
+- **One answer contributes at most `MAX_ANSWER_MS` (2 min).** A card's clock starts when it appears
+  and nothing but answering stops it, so a sitting begun and walked away from banks the whole walk.
+  `answerMs` caps it in `FlashcardsSession`, where the event is minted, so one number reaches the
+  deck, the stored sitting, the day's bar and the total rather than four places each capping their
+  own. It cannot move a rating: `ratingFromAnswer`'s slowest budget is 5 s a place, 30 s for a
+  six-place select-all card, so the cap only ever touches an answer already rated `hard`. Stored
+  records keep whatever they were written with; this is from here on.
+- **The empty buckets are drawn.** `practiceBuckets` fills the days or weeks nobody practised,
+  because "am I practising" is half of what this chart is asked and a series that skips them draws
+  a fortnight off as an unbroken run of bars. It steps by *calendar* day (`new Date(y, m, d + 1)`),
+  not by 86,400,000 ms — two days a year are not 24 hours long, and a fixed step files everything
+  after a DST boundary one bucket out. `MAX_BUCKETS` keeps the newest 400, so one stale record from
+  three years ago is not a thousand empty bars.
+
+`PracticeChart` is bars and not a line, because this is a quantity per bucket rather than a rate
+sampled at a point: a line between Tuesday and Friday draws a slope across two days nobody
+practised. It is the one chart here that owes no second channel — the site's rule is about telling
+two *series* apart and there is one, read against its axis — and it is magenta because that is what
+time already is on the typing trainer's over-time chart. Its day/week toggle is its own, both
+progress pages drawing the panel identically; its strings are in `Flashcards/translations.ts`,
+since a sitting belongs to neither deck.
 
 ### The components, and where the seam is
 

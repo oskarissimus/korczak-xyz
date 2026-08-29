@@ -160,6 +160,17 @@ export default function TypingStats({ lang }: TypingStatsProps) {
   }, [loading]);
 
   const sessionPoints = toSessionPoints(sessions);
+
+  /*
+   * Every minute typed, across every book.
+   *
+   * `activeTypingMs` per sitting and never across the join — the same measure as the per-book
+   * `Spent:` on the practice screen and as the time series on this chart, so the three cannot
+   * disagree. Summed over the sittings themselves rather than over `sessionPoints`, which drops
+   * anything under `MIN_CHAR_EVENTS`: a twenty-character sitting produces a meaningless WPM and
+   * still took the time it took.
+   */
+  const totalTimeMs = sessions.reduce((sum, s) => sum + activeTypingMs(s.events), 0);
   const points =
     grouping === 'day'
       ? aggregateByDayFromEvents(sessions)
@@ -249,6 +260,23 @@ export default function TypingStats({ lang }: TypingStatsProps) {
         <p className="typing-message">{t.noStats}</p>
       ) : (
         <>
+          {/* The page's two lifetime figures, in the trainer's own tile style — the same shape the
+              practice screen's stats bar uses. Above the chart because the total is the headline
+              this page had been missing, and `…` rather than a number while a signed-in reader's
+              cloud sittings are still landing, since a total that jumps is worse than one that
+              waits. */}
+          <div className="typing-stats typing-stats--totals">
+            <div className="typing-stat">
+              <span className="typing-stat-value">
+                {loading ? '…' : formatDuration(totalTimeMs / 60000)}
+              </span>
+              <span className="typing-stat-label">{t.totalTime}</span>
+            </div>
+            <div className="typing-stat">
+              <span className="typing-stat-value">{loading ? '…' : sessionPoints.length}</span>
+              <span className="typing-stat-label">{t.sessions}</span>
+            </div>
+          </div>
           <div className="typing-chart-controls">
             <div className="typing-toggle-group" role="group" aria-label={t.groupBy}>
               <button
@@ -333,9 +361,6 @@ export default function TypingStats({ lang }: TypingStatsProps) {
             animate={animate}
             loading={loading}
           />
-          <p className="typing-message">
-            {t.sessions}: {loading ? '…' : sessionPoints.length}
-          </p>
         </>
       )}
     </div>

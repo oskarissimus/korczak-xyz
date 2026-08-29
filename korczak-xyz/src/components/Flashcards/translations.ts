@@ -53,6 +53,24 @@ export const translations = {
     seeNeckStats: 'Neck progress',
     seeChordStats: 'Chord progress',
 
+    /*
+     * The practice-time panel — the tile on the start screen and the chart on both progress pages.
+     *
+     * Here rather than in either deck's table because it belongs to neither: a sitting draws from
+     * both decks, and how long one took is a fact about the sitting. Both stats pages already
+     * import this table for the sync badge.
+     */
+    practiceTime: 'Practice time',
+    practiceTimeTitle: 'Time spent practising',
+    perDay: 'Per day',
+    perWeek: 'Per week',
+    groupBy: 'Group by',
+    /* Labelled rather than plural — the readout says `Sessions: 2`, so neither English's one
+       plural nor Polish's three has to be got right in a template. */
+    sessionsLabel: 'Sessions',
+    total: 'Total',
+    noPractice: 'No practice recorded yet — play a session first.',
+
     // Settings
     settings: 'Settings',
     decks: 'Decks',
@@ -110,6 +128,15 @@ export const translations = {
     backToStart: 'Wróć',
     seeNeckStats: 'Postępy: gryf',
     seeChordStats: 'Postępy: akordy',
+
+    practiceTime: 'Czas ćwiczeń',
+    practiceTimeTitle: 'Czas spędzony na ćwiczeniach',
+    perDay: 'Dziennie',
+    perWeek: 'Tygodniowo',
+    groupBy: 'Grupuj wg',
+    sessionsLabel: 'Sesje',
+    total: 'Razem',
+    noPractice: 'Brak zapisanych ćwiczeń — zagraj najpierw sesję.',
 
     // Settings
     settings: 'Ustawienia',

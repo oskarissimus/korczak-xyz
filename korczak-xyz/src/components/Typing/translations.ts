@@ -40,6 +40,10 @@ export const translations = {
     perDay: 'Per day',
     perWeek: 'Per week',
     timeSpent: 'Time spent',
+    // The stats page's lifetime figure, across every book. `timeSpent` above is the session
+    // stopwatch on the practice screen and `timeInBook` this book's own history, so this is the
+    // third of three clocks and needs a word of its own.
+    totalTime: 'Total time',
     // Per-key stats page
     keyStatsTitle: 'Per-key breakdown',
     keyCol: 'Key',
@@ -151,6 +155,7 @@ export const translations = {
     perDay: 'Na dzień',
     perWeek: 'Na tydzień',
     timeSpent: 'Czas pisania',
+    totalTime: 'Łączny czas',
     // Per-key stats page
     keyStatsTitle: 'Rozkład wg klawiszy',
     keyCol: 'Klawisz',

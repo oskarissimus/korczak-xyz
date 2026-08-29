@@ -1,21 +1,31 @@
 ---
 /**
  * Server-rendered stand-in for <TypingStats client:only="react" />, mirroring
- * TypingStats.tsx: grouping toggles + legend, chart panel, session count. Astro
- * swaps it for the real island the moment React hydrates. The view tabs above
- * are real markup on the page, not part of the island, so nothing stands in.
+ * TypingStats.tsx: the two lifetime tiles, grouping toggles + legend, and the
+ * chart panel. Astro swaps it for the real island the moment React hydrates. The
+ * view tabs above are real markup on the page, not part of the island, so nothing
+ * stands in.
+ *
+ * The tiles print their real labels and a dash for the figure — the island shows
+ * `…` there until a signed-in reader's cloud sittings land, and both reserve the
+ * same height, so the chart below does not jump at hydration.
  */
+
+import { translations } from '../translations';
 
 interface Props {
   lang: 'en' | 'pl';
 }
 const { lang } = Astro.props;
+const t = translations[lang];
 
 /* Bar widths are the real labels' rendered widths minus each control's own
    chrome. Language-specific because Polish labels are longer, and at narrow
    widths that decides whether a row of controls wraps. */
 const TOGGLES = { en: [77, 49, 56], pl: [56, 56, 70] }[lang];
 const LEGEND_WIDTHS = { en: [21, 56, 70, 35], pl: [21, 49, 84, 35] }[lang];
+
+const TOTALS = [t.totalTime, t.sessions];
 
 const LEGEND = [
   'typing-legend-item--wpm',
@@ -30,6 +40,17 @@ const GRIDLINES = [0, 1, 2, 3, 4];
 ---
 
 <div class="typing-stats-page typing-skeleton" aria-hidden="true">
+  <div class="typing-stats typing-stats--totals">
+    {
+      TOTALS.map((label) => (
+        <div class="typing-stat">
+          <span class="typing-stat-value">—</span>
+          <span class="typing-stat-label">{label}</span>
+        </div>
+      ))
+    }
+  </div>
+
   <div class="typing-chart-controls">
     <div class="typing-toggle-group">
       {
@@ -59,8 +80,4 @@ const GRIDLINES = [0, 1, 2, 3, 4];
     <!-- The readout line the hydrated chart carries — reserved so nothing jumps at mount. -->
     <p class="chart-readout chart-readout--idle"></p>
   </div>
-
-  <p class="typing-message">
-    <span class="typing-skel" style="--skel-w: 7rem; --skel-h: 1.1rem; margin: 0 auto"></span>
-  </p>
 </div>

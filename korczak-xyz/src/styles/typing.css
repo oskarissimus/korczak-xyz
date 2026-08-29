@@ -498,6 +498,17 @@
   margin: 0 auto;
 }
 
+/*
+ * The progress page's two lifetime figures — total time typed, and sittings.
+ *
+ * The same tiles the practice screen's bar carries, so the page reads as the same app. That bar has
+ * a progress column to give its slack to and this row has nothing after it, so the tiles share the
+ * width between them rather than huddling at the left of an empty bar.
+ */
+.typing-stats--totals .typing-stat {
+  flex: 1 1 120px;
+}
+
 /* The per-key page puts the list and the chart side by side, which needs more
    than the single-column width. The page container (900px) is the real cap. */
 .typing-stats-page--keys {
@@ -1301,6 +1312,13 @@
 
 .typing-skeleton .typing-sync-link {
   height: calc(1.4em + 16px); /* padding 6px, border 2px */
+}
+
+/* The figures are the one thing the stand-in cannot know. A dash rather than a zero — a zero is a
+   claim, and it would be wrong as often as not — and dimmed, so it does not read as a measurement
+   in the green the real value is printed in. */
+.typing-skeleton .typing-stat-value {
+  color: var(--retro-dark-gray);
 }
 
 /* No stand-in rule for the sync slot: it carries its own fixed height (--sync-cell-h), so the

@@ -1,6 +1,6 @@
 ---
 /**
- * Server-rendered stand-in for <Flashcards client:only="react" />, mirroring the start screen: three
+ * Server-rendered stand-in for <Flashcards client:only="react" />, mirroring the start screen: four
  * figure tiles, the split line, the start button, and the settings block. Astro swaps it for the real
  * island the moment React hydrates.
  *
@@ -38,7 +38,7 @@ const t = translations[lang];
 const fb = fretboardTranslations[lang];
 const tp = transposeTranslations[lang];
 
-const TILES = [t.due, t.fresh, t.mastered];
+const TILES = [t.due, t.fresh, t.mastered, t.practiceTime];
 
 // The notation is the locale's default, which is what an un-hydrated page has no better guess than.
 const notation = defaultNotationFor(lang);

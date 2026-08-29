@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_ANSWERS_FACTOR, SESSION_HORIZON_MS, requeue } from '../../utils/srs/queue';
 import type { QueueShape } from '../../utils/srs/queue';
 import { createCard, isDueWithin, rate, ratingFromAnswer } from '../../utils/srs/scheduler';
+import { answerMs } from '../../utils/srs/practice';
 import { isAdvanceKey } from '../../utils/fretboard/keys';
 import { qualify, unqualify, type TrainerId } from '../../utils/flashcards/trainers';
 import type { Deck, ReviewEvent } from '../../utils/srs/types';
@@ -183,7 +184,12 @@ export default function FlashcardsSession({
       if (!split || resolved) return null;
       const { trainer, cardId } = split;
       const now = Date.now();
-      const ms = Math.max(0, now - shownAt.current);
+      // Through `answerMs`, which caps a single answer: the clock starts when the card appears and
+      // nothing but answering stops it, so a sitting walked away from would otherwise bank the whole
+      // walk as practice. Capped here, where the event is minted, so one number reaches the deck, the
+      // stored sitting, the day's bar and the lifetime total. It cannot move a rating — the slowest
+      // budget `ratingFromAnswer` grades on is 5s a place, well inside the cap.
+      const ms = answerMs(now - shownAt.current);
       const rating = ratingFromAnswer(correct, ms, targets);
       const deck = working[trainer];
       const card = deck[cardId] ?? createCard(cardId);

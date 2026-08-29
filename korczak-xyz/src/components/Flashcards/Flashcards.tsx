@@ -27,6 +27,7 @@ import type { MixSource } from '../../utils/flashcards/mix';
 import { qualify, type TrainerId } from '../../utils/flashcards/trainers';
 import { countDeck, nextDueAt } from '../../utils/srs/queue';
 import { formatDuration, summarizeSession } from '../../utils/srs/history';
+import { totalPracticeMs } from '../../utils/srs/practice';
 import type { SessionSummary as Summary } from '../../utils/srs/history';
 import type { Card, ReviewEvent } from '../../utils/srs/types';
 import { cardsInScope as neckCardsInScope, positionSubject } from '../../utils/fretboard/deck';
@@ -135,6 +136,20 @@ export default function Flashcards({ lang, library }: FlashcardsProps) {
   const neckCounts = useMemo(() => countDeck(neckScoped, tick), [neckScoped, tick]);
   const chordCounts = useMemo(() => countDeck(chordScoped, tick), [chordScoped, tick]);
   const dueAt = useMemo(() => nextDueAt(scoped, tick), [scoped, tick]);
+
+  /*
+   * Both decks added, and the addition is exact rather than approximate: a mixed sitting writes two
+   * records under one session id, one per deck, each holding only its own half's answering time. So
+   * there is nothing to join on and nothing counted twice.
+   *
+   * Every deck, not only the ones currently switched on — this is what has been put in, and turning
+   * the chord cards off for a fortnight does not unspend the hours already spent on them. The tiles
+   * above it are the opposite question, what to do now, and are scoped.
+   */
+  const practiceMs = useMemo(
+    () => totalPracticeMs(fretboard.sessions) + totalPracticeMs(transpose.sessions),
+    [fretboard.sessions, transpose.sessions]
+  );
 
   const sources = useCallback((): MixSource[] => {
     const out: MixSource[] = [];
@@ -280,6 +295,10 @@ export default function Flashcards({ lang, library }: FlashcardsProps) {
             <span className="fb-tile-of">/{counts.total}</span>
           </span>
           <span className="fb-tile-label">{t.mastered}</span>
+        </div>
+        <div className="fb-tile">
+          <span className="fb-tile-value">{formatDuration(practiceMs)}</span>
+          <span className="fb-tile-label">{t.practiceTime}</span>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 /*
- * The two charts on a trainer's progress page — the mastery bands and the accuracy/speed trend —
- * and the legend that goes under them.
+ * The three charts on a trainer's progress page — the mastery bands, the accuracy/speed trend and
+ * the practice-time bars — and the legend that goes under them.
  *
  * Shared by the fretboard and transposition trainers the way `tabs.css` is: pulled in by each
  * app's stylesheet with `@import`, so a page picks it up through the one stylesheet it already
@@ -119,6 +119,71 @@
 
 .srs-point--speed {
   fill: #9b9b00;
+}
+
+/*
+ * The practice-time bars, and the day/week toggle above them.
+ *
+ * **One series, so no second channel is owed.** The rule the other charts follow — never separate
+ * two series by hue alone — is about telling series apart, and there is one here; the bars are read
+ * against the axis, which is exactly what survives the colour being taken away. That is also why
+ * this pair is not in `chartContrast.test.ts`, whose table is per set of series sharing a chart.
+ *
+ * Magenta is what time already is on the typing trainer's over-time chart (`.typing-chart-line--time`,
+ * the same #c000c0), and the two charts answer the same question about two apps. On this panel it
+ * collides with nothing: cyan and #9b9b00 are the trend's, and the bucket ramp is the mastery
+ * stack's.
+ *
+ * Both `fill` and `background-color`, for `.srs-band--*`'s reason: one class paints the SVG rect in
+ * the chart and an HTML swatch in the legend beneath it, and `fill` does nothing to a <span>.
+ */
+.srs-bar {
+  fill: #c000c0;
+  background-color: #c000c0;
+}
+
+/* The slot the pointer is in, drawn under the bars so a short bar is still legible over it. A whole
+   slot rather than a guide line, because an empty bucket has no bar to highlight and "nothing that
+   day" is an answer the readout has to be able to point at. */
+.srs-bar-hit {
+  fill: var(--retro-white);
+  opacity: 0.12;
+}
+
+/* Win95 toggle, matching the typing trainer's grouping row. `srs-` because it belongs to a shared
+   component: `.fb-choice` would be an app prefix inside `src/components/srs/`, which is what left
+   the chord page's empty chart unstyled once already. */
+/* Above the plot, inside the black panel it belongs to. */
+.srs-chart .srs-toggle-group {
+  margin-bottom: 8px;
+}
+
+.srs-toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.srs-toggle {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  /* Win95 buttons size from their box, not their font metrics. */
+  line-height: 1;
+  padding: 5px 12px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 2px outset var(--retro-white);
+  cursor: pointer;
+}
+
+/* Pressed is drawn twice, the second time with `:hover`. `Layout.astro` carries a global
+   `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a single class — so the one button
+   the pointer is resting on, which on a toggle row is the one about to be clicked, went flat grey
+   and stayed grey until the mouse moved. The same guard `.fb-neck-cell--right` carries. */
+.srs-toggle[aria-pressed='true'],
+.srs-toggle[aria-pressed='true']:hover {
+  border-style: inset;
+  background: var(--retro-white);
 }
 
 .srs-legend {

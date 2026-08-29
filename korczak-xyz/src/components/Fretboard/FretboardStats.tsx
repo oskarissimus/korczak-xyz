@@ -19,7 +19,9 @@ import {
   positionStats,
 } from '../../utils/fretboard/stats';
 import type { PositionStat } from '../../utils/fretboard/stats';
+import { totalPracticeMs } from '../../utils/srs/practice';
 import MasteryChart from '../srs/MasteryChart';
+import PracticeChart from '../srs/PracticeChart';
 import { NeckHeatmap } from './NeckGrid';
 // The merged app's badge and the merged app's strings for it: this page is one of three tabs now,
 // and the sync it reports on is the whole account's rather than this deck's. See
@@ -51,6 +53,7 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
     [data.events, data.sessions, now]
   );
   const days = useMemo(() => dailyStats(data.events), [data.events]);
+  const practiceMs = useMemo(() => totalPracticeMs(data.sessions), [data.sessions]);
   const squares = useMemo(() => positionStats(data.deck), [data.deck]);
   const counts = useMemo(
     () => countDeck(cardsInScope(data.deck, data.settings), now),
@@ -98,7 +101,10 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
           <span className="fb-tile-label">{t.accuracy}</span>
         </div>
         <div className="fb-tile">
-          <span className="fb-tile-value">{formatDuration(overall.totalMs)}</span>
+          {/* From the sittings, not `overall.totalMs`: the local answer log is capped at 2000
+              answers and surrenders its older half under quota pressure, so a total folded from it
+              shrinks as the log is pruned. See `src/utils/srs/practice.ts`. */}
+          <span className="fb-tile-value">{formatDuration(practiceMs)}</span>
           <span className="fb-tile-label">{t.timeSpent}</span>
         </div>
         <div className="fb-tile">
@@ -130,6 +136,24 @@ export default function FretboardStats({ lang }: FretboardStatsProps) {
           formatDate={formatDate}
           labels={{ accuracy: t.accuracy, seconds: t.seconds }}
           emptyLabel={t.noData}
+        />
+      </section>
+
+      <section className="fb-section">
+        <h2 className="fb-subhead">{chrome.practiceTimeTitle}</h2>
+        <PracticeChart
+          sessions={data.sessions}
+          formatDate={formatDate}
+          labels={{
+            perDay: chrome.perDay,
+            perWeek: chrome.perWeek,
+            groupBy: chrome.groupBy,
+            practiceTime: chrome.practiceTime,
+            sessions: chrome.sessionsLabel,
+            total: chrome.total,
+          }}
+          emptyLabel={chrome.noPractice}
+          hintLabel={t.chartHint}
         />
       </section>
 
