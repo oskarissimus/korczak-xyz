@@ -2,11 +2,12 @@
  * One sitting drawn from both decks.
  *
  * **The whole point is that this is one `buildQueue` call, not two queues woven together.**
- * Selection there is by due date (see `src/utils/srs/queue.ts`), so a single call means the sitting
- * takes whatever has waited longest across both trainers: a deck left alone for a fortnight fills
- * the sitting, and one that is caught up contributes nothing. Two queues built to their own lengths
- * and interleaved would guarantee each deck a share of every sitting — which sounds fair and is
- * actually the scheduler being overruled twice, once in each direction.
+ * Selection there is a weighted sample of what is due, over one pool (see `src/utils/srs/queue.ts`),
+ * so a single call means both decks compete for every slot on the same terms: a deck that has
+ * fallen behind takes a larger share of the sitting, a deck left alone past `BACKLOG_DEADLINE_MS`
+ * fills it outright, and one that is caught up contributes nothing. Two queues built to their own
+ * lengths and interleaved would guarantee each deck a share of every sitting — which sounds fair
+ * and is actually the scheduler being overruled twice, once in each direction.
  *
  * What each trainer still owns is its own scope (the cards it hands over) and its own spread key.
  * This module knows neither; it knows only that ids from the two have to be told apart, which is

@@ -15,6 +15,7 @@ import {
 import { DIRECTIONS, NOTATIONS, parseCardId } from './notes';
 import { DAY, MINUTE, createCard } from '../srs/scheduler';
 import type { Card } from '../srs/scheduler';
+import { BACKLOG_DEADLINE_MS } from '../srs/queue';
 import type { QueueShape } from '../srs/queue';
 import type { Deck, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
@@ -265,16 +266,39 @@ describe('buildQueue', () => {
     expect(buildQueue(deck, scope, small, T0, { rng: rng() })).toEqual(['name:0-1']);
   });
 
-  it('takes the most overdue reviews when it cannot take them all', () => {
-    // Which cards a capped sitting draws is still decided by due date - the order it asks them
-    // in is the only thing the shuffle touches.
+  it('samples the reviews when it cannot take them all, favouring the older ones', () => {
+    // Which cards a capped sitting draws is a weighted sample of what is due, so the same three
+    // cards give different pairs from one sitting to the next - see `sampleDue` in
+    // `src/utils/srs/queue.ts`, where the distribution itself is tested.
     const deck = deckOf([
       scheduled('name:0-0', T0 - DAY),
       scheduled('name:0-1', T0 - 3 * DAY),
       scheduled('name:0-2', T0 - 2 * DAY),
     ]);
-    const queue = buildQueue(deck, scope, shape({ sessionLength: 2 }), T0, { rng: rng() });
-    expect(sorted(queue)).toEqual(['name:0-1', 'name:0-2']);
+    const pairs = new Set<string>();
+    const picks = new Map<string, number>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const queue = buildQueue(deck, scope, shape({ sessionLength: 2 }), T0, { rng: seeded(seed) });
+      expect(queue).toHaveLength(2);
+      pairs.add(sorted(queue).join(','));
+      for (const id of queue) picks.set(id, (picks.get(id) ?? 0) + 1);
+    }
+    expect(pairs.size).toBe(3);
+    expect(picks.get('name:0-1')!).toBeGreaterThan(picks.get('name:0-0')!);
+  });
+
+  it('takes a card that has been waiting past the deadline, whatever the sample says', () => {
+    // The one thing selection is not allowed to be random about: a card cannot rot in the backlog
+    // because the draw kept passing it over.
+    const deck = deckOf([
+      scheduled('name:0-0', T0 - BACKLOG_DEADLINE_MS - DAY),
+      scheduled('name:0-1', T0 - MINUTE),
+      scheduled('name:0-2', T0 - MINUTE),
+    ]);
+    for (let seed = 1; seed <= 50; seed++) {
+      const queue = buildQueue(deck, scope, shape({ sessionLength: 1 }), T0, { rng: seeded(seed) });
+      expect(queue).toEqual(['name:0-0']);
+    }
   });
 
   it('asks the same cards in a different order from one sitting to the next', () => {

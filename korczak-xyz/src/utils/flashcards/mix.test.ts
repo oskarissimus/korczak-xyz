@@ -74,9 +74,11 @@ describe('buildMixedQueue', () => {
   });
 
   /*
-   * The reason this is one `buildQueue` call rather than two queues interleaved. Selection is by due
-   * date across the whole sitting, so a deck left alone fills it and a deck that is caught up
-   * contributes nothing — which is the scheduler being obeyed, not overruled.
+   * The reason this is one `buildQueue` call rather than two queues interleaved. One draw covers the
+   * whole sitting, so a deck left alone long enough to be past `BACKLOG_DEADLINE_MS` fills it and a
+   * deck that is caught up contributes nothing — which is the scheduler being obeyed, not
+   * overruled. Thirty days is well past the deadline, so this case is the guarantee and not the
+   * sample; a deck only a day or two behind would take a larger share rather than all of it.
    */
   it('gives the sitting to whichever deck has waited longest', () => {
     const stale = NECK.map((id) => scheduled(id, T0 - 30 * DAY));

@@ -231,9 +231,10 @@ queue once their ids are told apart — `fb|find:1-4:b`, `tp|degrees:9:145:de`:
   trusting it, since a grammar that grew a `|` would fail silently as answers filed against ids
   nobody minted.
 - `src/utils/flashcards/mix.ts` — `buildMixedQueue`. **One `buildQueue` call, not two queues woven
-  together.** Selection there is by due date, so one call means the sitting takes whatever has waited
-  longest across both decks: a deck left alone for a fortnight fills it, a deck that is caught up
-  contributes nothing. Two queues built to their own lengths and interleaved would guarantee each deck
+  together.** Selection there is a weighted sample over one pool, so one call means both decks compete
+  for every slot on the same terms: a deck that has fallen behind takes a larger share, a deck left
+  alone past `BACKLOG_DEADLINE_MS` fills the sitting outright, a deck that is caught up contributes
+  nothing. Two queues built to their own lengths and interleaved would guarantee each deck
   a share of every sitting, which sounds fair and is the scheduler being overruled twice. The `spread`
   key is namespaced by trainer, so each deck's own rule applies to its own run and a neck card is
   never held apart from a chord card — they cannot give each other away.
@@ -544,15 +545,44 @@ few seconds. A tab closed mid-sitting therefore loses nothing: the next load fin
 and finishes the sitting on its behalf (`commitSitting`, shared by both paths, so "half of it in
 the deck and none of it in the history" is unreachable).
 
-### What to ask is scheduled; what order to ask it in is shuffled
+### What to ask is sampled with a deadline; what order to ask it in is shuffled
 
-`buildQueue` keeps those two apart. **Selection** stays by due date — a capped sitting draws the
-cards that have waited longest, and drawing a random handful instead would quietly abandon the
-schedule. **Order** is a shuffle, because once the cards are drawn their sequence carries no
-information, and a fixed one is something you learn instead of the neck: every sitting used to
-walk E, A, D, G, B, e in turn, which you can answer without reading the card. New cards are
-drawn from the whole fret range for the same reason — the range setting is the curriculum, so
-`scopeIds` is a stable enumeration and nothing more, not an introduction order.
+`buildQueue` keeps those two apart. **Order** is a shuffle, because once the cards are drawn their
+sequence carries no information, and a fixed one is something you learn instead of the neck: every
+sitting used to walk E, A, D, G, B, e in turn, which you can answer without reading the card. New
+cards are drawn from the whole fret range for the same reason — the range setting is the
+curriculum, so `scopeIds` is a stable enumeration and nothing more, not an introduction order.
+
+**Selection** was the top `sessionLength` by due date, on the grounds that a capped sitting must
+draw the cards that have waited longest and a random handful abandons the schedule. The first half
+of that is still true and the second half was the wrong conclusion, because taking the oldest makes
+a sitting predictable in *content*: sixty cards due and a sitting of ten is the same ten every time,
+and the shuffle only reorders them. So the draw is two tiers, and the point is that only one of them
+is a preference:
+
+- **`BACKLOG_DEADLINE_MS` (4 days) is a guarantee.** Anything overdue by more than it is taken
+  outright, oldest first. This is the whole of what keeps the schedule honest, and no weighting can
+  stand in for it: a soft bias moves the average and leaves the tail, and drawn uniformly about one
+  card in twelve waits over a fortnight. A week was judged too long to discover a card had been
+  quietly skipped over, hence four days.
+- **Everything else is a weighted sample**, `1 + overdue / BACKLOG_DEADLINE_MS`, so a card just due
+  weighs 1 and one at the deadline would weigh 2 — by which point it is not being sampled at all, so
+  the two tiers meet without a step. One constant sets both the ramp and the cutoff. The bias is
+  meant to be felt and not obeyed; a weight free to grow would quietly turn the sample back into the
+  oldest-first slice it replaced.
+
+The sample is Efraimidis–Spirakis — key each card `u^(1/w)`, take the largest `k` — which is exact
+for weighted-without-replacement in one pass and draws from the same injected `rng` as the shuffle,
+so a seeded sitting is still reproducible end to end.
+
+Two things about the guarantee are worth knowing before touching this. **The two tiers come back
+from `sampleDue` separately and the rescued cards are kept at the head of the review list**, because
+the `.slice(0, sessionLength)` that ends `buildQueue` eats the *tail* of that list — merge them and
+the new-card ration silently drops the very card the deadline rescued. And the deadline is a promise
+about **steady state**: while more cards are past it than one sitting holds, the bound is capacity,
+not the deadline. A hundred and twenty cards at ten a day take twelve sittings to work through
+however they are chosen. `queue.test.ts` simulates exactly that and measures only after the backlog
+is off.
 
 `spreadPositions` then pulls apart cards asking about the same place. `name:2-7` and `find:2-7`
 are different questions, but back to back the second is answered off the first — and it lands in
@@ -747,7 +777,8 @@ property `src/utils/flashcards/mix.ts` exploits to put both decks in one queue.
 
 - `scheduler.ts` — SM-2 with learning steps. Pure, takes `now`, which is what makes the deck a fold.
 - `replay.ts` — union by id, refold. The whole argument is in its header.
-- `queue.ts` — `buildQueue`, `requeue`, `spreadBy`. Selection by due date, order by shuffle.
+- `queue.ts` — `buildQueue`, `sampleDue`, `requeue`, `spreadBy`. Selection by weighted sample
+  under a deadline, order by shuffle.
 - `history.ts` — `summarizeSession` takes a `directionOf` callback rather than a parser, which is
   the one place the split needed a seam.
 - `storage.ts` / `cloud.ts` — **factories**, not modules of functions. `createSrsStorage(prefix)`

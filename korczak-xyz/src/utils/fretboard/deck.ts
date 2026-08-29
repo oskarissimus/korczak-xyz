@@ -195,9 +195,10 @@ export function spreadPositions(queue: string[], gap = MIN_POSITION_GAP): string
  * The order a sitting asks its cards in.
  *
  * The selection rule is `buildQueue` in `src/utils/srs/queue.ts` and is not the fretboard's own:
- * overdue learning cards first, then the most overdue reviews with the sitting's ration of new
- * cards interleaved, all of it shuffled. What *is* this deck's own is the scope it draws from and
- * `spreadPositions`, which pulls apart the cards that would answer each other.
+ * overdue learning cards first, then a weighted sample of the reviews that are due — with anything
+ * past `BACKLOG_DEADLINE_MS` taken outright — and the sitting's ration of new cards interleaved,
+ * all of it shuffled. What *is* this deck's own is the scope it draws from and `spreadPositions`,
+ * which pulls apart the cards that would answer each other.
  *
  * Deterministic order meant every sitting walked the strings E, A, D, G, B, e in turn, which is a
  * sequence you can answer without reading the card.

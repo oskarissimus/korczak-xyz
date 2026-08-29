@@ -7,9 +7,11 @@
  *
  * The two things it does that neither trainer did alone:
  *
- *   1. **One queue over both decks** (`buildMixedQueue`), so selection stays due-date fair across
- *      them. A deck left alone for a fortnight fills the sitting; a deck that is caught up
- *      contributes nothing. That is the scheduler being obeyed rather than overruled.
+ *   1. **One queue over both decks** (`buildMixedQueue`), so one draw decides the whole sitting.
+ *      Selection is a weighted sample of what is due across both, so a deck that has fallen behind
+ *      takes a larger share rather than every slot, and a deck left alone past
+ *      `BACKLOG_DEADLINE_MS` fills the sitting outright. A deck that is caught up contributes
+ *      nothing. That is the scheduler being obeyed rather than overruled.
  *   2. **Two commits under one session id.** Each trainer folds its own answers into its own deck and
  *      writes its own immutable sitting document, which is why the two stats pages stay separate and
  *      why this merge moved no data. A deck that contributed nothing gets no record —
