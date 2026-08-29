@@ -91,9 +91,20 @@ firebase deploy --only functions      # a secret version change does NOT trigger
 country and a reach (`local` / `national` / `international`) — the judgement that separates PyCon NL
 from EuroPython, which no listing states. See `src/classify.ts`.
 
-Absent, it is a configuration state and not a failure, exactly as the Ticketmaster key is: nothing
-is classified, every event stays unlabelled, and an unlabelled event passes the places rule — so the
-feed is what it was before the classifier existed.
+**The secret has to exist before the functions will deploy**, and that is a separate thing from
+having a real key. `defineSecret` plus a name in the function's `secrets` array makes the CLI refuse
+in CI with `In non-interactive mode but have no value for the secret GEMINI_API_KEY` — the Ticketmaster
+sentinel's whole reason for existing, arriving a second time. So set `none` if there is no key yet:
+
+```sh
+printf 'none' | firebase functions:secrets:set GEMINI_API_KEY --data-file -
+```
+
+`secretReader` in `index.ts` reads `none` back as `undefined`, and *that* is the configuration state
+rather than a failure, exactly as the Ticketmaster key is: nothing is classified, every event stays
+unlabelled, and an unlabelled event passes the places rule — so the feed is what it was before the
+classifier existed. Unlike an API key sent as a real `apikey`, an unset classifier earns no 401 and
+puts no red row on the Alerts tab; `eventSources/classifier` simply reports zero.
 
 The cost is small enough to be worth stating so nobody has to guess. `gemini-2.5-flash-lite` at
 \$0.10 / \$0.40 per million tokens, ~120 input tokens an event, 25 events a request: labelling the

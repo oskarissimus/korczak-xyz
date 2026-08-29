@@ -1308,9 +1308,15 @@ succeeded — failing a deploy whose output was perfectly good.
 
 The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
 `TICKETMASTER_API_KEY` / `GEMINI_API_KEY` as secrets, and the public key **also** in Netlify's build
-environment as `PUBLIC_VAPID_PUBLIC_KEY`. A missing `GEMINI_API_KEY` is a configuration state and not
-a failure — nothing is classified, everything stays unlabelled, and an unlabelled event passes the
-places rule, so the feed is what it was before the classifier existed.
+environment as `PUBLIC_VAPID_PUBLIC_KEY`.
+
+A secret named in a function's `secrets` array **must exist for the deploy to succeed at all** — the
+CLI stops with `In non-interactive mode but have no value for the secret …` — which is what the
+Ticketmaster `none` sentinel was invented for, and which `GEMINI_API_KEY` walked into on the very
+commit that added it. Set it to `none` if there is no key yet. *That* is the configuration state and
+not a failure: `secretReader` reads the sentinel back as undefined, nothing is classified, everything
+stays unlabelled, and an unlabelled event passes the places rule — so the feed is what it was before
+the classifier existed.
 The VAPID public key can never change: rotating it invalidates every subscription on every device,
 silently. Full sequence in `functions/README.md`.
 
