@@ -103,6 +103,17 @@ changes. A non-empty plan means these files describe something other than what i
 project, and `apply` would then *change* it — which for `gcf-artifacts` means the images the live
 functions are running from.
 
+## No lock file
+
+`terraform init` writes `.terraform.lock.hcl` and asks for it to be committed. It is not here,
+because nothing in this repo can run Terraform outside CI and the lock's hashes are
+platform-specific — generating one would mean a round trip through a build to fetch a file.
+
+The provider is pinned to an **exact** version in `main.tf` instead. That gets the property that
+matters: two runs a month apart resolve the same provider, and upgrading is a deliberate one-line
+commit. What it gives up is the lock's checksum pinning, which is a supply-chain guarantee rather
+than a determinism one.
+
 ## Guards, and what it means when one fires
 
 - **`prevent_destroy`** on the secrets and on `gcf-artifacts`: any plan that would replace or remove

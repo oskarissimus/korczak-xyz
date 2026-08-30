@@ -28,8 +28,18 @@ terraform {
 
   required_providers {
     google = {
-      source  = "hashicorp/google"
-      version = "~> 8.0"
+      source = "hashicorp/google"
+      /*
+       * Pinned exactly, not `~> 8.0`.
+       *
+       * The usual answer is a committed `.terraform.lock.hcl`, and `terraform init` asks for one —
+       * but nothing in this repo can run Terraform outside CI, so there is no way to generate the
+       * lock's platform hashes without a round trip through a build. An exact version gets the
+       * property that actually matters here: two runs a month apart resolve the same provider, and
+       * upgrading is a deliberate one-line commit rather than something that happens to a project
+       * layer while nobody is looking.
+       */
+      version = "8.0.0"
     }
   }
 

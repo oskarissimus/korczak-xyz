@@ -12,9 +12,10 @@ snapshot-crawler/node_modules/
 # regenerating the public key would silently invalidate every push subscription on every device.
 .secrets/
 
-# Terraform. The lock file is NOT ignored — a provider version that drifts between runs is a
-# project layer that drifts with it — but state, plans and the plugin cache never belong in git:
-# state holds real resource attributes, and a saved plan is a credentialed snapshot of them.
+# Terraform. State, plans and the plugin cache never belong in git: state holds real resource
+# attributes, and a saved plan is a credentialed snapshot of them. There is no .terraform.lock.hcl
+# to commit — nothing here runs Terraform outside CI, so the provider is pinned to an exact version
+# in main.tf instead; see the comment there.
 .terraform/
 *.tfstate
 *.tfstate.*
