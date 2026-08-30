@@ -96,18 +96,35 @@ the classifier off the deploy path — a secret named in a function's `secrets` 
 before the CLI will deploy *anything*, and the commit that first added this feature failed CI for
 exactly that reason.
 
-Two commands, once per project:
+**No key is not the same as no permission**, and conflating the two is the confusion this
+paragraph exists to prevent. The function has an *identity*; whether that identity may call Vertex
+AI is a separate fact, and whether the API is switched on for the project is a third. Deploying the
+function ships code and nothing else — it does not enable APIs and does not grant roles.
+
+**Check before granting anything.** Both may already be satisfied: the default compute service
+account has historically been granted `roles/editor` on project creation, which covers this, and
+`aiplatform.googleapis.com` is often already on. So force a collector run and read
+`eventSources/classifier` on the Alerts tab:
+
+- **green, with a count** — nothing to do, and nothing below is needed.
+- **red** — `lastError` carries a 403 naming which of the two is missing: the API not enabled for
+  the project, or the permission not granted to the service account. Run the matching command.
 
 ```sh
+# The API, for the project.
 gcloud services enable aiplatform.googleapis.com --project korczak-xyz-501720
+
+# The permission, for the identity the function runs as. `firebase.json` does not set
+# `serviceAccount`, so these gen-2 functions run as the default compute account — hence the target.
 gcloud projects add-iam-policy-binding korczak-xyz-501720 \
   --member="serviceAccount:$(gcloud projects describe korczak-xyz-501720 \
       --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
   --role=roles/aiplatform.user
 ```
 
-`firebase.json` does not set `serviceAccount`, so these gen-2 functions run as the default compute
-service account — that is the grant target above.
+Both are idempotent, so running them when they were not needed costs nothing but is still worth
+not doing blind — a role granted without knowing whether it was already there is a role nobody can
+later argue about removing.
 
 **Deliberately not done from CI**, though it could be. Granting an IAM role needs
 `roles/resourcemanager.projectIamAdmin` on the deploy identity, which is the right to grant itself

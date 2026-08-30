@@ -1218,11 +1218,14 @@ has nothing new to police. `gemini-2.5-flash-lite` via `@google/genai`.
 function's own service account — the code already runs inside the project the model is billed to, so
 a credential to prove that would be one to store, rotate and leak. It also keeps the classifier off
 the deploy path: a secret named in a function's `secrets` array must exist before the CLI will deploy
-anything at all, and the commit that first added this feature failed CI on precisely that. The setup
-is two `gcloud` commands once — enable `aiplatform.googleapis.com`, grant `roles/aiplatform.user` to
-the default compute service account — and it is **deliberately not done from CI**, though it could
-be: that needs `projectIamAdmin` on the deploy identity, which is the right to grant itself anything,
-a permanent widening of the pipeline bought to save a command run once. A project the classifier
+anything at all, and the commit that first added this feature failed CI on precisely that. No key is
+not the same as no permission, though: the function has an identity, and whether that identity may
+call Vertex AI is a second fact and whether the API is on for the project a third — deploying ships
+code and grants nothing. Both may already hold (the default compute account has historically carried
+`roles/editor`), so the order is **check `eventSources/classifier` on the Alerts tab first**, and
+only then the two `gcloud` commands the README spells out. They are **deliberately not run from
+CI**, though they could be: that needs `projectIamAdmin` on the deploy identity, which is the right
+to grant itself anything, a permanent widening of the pipeline bought to save a command run once. A project the classifier
 cannot reach is a configuration state, not a failure; a role it was never granted is a red
 `eventSources/classifier` row, and the feed goes on working either way.
 
