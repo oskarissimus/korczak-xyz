@@ -72,8 +72,15 @@ maybe('live sources', () => {
  * The classifier against real listings, which is the only way to check the premise this feature
  * rests on: that a model can tell PyCon NL from EuroPython when nothing in either listing says so.
  *
- * Needs a key: `GEMINI_API_KEY=... LIVE=1 npx vitest run smoke.live`. It prints every verdict, so a
- * disagreement is something to read rather than something to infer from a red assertion.
+ * There is no key to set. Vertex AI on Application Default Credentials, so locally:
+ *
+ *   gcloud auth application-default login
+ *   GOOGLE_CLOUD_PROJECT=korczak-xyz-501720 LIVE=1 npx vitest run smoke.live
+ *
+ * It prints every verdict with the model's reasoning, so a disagreement is something to read
+ * rather than something to infer from a red assertion. It also settles two things no unit test
+ * can: that `LOCATION` in classify.ts actually serves this model, and that Vertex accepts the
+ * response schema.
  */
 maybe('live classifier', () => {
   const now = Date.now();
@@ -90,9 +97,9 @@ maybe('live classifier', () => {
   it(
     'tells a national conference from one people fly to',
     async () => {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.log('  no GEMINI_API_KEY set — skipping');
+      const project = process.env.GOOGLE_CLOUD_PROJECT;
+      if (!project) {
+        console.log('  no GOOGLE_CLOUD_PROJECT set — skipping');
         return;
       }
 
@@ -116,11 +123,15 @@ maybe('live classifier', () => {
       const written = new Map<string, Partial<EventRecord>>();
       const { outcome } = await classifyEvents(records, {
         now,
-        secret: (name) => (name === 'GEMINI_API_KEY' ? apiKey : undefined),
+        project,
         write: async (id, update) => {
           written.set(id, update);
         },
       });
+
+      // A location that does not serve the model, or ADC that was never set up, arrives here as
+      // every event unlabelled — so say which it was rather than failing on a bare count.
+      if (outcome.error) console.log(`  classifier error: ${outcome.error}`);
 
       console.log(`\n  classified ${outcome.classified}, unlabelled ${outcome.missing}`);
       let agreed = 0;

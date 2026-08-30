@@ -44,6 +44,18 @@ export interface RunSummary {
 const CLASSIFIER_HEALTH_ID = 'classifier';
 
 /**
+ * What one run needs, which is a source's context plus what the classifier authenticates with.
+ *
+ * Kept apart from `SourceContext` rather than folded into it: an adapter has no business knowing
+ * which Google Cloud project this is, and widening the contract every adapter is written against
+ * to carry something only the classifier reads is how that contract stops meaning anything.
+ */
+export type RunContext = SourceContext & {
+  project?: string;
+  location?: string;
+};
+
+/**
  * Whether an event is worth storing.
  *
  * The python.org feed alone carries 874 events, most of them years past — keeping those would fill
@@ -96,7 +108,7 @@ async function recordHealth(
 
 export async function runCollection(
   db: Firestore,
-  ctx: SourceContext,
+  ctx: RunContext,
   sources: EventSource[] = SOURCES,
 ): Promise<RunSummary> {
   const now = ctx.now;
@@ -145,7 +157,8 @@ export async function runCollection(
    */
   const { records: labelled, outcome: classified } = await classifyEvents(upserted.records, {
     now,
-    secret: ctx.secret,
+    project: ctx.project,
+    location: ctx.location,
     write: async (id, update) => {
       await db.collection('events').doc(id).update(update);
     },

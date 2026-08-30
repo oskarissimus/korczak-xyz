@@ -9,9 +9,10 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import {
   db,
-  GEMINI_API_KEY,
+  PROJECT_ID,
   REGION,
   TICKETMASTER_API_KEY,
+  VERTEX_LOCATION,
   VAPID_PRIVATE_KEY,
   VAPID_PUBLIC_KEY,
   VAPID_SUBJECT,
@@ -20,7 +21,7 @@ import { runCollection } from './collect';
 import { configureWebPush, sendTo } from './push';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
-const SECRETS = [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, TICKETMASTER_API_KEY, GEMINI_API_KEY];
+const SECRETS = [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, TICKETMASTER_API_KEY];
 
 /**
  * The sentinel for "this source is deliberately not configured".
@@ -50,7 +51,6 @@ function secretReader(): (name: string) => string | undefined {
 
   return (name) => {
     if (name === 'TICKETMASTER_API_KEY') return read(TICKETMASTER_API_KEY);
-    if (name === 'GEMINI_API_KEY') return read(GEMINI_API_KEY);
     if (name === 'VAPID_PUBLIC_KEY') return read(VAPID_PUBLIC_KEY);
     if (name === 'VAPID_PRIVATE_KEY') return read(VAPID_PRIVATE_KEY);
     return undefined;
@@ -80,6 +80,8 @@ export const collectEvents = onSchedule(
       now: Date.now(),
       fetch: globalThis.fetch,
       secret: secretReader(),
+      project: PROJECT_ID,
+      location: VERTEX_LOCATION,
     });
     console.log('collectEvents', JSON.stringify(summary));
   },

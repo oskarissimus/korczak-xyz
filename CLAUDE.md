@@ -1212,8 +1212,19 @@ moment it lands, with `reach` arriving later.
 `functions/src/classify.ts`, in the Cloud Function. The browser never calls a model and neither does
 the matcher; what crosses into `src/utils/events/` is the *result*, as two ordinary fields. So the
 feed and the collector still answer "does this match?" with one pure function and `portable.test.ts`
-has nothing new to police. `gemini-2.5-flash-lite` via `@google/genai`, `GEMINI_API_KEY` as a secret
-on the Ticketmaster pattern — **no key is a configuration state, not a failure**.
+has nothing new to police. `gemini-2.5-flash-lite` via `@google/genai`.
+
+**There is no API key.** Vertex AI on Application Default Credentials, which in this runtime is the
+function's own service account — the code already runs inside the project the model is billed to, so
+a credential to prove that would be one to store, rotate and leak. It also keeps the classifier off
+the deploy path: a secret named in a function's `secrets` array must exist before the CLI will deploy
+anything at all, and the commit that first added this feature failed CI on precisely that. The setup
+is two `gcloud` commands once — enable `aiplatform.googleapis.com`, grant `roles/aiplatform.user` to
+the default compute service account — and it is **deliberately not done from CI**, though it could
+be: that needs `projectIamAdmin` on the deploy identity, which is the right to grant itself anything,
+a permanent widening of the pipeline bought to save a command run once. A project the classifier
+cannot reach is a configuration state, not a failure; a role it was never granted is a red
+`eventSources/classifier` row, and the feed goes on working either way.
 
 Four things about it are load-bearing:
 
@@ -1307,16 +1318,16 @@ npm throws `Cannot read properties of undefined (reading 'stdin')` *after* the b
 succeeded — failing a deploy whose output was perfectly good.
 
 The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
-`TICKETMASTER_API_KEY` / `GEMINI_API_KEY` as secrets, and the public key **also** in Netlify's build
-environment as `PUBLIC_VAPID_PUBLIC_KEY`.
+`TICKETMASTER_API_KEY` as secrets, and the public key **also** in Netlify's build environment as
+`PUBLIC_VAPID_PUBLIC_KEY`. The classifier needs no secret at all — see above.
 
 A secret named in a function's `secrets` array **must exist for the deploy to succeed at all** — the
 CLI stops with `In non-interactive mode but have no value for the secret …` — which is what the
-Ticketmaster `none` sentinel was invented for, and which `GEMINI_API_KEY` walked into on the very
-commit that added it. Set it to `none` if there is no key yet. *That* is the configuration state and
-not a failure: `secretReader` reads the sentinel back as undefined, nothing is classified, everything
-stays unlabelled, and an unlabelled event passes the places rule — so the feed is what it was before
-the classifier existed.
+Ticketmaster `none` sentinel was invented for, and which a `GEMINI_API_KEY` walked into on the very
+commit that added the classifier. That is the argument for authenticating as the function rather
+than with a key wherever the option exists: a secret is not only something to rotate, it is
+something a deploy can fail on. Where one is genuinely needed, set it to `none` until there is a
+real value; `secretReader` reads the sentinel back as undefined.
 The VAPID public key can never change: rotating it invalidates every subscription on every device,
 silently. Full sequence in `functions/README.md`.
 

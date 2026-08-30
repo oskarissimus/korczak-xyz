@@ -34,7 +34,6 @@ set up and how to redo it, not as a to-do list.
 | APIs | cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
 | `TICKETMASTER_API_KEY` | real Discovery API key (v2, 23 Aug 2026). v1 was the `none` sentinel; see below |
-| `GEMINI_API_KEY` | Gemini Developer API key, for the event classifier; see below |
 | `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
@@ -84,31 +83,55 @@ firebase deploy --only functions      # a secret version change does NOT trigger
                                       # decides. Deploy by hand or push an unrelated change.
 ```
 
-### The classifier key
+### The classifier, and why it has no key
 
-`GEMINI_API_KEY` is a Gemini Developer API key from
-[aistudio.google.com/apikey](https://aistudio.google.com/apikey). It labels every event with a
-country and a reach (`local` / `national` / `international`) — the judgement that separates PyCon NL
-from EuroPython, which no listing states. See `src/classify.ts`.
+`src/classify.ts` labels every event with a country and a reach (`local` / `national` /
+`international`) — the judgement that separates PyCon NL from EuroPython, which no listing states.
 
-**The secret has to exist before the functions will deploy**, and that is a separate thing from
-having a real key. `defineSecret` plus a name in the function's `secrets` array makes the CLI refuse
-in CI with `In non-interactive mode but have no value for the secret GEMINI_API_KEY` — the Ticketmaster
-sentinel's whole reason for existing, arriving a second time. So set `none` if there is no key yet:
+**It authenticates as the function itself.** `gemini-2.5-flash-lite` on Vertex AI through
+Application Default Credentials, which in this runtime is the Cloud Function's runtime service
+account. There is no API key: the code is already running inside the project the model is billed
+to, so a credential to prove that would be a credential to store, rotate and leak. It also keeps
+the classifier off the deploy path — a secret named in a function's `secrets` array must exist
+before the CLI will deploy *anything*, and the commit that first added this feature failed CI for
+exactly that reason.
+
+Two commands, once per project:
 
 ```sh
-printf 'none' | firebase functions:secrets:set GEMINI_API_KEY --data-file -
+gcloud services enable aiplatform.googleapis.com --project korczak-xyz-501720
+gcloud projects add-iam-policy-binding korczak-xyz-501720 \
+  --member="serviceAccount:$(gcloud projects describe korczak-xyz-501720 \
+      --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
+  --role=roles/aiplatform.user
 ```
 
-`secretReader` in `index.ts` reads `none` back as `undefined`, and *that* is the configuration state
-rather than a failure, exactly as the Ticketmaster key is: nothing is classified, every event stays
-unlabelled, and an unlabelled event passes the places rule — so the feed is what it was before the
-classifier existed. Unlike an API key sent as a real `apikey`, an unset classifier earns no 401 and
-puts no red row on the Alerts tab; `eventSources/classifier` simply reports zero.
+`firebase.json` does not set `serviceAccount`, so these gen-2 functions run as the default compute
+service account — that is the grant target above.
 
-The cost is small enough to be worth stating so nobody has to guess. `gemini-2.5-flash-lite` at
-\$0.10 / \$0.40 per million tokens, ~120 input tokens an event, 25 events a request: labelling the
-whole ~1,150-event corpus once is a few cents, and after that only genuinely new events are sent.
+**Deliberately not done from CI**, though it could be. Granting an IAM role needs
+`roles/resourcemanager.projectIamAdmin` on the deploy identity, which is the right to grant itself
+anything — a permanent widening of what a pipeline that fires on every push can do, bought to save
+a command run once. The security boundary of this setup is the WIF provider's `attribute-condition`
+pinning the pool to this repository; what sits behind that boundary should stay as small as it can.
+
+Failure modes, and what each looks like:
+
+- **The API is not enabled, or the role was never granted.** Every batch throws, nothing is
+  labelled, and `eventSources/classifier` goes red on the Alerts tab with the error on it. The feed
+  keeps working — an unlabelled event passes the places rule — so this is visible without being
+  destructive.
+- **`LOCATION` does not serve the model.** Same symptom. It is one constant in `classify.ts`,
+  currently `global`; `europe-west4` is the nearest regional alternative. The functions' own
+  `europe-central2` is deliberately *not* used — generative models are served from a smaller set of
+  locations than Cloud Functions are.
+- **No project at all** (a laptop with no ADC): `classifyEvents` returns without calling anything.
+  That is a configuration state and not a failure, the same shape as a missing Ticketmaster key.
+
+The cost is small enough to be worth stating so nobody has to guess: ~120 input tokens an event, 25
+events a request, so labelling the whole ~1,150-event corpus once is a few cents and after that
+only genuinely new events are sent. Note Vertex has no free tier where AI Studio's Developer API
+does — at this volume the difference is not worth a stored credential.
 `MAX_CLASSIFY_PER_RUN` (400) spreads the first backfill over about three runs so it cannot exhaust
 the function's 540-second timeout.
 
@@ -122,12 +145,12 @@ Two things about re-running it:
   the next few runs. There is deliberately no button for this in the app: "the prompt changed" is a
   fact about a build, and a re-run nobody can date afterwards is worse than no re-run.
 
-`eventSources/classifier` carries its health, beside the scrapes, so a model that has quietly
-stopped answering shows on the Alerts tab rather than looking like a filter with nothing to remove.
+To check the model's judgement before deploying — which also settles whether `LOCATION` serves the
+model and whether Vertex accepts the response schema:
 
 ```sh
-printf 'YOUR_KEY' | firebase functions:secrets:set GEMINI_API_KEY --data-file -
-firebase deploy --only functions      # as above: a secret version change does not trigger CI
+gcloud auth application-default login
+GOOGLE_CLOUD_PROJECT=korczak-xyz-501720 LIVE=1 npx vitest run smoke.live
 ```
 
 ### Redeploying by hand
@@ -163,7 +186,13 @@ npx web-push generate-vapid-keys
 firebase functions:secrets:set VAPID_PUBLIC_KEY
 firebase functions:secrets:set VAPID_PRIVATE_KEY
 firebase functions:secrets:set TICKETMASTER_API_KEY   # developer.ticketmaster.com, free
-firebase functions:secrets:set GEMINI_API_KEY         # aistudio.google.com/apikey
+
+# 3b. The classifier has NO secret — it uses the function's own identity. Once, per project:
+gcloud services enable aiplatform.googleapis.com --project korczak-xyz-501720
+gcloud projects add-iam-policy-binding korczak-xyz-501720 \
+  --member="serviceAccount:$(gcloud projects describe korczak-xyz-501720 \
+      --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
+  --role=roles/aiplatform.user
 
 # 4. The public key ALSO goes in the site's build environment, as PUBLIC_VAPID_PUBLIC_KEY
 #    (Netlify → Site settings → Environment variables, and your local .env).

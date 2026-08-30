@@ -18,10 +18,17 @@
  *      down: the event stays unclassified, `matchReason` lets an unclassified event through, and
  *      `eventSources/classifier` records that nothing came back. The failure mode is the noise
  *      coming back visibly, never a feed that quietly empties.
+ *
+ * There is **no API key**. Vertex AI on Application Default Credentials, which inside a Cloud
+ * Function is the function's own runtime service account — it is already inside the project the
+ * model is billed to, so a credential to prove that would be a credential to leak and to rotate.
+ * It also takes the classifier off the deploy path entirely: a secret named in a function's
+ * `secrets` array must exist before the CLI will deploy anything at all, and the commit that first
+ * added this one failed CI for exactly that reason.
  */
 
 import { createHash } from 'node:crypto';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type, type Schema } from '@google/genai';
 import type { EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
 import { REACHES } from '../../korczak-xyz/src/utils/events/types';
 import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
@@ -32,6 +39,17 @@ import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
  * every verdict in the corpus, and that should be a commit.
  */
 const MODEL = 'gemini-2.5-flash-lite';
+
+/**
+ * Where to ask.
+ *
+ * `global` rather than the functions' own `europe-central2`: the generative models are served from
+ * a subset of regions that does not obviously include Warsaw, and the global endpoint is the one
+ * with the fewest availability edges. This is the one constant to change if a run comes back with
+ * a 404 on the model — `europe-west4` is the nearest regional alternative — and the live smoke
+ * test is what settles it, before a deploy rather than after.
+ */
+const LOCATION = 'global';
 
 /**
  * Bump to re-classify the whole corpus.
@@ -81,18 +99,18 @@ export interface ClassifyOutcome {
  * `reason` is capped in the prompt rather than the schema, since a schema cannot express a length
  * and a truncated sentence is worse than a short one.
  */
-const RESPONSE_SCHEMA = {
-  type: 'object',
+const RESPONSE_SCHEMA: Schema = {
+  type: Type.OBJECT,
   properties: {
     events: {
-      type: 'array',
+      type: Type.ARRAY,
       items: {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
-          id: { type: 'string' },
-          country: { type: 'string' },
-          reach: { type: 'string', enum: [...REACHES] },
-          reason: { type: 'string' },
+          id: { type: Type.STRING },
+          country: { type: Type.STRING },
+          reach: { type: Type.STRING, enum: [...REACHES] },
+          reason: { type: Type.STRING },
         },
         required: ['id', 'country', 'reach', 'reason'],
       },
@@ -277,29 +295,42 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-/** One batch, or nothing. A batch that throws is a batch of unclassified events, never a dead run. */
+/**
+ * One batch, or nothing. A batch that throws is a batch of unclassified events, never a dead run.
+ *
+ * `models.generateContent` rather than the newer `interactions.create`: the latter is documented
+ * against the Gemini Developer API, and `models` is what the SDK points Vertex clients at. This is
+ * the only function in the file that touches a network, which is what let the whole switch away
+ * from an API key leave every test in `classify.test.ts` untouched.
+ */
 async function classifyBatch(
   client: GoogleGenAI,
   events: EventRecord[],
 ): Promise<Map<string, Verdict>> {
-  const interaction = await client.interactions.create(
-    {
-      model: MODEL,
-      input: buildPrompt(events),
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: RESPONSE_SCHEMA,
-      },
+  const response = await client.models.generateContent({
+    model: MODEL,
+    contents: buildPrompt(events),
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: RESPONSE_SCHEMA,
+      abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     },
-    { timeout: REQUEST_TIMEOUT_MS },
-  );
-  return parseClassification(interaction.output_text, events.map((e) => e.id));
+  });
+  return parseClassification(response.text, events.map((e) => e.id));
 }
 
 export interface ClassifyContext {
   now: number;
-  secret: (name: string) => string | undefined;
+  /**
+   * The Google Cloud project to bill and authenticate against.
+   *
+   * Absent means the classifier does not run, and that is a configuration state rather than a
+   * failure — the shape the Ticketmaster adapter established. Nothing is classified, every event
+   * stays unlabelled, and an unlabelled event passes the places rule, so the feed is exactly what
+   * it was before any of this existed.
+   */
+  project?: string;
+  location?: string;
   /** Writes one event's verdict. Separated so the whole loop is testable without a database. */
   write: (id: string, update: Partial<EventRecord>) => Promise<void>;
 }
@@ -321,18 +352,18 @@ export async function classifyEvents(
     return { records, outcome: { classified: 0, missing: 0, remaining: 0 } };
   }
 
-  /*
-   * No key is a configuration state, not a failure — the Ticketmaster adapter's rule. The app is
-   * useful without this: every event stays unclassified, and an unclassified event passes the
-   * places rule, so the feed is exactly what it was before this existed.
-   */
-  const apiKey = ctx.secret('GEMINI_API_KEY');
-  if (!apiKey) {
+  // Off GCP — a laptop with no ADC, a test that did not opt in — there is nothing to authenticate
+  // as. See `ClassifyContext.project`: this is a configuration state, not a failure.
+  if (!ctx.project) {
     return { records, outcome: { classified: 0, missing: 0, remaining: queue.length } };
   }
 
   const budget = queue.slice(0, MAX_CLASSIFY_PER_RUN);
-  const client = new GoogleGenAI({ apiKey });
+  const client = new GoogleGenAI({
+    vertexai: true,
+    project: ctx.project,
+    location: ctx.location ?? LOCATION,
+  });
   const batches = chunk(budget, BATCH_SIZE);
 
   let classified = 0;
