@@ -14,8 +14,8 @@ jobs:
       - name: Use Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          # Astro 7 requires >=22.12.0. Keep in sync with the NODE_VERSION pin
-          # in korczak-xyz/netlify.toml so CI builds what Netlify deploys.
+          # Astro 7 requires >=22.12.0, which korczak-xyz/package.json now states as `engines`.
+          # This is the only place that floor is enforced: nothing checks `engines` on its own.
           node-version: 22.x
           cache: "npm"
           cache-dependency-path: "korczak-xyz/package-lock.json"
@@ -31,6 +31,25 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: korczak-xyz
+
+      # This job used to build the site and throw it away, while Netlify ran its own build and
+      # deployed that one. Deploying the artifact we just tested closes that gap: a red test now
+      # blocks the deploy, which it could not do when the two builds were separate.
+      #
+      # Every push to main deploys, including one that touches only CLAUDE.md. Netlify skipped
+      # those (its base directory was korczak-xyz/, and its monorepo default skips a commit that
+      # changed nothing under it), which meant the navbar could be showing an older hash than HEAD
+      # and you had to know whether this commit was one of those. It always matches now.
+      #
+      # `git rev-parse --short HEAD` runs during the build, in Navbar.astro — actions/checkout
+      # leaves a real .git, so the status bar keeps reporting the commit it was built from.
+      - name: Deploy
+        if: github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: korczak-xyz
 
   functions:
     runs-on: ubuntu-latest

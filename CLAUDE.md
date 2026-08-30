@@ -7,6 +7,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The Astro site is `korczak-xyz/`; all npm commands run from there. `resume/` is a separate
 subproject.
 
+## Where it runs
+
+Two vendors, one each side. **Cloudflare** serves the site: `korczak-xyz/wrangler.jsonc` declares a
+Worker that is nothing but its own static assets, and the build is a plain `astro build` with no
+adapter — no SSR, no API routes, nothing running per request. **GCP** (`korczak-xyz-501720`) is the
+backend: Firestore, two gen-2 Cloud Functions in `europe-central2`, Cloud Scheduler, Secret
+Manager, and the project layer in `terraform/`. The browser talks to Firestore directly, so those
+two halves meet in the client and not on a server.
+
+This was Netlify until August 2026, behind Cloudflare's proxy — which meant two CDNs in the path,
+one of them earning the hop by serving 370 static files. `_headers` and `_redirects` are the same
+file format on Cloudflare, so nothing about the cache tiers or the redirects moved.
+
+**The Netlify site still exists, unlinked, and is still the rollback.** The apex is claimed by a
+Worker *route* rather than a custom domain, so the DNS record is untouched and still names Netlify
+as the origin behind it — deleting the route in `wrangler.jsonc` hands the site straight back, with
+no DNS edit and no propagation. Once that site is deleted the record is dead weight; see the note
+in `korczak-xyz/wrangler.jsonc` for what this should become then.
+
+**Two things must happen before that site is deleted**, and both are invisible until it is too
+late:
+
+1. **`www.korczak.xyz` is still Netlify's.** It 301s to the apex, and that redirect is served by
+   Netlify — `www` is not routed to the Worker. It cannot be: Cloudflare rejects a deploy whose
+   `_redirects` source is absolute (*"Only relative URLs are allowed"*), so unlike `_headers`, that
+   file cannot match on hostname. The replacement is a zone **Single Redirect** — hostname equals
+   `www.korczak.xyz` → 301 `https://korczak.xyz`, preserving path and query — which terminates at
+   the edge and needs no origin at all. Until that exists, deleting the Netlify site breaks `www`.
+2. **`PUBLIC_VAPID_PUBLIC_KEY`** was read out of Netlify's production context into
+   `.env.production`. It is the only value that ever lived *only* there.
+
 ## Solitaire Game
 
 The solitaire game is at `/apps/solitaire/`. A JavaScript debug interface is available at
@@ -100,15 +131,16 @@ Format, one line, at the very end:
 - Several pushes in one reply: one line each, in order, oldest first.
 
 One thing that line does **not** promise: **the navbar timestamp is the build time, not the commit
-time.** It is `new Date()` evaluated while Netlify builds, so it lands a minute or two after the
-push and will never match to the minute. The *hash* is the thing that matches exactly — compare on
-that.
+time.** It is `new Date()` evaluated while GitHub Actions builds, so it lands a minute or two after
+the push and will never match to the minute. The *hash* is the thing that matches exactly — compare
+on that.
 
 ### Don't make me poll for the deploy — read it off the site
 
-Netlify builds and deploys every push to `main` (`korczak-xyz/netlify.toml`; the GitHub Actions
-workflow is a build check and deploys nothing). So the push is not the end of the job, and the
-answer to "has it landed yet" is a request away rather than something to hand back to me:
+GitHub Actions builds, tests and deploys every push to `main` — the `build` job in
+`.github/workflows/node.js.yml` ends in a `wrangler deploy` to Cloudflare. So the push is not the
+end of the job, and the answer to "has it landed yet" is a request away rather than something to
+hand back to me:
 
 ```
 curl -sS https://korczak.xyz/ | grep -o 'commit/[0-9a-f]\{7,\}' | head -1
@@ -116,25 +148,21 @@ curl -sS https://korczak.xyz/ | grep -o 'commit/[0-9a-f]\{7,\}' | head -1
 
 That is the deployed commit, straight from the status bar's own markup — the same string the navbar
 links to, so it settles the question exactly. `data-timestamp="..."` on the same page carries the
-build time. The HTML is served `max-age=0, must-revalidate` and Cloudflare marks it `DYNAMIC`, so a
-poll always sees the current deploy and never a cached one. Poll every 15–30s; a deploy here takes
-a couple of minutes.
+build time. The HTML is served `max-age=0, must-revalidate` (`korczak-xyz/public/_headers`), and
+Cloudflare edge-caches it now — responses say `cf-cache-status: HIT` where under Netlify they said
+`DYNAMIC`. **That HIT is a revalidated one, not a stale one**: `must-revalidate` makes the edge
+check the Worker before answering, so the poll is still exact. Measured on the cutover deploy, the
+new hash came back on the very first request, 0s after `wrangler deploy` returned. Poll every
+15–30s; a deploy takes a couple of minutes — the tests run before it.
 
 **Wait for it before signing off**, unless I have said not to. Report the hash as *live* only once
 the site has actually served it, and say plainly if it has not landed yet rather than implying it
 has. If it has not flipped after ~10 minutes, say so and stop polling — that is a failed build, and
 I would rather hear it than watch a phone.
 
-**But first check the commit can deploy at all.** The Netlify site's base directory is
-`korczak-xyz/`, and Netlify's monorepo default skips any build whose commit changed nothing under
-it — roughly `git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- korczak-xyz`. A commit touching
-only root-level files (this file, `.claude/`, `README.md`, `resume/`) therefore **never deploys**,
-the status bar keeps the hash of the last commit that did, and polling for it would spin until it
-gave up. That is correct behaviour, not a failure — nothing user-facing changed. So:
-
-```
-git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^korczak-xyz/'
-```
-
-No match: say the commit is docs-only and does not deploy, name the hash the site is still serving,
-and don't poll. Match: poll, and report it live.
+**Every commit deploys, so always poll.** This used to have an exception worth checking for:
+Netlify's base directory was `korczak-xyz/` and its monorepo default skipped any build whose commit
+changed nothing under it, so a commit touching only root-level files never deployed and the status
+bar kept an older hash. Actions has no such rule and the deploy step is unconditional on `main`, so
+the hash on the site is always `HEAD` — including after a commit that only edits this file. There
+is no longer a case where polling is the wrong thing to do.

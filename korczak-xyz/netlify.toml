@@ -1,9 +1,0 @@
-[build]
-  command = "npm run build"
-  publish = "dist"
-
-[build.environment]
-  # Netlify's image still defaults this site to Node 18, which Astro 7 refuses
-  # to run on (it requires >=22.12.0). Without the pin every deploy since the
-  # Astro 7 upgrade failed while local builds passed.
-  NODE_VERSION = "22"

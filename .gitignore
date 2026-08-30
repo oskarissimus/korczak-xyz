@@ -5,7 +5,9 @@ snapshot-crawler/node_modules/
 .playwright-mcp/
 .DS_Store
 
-# Local Netlify folder
+# Local Netlify CLI state. Netlify no longer serves this site (Cloudflare does — see CLAUDE.md),
+# but the site is kept unlinked rather than deleted for a little while so a rollback is one DNS
+# record rather than a rebuild. Delete this line and the folder once that window closes.
 .netlify
 
 # Local secrets. The VAPID pair lives here so it can be re-read without regenerating —

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
  * Cloudflare's edge as much as by the browser. The filenames are not content-hashed the way
  * `_astro/*` chunks are, so before this the same URL meant different bytes on either side of a
  * deploy - and the edge went on answering with the copy it took first, for up to a week. Purging
- * Safari's own cache does nothing about it: the request is answered before it reaches Netlify.
+ * Safari's own cache does nothing about it: the request is answered before it reaches the origin.
  * That is how a home screen icon survived new artwork, a redeploy and a full browsing-data wipe.
  *
  * Appending `?v=<hash>` is enough because a query string is part of Cloudflare's cache key (and

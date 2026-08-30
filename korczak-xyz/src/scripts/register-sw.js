@@ -68,10 +68,10 @@
 
   window.addEventListener('load', function () {
     // `updateViaCache: 'none'` keeps the worker script out of the HTTP cache on every update
-    // check. public/_headers asks for the same thing and does not get it: korczak.xyz sits
-    // behind Cloudflare, whose 4-hour Browser Cache TTL raises any shorter origin max-age on a
-    // .js response, so /sw.js is served `max-age=14400` however it leaves Netlify. This says it
-    // in a place no CDN is between us and.
+    // check. public/_headers asks for the same thing and may not get it: Cloudflare's 4-hour
+    // Browser Cache TTL raises any shorter max-age on a .js response, and /sw.js has been seen
+    // served as `max-age=14400` regardless. This says it in a place no CDN is between us and.
+    // A stale worker is the one PWA bug with no recovery path, so it is worth saying twice.
     navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(function () {
       /* An unregisterable worker costs the site nothing: every page still works online. */
     });

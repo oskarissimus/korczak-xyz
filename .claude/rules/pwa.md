@@ -50,8 +50,8 @@ manifests, the icon set, the head tags — follows.
 - `src/components/PwaHead.astro` — manifest link, `apple-touch-icon`, and the Apple-only meta
   tags. `apple-mobile-web-app-title` is not optional: without it iOS labels the icon from
   `<title>`, which here is always `Something | korczak.xyz`, and shows `Songs|korcz...`.
-- `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: Netlify
-  only runs `astro build`, and the deploy should not depend on sharp's native binaries.
+- `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: CI only
+  runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
 The five drawn icons are **full bleed**: every platform masks a home screen icon to its own
 shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
@@ -75,7 +75,7 @@ deck holds chords too.
 route). `_headers` gives `/icons/*` a week, and Cloudflare's edge honours it: the filenames are
 not content-hashed the way `_astro/*` chunks are, so one URL meant different bytes either side of
 a deploy and the edge kept answering with whichever copy it took first. Clearing Safari's data
-does nothing — the request is answered before it reaches Netlify — which is how new artwork
+does nothing — the request is answered before it reaches the origin — which is how new artwork
 survived a redeploy, a full browsing-data wipe and a reinstall. A query string is part of the
 cache key everywhere (CDN, browser, service worker), so `?v=<hash>` misses on new art and the
 week-long TTL stays worth having on the bytes that really did not change. Note that iOS copies
@@ -223,7 +223,7 @@ Two things that are load-bearing and look like details:
   body but keeps the headers that described the bytes on the wire, so storing it verbatim
   yields plain JavaScript wearing `content-encoding: gzip`. The browser then fails to gunzip
   its own cache and every module script and font on the page dies, while the cache looks
-  perfectly healthy from the outside. Netlify compresses, so this is not a dev-only concern.
+  perfectly healthy from the outside. Cloudflare compresses, so this is not a dev-only concern.
   This was caught only by killing the server and reloading — Playwright's `setOffline` does
   not block localhost, so an "offline" test against a live server proves nothing.
 - **`activate` keeps the previous build's caches, not just the current one.** With
@@ -234,13 +234,18 @@ Two things that are load-bearing and look like details:
 worker indefinitely and never picks up a new one — you ship a fix and the home screen app goes
 on running last month's code.
 
-**That header does not survive the CDN, so registration asks for it too.** korczak.xyz sits
-behind Cloudflare in front of Netlify, and Cloudflare's 4-hour Browser Cache TTL raises any
-shorter origin `max-age` on a `.js` response: `/sw.js` arrives as `max-age=14400` however it
-leaves Netlify. (The other `_headers` rules are untouched — `/icons/*` is already longer at
-604800, and `/manifests/*` and HTML are `DYNAMIC`, so Cloudflare never rewrites them.) Hence
-`register('/sw.js', { updateViaCache: 'none' })` in `register-sw.js`, which puts the guarantee
-somewhere no CDN sits between us and it.
+**That header may not survive the CDN, so registration asks for it too.** The zone's 4-hour
+Browser Cache TTL raises any shorter `max-age` on a `.js` response, so `/sw.js` has been observed
+arriving as `max-age=14400` no matter what `_headers` said. (The other rules are untouched —
+`/icons/*` is already longer at 604800, and `/manifests/*` and HTML are `DYNAMIC`, so nothing
+rewrites them.) Hence `register('/sw.js', { updateViaCache: 'none' })` in `register-sw.js`, which
+puts the guarantee in the one place no CDN sits between us and.
+
+Cloudflare is now the origin rather than a proxy in front of one, so for the first time this is
+also fixable at the zone: a Cache Rule on `/sw.js` set to *Respect Origin TTL* would let the
+`_headers` value through. Do that if you like, but **keep `updateViaCache: 'none'` either way** —
+it costs nothing, it is enforced by the browser rather than by a dashboard setting nobody will
+remember, and the failure it prevents is permanent and silent.
 
 ### Fonts
 

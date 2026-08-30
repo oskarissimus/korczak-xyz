@@ -391,7 +391,7 @@ the toggle.
 `users/{uid}` wildcard, so a feed that reads nothing usually means the rules have not gone out.
 
 **Rules and functions deploy from CI** (`.github/workflows/firebase-deploy.yml`) — the site is
-Netlify's on every push, and the backend is this workflow's. A `terraform` job runs **before** the
+`node.js.yml`'s on every push, and the backend is this workflow's. A `terraform` job runs **before** the
 deploy job in that workflow; see *The project layer* below. It is path-filtered to `functions/`,
 `firestore.rules`, `firebase.json` and `korczak-xyz/src/utils/events/**` — that last one because
 `functions/tsconfig.json` compiles the matcher in from there rather than keeping a copy, so a change
@@ -407,8 +407,14 @@ npm throws `Cannot read properties of undefined (reading 'stdin')` *after* the b
 succeeded — failing a deploy whose output was perfectly good.
 
 The functions need the Blaze plan, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
-`TICKETMASTER_API_KEY` as secrets, and the public key **also** in Netlify's build environment as
-`PUBLIC_VAPID_PUBLIC_KEY`. The classifier needs no secret at all — see above.
+`TICKETMASTER_API_KEY` as secrets, and the public key **also** in `korczak-xyz/.env.production` as
+`PUBLIC_VAPID_PUBLIC_KEY` — committed, because it is the half of the pair meant to be published and
+the build needs it. The classifier needs no secret at all — see above.
+
+The two copies must stay equal, and nothing checks that they do. `VAPID_PUBLIC_KEY` in Secret
+Manager signs the pushes; `PUBLIC_VAPID_PUBLIC_KEY` in the bundle is what the browser subscribes
+with. If they diverge, subscriptions are created against one key and pushed against another, and
+every send fails with no error the user or the site can see.
 
 A secret named in a function's `secrets` array **must exist for the deploy to succeed at all** — the
 CLI stops with `In non-interactive mode but have no value for the secret …` — which is what the

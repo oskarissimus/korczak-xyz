@@ -13,9 +13,13 @@ yarn-error.log*
 pnpm-debug.log*
 
 
-# environment variables
+# environment variables. `.env.production` is deliberately NOT ignored: it holds only PUBLIC_*
+# values, which Astro compiles into the browser bundle anyway, and committing them is what lets a
+# fresh clone build the real site rather than a login-less one. See that file's header.
 .env
-.env.production
+# Vite loads `.env*.local` last, after the mode file, so this is the way to override a production
+# build locally without editing a committed file.
+.env*.local
 
 # macOS-specific files
 .DS_Store

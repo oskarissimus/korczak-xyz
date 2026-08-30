@@ -40,7 +40,7 @@ wrong — which has already happened once.
 | APIs | declared in `terraform/apis.tf` — cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam, firestore, aiplatform |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
 | `TICKETMASTER_API_KEY` | real Discovery API key (v2, 23 Aug 2026). v1 was the `none` sentinel; see below |
-| `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
+| `PUBLIC_VAPID_PUBLIC_KEY` | committed in `korczak-xyz/.env.production` |
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
 | Artifact cleanup | images older than 3 days deleted, so old containers do not accumulate a bill |
@@ -66,7 +66,7 @@ const d=s=>Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.len
 const e=c.createECDH('prime256v1'); e.setPrivateKey(d(k.privateKey));
 console.log(u(e.getPublicKey())===k.publicKey ? 'pair OK' : 'PAIR MISMATCH');"
 firebase functions:secrets:access VAPID_PUBLIC_KEY
-netlify env:get PUBLIC_VAPID_PUBLIC_KEY --context production
+grep PUBLIC_VAPID_PUBLIC_KEY ../korczak-xyz/.env.production
 ```
 
 ### The Ticketmaster sentinel
@@ -201,7 +201,7 @@ firebase functions:secrets:set TICKETMASTER_API_KEY   # developer.ticketmaster.c
 #     by hand, and it stays done for every project after this one.
 
 # 4. The public key ALSO goes in the site's build environment, as PUBLIC_VAPID_PUBLIC_KEY
-#    (Netlify → Site settings → Environment variables, and your local .env).
+#    (korczak-xyz/.env.production, committed — it is the publishable half of the pair).
 
 # 5. Rules first — until these are deployed the feed reads nothing.
 firebase deploy --only firestore:rules

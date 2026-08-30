@@ -24,3 +24,13 @@
   Cache-Control: public, max-age=0, must-revalidate
 /
   Cache-Control: public, max-age=0, must-revalidate
+
+# The Worker also answers on workers.dev, which is a second hostname serving byte-identical pages —
+# exactly the duplicate Google would otherwise have to pick a canonical for, possibly wrongly. The
+# preview URL is worth keeping (it is how a build gets checked before DNS moves to it), so the fix
+# is to tell crawlers rather than to turn it off. Two rules because a version preview URL carries an
+# extra leading label; placeholders stop at a dot, so neither pattern covers the other.
+https://korczak-xyz.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
+https://:version.korczak-xyz.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

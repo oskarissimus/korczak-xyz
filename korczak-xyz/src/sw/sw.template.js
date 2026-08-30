@@ -29,7 +29,7 @@ const DOCUMENT_TIMEOUT_MS = 2500;
  * wearing `content-encoding: gzip` — and the browser dutifully tries to gunzip it and fails,
  * so every module script and font on the page dies with a decoding error while the cache
  * looks perfectly healthy from the outside. `transfer-encoding: chunked` is hop-by-hop and has
- * no business surviving either. Both Netlify and `astro preview` compress, so this is not a
+ * no business surviving either. Both Cloudflare and `astro preview` compress, so this is not a
  * dev-only concern.
  */
 async function cachePut(cache, key, response) {

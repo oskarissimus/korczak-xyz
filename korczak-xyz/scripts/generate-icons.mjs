@@ -8,7 +8,7 @@
  * imports from the script's own directory - a root-level script cannot see this package's
  * node_modules.
  *
- * Output is committed to git rather than generated during the build: Netlify only runs
+ * Output is committed to git rather than generated during the build: CI only runs
  * `astro build`, and making the deploy depend on sharp's native binaries to produce artwork
  * that changes once a year is a bad trade. Re-run this by hand after editing the SVGs.
  */
