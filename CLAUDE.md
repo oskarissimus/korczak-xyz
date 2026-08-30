@@ -20,39 +20,32 @@ This was Netlify until August 2026, behind Cloudflare's proxy — which meant tw
 one of them earning the hop by serving 370 static files. `_headers` and `_redirects` are the same
 file format on Cloudflare, so nothing about the cache tiers or the redirects moved.
 
-**The Netlify site still exists, unlinked, and is still the rollback.** The apex is claimed by a
-Worker *route* rather than a custom domain, so the DNS record is untouched and still names Netlify
-as the origin behind it — deleting the route in `wrangler.jsonc` hands the site straight back, with
-no DNS edit and no propagation. Once that site is deleted the record is dead weight; see the note
-in `korczak-xyz/wrangler.jsonc` for what this should become then.
+That site was deleted on 30 Aug 2026 and the account is empty, so there is no origin behind any of
+this and no rollback to it. Everything below is the whole serving path.
 
-**`www` no longer depends on Netlify**, which it did until the migration. It is a zone **Single
-Redirect** now (`http_request_dynamic_redirect` phase, rule *"www -> apex"*): host equals
-`www.korczak.xyz` → 301 to `https://korczak.xyz` with the path concatenated and the query string
-preserved. It terminates at the edge, so it needs no origin and survives the Worker being broken.
+**`www` is a zone Single Redirect** (`http_request_dynamic_redirect` phase, rule *"www -> apex"*):
+host equals `www.korczak.xyz` → 301 to `https://korczak.xyz`, path concatenated, query preserved.
+It terminates at the edge, so it needs no origin and keeps working even if the Worker is broken.
 
 It is a dashboard object rather than a repo file, and that is forced: Cloudflare rejects a deploy
 whose `_redirects` source is absolute (*"Only relative URLs are allowed"*), so unlike `_headers`,
-that file cannot match on hostname. This is the one piece of the serving path not in git — if `www`
-ever stops redirecting, look in Rules → Redirect Rules, not here.
+that file cannot match on hostname. **This is the one piece of the serving path not in git** — if
+`www` ever stops redirecting, look in Rules → Redirect Rules, not here.
 
-### The zone's records, and the exact rollback
+### The zone's records
 
 ```
-korczak.xyz      CNAME  apex-loadbalancer.netlify.com          proxied   <- the Worker route sits in front
-www.korczak.xyz  CNAME  marvelous-banoffee-865a28.netlify.app  proxied   <- shadowed by the Single Redirect
-dresden          A      34.66.172.112                          proxied   <- unrelated
-korczak.xyz      TXT    v=spf1 -all          _dmarc TXT  p=reject        <- the domain sends no mail
+korczak.xyz      AAAA   100::           proxied   <- Cloudflare-managed, the Worker's custom domain
+www.korczak.xyz  CNAME  korczak.xyz     proxied   <- exists only to be proxied; the redirect fires first
+dresden          A      34.66.172.112   proxied   <- unrelated to this site
+korczak.xyz      TXT    v=spf1 -all     _dmarc p=reject   <- the domain sends no mail
 ```
 
-Both Netlify records are still live and still resolve. Rollback of the apex is deleting the route
-from `wrangler.jsonc` and deploying; the CNAME underneath then answers from Netlify exactly as it
-did before, with no DNS edit. That is the whole reason the apex is a route and not a custom domain.
-
-**Before deleting the Netlify site**, note that `PUBLIC_VAPID_PUBLIC_KEY` was read out of its
-production context into `.env.production` — it is the only value that ever lived *only* there — and
-that both CNAMEs above will then point at nothing and should be replaced (a custom domain on the
-apex, and `www` pointed anywhere proxied, since the redirect fires before the origin is consulted).
+`100::` is the IPv6 discard prefix, and it is not a placeholder to be tidied away: a Worker custom
+domain has no origin server, so Cloudflare points the record at an address that can never answer
+and routes the request to the Worker before that matters. The same is true of `www` — the CNAME
+target is irrelevant because the Single Redirect returns before any origin is consulted. **Neither
+record is a thing to "fix" if it looks wrong.**
 
 ## Solitaire Game
 

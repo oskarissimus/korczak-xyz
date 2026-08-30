@@ -1,7 +1,7 @@
 # Deploys the Firestore rules and the Event Watch collector.
 #
-# Separate from node.js.yml because it is path-filtered: the site deploys on every push via
-# Netlify, but redeploying Cloud Functions on a commit that only touched a song chart would take
+# Separate from node.js.yml because it is path-filtered: the site deploys on every push from that
+# workflow, but redeploying Cloud Functions on a commit that only touched a song chart would take
 # three minutes and change nothing. The paths below are exactly what can affect the backend —
 # note that `korczak-xyz/src/utils/events/**` is in the list, because functions/tsconfig.json
 # compiles that directory into the deploy bundle rather than keeping a copy of it.

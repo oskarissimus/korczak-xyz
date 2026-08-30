@@ -33,32 +33,28 @@
   },
 
   /*
-   * A ROUTE, not a custom domain, and the difference is the whole cutover story.
+   * A custom domain: Cloudflare owns the apex's DNS record, and there is no origin behind it.
    *
-   * A custom domain requires Cloudflare to own the hostname's DNS record, so attaching one to
-   * korczak.xyz meant deleting the record that pointed at Netlify first — a window where the apex
-   * resolves to nothing, and a rollback that needs the dashboard. A route needs no such thing: the
-   * record stays exactly as it is, and the Worker answers at the edge before the request is ever
-   * forwarded to the origin behind it. Cutover is this line appearing; rollback is it disappearing.
+   * It was a route (`korczak.xyz/*`) for the length of the migration, which is worth knowing if
+   * you ever have to do this again. A custom domain refuses to attach while a record it does not
+   * manage already exists, and during the cutover that record was the CNAME to Netlify — so a
+   * route was the way to put the Worker in front of a live origin without touching DNS at all,
+   * and to roll back by deleting one line. Once Netlify went, the record was deleted and the
+   * custom domain attached in its place.
    *
-   * The record therefore still names Netlify, which reads as untidy and is deliberate — it is a
-   * live fallback for as long as that site exists. Once it is deleted (see CLAUDE.md), the record
-   * is dead weight and this should become `{ pattern: "korczak.xyz", custom_domain: true }`, which
-   * is the tidier end state and can then attach without a conflict.
-   *
-   * www is NOT routed here on purpose. It 301s to the apex, that redirect currently comes from
-   * Netlify, and leaving it unrouted keeps it working through the transition. It needs a zone
-   * Single Redirect before Netlify goes — a redirect that needs no origin should not cost a Worker.
+   * www is NOT here. It 301s to the apex from a zone Single Redirect, which terminates at the
+   * edge — a redirect that needs no origin should not cost a Worker invocation. That rule is the
+   * one piece of the serving path not in this repo; see CLAUDE.md.
    */
   "routes": [
-    { "pattern": "korczak.xyz/*", "zone_name": "korczak.xyz" }
+    { "pattern": "korczak.xyz", "custom_domain": true }
   ],
 
   /*
-   * Explicit because the default flips the moment `routes` exists: adding the line above turned
-   * workers.dev off in the same deploy, and since the custom domain had not attached yet, that
-   * deploy left the Worker reachable at no hostname at all. Keep it — the preview URL is how a
-   * build gets checked before the domain points at it, and public/_headers keeps it out of search.
+   * Explicit because the default flips the moment `routes` exists: adding that key turned
+   * workers.dev off in the same deploy, and since the domain had not attached yet, that deploy
+   * left the Worker reachable at no hostname at all. Keep it — the preview URL is how a build
+   * gets checked before the domain points at it, and public/_headers keeps it out of search.
    */
   "workers_dev": true,
 
