@@ -26,17 +26,33 @@ as the origin behind it — deleting the route in `wrangler.jsonc` hands the sit
 no DNS edit and no propagation. Once that site is deleted the record is dead weight; see the note
 in `korczak-xyz/wrangler.jsonc` for what this should become then.
 
-**Two things must happen before that site is deleted**, and both are invisible until it is too
-late:
+**`www` no longer depends on Netlify**, which it did until the migration. It is a zone **Single
+Redirect** now (`http_request_dynamic_redirect` phase, rule *"www -> apex"*): host equals
+`www.korczak.xyz` → 301 to `https://korczak.xyz` with the path concatenated and the query string
+preserved. It terminates at the edge, so it needs no origin and survives the Worker being broken.
 
-1. **`www.korczak.xyz` is still Netlify's.** It 301s to the apex, and that redirect is served by
-   Netlify — `www` is not routed to the Worker. It cannot be: Cloudflare rejects a deploy whose
-   `_redirects` source is absolute (*"Only relative URLs are allowed"*), so unlike `_headers`, that
-   file cannot match on hostname. The replacement is a zone **Single Redirect** — hostname equals
-   `www.korczak.xyz` → 301 `https://korczak.xyz`, preserving path and query — which terminates at
-   the edge and needs no origin at all. Until that exists, deleting the Netlify site breaks `www`.
-2. **`PUBLIC_VAPID_PUBLIC_KEY`** was read out of Netlify's production context into
-   `.env.production`. It is the only value that ever lived *only* there.
+It is a dashboard object rather than a repo file, and that is forced: Cloudflare rejects a deploy
+whose `_redirects` source is absolute (*"Only relative URLs are allowed"*), so unlike `_headers`,
+that file cannot match on hostname. This is the one piece of the serving path not in git — if `www`
+ever stops redirecting, look in Rules → Redirect Rules, not here.
+
+### The zone's records, and the exact rollback
+
+```
+korczak.xyz      CNAME  apex-loadbalancer.netlify.com          proxied   <- the Worker route sits in front
+www.korczak.xyz  CNAME  marvelous-banoffee-865a28.netlify.app  proxied   <- shadowed by the Single Redirect
+dresden          A      34.66.172.112                          proxied   <- unrelated
+korczak.xyz      TXT    v=spf1 -all          _dmarc TXT  p=reject        <- the domain sends no mail
+```
+
+Both Netlify records are still live and still resolve. Rollback of the apex is deleting the route
+from `wrangler.jsonc` and deploying; the CNAME underneath then answers from Netlify exactly as it
+did before, with no DNS edit. That is the whole reason the apex is a route and not a custom domain.
+
+**Before deleting the Netlify site**, note that `PUBLIC_VAPID_PUBLIC_KEY` was read out of its
+production context into `.env.production` — it is the only value that ever lived *only* there — and
+that both CNAMEs above will then point at nothing and should be replaced (a custom domain on the
+apex, and `www` pointed anywhere proxied, since the redirect fires before the origin is consulted).
 
 ## Solitaire Game
 

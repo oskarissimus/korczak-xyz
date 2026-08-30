@@ -15,8 +15,8 @@
 
 # www -> apex is NOT here, and cannot be: Cloudflare rejects a deploy whose _redirects source is
 # absolute ("Line N: Only relative URLs are allowed"), so this file cannot match on hostname the
-# way _headers can. Netlify served that 301 and still does; before that site is deleted it has to
-# become a zone Single Redirect. See CLAUDE.md.
+# way _headers can. It is a zone Single Redirect instead - the one piece of the serving path that
+# is not in this repo. See "The zone's records" in CLAUDE.md.
 
 /games/fretboard              /apps/flashcards           301
 /games/fretboard/stats        /apps/flashcards/neck      301
