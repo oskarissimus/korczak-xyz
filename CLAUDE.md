@@ -1306,7 +1306,8 @@ the toggle.
 `users/{uid}` wildcard, so a feed that reads nothing usually means the rules have not gone out.
 
 **Rules and functions deploy from CI** (`.github/workflows/firebase-deploy.yml`) — the site is
-Netlify's on every push, and the backend is this workflow's. It is path-filtered to `functions/`,
+Netlify's on every push, and the backend is this workflow's. A `terraform` job runs **before** the
+deploy job in that workflow; see *The project layer* below. It is path-filtered to `functions/`,
 `firestore.rules`, `firebase.json` and `korczak-xyz/src/utils/events/**` — that last one because
 `functions/tsconfig.json` compiles the matcher in from there rather than keeping a copy, so a change
 to it changes the backend. Auth is Workload Identity Federation, so there is no long-lived service
@@ -1333,6 +1334,45 @@ something a deploy can fail on. Where one is genuinely needed, set it to `none` 
 real value; `secretReader` reads the sentinel back as undefined.
 The VAPID public key can never change: rotating it invalidates every subscription on every device,
 silently. Full sequence in `functions/README.md`.
+
+### The project layer is Terraform, the app is the Firebase CLI
+
+`terraform/` holds what the GCP project must have switched on and granted: the API list, the role
+grants, the secret **containers**, `sendTestPush`'s public invoker binding, and the `gcf-artifacts`
+cleanup policy. It exists because two deploys in a row failed for reasons that were not in the code
+— a secret container that did not exist stopped the CLI deploying anything, and whether the
+classifier's identity could reach Vertex AI was a question you answered by running commands.
+
+**The ownership line is the whole design, and nothing may cross it.** Terraform owns the project;
+the Firebase CLI keeps owning the functions, `firestore.rules` and `firestore.indexes.json`. Two
+owners of one resource is permanent drift, where every `apply` reverts the last `deploy` and back
+again with neither tool wrong — which is why the functions are not in Terraform even though they
+could be.
+
+Four things there are load-bearing, each written up in `terraform/README.md`:
+
+- **Secret values are not in Terraform.** State stores them in the clear, and `VAPID_PRIVATE_KEY` in
+  a state file is worse than the problem being solved. Only containers — their *absence* is what
+  broke the deploy. Adding a secret is a line in `secrets.tf` plus one
+  `firebase functions:secrets:set`.
+- **`google_project_iam_member`, never `_binding` or `_policy`.** Only `_member` is additive.
+  `_binding` is authoritative for a whole role and `_policy` for the whole project: applying one
+  drops every binding not written in the file, including the ones that let CI back in.
+- **`disable_on_destroy = false` on every API**, or deleting a line — or a typo renaming a resource
+  — disables that API and takes live functions down to fix a text file.
+- **The gate is "no plan may destroy anything"**, enforced in the workflow over the whole directory,
+  plus `prevent_destroy` on the secrets and the registry. This repo commits straight to `main`, so
+  there is no pull request at which somebody reads the plan; that check is what stands in for it.
+  The acceptance test after the first apply is an **empty plan** — a non-empty one means the files
+  describe something other than the project, and `apply` would change it.
+
+The one-time bootstrap (a state bucket and the roles the deploy account needs) cannot be automated
+away: an account cannot grant itself what it lacks, and a GCS backend cannot create its own bucket.
+Until it is run the terraform job logs a warning and skips, so the app deploys exactly as before.
+Note the trade it carries, taken deliberately: the roles go on the **existing deploy account**, so a
+pipeline firing on every push to `main` holds `projectIamAdmin` — the right to grant itself
+anything. The narrower alternative, a separate `terraform@` account, is recorded in that README as
+the way out rather than as what is done.
 
 Push works only from an app installed to the Home Screen — not from a Safari tab, ever. That is what
 the `needs-install` state on the Alerts tab exists to explain, and why it is checked before

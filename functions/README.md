@@ -28,10 +28,16 @@ and every installed app — and FCM's web SDK wants its own `firebase-messaging-
 Everything below is **already done** for `korczak-xyz-501720`. It is kept as a record of what was
 set up and how to redo it, not as a to-do list.
 
+**The project layer is now `terraform/`**, and that is the source of truth for the first two rows
+below — enabled APIs and role grants — plus the secret *containers*, `sendTestPush`'s public
+invoker binding and the Artifact Registry cleanup policy. This table is a description; those files
+are what CI applies. When the two disagree, the files win and this table is the thing that is
+wrong — which has already happened once.
+
 | Thing | State |
 |---|---|
 | Billing | Blaze, billing account `01AB98-…` |
-| APIs | cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam |
+| APIs | declared in `terraform/apis.tf` — cloudfunctions, cloudbuild, artifactregistry, secretmanager, cloudscheduler, run, eventarc, pubsub, iamcredentials, sts, iam, firestore, aiplatform |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | set (v1). The pair is also in `.secrets/vapid.json`, gitignored |
 | `TICKETMASTER_API_KEY` | real Discovery API key (v2, 23 Aug 2026). v1 was the `none` sentinel; see below |
 | `PUBLIC_VAPID_PUBLIC_KEY` | set in Netlify, production context |
@@ -39,7 +45,8 @@ set up and how to redo it, not as a to-do list.
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
 | Artifact cleanup | images older than 3 days deleted, so old containers do not accumulate a bill |
 | Firestore indexes | `firestore.indexes.json`, deployed — the undated-events query needs a composite |
-| CI deploy | `.github/workflows/firebase-deploy.yml`, keyless via Workload Identity Federation |
+| CI deploy | `.github/workflows/firebase-deploy.yml`, keyless via Workload Identity Federation. The `terraform` job runs first, so a commit needing a new API gets it before the deploy uses it |
+| Project layer | `terraform/` — APIs, IAM, secret containers, invoker binding, registry cleanup. See its README for the ownership line and the one-time bootstrap |
 | Verified | VAPID pair derives correctly; all three copies of the public key agree; `sendTestPush` reachable (`allUsers` → `run.invoker`) and returning its own auth error; collector idempotent (`created: 0` on a second run) |
 
 ### The VAPID pair
@@ -101,30 +108,15 @@ paragraph exists to prevent. The function has an *identity*; whether that identi
 AI is a separate fact, and whether the API is switched on for the project is a third. Deploying the
 function ships code and nothing else — it does not enable APIs and does not grant roles.
 
-**Check before granting anything.** Both may already be satisfied: the default compute service
-account has historically been granted `roles/editor` on project creation, which covers this, and
-`aiplatform.googleapis.com` is often already on. So force a collector run and read
-`eventSources/classifier` on the Alerts tab:
+**Both are now declared in `terraform/`** — `aiplatform.googleapis.com` in `apis.tf`,
+`roles/aiplatform.user` on the functions' runtime account in `iam.tf` — so once the Terraform
+bootstrap has been run there is nothing to do here by hand, and nothing to remember on the next
+project. Before that bootstrap they may or may not be in place; the honest check is
+`eventSources/classifier` on the Alerts tab after a collector run:
 
-- **green, with a count** — nothing to do, and nothing below is needed.
-- **red** — `lastError` carries a 403 naming which of the two is missing: the API not enabled for
-  the project, or the permission not granted to the service account. Run the matching command.
-
-```sh
-# The API, for the project.
-gcloud services enable aiplatform.googleapis.com --project korczak-xyz-501720
-
-# The permission, for the identity the function runs as. `firebase.json` does not set
-# `serviceAccount`, so these gen-2 functions run as the default compute account — hence the target.
-gcloud projects add-iam-policy-binding korczak-xyz-501720 \
-  --member="serviceAccount:$(gcloud projects describe korczak-xyz-501720 \
-      --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
-  --role=roles/aiplatform.user
-```
-
-Both are idempotent, so running them when they were not needed costs nothing but is still worth
-not doing blind — a role granted without knowing whether it was already there is a role nobody can
-later argue about removing.
+- **green, with a count** — it works, whether or not Terraform has applied yet.
+- **red** — `lastError` carries a 403 naming which of the two is missing. Running the Terraform
+  bootstrap (`terraform/README.md`) fixes both and stops the question recurring.
 
 **Deliberately not done from CI**, though it could be. Granting an IAM role needs
 `roles/resourcemanager.projectIamAdmin` on the deploy identity, which is the right to grant itself
@@ -204,12 +196,9 @@ firebase functions:secrets:set VAPID_PUBLIC_KEY
 firebase functions:secrets:set VAPID_PRIVATE_KEY
 firebase functions:secrets:set TICKETMASTER_API_KEY   # developer.ticketmaster.com, free
 
-# 3b. The classifier has NO secret — it uses the function's own identity. Once, per project:
-gcloud services enable aiplatform.googleapis.com --project korczak-xyz-501720
-gcloud projects add-iam-policy-binding korczak-xyz-501720 \
-  --member="serviceAccount:$(gcloud projects describe korczak-xyz-501720 \
-      --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
-  --role=roles/aiplatform.user
+# 3b. The classifier has NO secret — it uses the function's own identity. The API and the role
+#     it needs are in terraform/; run that bootstrap (terraform/README.md) instead of doing this
+#     by hand, and it stays done for every project after this one.
 
 # 4. The public key ALSO goes in the site's build environment, as PUBLIC_VAPID_PUBLIC_KEY
 #    (Netlify → Site settings → Environment variables, and your local .env).

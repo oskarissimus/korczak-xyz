@@ -9,6 +9,11 @@
 # Auth is Workload Identity Federation, so there is no long-lived service account key in GitHub.
 # The security boundary is the provider's attribute-condition, which pins it to this repository —
 # without that, any repo on GitHub could mint a token for the pool.
+#
+# The `terraform` job runs BEFORE `deploy`, and that ordering is a feature rather than tidiness: a
+# commit that needs a new API and ships the code using it would otherwise fail on the deploy, which
+# is exactly how GEMINI_API_KEY took a build down. See terraform/README.md for what Terraform owns
+# and, more importantly, what it deliberately does not.
 name: Deploy Firebase
 
 on:
@@ -20,6 +25,7 @@ on:
       - "firestore.indexes.json"
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
+      - "terraform/**"
       - ".github/workflows/firebase-deploy.yml"
   # So rules can be pushed out without waiting for a code change to ride along.
   workflow_dispatch:
@@ -32,7 +38,90 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The project layer: APIs, IAM, secret containers. Runs on every deploy, not only when
+  # terraform/ changed — it is idempotent, costs a handful of API calls, and running it always is
+  # what makes the ordering guarantee above hold.
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      # Until the one-time bootstrap in terraform/README.md has been run, the state bucket does not
+      # exist and the deploy account does not hold the roles Terraform needs. That must not block
+      # deploying the app: this job no-ops loudly instead, and the deploy carries on exactly as it
+      # did before Terraform existed. Once bootstrapped, a real failure here DOES stop the deploy,
+      # which is the point.
+      - name: Has the bootstrap been run?
+        id: bootstrap
+        run: |
+          if gcloud storage buckets describe "gs://${{ vars.FIREBASE_PROJECT_ID }}-tfstate" >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Terraform not bootstrapped::No state bucket. See terraform/README.md. Skipping the project layer; the app still deploys."
+          fi
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      # Unconditional, and before the bootstrap gate on purpose: `-backend=false` needs no bucket
+      # and no credentials, so malformed HCL is caught on the very first push rather than lying in
+      # wait until somebody runs the bootstrap weeks later. It is also the only check on this
+      # directory that runs without any of the setup existing.
+      - name: Validate
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: terraform
+
+      - name: Init
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform init -input=false -reconfigure
+        working-directory: terraform
+
+      - name: Plan
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform plan -input=false -out=tfplan
+        working-directory: terraform
+
+      # This repo commits straight to main, so there is no pull request at which a human reads the
+      # plan before it applies. This is the gate instead, and it is a better one for the failure
+      # that actually matters: nothing in this directory should ever destroy anything. Deleting a
+      # secret container takes its versions with it, and VAPID_PUBLIC_KEY can never be reissued.
+      #
+      # `prevent_destroy` already guards the two resources that carry it; this catches the whole
+      # directory, including a resource somebody adds later and forgets to guard.
+      - name: Refuse a plan that destroys anything
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: |
+          terraform show -json tfplan > tfplan.json
+          doomed=$(jq -r '[.resource_changes[]? | select(.change.actions[]? == "delete") | .address] | join(", ")' tfplan.json)
+          if [ -n "$doomed" ]; then
+            echo "::error title=Terraform wants to destroy::$doomed"
+            echo "Nothing in terraform/ should ever delete. Read the plan before going further."
+            exit 1
+          fi
+        working-directory: terraform
+
+      - name: Apply
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform apply -input=false -auto-approve tfplan
+        working-directory: terraform
+
   deploy:
+    needs: terraform
     runs-on: ubuntu-latest
     permissions:
       # Required for the OIDC token WIF exchanges. Without it the auth step fails with a

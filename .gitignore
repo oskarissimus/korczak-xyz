@@ -11,3 +11,12 @@ snapshot-crawler/node_modules/
 # Local secrets. The VAPID pair lives here so it can be re-read without regenerating —
 # regenerating the public key would silently invalidate every push subscription on every device.
 .secrets/
+
+# Terraform. The lock file is NOT ignored — a provider version that drifts between runs is a
+# project layer that drifts with it — but state, plans and the plugin cache never belong in git:
+# state holds real resource attributes, and a saved plan is a credentialed snapshot of them.
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+tfplan.json
