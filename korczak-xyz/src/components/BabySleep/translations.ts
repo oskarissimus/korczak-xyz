@@ -177,10 +177,12 @@ export const translations = {
     wake1Aria:
       'Time awake from the morning wake-up to the first nap, per day, with the mean, one standard deviation and a 7-day average',
     wake1Series: 'Wake-up to first nap',
-    wake2Title: 'How long he was awake between the first and second nap',
+    /* Named after where the window sits in the day rather than after what ends it: with one nap that
+       is the nap to bedtime, with two it is the gap between them, and the chart is the same one. */
+    wake2Title: 'How long he was awake after the first nap',
     wake2Aria:
-      'Time awake between the end of the first nap and the start of the second, per day, with the mean, one standard deviation and a 7-day average',
-    wake2Series: 'First nap to second',
+      'Time awake from the end of the first nap to the next sleep — the second nap, or bedtime — per day, with the mean, one standard deviation and a 7-day average',
+    wake2Series: 'First nap to next sleep',
     legendNight: 'Night',
     legendNap: 'Nap',
     legendRoutine: 'Routine',
@@ -479,13 +481,13 @@ export const translations = {
     bedtimeAria:
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
     wake1Title: 'Jak długo nie spało przed pierwszą drzemką',
-    wake2Title: 'Jak długo nie spało między pierwszą a drugą drzemką',
+    wake2Title: 'Jak długo nie spało po pierwszej drzemce',
     wake1Aria:
       'Czas czuwania od porannej pobudki do pierwszej drzemki, dzień po dniu, ze średnią, jednym odchyleniem standardowym i średnią z 7 dni',
     wake1Series: 'Od pobudki do pierwszej drzemki',
     wake2Aria:
-      'Czas czuwania od końca pierwszej drzemki do początku drugiej, dzień po dniu, ze średnią, jednym odchyleniem standardowym i średnią z 7 dni',
-    wake2Series: 'Od pierwszej drzemki do drugiej',
+      'Czas czuwania od końca pierwszej drzemki do kolejnego snu — drugiej drzemki albo nocy — dzień po dniu, ze średnią, jednym odchyleniem standardowym i średnią z 7 dni',
+    wake2Series: 'Od pierwszej drzemki do kolejnego snu',
     legendNight: 'Noc',
     legendNap: 'Drzemka',
     legendRoutine: 'Rytuał',

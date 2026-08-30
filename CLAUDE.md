@@ -1755,16 +1755,25 @@ it does *not* put them in its grayscale table, which that green/cyan pair would 
 #### The activity windows
 
 Two more duration charts, and they are about the *day* rather than the night: how long he was awake
-from the morning wake-up to the first nap, and from the first nap to the second. Each carries the
+from the morning wake-up to the first nap, and from that nap to the next sleep. Each carries the
 mean, the ±1 SD band and the same trailing average — `AVERAGE_WINDOW` is one constant for all three
 charts that draw that line, because a legend saying "7-day average" beside a line smoothed over five
 is a disagreement nothing on the screen would show.
 
 **Two charts and not one.** The first window is set by the morning and is what decides whether the
-first nap lands mid-morning or at noon; the second is set by how the first nap went, a forty-minute
-one and a two-hour one not buying the same afternoon. A single series pooling every gap between
-sleeps averages the two into a number that answers neither, which is `firstNapPoints`' argument
-against a mean over all nap starts, one rung down.
+nap lands mid-morning or at noon; the second is set by how that nap went, a forty-minute one and a
+two-hour one not buying the same afternoon. A single series pooling every gap between sleeps averages
+the two into a number that answers neither, which is `firstNapPoints`' argument against a mean over
+all nap starts, one rung down.
+
+**A window is numbered by its place in the day, not by what happens to bound it.** The second one was
+the first nap to the *second* nap when it was written, and on the shape this log actually has — wake,
+one nap, bed — that is not a window at all: the chart shipped empty, with nothing on it to say why.
+It runs to whatever sleep comes next, which is the second nap where there is one and bedtime where
+there is not, and `secondWakeWindowPoints` needs no branch to say so — it takes the first entry in
+the day's bucket beginning after the nap ends. The night it lands on is the day's own, filed under
+the evening that closes the day; the night that ended *this* morning belongs to the day before and
+cannot be picked up by mistake, since it begins before the nap rather than after it.
 
 Four rules in `stats.ts`, each the kind a later change reverses quietly:
 
@@ -1777,19 +1786,23 @@ Four rules in `stats.ts`, each the kind a later change reverses quietly:
 - **Today counts.** These follow the clock-point rule, not the duration one: a window is a complete
   fact the moment the next sleep begins, however much of the day is still to come. That is
   `routineStats.ts`'s rule for a settling time, reached again.
-- **`MAX_WAKE_MS` (8h) excludes rather than counts.** A gap longer than that is a nap nobody logged,
-  and it would land in the mean as a morning the baby was up for nine hours with nothing on the chart
-  to say the afternoon nap was the first one written down. `MAX_SETTLE_MS`'s rule for the other join
-  this app makes between two records — a fabricated window is worse than a gap.
-- **The first window needs only a nap's *start*, the second needs the first nap closed.** So a day
-  whose morning nap is still running contributes to the first chart and not to the second, and the
-  two tiles print different denominators. That is the same fact the tiles have always stated.
+- **`MAX_WAKE_MS` (10h) excludes rather than counts.** A gap longer than that has a sleep missing from
+  the middle of it, and it would land in the mean as a morning the baby was up for eleven hours with
+  nothing on the chart to say the afternoon nap was the first one written down. `MAX_SETTLE_MS`'s
+  rule for the other join this app makes between two records — a fabricated window is worse than a
+  gap. The slack is deliberate and was bought once already: at eight hours the cap silently dropped
+  the genuine afternoons of a one-nap day, an early nap and a late bedtime being that far apart, and
+  a real evening quietly missing is the same loss the other way round. A window with a whole sleep
+  missing from it is hours past ten either way.
+- **The first window needs only a nap's *start*, the second needs that nap closed.** So a day whose
+  nap is still running contributes to the first chart and not to the second, and the two tiles print
+  different denominators. That is the same fact the tiles have always stated.
 
 `firstWakeWindowPoints` therefore takes the raw entries as well as the buckets and
-`secondWakeWindowPoints` takes only the buckets — both ends of the second window are naps, and a nap
-is filed under the day it happened on. Each is honest about what it needs rather than sharing one
-signature. `WAKE_MIN_SPAN` is an hour: the night's three-hour floor draws a fortnight of real drift
-as a flat line, and the settling chart's half-hour floor turns the same drift into a mountain range.
+`secondWakeWindowPoints` takes only the buckets — both ends of the second window are filed under the
+day it happened on. Each is honest about what it needs rather than sharing one signature.
+`WAKE_MIN_SPAN` is an hour: the night's three-hour floor draws a fortnight of real drift as a flat
+line, and the settling chart's half-hour floor turns the same drift into a mountain range.
 
 ### The climate tab
 

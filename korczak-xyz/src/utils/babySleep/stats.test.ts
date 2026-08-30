@@ -271,12 +271,43 @@ describe('activity windows', () => {
     ]);
   });
 
-  it('measures the second window between the two naps', () => {
+  it('measures the second window to the next nap where there is one', () => {
     const days = groupByDay([...normalDay(12), ...normalDay(13)], week, T0);
     expect(secondWakeWindowPoints(days)).toEqual([
       { at: local(12, 0), ms: 2.5 * HOUR },
       { at: local(13, 0), ms: 2.5 * HOUR },
     ]);
+  });
+
+  it('measures the second window to bedtime on a one-nap day', () => {
+    // The shape this log actually has: wake, one nap, bed. Read as nap-to-nap there is no second
+    // window at all and the chart comes up empty.
+    const days = groupByDay(
+      [
+        entry('nap', local(12, 12), local(12, 14)),
+        entry('night', local(12, 20), local(13, 6, 30)),
+        entry('nap', local(13, 12), local(13, 14)),
+      ],
+      week,
+      T0
+    );
+    expect(secondWakeWindowPoints(days)).toEqual([{ at: local(12, 0), ms: 6 * HOUR }]);
+    // The 13th's nap has no sleep after it yet, so it has no window — not a window of zero.
+    expect(secondWakeWindowPoints(days).map((p) => p.at)).not.toContain(local(13, 0));
+  });
+
+  it('never measures the second window back to the night that ended that morning', () => {
+    // A "night" mis-logged in the morning starts before the nap, so it can only ever be behind it.
+    const days = groupByDay(
+      [
+        entry('night', local(12, 7), local(12, 8)),
+        entry('nap', local(12, 12), local(12, 14)),
+        entry('night', local(12, 20), local(13, 6)),
+      ],
+      week,
+      T0
+    );
+    expect(secondWakeWindowPoints(days)).toEqual([{ at: local(12, 0), ms: 6 * HOUR }]);
   });
 
   it('counts today, because a window is finished the moment the next sleep starts', () => {
@@ -294,17 +325,28 @@ describe('activity windows', () => {
     expect(secondWakeWindowPoints(stats.days)).toEqual([]);
   });
 
-  it('drops a window longer than a day can really hold — that is a nap nobody logged', () => {
+  it('drops a window longer than a day can really hold — that is a sleep nobody logged', () => {
     const entries = [
       ...normalDay(12),
-      entry('nap', local(13, 15), local(13, 16)),
       entry('nap', local(13, 17), local(13, 18)),
+      entry('night', local(13, 20), local(14, 6)),
     ];
     const days = groupByDay(entries, week, T0);
-    // 06:00 to 15:00 is nine hours: the morning nap was never written down.
+    // 06:00 to 17:00 is eleven hours: the day's real nap was never written down.
     expect(firstWakeWindowPoints(days, entries, T0).map((p) => p.at)).not.toContain(local(13, 0));
-    // The gap between the two naps that *were* logged is untouched by that.
-    expect(secondWakeWindowPoints(days)).toContainEqual({ at: local(13, 0), ms: HOUR });
+    // The evening after the nap that *was* logged is untouched by that.
+    expect(secondWakeWindowPoints(days)).toContainEqual({ at: local(13, 0), ms: 2 * HOUR });
+  });
+
+  it('keeps the long afternoon a one-nap day really has', () => {
+    // An early nap and a late bedtime are genuinely eight hours apart. A tighter cap would drop the
+    // evenings this chart exists to show.
+    const days = groupByDay(
+      [entry('nap', local(12, 11), local(12, 12)), entry('night', local(12, 20), local(13, 6))],
+      week,
+      T0
+    );
+    expect(secondWakeWindowPoints(days)).toEqual([{ at: local(12, 0), ms: 8 * HOUR }]);
   });
 
   it('plots exactly the windows the tiles average', () => {

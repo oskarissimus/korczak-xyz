@@ -91,15 +91,21 @@ export interface DurationPoint {
 }
 
 /**
- * Longer than this and the gap is a nap nobody logged, not a stretch anybody stayed awake for.
+ * Longer than this and the gap is a sleep nobody logged, not a stretch anybody stayed awake for.
  *
  * `MAX_SETTLE_MS`'s rule, applied to the other join this app makes between two records: an activity
- * window is measured between two sleeps, so a missing sleep in the middle silently doubles one. Nine
- * hours would then land in the mean as a day the baby was up all morning, and nothing on the chart
- * would say the afternoon nap was the first one logged. Excluded rather than counted — a fabricated
- * window is worse than a gap. Eight hours is past any real one and short enough to catch that.
+ * window is measured between two sleeps, so a missing sleep in the middle silently welds two of them
+ * into one. That would land in the mean as a day the baby was up all morning, with nothing on the
+ * chart to say the afternoon nap was the first one written down. Excluded rather than counted — a
+ * fabricated window is worse than a gap.
+ *
+ * Ten hours, and the slack is deliberate. Once a child is down to one nap the afternoon window is
+ * genuinely long — an early nap and a late bedtime can be eight hours apart — so a tighter cap would
+ * start dropping real evenings, which is the same silent loss the other way round. A window with a
+ * sleep missing from the middle of it is a whole night or a whole nap longer than that, so ten hours
+ * still catches every case this exists for.
  */
-export const MAX_WAKE_MS = 8 * 60 * 60_000;
+export const MAX_WAKE_MS = 10 * 60 * 60_000;
 
 /**
  * The morning wake-up on a day: the latest night block that *ended* inside it.
@@ -143,10 +149,15 @@ function wakeWindow(from: number | null, to: number | null): number | null {
  * The activity windows — how long he was awake between one sleep and the next.
  *
  * Two of them get a chart, because they are two different questions. The **first** is set by the
- * morning: it is the one that decides whether the first nap lands mid-morning or at noon, and it is
- * the window that shifts as he grows out of one. The **second** is set by how the first nap went — a
- * forty-minute nap and a two-hour one do not buy the same afternoon — so pooling the two would
- * average away exactly what each is for.
+ * morning: it is the one that decides whether the nap lands mid-morning or at noon, and it is the
+ * window that stretches as he grows. The **second** is set by how that nap went — a forty-minute nap
+ * and a two-hour one do not buy the same afternoon — so pooling the two would average away exactly
+ * what each is for.
+ *
+ * **A window is numbered by its place in the day, not by what happens to bound it.** On one nap the
+ * day's shape is wake → nap → bed, so the second window is the nap to bedtime; on two it is the gap
+ * between the naps. Defining it as nap-to-nap instead left a one-nap day — which is the shape here —
+ * with no second window at all, and the chart simply came up empty with nothing to say why.
  *
  * Both follow the **clock-point rule and not the duration one**, so today is included: a window is a
  * complete fact the moment the next sleep begins, however much of the day is still to come. That is
@@ -169,17 +180,30 @@ export function firstWakeWindowPoints(
 }
 
 /**
- * The first nap to the second, one point a day.
+ * The first nap to whatever sleep came next, one point a day.
  *
- * Needs no entries beyond the day's own: both ends of it are naps, and a nap is filed under the day
- * it happened on. It needs the first nap *closed*, where the window above needs only a start — which
- * is why a day with one nap still running contributes to the first chart and not to this one.
+ * The next sleep is the second nap where there is one and the night where there is not — see the
+ * header: the window is the day's second, and on one nap that is the stretch from the nap to
+ * bedtime. Which of the two it turns out to be needs no branch here, only the day's own entries in
+ * the order they happened.
+ *
+ * The night it can end at is the day's *own* — the one filed under the evening that closes this day,
+ * which is the bedtime this window leads to. The night that ended this morning belongs to the day
+ * before and cannot be picked up by mistake, because it begins before this one's first nap.
+ *
+ * Needs no entries beyond the day's bucket, where the first window needs the whole log: both ends of
+ * this one are filed under the day it happened on. It does need the first nap *closed*, where that
+ * one needs only a start — which is why a day whose nap is still running contributes to the first
+ * chart and not to this one, and why the two tiles print different denominators.
  */
 export function secondWakeWindowPoints(days: DayBucket[]): DurationPoint[] {
   return days.flatMap((day) => {
-    const naps = napsOf(day);
-    if (naps.length < 2) return [];
-    const ms = wakeWindow(naps[0].end, naps[1].start);
+    const from = napsOf(day)[0]?.end ?? null;
+    if (from == null) return [];
+    // `groupByDay` leaves a bucket's entries in start order, so the first one that begins after the
+    // nap is the next sleep of the day.
+    const next = day.entries.find((e) => e.start >= from);
+    const ms = wakeWindow(from, next ? next.start : null);
     return ms == null ? [] : [{ at: day.start, ms }];
   });
 }
