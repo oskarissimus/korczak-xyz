@@ -11,7 +11,17 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  /* Wraps, and the rows abut: `gap` is column-only so a second row of tabs sits directly on the
+     first, which is what a Win95 property sheet does when its tabs outgrow one row. A no-op where
+     the strip fits — which is every strip that fitted before — and the alternative is the last tab
+     off the side of the screen. The sleep log's five Polish labels and this app's four both need
+     it at 320px: `Wydarzenia Zainteresowania Powiadomienia Źródła` is ~424px of VT323.
+
+     `::after` below stays at the strip's bottom, so the panel line runs under the *last* row and
+     the rows above lap onto it — which is the stacking illusion, not a break in it. */
+  flex-wrap: wrap;
+  column-gap: 2px;
+  row-gap: 0;
   /* The bottom padding is the shelf the current tab sits on. No horizontal
      padding: the first tab lines up with the panel's own left edge. */
   padding: 4px 0 6px;

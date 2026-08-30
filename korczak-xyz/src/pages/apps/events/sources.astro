@@ -1,0 +1,30 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import EventsSources from '../../../components/Events/EventsSources';
+import EventsTabs from '../../../components/Events/EventsTabs.astro';
+import EventsSourcesSkeleton from '../../../components/Events/skeletons/EventsSourcesSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/events.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Events')} | korczak.xyz`} lang={lang} pwa="events">
+  <div class="window events-window">
+    <div class="title-bar">
+      <span>{t('Events')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content events-content">
+      <EventsTabs lang={lang} active="sources" />
+      <EventsSources client:only="react" lang={lang}>
+        <EventsSourcesSkeleton slot="fallback" lang={lang} />
+      </EventsSources>
+    </div>
+  </div>
+</Layout>

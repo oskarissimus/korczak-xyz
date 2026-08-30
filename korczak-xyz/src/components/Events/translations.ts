@@ -14,6 +14,7 @@ export const translations = {
     navFeed: 'Feed',
     navInterests: 'Interests',
     navAlerts: 'Alerts',
+    navSources: 'Sources',
     navLabel: 'Event Watch sections',
 
     // Auth gate
@@ -121,6 +122,36 @@ export const translations = {
     sourceFailing: 'failing since {when}',
     sourceNever: 'has not run yet',
 
+    // Sources
+    sourcesTabHeading: 'Where events come from',
+    sourcesIntro:
+      'Every page the collector reads, as a link, so the list can be checked rather than taken on trust. It runs every few hours; nothing here is watched that is not on this page.',
+    kindScrape: 'scraped page',
+    kindIcal: 'calendar feed',
+    kindRss: 'RSS',
+    kindApi: 'API',
+    // One name and one sentence per source id — see `sourceNames.ts`, whose two tables are typed
+    // over `SourceId`, so a fifth source cannot be added without both.
+    sourceNameTeatrWielki: 'Teatr Wielki – Opera Narodowa',
+    sourceNamePythonOrg: 'python.org events',
+    sourceNameFeed: 'Watched feeds',
+    sourceNameTicketmaster: 'Ticketmaster (PL)',
+    noteTeatrWielki:
+      'The season repertoire pages. Which productions are programmed and when they premiere — not the individual nights, which live behind a calendar drawn in JavaScript.',
+    notePythonOrg:
+      'Worldwide, and deliberately not narrowed by country: whether PyCon US is worth knowing about is your interest’s call, not the collector’s.',
+    noteFeed:
+      'Blogs and magazines that publish what they are putting on. A feed item is an article, so it carries no date of its own and shows under “announced, no dates yet”.',
+    noteTicketmaster:
+      'The ticketed end of what is watched for. Everything it lists is already on sale, so it can never tell you tickets have just been released.',
+    sourceNeedsKey: 'needs {name}',
+    sourceLastRun: 'ran {when}',
+    sourceInCorpus: '{count} in your feed now',
+    pageOptional: 'appears when announced',
+    sourcesUnlistedHeading: 'Also reporting',
+    sourcesUnlistedHint:
+      'Reporting its health beside the sources without being a page — the classifier is one. A scrape here is one that was removed from the list and is still collecting.',
+
     // Sync badge
     syncOff: 'Not signed in — nothing is being saved to your account',
     syncSynced: 'Synced',
@@ -137,6 +168,7 @@ export const translations = {
     navFeed: 'Wydarzenia',
     navInterests: 'Zainteresowania',
     navAlerts: 'Powiadomienia',
+    navSources: 'Źródła',
     navLabel: 'Sekcje aplikacji',
 
     signedOutTitle: 'Zaloguj się, żeby śledzić wydarzenia',
@@ -239,6 +271,33 @@ export const translations = {
     sourceOk: 'ok, {count} wydarzeń',
     sourceFailing: 'nie działa od {when}',
     sourceNever: 'jeszcze nie uruchomione',
+
+    sourcesTabHeading: 'Skąd biorą się wydarzenia',
+    sourcesIntro:
+      'Każda strona, którą czyta kolektor, jako link — żeby dało się to sprawdzić, a nie tylko przyjąć na słowo. Działa co kilka godzin; nie śledzimy niczego, czego nie ma na tej liście.',
+    kindScrape: 'strona',
+    kindIcal: 'kalendarz',
+    kindRss: 'RSS',
+    kindApi: 'API',
+    sourceNameTeatrWielki: 'Teatr Wielki – Opera Narodowa',
+    sourceNamePythonOrg: 'python.org events',
+    sourceNameFeed: 'Śledzone kanały',
+    sourceNameTicketmaster: 'Ticketmaster (PL)',
+    noteTeatrWielki:
+      'Strony repertuaru sezonu. Które spektakle są w planie i kiedy mają premierę — bez pojedynczych wieczorów, te siedzą za kalendarzem rysowanym JavaScriptem.',
+    notePythonOrg:
+      'Cały świat i celowo bez filtra kraju: czy PyCon US jest wart uwagi, decyduje Twoje zainteresowanie, a nie kolektor.',
+    noteFeed:
+      'Blogi i czasopisma, które piszą o tym, co organizują. Wpis w kanale to artykuł, więc nie ma własnej daty i trafia do „ogłoszone, bez dat”.',
+    noteTicketmaster:
+      'Biletowana część tego, czego szukamy. Wszystko, co tam jest, już jest w sprzedaży, więc stamtąd nie przyjdzie wiadomość o starcie sprzedaży.',
+    sourceNeedsKey: 'wymaga {name}',
+    sourceLastRun: 'ostatnio {when}',
+    sourceInCorpus: '{count} na Twojej liście',
+    pageOptional: 'pojawi się po ogłoszeniu',
+    sourcesUnlistedHeading: 'Zgłasza się też',
+    sourcesUnlistedHint:
+      'Raportuje swój stan obok źródeł, nie będąc stroną — tak działa klasyfikator. Jeśli trafi tu scraper, znaczy że wypadł z listy, a nadal zbiera.',
 
     syncOff: 'Nie zalogowano — nic nie jest zapisywane na koncie',
     syncSynced: 'Zsynchronizowano',

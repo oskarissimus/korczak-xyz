@@ -17,6 +17,7 @@ import { pullNotices, pullSourceHealth } from '../../utils/events/browser/cloud'
 import { canArm } from '../../utils/events/pushState';
 import type { Notice, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
+import { sourceName } from './sourceNames';
 import { fill, relativeTime, translations, type Lang } from './translations';
 
 interface Props {
@@ -165,7 +166,10 @@ function AlertsPanel({ lang }: Props) {
                 className={`ev-row${source.consecutiveFailures > 0 ? ' ev-row--bad' : ''}`}
                 key={source.id}
               >
-                <span className="ev-row-main">{source.label}</span>
+                {/* The Sources tab's name for it, or the record's own for a row nothing there
+                    describes — the classifier is one. Two tabs naming one source differently is
+                    worse than either name. */}
+                <span className="ev-row-main">{sourceName(source.id, source.label, t)}</span>
                 <span className="ev-row-meta">
                   {source.consecutiveFailures > 0
                     ? fill(t.sourceFailing, {

@@ -26,26 +26,10 @@
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
 import { parsePolishDate, stripTags, warsawEpoch } from './html';
-
-const HOST = 'https://teatrwielki.pl';
-
-/**
- * Which season pages to read.
- *
- * Both the current and the next, because the whole point is catching the announcement — and a new
- * season page appearing *is* the announcement. The URL shape is `/repertuar/sezon-2026/27/`, which
- * is the theatre's own odd split of the year pair.
- */
-export function seasonPaths(now: number): string[] {
-  const year = new Date(now).getUTCFullYear();
-  const month = new Date(now).getUTCMonth() + 1;
-  // A season is announced in spring and runs to the following summer, so from about March the
-  // interesting pair is this year's; before that, last year's is still current.
-  const first = month >= 3 ? year : year - 1;
-  return [first, first + 1].map(
-    (start) => `${HOST}/repertuar/sezon-${start}/${String((start + 1) % 100).padStart(2, '0')}/`,
-  );
-}
+import {
+  TEATR_WIELKI_HOST as HOST,
+  seasonPaths,
+} from '../../../korczak-xyz/src/utils/events/sources';
 
 /** One `<li class="page">…</li>` block per production. */
 const BLOCK = /<li class="page">([\s\S]*?)<\/li>/g;

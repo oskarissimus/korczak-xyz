@@ -1,6 +1,6 @@
 ---
 /**
- * Navigation between the feed, the interests and the notification settings.
+ * Navigation between the feed, the interests, the notification settings and the sources.
  *
  * Server-rendered rather than part of the islands, for the reason the sleep log's is: all three
  * islands are client:only, so anything inside one is missing until React hydrates — and the nav is
@@ -8,7 +8,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'feed' | 'interests' | 'alerts';
+type View = 'feed' | 'interests' | 'alerts' | 'sources';
 
 interface Props {
   lang: Lang;
@@ -24,6 +24,7 @@ const TABS: { view: View; href: string; label: string }[] = [
   { view: 'feed', href: `${base}/`, label: t.navFeed },
   { view: 'interests', href: `${base}/interests/`, label: t.navInterests },
   { view: 'alerts', href: `${base}/alerts/`, label: t.navAlerts },
+  { view: 'sources', href: `${base}/sources/`, label: t.navSources },
 ];
 ---
 

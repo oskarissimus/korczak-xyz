@@ -4,7 +4,11 @@
  * This is what makes the fuzzy categories tractable. There is no aggregator API for medieval fairs
  * or klezmer festivals in Poland — but the people who run them publish, and most of what they
  * publish is WordPress, which means a feed. So instead of one bespoke scraper per interest, there is
- * one adapter and a list: adding "watch this festival's blog" later is a line in FEEDS, not code.
+ * one adapter and a list: adding "watch this festival's blog" later is a line in `FEEDS`, not code.
+ *
+ * That list lives in `src/utils/events/sources.ts` rather than here, so the Sources tab can name
+ * the feeds without importing a Cloud Function — see the header there. It carries each feed's
+ * tags, city and country, which are facts about the publication rather than about any one item.
  *
  * The trade is that a feed item is an *article*, not an event: there is a publication date but
  * usually no event date. That is handled honestly rather than guessed at — `startsAt` stays null,
@@ -15,57 +19,7 @@
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
 import { decodeEntities, stripTags } from './html';
-
-interface Feed {
-  url: string;
-  label: string;
-  /** Applied to everything from this feed, so an interest can narrow by them. */
-  tags: string[];
-  city?: string;
-  /**
-   * ISO-2, where the feed is unambiguously about one country's events.
-   *
-   * Both of these are Polish publications writing about Polish events, so it is a fact about the
-   * feed rather than about any one item — which is what makes it belong here beside `city` and not
-   * in a per-item guess.
-   */
-  country?: string;
-}
-
-/**
- * The watched feeds.
- *
- * Both were checked to be live and returning `application/rss+xml`. Adding one is a line here;
- * nothing else changes, and `eventSources` will report it separately if it stops working.
- */
-export const FEEDS: Feed[] = [
-  {
-    url: 'https://historia.org.pl/feed/',
-    label: 'historia.org.pl',
-    /*
-     * Their reenactment and tournament calendars are the best single source for castles and fairs —
-     * but the feed is a general history magazine, so most items are articles about something else
-     * entirely. `history` describes what the feed is; it is the interest's keywords that pick the
-     * tournaments out, and only one item in seventy-seven matched on the last live run, which is
-     * the ratio working as intended. Tagging it `festival` would have claimed every article was one.
-     */
-    tags: ['history'],
-    country: 'PL',
-  },
-  {
-    url: 'https://www.jewishfestival.pl/feed/',
-    label: 'Festiwal Kultury Żydowskiej',
-    /*
-     * No `klezmer` tag, deliberately. Tags are matched all-of and structurally, but they used to be
-     * folded into the keyword haystack too — and a feed-wide `klezmer` made the Klezmer interest
-     * match all 67 articles this feed carried, Ted Kaczynski included. The haystack no longer reads
-     * tags (see haystackOf), and the tag stays off anyway: what this feed IS is a festival's blog.
-     */
-    tags: ['music', 'festival'],
-    city: 'Kraków',
-    country: 'PL',
-  },
-];
+import { FEEDS, type SourcePage } from '../../../korczak-xyz/src/utils/events/sources';
 
 const ITEM = /<(item|entry)[\s>]([\s\S]*?)<\/\1>/g;
 
@@ -84,7 +38,7 @@ function linkOf(xml: string): string | undefined {
   return tag(xml, 'link');
 }
 
-export function parseFeed(xml: string, feed: Feed): RawEvent[] {
+export function parseFeed(xml: string, feed: SourcePage): RawEvent[] {
   const out: RawEvent[] = [];
   for (const match of xml.matchAll(ITEM)) {
     const item = match[2];

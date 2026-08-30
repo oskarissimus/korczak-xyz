@@ -22,7 +22,8 @@ paths:
 
 ## Event Watch
 
-At `/apps/events/` — three tabs (Feed, Interests, Alerts) over a shared corpus of scraped listings,
+At `/apps/events/` — four tabs (Feed, Interests, Alerts, Sources) over a shared corpus of scraped
+listings,
 with web push when something matching an interest is announced, goes on sale, or gets close. The
 first app here that watches the outside world rather than recording what I did, which is why it is
 **signed-in only**: the collecting happens on a server and the notifications have to know where to go.
@@ -179,6 +180,72 @@ the least likely way anyone notices.
 `functions/src/smoke.live.test.ts` runs every adapter against the real network under `LIVE=1`
 (skipped otherwise, so CI and an offline laptop are unaffected). It is what caught both the haystack
 bug and the opera over-tagging; run it after touching an adapter.
+
+### The Sources tab, and why the URLs had to move
+
+The feed answers what is on. `/apps/events/sources/` answers *and how would I know if that were
+wrong* — every page the collector requests, as a link, so the claim is checkable rather than stated.
+The Alerts tab's health table already named sources; it never said what a source **is**, and a
+`teatr-wielki` row reading `ok, 64 events` tells you nothing about which pages produced them.
+
+**The catalogue is in `src/utils/events/sources.ts`, not beside the adapters.** That is this app's
+one-matcher-two-runtimes argument reaching a second fact: the browser cannot import a Cloud
+Function, so a list of URLs next to the scrapers would have had a copy in the island, correct until
+the first time a feed moved. So the adapters now *import* their targets — `FEEDS` drives the RSS
+adapter, `seasonPaths` the theatre scrape, `PYTHON_ORG_ICAL` and `TICKETMASTER_ENDPOINT` the other
+two — and the tab lists the same objects the collector fetches. `functions/src/sources/index.test.ts`
+asserts `SOURCES` and the catalogue still name the same four things: the drift is one-sided and
+silent otherwise, a fifth source collecting events the tab claims nothing produces.
+
+Two rules that file keeps, and they are the same rule twice — **it holds facts, not words**:
+
+- **No secret ever appears in it.** It compiles into the browser bundle, so the Ticketmaster entry
+  is the query *without* its `apikey`, which the adapter appends at the point of the request. A URL
+  is a page to show; a key is not. `sources.test.ts` greps the rendered URLs for it rather than
+  trusting the next person to remember.
+- **No prose either.** It also compiles into a Cloud Function, which has no locale. The sentence
+  describing each source lives in `Events/translations.ts` behind `sourceNames.ts`, whose two
+  tables are `Record<SourceId, keyof Translation>` — so a fifth source is a compile error until
+  somebody names it and says what it covers. It shipped the other way round for one build and the
+  Polish page printed four English paragraphs.
+
+`sourceNames.ts` is shared with the **Alerts** tab, which now draws its health rows under the same
+names. Two tabs naming one source differently is worse than either name. A source's catalogue
+`label` stays its *server-side identity* — the string a health row and a "this source has stopped
+working" push are written under — and is what an id nothing describes falls back to.
+
+Three facts per card, and they are three different questions:
+
+- **The pages**, from the catalogue. Static: no network, no pull, no collector run, so the tab says
+  something useful offline and on an account whose first collection has not happened. Each carries
+  what that *page* stamps on everything it yields — its tags, its city, its country. That is on the
+  screen because a keyword-less interest has no second filter, so a blanket tag **is** the whole of
+  what reaches it, and this app has made that mistake from three directions (the Jewish Culture
+  Festival's feed, `tagsFor`'s fallthrough, Ticketmaster's `classical`). Being able to read a
+  source's blanket tags off the page they come from is what makes the fourth one catchable.
+- **Health**, from `eventSources`. Three states and not two: never run is not ran-and-found-nothing,
+  and only one of them is a reason to go and look at the page.
+- **How much of the corpus is its.** A source can be green, be read, and be contributing nothing you
+  would miss — which is not a failure, does not belong in the health table, and is what you look at
+  before deciding a scrape is worth its fixture. Drawn as a chip rather than more grey text after a
+  separator: spaced apart the two statuses read as one run-on sentence, and a `·` between them
+  orphans onto the second line at 320px, where it reads as a bullet.
+
+A health row the catalogue does not describe gets its own short list under *Also reporting* rather
+than a special case for the id we happen to know about. `classifier` lands there correctly — it
+reports beside the scrapes because it fails the way they do, and it is not a page — and so would a
+scrape deleted from the catalogue and still collecting, which is the one worth seeing.
+
+`displayUrl` is why a link's text is the URL and still fits: the whole point is checking it, so a
+friendly name would be one more thing to take on trust — but python.org's calendar is a
+103-character Google Calendar id that takes three lines of a 320px panel to say nothing, so a long
+one collapses to its host and last segment. The `href` is always whole. Language-neutral by
+construction, which is what lets it live in the portable file at all.
+
+Behind the sign-in gate like every other tab. The catalogue alone would render fine signed out, but
+two of the three columns would be empty and one tab behaving unlike the other three is worse than
+the consistency is worth. No PWA work was needed: `APP_TIERS['events']` already claims the whole
+subtree, so the tab precached itself.
 
 ### Where an event is, and who it is for
 

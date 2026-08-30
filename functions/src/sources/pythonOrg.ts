@@ -13,9 +13,7 @@
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
 import { firstUrl, parseIcal } from './ical';
-
-const FEED =
-  'https://www.google.com/calendar/ical/j7gov1cmnqr9tvg14k621j7t5c%40group.calendar.google.com/public/basic.ics';
+import { PYTHON_ORG_ICAL } from '../../../korczak-xyz/src/utils/events/sources';
 
 export function toRawEvents(ics: string): RawEvent[] {
   return parseIcal(ics).map((event) => ({
@@ -52,6 +50,6 @@ export const pythonOrg: EventSource = {
   id: 'python-org',
   label: 'python.org events',
   async fetchEvents(ctx: SourceContext): Promise<RawEvent[]> {
-    return toRawEvents(await fetchText(ctx, FEED, {}, 30000));
+    return toRawEvents(await fetchText(ctx, PYTHON_ORG_ICAL, {}, 30000));
   },
 };

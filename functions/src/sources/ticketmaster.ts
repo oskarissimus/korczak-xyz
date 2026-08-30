@@ -11,8 +11,10 @@
  */
 
 import type { EventSource, RawEvent, SourceContext } from './types';
-
-const ENDPOINT = 'https://app.ticketmaster.com/discovery/v2/events.json';
+import {
+  TICKETMASTER_COUNTRY,
+  TICKETMASTER_ENDPOINT as ENDPOINT,
+} from '../../../korczak-xyz/src/utils/events/sources';
 const PAGE_SIZE = 200;
 /** Their deep-paging cap is 1000 items whatever we ask for, so more pages than this buy nothing. */
 const MAX_PAGES = 5;
@@ -98,7 +100,7 @@ export function toRawEvent(event: TmEvent): RawEvent | null {
     allDay: start?.noSpecificTime === true,
     city: venue?.city?.name,
     // The query is `countryCode=PL`, so this is the request's own constraint read back, not a guess.
-    country: 'PL',
+    country: TICKETMASTER_COUNTRY,
     venue: venue?.name,
     tags: tagsOf(event),
     // A Ticketmaster listing is its own ticket page.
@@ -125,7 +127,7 @@ export const ticketmaster: EventSource = {
     const out: RawEvent[] = [];
     for (let page = 0; page < MAX_PAGES; page++) {
       const url =
-        `${ENDPOINT}?countryCode=PL&size=${PAGE_SIZE}&page=${page}` +
+        `${ENDPOINT}?countryCode=${TICKETMASTER_COUNTRY}&size=${PAGE_SIZE}&page=${page}` +
         `&sort=date,asc&startDateTime=${new Date(ctx.now).toISOString().slice(0, 19)}Z` +
         `&apikey=${encodeURIComponent(key)}`;
 

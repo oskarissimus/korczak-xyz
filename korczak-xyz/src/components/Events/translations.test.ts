@@ -8,6 +8,25 @@ describe('translations', () => {
     expect(Object.keys(translations.pl).sort()).toEqual(Object.keys(translations.en).sort());
   });
 
+  /*
+   * The key-parity test above passes when a key exists in both tables holding the *same* English
+   * text, which is what a copy-paste into the wrong table produces — and that shipped once: four
+   * source descriptions rendered in English on the Polish page, with every test green.
+   *
+   * A blanket "no value repeats" would be wrong: `RSS`, `API` and `korczak.xyz` are the same word
+   * in both languages and should be. Length is what separates a label from a sentence, and a
+   * sentence that is byte-identical in two languages has not been translated.
+   */
+  it('translates the prose, rather than repeating the English', () => {
+    for (const [key, english] of Object.entries(translations.en)) {
+      if (english.length < 60) continue;
+      expect(
+        (translations.pl as Record<string, string>)[key],
+        `${key} is the same sentence in both locales — it looks untranslated`,
+      ).not.toBe(english);
+    }
+  });
+
   it('leaves no placeholder unfilled in either locale', () => {
     for (const [lang, table] of Object.entries(translations)) {
       for (const [key, value] of Object.entries(table)) {

@@ -16,7 +16,8 @@
 
 .ev-feed,
 .ev-interests,
-.ev-alerts {
+.ev-alerts,
+.ev-sources-tab {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -466,6 +467,94 @@
 
 .ev-row--bad {
   background: #ffd9d9;
+}
+
+/* --- the sources tab ------------------------------------------------------------------------ */
+
+.ev-source-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* A card rather than a row: a source is a heading, a sentence, a list of links and two statuses,
+   and the Alerts tab's one-line `.ev-row` is for something that fits on a line. */
+.ev-source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--retro-white);
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.ev-source--bad {
+  background: #ffd9d9;
+}
+
+.ev-source-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ev-source-name {
+  font-family: 'VT323', monospace;
+  font-size: 1.25rem;
+  margin: 0;
+  color: var(--retro-black);
+}
+
+.ev-source-note {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+.ev-pages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ev-page {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 1.05rem;
+}
+
+/* A URL has no spaces to break at and these are long — `anywhere` is what keeps the Google
+   Calendar ICS link inside a 320px panel instead of widening the window it sits in. */
+.ev-page-url {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.ev-page-meta {
+  color: var(--retro-dark-gray);
+  font-size: 1rem;
+}
+
+.ev-source-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+.ev-status--bad {
+  color: var(--retro-red);
 }
 
 /* --- sync badge ---------------------------------------------------------------------------- */

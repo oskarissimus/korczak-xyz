@@ -589,6 +589,12 @@ The Win95 tab strip is shared with the typing trainer as `src/styles/tabs.css` (
 `.win-tab`), pulled in by each app's stylesheet with `@import`, so a page picks it up through
 the one stylesheet it already needed.
 
+It **wraps**, with `column-gap` only so the rows abut and the panel line stays under the last one —
+which is what a Win95 property sheet does when its tabs outgrow a row, and a no-op for every strip
+that already fitted. Without it a strip simply ran off the side of a phone: the sleep log's five
+Polish labels want ~470px and Event Watch's four want ~424px against a 320px screen, so the last
+tab — the newest one, every time — was the one nobody could reach.
+
 ## Two decks, one scheduler
 
 `src/utils/srs/` is what the two decks genuinely share, and the line is drawn at **what does not know

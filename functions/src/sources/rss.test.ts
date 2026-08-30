@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FEEDS, parseFeed } from './rss';
+import { parseFeed } from './rss';
 
 const feed = { url: 'https://x.test/feed/', label: 'X', tags: ['history', 'festival'] };
 
@@ -63,16 +63,5 @@ describe('parseFeed', () => {
 
   it('skips an item with no title', () => {
     expect(parseFeed('<rss><item><link>https://x.test/a</link></item></rss>', feed)).toEqual([]);
-  });
-});
-
-describe('FEEDS', () => {
-  it('names a real feed and the tags an interest can narrow by', () => {
-    expect(FEEDS.length).toBeGreaterThan(0);
-    for (const entry of FEEDS) {
-      expect(entry.url).toMatch(/^https:\/\//);
-      expect(entry.tags.length).toBeGreaterThan(0);
-      expect(entry.label).toBeTruthy();
-    }
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseSeasonPage, seasonPaths, slugOf, tagsFor } from './teatrWielki';
+import { parseSeasonPage, slugOf, tagsFor } from './teatrWielki';
 
 /*
  * A committed fixture of the real page.
@@ -78,27 +78,6 @@ describe('parseSeasonPage', () => {
 
   it('skips a block with no title or no link', () => {
     expect(parseSeasonPage('<li class="page"><div class="teaser"></div></li>')).toEqual([]);
-  });
-});
-
-describe('seasonPaths', () => {
-  it('watches the current and the next season, since a new page IS the announcement', () => {
-    const paths = seasonPaths(Date.parse('2026-08-23T00:00:00Z'));
-    expect(paths).toEqual([
-      'https://teatrwielki.pl/repertuar/sezon-2026/27/',
-      'https://teatrwielki.pl/repertuar/sezon-2027/28/',
-    ]);
-  });
-
-  it('still points at the running season in January', () => {
-    // A season announced in spring 2026 runs into summer 2027, so in January 2027 the current
-    // pair is still 2026/27.
-    expect(seasonPaths(Date.parse('2027-01-15T00:00:00Z'))[0]).toContain('sezon-2026/27');
-  });
-
-  it('pads the second year, so 2029/30 does not become 2029/3', () => {
-    expect(seasonPaths(Date.parse('2029-06-01T00:00:00Z'))[0]).toContain('sezon-2029/30');
-    expect(seasonPaths(Date.parse('2099-06-01T00:00:00Z'))[0]).toContain('sezon-2099/00');
   });
 });
 
