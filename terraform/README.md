@@ -88,20 +88,28 @@ done
 
 Then push anything, or re-run the workflow.
 
-## The first apply adopts what exists
+## The first apply adopted what existed — done, 30 Aug 2026
 
-Every resource here already exists in the project. `imports.tf` carries `import` blocks rather than
-asking anyone to run `terraform import` — the adoption happens in CI like everything else, and that
-file is deleted in a follow-up commit once it has run.
+`imports.tf` held `import` blocks rather than asking anyone to run `terraform import`; the adoption
+happened in CI like everything else, and the file is gone now that it has run. Only resources whose
+*creation* would fail if they already exist were imported — the three secret containers and
+`gcf-artifacts`. APIs and IAM members are idempotent, so importing them would have added a way to
+fail for no benefit.
 
-Only resources whose *creation* would fail if they already exist are imported: the three secret
-containers and `gcf-artifacts`. APIs and IAM members are idempotent — enabling an enabled service
-and granting a held role both succeed — so importing them would add a way to fail for no benefit.
+What that first apply reported:
 
-**The acceptance test is an empty plan.** After the first apply, the next run must plan zero
-changes. A non-empty plan means these files describe something other than what is really in the
-project, and `apply` would then *change* it — which for `gcf-artifacts` means the images the live
-functions are running from.
+```
+Plan:  4 to import, 15 to add, 1 to change, 0 to destroy
+Apply: 4 imported, 15 added, 1 changed, 0 destroyed
+```
+
+The one change was attaching the cleanup policy to `gcf-artifacts`. The next run planned **no
+changes**, which is the acceptance test: state and the project agree, so nothing here is quietly
+about to be altered.
+
+**Keep that test.** A non-empty plan on a run that changed no files means these files describe
+something other than what is really in the project, and `apply` would then *change* it — which for
+`gcf-artifacts` means the images the live functions are running from.
 
 ## No lock file
 
