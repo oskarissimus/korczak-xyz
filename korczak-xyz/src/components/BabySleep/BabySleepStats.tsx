@@ -27,7 +27,9 @@ import {
   bedtimePoints,
   computeStats,
   firstNapPoints,
+  firstWakeWindowPoints,
   nightDurationPoints,
+  secondWakeWindowPoints,
   wakePoints,
 } from '../../utils/babySleep/stats';
 import {
@@ -37,7 +39,7 @@ import {
   nightRoutinesByDay,
   settlePoints,
 } from '../../utils/babySleep/routineStats';
-import { movingAverage, NIGHT_AVERAGE_WINDOW } from '../../utils/babySleep/movingAverage';
+import { movingAverage, AVERAGE_WINDOW } from '../../utils/babySleep/movingAverage';
 import { loadSettings, saveSettings } from '../../utils/babySleep/storage';
 import type { ClockStat, MeanStat, WindowChoice } from '../../utils/babySleep/types';
 import ClockSpreadChart from './ClockSpreadChart';
@@ -45,6 +47,8 @@ import DailySleepBars from './DailySleepBars';
 import DurationSpreadChart, {
   SHORT_MIN_SPAN,
   SHORT_TICK_STEPS,
+  WAKE_MIN_SPAN,
+  WAKE_TICK_STEPS,
 } from './DurationSpreadChart';
 import SleepTimeline from './SleepTimeline';
 import SyncBadge from './SyncBadge';
@@ -143,6 +147,17 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
      `nightPerDay` is the mean of them — three readings of one population, which is the whole reason
      `computeStats` goes through this extractor rather than over the day buckets. */
   const nightPoints = useMemo(() => nightDurationPoints(stats.days), [stats.days]);
+  /* The two activity windows, held here for the same reason: each is plotted, averaged over seven
+     days and summed into its own tile, and all three have to be one population.
+
+     The first takes the raw entries as well as the buckets — the night a morning ends is filed under
+     the day before, and on the window's first morning that night began before the window opened, so
+     it is in no bucket at all. */
+  const wake1Points = useMemo(
+    () => firstWakeWindowPoints(stats.days, data.entries, now),
+    [stats.days, data.entries] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const wake2Points = useMemo(() => secondWakeWindowPoints(stats.days), [stats.days]);
   /* The timeline's settling bands end where this says the sleep began — the same `asleepFor` the
      history rows and the live strip use, so none of them can come to disagree. Keyed by routine id
      rather than by night: a day holds several routines now. */
@@ -225,6 +240,10 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           t={t}
         />
         {durationTile(t.tileNapLength, stats.napLength, 'naps')}
+        {/* After the naps, because both windows are bounded by one: how long he manages before the
+            first, and what the first one buys before the second. */}
+        {durationTile(t.tileWake1, stats.firstWakeWindow)}
+        {durationTile(t.tileWake2, stats.secondWakeWindow)}
         {clockTile(t.tileBedtime, stats.bedtime)}
         {clockTile(t.tileWake, stats.wakeTime)}
         {clockTile(t.tileFirstNap, stats.firstNapStart)}
@@ -326,7 +345,7 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
         <h2 className="bs-subhead">{t.nightLengthTitle}</h2>
         <DurationSpreadChart
           points={nightPoints}
-          average={movingAverage(nightPoints, NIGHT_AVERAGE_WINDOW)}
+          average={movingAverage(nightPoints, AVERAGE_WINDOW)}
           averageLabel={t.legendAverage}
           stat={stats.nightPerDay}
           formatDay={formatDay}
@@ -411,6 +430,49 @@ export default function BabySleepStats({ lang }: BabySleepStatsProps) {
           meanLabel={t.legendMean}
           spreadLabel={t.legendSpread}
           ariaLabel={t.bedtimeAria}
+          emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
+        />
+      </section>
+
+      {/* Last, after the clock chart of when the first nap begins: these are the two stretches
+          between the day's sleeps, and the first of them is what decides that clock time. Each gets
+          its own section rather than sharing one, because they are two questions — the morning sets
+          the first window, the length of the first nap sets the second — and a single heading over
+          both would invite reading them as one number twice. */}
+      <section className="bs-section">
+        <h2 className="bs-subhead">{t.wake1Title}</h2>
+        <DurationSpreadChart
+          points={wake1Points}
+          average={movingAverage(wake1Points, AVERAGE_WINDOW)}
+          averageLabel={t.legendAverageDays}
+          stat={stats.firstWakeWindow}
+          minSpan={WAKE_MIN_SPAN}
+          tickSteps={WAKE_TICK_STEPS}
+          formatDay={formatDay}
+          label={t.wake1Series}
+          meanLabel={t.legendMean}
+          spreadLabel={t.legendSpread}
+          ariaLabel={t.wake1Aria}
+          emptyLabel={t.chartEmpty}
+          hintLabel={t.chartHint}
+        />
+      </section>
+
+      <section className="bs-section">
+        <h2 className="bs-subhead">{t.wake2Title}</h2>
+        <DurationSpreadChart
+          points={wake2Points}
+          average={movingAverage(wake2Points, AVERAGE_WINDOW)}
+          averageLabel={t.legendAverageDays}
+          stat={stats.secondWakeWindow}
+          minSpan={WAKE_MIN_SPAN}
+          tickSteps={WAKE_TICK_STEPS}
+          formatDay={formatDay}
+          label={t.wake2Series}
+          meanLabel={t.legendMean}
+          spreadLabel={t.legendSpread}
+          ariaLabel={t.wake2Aria}
           emptyLabel={t.chartEmpty}
           hintLabel={t.chartHint}
         />

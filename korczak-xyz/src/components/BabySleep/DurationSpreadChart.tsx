@@ -51,6 +51,17 @@ const TICK_STEPS = [30 * MINUTE, HOUR, 2 * HOUR];
 export const SHORT_MIN_SPAN = 30 * MINUTE;
 export const SHORT_TICK_STEPS = [5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE];
 
+/**
+ * For the activity windows, which are a couple of hours and vary by twenty minutes.
+ *
+ * Between the two above, and it has to be: the night's three-hour floor draws a fortnight of real
+ * drift as a flat line here, and the settling chart's half-hour floor magnifies the same drift into
+ * a mountain range. An hour is the smallest span an activity window can be read against without
+ * either happening.
+ */
+export const WAKE_MIN_SPAN = HOUR;
+export const WAKE_TICK_STEPS = [10 * MINUTE, 15 * MINUTE, 30 * MINUTE, HOUR];
+
 export default function DurationSpreadChart({
   points,
   stat,

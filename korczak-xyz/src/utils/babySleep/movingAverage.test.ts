@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { movingAverage, NIGHT_AVERAGE_WINDOW } from './movingAverage';
+import { movingAverage, AVERAGE_WINDOW } from './movingAverage';
 import type { DurationPoint } from './stats';
 
 const HOUR = 3_600_000;
@@ -77,12 +77,12 @@ describe('movingAverage', () => {
     const long = nights(
       Array.from({ length: 40 }, (_, i) => 8 + ((i * 7) % 11) / 3)
     );
-    const avg = movingAverage(long, NIGHT_AVERAGE_WINDOW);
+    const avg = movingAverage(long, AVERAGE_WINDOW);
 
-    expect(avg).toHaveLength(40 - NIGHT_AVERAGE_WINDOW + 1);
+    expect(avg).toHaveLength(40 - AVERAGE_WINDOW + 1);
     avg.forEach((p, i) => {
-      const window = long.slice(i, i + NIGHT_AVERAGE_WINDOW);
-      const plain = window.reduce((sum, q) => sum + q.ms, 0) / NIGHT_AVERAGE_WINDOW;
+      const window = long.slice(i, i + AVERAGE_WINDOW);
+      const plain = window.reduce((sum, q) => sum + q.ms, 0) / AVERAGE_WINDOW;
       expect(p.ms).toBeCloseTo(plain, 6);
       expect(p.at).toBe(window[window.length - 1].at);
     });

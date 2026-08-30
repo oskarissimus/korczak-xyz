@@ -1660,7 +1660,7 @@ absent line and a feature nobody has heard of look identical.
 
 ### The spread charts
 
-Five of them: four clock times and the night's length. `SpreadChart.tsx` is the drawing — dots, mean
+Eight of them: four clock times and four durations. `SpreadChart.tsx` is the drawing — dots, mean
 line, ±1 SD band, ticks, legend — and the line it is split on is that **it does not know what it is
 plotting**. It takes numbers in the axis's own units and a function that prints one, so
 `ClockSpreadChart` (minutes, circular) and `DurationSpreadChart` (milliseconds, linear) stay one
@@ -1711,6 +1711,45 @@ green, on a floor of 1.5. But the **dash** is what carries it: this chart tells 
 mark rather than by hue, the target's green against the dots' cyan being 1.09 and always having been.
 So the third pattern has to be a third pattern, and `chartContrast.test.ts` holds the three apart —
 it does *not* put them in its grayscale table, which that green/cyan pair would rightly fail.
+
+#### The activity windows
+
+Two more duration charts, and they are about the *day* rather than the night: how long he was awake
+from the morning wake-up to the first nap, and from the first nap to the second. Each carries the
+mean, the ±1 SD band and the same trailing average — `AVERAGE_WINDOW` is one constant for all three
+charts that draw that line, because a legend saying "7-day average" beside a line smoothed over five
+is a disagreement nothing on the screen would show.
+
+**Two charts and not one.** The first window is set by the morning and is what decides whether the
+first nap lands mid-morning or at noon; the second is set by how the first nap went, a forty-minute
+one and a two-hour one not buying the same afternoon. A single series pooling every gap between
+sleeps averages the two into a number that answers neither, which is `firstNapPoints`' argument
+against a mean over all nap starts, one rung down.
+
+Four rules in `stats.ts`, each the kind a later change reverses quietly:
+
+- **The morning wake-up is read off when nights *end*, never off the day's own night.** A night is
+  filed under the evening it began — the night of the 18th ends on the morning of the 19th — so the
+  window that follows it belongs to the *next* bucket. Reaching back through `days[i - 1]` would also
+  cost the first day of every window its point, that night having started before the window opened;
+  `morningWakeAt` scans the ends instead, which needs no predecessor bucket and picks the last block
+  of a broken night without being told about wakings.
+- **Today counts.** These follow the clock-point rule, not the duration one: a window is a complete
+  fact the moment the next sleep begins, however much of the day is still to come. That is
+  `routineStats.ts`'s rule for a settling time, reached again.
+- **`MAX_WAKE_MS` (8h) excludes rather than counts.** A gap longer than that is a nap nobody logged,
+  and it would land in the mean as a morning the baby was up for nine hours with nothing on the chart
+  to say the afternoon nap was the first one written down. `MAX_SETTLE_MS`'s rule for the other join
+  this app makes between two records — a fabricated window is worse than a gap.
+- **The first window needs only a nap's *start*, the second needs the first nap closed.** So a day
+  whose morning nap is still running contributes to the first chart and not to the second, and the
+  two tiles print different denominators. That is the same fact the tiles have always stated.
+
+`firstWakeWindowPoints` therefore takes the raw entries as well as the buckets and
+`secondWakeWindowPoints` takes only the buckets — both ends of the second window are naps, and a nap
+is filed under the day it happened on. Each is honest about what it needs rather than sharing one
+signature. `WAKE_MIN_SPAN` is an hour: the night's three-hour floor draws a fortnight of real drift
+as a flat line, and the settling chart's half-hour floor turns the same drift into a mountain range.
 
 ### The climate tab
 

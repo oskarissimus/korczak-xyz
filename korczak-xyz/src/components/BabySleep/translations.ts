@@ -137,6 +137,8 @@ export const translations = {
     tileNightWakes: 'Night wakings',
     tileNightAwake: 'Awake at night',
     tileNapLength: 'Nap length',
+    tileWake1: 'First activity window',
+    tileWake2: 'Second activity window',
     tileBedtime: 'Falls asleep',
     tileWake: 'Wakes up',
     tileFirstNap: 'First nap',
@@ -171,6 +173,14 @@ export const translations = {
     cribNoTarget: 'No target set. The Config tab draws one on this chart and on the timeline above.',
     bedtimeTitle: 'Falling asleep and waking up',
     bedtimeAria: 'Bedtime and wake-up clock times per day, with the mean and one standard deviation',
+    wake1Title: 'How long he was awake before the first nap',
+    wake1Aria:
+      'Time awake from the morning wake-up to the first nap, per day, with the mean, one standard deviation and a 7-day average',
+    wake1Series: 'Wake-up to first nap',
+    wake2Title: 'How long he was awake between the first and second nap',
+    wake2Aria:
+      'Time awake between the end of the first nap and the start of the second, per day, with the mean, one standard deviation and a 7-day average',
+    wake2Series: 'First nap to second',
     legendNight: 'Night',
     legendNap: 'Nap',
     legendRoutine: 'Routine',
@@ -182,6 +192,9 @@ export const translations = {
     legendSpread: '±1 SD',
     legendTarget: 'Target',
     legendAverage: '7-night average',
+    /* The same line over a daytime chart, where "night" would name the wrong unit — an activity
+       window is a fact about a day. */
+    legendAverageDays: '7-day average',
     chartEmpty: 'Nothing logged in this window.',
     chartHint: 'Point at the chart, or tap it, for the values.',
     meanLine: 'Mean {value}',
@@ -428,6 +441,8 @@ export const translations = {
     tileNightWakes: 'Pobudki w nocy',
     tileNightAwake: 'Czuwanie w nocy',
     tileNapLength: 'Długość drzemki',
+    tileWake1: 'Pierwsze okno aktywności',
+    tileWake2: 'Drugie okno aktywności',
     tileBedtime: 'Zasypia',
     tileWake: 'Wstaje',
     tileFirstNap: 'Pierwsza drzemka',
@@ -463,6 +478,14 @@ export const translations = {
     bedtimeTitle: 'Zasypianie i pobudka',
     bedtimeAria:
       'Godziny zaśnięcia i pobudki dla każdego dnia, ze średnią i jednym odchyleniem standardowym',
+    wake1Title: 'Jak długo nie spało przed pierwszą drzemką',
+    wake2Title: 'Jak długo nie spało między pierwszą a drugą drzemką',
+    wake1Aria:
+      'Czas czuwania od porannej pobudki do pierwszej drzemki, dzień po dniu, ze średnią, jednym odchyleniem standardowym i średnią z 7 dni',
+    wake1Series: 'Od pobudki do pierwszej drzemki',
+    wake2Aria:
+      'Czas czuwania od końca pierwszej drzemki do początku drugiej, dzień po dniu, ze średnią, jednym odchyleniem standardowym i średnią z 7 dni',
+    wake2Series: 'Od pierwszej drzemki do drugiej',
     legendNight: 'Noc',
     legendNap: 'Drzemka',
     legendRoutine: 'Rytuał',
@@ -474,6 +497,7 @@ export const translations = {
     legendSpread: '±1 SD',
     legendTarget: 'Cel',
     legendAverage: 'Średnia z 7 nocy',
+    legendAverageDays: 'Średnia z 7 dni',
     chartEmpty: 'Brak wpisów w tym zakresie.',
     chartHint: 'Najedź na wykres lub dotknij go, aby zobaczyć wartości.',
     meanLine: 'Średnia {value}',

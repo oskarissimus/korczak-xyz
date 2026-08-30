@@ -259,6 +259,15 @@ export interface SleepStats {
   napPerDay: MeanStat;
   napsPerDay: MeanStat;
   napLength: MeanStat;
+  /**
+   * How long he was awake between two sleeps — the activity windows.
+   *
+   * The first is the morning wake-up to the first nap, the second is the first nap to the second.
+   * Two figures rather than one mean over every gap: the morning sets one and the length of the
+   * first nap sets the other, so an average of the two answers neither.
+   */
+  firstWakeWindow: MeanStat;
+  secondWakeWindow: MeanStat;
   bedtime: ClockStat;
   wakeTime: ClockStat;
   /** The first nap of the day. A mean over *all* nap starts averages the 9am and 3pm nap into noon. */

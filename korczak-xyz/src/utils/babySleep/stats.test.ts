@@ -5,7 +5,9 @@ import {
   bedtimePoints,
   computeStats,
   firstNapPoints,
+  firstWakeWindowPoints,
   nightDurationPoints,
+  secondWakeWindowPoints,
   wakePoints,
 } from './stats';
 import { groupByDay } from './days';
@@ -255,5 +257,67 @@ describe('chart points', () => {
   it('has no points for days without closed sleep', () => {
     expect(bedtimePoints(groupByDay([], week, T0))).toEqual([]);
     expect(firstNapPoints(groupByDay([], week, T0))).toEqual([]);
+  });
+});
+
+describe('activity windows', () => {
+  it('measures the first window from the night that ended that morning', () => {
+    // The night ending on the 13th is filed under the 12th, so this only works by looking at when
+    // nights *end* rather than at the day's own night.
+    const days = groupByDay([...normalDay(12), ...normalDay(13)], week, T0);
+    expect(firstWakeWindowPoints(days, [...normalDay(12), ...normalDay(13)], T0)).toEqual([
+      // The 12th has no point: the night before it is outside the window entirely.
+      { at: local(13, 0), ms: 3 * HOUR },
+    ]);
+  });
+
+  it('measures the second window between the two naps', () => {
+    const days = groupByDay([...normalDay(12), ...normalDay(13)], week, T0);
+    expect(secondWakeWindowPoints(days)).toEqual([
+      { at: local(12, 0), ms: 2.5 * HOUR },
+      { at: local(13, 0), ms: 2.5 * HOUR },
+    ]);
+  });
+
+  it('counts today, because a window is finished the moment the next sleep starts', () => {
+    // The 15th is today at noon: partial, so it reaches no duration mean — but the morning is over.
+    const entries = [
+      entry('night', local(14, 20), local(15, 6, 30)),
+      entry('nap', local(15, 9, 30), null),
+    ];
+    const stats = computeStats(entries, week, T0);
+    expect(firstWakeWindowPoints(stats.days, entries, T0)).toEqual([
+      { at: local(15, 0), ms: 3 * HOUR },
+    ]);
+    expect(stats.firstWakeWindow).toMatchObject({ mean: 3 * HOUR, n: 1 });
+    // The nap is still running, so nothing yet says what the second window will be.
+    expect(secondWakeWindowPoints(stats.days)).toEqual([]);
+  });
+
+  it('drops a window longer than a day can really hold — that is a nap nobody logged', () => {
+    const entries = [
+      ...normalDay(12),
+      entry('nap', local(13, 15), local(13, 16)),
+      entry('nap', local(13, 17), local(13, 18)),
+    ];
+    const days = groupByDay(entries, week, T0);
+    // 06:00 to 15:00 is nine hours: the morning nap was never written down.
+    expect(firstWakeWindowPoints(days, entries, T0).map((p) => p.at)).not.toContain(local(13, 0));
+    // The gap between the two naps that *were* logged is untouched by that.
+    expect(secondWakeWindowPoints(days)).toContainEqual({ at: local(13, 0), ms: HOUR });
+  });
+
+  it('plots exactly the windows the tiles average', () => {
+    const entries = [...normalDay(12), ...normalDay(13), ...normalDay(14)];
+    const stats = computeStats(entries, week, T0);
+    expect(stats.firstWakeWindow.n).toBe(firstWakeWindowPoints(stats.days, entries, T0).length);
+    expect(stats.secondWakeWindow.n).toBe(secondWakeWindowPoints(stats.days).length);
+    expect(stats.secondWakeWindow.mean).toBe(2.5 * HOUR);
+  });
+
+  it('has no windows without sleeps to measure between', () => {
+    const empty = groupByDay([], week, T0);
+    expect(firstWakeWindowPoints(empty, [], T0)).toEqual([]);
+    expect(secondWakeWindowPoints(empty)).toEqual([]);
   });
 });

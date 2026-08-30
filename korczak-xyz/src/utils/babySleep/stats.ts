@@ -27,6 +27,7 @@
 import { circularStat, linearStat } from './circular';
 import { groupByDay, minutesOfDay } from './days';
 import type { DayBucket, MeanStat, SleepEntry, SleepStats, TimeWindow } from './types';
+import { isPlausible } from './types';
 
 function meanStat(values: number[]): MeanStat {
   const { mean, sd, n } = linearStat(values);
@@ -89,6 +90,100 @@ export interface DurationPoint {
   ms: number;
 }
 
+/**
+ * Longer than this and the gap is a nap nobody logged, not a stretch anybody stayed awake for.
+ *
+ * `MAX_SETTLE_MS`'s rule, applied to the other join this app makes between two records: an activity
+ * window is measured between two sleeps, so a missing sleep in the middle silently doubles one. Nine
+ * hours would then land in the mean as a day the baby was up all morning, and nothing on the chart
+ * would say the afternoon nap was the first one logged. Excluded rather than counted — a fabricated
+ * window is worse than a gap. Eight hours is past any real one and short enough to catch that.
+ */
+export const MAX_WAKE_MS = 8 * 60 * 60_000;
+
+/**
+ * The morning wake-up on a day: the latest night block that *ended* inside it.
+ *
+ * Read off the ends rather than off the day's own night, because the night a morning belongs to is
+ * filed under the *previous* day — a night beginning at 20:40 on the 18th is the 18th's, and the
+ * wake-up it produces is the 19th's morning. Going through the previous day's bucket would also cost
+ * the first day of every window its point, that night having started before the window opened.
+ *
+ * A night broken by a waking needs nothing special: the last block to end is the one he got up from.
+ */
+function morningWakeAt(day: DayBucket, nightEnds: number[]): number | null {
+  let last: number | null = null;
+  for (const end of nightEnds) {
+    if (end < day.start || end >= day.end) continue;
+    if (last == null || end > last) last = end;
+  }
+  return last;
+}
+
+/** Every believable night block's wake time, whichever day the night itself was filed under. */
+function nightEndsOf(entries: SleepEntry[], now: number): number[] {
+  return entries.flatMap((e) =>
+    e.kind === 'night' && e.end != null && isPlausible(e, now) ? [e.end] : []
+  );
+}
+
+/** The naps attributed to a day, earliest first. Running ones included — a start is a start. */
+function napsOf(bucket: DayBucket): SleepEntry[] {
+  return bucket.entries.filter((e) => e.kind === 'nap');
+}
+
+/** One activity window, or null when either end of it is missing or past believing. */
+function wakeWindow(from: number | null, to: number | null): number | null {
+  if (from == null || to == null) return null;
+  const ms = to - from;
+  return ms > 0 && ms <= MAX_WAKE_MS ? ms : null;
+}
+
+/*
+ * The activity windows — how long he was awake between one sleep and the next.
+ *
+ * Two of them get a chart, because they are two different questions. The **first** is set by the
+ * morning: it is the one that decides whether the first nap lands mid-morning or at noon, and it is
+ * the window that shifts as he grows out of one. The **second** is set by how the first nap went — a
+ * forty-minute nap and a two-hour one do not buy the same afternoon — so pooling the two would
+ * average away exactly what each is for.
+ *
+ * Both follow the **clock-point rule and not the duration one**, so today is included: a window is a
+ * complete fact the moment the next sleep begins, however much of the day is still to come. That is
+ * `routineStats.ts`'s rule for a settling time, and it holds here for its reason.
+ */
+
+/** Morning wake-up to the first nap, one point a day. */
+export function firstWakeWindowPoints(
+  days: DayBucket[],
+  entries: SleepEntry[],
+  now: number
+): DurationPoint[] {
+  const ends = nightEndsOf(entries, now);
+  return days.flatMap((day) => {
+    const naps = napsOf(day);
+    if (naps.length === 0) return [];
+    const ms = wakeWindow(morningWakeAt(day, ends), naps[0].start);
+    return ms == null ? [] : [{ at: day.start, ms }];
+  });
+}
+
+/**
+ * The first nap to the second, one point a day.
+ *
+ * Needs no entries beyond the day's own: both ends of it are naps, and a nap is filed under the day
+ * it happened on. It needs the first nap *closed*, where the window above needs only a start — which
+ * is why a day with one nap still running contributes to the first chart and not to this one.
+ */
+export function secondWakeWindowPoints(days: DayBucket[]): DurationPoint[] {
+  return days.flatMap((day) => {
+    const naps = napsOf(day);
+    if (naps.length < 2) return [];
+    const ms = wakeWindow(naps[0].end, naps[1].start);
+    return ms == null ? [] : [{ at: day.start, ms }];
+  });
+}
+
 export function computeStats(entries: SleepEntry[], window: TimeWindow, now: number): SleepStats {
   const days = groupByDay(entries, window, now);
   const settled = days.filter((d) => !d.partial);
@@ -117,6 +212,10 @@ export function computeStats(entries: SleepEntry[], window: TimeWindow, now: num
     napLength: meanStat(
       tracked.flatMap((d) => closedNaps(d).map((e) => (e.end as number) - e.start))
     ),
+    // Through the extractors, like `nightPerDay` and for its reason: the tile and the chart under it
+    // are then one population, today included in both or in neither.
+    firstWakeWindow: meanStat(firstWakeWindowPoints(days, entries, now).map((p) => p.ms)),
+    secondWakeWindow: meanStat(secondWakeWindowPoints(days).map((p) => p.ms)),
     bedtime: circularStat(bedtimePoints(days).map((p) => p.minutes)),
     wakeTime: circularStat(wakePoints(days).map((p) => p.minutes)),
     firstNapStart: circularStat(firstNapPoints(days).map((p) => p.minutes)),
