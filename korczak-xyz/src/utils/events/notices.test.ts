@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noticesFor, planRun, type PlanContext } from './notices';
+import { NO_IGNORES } from './ignores';
 import { fingerprintOf, haystackOf, noticeIdFor } from './normalize';
 import type { EventRecord, Interest } from './types';
 
@@ -12,6 +13,7 @@ const ctx = (over: Partial<PlanContext> = {}): PlanContext => ({
   armedAt: ARMED,
   maxPerRun: 3,
   maxOnSalePerRun: 10,
+  ignored: NO_IGNORES,
   ...over,
 });
 
@@ -137,6 +139,45 @@ describe('noticesFor', () => {
   it('never pushes for a muted interest', () => {
     const muted: Interest = { ...KEEN, muted: true };
     expect(noticesFor(ev({ title: 'X' }), [muted], new Set(), ctx())).toEqual([]);
+  });
+});
+
+describe('an event dismissed by hand', () => {
+  it('is never notified about, however well it matches', () => {
+    /*
+     * The half of ignoring that is not on the screen. An ignore the collector never reads means
+     * the card is gone from the feed and the phone still rings about it at 7am — which is the
+     * reading of "ignore" nobody means, and the one that gets a push app deleted.
+     */
+    const event = ev({ title: 'Not going', startsAt: NOW + 3 * DAY });
+    expect(kinds(noticesFor(event, [KEEN], new Set(), ctx()))).not.toEqual([]);
+    expect(
+      noticesFor(event, [KEEN], new Set(), ctx({ ignored: new Set([event.fingerprint]) })),
+    ).toEqual([]);
+  });
+
+  it('claims no notice, so un-ignoring it gets its notifications back', () => {
+    /*
+     * Deliberately not latched. A claimed-but-unsent notice would silently consume the `soon`
+     * reminder for an event brought back precisely because its date is wanted after all — and
+     * un-ignoring is a deliberate act by the person who would receive the push, which is why this
+     * is the one place the app prefers a possible extra send to a lost one.
+     */
+    const event = ev({ title: 'Reconsidered', startsAt: NOW + 3 * DAY });
+    const plan = planRun([event], [KEEN], new Set(), ctx({ ignored: new Set([event.fingerprint]) }));
+    expect(plan.send).toEqual([]);
+    expect(plan.suppressed).toEqual([]);
+    expect(plan.summary).toBeNull();
+
+    // Nothing was written while it was ignored, so the latch is still open for it.
+    expect(kinds(planRun([event], [KEEN], new Set(), ctx()).send)).toContain('soon');
+  });
+
+  it('silences the twin a second source listed, the key being the fingerprint', () => {
+    const fp = fingerprintOf({ title: 'Wesele Figara', day: '2027-01-14' });
+    const a = ev({ id: 'tw', title: 'Wesele Figara', fingerprint: fp });
+    const b = ev({ id: 'tm', title: 'Wesele Figara', fingerprint: fp, ticketUrl: 'https://t.test/x' });
+    expect(planRun([a, b], [KEEN], new Set(), ctx({ ignored: new Set([fp]) })).send).toEqual([]);
   });
 });
 

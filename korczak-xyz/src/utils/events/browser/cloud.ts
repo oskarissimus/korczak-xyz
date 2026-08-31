@@ -3,8 +3,9 @@
  *
  * Two very different collections, and the difference is the whole design:
  *
- *   - `users/{uid}/eventInterests` is his, read and written from here. Covered by the
- *     `users/{uid}/{document=**}` catch-all, so it needed no rules change.
+ *   - `users/{uid}/eventInterests` and `users/{uid}/eventIgnores` are his, read and written from
+ *     here. Both are covered by the `users/{uid}/{document=**}` catch-all, so neither needed a
+ *     rules change.
  *   - `events/` is a SHARED corpus, written only by the collector (a Cloud Function on the Admin
  *     SDK, which bypasses rules) and read by any signed-in account. That one needed a new rules
  *     block, and until `firebase deploy --only firestore:rules` has been run the feed reads
@@ -29,8 +30,8 @@ import {
 import { getDb } from '../../../lib/firebase';
 import { runCloud } from '../../../lib/firestoreHealth';
 import { log } from '../../../lib/logger';
-import type { EventRecord, Interest, Notice, PushSettings, PushSub, SourceHealth } from '../types';
-import { normalizeInterest } from './storage';
+import type { EventRecord, Ignore, Interest, Notice, PushSettings, PushSub, SourceHealth } from '../types';
+import { normalizeIgnore, normalizeInterest } from './storage';
 
 /**
  * How much of the shared corpus one pull takes.
@@ -41,6 +42,7 @@ import { normalizeInterest } from './storage';
  */
 const EVENT_PULL_LIMIT = 2000;
 const INTEREST_PULL_LIMIT = 500;
+const IGNORE_PULL_LIMIT = 1000;
 const DAY = 86400000;
 
 // --- interests ------------------------------------------------------------------------------
@@ -77,6 +79,48 @@ export async function pushInterest(uid: string, interest: Interest): Promise<voi
   if (!getDb()) return;
   await runCloud('events.interests.push', () =>
     setDoc(doc(interestsCollection(uid), interest.id), stripUndefined(interest)),
+  );
+}
+
+// --- the ignores ------------------------------------------------------------------------------
+
+function ignoresCollection(uid: string) {
+  return collection(getDb()!, 'users', uid, 'eventIgnores');
+}
+
+/**
+ * Every ignore, tombstones included. The whole collection, for `pullInterests`' reason.
+ *
+ * **No `orderBy`.** A Firestore `orderBy` excludes any document lacking the field it names, so
+ * ordering on anything an older or future build might not write would silently hide those rows —
+ * and a hidden tombstone is an ignore that comes back. Ordering is the caller's job anyway: these
+ * are a set, read into one.
+ */
+export async function pullIgnores(uid: string): Promise<Ignore[]> {
+  if (!getDb()) return [];
+  const snap = await runCloud('events.ignores.pull', () =>
+    getDocs(query(ignoresCollection(uid), limit(IGNORE_PULL_LIMIT))),
+  );
+  const out: Ignore[] = [];
+  let rejected = 0;
+  for (const document of snap.docs) {
+    const ignore = normalizeIgnore({ ...document.data(), id: document.id });
+    if (ignore) out.push(ignore);
+    else rejected += 1;
+  }
+  if (rejected > 0) log.warn('events.ignores.pull.rejected', { rejected, kept: out.length });
+  return out;
+}
+
+/**
+ * Never a `deleteDoc`, for the reason `pushInterest` is not one — and here it is sharper: the row's
+ * *presence* is the hidden state, so un-ignoring is the delete. Sent as a real delete it would
+ * simply be recreated from the other device's live copy on the next merge.
+ */
+export async function pushIgnore(uid: string, ignore: Ignore): Promise<void> {
+  if (!getDb()) return;
+  await runCloud('events.ignores.push', () =>
+    setDoc(doc(ignoresCollection(uid), ignore.id), stripUndefined(ignore)),
   );
 }
 

@@ -34,6 +34,15 @@ export interface PlanContext {
   armedAt: number | null;
   maxPerRun: number;
   maxOnSalePerRun: number;
+  /**
+   * Fingerprints dismissed by hand — `ignoredFingerprints(...)`.
+   *
+   * Required rather than optional, unlike the feed's, and that is the point of it being on the
+   * context at all: an ignore that reaches the feed and not the collector means the card is gone
+   * from the screen and the phone still rings about it at 7am, which is the reading of "ignore"
+   * that gets the app deleted. A new caller that has no list has to say `NO_IGNORES` out loud.
+   */
+  ignored: ReadonlySet<string>;
 }
 
 export interface RunPlan {
@@ -78,6 +87,18 @@ export function noticesFor(
 ): PendingNotice[] {
   // A date that has already passed is not news, whatever else is true of it.
   if (event.startsAt !== null && event.startsAt < ctx.now) return [];
+
+  /*
+   * Dismissed by hand. Checked here rather than in `planRun` so both entry points obey it, and
+   * checked before anything is built so **nothing is latched**: an ignored event leaves no claimed
+   * notice behind, and un-ignoring it therefore gets its notifications back.
+   *
+   * That is the one place this app prefers a possible extra send to a lost one, and only because
+   * the send cannot happen without a deliberate act — un-ignoring — by the person who would
+   * receive it. Latching instead would silently consume the `soon` reminder for an event brought
+   * back precisely because its date is wanted after all.
+   */
+  if (ctx.ignored.has(event.fingerprint)) return [];
 
   const matched = matchingInterests(event, interests, { forPush: true });
   if (matched.length === 0) return [];

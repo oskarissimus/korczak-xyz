@@ -15,18 +15,22 @@
  * What is expendable and what is not:
  *
  *   - `events-interests` is the ONLY local copy of something he typed. Never evicted.
+ *   - `events-ignores` is the same: an event dismissed by hand is a decision, and dropping it
+ *     brings the card back with nothing to say why. Never evicted either.
  *   - `events-feed` is a cache of a server-owned corpus. First to go, and losing it costs one
  *     online refresh — it exists so an installed app shows something on a dead network.
  */
 
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
-import type { EventRecord, Interest, PushSettings } from '../types';
+import type { EventRecord, Ignore, Interest, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
 export const EVENT_KEYS = {
   interests: 'events-interests',
   unsynced: 'events-interests-unsynced',
+  ignores: 'events-ignores',
+  ignoresUnsynced: 'events-ignores-unsynced',
   feed: 'events-feed',
   pushSubId: 'events-push-sub-id',
   pushSeen: 'events-push-seen-at',
@@ -46,6 +50,8 @@ const FEED_CACHE_LIMIT = 200;
 const CACHED_PER_OWNER = [
   EVENT_KEYS.interests,
   EVENT_KEYS.unsynced,
+  EVENT_KEYS.ignores,
+  EVENT_KEYS.ignoresUnsynced,
   EVENT_KEYS.feed,
   EVENT_KEYS.settings,
 ] as const;
@@ -203,24 +209,84 @@ export function normalizeInterest(raw: unknown): Interest | null {
   };
 }
 
-// --- the push queue -------------------------------------------------------------------------
+// --- the ignores ------------------------------------------------------------------------------
 
-export function loadUnsynced(): string[] {
-  const raw = readJSON<unknown>(EVENT_KEYS.unsynced, []);
+/**
+ * Every stored ignore, tombstones included — callers filter, through `ignoredFingerprints`.
+ *
+ * The tombstones have to survive the round trip: a lifted ignore is a *deleted* row, and dropping
+ * it here would let the other device's live copy win the next merge and hide the card again.
+ */
+export function loadIgnores(): Ignore[] {
+  const raw = readJSON<unknown[]>(EVENT_KEYS.ignores, []);
+  if (!Array.isArray(raw)) return [];
+  const out: Ignore[] = [];
+  for (const item of raw) {
+    const ignore = normalizeIgnore(item);
+    if (ignore) out.push(ignore);
+  }
+  return out;
+}
+
+export function saveIgnores(ignores: Ignore[]): boolean {
+  return writeEventsKey(EVENT_KEYS.ignores, JSON.stringify(ignores));
+}
+
+/**
+ * Rebuilds an ignore from an untrusted value, allow-list style — `normalizeInterest`'s contract.
+ *
+ * A row with no `fingerprint` is dropped rather than kept: the fingerprint is the whole payload,
+ * and a row without one is an ignore of nothing that would sit in the list forever, unmatched by
+ * any event and so unreachable from the Ignored view.
+ */
+export function normalizeIgnore(raw: unknown): Ignore | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || !r.id) return null;
+  if (typeof r.rev !== 'number' || typeof r.updatedAt !== 'number') return null;
+  if (typeof r.writerId !== 'string') return null;
+  if (typeof r.fingerprint !== 'string' || !r.fingerprint) return null;
+
+  return {
+    id: r.id,
+    rev: r.rev,
+    updatedAt: r.updatedAt,
+    writerId: r.writerId,
+    ...(r.deleted === true ? { deleted: true as const } : {}),
+    fingerprint: r.fingerprint,
+    title: typeof r.title === 'string' ? r.title : '',
+  };
+}
+
+// --- the push queues ------------------------------------------------------------------------
+
+/*
+ * Two queues over one pair of functions, keyed by the store they drain — `EVENT_KEYS.unsynced` for
+ * the interests, `EVENT_KEYS.ignoresUnsynced` for the ignores.
+ *
+ * The key is a required argument rather than a default, because the two collections hold ids from
+ * different id spaces: an interest is a `uuid()` and an ignore is `slugKey(fingerprint)`. Sharing
+ * one queue would have each hook's sync loop look up the other's ids, find nothing, and quietly
+ * drop them as already-done — a write that never leaves the device, with a drained queue and a
+ * Synced badge saying it did.
+ */
+
+export function loadUnsynced(key: string): string[] {
+  const raw = readJSON<unknown>(key, []);
   return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
 }
 
-export function saveUnsynced(ids: string[]): boolean {
-  return writeEventsKey(EVENT_KEYS.unsynced, JSON.stringify([...new Set(ids)]));
+export function saveUnsynced(key: string, ids: string[]): boolean {
+  return writeEventsKey(key, JSON.stringify([...new Set(ids)]));
 }
 
-export function markUnsynced(ids: string[]): boolean {
-  return saveUnsynced([...loadUnsynced(), ...ids]);
+export function markUnsynced(key: string, ids: string[]): boolean {
+  return saveUnsynced(key, [...loadUnsynced(key), ...ids]);
 }
 
-export function clearUnsynced(ids: string[]): boolean {
+export function clearUnsynced(key: string, ids: string[]): boolean {
   const done = new Set(ids);
-  return saveUnsynced(loadUnsynced().filter((id) => !done.has(id)));
+  return saveUnsynced(key, loadUnsynced(key).filter((id) => !done.has(id)));
 }
 
 // --- the feed cache -------------------------------------------------------------------------
@@ -285,21 +351,30 @@ export function savePushSettings(settings: PushSettings): boolean {
 // --- account switching ----------------------------------------------------------------------
 
 let adopted: string | null = null;
+let adoptedSwitched = false;
 
 /**
  * Records which account this browser's cache belongs to, clearing it on a change.
  *
- * Memoised for the page load because more than one island calls it and only the first can observe
- * the switch — without the memo the second keeps the previous account's rows in memory and pushes
- * them into the new one on its first write. That is the sleep log's `adoptOwner` bug, avoided by
- * having read it.
+ * Memoised for the page load because more than one caller asks — the interests hook and the
+ * ignores hook both mount on the Feed — and the *clearing* must happen exactly once. But the
+ * **answer** is memoised too, not just the guard, and that distinction is the whole of the sleep
+ * log's `adoptOwner` bug: whoever asks second reads `previous === uid`, having watched the first
+ * caller write it, so a plain re-read tells them nothing happened. They then keep the previous
+ * account's rows in memory over a store that has just been emptied, and the next sync sees rows
+ * the cloud lacks and pushes them into the new account.
+ *
+ * So every caller in a page load that switched accounts is told it switched, and every one of them
+ * reloads from the (now empty) store. Returning `false` to all but the first is only safe while
+ * there is exactly one caller, which stopped being true the moment ignoring an event became its
+ * own collection.
  *
  * An absent value adopts the current account rather than clearing, so an install predating this
  * migrates instead of losing its interests.
  */
 export function adoptOwner(uid: string): boolean {
   if (typeof window === 'undefined') return false;
-  if (adopted === uid) return false;
+  if (adopted === uid) return adoptedSwitched;
   adopted = uid;
   let previous: string | null = null;
   try {
@@ -307,8 +382,12 @@ export function adoptOwner(uid: string): boolean {
   } catch {
     return false;
   }
-  if (previous === uid) return false;
+  if (previous === uid) {
+    adoptedSwitched = false;
+    return false;
+  }
   const switched = previous !== null;
+  adoptedSwitched = switched;
   if (switched) {
     for (const key of CACHED_PER_OWNER) {
       try {

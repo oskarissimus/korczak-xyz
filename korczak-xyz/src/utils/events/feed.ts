@@ -7,6 +7,7 @@
  */
 
 import type { EventRecord, Interest } from './types';
+import { NO_IGNORES } from './ignores';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
@@ -20,6 +21,12 @@ export interface FeedItem {
    * `rejected-place` mode, where it is the whole point of the row.
    */
   rejectedBy?: Interest[];
+  /**
+   * Dismissed by hand. Set in every mode that can show such a row — so `all` can mark one rather
+   * than draw it as though nothing had happened to it, which would make "Everything" and "Matched"
+   * differ for a reason nothing on the screen states.
+   */
+  ignored?: boolean;
 }
 
 /**
@@ -33,8 +40,13 @@ export interface FeedItem {
  *
  * Built from the same `matchReason` call the real filter makes, so this view cannot show a
  * different set from the one being filtered on. See `matchReason`'s header.
+ *
+ * `ignored` is the same argument reaching the hand-dismissed rows: hiding something with no list
+ * that says what is hidden is a filter you cannot check and cannot undo, and the only way back to
+ * an ignored event would be remembering it existed. It is also the *only* way back — the Ignore
+ * button is on the card, so the card has to be reachable.
  */
-export type FeedMode = 'matched' | 'rejected-place' | 'all';
+export type FeedMode = 'matched' | 'rejected-place' | 'all' | 'ignored';
 
 export type FeedGroup = 'week' | 'month' | 'later' | 'undated';
 
@@ -70,26 +82,69 @@ export function dedupeByFingerprint(events: EventRecord[]): EventRecord[] {
   return [...best.values()];
 }
 
+export interface FeedOptions {
+  /** Which view. Defaults to `matched`, which is what the tab opens on. */
+  mode?: FeedMode;
+  /**
+   * Fingerprints the reader has dismissed by hand — `ignoredFingerprints(...)`.
+   *
+   * Defaulted to empty rather than required, unlike `PlanContext.ignored`, and the asymmetry is
+   * deliberate: a caller here that forgot it would show a row that should be hidden, which is
+   * visible on the screen and one tap from being fixed, where the same omission in the collector
+   * is a notification at 7am about the concert you already said no to.
+   */
+  ignored?: ReadonlySet<string>;
+}
+
 /**
  * The feed: matched events, deduped, grouped by how soon they are.
  *
  * `forPush: false` — a muted interest still puts things here. Muting says "do not wake me", not
  * "hide it from me", and conflating the two is how a muted interest becomes indistinguishable from
  * a deleted one.
+ *
+ * Ignoring is the opposite instruction and is applied here rather than in the matcher, because it
+ * is not a fact about whether the event matches: it matched, and was dismissed anyway. Folding it
+ * into `matchReason` would make an ignored row indistinguishable from one no interest ever wanted,
+ * and there would be nothing left to draw the `ignored` view from.
  */
 export function buildFeed(
   events: EventRecord[],
   interests: Interest[],
   now: number,
-  opts: { mode: FeedMode } = { mode: 'matched' },
+  opts: FeedOptions = {},
 ): FeedSection[] {
+  const mode = opts.mode ?? 'matched';
+  const ignoredSet = opts.ignored ?? NO_IGNORES;
+
   const items: FeedItem[] = [];
   for (const event of dedupeByFingerprint(events)) {
     // Something that finished yesterday is not "coming up", whatever matched it.
     if (event.startsAt !== null && daysUntil(event.startsAt, now) < 0) continue;
+    /*
+     * Dedupe first, then ask. The fingerprint is what an ignore is keyed on, so the survivor of two
+     * copies of one night carries the dismissal however the dedupe went — which is the whole reason
+     * the key is not an event id.
+     */
+    const ignored = ignoredSet.has(event.fingerprint);
+
+    // The one view that is *only* the dismissed rows, and the only route back to them.
+    if (mode === 'ignored') {
+      if (!ignored) continue;
+      items.push({
+        event,
+        matched: matchingInterests(event, interests, { forPush: false }),
+        ignored: true,
+      });
+      continue;
+    }
+
+    // Everywhere else a dismissal hides the row — except in `all`, which claims to be everything.
+    if (ignored && mode !== 'all') continue;
+
     const matched = matchingInterests(event, interests, { forPush: false });
 
-    if (opts.mode === 'rejected-place') {
+    if (mode === 'rejected-place') {
       /*
        * An event another interest already lets through is not something the filter is keeping from
        * you, so it does not belong in a list of what the filter removed — however near a miss it
@@ -102,8 +157,8 @@ export function buildFeed(
       continue;
     }
 
-    if (opts.mode === 'matched' && matched.length === 0) continue;
-    items.push({ event, matched });
+    if (mode === 'matched' && matched.length === 0) continue;
+    items.push({ event, matched, ...(ignored ? { ignored: true } : {}) });
   }
 
   items.sort(compareItems);

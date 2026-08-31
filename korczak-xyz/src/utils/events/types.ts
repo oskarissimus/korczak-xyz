@@ -166,6 +166,43 @@ export interface Interest {
   createdAt: number;
 }
 
+/**
+ * One event the reader has dismissed by hand.
+ *
+ * The app's other two ways of not seeing something are rules — an interest's `excludeKeywords`
+ * turn away a *kind* of event, and the countries filter turns away a *place*. Neither can say "yes,
+ * this is exactly what I asked for, and I am not going to that one": a keyword narrow enough to
+ * remove a single concert usually removes the next one by the same artist too, and writing one per
+ * dismissal turns the interest into a blocklist that nobody can read afterwards.
+ *
+ * **Keyed by fingerprint, not by event id.** Ticketmaster and the Teatr Wielki scrape both list the
+ * same night; the feed already collapses them with `dedupeByFingerprint`, so ignoring the row you
+ * are looking at has to ignore the twin behind it, or the card comes back the day the other source
+ * wins the dedupe. That is the same argument `noticeIdFor` is keyed on the fingerprint for.
+ *
+ * Extends `Versioned` structurally, like `Interest` — so `mergeById` reconciles two devices without
+ * being told anything about it. `deleted` here means **un-ignored**: not-ignored is the resting
+ * state, so lifting an ignore is a tombstone rather than a field. The id is derived from the
+ * fingerprint, which makes re-ignoring meet its own tombstone — exactly the case `versioned.ts`
+ * documents, and what its causal rule (a live row past the tombstone's rev wins) exists for.
+ */
+export interface Ignore {
+  /** `slugKey(fingerprint)`. Derived, so two devices dismissing the same card write one document. */
+  id: string;
+  rev: number;
+  updatedAt: number;
+  writerId: string;
+  /** Tombstone, meaning un-ignored. */
+  deleted?: boolean;
+  fingerprint: string;
+  /**
+   * The title at the moment it was dismissed. Denormalised for the same reason `Notice.title` is:
+   * so this collection can be read in a console without a join back to `events/`. The UI never
+   * uses it — an ignored row is drawn from the corpus copy, which is the current one.
+   */
+  title: string;
+}
+
 export type NoticeKind = 'announced' | 'onsale' | 'soon';
 
 export interface Notice {

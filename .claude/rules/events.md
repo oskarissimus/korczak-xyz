@@ -373,9 +373,73 @@ Three things are drawn, and they answer three different questions:
   list, and a classifier that has quietly stopped looks exactly like a filter with nothing to remove.
 
 The model's own sentence (`reachReason`) is printed under each rejected card, so a verdict can be
-argued with rather than only obeyed. There is no per-event override: a wrong rejection is corrected
-with a second interest naming the event, a wrong admission with the `excludeKeywords` that already
-exist.
+argued with rather than only obeyed. A wrong *rejection* is still corrected with a second interest
+naming the event — there is no per-event way to force something back in, and the geography verdict
+itself is not editable. A wrong *admission* now has two answers: the `excludeKeywords` that already
+existed, and the Ignore button below.
+
+### Ignoring one event
+
+The rules above turn away a **kind** of event (`excludeKeywords`) or a **place** (`countries`).
+Neither can say *yes, this is exactly what I asked for, and I am not going to that one*. A keyword
+narrow enough to remove a single concert usually removes the next one by the same artist too, and
+one exclusion per dismissal turns an interest into a blocklist nobody can read a month later. So
+`Ignore` on a feed card is a per-event dismissal, stored as an `Ignore` row in
+`users/{uid}/eventIgnores` and reconciled by `versioned.ts` like everything else here.
+
+Four things about it are load-bearing:
+
+- **It is keyed on the fingerprint, not the event id.** Ticketmaster and the Teatr Wielki scrape
+  both list the same night and `dedupeByFingerprint` already collapses them, so an id-keyed
+  dismissal would come back the day the other copy won the dedupe — the ignore still stored, and
+  pointing at a document nothing draws. Same key, same argument, as `noticeIdFor`.
+- **It is applied in `buildFeed`, never in `matchReason`.** An ignored event *did* match; that is
+  the whole content of the act. Folded into the matcher it would be indistinguishable from one no
+  interest ever wanted, and there would be nothing left to build the `Ignored` view from — while
+  `portable.test.ts`'s one-matcher guarantee would start covering a per-account fact the collector
+  reads from a different collection.
+- **`PlanContext.ignored` is required where `FeedOptions.ignored` is optional**, and the asymmetry
+  is the point. A feed caller that forgets it shows a row that should be hidden — visible, one tap
+  from fixed. The same omission in the collector is a notification at 7am about the concert you
+  already said no to, which is the reading of "ignore" that gets a push app deleted. So a new
+  caller with no list has to write `NO_IGNORES` out loud.
+- **A skipped notice is not latched.** `noticesFor` returns before building anything, so an ignored
+  event claims no notice document and un-ignoring restores its notifications. This is the one place
+  the app prefers a possible extra send to a lost one, against the rule `notifyAccount` states —
+  and only because the send needs a deliberate act by the person who would receive it. Latching
+  would silently consume the `soon` reminder for an event brought back precisely because its date
+  is wanted after all.
+
+Un-ignoring is a **tombstone**, because not-ignored is the resting state. The id being derived,
+re-ignoring necessarily meets its own tombstone — the case `versioned.ts` documents as having once
+made a night unloggable for good, handled by its causal rule and by `commit` going through
+`applyLocal`. `ignoreEvent` is one entry point for ignore *and* re-ignore for that reason: a caller
+minting a fresh row at `rev: 0` would write it straight underneath the delete.
+
+The `Ignored (n)` view is not a nicety. Hiding rows with no list of what is hidden is a filter you
+cannot check and cannot undo, which is the argument the `Filtered out` view exists for one section
+above; here it is stronger, because the Ignore button lives **on the card**, so the card has to
+stay reachable or the dismissal is permanent. The button appears only once `n > 0` — you can only
+reach one by pressing Ignore, which puts it on screen in the same render — and its count comes from
+a second `buildFeed(..., { mode: 'ignored' })` rather than the length of the ignore list, because an
+ignore outlives its event: a concert that has been and gone leaves its row behind forever, and
+counting those would offer a view holding nothing. `Everything` still lists an ignored card and
+marks it, or a row present there and absent from `Matched` reads as the matcher disagreeing with
+itself.
+
+`adoptOwner` changed for this, and the change is worth knowing: it now memoises its **answer**, not
+just its guard. Whoever asks second reads `previous === uid`, having watched the first caller write
+it, so a plain re-read tells them nothing happened — and they keep the previous account's rows in
+memory over a store that has just been emptied. Returning `false` to all but the first was only
+safe while there was exactly one caller, which stopped being true the moment the Feed mounted a
+second hook. `CACHED_PER_OWNER` gains both ignore keys, and the two push queues are keyed
+explicitly (`loadUnsynced(key)`): an interest id is a `uuid()` and an ignore id is
+`slugKey(fingerprint)`, so one shared queue would have each hook look up the other's ids, find
+nothing, and drop them as already-done — a write that never leaves the device, with a drained queue
+and a Synced badge saying it did.
+
+No `firestore.rules` change: `users/{uid}/eventIgnores` is under the `users/{uid}/{document=**}`
+catch-all, like `eventInterests`.
 
 The countries also join the interest row's rule summary (`@PL`, and `+international` for the OR
 clause) — left off, an interest quietly dropping four conferences a week would look exactly like one

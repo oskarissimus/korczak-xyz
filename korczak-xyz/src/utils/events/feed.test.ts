@@ -127,6 +127,79 @@ describe('buildFeed', () => {
   });
 });
 
+describe('buildFeed and the events dismissed by hand', () => {
+  const ignoring = (fp: string) => new Set([fp]);
+
+  it('keeps an ignored event out of the default list', () => {
+    const event = ev({ title: 'Not going' });
+    expect(buildFeed([event], [ALL], NOW, { ignored: ignoring(event.fingerprint) })).toEqual([]);
+  });
+
+  it('hides both copies of a night two sources list, since the key is the fingerprint', () => {
+    /*
+     * The reason an ignore is not keyed on an event id. `dedupeByFingerprint` picks a survivor by
+     * whether it has tickets, so keyed on the id the card would come back the day the other source
+     * won — the dismissal still stored, and pointing at a document nothing draws.
+     */
+    const fp = fingerprintOf({ title: 'Wesele Figara', day: '2027-01-14' });
+    const scraped = ev({ id: 'tw', title: 'Wesele Figara', fingerprint: fp, firstSeenAt: 1 });
+    const sold = ev({
+      id: 'tm', title: 'Wesele Figara', fingerprint: fp, firstSeenAt: 9,
+      ticketUrl: 'https://tickets.test/x',
+    });
+    expect(buildFeed([scraped, sold], [ALL], NOW, { ignored: ignoring(fp) })).toEqual([]);
+  });
+
+  it('keeps it out of the rejected-place view too', () => {
+    // Otherwise dismissing something would move it from one visible list to another.
+    const abroad = ev({ title: 'PyCon NL', country: 'NL', reach: 'national' });
+    const dev: Interest = { ...ALL, keywords: ['pycon'], countries: ['PL'] };
+    expect(buildFeed([abroad], [dev], NOW, { mode: 'rejected-place' })).not.toEqual([]);
+    expect(
+      buildFeed([abroad], [dev], NOW, { mode: 'rejected-place', ignored: ignoring(abroad.fingerprint) }),
+    ).toEqual([]);
+  });
+
+  it('still lists it under Everything, and says so on the row', () => {
+    const event = ev({ title: 'Not going' });
+    const items = buildFeed([event], [ALL], NOW, {
+      mode: 'all',
+      ignored: ignoring(event.fingerprint),
+    }).flatMap((s) => s.items);
+    expect(items).toHaveLength(1);
+    expect(items[0].ignored).toBe(true);
+  });
+
+  it('is the whole of the ignored view, and the only way back to one', () => {
+    const gone = ev({ title: 'Not going' });
+    const kept = ev({ title: 'Still going' });
+    const items = buildFeed([gone, kept], [ALL], NOW, {
+      mode: 'ignored',
+      ignored: ignoring(gone.fingerprint),
+    }).flatMap((s) => s.items);
+    expect(items.map((i) => i.event.title)).toEqual(['Not going']);
+    expect(items[0].ignored).toBe(true);
+  });
+
+  it('lists an ignored event there even when no interest matches it any more', () => {
+    // The list has to be reachable however the interests moved since, or an edit strands the row
+    // it is the only route back to.
+    const event = ev({ title: 'Techno' });
+    const narrow: Interest = { ...ALL, keywords: ['klezmer'] };
+    const items = buildFeed([event], [narrow], NOW, {
+      mode: 'ignored',
+      ignored: ignoring(event.fingerprint),
+    }).flatMap((s) => s.items);
+    expect(items).toHaveLength(1);
+    expect(items[0].matched).toEqual([]);
+  });
+
+  it('marks nothing when nothing is ignored', () => {
+    const items = buildFeed([ev({ title: 'X' })], [ALL], NOW).flatMap((s) => s.items);
+    expect(items[0].ignored).toBeUndefined();
+  });
+});
+
 describe('placeLabel', () => {
   it('does not say the city twice', () => {
     // An iCal LOCATION is one free-text line that the adapter also extracts a city from, so the

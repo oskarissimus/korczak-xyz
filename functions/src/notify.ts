@@ -9,12 +9,14 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import type {
   EventRecord,
+  Ignore,
   Interest,
   Notice,
   PushSettings,
   PushSub,
 } from '../../korczak-xyz/src/utils/events/types';
 import { DEFAULT_PUSH_SETTINGS } from '../../korczak-xyz/src/utils/events/types';
+import { ignoredFingerprints } from '../../korczak-xyz/src/utils/events/ignores';
 import { planRun, type PendingNotice } from '../../korczak-xyz/src/utils/events/notices';
 import { noticeIdFor } from '../../korczak-xyz/src/utils/events/normalize';
 import { sendToAll, type PushPayload } from './push';
@@ -32,9 +34,15 @@ export interface NotifyResult {
 async function loadAccount(
   db: Firestore,
   uid: string,
-): Promise<{ interests: Interest[]; settings: PushSettings; subs: PushSub[]; seen: Set<string> }> {
+): Promise<{
+  interests: Interest[];
+  settings: PushSettings;
+  subs: PushSub[];
+  seen: Set<string>;
+  ignored: ReadonlySet<string>;
+}> {
   const user = db.collection('users').doc(uid);
-  const [interestsSnap, settingsSnap, subsSnap, noticesSnap] = await Promise.all([
+  const [interestsSnap, settingsSnap, subsSnap, noticesSnap, ignoresSnap] = await Promise.all([
     user.collection('eventInterests').get(),
     user.collection('eventSettings').doc('push').get(),
     user.collection('pushSubs').get(),
@@ -44,6 +52,16 @@ async function loadAccount(
      * candidate. It is the only thing standing between a re-run and a repeat notification.
      */
     user.collection('eventNotices').select().get(),
+    /*
+     * The events dismissed by hand in the feed.
+     *
+     * Read here, not skipped as a client-side nicety: an ignore the collector never sees is a card
+     * that is gone from the screen and still rings the phone at 7am, which is the reading of
+     * "ignore" nobody means. Whole rather than filtered on `deleted` in the query — a `where` on a
+     * field an un-ignored row may not carry excludes exactly the tombstones that decide the answer,
+     * and `ignoredFingerprints` is the one place that flag is read.
+     */
+    user.collection('eventIgnores').get(),
   ]);
 
   return {
@@ -53,6 +71,9 @@ async function loadAccount(
       : DEFAULT_PUSH_SETTINGS,
     subs: subsSnap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
     seen: new Set(noticesSnap.docs.map((d) => d.id)),
+    ignored: ignoredFingerprints(
+      ignoresSnap.docs.map((d) => ({ ...(d.data() as Ignore), id: d.id })),
+    ),
   };
 }
 
@@ -95,13 +116,14 @@ export async function notifyAccount(
   events: EventRecord[],
   now: number,
 ): Promise<NotifyResult> {
-  const { interests, settings, subs, seen } = await loadAccount(db, uid);
+  const { interests, settings, subs, seen, ignored } = await loadAccount(db, uid);
 
   const plan = planRun(events, interests, seen, {
     now,
     armedAt: settings.armedAt,
     maxPerRun: settings.maxPerRun,
     maxOnSalePerRun: settings.maxOnSalePerRun,
+    ignored,
   });
 
   let claimed = 0;

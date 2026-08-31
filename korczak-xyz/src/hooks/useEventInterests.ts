@@ -18,6 +18,7 @@ import { getClientId, uuid } from '../lib/clientId';
 import { describeError, log } from '../lib/logger';
 import {
   adoptOwner,
+  EVENT_KEYS,
   loadInterests,
   loadUnsynced,
   clearUnsynced,
@@ -45,6 +46,9 @@ export interface EventInterestsData {
 }
 
 const OFF: SyncState = { status: 'off', pending: 0, lastSyncedAt: null, lastError: null };
+
+/** Which push queue is this hook's. The ignores have their own; see the note in `storage.ts`. */
+const QUEUE = EVENT_KEYS.unsynced;
 
 /** Newest first, id as the deterministic tiebreak so two devices order identically. */
 function byCreatedDesc(a: Interest, b: Interest): number {
@@ -92,12 +96,12 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
     const seeded = withMissingSeeds(stored, { writerId: getClientId(), now: Date.now() });
     if (seeded.length !== stored.length) {
       saveInterests(seeded);
-      markUnsynced(seeded.slice(stored.length).map((i) => i.id));
+      markUnsynced(QUEUE, seeded.slice(stored.length).map((i) => i.id));
     }
     publish(seeded);
     readyRef.current = true;
     setReady(true);
-    setSync((s) => ({ ...s, pending: loadUnsynced().length }));
+    setSync((s) => ({ ...s, pending: loadUnsynced(QUEUE).length }));
   }, [publish]);
 
   // --- writing ---------------------------------------------------------------------------------
@@ -118,8 +122,8 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
       const next = applyLocal(recordsRef.current, changed, byCreatedDesc);
       publish(next);
       saveInterests(next);
-      markUnsynced(changed.map((i) => i.id));
-      setSync((s) => ({ ...s, pending: loadUnsynced().length }));
+      markUnsynced(QUEUE, changed.map((i) => i.id));
+      setSync((s) => ({ ...s, pending: loadUnsynced(QUEUE).length }));
       void runSyncRef.current?.();
     },
     [publish],
@@ -177,7 +181,7 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
       setSync((s) => ({ ...s, status: 'syncing' }));
 
       try {
-        const toPush = new Set(loadUnsynced());
+        const toPush = new Set(loadUnsynced(QUEUE));
         if (full || !pulledRef.current) {
           const remote = await pullInterests(uid);
           const merged = mergeById(recordsRef.current, remote, isSameVersion, byCreatedDesc);
@@ -202,11 +206,11 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
           await pushInterest(uid, record);
           done.push(id);
         }
-        if (done.length > 0) clearUnsynced(done);
+        if (done.length > 0) clearUnsynced(QUEUE, done);
 
         setSync({
           status: 'idle',
-          pending: loadUnsynced().length,
+          pending: loadUnsynced(QUEUE).length,
           lastSyncedAt: Date.now(),
           lastError: null,
         });
@@ -215,7 +219,7 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
         setSync((s) => ({
           ...s,
           status: 'error',
-          pending: loadUnsynced().length,
+          pending: loadUnsynced(QUEUE).length,
           lastError: String(describeError(e).message ?? 'sync failed'),
         }));
       } finally {
@@ -231,7 +235,7 @@ export function useEventInterests(user: AuthUser | null): EventInterestsData {
     if (!user) {
       uidRef.current = null;
       pulledRef.current = false;
-      setSync({ status: 'off', pending: loadUnsynced().length, lastSyncedAt: null, lastError: null });
+      setSync({ status: 'off', pending: loadUnsynced(QUEUE).length, lastSyncedAt: null, lastError: null });
       return;
     }
 

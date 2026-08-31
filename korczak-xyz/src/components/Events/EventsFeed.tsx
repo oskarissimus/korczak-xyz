@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
+import { useEventIgnores } from '../../hooks/useEventIgnores';
 import { useEventInterests } from '../../hooks/useEventInterests';
 import { useWebPush } from '../../hooks/useWebPush';
 import {
@@ -50,6 +51,7 @@ function FeedPanel({ lang }: Props) {
   const auth = useAuth();
   const feed = useEventFeed(auth.user);
   const { interests, ready } = useEventInterests(auth.user);
+  const ignores = useEventIgnores(auth.user);
   const t = translations[lang];
   const [mode, setMode] = useState<FeedMode>('matched');
 
@@ -57,19 +59,38 @@ function FeedPanel({ lang }: Props) {
   useWebPush(auth.user, lang, { verifyOnly: true });
 
   const now = Date.now();
+  const ignored = ignores.fingerprints;
   const sections = useMemo(
-    () => buildFeed(feed.events, interests, now, { mode }),
+    () => buildFeed(feed.events, interests, now, { mode, ignored }),
     // `now` is deliberately not a dependency: re-grouping on every render would rebuild the list
     // for a clock tick nobody can see. It is recomputed when the data actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, mode],
+    [feed.events, interests, mode, ignored],
   );
 
-  if (!feed.ready || !ready) return <div className="ev-loading" />;
+  /*
+   * How many dismissed events there are to go back to — which is a second pass over the corpus and
+   * not a `filter` on the ignore list, deliberately. An ignore outlives the event: a concert that
+   * has been and gone leaves its row behind forever, and counting those would offer a view holding
+   * nothing. Asking `buildFeed` means the number and the list it opens are the same question asked
+   * twice, so they cannot disagree about what "an ignored event" is.
+   */
+  const ignoredCount = useMemo(
+    () =>
+      buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }).reduce(
+        (total, section) => total + section.items.length,
+        0,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [feed.events, interests, ignored],
+  );
+
+  if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
 
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
   const rejecting = mode === 'rejected-place';
+  const ignoring = mode === 'ignored';
   const coverage = classificationCoverage(feed.events);
 
   return (
@@ -89,6 +110,21 @@ function FeedPanel({ lang }: Props) {
                 ['matched', t.viewMatched],
                 ['rejected-place', t.viewRejected],
                 ['all', t.viewAll],
+                /*
+                 * The fourth button appears only once there is something behind it, and it carries
+                 * the count so it says so. A permanent `Ignored (0)` would be a control for a
+                 * feature most visits never use, and it cannot strand anything: the only way to
+                 * reach one is to press Ignore, which puts the button on screen in the same render.
+                 *
+                 * `|| ignoring` is what keeps it there while you are standing on it. Bringing the
+                 * last one back from inside this view takes the count to zero, and without that
+                 * clause the button under your finger vanishes mid-tap — leaving an empty list with
+                 * none of the three remaining views pressed, which is the state `.ev-view--on`
+                 * exists to make impossible.
+                 */
+                ...(ignoredCount > 0 || ignoring
+                  ? [['ignored', fill(t.viewIgnored, { count: ignoredCount })]]
+                  : []),
               ] as Array<[FeedMode, string]>
             ).map(([value, label]) => (
               <button
@@ -104,6 +140,8 @@ function FeedPanel({ lang }: Props) {
           </div>
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
+
+        {ignoring ? <p className="ev-hint">{t.ignoredIntro}</p> : null}
 
         {rejecting ? (
           <div className="ev-verify">
@@ -136,8 +174,8 @@ function FeedPanel({ lang }: Props) {
 
       {sections.length === 0 ? (
         <div className="ev-empty">
-          <p>{rejecting ? t.rejectedEmpty : t.feedEmpty}</p>
-          <p className="ev-hint">{rejecting ? t.rejectedEmptyHint : t.feedEmptyHint}</p>
+          <p>{emptyHeading(mode, t)}</p>
+          <p className="ev-hint">{emptyHint(mode, t)}</p>
         </div>
       ) : (
         sections.map((section) => (
@@ -145,7 +183,14 @@ function FeedPanel({ lang }: Props) {
             <h3 className="ev-group-head">{groupLabel(section.group, t)}</h3>
             <ul className="ev-list">
               {section.items.map((item) => (
-                <EventCard key={item.event.id} item={item} lang={lang} now={now} />
+                <EventCard
+                  key={item.event.id}
+                  item={item}
+                  lang={lang}
+                  now={now}
+                  onIgnore={() => ignores.ignore(item.event)}
+                  onUnignore={() => ignores.unignore(item.event.fingerprint)}
+                />
               ))}
             </ul>
           </section>
@@ -169,6 +214,26 @@ function reachLabel(reach: Reach | undefined, t: Translation): string {
   return t.reachUnknown;
 }
 
+/**
+ * What an empty list says.
+ *
+ * By mode rather than by a `rejecting ? … : …` pair, which was already one ternary short of
+ * readable at three views. Each of the four is a different sentence because an empty list means a
+ * different thing in each: no matches, nothing removed by place, nothing dismissed, or a corpus
+ * with nothing upcoming in it at all.
+ */
+function emptyHeading(mode: FeedMode, t: Translation): string {
+  if (mode === 'rejected-place') return t.rejectedEmpty;
+  if (mode === 'ignored') return t.ignoredEmpty;
+  return t.feedEmpty;
+}
+
+function emptyHint(mode: FeedMode, t: Translation): string {
+  if (mode === 'rejected-place') return t.rejectedEmptyHint;
+  if (mode === 'ignored') return t.ignoredEmptyHint;
+  return t.feedEmptyHint;
+}
+
 function groupLabel(group: FeedGroup, t: Translation): string {
   if (group === 'week') return t.groupThisWeek;
   if (group === 'month') return t.groupThisMonth;
@@ -176,7 +241,19 @@ function groupLabel(group: FeedGroup, t: Translation): string {
   return t.groupUndated;
 }
 
-function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: number }) {
+function EventCard({
+  item,
+  lang,
+  now,
+  onIgnore,
+  onUnignore,
+}: {
+  item: FeedItem;
+  lang: Lang;
+  now: number;
+  onIgnore: () => void;
+  onUnignore: () => void;
+}) {
   const t = translations[lang];
   const { event } = item;
 
@@ -210,6 +287,12 @@ function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: numbe
         <span className="ev-chip ev-chip--place">
           {countryLabel(event.country)} · {reachLabel(event.reach, t)}
         </span>
+        {/*
+          * Only `all` and `ignored` can draw a dismissed row, and in `all` the chip is the whole
+          * difference between the two views: without it, a card present in Everything and absent
+          * from Matched looks like the matcher disagreeing with itself.
+          */}
+        {item.ignored ? <span className="ev-chip ev-chip--ignored">{t.ignoredChip}</span> : null}
         {placeLabel(event) ? <span>{placeLabel(event)}</span> : null}
         <span>{event.sourceName}</span>
         <span>{fill(t.announcedAgo, { when: relativeTime(event.firstSeenAt, now, t) })}</span>
@@ -230,6 +313,15 @@ function EventCard({ item, lang, now }: { item: FeedItem; lang: Lang; now: numbe
             {t.tickets}
           </a>
         ) : null}
+        {/*
+          * Last in the row, after the two links, because it is the destructive one and the row is
+          * scanned left to right for the thing you came to the card to do. No confirmation: it is
+          * one tap to undo from the Ignored view, and a dialog per dismissal would cost more than
+          * the mistake does.
+          */}
+        <button className="ev-link" type="button" onClick={item.ignored ? onUnignore : onIgnore}>
+          {item.ignored ? t.unignoreEvent : t.ignoreEvent}
+        </button>
       </div>
     </li>
   );

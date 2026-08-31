@@ -55,6 +55,15 @@ export const translations = {
     reachNational: 'national',
     reachInternational: 'international',
     reachUnknown: 'not labelled yet',
+    viewIgnored: 'Ignored ({count})',
+    ignoreEvent: 'Ignore',
+    unignoreEvent: 'Show again',
+    ignoredChip: 'Ignored',
+    ignoredIntro:
+      'Events you dismissed by hand. They stay out of the other views and never notify you, until you bring one back.',
+    ignoredEmpty: 'Nothing has been ignored.',
+    ignoredEmptyHint:
+      'Ignore is for the one event you are not going to, where narrowing an interest would also lose the next one like it.',
 
     // Interests
     interestsHeading: 'What to watch for',
@@ -207,6 +216,15 @@ export const translations = {
     reachNational: 'krajowe',
     reachInternational: 'międzynarodowe',
     reachUnknown: 'jeszcze nieopisane',
+    viewIgnored: 'Ukryte ({count})',
+    ignoreEvent: 'Ukryj',
+    unignoreEvent: 'Przywróć',
+    ignoredChip: 'Ukryte',
+    ignoredIntro:
+      'Wydarzenia ukryte ręcznie. Nie pojawiają się w pozostałych widokach i nigdy nie wysyłają powiadomień, dopóki któregoś nie przywrócisz.',
+    ignoredEmpty: 'Nic nie zostało ukryte.',
+    ignoredEmptyHint:
+      'Ukrywanie jest dla tego jednego wydarzenia, na które nie idziesz — zawężenie zainteresowania odrzuciłoby też następne takie samo.',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:
