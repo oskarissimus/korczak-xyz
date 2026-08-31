@@ -64,6 +64,12 @@ export const translations = {
     ignoredEmpty: 'Nothing has been ignored.',
     ignoredEmptyHint:
       'Ignore is for the one event you are not going to, where narrowing an interest would also lose the next one like it.',
+    cityFilter: 'City',
+    cityAnywhere: 'Anywhere ({count})',
+    cityOption: '{city} ({count})',
+    cityClear: 'Show every city',
+    cityEmptyHint:
+      'Nothing here is in {city}. This filter only narrows what you are looking at — set the cities on an interest to change what notifies you.',
 
     // Interests
     interestsHeading: 'What to watch for',
@@ -225,6 +231,12 @@ export const translations = {
     ignoredEmpty: 'Nic nie zostało ukryte.',
     ignoredEmptyHint:
       'Ukrywanie jest dla tego jednego wydarzenia, na które nie idziesz — zawężenie zainteresowania odrzuciłoby też następne takie samo.',
+    cityFilter: 'Miasto',
+    cityAnywhere: 'Wszędzie ({count})',
+    cityOption: '{city} ({count})',
+    cityClear: 'Pokaż wszystkie miasta',
+    cityEmptyHint:
+      'Nic tutaj nie odbywa się w takim mieście: {city}. Ten filtr zawęża tylko widok — o powiadomieniach decydują miasta wpisane w zainteresowaniu.',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:

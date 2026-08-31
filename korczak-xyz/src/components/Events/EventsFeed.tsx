@@ -14,15 +14,20 @@ import { useEventInterests } from '../../hooks/useEventInterests';
 import { useWebPush } from '../../hooks/useWebPush';
 import {
   buildFeed,
+  cityOptions,
   classificationCoverage,
   countryTally,
+  filterSectionsByCity,
   placeLabel,
   whenLabel,
+  type CityOption,
   type FeedGroup,
   type FeedItem,
   type FeedMode,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
+import { foldText } from '../../utils/events/normalize';
+import { loadFeedCity, saveFeedCity } from '../../utils/events/browser/storage';
 import type { Reach } from '../../utils/events/types';
 import EventsGate from './EventsGate';
 import {
@@ -54,19 +59,43 @@ function FeedPanel({ lang }: Props) {
   const ignores = useEventIgnores(auth.user);
   const t = translations[lang];
   const [mode, setMode] = useState<FeedMode>('matched');
+  /*
+   * The city, held as the spelling to show and compared folded — one value, so the label on the
+   * picker and the key it filters with cannot drift apart. Read from localStorage on the first
+   * render rather than in an effect: this hides rows, and a frame of the unfiltered feed before it
+   * applied would be the app appearing to forget the setting every time it opens.
+   */
+  const [city, setCity] = useState<string>(() => loadFeedCity());
+  const cityKey = foldText(city);
+
+  const chooseCity = (next: string) => {
+    setCity(next);
+    saveFeedCity(next);
+  };
 
   // Re-arm silently. Nothing is rendered for it here — the Alerts tab is where push has a UI.
   useWebPush(auth.user, lang, { verifyOnly: true });
 
   const now = Date.now();
   const ignored = ignores.fingerprints;
-  const sections = useMemo(
+  const built = useMemo(
     () => buildFeed(feed.events, interests, now, { mode, ignored }),
     // `now` is deliberately not a dependency: re-grouping on every render would rebuild the list
     // for a clock tick nobody can see. It is recomputed when the data actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [feed.events, interests, mode, ignored],
   );
+
+  /*
+   * The picker is built from the view *before* the city filter, so its counts say what each choice
+   * would show rather than what the current choice left. The selected city is kept in the list
+   * whatever the corpus holds — see `withSelected`.
+   */
+  const cities = useMemo(
+    () => withSelected(cityOptions(built.flatMap((s) => s.items).map((i) => i.event)), city),
+    [built, city],
+  );
+  const sections = useMemo(() => filterSectionsByCity(built, cityKey), [built, cityKey]);
 
   /*
    * How many dismissed events there are to go back to — which is a second pass over the corpus and
@@ -77,18 +106,21 @@ function FeedPanel({ lang }: Props) {
    */
   const ignoredCount = useMemo(
     () =>
-      buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }).reduce(
-        (total, section) => total + section.items.length,
-        0,
-      ),
+      filterSectionsByCity(
+        buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }),
+        cityKey,
+      ).reduce((total, section) => total + section.items.length, 0),
+    // The city is a dependency: the button's number and the list it opens are the same question,
+    // and a count taken over every city would offer a view that opens on nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, ignored],
+    [feed.events, interests, ignored, cityKey],
   );
 
   if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
 
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
+  const inAnyCity = built.reduce((total, section) => total + section.items.length, 0);
   const rejecting = mode === 'rejected-place';
   const ignoring = mode === 'ignored';
   const coverage = classificationCoverage(feed.events);
@@ -138,6 +170,32 @@ function FeedPanel({ lang }: Props) {
               </button>
             ))}
           </div>
+          {/*
+            * A picker rather than a row of buttons, because the number of cities is whatever the
+            * sources happen to list — twenty-odd once Ticketmaster is on — and it is drawn only
+            * when there is a choice to make. `Anywhere` carries its own count so the two numbers
+            * can be compared: it is larger than the sum of the cities by however many rows no
+            * source placed, which is the only way that difference is visible.
+            */}
+          {cities.length > 0 ? (
+            <label className="ev-city">
+              <span className="ev-city-label">{t.cityFilter}</span>
+              <select
+                className="ev-city-select"
+                value={cityKey}
+                onChange={(e) =>
+                  chooseCity(cities.find((c) => c.key === e.target.value)?.label ?? '')
+                }
+              >
+                <option value="">{fill(t.cityAnywhere, { count: inAnyCity })}</option>
+                {cities.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {fill(t.cityOption, { city: option.label, count: option.count })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
 
@@ -175,7 +233,20 @@ function FeedPanel({ lang }: Props) {
       {sections.length === 0 ? (
         <div className="ev-empty">
           <p>{emptyHeading(mode, t)}</p>
-          <p className="ev-hint">{emptyHint(mode, t)}</p>
+          {/*
+            * With a city selected, the reason the list is empty is almost always the city and not
+            * the interests — so the hint says which one, and the way out is a button rather than a
+            * sentence telling you where to find one. A persisted filter with no visible cause is
+            * how an app comes to look broken weeks after the choice was made.
+            */}
+          <p className="ev-hint">
+            {cityKey ? fill(t.cityEmptyHint, { city }) : emptyHint(mode, t)}
+          </p>
+          {cityKey ? (
+            <button className="ev-link" type="button" onClick={() => chooseCity('')}>
+              {t.cityClear}
+            </button>
+          ) : null}
         </div>
       ) : (
         sections.map((section) => (
@@ -212,6 +283,23 @@ function reachLabel(reach: Reach | undefined, t: Translation): string {
   if (reach === 'national') return t.reachNational;
   if (reach === 'international') return t.reachInternational;
   return t.reachUnknown;
+}
+
+/**
+ * The picker's options, with the chosen city in them whether or not it is still in the corpus.
+ *
+ * A selection missing from the list is the one state a `<select>` cannot draw: it falls back to the
+ * first option, so the control would read `Anywhere` while the feed went on showing one city. That
+ * happens for ordinary reasons — a season ends, a scrape has a bad run, the account changes — and
+ * it would look exactly like the filter being stuck. Kept with its count of zero, it says the true
+ * thing instead: this is on, and there is nothing behind it.
+ */
+function withSelected(options: CityOption[], city: string): CityOption[] {
+  const key = foldText(city);
+  if (!key || options.some((option) => option.key === key)) return options;
+  return [...options, { key, label: city, count: 0 }].sort((a, b) =>
+    a.label.localeCompare(b.label),
+  );
 }
 
 /**

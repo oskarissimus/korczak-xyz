@@ -449,6 +449,41 @@ that constrains nothing, which is this feature's own failure mode reappearing on
 an account's own `Python & dev` is set by hand in the editor, which is also the first real test of
 the toggle.
 
+### Narrowing the feed to one city
+
+The picker in the Feed toolbar, persisted in `events-feed-city`. Three tours of the same show in
+Rzeszów, Warszawa and Gdańsk are three cards you cannot go to two of, and the interest that matched
+them is right — so this is a **view preference on one device**, not a rule.
+
+That is why `filterSectionsByCity` is a lens over the *output* of `buildFeed` rather than another
+`FeedOptions` field, and why `PlanContext` never hears about it: a filter set once and persisted
+would otherwise be silently deciding, months later, which concerts are allowed to wake you. The
+durable form of "only Warszawa" already exists and the collector already reads it —
+`Interest.cities` — and the empty-state hint says so rather than leaving the two to be confused.
+
+Four things about it:
+
+- **The key is `foldText(city)`, the stored value is the spelling to show.** One value, derived one
+  way, so the label on the control and the key it filters with cannot drift. Folding is what makes
+  `Kraków`, `KRAKOW` and `Krakow` one option; what it cannot do is translate, so a source writing
+  `Warsaw` in English stays a second entry beside `Warszawa`. Both are in the picker with their
+  counts, which is the honest form of that limit — half the nights missing with no explanation is
+  not.
+- **The counts come from the view before the filter**, so each option says what pressing it would
+  show. `Anywhere` carries its own count for the comparison: it is larger than the cities' sum by
+  however many rows no source placed, and that difference is the only thing on screen saying those
+  rows exist. They are not an option of their own — an RSS article is a piece of writing, and
+  "somewhere unspecified" is not a place anyone picks.
+- **The selected city stays in the list at zero.** A `<select>` whose value is absent falls back to
+  its first option, so the control would read `Anywhere` while the feed went on showing one city —
+  and a season ending or one bad scrape is enough to cause it. `withSelected` is what keeps that
+  state visible and one tap from undone.
+- **`ignoredCount` is filtered too.** The count on the `Ignored (n)` button and the list it opens
+  are one question asked twice; taken over every city it would offer a view that opens on nothing.
+
+It joins `CACHED_PER_OWNER`. It is a preference rather than data, but it is one that hides rows, and
+inherited across a sign-in it would empty a feed nobody in that account had narrowed.
+
 ### Deploying it
 
 `firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the

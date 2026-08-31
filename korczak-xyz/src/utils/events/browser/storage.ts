@@ -35,6 +35,7 @@ export const EVENT_KEYS = {
   pushSubId: 'events-push-sub-id',
   pushSeen: 'events-push-seen-at',
   settings: 'events-push-settings',
+  feedCity: 'events-feed-city',
 } as const;
 
 /** How many events the offline cache keeps. Roughly 60 kB at ~300 bytes a row. */
@@ -54,6 +55,12 @@ const CACHED_PER_OWNER = [
   EVENT_KEYS.ignoresUnsynced,
   EVENT_KEYS.feed,
   EVENT_KEYS.settings,
+  /*
+   * A view preference rather than data, but it is one that hides rows — and a filter to Warszawa
+   * inherited by the next account would empty a feed nobody in that account had ever narrowed.
+   * Cheap to clear, since the whole cost of losing it is one tap on the picker.
+   */
+  EVENT_KEYS.feedCity,
 ] as const;
 
 const OWNER_KEY = 'events-owner';
@@ -337,6 +344,35 @@ export function loadPushSeenAt(): number {
 
 export function savePushSeenAt(at: number): boolean {
   return writeEventsKey(EVENT_KEYS.pushSeen, JSON.stringify(at));
+}
+
+/**
+ * Which city the feed is narrowed to, as the spelling to show — `''` for anywhere.
+ *
+ * The *label* is stored rather than the folded key, and one derives the other: the picker has to
+ * name the city it is filtering on even when the corpus currently holds nothing from there (a
+ * scrape between runs, a season just ended), and a key alone would leave it saying `warszawa`. The
+ * comparison key is `foldText` of this, so the two can never drift into disagreeing.
+ */
+export function loadFeedCity(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return localStorage.getItem(EVENT_KEYS.feedCity) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveFeedCity(city: string): boolean {
+  if (city === '') {
+    try {
+      localStorage.removeItem(EVENT_KEYS.feedCity);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return writeEventsKey(EVENT_KEYS.feedCity, city);
 }
 
 export function loadPushSettings(): PushSettings {

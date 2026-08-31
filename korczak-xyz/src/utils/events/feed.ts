@@ -211,6 +211,92 @@ function bestScore(item: FeedItem): number {
 }
 
 /**
+ * The city an event is in, folded — `''` when the source never said.
+ *
+ * Folded because a city arrives spelled however each source spells it — `Kraków`, `KRAKOW` and
+ * `Krakow` from three feeds about the same festival, `Łódź` and `Lodz` from two. Compared raw, the
+ * picker would offer two entries for one place and each would then hide the other's nights. This is
+ * the same `foldText` the matcher compares `Interest.cities` with, so the picker and that rule
+ * cannot disagree about what one city is.
+ *
+ * What folding cannot do is translate: a source writing `Warsaw` in English is a second option
+ * beside `Warszawa`, and nothing here can know they are one place without a gazetteer this app has
+ * no reason to carry. Both are visible in the picker with their counts, which is the honest form of
+ * that limit — an unexplained half of the nights would not be.
+ */
+export function cityKeyOf(event: { city?: string }): string {
+  return foldText(event.city ?? '');
+}
+
+export interface CityOption {
+  /** Folded. What a selection is stored and compared as. */
+  key: string;
+  /** The spelling to show, chosen from the sources' own words. */
+  label: string;
+  count: number;
+}
+
+/**
+ * The cities present in a built feed, with how many rows each holds.
+ *
+ * Counts rather than a bare list, because a picker is the one control here that can empty the
+ * screen: `Warszawa (12)` says what pressing it does, and a city that has fallen to zero says that
+ * too rather than looking like a filter that broke. It is computed over the *unfiltered* sections
+ * for the view being looked at, so the numbers are what the reader would see, not what the corpus
+ * holds.
+ *
+ * Rows with no city are deliberately not an option. They are the RSS articles, which are pieces of
+ * writing rather than nights out, and "somewhere unspecified" is not a place anyone picks — the
+ * `Anywhere` count staying larger than the sum of the cities is where they show up.
+ *
+ * Alphabetical, because the picker is scanned for a name that is already known. The label is the
+ * commonest spelling for the key, tie-broken alphabetically so two equally common spellings do not
+ * swap between renders.
+ */
+export function cityOptions(events: Array<{ city?: string }>): CityOption[] {
+  const byKey = new Map<string, { count: number; spellings: Map<string, number> }>();
+  for (const event of events) {
+    const key = cityKeyOf(event);
+    if (!key) continue;
+    const entry = byKey.get(key) ?? { count: 0, spellings: new Map<string, number>() };
+    const spelling = (event.city ?? '').trim();
+    entry.count += 1;
+    entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
+    byKey.set(key, entry);
+  }
+
+  return [...byKey]
+    .map(([key, { count, spellings }]) => ({
+      key,
+      count,
+      label: [...spellings].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0],
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * One city's rows out of a built feed.
+ *
+ * A lens over the finished list rather than an argument to `buildFeed`, and that is the whole
+ * design of this filter: it is a **view preference on one device**, not a fact about what matches.
+ * An interest's `cities` is the durable form of "only Warsaw" and it is what the collector reads,
+ * so narrowing the picker never quietly stops a notification — which is the failure a persisted
+ * filter would otherwise cause months later, on a phone whose owner has forgotten it is set.
+ *
+ * Grouping survives untouched: filtering after `buildFeed` cannot reorder anything, and a section
+ * left with nothing in it is dropped rather than drawn as an empty heading.
+ */
+export function filterSectionsByCity(sections: FeedSection[], cityKey: string): FeedSection[] {
+  if (!cityKey) return sections;
+  return sections
+    .map((section) => ({
+      group: section.group,
+      items: section.items.filter((item) => cityKeyOf(item.event) === cityKey),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/**
  * How many of each country are in a list, commonest first.
  *
  * Drawn over the rejected view, where it answers the question the cards cannot: not "what was

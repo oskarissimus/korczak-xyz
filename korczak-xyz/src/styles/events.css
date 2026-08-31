@@ -290,6 +290,39 @@
 }
 
 /*
+ * The city picker.
+ *
+ * A native `<select>`, styled only as far as the retro chrome needs: the option list is the OS's,
+ * which on a phone is a full-height wheel that stays usable at twenty-odd cities where a row of
+ * buttons would have wrapped into four lines of the toolbar.
+ *
+ * `font-size` is not decoration here. iOS Safari zooms the whole page when a form control it is
+ * focusing is under 16px, and never zooms back out — so the feed would end up scrolled sideways
+ * every time a city is chosen. 1.15rem of VT323 clears it.
+ */
+.ev-city {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ev-city-label {
+  color: var(--retro-dark-gray);
+}
+
+.ev-city-select {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 4px 6px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  color: var(--retro-black);
+  max-width: 100%;
+  cursor: pointer;
+}
+
+/*
  * The two verification lines above the rejected list.
  *
  * Deliberately plain: this is instrumentation, and it is read once to answer a question rather
