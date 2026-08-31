@@ -26,7 +26,7 @@ import {
   type FeedMode,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
-import { foldText } from '../../utils/events/normalize';
+import { cityKey } from '../../utils/events/cities';
 import { loadFeedCity, saveFeedCity } from '../../utils/events/browser/storage';
 import type { Reach } from '../../utils/events/types';
 import EventsGate from './EventsGate';
@@ -60,13 +60,14 @@ function FeedPanel({ lang }: Props) {
   const t = translations[lang];
   const [mode, setMode] = useState<FeedMode>('matched');
   /*
-   * The city, held as the spelling to show and compared folded — one value, so the label on the
-   * picker and the key it filters with cannot drift apart. Read from localStorage on the first
-   * render rather than in an effect: this hides rows, and a frame of the unfiltered feed before it
-   * applied would be the app appearing to forget the setting every time it opens.
+   * The city, held as the spelling that was chosen and compared through `cityKey` — one value, so
+   * the label on the picker and the key it filters with cannot drift apart, and a `Warsaw` stored
+   * by an older build still selects the option now labelled `Warszawa`. Read from localStorage on
+   * the first render rather than in an effect: this hides rows, and a frame of the unfiltered feed
+   * before it applied would be the app appearing to forget the setting every time it opens.
    */
   const [city, setCity] = useState<string>(() => loadFeedCity());
-  const cityKey = foldText(city);
+  const selectedCity = cityKey(city);
 
   const chooseCity = (next: string) => {
     setCity(next);
@@ -95,7 +96,7 @@ function FeedPanel({ lang }: Props) {
     () => withSelected(cityOptions(built.flatMap((s) => s.items).map((i) => i.event)), city),
     [built, city],
   );
-  const sections = useMemo(() => filterSectionsByCity(built, cityKey), [built, cityKey]);
+  const sections = useMemo(() => filterSectionsByCity(built, selectedCity), [built, selectedCity]);
 
   /*
    * How many dismissed events there are to go back to — which is a second pass over the corpus and
@@ -108,16 +109,19 @@ function FeedPanel({ lang }: Props) {
     () =>
       filterSectionsByCity(
         buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }),
-        cityKey,
+        selectedCity,
       ).reduce((total, section) => total + section.items.length, 0),
     // The city is a dependency: the button's number and the list it opens are the same question,
     // and a count taken over every city would offer a view that opens on nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, ignored, cityKey],
+    [feed.events, interests, ignored, selectedCity],
   );
 
   if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
 
+  // The picker's own spelling of the chosen city, so the empty-state sentence and the control
+  // agree — the stored value may be an exonym the corpus does not use.
+  const cityName = cities.find((option) => option.key === selectedCity)?.label ?? city;
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
   const inAnyCity = built.reduce((total, section) => total + section.items.length, 0);
@@ -182,7 +186,7 @@ function FeedPanel({ lang }: Props) {
               <span className="ev-city-label">{t.cityFilter}</span>
               <select
                 className="ev-city-select"
-                value={cityKey}
+                value={selectedCity}
                 onChange={(e) =>
                   chooseCity(cities.find((c) => c.key === e.target.value)?.label ?? '')
                 }
@@ -240,9 +244,9 @@ function FeedPanel({ lang }: Props) {
             * how an app comes to look broken weeks after the choice was made.
             */}
           <p className="ev-hint">
-            {cityKey ? fill(t.cityEmptyHint, { city }) : emptyHint(mode, t)}
+            {selectedCity ? fill(t.cityEmptyHint, { city: cityName }) : emptyHint(mode, t)}
           </p>
-          {cityKey ? (
+          {selectedCity ? (
             <button className="ev-link" type="button" onClick={() => chooseCity('')}>
               {t.cityClear}
             </button>
@@ -295,7 +299,7 @@ function reachLabel(reach: Reach | undefined, t: Translation): string {
  * thing instead: this is on, and there is nothing behind it.
  */
 function withSelected(options: CityOption[], city: string): CityOption[] {
-  const key = foldText(city);
+  const key = cityKey(city);
   if (!key || options.some((option) => option.key === key)) return options;
   return [...options, { key, label: city, count: 0 }].sort((a, b) =>
     a.label.localeCompare(b.label),

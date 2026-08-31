@@ -9,6 +9,7 @@
  */
 
 import type { EventRecord, Interest } from './types';
+import { cityKey } from './cities';
 import { foldText } from './normalize';
 
 /**
@@ -106,10 +107,19 @@ export function matchReason(event: EventRecord, interest: Interest): MatchReason
 
   if (!passesPlaces(event, interest)) return 'places';
 
+  /*
+   * `cityKey` on both sides rather than `foldText`, so an interest limited to `Warsaw` reaches the
+   * nights Ticketmaster's Polish catalogue files under `Warszawa`. Folding makes spellings of one
+   * word agree; only the alias table makes two words for one place agree, and a city rule that
+   * silently matched nothing was indistinguishable from one that was never satisfied.
+   *
+   * The same call the feed's city picker uses, which is the point: what an interest means by a
+   * city and what the picker groups under it cannot come apart.
+   */
   if (interest.cities?.length) {
-    const city = foldText(event.city ?? '');
+    const city = cityKey(event.city);
     if (!city) return 'cities';
-    if (!interest.cities.some((c) => foldText(c) === city)) return 'cities';
+    if (!interest.cities.some((c) => cityKey(c) === city)) return 'cities';
   }
 
   /*

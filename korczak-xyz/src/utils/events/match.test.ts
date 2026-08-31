@@ -154,6 +154,17 @@ describe('matchesInterest', () => {
     expect(matchesInterest(ev({ title: 'X' }), i)).toBe(false);
   });
 
+  it('reads a city and a name for it as one place', () => {
+    // Ticketmaster's English catalogue says Warsaw where its Polish one says Warszawa, and an
+    // interest typed either way has to reach both — otherwise a city rule that matches nothing
+    // looks exactly like one that is simply never satisfied.
+    const pl = interest({ id: 'pl', cities: ['Warszawa'] });
+    const en = interest({ id: 'en', cities: ['Warsaw'] });
+    expect(matchesInterest(ev({ title: 'X', city: 'Warsaw' }), pl)).toBe(true);
+    expect(matchesInterest(ev({ title: 'X', city: 'Warszawa' }), en)).toBe(true);
+    expect(matchesInterest(ev({ title: 'X', city: 'Rzeszów' }), en)).toBe(false);
+  });
+
   it('compares the date window lexically', () => {
     const i = interest({ id: 'i', fromDay: '2026-09-01', toDay: '2026-09-30' });
     expect(matchesInterest(ev({ title: 'X', day: '2026-09-15' }), i)).toBe(true);

@@ -463,12 +463,26 @@ durable form of "only Warszawa" already exists and the collector already reads i
 
 Four things about it:
 
-- **The key is `foldText(city)`, the stored value is the spelling to show.** One value, derived one
-  way, so the label on the control and the key it filters with cannot drift. Folding is what makes
-  `Kraków`, `KRAKOW` and `Krakow` one option; what it cannot do is translate, so a source writing
-  `Warsaw` in English stays a second entry beside `Warszawa`. Both are in the picker with their
-  counts, which is the honest form of that limit — half the nights missing with no explanation is
-  not.
+- **The key is `cityKey(city)`, the stored value is the spelling that was chosen.** One value,
+  derived one way, so the label on the control and the key it filters with cannot drift — and a
+  `Warsaw` stored by an older build still selects the option now labelled `Warszawa`. `cityKey` is
+  `foldText` plus **`CITY_ALIASES`**, and the two halves are different problems: folding makes
+  `Kraków`, `KRAKOW` and `Krakow` one string, but `Warsaw` and `Warszawa` are two words and no
+  normaliser will ever join them. Ticketmaster's English and Polish catalogues list the same hall
+  under both, so left apart they were two options each hiding the other's nights.
+
+  The table is deliberately short and hand-written — this file compiles into the Cloud Function
+  too, so a gazetteer here is a dependency in the collector, and **a wrong merge is worse than a
+  missing one**: two options for one city costs a tap, where two cities filed as one is a filter
+  that lies. Only the names this corpus produces are in it. The canonical side is the city's own
+  name, which is what `isEndonym` lets the picker prefer to print (`Warszawa` over `Warsaw`,
+  however often the English catalogue says it) — and `cities.test.ts` holds the two properties that
+  keeps honest: every target folds to itself, and no target is itself an alias.
+
+  **`matchReason`'s `cities` rule uses the same call**, so an interest limited to `Warsaw` reaches
+  the nights filed under `Warszawa`, in the browser and in the collector alike. That is not tidiness:
+  what an interest means by a city and what the picker groups under it coming apart is the failure
+  this whole app is arranged to prevent, one field along.
 - **The counts come from the view before the filter**, so each option says what pressing it would
   show. `Anywhere` carries its own count for the comparison: it is larger than the cities' sum by
   however many rows no source placed, and that difference is the only thing on screen saying those

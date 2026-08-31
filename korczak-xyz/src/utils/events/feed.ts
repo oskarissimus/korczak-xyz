@@ -9,6 +9,7 @@
 import type { EventRecord, Interest } from './types';
 import { NO_IGNORES } from './ignores';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
+import { cityKey, isEndonym } from './cities';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
 
@@ -211,21 +212,15 @@ function bestScore(item: FeedItem): number {
 }
 
 /**
- * The city an event is in, folded — `''` when the source never said.
+ * The city an event is in, as the one key its spellings agree on — `''` when the source never said.
  *
- * Folded because a city arrives spelled however each source spells it — `Kraków`, `KRAKOW` and
- * `Krakow` from three feeds about the same festival, `Łódź` and `Lodz` from two. Compared raw, the
- * picker would offer two entries for one place and each would then hide the other's nights. This is
- * the same `foldText` the matcher compares `Interest.cities` with, so the picker and that rule
- * cannot disagree about what one city is.
- *
- * What folding cannot do is translate: a source writing `Warsaw` in English is a second option
- * beside `Warszawa`, and nothing here can know they are one place without a gazetteer this app has
- * no reason to carry. Both are visible in the picker with their counts, which is the honest form of
- * that limit — an unexplained half of the nights would not be.
+ * `cityKey` rather than a fold done here: it is the same function the matcher compares
+ * `Interest.cities` with, so the picker and that rule cannot disagree about what one city is. It
+ * absorbs both halves of the problem — `Kraków`, `KRAKOW` and `Krakow` fold together, and `Warsaw`
+ * is mapped onto `Warszawa`, which folding alone will never do.
  */
 export function cityKeyOf(event: { city?: string }): string {
-  return foldText(event.city ?? '');
+  return cityKey(event.city);
 }
 
 export interface CityOption {
@@ -250,8 +245,8 @@ export interface CityOption {
  * `Anywhere` count staying larger than the sum of the cities is where they show up.
  *
  * Alphabetical, because the picker is scanned for a name that is already known. The label is the
- * commonest spelling for the key, tie-broken alphabetically so two equally common spellings do not
- * swap between renders.
+ * city's own name where the corpus holds it — `Warszawa` over `Warsaw` — then the commonest
+ * spelling, then alphabetical, so two equally common spellings do not swap between renders.
  */
 export function cityOptions(events: Array<{ city?: string }>): CityOption[] {
   const byKey = new Map<string, { count: number; spellings: Map<string, number> }>();
@@ -269,7 +264,12 @@ export function cityOptions(events: Array<{ city?: string }>): CityOption[] {
     .map(([key, { count, spellings }]) => ({
       key,
       count,
-      label: [...spellings].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0],
+      label: [...spellings].sort(
+        (a, b) =>
+          Number(isEndonym(b[0])) - Number(isEndonym(a[0])) ||
+          b[1] - a[1] ||
+          a[0].localeCompare(b[0]),
+      )[0][0],
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

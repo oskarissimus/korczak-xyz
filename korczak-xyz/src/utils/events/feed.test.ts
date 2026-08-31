@@ -352,8 +352,8 @@ describe('the city filter', () => {
   const sections = () =>
     buildFeed(
       [
-        ev({ title: 'Pink Floyd History', city: 'Kraków', day: '2026-10-21' }),
-        ev({ title: 'Pink Floyd History', city: 'KRAKOW', day: '2026-10-22' }),
+        ev({ title: 'Pink Floyd History', city: 'Warszawa', day: '2026-10-21' }),
+        ev({ title: 'Pink Floyd History', city: 'Warsaw', day: '2026-10-22' }),
         ev({ title: 'Pink Floyd History', city: 'Rzeszów', day: '2026-10-20' }),
         ev({ title: 'A blog post about Pink Floyd', startsAt: null, day: null }),
       ],
@@ -367,18 +367,18 @@ describe('the city filter', () => {
     expect(cityKeyOf({ city: 'Kraków' })).toBe(cityKeyOf({ city: 'KRAKOW' }));
     expect(cityKeyOf({ city: 'Łódź' })).toBe(cityKeyOf({ city: 'Lodz' }));
     expect(cityKeyOf({})).toBe('');
-    // Folding is not translation, and this pair is meant to stay two options: nothing here can
-    // know they are one place, and quietly merging them would need a gazetteer.
-    expect(cityKeyOf({ city: 'Warsaw' })).not.toBe(cityKeyOf({ city: 'Warszawa' }));
+    // The half folding cannot do. Ticketmaster's English catalogue and its Polish one list the
+    // same hall, and two options for one city each hide the other's nights.
+    expect(cityKeyOf({ city: 'Warsaw' })).toBe(cityKeyOf({ city: 'Warszawa' }));
   });
 
   it('offers each city once, with what pressing it would show', () => {
     const options = cityOptions(sections().flatMap((s) => s.items).map((i) => i.event));
     expect(options).toEqual([
-      // One option for two spellings, labelled with the commoner of them — here the tie goes
-      // alphabetically so the picker does not reshuffle between renders.
-      { key: 'krakow', label: 'KRAKOW', count: 2 },
       { key: 'rzeszow', label: 'Rzeszów', count: 1 },
+      // One option for the two names, labelled with the city's own — not `Warsaw`, however often
+      // the English catalogue says it.
+      { key: 'warszawa', label: 'Warszawa', count: 2 },
     ]);
   });
 
@@ -390,10 +390,10 @@ describe('the city filter', () => {
   });
 
   it('keeps one city and drops the rest, grouping untouched', () => {
-    const filtered = filterSectionsByCity(sections(), 'krakow');
+    const filtered = filterSectionsByCity(sections(), 'warszawa');
     expect(filtered.flatMap((s) => s.items).map((i) => i.event.city)).toEqual([
-      'Kraków',
-      'KRAKOW',
+      'Warszawa',
+      'Warsaw',
     ]);
     // The undated article had no city, so its section is gone rather than drawn empty.
     expect(filtered.map((s) => s.group)).toEqual(['later']);
