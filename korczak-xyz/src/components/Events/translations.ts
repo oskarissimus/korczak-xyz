@@ -149,12 +149,15 @@ export const translations = {
     // over `SourceId`, so a fifth source cannot be added without both.
     sourceNameTeatrWielki: 'Teatr Wielki – Opera Narodowa',
     sourceNamePythonOrg: 'python.org events',
+    sourceNameElektroniczneZapisy: 'Elektroniczne Zapisy — races',
     sourceNameFeed: 'Watched feeds',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
       'The season repertoire pages. Which productions are programmed and when they premiere — not the individual nights, which live behind a calendar drawn in JavaScript.',
     notePythonOrg:
       'Worldwide, and deliberately not narrowed by country: whether PyCon US is worth knowing about is your interest’s call, not the collector’s.',
+    noteElektroniczneZapisy:
+      'The running listings on an entry platform, nationwide — road, cross, obstacle and ultra. Each row says its own town, so which of them is Warsaw is your interest’s call; the sign-up form is a page of its own, which is what lets this one tell you entries have opened.',
     noteFeed:
       'Blogs and magazines that publish what they are putting on. A feed item is an article, so it carries no date of its own and shows under “announced, no dates yet”.',
     noteTicketmaster:
@@ -311,12 +314,15 @@ export const translations = {
     kindApi: 'API',
     sourceNameTeatrWielki: 'Teatr Wielki – Opera Narodowa',
     sourceNamePythonOrg: 'python.org events',
+    sourceNameElektroniczneZapisy: 'Elektroniczne Zapisy — biegi',
     sourceNameFeed: 'Śledzone kanały',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
       'Strony repertuaru sezonu. Które spektakle są w planie i kiedy mają premierę — bez pojedynczych wieczorów, te siedzą za kalendarzem rysowanym JavaScriptem.',
     notePythonOrg:
       'Cały świat i celowo bez filtra kraju: czy PyCon US jest wart uwagi, decyduje Twoje zainteresowanie, a nie kolektor.',
+    noteElektroniczneZapisy:
+      'Biegowe listy na platformie zapisów, z całej Polski — szosa, przełaje, przeszkody i ultra. Każdy wiersz podaje własne miasto, więc o to, które z nich jest warszawskie, pyta Twoje zainteresowanie; formularz zapisów to osobna strona i stąd wiadomo, kiedy ruszyły zapisy.',
     noteFeed:
       'Blogi i czasopisma, które piszą o tym, co organizują. Wpis w kanale to artykuł, więc nie ma własnej daty i trafia do „ogłoszone, bez dat”.',
     noteTicketmaster:

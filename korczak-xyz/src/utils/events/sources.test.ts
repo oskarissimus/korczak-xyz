@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEDS, SOURCE_CATALOGUE, catalogueEntry, displayUrl, seasonPaths } from './sources';
+import {
+  FEEDS,
+  RUNNING_LISTINGS,
+  SOURCE_CATALOGUE,
+  catalogueEntry,
+  displayUrl,
+  seasonPaths,
+} from './sources';
 
 describe('SOURCE_CATALOGUE', () => {
   it('names at least one real page per source', () => {
@@ -80,6 +87,30 @@ describe('FEEDS', () => {
       expect(entry.tags?.length ?? 0).toBeGreaterThan(0);
       expect(entry.label).toBeTruthy();
     }
+  });
+});
+
+describe('RUNNING_LISTINGS', () => {
+  it('tags every listing `running`, which is the seeded interest’s whole filter', () => {
+    expect(RUNNING_LISTINGS.length).toBeGreaterThan(0);
+    for (const page of RUNNING_LISTINGS) {
+      expect(page.tags).toEqual(['running']);
+      expect(page.country).toBe('PL');
+      expect(page.label).toBe(displayUrl(page.url));
+    }
+  });
+
+  it('stamps no city, the listing being national and each row saying its own', () => {
+    /*
+     * The one thing separating these pages from every other entry in this file. A `city` here
+     * would be one reader's Warsaw written onto races in eighty other towns, in a corpus every
+     * account shares — and `Interest.cities` is where that question already lives.
+     */
+    for (const page of RUNNING_LISTINGS) expect(page.city).toBeUndefined();
+  });
+
+  it('is what the catalogue shows for the entry platform', () => {
+    expect(catalogueEntry('elektroniczne-zapisy')?.pages(Date.now())).toEqual(RUNNING_LISTINGS);
   });
 });
 

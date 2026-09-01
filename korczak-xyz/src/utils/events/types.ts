@@ -13,7 +13,12 @@
  */
 
 /** Which adapter produced a record. Also the first half of its id. */
-export type SourceId = 'ticketmaster' | 'teatr-wielki' | 'python-org' | 'feed';
+export type SourceId =
+  | 'ticketmaster'
+  | 'teatr-wielki'
+  | 'python-org'
+  | 'elektroniczne-zapisy'
+  | 'feed';
 
 /**
  * How far an event pulls its audience from.

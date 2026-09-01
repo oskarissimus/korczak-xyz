@@ -4,10 +4,10 @@
  * These cannot live in `src/utils/events/sources.ts` with the URLs: that file compiles into the
  * Cloud Function, which has no locale, and the catalogue's own `label` is the source's *server-side
  * identity* — the string a health row and a "this source has stopped working" push are written
- * under. Three of the four are proper nouns and read the same in both languages; `Watched feeds` is
- * a description, and it rendered in English on the Polish page until this existed.
+ * under. Most of them are proper nouns and read the same in both languages; `Watched feeds` is a
+ * description, and it rendered in English on the Polish page until this existed.
  *
- * Both tables are keyed by `SourceId` rather than looked up loosely, so a fifth source is a compile
+ * Both tables are keyed by `SourceId` rather than looked up loosely, so a new source is a compile
  * error until somebody names it and says what it covers — the second being the only part of a
  * source a reader cannot work out from the URL beside it.
  *
@@ -20,6 +20,7 @@ import type { Translation } from './translations';
 const NAME_KEYS: Record<SourceId, keyof Translation> = {
   'teatr-wielki': 'sourceNameTeatrWielki',
   'python-org': 'sourceNamePythonOrg',
+  'elektroniczne-zapisy': 'sourceNameElektroniczneZapisy',
   feed: 'sourceNameFeed',
   ticketmaster: 'sourceNameTicketmaster',
 };
@@ -27,6 +28,7 @@ const NAME_KEYS: Record<SourceId, keyof Translation> = {
 const NOTE_KEYS: Record<SourceId, keyof Translation> = {
   'teatr-wielki': 'noteTeatrWielki',
   'python-org': 'notePythonOrg',
+  'elektroniczne-zapisy': 'noteElektroniczneZapisy',
   feed: 'noteFeed',
   ticketmaster: 'noteTicketmaster',
 };

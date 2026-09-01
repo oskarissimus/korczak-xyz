@@ -9,9 +9,10 @@
  * made for: the collector fetches these URLs, the tab lists them, and there is one list.
  *
  * So the adapters import their targets from here rather than declaring them. `FEEDS` drives the
- * RSS adapter, `seasonPaths` drives the theatre scrape, and `index.test.ts` in that directory
- * checks the running sources and this catalogue still name the same four things — a source added
- * there and forgotten here would collect events the tab claims nothing produces.
+ * RSS adapter, `seasonPaths` the theatre scrape, `RUNNING_LISTINGS` the entry-platform one, and
+ * `index.test.ts` in that directory checks the live sources and this catalogue still name the same
+ * five things — a source added there and forgotten here would collect events the tab claims
+ * nothing produces.
  *
  * Nothing user-facing lives here either, and that is the other half of the same rule: this file
  * compiles into a Cloud Function, which has no locale to render prose in. The sentence describing
@@ -91,6 +92,41 @@ export function seasonPaths(now: number): string[] {
 export const PYTHON_ORG_ICAL =
   'https://www.google.com/calendar/ical/j7gov1cmnqr9tvg14k621j7t5c%40group.calendar.google.com/public/basic.ics';
 
+/* --- elektronicznezapisy.pl -------------------------------------------------------------------- */
+
+export const ELEKTRONICZNE_ZAPISY_HOST = 'https://elektronicznezapisy.pl';
+
+/**
+ * The running disciplines on the entry platform, which is where a race is a row.
+ *
+ * One page per discipline, because the platform has no "all running" view — its own navigation is
+ * the taxonomy, and these four of its thirty-odd categories are the ones worth watching. The kids'
+ * cups, the mountain runs and the relays are each a line away.
+ *
+ * **No `city`, unlike every other page in this file.** These listings are national and each row
+ * says its own place, so the fact belongs to the row rather than to the page — see `splitPlace` in
+ * the adapter. Fetching `?city_id=12` instead would have put one reader's Warsaw into a corpus
+ * every account shares; `Interest.cities` and the feed's city picker are where that question lives.
+ *
+ * `running` is what these pages *are*, which is the only kind of tag a page may stamp feed-wide:
+ * every row on them is a race. It is deliberately the whole tag list — a discipline tag per page
+ * would read as a fact about the event when it is really a fact about which of the platform's
+ * categories the organiser ticked, and a race entered in two of them would then carry whichever
+ * page happened to be fetched first.
+ */
+export const RUNNING_LISTINGS: SourcePage[] = [
+  '1/bieg.html',
+  '48/bieg-przelajowy.html',
+  '52/ultra.html',
+  '64/bieg-z-przeszkodami.html',
+].map((path) => {
+  const url = `${ELEKTRONICZNE_ZAPISY_HOST}/${path}`;
+  // The link's text is the URL, and here it can be: `elektronicznezapisy.pl/52/ultra.html` names
+  // the discipline it lists, so there is nothing a friendlier label would add but something to
+  // take on trust.
+  return { url, label: displayUrl(url), tags: ['running'], country: 'PL' };
+});
+
 /* --- the watched feeds ------------------------------------------------------------------------ */
 
 /**
@@ -124,6 +160,29 @@ export const FEEDS: SourcePage[] = [
      */
     tags: ['music', 'festival'],
     city: 'Kraków',
+    country: 'PL',
+  },
+  {
+    url: 'https://maratonwarszawski.com/pl/feed/',
+    label: 'Maraton Warszawski',
+    /*
+     * The other half of watching the running calendar, and the half a listing cannot be.
+     *
+     * `RUNNING_LISTINGS` knows a race once it has a date and an entry form. This is the foundation
+     * that puts on the Maraton, the Półmaraton, Biegnij Warszawo and the Bieg Powstania — so the
+     * route changing, next year's date being fixed and entries opening are all announced here
+     * first, months before any of it is a row anywhere.
+     *
+     * `running` is honest as a feed-wide tag: this is a running organiser's own publication, the
+     * way historia.org.pl is a history magazine. The cost is the one that tag always carries — a
+     * keyword-less interest asking for `running` gets the sponsor posts too, and the seeded
+     * `Running in Warszawa` is exactly such an interest. Ten items is what a WordPress feed holds,
+     * so that is a card or two, not the sixty-seven the Jewish Culture Festival's feed once handed
+     * the Klezmer interest; and it is the trade this feed is here to make, since an announcement
+     * with no date yet is the thing worth knowing earliest.
+     */
+    tags: ['running'],
+    city: 'Warszawa',
     country: 'PL',
   },
 ];
@@ -180,6 +239,12 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     pages: () => [
       { url: PYTHON_ORG_ICAL, label: displayUrl(PYTHON_ORG_ICAL), tags: ['tech', 'python'] },
     ],
+  },
+  {
+    id: 'elektroniczne-zapisy',
+    label: 'Elektroniczne Zapisy – biegi',
+    kind: 'scrape',
+    pages: () => RUNNING_LISTINGS,
   },
   {
     id: 'feed',

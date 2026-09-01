@@ -14,12 +14,13 @@ import type { Interest } from './types';
 const CTX = { writerId: 'w', now: 1_700_000_000_000 };
 
 describe('the seeded interests', () => {
-  it('covers the five things he asked for', () => {
+  it('covers the six things he asked for', () => {
     expect(SEED_INTERESTS.map((s) => s.label)).toEqual([
       'Klezmer',
       'Pink Floyd',
       'Castles & medieval fairs',
       'Python & dev',
+      'Running in Warszawa',
       'Opera Narodowa',
     ]);
   });
@@ -30,6 +31,16 @@ describe('the seeded interests', () => {
     const opera = SEED_INTERESTS.find((s) => s.id === 'events-seed-opera')!;
     expect(opera.keywords).toEqual([]);
     expect(opera.tags).toEqual(['opera']);
+  });
+
+  it('asks for running by place rather than by keyword, races sharing no words', () => {
+    // The listing is national and its rows are all races, so `running` says what they are and
+    // the city list says which of them are reachable. A keyword list would have to guess at names
+    // — "Cross Forteczny" and "Zabierz PIESia do Międzylesia" have none in common.
+    const running = SEED_INTERESTS.find((s) => s.id === 'events-seed-running')!;
+    expect(running.keywords).toEqual([]);
+    expect(running.tags).toEqual(['running']);
+    expect(running.cities).toEqual(['Warszawa']);
   });
 
   it('gives every seed a stable id, so re-seeding is idempotent', () => {

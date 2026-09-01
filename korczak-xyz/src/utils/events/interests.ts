@@ -26,19 +26,22 @@ export interface InterestDraft {
 }
 
 /**
- * The five interests a new account starts with — the owner's own list, expressed in this app's
+ * The six interests a new account starts with — the owner's own list, expressed in this app's
  * vocabulary.
  *
  * Seeded as ordinary rows, not hard-coded and not special-cased, so every one can be edited,
  * muted or deleted like any other. The seeding is idempotent by id, and a deleted seed stays
  * deleted (its tombstone outranks a re-seed at the same rev).
  *
- * Two of them are worth reading closely because they are the two shapes an interest can take:
+ * Three of them are worth reading closely because they are the three shapes an interest can take:
  *
  *   - `events-seed-opera` has **no keywords at all**. It is `tags: ['opera']`, meaning "everything
  *     the opera house announces" — which is what "I want to know when new repertoire is announced"
  *     actually asks for, and which no keyword list could express. This is the case
  *     `matchesInterest` treats an empty keyword array as *no constraint* for.
+ *   - `events-seed-running` has no keywords either, and no tag that a source's *subject* supplies:
+ *     it is `tags: ['running']` narrowed by `cities: ['Warszawa']`, because "what can I run here"
+ *     is a question about a place and the app's durable way to ask one is an interest's city list.
  *   - `events-seed-floyd` carries exclusions. 'floyd' alone reaches guitar hardware ("Floyd Rose"
  *     tremolos) and, in an English-language feed, news about a person. The vetoes are cheaper than
  *     a narrower keyword list that would miss "The Wall live".
@@ -105,6 +108,30 @@ export const SEED_INTERESTS: ReadonlyArray<{ id: string } & InterestDraft> = [
       'programistyczn*',
     ],
     leadDays: 14,
+  },
+  {
+    id: 'events-seed-running',
+    label: 'Running in Warszawa',
+    /*
+     * The third shape, and the reason it is worth reading beside the other two: a **place** is the
+     * whole of the question.
+     *
+     * No keywords, like the opera one — `RUNNING_LISTINGS` is a running-only listing and the
+     * Maraton Warszawski feed is a running organiser's blog, so `running` already says what these
+     * are, and a keyword list would have to guess at race names. "Cross Forteczny" and "Zabierz
+     * PIESia do Międzylesia" are both races and share no word with each other or with 'bieg'.
+     *
+     * `cities` rather than `countries`, because the listing is national: the platform lists races
+     * in eighty-odd places and this narrows the feed to the ones that can be reached by tram. It
+     * goes through `cityKey`, so the rows Ticketmaster files under `Warsaw` come too.
+     *
+     * `leadDays: 30` — a marathon is trained for, not decided on. It is the longest lead here after
+     * the opera's season.
+     */
+    keywords: [],
+    tags: ['running'],
+    cities: ['Warszawa'],
+    leadDays: 30,
   },
   {
     id: 'events-seed-opera',

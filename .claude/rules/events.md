@@ -80,6 +80,15 @@ or subGenre at all, so the branch only ever fired on classical. The rule to appl
 source's vocabulary onto ours: **widen a tag only as far as the narrowest interest that uses it can
 bear**, and let the raw genre slug carry the rest, which is what it is there for.
 
+The `running` tag is the one place that rule is knowingly bent, and it is written down here so the
+next person does not "fix" it. `RUNNING_LISTINGS` is a running-only listing, so the tag is exactly
+what those pages are; the **Maraton Warszawski feed carries it too**, and that feed is a magazine —
+so the keyword-less `Running in Warszawa` seed picks up its sponsor posts along with the route
+announcements. Taken deliberately, for two reasons: a WordPress feed holds ten items, so this is a
+card or two rather than the sixty-seven that made the Klezmer case a disaster; and an announcement
+with no date yet — entries opening, next year's date fixed — is the earliest anything about a race
+is knowable, which is what the app is for.
+
 ### What may wake me up
 
 `notices.ts` is pure, so the whole "should this push fire?" question is reachable from a unit test
@@ -147,14 +156,15 @@ endpoint the collector pushes to until it earns a 410 that may never come. On th
 **404 and 410 are the only codes that delete a subscription**: a 403 is a VAPID key mismatch, and
 deleting on that would wipe every device the first time a secret is fumbled.
 
-### The sources, and why three of the four are generic
+### The sources, and why most of them are generic
 
-Four adapter *types*, not four scrapers — `rss` and `ical` are driven by URL lists, so watching one
-more festival blog is a line in `FEEDS`, not code. An adapter returns `RawEvent[]` and **nothing
-derived**: the id, the haystack, the fingerprint and the day are computed by `upsert.ts`, so a new
-adapter cannot get normalisation subtly different.
+Five adapter *types*, not five scrapers — `rss` and `ical` are driven by URL lists and
+`elektroniczne-zapisy` by a third, so watching one more festival blog is a line in `FEEDS`, and one
+more running discipline a line in `RUNNING_LISTINGS`, not code. An adapter returns `RawEvent[]` and
+**nothing derived**: the id, the haystack, the fingerprint and the day are computed by `upsert.ts`,
+so a new adapter cannot get normalisation subtly different.
 
-- **teatrwielki.pl** is the one bespoke scrape, and the source the app was really asked for. Note
+- **teatrwielki.pl** is the first bespoke scrape, and the source the app was really asked for. Note
   `/kalendarium/` is useless — a TYPO3 shell whose calendar is drawn by JavaScript, containing
   `data-day` attributes and no events. The **season page** (`/repertuar/sezon-2026/27/`) is plain
   server-rendered markup carrying title, genre, composer, premiere date and a stable slug. Titles
@@ -169,6 +179,24 @@ adapter cannot get normalisation subtly different.
   having short titles.
 - **RSS feeds** leave `startsAt` null on purpose. A feed item is an *article*: putting its `pubDate`
   in `startsAt` would file every post as happening today and then let `soon` fire about it.
+- **elektronicznezapisy.pl** is the second bespoke scrape, and it is there because a race is not
+  repertoire and Ticketmaster does not sell one. Organisers publish, but each on its own WordPress —
+  the RSS route would have been a line in `FEEDS` per club and still no dates. An **entry platform**
+  is the one place a race is a row: it exists to be signed up to, so the listing carries a stable
+  numeric id, a day, a place and a link that becomes the form. Two things about that row shape the
+  adapter. The **city is inside the title**, as `Miasto, "Nazwa"`, so `splitPlace` reads it per row
+  rather than the page stamping one on; the split is greedy on the left because `Kurejwa, gm.
+  Grajewo` is one village. And **`signup.html` is a second page**, which is what makes an `onsale`
+  transition real here where it can never be for Ticketmaster — a race is announced with its date
+  months before entries open, and the button appearing is the event.
+
+  The fetch is deliberately **not** narrowed to `?city_id=12`, which the platform offers and which
+  would have halved the rows. Geography is the interest's job, as it is for python.org: a Warsaw
+  baked into the *fetch* is one reader's preference written into a corpus every account shares, and
+  the day the question becomes Kraków there is nothing stored to answer it with. So the collector
+  takes the national listing, every row says its own town, and `Interest.cities` and the feed's city
+  picker decide what is Warsaw — through `cityKey`, so `Warsaw` and `Warszawa` are the same ask.
+
 - **Ticketmaster** can never produce an `onsale` transition — its listing *is* its ticket page. That
   is correct, not a gap. No API key is a configuration state, not a failure, so it returns `[]`.
 
@@ -192,10 +220,11 @@ The Alerts tab's health table already named sources; it never said what a source
 one-matcher-two-runtimes argument reaching a second fact: the browser cannot import a Cloud
 Function, so a list of URLs next to the scrapers would have had a copy in the island, correct until
 the first time a feed moved. So the adapters now *import* their targets — `FEEDS` drives the RSS
-adapter, `seasonPaths` the theatre scrape, `PYTHON_ORG_ICAL` and `TICKETMASTER_ENDPOINT` the other
-two — and the tab lists the same objects the collector fetches. `functions/src/sources/index.test.ts`
-asserts `SOURCES` and the catalogue still name the same four things: the drift is one-sided and
-silent otherwise, a fifth source collecting events the tab claims nothing produces.
+adapter, `RUNNING_LISTINGS` the entry-platform scrape, `seasonPaths` the theatre one, and
+`PYTHON_ORG_ICAL` and `TICKETMASTER_ENDPOINT` the other two — and the tab lists the same objects the
+collector fetches. `functions/src/sources/index.test.ts`
+asserts `SOURCES` and the catalogue still name the same five things: the drift is one-sided and
+silent otherwise, a new source collecting events the tab claims nothing produces.
 
 Two rules that file keeps, and they are the same rule twice — **it holds facts, not words**:
 
@@ -205,7 +234,7 @@ Two rules that file keeps, and they are the same rule twice — **it holds facts
   trusting the next person to remember.
 - **No prose either.** It also compiles into a Cloud Function, which has no locale. The sentence
   describing each source lives in `Events/translations.ts` behind `sourceNames.ts`, whose two
-  tables are `Record<SourceId, keyof Translation>` — so a fifth source is a compile error until
+  tables are `Record<SourceId, keyof Translation>` — so a new source is a compile error until
   somebody names it and says what it covers. It shipped the other way round for one build and the
   Polish page printed four English paragraphs.
 
@@ -448,6 +477,12 @@ that constrains nothing, which is this feature's own failure mode reappearing on
 `SEED_INTERESTS` is untouched: `withMissingSeeds` is keyed by id and never edits an existing row, so
 an account's own `Python & dev` is set by hand in the editor, which is also the first real test of
 the toggle.
+
+`Running in Warszawa` is the seed that made a **third** interest shape worth naming, beside the
+keyword one and the keyword-less-plus-tag one: `tags: ['running']` narrowed by `cities:
+['Warszawa']`, where the place is the whole question. Keywords could not have done it — "Cross
+Forteczny" and "Zabierz PIESia do Międzylesia" are both races and share no word with each other or
+with `bieg` — and `countries` is the wrong axis for a listing that is national by design.
 
 ### Narrowing the feed to one city
 
