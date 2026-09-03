@@ -20,6 +20,15 @@ export interface PendingNotice {
   interestIds: string[];
   title: string;
   startsAt: number | null;
+  /**
+   * When the sale opens, where the source said so ahead of time.
+   *
+   * Carried on the notice rather than looked up again because it is what a `presale` is *about*:
+   * the body has to name the date being warned about, and the ordering below has to rank it by
+   * that date. A sale announcement is an article, so its `startsAt` is null and reading the two
+   * off one field would put the one notice you can be late for last.
+   */
+  onSaleAt?: number;
   url: string;
 }
 
@@ -109,6 +118,7 @@ export function noticesFor(
     eventId: event.id,
     title: event.title,
     startsAt: event.startsAt,
+    onSaleAt: event.onSaleAt,
     url: event.url,
   };
 
@@ -127,6 +137,27 @@ export function noticesFor(
   }
 
   /*
+   * The sale is coming. The other half of `onsale`, and the half that is any use.
+   *
+   * `onsale` can only fire once a ticket link has appeared, which for a season that sells out in a
+   * morning is news that arrives too late to act on. But the date is usually *known in advance* —
+   * Teatr Wielki prints it in its own news weeks ahead, and Ticketmaster carries it as
+   * `sales.public.startDateTime` — so where a source states it, this counts down to it exactly as
+   * `soon` counts down to a curtain, on the same `leadDays`.
+   *
+   * `> ctx.now` and not merely "present": a sale that opened last month is the ordinary state of
+   * most of the corpus, and warning about it is warning about the past. Note this deliberately
+   * does *not* ask `isFresh` — a date-based reminder is not an announcement, and an interest added
+   * today should still be able to warn about a sale announced last week, which is the whole reason
+   * anyone would add it.
+   */
+  const onSaleAt = event.onSaleAt;
+  if (onSaleAt !== undefined && ctx.armedAt !== null && onSaleAt > ctx.now) {
+    const lead = Math.max(...matched.map((i) => i.leadDays));
+    if (daysUntil(onSaleAt, ctx.now) <= lead) add(out, 'presale', matched, base, seen);
+  }
+
+  /*
    * Getting close. `max` of the matching interests' leadDays, not `min`: leadDays says how much
    * warning is wanted, so if any matching interest asked for thirty days it gets thirty. Undated
    * events cannot be close to anything.
@@ -137,6 +168,18 @@ export function noticesFor(
   }
 
   return out;
+}
+
+/**
+ * The date a notice is *about*, which is not always the date the event is on.
+ *
+ * A sale announcement has no `startsAt` — it is an article, and the RSS adapter's rule that an
+ * article carries no date of its own holds here too. Ranking it by `startsAt` alone would sort the
+ * one notice with a deadline behind every dated concert, so the cap below would drop it first.
+ */
+function noticeAt(notice: PendingNotice): number {
+  const at = notice.kind === 'presale' ? notice.onSaleAt : notice.startsAt;
+  return at ?? Infinity;
 }
 
 function add(
@@ -156,9 +199,9 @@ function add(
  *
  * Two caps, for two different reasons. `announced` is capped hard (3) and the overflow becomes a
  * single summary — because the realistic way this floods is a scrape whose markup shifted, every
- * synthesised key changed, and an entire opera season looks new. `onsale` gets its own, looser cap
- * (10) and never becomes a summary: tickets going on sale is the thing he asked for, and it is not
- * noise.
+ * synthesised key changed, and an entire opera season looks new. `onsale` and `presale` share
+ * their own, looser cap (10) and never become a summary: tickets going on sale — and the warning
+ * that they are about to — is the thing he asked for, and it is not noise.
  *
  * Suppressed notices are still returned so the caller latches them. They must never be left
  * unclaimed to fire individually on the next run — that would only postpone the flood.
@@ -183,10 +226,19 @@ export function planRun(
   }
 
   // Soonest first, so if anything is dropped it is the most distant.
-  all.sort((a, b) => (a.startsAt ?? Infinity) - (b.startsAt ?? Infinity));
+  all.sort((a, b) => noticeAt(a) - noticeAt(b));
 
   const announced = all.filter((n) => n.kind === 'announced');
-  const onsale = all.filter((n) => n.kind === 'onsale').slice(0, Math.max(0, ctx.maxOnSalePerRun));
+  /*
+   * `presale` shares the ticket budget with `onsale` rather than getting one of its own, because
+   * they are one category of noise: both say "there is a thing to buy". A source that begins
+   * stating sale dates for its whole catalogue — which is what Ticketmaster's
+   * `sales.public.startDateTime` is — must not be able to outflank the cap by arriving under a
+   * second name.
+   */
+  const sale = all
+    .filter((n) => n.kind === 'onsale' || n.kind === 'presale')
+    .slice(0, Math.max(0, ctx.maxOnSalePerRun));
   const soon = all.filter((n) => n.kind === 'soon');
 
   const keep = Math.max(0, ctx.maxPerRun);
@@ -194,7 +246,7 @@ export function planRun(
   const suppressed = announced.slice(keep);
 
   return {
-    send: [...sentAnnounced, ...onsale, ...soon],
+    send: [...sentAnnounced, ...sale, ...soon],
     suppressed,
     summary: suppressed.length > 0 ? { count: suppressed.length, url: '/apps/events' } : null,
   };

@@ -86,6 +86,24 @@ export function seasonPaths(now: number): string[] {
   );
 }
 
+/**
+ * The theatre's own news page, and why a *scrape of articles* earns its place beside the season.
+ *
+ * The season page answers "what is programmed". It cannot answer the question that actually costs
+ * money to get wrong: **when do the tickets go on sale**. A season's sale opens on one morning at
+ * one hour, and by the time a ticket link appears on a production — which is all `onsale` can ever
+ * observe — the good seats are gone.
+ *
+ * The theatre states it in advance, in prose, in its own news list: "Sprzedaż biletów od
+ * 1 września, g. 11.00", published a fortnight or more ahead. That sentence is the whole reason
+ * this page is fetched, and `parseNewsPage` reads it into `onSaleAt` so the `presale` notice can
+ * count down to it.
+ *
+ * Not optional, unlike next season's page: a theatre always has current news, so an empty or
+ * unreachable news list means the markup moved rather than that nothing is happening.
+ */
+export const TEATR_WIELKI_NEWS = `${TEATR_WIELKI_HOST}/teatr/aktualnosci/`;
+
 /* --- python.org ------------------------------------------------------------------------------- */
 
 /** The public Google Calendar behind python.org/events. */
@@ -220,8 +238,8 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'teatr-wielki',
     label: 'Teatr Wielki – Opera Narodowa',
     kind: 'scrape',
-    pages: (now) =>
-      seasonPaths(now).map((url, index) => ({
+    pages: (now) => [
+      ...seasonPaths(now).map((url, index) => ({
         url,
         label: displayUrl(url),
         // The first is the running season and must be there; the second is next season's, which
@@ -231,6 +249,22 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
         city: 'Warszawa',
         country: 'PL',
       })),
+      {
+        url: TEATR_WIELKI_NEWS,
+        label: displayUrl(TEATR_WIELKI_NEWS),
+        /*
+         * `ticket-sale` is deliberately NOT here, though it is the tag this page exists to
+         * produce. A page may only stamp feed-wide what every row on it *is*, and most of these
+         * rows are a job advert or a parking notice; the tag is applied per row, by the adapter,
+         * and only where a sale date was actually read out of the prose. Stamping it here would
+         * hand the keyword-less "Ticket sales opening" interest the theatre's entire press
+         * office — which is the mistake this app has now made from three directions.
+         */
+        tags: ['theatre', 'teatr-wielki'],
+        city: 'Warszawa',
+        country: 'PL',
+      },
+    ],
   },
   {
     id: 'python-org',

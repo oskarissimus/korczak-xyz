@@ -221,6 +221,23 @@
 }
 
 /*
+ * The sale opens on a date the source stated in advance — the one chip on a card that is about a
+ * deadline rather than a state.
+ *
+ * Outlined in the same navy `ev-chip--sale` is filled with, rather than given a colour of its own.
+ * They are the same fact at two moments ("tickets exist" and "tickets will exist, on this
+ * morning"), so they should read as a pair; and filled, this would compete with the one chip that
+ * means you can act right now. There is no third colour to spend here — `ev-chip--place` has the
+ * grey, and a card carrying four filled chips says nothing by emphasis at all.
+ */
+.ev-chip--presale {
+  background: var(--retro-white);
+  border: 2px solid var(--retro-navy);
+  color: var(--retro-navy);
+  padding: 0 5px;
+}
+
+/*
  * Dismissed by hand. Drawn as an inset well rather than in a colour, because it is the one chip on
  * a card that reports something *you* did — where `ev-chip--sale` is a fact from a listing and
  * `ev-chip--place` a verdict from the classifier. A fourth colour beside those two would read as a

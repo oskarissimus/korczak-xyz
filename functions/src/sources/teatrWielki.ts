@@ -21,13 +21,20 @@
  *
  * What this cannot give us is individual performance nights; those live behind the JS calendar. That
  * is an acceptable gap — the question is "is Figaro programmed this season", not "which Tuesday".
+ *
+ * The season page cannot answer the *other* question either, and that one has a deadline: **when
+ * the tickets go on sale.** A season's sale opens on one morning at one hour and the house is half
+ * sold by lunchtime, so noticing a ticket link has appeared — which is all `onsale` can ever do —
+ * is noticing too late. The theatre says it in advance, in prose, in its own news list, so
+ * `parseNewsPage` reads that sentence into `onSaleAt` and the `presale` notice counts down to it.
  */
 
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
-import { parsePolishDate, stripTags, warsawEpoch } from './html';
+import { parsePolishDate, parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
 import {
   TEATR_WIELKI_HOST as HOST,
+  TEATR_WIELKI_NEWS,
   seasonPaths,
 } from '../../../korczak-xyz/src/utils/events/sources';
 
@@ -123,6 +130,93 @@ export function tagsFor(genre: string | undefined): string[] {
   return tags;
 }
 
+/* --- the news list, which is where a sale date is stated in advance ---------------------------- */
+
+/** One `<li>` of `<ul id="content" class="white-list cal-list">`. */
+const NEWS_ROW = /<li>\s*<time class="date"([\s\S]*?)<\/li>/g;
+
+/**
+ * The news list, as events.
+ *
+ * Every row, not only the ones announcing a sale — and that is worth defending, because most of
+ * these are a job advert or a parking notice. Two reasons:
+ *
+ *   - **A source that returns rows can be seen to be working.** `eventSources` reads zero as a
+ *     failure only where there used to be something; kept to sale rows alone, this page would
+ *     legitimately yield nothing for months, and the run where the wording changed and the parse
+ *     silently died would look exactly the same. Ten articles a run is a health signal that stays
+ *     honest.
+ *   - **Nothing here reaches an interest by accident.** The page stamps `theatre` and
+ *     `teatr-wielki`, which no seeded interest asks for, and `ticket-sale` — the tag the seeded
+ *     "Ticket sales opening" interest is built on — is added per row and only where a date was
+ *     actually read out of the prose. A parking notice carries no deadline and matches nothing.
+ *
+ * `startsAt` is null on every row, sale or not. A news item is an article and an article has no
+ * date of its own; the RSS adapter refuses to put a `pubDate` there for the same reason, and doing
+ * it here would file the announcement as happening today and let `soon` fire about it. The sale
+ * moment goes in `onSaleAt`, which is the field for exactly that and which the feed already ranks
+ * a dateless row by.
+ */
+export function parseNewsPage(html: string): RawEvent[] {
+  const out: RawEvent[] = [];
+
+  for (const match of html.matchAll(NEWS_ROW)) {
+    const block = match[1];
+
+    const href = /<a[^>]+href="([^"]+)"/.exec(block)?.[1];
+    const title = stripTags(/<h2[^>]*>([\s\S]*?)<\/h2>/.exec(block)?.[1] ?? '');
+    if (!href || !title) continue;
+
+    const slug = newsSlugOf(href);
+    if (!slug) continue;
+
+    // `datetime` is machine-readable and already ISO, so the publication day needs no parsing —
+    // which matters, because it is what resolves the year the sale sentence leaves out.
+    const publishedDay = /datetime="(\d{4}-\d{2}-\d{2})"/.exec(block)?.[1] ?? null;
+
+    // The teaser, with the category chip ("Aktualności |") stripped off the front.
+    const teaser = stripTags(/<p[^>]*>([\s\S]*?)<\/p>/.exec(block)?.[1] ?? '')
+      .replace(/^[^|]*\|\s*/, '')
+      .trim();
+
+    // The title can carry it as readily as the teaser ("Sprzedaż biletów na sezon 2027/28").
+    const sale = parseSaleAnnouncement(`${title} ${teaser}`, publishedDay);
+    const onSaleAt = sale ? warsawEpoch(sale.day, sale.hour) : null;
+
+    out.push({
+      sourceKey: `aktualnosci/${slug}`,
+      title,
+      subtitle: teaser || undefined,
+      url: href.startsWith('http') ? href : `${HOST}${href}`,
+      startsAt: null,
+      // The theatre's own sentence, so a card is never dateless-and-mute and so a wrong parse can
+      // be argued with against what was actually written.
+      dateText: sale ? teaser || title : undefined,
+      city: 'Warszawa',
+      country: 'PL',
+      venue: 'Teatr Wielki – Opera Narodowa',
+      /*
+       * `ticket-sale` per row, never page-wide. It is the one tag that says "this row carries a
+       * deadline", the keyword-less seeded interest matches on it alone, and a keyword-less
+       * interest has no second filter — so stamping it on the whole page would hand that interest
+       * the theatre's job adverts. Same mistake, fourth direction; see the rules file.
+       */
+      tags: onSaleAt !== null ? ['theatre', 'teatr-wielki', 'ticket-sale'] : ['theatre', 'teatr-wielki'],
+      ...(onSaleAt !== null ? { onSaleAt } : {}),
+      description: teaser,
+    });
+  }
+
+  return out;
+}
+
+/** `/teatr/aktualnosci/aktualnosc/edukacja-w-nowym-sezonie/` -> `edukacja-w-nowym-sezonie`. */
+export function newsSlugOf(href: string): string | null {
+  const match = /\/aktualnosci\/aktualnosc\/([^?#]+)/.exec(href);
+  if (!match) return null;
+  return match[1].replace(/^\/+|\/+$/g, '') || null;
+}
+
 export const teatrWielki: EventSource = {
   id: 'teatr-wielki',
   label: 'Teatr Wielki – Opera Narodowa',
@@ -145,9 +239,27 @@ export const teatrWielki: EventSource = {
       out.push(...parseSeasonPage(html));
     }
 
+    /*
+     * The news list, and it is fetched even when both season pages failed.
+     *
+     * A theatre always has current news, so unlike next season's page a 404 here is a fault rather
+     * than the ordinary state of half the year. But it is caught all the same and does not fail
+     * the source on its own: the season pages are what the app was built for, and losing an opera
+     * season from the feed because a news template moved would be the fragile half taking the
+     * sturdy half down with it.
+     */
+    try {
+      out.push(...parseNewsPage(await fetchText(ctx, TEATR_WIELKI_NEWS)));
+      reached += 1;
+    } catch {
+      // Recorded only by its absence from the count below.
+    }
+
     // Every page unreachable is different from "the current season has nothing on", and only the
     // first is worth recording as a broken source.
-    if (reached === 0) throw new Error(`no season page reachable (${paths.join(', ')})`);
+    if (reached === 0) {
+      throw new Error(`no page reachable (${[...paths, TEATR_WIELKI_NEWS].join(', ')})`);
+    }
     return out;
   },
 };

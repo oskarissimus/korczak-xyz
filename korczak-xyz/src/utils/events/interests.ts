@@ -26,7 +26,7 @@ export interface InterestDraft {
 }
 
 /**
- * The six interests a new account starts with — the owner's own list, expressed in this app's
+ * The seven interests a new account starts with — the owner's own list, expressed in this app's
  * vocabulary.
  *
  * Seeded as ordinary rows, not hard-coded and not special-cased, so every one can be edited,
@@ -141,6 +141,31 @@ export const SEED_INTERESTS: ReadonlyArray<{ id: string } & InterestDraft> = [
     keywords: [],
     tags: ['opera'],
     leadDays: 45,
+  },
+  {
+    id: 'events-seed-ticket-sale',
+    label: 'Ticket sales opening',
+    /*
+     * The one interest here whose subject is a **deadline** rather than a night out.
+     *
+     * Knowing Figaro is programmed is worth a season's notice; knowing the box office opens at
+     * 11.00 on the 1st is worth a fortnight's, and getting it a day late is worth nothing at all,
+     * because a Teatr Wielki season is half sold by lunchtime. So this exists separately from
+     * `Opera Narodowa`, which watches the same house for the opposite thing.
+     *
+     * Keyword-less, like the opera one, and for the same reason: no word picks out "a sale is
+     * about to open" — the announcements are titled "Edukacja w nowym sezonie" as readily as
+     * anything with `bilety` in it. What identifies them is that a **date was successfully read
+     * out of the prose**, which is exactly what `ticket-sale` records, so the tag is the whole
+     * interest. It is applied per row by the adapter and never stamped on a page, which is what
+     * keeps a keyword-less interest from inheriting a press office.
+     *
+     * `leadDays: 14` — a fortnight is long enough to put in the diary and short enough that the
+     * warning still feels like it is about this sale. It is what `presale` counts back from.
+     */
+    keywords: [],
+    tags: ['ticket-sale'],
+    leadDays: DEFAULT_LEAD_DAYS,
   },
 ];
 

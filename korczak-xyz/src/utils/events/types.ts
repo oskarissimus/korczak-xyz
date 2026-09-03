@@ -93,6 +93,15 @@ export interface EventRecord {
   classifyHash?: string;
   /** Normalised topics, folded lowercase: 'music', 'opera', 'theatre', 'tech', 'festival'. */
   tags: string[];
+  /**
+   * When tickets go on sale, where the source states it **in advance**.
+   *
+   * The one date in this record that is not about the performance. Teatr Wielki announces a
+   * season's sale weeks ahead ("Sprzedaż biletów od 1 września, g. 11.00") and Ticketmaster
+   * carries `sales.public.startDateTime` — and a sale you find out about afterwards is a sale you
+   * missed, so this is what the `presale` notice counts down to. `onsale` is the opposite half:
+   * the moment a link appeared, observed rather than foretold.
+   */
   onSaleAt?: number;
   /**
    * When the collector first observed a ticket link on this event. The `onsale` transition cannot
@@ -208,7 +217,16 @@ export interface Ignore {
   title: string;
 }
 
-export type NoticeKind = 'announced' | 'onsale' | 'soon';
+/**
+ * Why a notification fired.
+ *
+ * `presale` and `onsale` are the two halves of one question asked at two different times, and only
+ * one of them is any use for a season that sells out in a morning: `presale` is "the sale opens on
+ * a date the source has already told us", counted down to like `soon` counts down to a curtain,
+ * where `onsale` is "a ticket link has appeared", which can only ever be observed once it is too
+ * late to have planned for it.
+ */
+export type NoticeKind = 'announced' | 'onsale' | 'soon' | 'presale';
 
 export interface Notice {
   /** `${slugKey(fingerprint)}|${kind}` — see noticeIdFor. */
@@ -227,6 +245,8 @@ export interface Notice {
   /** Denormalised so the history renders without a join back to `events/`. */
   title: string;
   startsAt: number | null;
+  /** Denormalised for the same reason `startsAt` is — a `presale` row's date is this one, not that. */
+  onSaleAt?: number;
   url: string;
 }
 

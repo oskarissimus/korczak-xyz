@@ -102,12 +102,41 @@ rather than from a phone at 7am. Three guards against the flood, and all three a
 - **`maxPerRun`** (3) — the overflow becomes one summary, and the suppressed notices are still
   latched so they never fire individually later. This is what saves you when a scrape's markup
   shifts, every synthesised key changes, and an entire opera season looks new. `onsale` is exempt
-  (capped separately at 10): tickets going on sale is the thing that was asked for, and it is not
-  noise.
+  (capped separately at 10, a budget it shares with `presale`): tickets going on sale is the thing
+  that was asked for, and it is not noise.
 
 `soon` uses **`max`** of the matching interests' `leadDays`, not min — leadDays means "how much
 warning I want". One notice per kind per fingerprint, never one per interest: the interests are *why*
 it fired, not *what* fired.
+
+#### `presale`, and why `onsale` was never enough
+
+`onsale` fires when a ticket link **appears**, which is a thing that can only be observed after it
+has happened. For a Teatr Wielki season that is the wrong side of the event entirely: the sale opens
+at 11.00 on one morning and the house is half sold by lunchtime, so a notification that arrives on
+the next six-hourly run is a notification about seats somebody else has.
+
+The date, though, is **known weeks ahead**. `presale` counts down to `EventRecord.onSaleAt` exactly
+as `soon` counts down to `startsAt`, on the same `leadDays`. Four things about it:
+
+- **`onSaleAt` must be in the future.** Nearly every Ticketmaster row carries the date its sale
+  opened, usually months ago; without the guard the feature's first run is a hundred warnings about
+  the past.
+- **It is deliberately not gated on `isFresh`**, unlike `announced`. A date-based reminder is not
+  an announcement. An interest added today has to be able to warn about a sale announced last week,
+  which is the only reason anyone would add it.
+- **Notices are ranked by `noticeAt`, not by `startsAt`.** A sale announcement is an article and has
+  no `startsAt`, so sorting on that field alone files every one of them behind every dated notice in
+  the run — and then the ticket budget keeps whatever the tail happened to hold instead of the sale
+  that opens first.
+- **It shares `maxOnSalePerRun` with `onsale`** rather than getting a budget of its own. They are one
+  category of noise, and a source that starts stating sale dates across its whole catalogue must not
+  walk past the cap by arriving under a second name.
+
+`Interest.leadDays` now means two things at once — how long before the curtain, and how long before
+the sale — and that is on purpose rather than an economy. Both answer "how much warning do I want
+about this kind of thing", and a second field would have to be filled in on every interest by
+somebody who has never wanted the two to differ.
 
 **The notice document is a lock taken before sending, not a receipt written after.** `create()` fails
 on an existing document, which is the atomic latch. Written after the send, a crash between sending
@@ -172,6 +201,36 @@ so a new adapter cannot get normalisation subtly different.
   performance nights stay behind the JS calendar; that is an accepted gap, since the question is
   whether Figaro is programmed, not which Tuesday. A **committed HTML fixture** is what turns the
   inevitable redesign into a red build rather than a silently empty feed.
+
+  The **news list** (`/teatr/aktualnosci/`) is fetched beside it, and it is the only page in this
+  app that answers a question with a deadline: *when does the sale open*. The theatre states it in
+  prose — "Sprzedaż biletów od 1 września, g. 11.00" — a fortnight or more ahead, and
+  `parseSaleAnnouncement` reads that sentence into `onSaleAt` so `presale` can count down to it.
+  Four things about that read:
+
+  - **There is no year in the sentence.** `parsePolishDate` requires one and rightly refuses to
+    guess; here the guess has to be made, and the article's own `datetime` attribute is what makes
+    it safe — a sale is announced before it opens, so the answer is the next occurrence of that
+    day and month at or after publication. That rolls a December announcement of a January sale
+    into the next year without a special case.
+  - **The sale wording is required, and the date must follow it.** The same list carries "Od 12
+    czerwca 2026 roku nasi Widzowie mogą korzystać z 30% zniżki na parking" — a date after "od",
+    about a car park. A reader that took any such date would put that on the calendar as a ticket
+    sale.
+  - **Every row is kept, not only the ones announcing a sale.** `eventSources` reads zero as a
+    failure only where there used to be something, so a page that legitimately yields nothing for
+    months could not be told apart from one whose wording moved. Ten articles a run is a health
+    signal that stays honest.
+  - **`ticket-sale` is applied per row and never stamped on the page**, and only where a date was
+    actually parsed. That tag is the whole of the keyword-less `Ticket sales opening` seed, and a
+    keyword-less interest has no second filter — page-wide it would hand that interest the
+    theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
+
+  `startsAt` stays null on those rows, sale or not: a news item is an article, which is the rule the
+  RSS adapter is built on. `feed.ts`'s `actionableAt` is what stops that filing the one row with a
+  deadline under *announced, no dates yet* — it reads `startsAt` where there is one and `onSaleAt`
+  otherwise, so the announcement is grouped, sorted and expired by the morning it is about. Nothing
+  else in the feed moves, `onSaleAt` being set only where a source stated it in advance.
 - **python.org** is an iCal feed — 874 VEVENTs, mostly historical, so `collect.ts` drops anything
   already past. Geography is deliberately *not* filtered there: PyCon US may still be worth knowing
   about, and deciding that is the interest's job. RFC 5545 line unfolding is the one parsing bug

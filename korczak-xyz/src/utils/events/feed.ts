@@ -120,8 +120,10 @@ export function buildFeed(
 
   const items: FeedItem[] = [];
   for (const event of dedupeByFingerprint(events)) {
-    // Something that finished yesterday is not "coming up", whatever matched it.
-    if (event.startsAt !== null && daysUntil(event.startsAt, now) < 0) continue;
+    // Something that finished yesterday is not "coming up", whatever matched it. A sale
+    // announcement expires the same way, on the day the sale it announced opens.
+    const at = actionableAt(event);
+    if (at !== null && daysUntil(at, now) < 0) continue;
     /*
      * Dedupe first, then ask. The fingerprint is what an ignore is keyed on, so the survivor of two
      * copies of one night carries the dismissal however the dedupe went — which is the whole reason
@@ -173,14 +175,33 @@ export function buildFeed(
 }
 
 /**
+ * The next moment this event asks anything of the reader.
+ *
+ * Almost always `startsAt`, and for every source but one it is exactly that. The exception is an
+ * announcement that a **sale opens** on a stated date: an article carries no date of its own (the
+ * rule the RSS adapter is built on, and for the same reason), so its `startsAt` is null while the
+ * moment you have to be at a keyboard is perfectly well known.
+ *
+ * Filing that under "no dates yet" would put the one row in the feed you can be *late* for below
+ * every concert in the corpus. So the grouping, the ordering and the has-it-passed test all ask
+ * this rather than reading `startsAt` directly — and because `onSaleAt` is only ever set where a
+ * source stated it ahead of time, nothing else in the feed moves.
+ */
+export function actionableAt(event: Pick<EventRecord, 'startsAt' | 'onSaleAt'>): number | null {
+  if (event.startsAt !== null) return event.startsAt;
+  return event.onSaleAt ?? null;
+}
+
+/**
  * Which bucket an event belongs in.
  *
  * `undated` last rather than first: a season with no nights scheduled is the least actionable
  * thing in the list, however recently it was announced.
  */
 export function groupOf(event: EventRecord, now: number): FeedGroup {
-  if (event.startsAt === null) return 'undated';
-  const days = daysUntil(event.startsAt, now);
+  const at = actionableAt(event);
+  if (at === null) return 'undated';
+  const days = daysUntil(at, now);
   if (days <= 7) return 'week';
   if (days <= 31) return 'month';
   return 'later';
@@ -194,8 +215,8 @@ export function groupOf(event: EventRecord, now: number): FeedGroup {
  * fall to the end and order by when they were announced.
  */
 function compareItems(a: FeedItem, b: FeedItem): number {
-  const at = a.event.startsAt;
-  const bt = b.event.startsAt;
+  const at = actionableAt(a.event);
+  const bt = actionableAt(b.event);
   if (at === null && bt === null) return b.event.firstSeenAt - a.event.firstSeenAt;
   if (at === null) return 1;
   if (bt === null) return -1;
@@ -362,6 +383,31 @@ export function placeLabel(event: { venue?: string; city?: string }): string {
  * the doors open — a precision the source never claimed, and one that would read differently either
  * side of a daylight-saving change.
  */
+/**
+ * The sale moment in words, or null when the source never stated one.
+ *
+ * Separate from `whenLabel` rather than folded into it, because a card can have both: a
+ * Ticketmaster night has a curtain *and* a sale date, and the two are different instructions. It
+ * is also the one thing on a sale-announcement card that is not in Polish — `dateText` holds the
+ * theatre's own sentence, which is right for checking the parse and no use to an English reader
+ * trying to work out which morning to be awake.
+ */
+export function saleWhenLabel(
+  event: { onSaleAt?: number },
+  locale: string,
+  timeZone = 'Europe/Warsaw',
+): string | null {
+  if (event.onSaleAt === undefined) return null;
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    // The hour is the point: a season sale opening at 11.00 is not one opening at midnight.
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(event.onSaleAt));
+}
+
 export function whenLabel(
   event: { startsAt: number | null; dateText?: string; allDay?: boolean },
   locale: string,

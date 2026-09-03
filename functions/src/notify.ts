@@ -77,11 +77,17 @@ async function loadAccount(
   };
 }
 
+const PREFIXES: Partial<Record<PendingNotice['kind'], string>> = {
+  onsale: 'Tickets: ',
+  soon: 'Coming up: ',
+  // Not "Tickets:", which is what `onsale` says. The whole value of this one is that it is a
+  // warning rather than an announcement, and the banner has to read as one from the lock screen.
+  presale: 'Sale opens: ',
+};
+
 export function payloadFor(notice: PendingNotice): PushPayload {
-  const prefix =
-    notice.kind === 'onsale' ? 'Tickets: ' : notice.kind === 'soon' ? 'Coming up: ' : '';
   return {
-    title: `${prefix}${notice.title}`.slice(0, 110),
+    title: `${PREFIXES[notice.kind] ?? ''}${notice.title}`.slice(0, 110),
     body: bodyFor(notice),
     url: '/apps/events',
     tag: notice.noticeId,
@@ -89,15 +95,31 @@ export function payloadFor(notice: PendingNotice): PushPayload {
   };
 }
 
+/**
+ * The date a notification is about, in words.
+ *
+ * A `presale` names the sale moment and nothing else — the announcement it came from has no date
+ * of its own, and the performance it is about may not be scheduled yet. The hour is part of it:
+ * "1 Sep" and "1 Sep, 11:00" are different instructions when the house sells out by lunchtime.
+ */
 function bodyFor(notice: PendingNotice): string {
+  if (notice.kind === 'presale' && notice.onSaleAt !== undefined) {
+    return `Tickets on sale from ${when(notice.onSaleAt, true)}`;
+  }
   if (notice.startsAt === null) return 'Announced — no dates yet.';
-  const when = new Intl.DateTimeFormat('en-GB', {
+  return notice.kind === 'onsale'
+    ? `On sale now · ${when(notice.startsAt, false)}`
+    : when(notice.startsAt, false);
+}
+
+function when(at: number, withTime: boolean): string {
+  return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
     timeZone: 'Europe/Warsaw',
-  }).format(new Date(notice.startsAt));
-  return notice.kind === 'onsale' ? `On sale now · ${when}` : when;
+  }).format(new Date(at));
 }
 
 /**
@@ -142,6 +164,7 @@ export async function notifyAccount(
       sentAt: null,
       title: notice.title,
       startsAt: notice.startsAt,
+      onSaleAt: notice.onSaleAt,
       url: notice.url,
     };
     try {

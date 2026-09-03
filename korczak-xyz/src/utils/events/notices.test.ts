@@ -236,3 +236,116 @@ describe('planRun', () => {
     expect(plan.send.filter((n) => n.kind === 'announced')).toHaveLength(1);
   });
 });
+
+/*
+ * `presale` — the notice this app grew a fourth kind for.
+ *
+ * `onsale` can only fire once a ticket link has appeared, which for a Teatr Wielki season is news
+ * that arrives on the morning the good seats sell. The date, though, is stated weeks ahead in the
+ * theatre's own news, and this is what counts down to it.
+ */
+describe('presale', () => {
+  const sale = (at: string, over: Partial<EventRecord> = {}) =>
+    ev({
+      title: 'Sprzedaż biletów na sezon 2027/28',
+      // An announcement is an article: no date of its own. That is the shape this must work for.
+      startsAt: null,
+      day: null,
+      onSaleAt: Date.parse(at),
+      firstSeenAt: ARMED - 10 * DAY,
+      ...over,
+    } as Partial<EventRecord> & { title: string });
+
+  it('warns leadDays before the sale opens', () => {
+    // 10 days out, against a 14-day lead.
+    const got = noticesFor(sale('2026-09-02T09:00:00Z'), [KEEN], new Set(), ctx());
+    expect(got.map((n) => n.kind)).toContain('presale');
+  });
+
+  it('says nothing while the sale is further out than the lead', () => {
+    const got = noticesFor(sale('2026-11-02T09:00:00Z'), [KEEN], new Set(), ctx());
+    expect(got.map((n) => n.kind)).not.toContain('presale');
+  });
+
+  it('never warns about a sale that has already opened', () => {
+    /*
+     * Most of the corpus is in this state — every Ticketmaster row carries the date its sale
+     * opened, usually months ago. Warning about those is warning about the past, and it is how a
+     * feature meant to fire once a season fires a hundred times on its first run.
+     */
+    const got = noticesFor(sale('2026-08-01T09:00:00Z'), [KEEN], new Set(), ctx());
+    expect(got.map((n) => n.kind)).not.toContain('presale');
+  });
+
+  it('warns about a sale announced before the interest existed', () => {
+    /*
+     * Deliberately not gated on `isFresh`, unlike `announced`. A date-based reminder is not an
+     * announcement: adding "Ticket sales opening" today is worth nothing at all if it cannot warn
+     * about the sale that was announced last week, which is the only reason anyone would add it.
+     */
+    const young: Interest = { ...KEEN, createdAt: NOW - DAY };
+    const got = noticesFor(sale('2026-09-02T09:00:00Z'), [young], new Set(), ctx());
+    expect(got.map((n) => n.kind)).toContain('presale');
+  });
+
+  it('is silent until notifications have been armed', () => {
+    const got = noticesFor(sale('2026-09-02T09:00:00Z'), [KEEN], new Set(), ctx({ armedAt: null }));
+    expect(got).toEqual([]);
+  });
+
+  it('fires once and stays fired, the notice document being the latch', () => {
+    const event = sale('2026-09-02T09:00:00Z');
+    const seen = new Set([noticeIdFor(event.fingerprint, 'presale')]);
+    expect(noticesFor(event, [KEEN], seen, ctx()).map((n) => n.kind)).not.toContain('presale');
+  });
+
+  it('carries the sale moment on the notice, which is what the body has to name', () => {
+    const at = Date.parse('2026-09-02T09:00:00Z');
+    const got = noticesFor(sale('2026-09-02T09:00:00Z'), [KEEN], new Set(), ctx());
+    expect(got.find((n) => n.kind === 'presale')!.onSaleAt).toBe(at);
+  });
+
+  it('takes the longest lead of the matching interests, as `soon` does', () => {
+    const patient: Interest = { ...KEEN, id: 'i2', leadDays: 45 };
+    const got = noticesFor(sale('2026-09-20T09:00:00Z'), [KEEN, patient], new Set(), ctx());
+    // 28 days out: too far for the 14-day interest, within the 45-day one.
+    expect(got.map((n) => n.kind)).toContain('presale');
+  });
+
+  it('ranks by the sale date, not by the article having none', () => {
+    /*
+     * The reason `noticeAt` exists, and it is the cap that makes it matter. A sale announcement
+     * has a null `startsAt`, so ordering on that field alone sorts every one of them behind every
+     * dated notice in the run — and then the budget below keeps whichever the tail happened to
+     * hold rather than the sale that opens first.
+     */
+    const imminent = sale('2026-08-25T09:00:00Z', { id: 'sale-soon', title: 'Sale in two days' });
+    const distant = sale('2026-09-05T09:00:00Z', { id: 'sale-later', title: 'Sale in a fortnight' });
+    const plan = planRun([distant, imminent], [KEEN], new Set(), ctx({ maxOnSalePerRun: 1 }));
+    expect(plan.send.map((n) => n.title)).toEqual(['Sale in two days']);
+  });
+
+  it('shares the ticket budget with onsale rather than getting one of its own', () => {
+    /*
+     * Both say "there is a thing to buy". A source that starts stating sale dates across its whole
+     * catalogue must not be able to walk past the cap by arriving under a second name.
+     */
+    const sales = Array.from({ length: 5 }, (_, i) =>
+      sale('2026-09-02T09:00:00Z', { id: `s${i}`, title: `Sale ${i}` }),
+    );
+    const plan = planRun(sales, [KEEN], new Set(), ctx({ maxOnSalePerRun: 2 }));
+    expect(plan.send.filter((n) => n.kind === 'presale')).toHaveLength(2);
+  });
+
+  it('is not rolled into the announced summary, being the thing that was asked for', () => {
+    const plan = planRun([sale('2026-09-02T09:00:00Z')], [KEEN], new Set(), ctx({ maxPerRun: 0 }));
+    expect(plan.send.map((n) => n.kind)).toContain('presale');
+    expect(plan.suppressed).toEqual([]);
+  });
+
+  it('says nothing about an event dismissed by hand', () => {
+    const event = sale('2026-09-02T09:00:00Z');
+    const got = noticesFor(event, [KEEN], new Set(), ctx({ ignored: new Set([event.fingerprint]) }));
+    expect(got).toEqual([]);
+  });
+});

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseSeasonPage, slugOf, tagsFor } from './teatrWielki';
+import { newsSlugOf, parseNewsPage, parseSeasonPage, slugOf, tagsFor } from './teatrWielki';
 
 /*
  * A committed fixture of the real page.
@@ -105,5 +105,94 @@ describe('tagsFor', () => {
     expect(tagsFor('KONCERT')).not.toContain('opera');
     // The house tag is still there for an interest that genuinely wants everything from here.
     expect(tagsFor('KONCERT')).toContain('teatr-wielki');
+  });
+});
+
+/*
+ * The news list, which is where the theatre says when the tickets go on sale.
+ *
+ * A second committed fixture, for the same reason as the first: this scrape is the only thing that
+ * can warn *before* a season sale opens, and the way it fails is silently.
+ */
+const newsHtml = readFileSync(new URL('./fixtures/teatr-wielki-news.html', import.meta.url), 'utf8');
+const news = parseNewsPage(newsHtml);
+
+describe('parseNewsPage', () => {
+  it('reads the news list', () => {
+    expect(news.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('reads the sale date out of the theatre’s own sentence', () => {
+    /*
+     * "Sprzedaż biletów od 1 września, g. 11.00", published 31 August 2026 — and note there is no
+     * year in it. 11:00 Warsaw on 1 September is 09:00 UTC, summer time.
+     */
+    const sale = news.find((e) => e.title === 'Edukacja w nowym sezonie');
+    expect(sale).toBeDefined();
+    expect(new Date(sale!.onSaleAt!).toISOString()).toBe('2026-09-01T09:00:00.000Z');
+  });
+
+  it('tags exactly the rows that carry a deadline', () => {
+    /*
+     * `ticket-sale` is what the keyword-less "Ticket sales opening" interest matches on, and a
+     * keyword-less interest has no second filter — so this tag reaching a row without a sale date
+     * hands that interest the theatre's press office. The four earlier versions of this mistake
+     * are written up in .claude/rules/events.md.
+     */
+    for (const item of news) {
+      expect(item.tags).toContain('teatr-wielki');
+      expect(item.tags!.includes('ticket-sale')).toBe(item.onSaleAt !== undefined);
+    }
+    expect(news.filter((e) => e.tags!.includes('ticket-sale'))).toHaveLength(1);
+  });
+
+  it('does not read a date after “od” that is about something else', () => {
+    /*
+     * The same page carries "Od 12 czerwca 2026 roku nasi Widzowie mogą korzystać z 30% zniżki na
+     * parking podziemny". A reader that took any date after "od" would file a car park discount as
+     * a ticket sale and put a notification on the calendar for it.
+     */
+    const parking = news.find((e) => /Parking/i.test(e.title));
+    expect(parking).toBeDefined();
+    expect(parking!.onSaleAt).toBeUndefined();
+  });
+
+  it('leaves startsAt null on every row, an article having no date of its own', () => {
+    // The rule the RSS adapter is built on. Put the publication date here and every announcement
+    // is filed as happening today, and `soon` fires about it.
+    expect(news.every((e) => e.startsAt === null)).toBe(true);
+  });
+
+  it('keys on the article slug, so the theatre’s own id survives a redesign', () => {
+    const sale = news.find((e) => e.title === 'Edukacja w nowym sezonie')!;
+    expect(sale.sourceKey).toBe('aktualnosci/edukacja-w-nowym-sezonie');
+  });
+
+  it('keeps the sentence it read the date from, so a wrong parse can be argued with', () => {
+    const sale = news.find((e) => e.title === 'Edukacja w nowym sezonie')!;
+    expect(sale.dateText).toMatch(/Sprzedaż biletów od 1 września/);
+    // And the category chip is not part of it.
+    expect(sale.dateText).not.toMatch(/Aktualności \|/);
+  });
+
+  it('places every row at the theatre, which the rows never say themselves', () => {
+    expect(news[0].city).toBe('Warszawa');
+    expect(news[0].country).toBe('PL');
+  });
+
+  it('returns nothing rather than garbage for mangled markup', () => {
+    expect(parseNewsPage('<div>completely different</div>')).toEqual([]);
+    expect(parseNewsPage('')).toEqual([]);
+  });
+});
+
+describe('newsSlugOf', () => {
+  it('reads the article slug and refuses anything else', () => {
+    expect(newsSlugOf('/teatr/aktualnosci/aktualnosc/ufo-znowu-w-trasie/')).toBe(
+      'ufo-znowu-w-trasie',
+    );
+    // The listing's own link, and the category filters, are not articles.
+    expect(newsSlugOf('/teatr/aktualnosci/')).toBeNull();
+    expect(newsSlugOf('/teatr/aktualnosci/c/109/')).toBeNull();
   });
 });

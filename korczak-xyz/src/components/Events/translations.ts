@@ -39,6 +39,7 @@ export const translations = {
     groupUndated: 'Announced, no dates yet',
     announcedAgo: 'Announced {when}',
     onSaleNow: 'On sale',
+    saleOpens: 'Sale opens {when}',
     showingCount: '{shown} of {total} upcoming',
     viewMatched: 'Matched',
     viewRejected: 'Filtered out',
@@ -153,7 +154,7 @@ export const translations = {
     sourceNameFeed: 'Watched feeds',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
-      'The season repertoire pages. Which productions are programmed and when they premiere — not the individual nights, which live behind a calendar drawn in JavaScript.',
+      'The season repertoire pages, plus the theatre’s own news. Which productions are programmed and when they premiere — not the individual nights, which live behind a calendar drawn in JavaScript — and, from the news, the morning the tickets go on sale, which is the only thing here with a deadline.',
     notePythonOrg:
       'Worldwide, and deliberately not narrowed by country: whether PyCon US is worth knowing about is your interest’s call, not the collector’s.',
     noteElektroniczneZapisy:
@@ -209,6 +210,7 @@ export const translations = {
     groupUndated: 'Ogłoszone, bez dat',
     announcedAgo: 'Ogłoszone {when}',
     onSaleNow: 'W sprzedaży',
+    saleOpens: 'Sprzedaż od {when}',
     showingCount: '{shown} z {total} nadchodzących',
     viewMatched: 'Pasujące',
     viewRejected: 'Odrzucone',
@@ -318,7 +320,7 @@ export const translations = {
     sourceNameFeed: 'Śledzone kanały',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
-      'Strony repertuaru sezonu. Które spektakle są w planie i kiedy mają premierę — bez pojedynczych wieczorów, te siedzą za kalendarzem rysowanym JavaScriptem.',
+      'Strony repertuaru sezonu i aktualności teatru. Które spektakle są w planie i kiedy mają premierę — bez pojedynczych wieczorów, te siedzą za kalendarzem rysowanym JavaScriptem — a z aktualności ranek, w którym rusza sprzedaż biletów, czyli jedyna rzecz tutaj z terminem.',
     notePythonOrg:
       'Cały świat i celowo bez filtra kraju: czy PyCon US jest wart uwagi, decyduje Twoje zainteresowanie, a nie kolektor.',
     noteElektroniczneZapisy:

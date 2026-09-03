@@ -19,6 +19,7 @@ import {
   countryTally,
   filterSectionsByCity,
   placeLabel,
+  saleWhenLabel,
   whenLabel,
   type CityOption,
   type FeedGroup,
@@ -348,6 +349,8 @@ function EventCard({
 }) {
   const t = translations[lang];
   const { event } = item;
+  const saleWhen = saleWhenLabel(event, localeOf(lang));
+  const saleChip = saleWhen ? fill(t.saleOpens, { when: saleWhen }) : null;
 
   return (
     <li className="ev-card">
@@ -360,6 +363,13 @@ function EventCard({
 
       <div className="ev-card-meta">
         {event.ticketUrl ? <span className="ev-chip ev-chip--sale">{t.onSaleNow}</span> : null}
+        {/*
+          * The sale date, where the source stated it ahead of time. Drawn even when a ticket link
+          * is already there, because the two say different things: `onSaleNow` means "buy it", and
+          * this means "be awake". Without it the card gives no way to check what the reminder that
+          * is about to arrive was counting down to.
+          */}
+        {saleChip ? <span className="ev-chip ev-chip--presale">{saleChip}</span> : null}
         {item.matched.length > 0 ? (
           <span>
             {t.matchedBy} {item.matched.map((i) => i.label).join(', ')}

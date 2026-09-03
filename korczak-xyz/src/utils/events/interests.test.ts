@@ -14,7 +14,7 @@ import type { Interest } from './types';
 const CTX = { writerId: 'w', now: 1_700_000_000_000 };
 
 describe('the seeded interests', () => {
-  it('covers the six things he asked for', () => {
+  it('covers the seven things he asked for', () => {
     expect(SEED_INTERESTS.map((s) => s.label)).toEqual([
       'Klezmer',
       'Pink Floyd',
@@ -22,6 +22,7 @@ describe('the seeded interests', () => {
       'Python & dev',
       'Running in Warszawa',
       'Opera Narodowa',
+      'Ticket sales opening',
     ]);
   });
 
@@ -41,6 +42,19 @@ describe('the seeded interests', () => {
     expect(running.keywords).toEqual([]);
     expect(running.tags).toEqual(['running']);
     expect(running.cities).toEqual(['Warszawa']);
+  });
+
+  it('watches the sale opening by tag, the announcements sharing no word either', () => {
+    /*
+     * The interest the app was extended for. It cannot be keywords: "Edukacja w nowym sezonie" is
+     * the title of a sale announcement, and nothing in it says so. `ticket-sale` is applied by the
+     * adapter only where a date was actually read out of the prose, so the tag *is* the question.
+     */
+    const sale = SEED_INTERESTS.find((s) => s.id === 'events-seed-ticket-sale')!;
+    expect(sale.keywords).toEqual([]);
+    expect(sale.tags).toEqual(['ticket-sale']);
+    // A fortnight, which is what `presale` counts back from.
+    expect(sale.leadDays).toBe(14);
   });
 
   it('gives every seed a stable id, so re-seeding is idempotent', () => {

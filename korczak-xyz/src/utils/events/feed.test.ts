@@ -9,6 +9,7 @@ import {
   filterSectionsByCity,
   groupOf,
   placeLabel,
+  saleWhenLabel,
   whenLabel,
 } from './feed';
 import { fingerprintOf, haystackOf } from './normalize';
@@ -402,5 +403,72 @@ describe('the city filter', () => {
   it('is a lens over a built feed, so anywhere is what buildFeed said', () => {
     const all = sections();
     expect(filterSectionsByCity(all, '')).toBe(all);
+  });
+});
+
+/*
+ * A sale announcement: no date of its own, and a date you can be late for.
+ *
+ * The one shape in the corpus where `startsAt` being null does not mean "not actionable yet". The
+ * theatre's news item is an article — the RSS rule holds — but the sentence inside it names the
+ * morning the box office opens, which is the only thing on the card worth being on time for.
+ */
+describe('a dateless event with a known sale date', () => {
+  const saleAt = Date.parse('2026-08-26T09:00:00Z');
+  const announcement = () =>
+    ev({
+      title: 'Sprzedaż biletów na sezon 2027/28',
+      startsAt: null,
+      day: null,
+      onSaleAt: saleAt,
+    } as Partial<EventRecord> & { title: string });
+
+  it('is grouped by when the sale opens, not filed under “no dates yet”', () => {
+    // Three days out. Filed as undated it would sit below every concert in the corpus.
+    expect(groupOf(announcement(), NOW)).toBe('week');
+  });
+
+  it('sorts among the dated events by that same moment', () => {
+    const later = ev({ title: 'Concert', day: '2026-09-10' });
+    const sections = buildFeed([later, announcement()], [ALL], NOW);
+    expect(sections.flatMap((s) => s.items).map((i) => i.event.title)[0]).toBe(
+      'Sprzedaż biletów na sezon 2027/28',
+    );
+  });
+
+  it('drops out of the feed once the sale it announced has opened', () => {
+    const past = ev({
+      title: 'Old sale',
+      startsAt: null,
+      day: null,
+      onSaleAt: NOW - 3 * DAY,
+    } as Partial<EventRecord> & { title: string });
+    expect(buildFeed([past], [ALL], NOW)).toEqual([]);
+  });
+
+  it('leaves an ordinary undated announcement exactly where it was', () => {
+    /*
+     * The guard on this whole change: `onSaleAt` is only ever set where a source stated a sale
+     * date in advance, so an RSS article or a season with no nights scheduled must not move.
+     */
+    const article = ev({
+      title: 'Season announced',
+      startsAt: null,
+      day: null,
+    } as Partial<EventRecord> & { title: string });
+    expect(groupOf(article, NOW)).toBe('undated');
+    expect(buildFeed([article], [ALL], NOW)).toHaveLength(1);
+  });
+});
+
+describe('saleWhenLabel', () => {
+  it('names the hour, a sale opening at 11.00 not being one opening at midnight', () => {
+    const at = Date.parse('2026-09-01T09:00:00Z'); // 11:00 Warsaw, summer time.
+    expect(saleWhenLabel({ onSaleAt: at }, 'en-GB')).toMatch(/11:00/);
+    expect(saleWhenLabel({ onSaleAt: at }, 'en-GB')).toMatch(/1 Sep/);
+  });
+
+  it('says nothing where no source stated a sale date', () => {
+    expect(saleWhenLabel({}, 'en-GB')).toBeNull();
   });
 });
