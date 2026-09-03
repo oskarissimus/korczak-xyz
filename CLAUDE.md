@@ -65,6 +65,7 @@ there; they exist because most of what is in them was learnt by breaking somethi
 | `.claude/rules/flashcards.md` | The guitar flashcards: both decks, the shared SM-2 scheduler, the mixed sitting, the neck cards and the chord cards |
 | `.claude/rules/baby-sleep.md` | The baby sleep log: entries, routines, stats, the climate tab, targets, sharing |
 | `.claude/rules/events.md` | Event Watch: the corpus, the one matcher in two runtimes, web push, the classifier, Terraform |
+| `.claude/rules/transit.md` | Metro Watch: the two WTP feeds, the station tables, the extractor, the two alert kinds, the raw archive |
 | `.claude/rules/pwa.md` | The installable apps: manifests, the service worker and its tiers, the safe area, fonts |
 | `.claude/rules/charts.md` | Every chart: why no series is read by colour alone, the shared marks, the pointer readout |
 | `.claude/rules/songbook.md` | The songbook: chord lines aligned in characters, and the synthetic-bold trap |

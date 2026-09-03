@@ -74,6 +74,36 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /*
+     * The public-transport corpus: the parsed communiqués, the raw feed archive, and how each of
+     * WTP's two feeds last answered.
+     *
+     * Same shape and same argument as `events/` above — written only by the scheduled Cloud
+     * Function on the Admin SDK, which bypasses rules entirely, so `write: if false` costs the
+     * collector nothing and is a statement about the client. Readable by any signed-in account,
+     * because it is public operator announcements scraped from public pages and holds nothing
+     * belonging to a person. What IS personal — which stretch of which line somebody rides, and
+     * what was pushed to them — lives under users/{uid} and is covered by the catch-all below.
+     *
+     * `transitRaw` is readable for a reason worth stating: the Raw tab exists so a reading produced
+     * by a language model can be checked against the operator's own words, and a source you cannot
+     * open is not a source you can check.
+     */
+    match /transitItems/{itemId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /transitRaw/{itemId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /transitFeeds/{feedId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     // Covers progress, sessions, and the frontend diagnostic log batches written to
     // users/{uid}/logs.
     //

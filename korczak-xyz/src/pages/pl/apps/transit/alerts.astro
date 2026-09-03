@@ -1,0 +1,30 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import TransitAlerts from '../../../../components/Transit/TransitAlerts';
+import TransitTabs from '../../../../components/Transit/TransitTabs.astro';
+import TransitAlertsSkeleton from '../../../../components/Transit/skeletons/TransitAlertsSkeleton.astro';
+import { useTranslations } from '../../../../i18n';
+import '../../../../styles/transit.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Transit')} | korczak.xyz`} lang={lang} pwa="transit">
+  <div class="window transit-window">
+    <div class="title-bar">
+      <span>{t('Transit')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content transit-content">
+      <TransitTabs lang={lang} active="alerts" />
+      <TransitAlerts client:only="react" lang={lang}>
+        <TransitAlertsSkeleton slot="fallback" lang={lang} />
+      </TransitAlerts>
+    </div>
+  </div>
+</Layout>

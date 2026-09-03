@@ -4,7 +4,7 @@
  * Split out from apps.ts because this half ships to the browser, and apps.ts imports the whole
  * i18n table.
  */
-export type PwaApp = 'site' | 'tuner' | 'songs' | 'flashcards' | 'baby-sleep' | 'events';
+export type PwaApp = 'site' | 'tuner' | 'songs' | 'flashcards' | 'baby-sleep' | 'events' | 'transit';
 
 /**
  * The scoped subtrees, in both locales. `site` is everything else, so it is not listed - it is
@@ -21,6 +21,7 @@ const SCOPED: ReadonlyArray<{ app: PwaApp; pattern: RegExp }> = [
   { app: 'flashcards', pattern: /^(\/pl)?\/apps\/flashcards(\/|$)/ },
   { app: 'baby-sleep', pattern: /^(\/pl)?\/apps\/baby-sleep(\/|$)/ },
   { app: 'events', pattern: /^(\/pl)?\/apps\/events(\/|$)/ },
+  { app: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
 ];
 
 function normalize(pathname: string): string {

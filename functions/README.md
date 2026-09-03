@@ -1,4 +1,4 @@
-# Event Watch backend
+# Event Watch and Metro Watch backend
 
 The scheduled collector and the web-push sender for `/apps/events/`.
 
@@ -43,6 +43,7 @@ wrong — which has already happened once.
 | `PUBLIC_VAPID_PUBLIC_KEY` | committed in `korczak-xyz/.env.production` |
 | Firestore rules | deployed |
 | `collectEvents`, `sendTestPush` | deployed to `europe-central2`, nodejs22, gen 2 |
+| `collectTransit` | the metro watcher, same region and runtime. Every 10 minutes; no secret of its own beyond the VAPID pair |
 | Artifact cleanup | images older than 3 days deleted, so old containers do not accumulate a bill |
 | Firestore indexes | `firestore.indexes.json`, deployed — the undated-events query needs a composite |
 | CI deploy | `.github/workflows/firebase-deploy.yml`, keyless via Workload Identity Federation. The `terraform` job runs first, so a commit needing a new API gets it before the deploy uses it |
@@ -168,9 +169,10 @@ GOOGLE_CLOUD_PROJECT=korczak-xyz-501720 LIVE=1 npx vitest run smoke.live
 firebase deploy --only firestore:rules,functions --project korczak-xyz-501720
 ```
 
-CI does this on any push to `main` touching `functions/`, `firestore.rules`, `firebase.json` or
-`korczak-xyz/src/utils/events/`. Note that last path: `tsconfig.json` compiles the matcher in from
-the site rather than keeping a copy, so a change there is a change to the backend.
+CI does this on any push to `main` touching `functions/`, `firestore.rules`, `firebase.json`,
+`korczak-xyz/src/utils/events/` or `korczak-xyz/src/utils/transit/`. Note those last two paths:
+`tsconfig.json` compiles both matchers in from the site rather than keeping a copy, so a change
+there is a change to the backend.
 
 ### Triggering a collection run now
 
@@ -182,6 +184,52 @@ firebase functions:log --only collectEvents
 
 The idempotency property is the one worth re-checking after touching an adapter: run it twice and
 the second run must report `"created":0`.
+
+For the metro watcher, the same shape:
+
+```sh
+gcloud scheduler jobs run firebase-schedule-collectTransit-europe-central2 \
+  --location=europe-central2 --project=korczak-xyz-501720
+firebase functions:log --only collectTransit
+```
+
+Two numbers in that summary are the ones to read. `"created":0` on a second run is idempotency, as
+above. `"brokenFeeds":[]` is the one that matters more — see below.
+
+### If `collectTransit` cannot read wtp.waw.pl
+
+**This is the failure to expect, and it will not look like an error unless you go and look.**
+
+wtp.waw.pl is served through CloudFront with AWS WAF in front of it. A request the WAF decides to
+challenge comes back as `HTTP 202`, header `x-amzn-waf-action: challenge`, **body of zero bytes** —
+which `response.ok` calls a success and an RSS parser reads as a feed with no items. Measured from
+a US datacentre address while this was written, every plain request got exactly that; requests from
+a European address are reported to work, which is what the community bot reading these same two
+feeds relies on. Whether Google's `europe-central2` egress is challenged is not something that
+could be established from here.
+
+So the adapter treats a non-feed body as an **error**, never as an empty feed (`notAFeed` in
+`src/transit/wtp.ts`), and records the status, the byte count and the first 500 bytes of whatever
+did arrive in `transitFeeds/{impediment,change}`. Three consecutive failures send a push saying the
+app cannot see.
+
+To check: open the app's **Raw** tab, or
+
+```sh
+firebase firestore:get transitFeeds/impediment --project korczak-xyz-501720
+```
+
+If it is being challenged, the answer is **not** in this repository and nothing here should learn
+to solve a WAF challenge. The options, in the order worth trying:
+
+1. Confirm it is the WAF and not us — `error` will name it, and `bodyHead` will be empty.
+2. Ask ZTM for feed access, or for the terms under which a client may read it. They publish these
+   feeds for readers; a named agent that identifies itself (which is what the adapter sends) is the
+   thing to point at.
+3. Fetch through something with a Polish address. That is a second moving part and a second thing
+   to pay for, and it should be a last resort rather than the first idea.
+
+Until then the app is honest about being blind, which is the whole of what this design buys.
 
 ## Setting it up from scratch (for reference)
 
@@ -206,7 +254,8 @@ firebase functions:secrets:set TICKETMASTER_API_KEY   # developer.ticketmaster.c
 # 5. Rules first — until these are deployed the feed reads nothing.
 firebase deploy --only firestore:rules
 
-# 6. Then the functions.
+# 6. Then the functions. `collectTransit` needs no secret of its own — it uses the same VAPID pair
+#    and, like the classifier, reaches Vertex AI as the function's own service account.
 firebase deploy --only functions
 ```
 

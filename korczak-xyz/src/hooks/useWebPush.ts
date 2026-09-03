@@ -50,6 +50,18 @@ export interface WebPushApi {
 interface Options {
   /** Re-verify and record, but skip the device list — for islands that show no push UI. */
   verifyOnly?: boolean;
+  /**
+   * Whether arming here also stamps Event Watch's `armedAt`. Default true.
+   *
+   * The subscription is shared — one origin, one service worker, one endpoint per device — but
+   * `armedAt` is not: it means "nothing already in this app's corpus may fire", and the two apps
+   * are switched on at different moments over different corpora. Left at the default, pressing
+   * *Turn on notifications* on the transport app's Alerts tab would also arm Event Watch, and the
+   * next collector run would announce a fortnight of opera to somebody who asked about the metro.
+   *
+   * The transport app passes `false` and stamps its own, in `useTransitSettings`.
+   */
+  stampArmedAt?: boolean;
 }
 
 const supported = () =>
@@ -78,6 +90,7 @@ function isInstalled(): boolean {
 }
 
 export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Options = {}): WebPushApi {
+  const stampArmedAt = options.stampArmedAt !== false;
   const [hasSubscription, setHasSubscription] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -237,7 +250,7 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
        * Written once and never moved, so re-arming a second device does not replay the backlog.
        */
       const settings = loadPushSettings();
-      if (settings.armedAt === null) {
+      if (stampArmedAt && settings.armedAt === null) {
         const armed = { ...settings, armedAt: Date.now() };
         savePushSettings(armed);
         await pushSettings(user.uid, armed);
@@ -249,7 +262,7 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
     } finally {
       setBusy(false);
     }
-  }, [user, record]);
+  }, [record, stampArmedAt, user]);
 
   const removeDevice = useCallback(
     async (subId: string) => {

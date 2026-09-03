@@ -1,0 +1,153 @@
+/* Public transport — retro theme
+ *
+ * This app is drawn in the events app's furniture, deliberately. Every `.ev-*` class here comes
+ * from `events.css`, which is imported below rather than copied: the two apps are the same kind of
+ * thing — a signed-in watcher over a shared corpus with four tabs and a push panel — and two
+ * stylesheets describing one visual language would drift apart at the first change to either.
+ *
+ * What is genuinely this app's own is here, under `.tr-*`, and it is short: the line badges, the
+ * station chips, and the one border that separates a notice about the journey from a notice about
+ * the line.
+ */
+
+@import './events.css';
+
+.transit-window {
+  margin-bottom: 20px;
+}
+
+.transit-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.tr-feed,
+.tr-routes,
+.tr-alerts,
+.tr-raw {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+/* The line badge.
+ *
+ * M1 and M2 carry the operator's own colours, and this is the one place in the repo where colour
+ * is doing work — so it is never doing it alone: the badge always contains the line's name in
+ * text. That is the rule `charts.md` states for every series on every chart, and a metro line is
+ * the same argument in miniature. */
+.tr-line {
+  display: inline-block;
+  min-width: 2.2em;
+  padding: 0 6px;
+  margin-right: 6px;
+  text-align: center;
+  font-weight: bold;
+  color: #fff;
+  border: 1px solid var(--retro-black);
+}
+
+.tr-line--m1 {
+  background: #0a3d91;
+}
+
+.tr-line--m2 {
+  background: #b00000;
+}
+
+/* A notice that lands on the journey. A left edge rather than a fill: the card has to stay
+   readable, and the section heading above it already says which list this is — the border is the
+   thing that survives being scrolled past. */
+.tr-card--route {
+  border-left: 4px solid var(--retro-black);
+  padding-left: 10px;
+}
+
+.tr-stops {
+  margin: 6px 0;
+  line-height: 1.6;
+}
+
+.tr-stops-label {
+  font-weight: bold;
+}
+
+.tr-stops--whole {
+  font-weight: bold;
+}
+
+.tr-stops--none,
+.tr-source-title {
+  opacity: 0.75;
+}
+
+.tr-source-title {
+  margin: 6px 0 0;
+  font-size: 0.95em;
+}
+
+/* One station. The ones on the reader's own stretch are marked — a closure list is often eight
+   names long, and which of them is theirs is the whole question. */
+.tr-stop {
+  display: inline-block;
+  padding: 0 5px;
+  margin: 2px 4px 2px 0;
+  border: 1px solid var(--retro-black);
+  background: var(--retro-white, #fff);
+}
+
+.tr-stop--mine {
+  background: var(--retro-black);
+  color: var(--retro-gray);
+}
+
+.tr-chip--unread,
+.tr-chip--stale {
+  border-style: dashed;
+}
+
+.tr-mine {
+  font-weight: bold;
+}
+
+.tr-reason,
+.tr-when {
+  margin-right: 10px;
+}
+
+.tr-stations {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.tr-form {
+  border: 1px solid var(--retro-black);
+  padding: 12px;
+}
+
+.tr-coverage {
+  border-top: 1px solid var(--retro-black);
+  padding-top: 8px;
+}
+
+/* The archived XML. Scrolls inside its own box: a communiqué's markup is a few thousand characters
+   of one long line, and left to itself it would make the whole page scroll sideways. */
+.tr-xml {
+  max-height: 320px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  background: var(--retro-black);
+  color: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tr-raw-list .ev-row {
+  flex-wrap: wrap;
+}

@@ -1,10 +1,11 @@
-# Deploys the Firestore rules and the Event Watch collector.
+# Deploys the Firestore rules and the two collectors — Event Watch and the metro watcher.
 #
 # Separate from node.js.yml because it is path-filtered: the site deploys on every push from that
 # workflow, but redeploying Cloud Functions on a commit that only touched a song chart would take
 # three minutes and change nothing. The paths below are exactly what can affect the backend —
-# note that `korczak-xyz/src/utils/events/**` is in the list, because functions/tsconfig.json
-# compiles that directory into the deploy bundle rather than keeping a copy of it.
+# note that `korczak-xyz/src/utils/{events,transit}/**` are in the list, because
+# functions/tsconfig.json compiles both directories into the deploy bundle rather than keeping a
+# copy of either.
 #
 # Auth is Workload Identity Federation, so there is no long-lived service account key in GitHub.
 # The security boundary is the provider's attribute-condition, which pins it to this repository —
@@ -25,6 +26,7 @@ on:
       - "firestore.indexes.json"
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
+      - "korczak-xyz/src/utils/transit/**"
       - "terraform/**"
       - ".github/workflows/firebase-deploy.yml"
   # So rules can be pushed out without waiting for a code change to ride along.
@@ -144,7 +146,7 @@ jobs:
 
       # Deliberately before the deploy, not in a separate workflow: nothing should be able to
       # reach the collector that has not typechecked and passed its tests. The build also
-      # typechecks the site's src/utils/events, which this bundle compiles in.
+      # typechecks the site's src/utils/events and src/utils/transit, which this bundle compiles in.
       - name: Build
         run: npm run build
         working-directory: functions

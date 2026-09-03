@@ -59,6 +59,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     shortNameKey: 'pwa.events.short',
     descriptionKey: 'events.desc',
   },
+  transit: {
+    path: '/apps/transit',
+    nameKey: 'Transit',
+    shortNameKey: 'pwa.transit.short',
+    descriptionKey: 'transit.desc',
+  },
   'baby-sleep': {
     path: '/apps/baby-sleep',
     nameKey: 'BabySleep',

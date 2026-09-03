@@ -1,0 +1,16 @@
+---
+/**
+ * Server-rendered stand-in for the Feed island, shown until React hydrates.
+ *
+ * Blocks rather than words: it is aria-hidden, so it exists to hold the window's shape and stop the
+ * tab strip jumping when the island arrives, not to say anything. Imports nothing that touches
+ * localStorage or Firebase — this renders at build time.
+ */
+---
+
+<div class="ev-skel" aria-hidden="true">
+  <div class="ev-skel-head"></div>
+  <div class="ev-skel-card"></div>
+  <div class="ev-skel-card"></div>
+  <div class="ev-skel-card ev-skel-card--short"></div>
+</div>

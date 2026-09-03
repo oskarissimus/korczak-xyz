@@ -70,6 +70,7 @@ const sources = {
   flashcards: { file: join(iconsDir, 'flashcards.svg'), maskable: 'bleed' },
   'baby-sleep': { file: join(iconsDir, 'baby-sleep.svg'), maskable: 'bleed' },
   events: { file: join(iconsDir, 'events.svg'), maskable: 'bleed' },
+  transit: { file: join(iconsDir, 'transit.svg'), maskable: 'bleed' },
 };
 
 /**

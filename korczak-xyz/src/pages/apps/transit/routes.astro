@@ -1,0 +1,30 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import TransitRoutes from '../../../components/Transit/TransitRoutes';
+import TransitTabs from '../../../components/Transit/TransitTabs.astro';
+import TransitRoutesSkeleton from '../../../components/Transit/skeletons/TransitRoutesSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/transit.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Transit')} | korczak.xyz`} lang={lang} pwa="transit">
+  <div class="window transit-window">
+    <div class="title-bar">
+      <span>{t('Transit')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content transit-content">
+      <TransitTabs lang={lang} active="routes" />
+      <TransitRoutes client:only="react" lang={lang}>
+        <TransitRoutesSkeleton slot="fallback" lang={lang} />
+      </TransitRoutes>
+    </div>
+  </div>
+</Layout>

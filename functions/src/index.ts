@@ -18,6 +18,7 @@ import {
   VAPID_SUBJECT,
 } from './runtime';
 import { runCollection } from './collect';
+import { runTransitCollection } from './transit/collect';
 import { configureWebPush, sendTo } from './push';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
@@ -124,5 +125,45 @@ export const sendTestPush = onCall(
       );
     }
     return { ok: true, statusCode: outcome.statusCode };
+  },
+);
+
+/**
+ * The Warsaw metro watcher.
+ *
+ * A second scheduled function rather than more work inside `collectEvents`, and the schedule is
+ * why: an opera season moves on a scale of days and is read every six hours, where "is the metro
+ * broken right now" is worth nothing if the answer is five hours old. WTP's own community bot
+ * settled on five minutes for the impediment feed; ten is the compromise here, because every run
+ * costs two HTTP requests and a Firestore read of the corpus, and the difference between five and
+ * ten minutes of warning is smaller than it looks when the alternative is finding out on the
+ * platform.
+ *
+ * Both feeds are read every run. The planned-changes feed does not need ten-minute freshness — it
+ * is announced days ahead — but reading it costs one more request against a feed that returns the
+ * same twenty items, and a second schedule would be a second thing to reason about for nothing.
+ *
+ * `retryCount: 0`, like the events collector: the claim latch makes a retry safe, but the next run
+ * is ten minutes away, which is a better answer than an immediate repeat.
+ */
+export const collectTransit = onSchedule(
+  {
+    schedule: 'every 10 minutes',
+    timeZone: 'Europe/Warsaw',
+    region: REGION,
+    secrets: [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY],
+    memory: '512MiB',
+    timeoutSeconds: 300,
+    retryCount: 0,
+  },
+  async () => {
+    configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
+    const summary = await runTransitCollection(db, {
+      now: Date.now(),
+      fetch: globalThis.fetch,
+      project: PROJECT_ID,
+      location: VERTEX_LOCATION,
+    });
+    console.log('collectTransit', JSON.stringify(summary));
   },
 );

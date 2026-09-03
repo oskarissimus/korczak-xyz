@@ -47,6 +47,7 @@ const APP_TIERS = {
   flashcards: /^(\/pl)?\/apps\/flashcards(\/|$)/,
   'baby-sleep': /^(\/pl)?\/apps\/baby-sleep(\/|$)/,
   events: /^(\/pl)?\/apps\/events(\/|$)/,
+  transit: /^(\/pl)?\/apps\/transit(\/|$)/,
 };
 
 /**

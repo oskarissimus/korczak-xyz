@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Warszawski Transport Publiczny &#187; Utrudnienia</title>
+  <link>https://www.wtp.waw.pl</link>
+  <description>Utrudnienia w kursowaniu</description>
+  <language>pl-PL</language>
+  <item>
+    <title>Utrudnienia w komunikacji: M1</title>
+    <link>https://www.wtp.waw.pl/utrudnienia/2026/08/27/utrudnienia-w-kursowaniu-linii-metra-m1-66/</link>
+    <guid isPermaLink="true">https://www.wtp.waw.pl/utrudnienia/2026/08/27/utrudnienia-w-kursowaniu-linii-metra-m1-66/</guid>
+    <pubDate>Thu, 27 Aug 2026 20:10:00 +0200</pubDate>
+    <dc:creator><![CDATA[ZTM]]></dc:creator>
+    <description><![CDATA[Od godz. 20:00 pociągi metra linii M1 nie kursują na odcinku Centrum – Wilanowska.]]></description>
+    <content:encoded><![CDATA[<p>Od godz. 20:00 z powodu awarii taboru pociągi metra linii M1 nie kursują na odcinku <strong>Centrum &#8211; Wilanowska</strong>. Zamknięte dla pasażerów są stacje Politechnika, Pole Mokotowskie, Racławicka, Wierzbno oraz Wilanowska.</p><p>Uruchomiona została komunikacja zastępcza autobusowa linii ZM1. Utrudnienia potrwają do odwołania.</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>Utrudnienia w komunikacji: 742, M1</title>
+    <link>https://www.wtp.waw.pl/utrudnienia/2026/08/22/utrudnienia-w-kursowaniu-pociagow-km-99/</link>
+    <guid isPermaLink="true">https://www.wtp.waw.pl/utrudnienia/2026/08/22/utrudnienia-w-kursowaniu-pociagow-km-99/</guid>
+    <pubDate>Sat, 22 Aug 2026 05:10:00 +0200</pubDate>
+    <content:encoded><![CDATA[<p>W związku z pracami torowymi pociągi Kolei Mazowieckich kursują z opóźnieniem. Na linii metra M1 pociągi kursują ze zwiększoną częstotliwością. Stacje są czynne bez zmian.</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>Utrudnienia w komunikacji: M2</title>
+    <link>https://www.wtp.waw.pl/utrudnienia/2026/08/10/utrudnienia-na-linii-metra-m2-czasowe-zamkniecie-stacji-stadion-narodowy/</link>
+    <guid isPermaLink="true">https://www.wtp.waw.pl/utrudnienia/2026/08/10/utrudnienia-na-linii-metra-m2-czasowe-zamkniecie-stacji-stadion-narodowy/</guid>
+    <pubDate>Mon, 10 Aug 2026 18:15:00 +0200</pubDate>
+    <content:encoded><![CDATA[<p>Z powodu zdarzenia z udziałem pasażera od godz. 18:05 zamknięta jest stacja <strong>Stadion Narodowy</strong>. Pociągi linii M2 przejeżdżają przez stację bez zatrzymania. Pozostałe stacje funkcjonują normalnie.</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>Utrudnienia w komunikacji: 189, 401, 402</title>
+    <link>https://www.wtp.waw.pl/utrudnienia/2026/09/03/utrudnienia-w-kursowaniu-autobusow-linii-189-401-oraz-402/</link>
+    <guid isPermaLink="true">https://www.wtp.waw.pl/utrudnienia/2026/09/03/utrudnienia-w-kursowaniu-autobusow-linii-189-401-oraz-402/</guid>
+    <pubDate>Wed, 03 Sep 2026 09:50:00 +0200</pubDate>
+    <content:encoded><![CDATA[<p>Z powodu kolizji drogowej autobusy linii 189, 401 i 402 kursują objazdem ulicami Ostrobramską i Grochowską.</p>]]></content:encoded>
+  </item>
+</channel>
+</rss>
