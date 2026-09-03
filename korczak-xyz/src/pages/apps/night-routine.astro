@@ -1,0 +1,31 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import NightRoutineSheet from '../../components/NightRoutine/NightRoutineSheet.astro';
+import { useTranslations } from '../../i18n';
+import '../../styles/night-routine.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('NightRoutine')} | korczak.xyz`} description={t('nightRoutine.desc')} lang={lang}>
+  <div class="window night-routine-window">
+    <div class="title-bar">
+      <span>{t('NightRoutine')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content">
+      <NightRoutineSheet lang={lang} />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .night-routine-window {
+    margin-bottom: 20px;
+  }
+</style>

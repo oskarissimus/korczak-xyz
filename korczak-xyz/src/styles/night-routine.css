@@ -1,0 +1,289 @@
+/* The night routine sheet. Everything inside .nr-sheet is sized in `em` off a single base
+   unit, so the same markup is an exact A4 page at print size and a scaled-down preview on a
+   phone: the print value (4.4mm) and the top of the screen clamp (16.5px) are the same length
+   at 96dpi, so what is on screen at full width is what comes out of the printer. */
+
+.nr-sheet {
+  --nr: 4.4mm;
+  --nr-ink: #000000;
+  --nr-frame: var(--retro-navy, #000080);
+  --nr-tint: #f1f1f1;
+
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10mm;
+  margin: 0 auto;
+  background: #ffffff;
+  color: var(--nr-ink);
+  font-family: 'VT323', monospace;
+  font-size: var(--nr);
+  line-height: 1;
+}
+
+/* The preview is a container so the sheet can be scaled off its own width rather than the
+   viewport's: at any width the base unit stays 4.4/210 of the sheet, which is what keeps a
+   label from wrapping on screen where it would not wrap on paper - the preview is only worth
+   showing if it lays out exactly like the print. */
+@media screen {
+  .nr-preview {
+    container-type: inline-size;
+  }
+
+  .nr-sheet {
+    /* Viewport-based fallback for browsers without container queries; the sheet is at most
+       210mm wide, so on a wide screen the two agree. */
+    --nr: clamp(6px, 2.1vw, 16.5px);
+    width: 100%;
+    max-width: 210mm;
+    min-height: 0;
+    aspect-ratio: 210 / 297;
+    overflow: hidden;
+    border: 2px solid var(--retro-dark-gray, #808080);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+  }
+}
+
+@supports (container-type: inline-size) {
+  @media screen {
+    .nr-sheet {
+      /* 4.4mm of 210mm, the print base as a share of the page width. */
+      --nr: 2.095cqi;
+    }
+  }
+}
+
+.nr-frame {
+  box-sizing: border-box;
+  height: 100%;
+  border: 0.5em solid var(--nr-frame);
+  outline: 0.14em solid var(--nr-frame);
+  outline-offset: 0.4em;
+  padding: 0.9em 1.1em 0.8em;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+
+.nr-head {
+  text-align: center;
+  border-bottom: 0.14em dashed var(--retro-teal, #008080);
+  padding-bottom: 0.8em;
+}
+
+.nr-moon {
+  font-size: 1.9em;
+  letter-spacing: 0.35em;
+  color: var(--retro-teal, #008080);
+  display: block;
+}
+
+.nr-title {
+  font-family: 'Press Start 2P', 'VT323', monospace;
+  font-size: 1.55em;
+  line-height: 1.45;
+  margin: 0.5em 0 0;
+  color: var(--nr-frame);
+  /* The site's global h1 carries a magenta drop shadow. It belongs on a page, not on a sheet
+     that is about to come out of an inkjet. */
+  text-shadow: none;
+  text-transform: uppercase;
+  word-break: break-word;
+}
+
+.nr-subtitle {
+  font-size: 1.7em;
+  margin: 0.35em 0 0;
+  color: var(--retro-teal, #008080);
+}
+
+/* The steps */
+
+.nr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.6em 0 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.nr-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  min-height: 3.9em;
+  padding: 0 0.5em;
+  border-bottom: 0.1em dotted var(--retro-dark-gray, #808080);
+}
+
+.nr-item:last-child {
+  border-bottom: 0;
+}
+
+.nr-item:nth-child(even) {
+  background: var(--nr-tint);
+}
+
+.nr-num {
+  flex: none;
+  width: 2.1em;
+  height: 2.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nr-frame);
+  color: #ffffff;
+  font-size: 1.15em;
+  padding-top: 0.15em;
+}
+
+.nr-icon {
+  flex: none;
+  width: 2em;
+  font-size: 1.6em;
+  text-align: center;
+  line-height: 1;
+}
+
+.nr-label {
+  flex: 1;
+  font-size: 2.1em;
+  line-height: 1.05;
+  padding-top: 0.1em;
+}
+
+/* A Win95 button as a tick box: printed it is just a square with a shadow, and it is the one
+   thing on the sheet a five-year-old is meant to touch. */
+.nr-box {
+  flex: none;
+  width: 2.6em;
+  height: 2.6em;
+  background: var(--retro-gray, #c0c0c0);
+  border: 0.22em outset #ffffff;
+  border-right-color: var(--retro-dark-gray, #808080);
+  border-bottom-color: var(--retro-dark-gray, #808080);
+}
+
+/* Footer */
+
+.nr-foot {
+  border-top: 0.14em dashed var(--retro-teal, #008080);
+  margin-top: 0.6em;
+  padding-top: 0.6em;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 1.5em;
+  color: var(--retro-teal, #008080);
+}
+
+.nr-foot .nr-site {
+  font-size: 0.8em;
+  color: var(--retro-dark-gray, #808080);
+}
+
+/* Screen-only chrome around the sheet */
+
+.nr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.nr-print-btn {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  padding: 6px 18px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+}
+
+.nr-print-btn:active {
+  border-style: inset;
+}
+
+.nr-hint {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  color: var(--retro-white);
+  flex: 1;
+  min-width: 240px;
+  margin: 0;
+}
+
+/* Print: the sheet, and nothing else on the page.
+
+   The page chrome is taken out of flow with `display: none` rather than hidden with
+   `visibility`, because hidden boxes still take up their space - and a document taller than
+   one page prints a second, blank one however empty it looks. Everything here is a global
+   selector on purpose: this stylesheet is imported by the two night-routine pages and nothing
+   else, so it can reach the layout's own wrappers. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body > svg,
+  body > .taskbar {
+    display: none !important;
+  }
+
+  .container {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* The navbar and the footer; the window itself is the one child that survives. */
+  .container > *:not(.night-routine-window) {
+    display: none !important;
+  }
+
+  .night-routine-window {
+    margin: 0 !important;
+    border: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .night-routine-window .title-bar,
+  .nr-toolbar {
+    display: none !important;
+  }
+
+  .night-routine-window .window-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .nr-sheet {
+    /* A millimetre short of A4: exactly 297mm rounds up on some printers and spills a blank
+       second page, and one missing millimetre at the foot of the sheet is invisible. */
+    width: 210mm;
+    height: 296mm;
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    overflow: hidden;
+    /* Backgrounds are the design here - the numbered chips and the tick boxes are unreadable
+       as outlines - so ask for them even in the browsers that drop them by default. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

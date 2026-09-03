@@ -1,0 +1,68 @@
+---
+import { useTranslations, type Lang, type TranslationKey } from '../../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+
+/* The order is the order of the evening, and the sheet is printed - so it is a fixed list here
+   rather than anything editable. Ten steps is what fits one A4 page at a size readable from
+   across a bathroom; adding an eleventh means checking the print preview again. */
+const steps: { icon: string; key: TranslationKey }[] = [
+  { icon: '\u{1F95B}', key: 'nightRoutine.step.drink' },
+  { icon: '\u{1F6C1}', key: 'nightRoutine.step.bath' },
+  { icon: '\u{1F9F7}', key: 'nightRoutine.step.nappy' },
+  { icon: '\u{1F455}', key: 'nightRoutine.step.pyjamas' },
+  { icon: '\u{1FAA5}', key: 'nightRoutine.step.teeth' },
+  { icon: '\u{1F443}', key: 'nightRoutine.step.nose' },
+  { icon: '\u{1F6BD}', key: 'nightRoutine.step.wee' },
+  { icon: '\u{1F4D6}', key: 'nightRoutine.step.book' },
+  { icon: '\u{1F3B5}', key: 'nightRoutine.step.song' },
+  { icon: '\u{1F534}', key: 'nightRoutine.step.lamp' },
+];
+---
+
+<div class="nr-toolbar">
+  <button type="button" class="nr-print-btn" id="nr-print">{t('nightRoutine.print')}</button>
+  <p class="nr-hint">{t('nightRoutine.hint')}</p>
+</div>
+
+<div class="nr-preview">
+  <div class="nr-sheet">
+    <div class="nr-frame">
+      <header class="nr-head">
+        <span class="nr-moon">{'☾'} {'✦'} {'✧'}</span>
+        <h1 class="nr-title">{t('NightRoutine')}</h1>
+        <p class="nr-subtitle">{t('nightRoutine.subtitle')}</p>
+      </header>
+
+      <ol class="nr-list">
+        {steps.map((step, i) => (
+          <li class="nr-item">
+            <span class="nr-num">{i + 1}</span>
+            <span class="nr-icon" aria-hidden="true">{step.icon}</span>
+            <span class="nr-label">{t(step.key)}</span>
+            <span class="nr-box"></span>
+          </li>
+        ))}
+      </ol>
+
+      <footer class="nr-foot">
+        <span>{t('nightRoutine.goodnight')} {'☾'}</span>
+        <span class="nr-site">korczak.xyz</span>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+  // astro:page-load rather than a bare listener: the site routes on the client, so a page
+  // arrived at from the navbar never fires DOMContentLoaded again.
+  document.addEventListener('astro:page-load', () => {
+    const btn = document.getElementById('nr-print');
+    if (btn) btn.addEventListener('click', () => window.print());
+  });
+</script>
