@@ -140,6 +140,17 @@ describe('noticesFor', () => {
     const muted: Interest = { ...KEEN, muted: true };
     expect(noticesFor(ev({ title: 'X' }), [muted], new Set(), ctx())).toEqual([]);
   });
+
+  /*
+   * The push body is built from the notice and never from the event, so a distance that stops here
+   * is a lock screen saying only `XVII Bieg Ziemi Puckiej` — a name, with no way to tell whether
+   * it is worth getting up for.
+   */
+  it('carries a race distance through to the notice', () => {
+    const race = ev({ title: 'Maraton Warszawski', tags: ['running'], distancesM: [42195] });
+    const [notice] = noticesFor(race, [KEEN], new Set(), ctx());
+    expect(notice.distancesM).toEqual([42195]);
+  });
 });
 
 describe('an event dismissed by hand', () => {

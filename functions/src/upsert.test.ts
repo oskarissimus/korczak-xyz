@@ -34,6 +34,24 @@ describe('toRecord', () => {
     expect(a.id).toBe(b.id);
   });
 
+  it('reads a race distance out of the title, and only for a race', () => {
+    const race = toRecord(
+      raw({ title: '48. Maraton Warszawski', tags: ['running'] }),
+      'elektroniczne-zapisy',
+      'Elektroniczne Zapisy',
+      NOW,
+    );
+    expect(race.distancesM).toEqual([42195]);
+
+    // The gate. Without the tag the same words read `Maraton filmowy` as a 42 km run.
+    expect(toRecord(raw({ title: '48. Maraton Warszawski' }), 's', 'S', NOW).distancesM)
+      .toBeUndefined();
+    // A race whose title does not say carries no field at all, rather than an empty array on
+    // every one of two thousand documents.
+    expect(toRecord(raw({ title: 'VII Bieg o Puchar Wójta', tags: ['running'] }), 's', 'S', NOW)
+      .distancesM).toBeUndefined();
+  });
+
   it('handles an undated announcement', () => {
     const record = toRecord(raw({ startsAt: null, dateText: 'Premiera: jesień 2027' }), 's', 'S', NOW);
     expect(record.startsAt).toBeNull();

@@ -27,6 +27,7 @@ import {
   type FeedMode,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
+import { formatDistances } from '../../utils/events/distance';
 import { cityKey } from '../../utils/events/cities';
 import { loadFeedCity, saveFeedCity } from '../../utils/events/browser/storage';
 import type { Reach } from '../../utils/events/types';
@@ -362,6 +363,15 @@ function EventCard({
       {event.subtitle ? <p className="ev-card-sub">{event.subtitle}</p> : null}
 
       <div className="ev-card-meta">
+        {/*
+          * First in the row, ahead of even the on-sale chip, because on a running card it is the
+          * question the title left open — `XVII Bieg Ziemi Puckiej` is a name, not a plan. Absent
+          * on everything that is not a race, and on the four races in five whose title does not
+          * say: see the precision note in `distance.ts`.
+          */}
+        {event.distancesM?.length ? (
+          <span className="ev-chip ev-chip--distance">{formatDistances(event.distancesM)}</span>
+        ) : null}
         {event.ticketUrl ? <span className="ev-chip ev-chip--sale">{t.onSaleNow}</span> : null}
         {/*
           * The sale date, where the source stated it ahead of time. Drawn even when a ticket link

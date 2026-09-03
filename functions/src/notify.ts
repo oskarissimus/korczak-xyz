@@ -19,6 +19,7 @@ import { DEFAULT_PUSH_SETTINGS } from '../../korczak-xyz/src/utils/events/types'
 import { ignoredFingerprints } from '../../korczak-xyz/src/utils/events/ignores';
 import { planRun, type PendingNotice } from '../../korczak-xyz/src/utils/events/notices';
 import { noticeIdFor } from '../../korczak-xyz/src/utils/events/normalize';
+import { formatDistances } from '../../korczak-xyz/src/utils/events/distance';
 import { sendToAll, type PushPayload } from './push';
 import { stripUndefined } from './upsert';
 
@@ -96,20 +97,34 @@ export function payloadFor(notice: PendingNotice): PushPayload {
 }
 
 /**
- * The date a notification is about, in words.
+ * The one line under the title: what the notification is about, in words.
  *
- * A `presale` names the sale moment and nothing else — the announcement it came from has no date
- * of its own, and the performance it is about may not be scheduled yet. The hour is part of it:
- * "1 Sep" and "1 Sep, 11:00" are different instructions when the house sells out by lunchtime.
+ * Two things go in front of the date. A **race distance**, because a notification is the one place
+ * there is no card to open — `48. Maraton Warszawski` on a lock screen is enough to recognise, but
+ * `XVII Bieg Ziemi Puckiej` is not enough to decide about, and deciding is what a `soon` reminder
+ * is for. And a `presale` names the sale moment and nothing else: the announcement it came from
+ * has no date of its own, and the performance it is about may not be scheduled yet. The hour is
+ * part of that one — "1 Sep" and "1 Sep, 11:00" are different instructions when the house sells
+ * out by lunchtime.
+ *
+ * Language-neutral by construction, like everything else this function sends: `5 km · 21.1 km` is
+ * read the same in both, and the date is already an `en-GB` short form for every subscriber.
  */
 function bodyFor(notice: PendingNotice): string {
+  const distances = formatDistances(notice.distancesM);
+  const parts = distances ? [distances] : [];
+
   if (notice.kind === 'presale' && notice.onSaleAt !== undefined) {
-    return `Tickets on sale from ${when(notice.onSaleAt, true)}`;
+    parts.push(`Tickets on sale from ${when(notice.onSaleAt, true)}`);
+  } else if (notice.startsAt === null) {
+    parts.push('Announced — no dates yet.');
+  } else if (notice.kind === 'onsale') {
+    parts.push(`On sale now · ${when(notice.startsAt, false)}`);
+  } else {
+    parts.push(when(notice.startsAt, false));
   }
-  if (notice.startsAt === null) return 'Announced — no dates yet.';
-  return notice.kind === 'onsale'
-    ? `On sale now · ${when(notice.startsAt, false)}`
-    : when(notice.startsAt, false);
+
+  return parts.join(' · ');
 }
 
 function when(at: number, withTime: boolean): string {
@@ -166,6 +181,7 @@ export async function notifyAccount(
       startsAt: notice.startsAt,
       onSaleAt: notice.onSaleAt,
       url: notice.url,
+      distancesM: notice.distancesM,
     };
     try {
       await notices.doc(notice.noticeId).create(stripUndefined(record));

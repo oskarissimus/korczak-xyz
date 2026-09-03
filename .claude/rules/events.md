@@ -185,6 +185,60 @@ endpoint the collector pushes to until it earns a 410 that may never come. On th
 **404 and 410 are the only codes that delete a subscription**: a 403 is a VAPID key mismatch, and
 deleting on that would wipe every device the first time a secret is fumbled.
 
+### How long the race is
+
+`distance.ts` pulls a race's distances out of its title and `toRecord` stores them as
+`EventRecord.distancesM` — **metres, integers, ascending**. Kilometres would be floats: a half
+marathon is 21,097 m exactly where 21.0975 km is a number two runtimes may print differently, and
+this value is written and compared on every run. The card draws it as the first chip in the meta
+row and `bodyFor` puts it ahead of the date in the push body, which is the half that mattered —
+a notification is the one place there is no card to open, and `XVII Bieg Ziemi Puckiej` on a lock
+screen is a name, not a decision.
+
+**Precision over recall, and the numbers say what that costs.** Every rule is anchored on a unit
+or on a word that can only be a distance; nothing is inferred from a bare number. Race titles are
+full of numbers that are not distances — `44 Międzynarodowy Bieg` is an edition, `5. Pietrasze
+Cross Country 1/5` a round, `Grand Prix 2026 - 13.09.2026` a date, and `Bieg 3 Króli` is three
+kings. Measured against the four live listings on 3 Sep 2026: **27 of 134 races carry their
+distance in their title, and none of the other 107 produced a false one.** Four cards in five stay
+quiet, deliberately — a card that says nothing is one you open, a card that says `44 km` about a
+5 km run is one you plan a season around.
+
+Three things in there are load-bearing:
+
+- **The `running` tag is the gate, and it is the whole safety of the feature.** `maraton` is a live
+  Polish word for a long sitting of anything — *maraton filmowy*, *maraton pisania listów* — and
+  `piątka` is a five of any kind. Run across the whole corpus, the same rules that are exactly
+  right about a race put `42.2 km` on a film night.
+- **The named distances are most of the yield.** Polish names a race after its length far more
+  often than it states one: `Stalowa Dycha`, `Nocna Piątka`, `Hajnowska Dwunastka`, `Zamkowa
+  Energetyczna Ósemka`, and the marathons, which are never written as a number. They inflect
+  through every case, so each is a prefix — the same bargain `klezmer*` makes in the matcher. The
+  `\b` anchors are what keep them independent of each other: folded, `półmaraton` is `polmaraton`,
+  so `\bmaraton` cannot see it, and `ultramaraton` hides from both, which is right — an ultra has
+  no one distance.
+- **A number's left edge is a consumed character, not a lookbehind.** Without it a three-digit
+  pattern reads the *tail* of a longer number and `Bieg 2026 km` is a 26 km race. Safari only
+  learnt lookbehind in 16.4 and this file compiles into the browser bundle too, so the guard is
+  `(?:^|[^\d.,])` and the capture group stays group 1.
+
+The **description is deliberately not read**, only title and subtitle. A description is prose, and
+prose says `10 km od centrum`, `przewyższenie 300 m` and `500 m od mety` — distances that are real
+and are not the race's. The one source that lists races carries no description at all, so this
+costs nothing today and holds the line the day an adapter starts supplying one.
+
+It is derived in `toRecord` beside the haystack and the fingerprint rather than in the running
+adapter, so a second source of races cannot get it subtly different — the Maraton Warszawski feed
+already tags itself `running`. And unlike the classifier's fields it is **not** carried forward by
+`mergeRecord`: it is recomputed from the title every run, costs nothing, and a stale one would
+outlive a title being corrected.
+
+The obvious next step, if four in five is not enough: `elektronicznezapisy.pl/event/<id>.html`
+carries the organiser's own description, and roughly half of the titles that say nothing state a
+distance there. That is ~110 extra page fetches per run against an adapter that currently makes
+four, so it belongs in a `classify.ts`-shaped pass — after the upsert, only for events still
+without a distance, capped per run and latched so it converges — and not in the listing scrape.
+
 ### The sources, and why most of them are generic
 
 Five adapter *types*, not five scrapers — `rss` and `ical` are driven by URL lists and

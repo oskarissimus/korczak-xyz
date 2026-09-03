@@ -30,6 +30,14 @@ export interface PendingNotice {
    */
   onSaleAt?: number;
   url: string;
+  /**
+   * The race distances, in metres, when the event is one and its title said so.
+   *
+   * Carried on the notice rather than looked up when the push is built, because by then there is
+   * no event to look it up from: `payloadFor` receives this shape and nothing else, and the same
+   * shape is what the alerts history is written from.
+   */
+  distancesM?: number[];
 }
 
 export interface PlanContext {
@@ -120,6 +128,7 @@ export function noticesFor(
     startsAt: event.startsAt,
     onSaleAt: event.onSaleAt,
     url: event.url,
+    distancesM: event.distancesM,
   };
 
   const announcedFor = matched.filter((i) => isFresh(event.firstSeenAt, i, ctx));

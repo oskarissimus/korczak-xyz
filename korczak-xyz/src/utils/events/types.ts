@@ -94,6 +94,19 @@ export interface EventRecord {
   /** Normalised topics, folded lowercase: 'music', 'opera', 'theatre', 'tech', 'festival'. */
   tags: string[];
   /**
+   * The race distances on offer, in **metres**, ascending. Only ever set on `running` events.
+   *
+   * Derived from the title by `distancesOf`, so it is recomputed every run and never merged
+   * forward — unlike the classifier's fields, nothing here is a verdict that cost something to
+   * reach. Metres rather than kilometres because they are integers: 21,097 m is exact where
+   * 21.0975 km is a float compared against a stored one on every collector run.
+   *
+   * Absent means the title did not say, which is the common case — roughly four races in five
+   * are titled with a name and no number. It is not "no distance", and a card that stays quiet
+   * about it is the point: see the precision note at the top of `distance.ts`.
+   */
+  distancesM?: number[];
+  /**
    * When tickets go on sale, where the source states it **in advance**.
    *
    * The one date in this record that is not about the performance. Teatr Wielki announces a
@@ -248,6 +261,8 @@ export interface Notice {
   /** Denormalised for the same reason `startsAt` is — a `presale` row's date is this one, not that. */
   onSaleAt?: number;
   url: string;
+  /** Denormalised for the same reason, and because the push body is built from this shape. */
+  distancesM?: number[];
 }
 
 /** A browser's push registration. One per device, keyed by a hash of the endpoint. */

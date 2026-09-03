@@ -19,6 +19,7 @@ import {
   haystackOf,
   synthKey,
 } from '../../korczak-xyz/src/utils/events/normalize';
+import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
 import type { RawEvent } from './sources/types';
 
 export interface UpsertResult {
@@ -71,6 +72,13 @@ export function toRecord(
     venue: raw.venue,
     country: raw.country,
     tags: raw.tags ?? [],
+    /*
+     * Derived here with everything else derived, rather than in the running adapter, for the same
+     * reason the haystack and the fingerprint are: a second source of races — and the Maraton
+     * Warszawski feed already tags itself `running` — would otherwise have to remember to do it,
+     * and would get it subtly different.
+     */
+    distancesM: distancesOf({ title: raw.title, subtitle: raw.subtitle, tags: raw.tags }),
     onSaleAt: raw.onSaleAt,
     fingerprint: fingerprintOf({ title: raw.title, day, city: raw.city }),
     firstSeenAt: now,

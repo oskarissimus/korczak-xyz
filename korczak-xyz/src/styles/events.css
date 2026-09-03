@@ -214,6 +214,19 @@
   color: var(--retro-black);
 }
 
+/*
+ * How long the race is.
+ *
+ * The base chip's colours and no others: this is a fact read straight out of the listing's own
+ * title, which is what `ev-chip--sale` is too, and a colour of its own would make it look like a
+ * third kind of claim beside that and the classifier's `ev-chip--place`. `tabular-nums` is the
+ * whole of the styling — a column of cards reading 5 km / 10 km / 21.1 km lines up on the digits
+ * rather than shuffling, which is what makes the list scannable for a distance in the first place.
+ */
+.ev-chip--distance {
+  font-variant-numeric: tabular-nums;
+}
+
 .ev-chip--sale {
   background: var(--retro-navy);
   border-color: var(--retro-navy);
