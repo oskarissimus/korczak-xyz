@@ -21,8 +21,9 @@ export const translations = {
     checklistTitle: 'Night Routine',
     checklistSubtitle: 'Step by step to sleep',
     checklistPrint: 'Print (A4)',
+    checklistReset: 'Start over',
     checklistHint:
-      'Prints as a single A4 portrait page. Turn on "Background graphics" in the print dialog to keep the colours.',
+      'Tick the steps as you go, or print the sheet - one A4 portrait page, with "Background graphics" on for the colours. Ticks stay on this device and start fresh each evening.',
     checklistGoodnight: 'Good night',
     checklistDrink: 'Last drink',
     checklistBath: 'Bath',
@@ -346,8 +347,9 @@ export const translations = {
     checklistTitle: 'Wieczorna rutyna',
     checklistSubtitle: 'Krok po kroku do snu',
     checklistPrint: 'Drukuj (A4)',
+    checklistReset: 'Zacznij od nowa',
     checklistHint:
-      'Drukuje się na jednej stronie A4 w pionie. Włącz "Grafikę tła" w oknie drukowania, żeby zachować kolory.',
+      'Odhaczaj kroki po kolei albo wydrukuj kartkę - jedna strona A4 w pionie, z włączoną "Grafiką tła" dla kolorów. Odhaczenia zostają na tym urządzeniu i zaczynają się od nowa każdego wieczoru.',
     checklistGoodnight: 'Dobranoc',
     checklistDrink: 'Ostatnie picie',
     checklistBath: 'Kąpiel',

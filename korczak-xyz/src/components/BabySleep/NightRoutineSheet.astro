@@ -1,8 +1,12 @@
 ---
 /**
- * The bedtime routine as a sheet to print and hang up, rather than anything to tap. It holds no
- * state and reads none: it is the one part of the sleep log that is the same every night, which
- * is exactly why it belongs on a wall and not in Firestore.
+ * The bedtime routine, as a sheet to tick through on the phone and as one to print and hang up -
+ * the same ten rows either way, which is the point: whoever is following the paper on the wall and
+ * whoever is following the screen are on the same step.
+ *
+ * The ticks are this evening's and this device's, and deliberately go nowhere near Firestore: what
+ * is worth keeping about a routine is already kept, as the `RoutineRecord` the log writes. See
+ * `checklist.ts`.
  */
 import { translations, type Lang } from './translations';
 
@@ -30,7 +34,8 @@ const steps: { icon: string; label: string }[] = [
 ---
 
 <div class="nr-toolbar">
-  <button type="button" class="nr-print-btn" id="nr-print">{t.checklistPrint}</button>
+  <button type="button" class="nr-btn" id="nr-print">{t.checklistPrint}</button>
+  <button type="button" class="nr-btn" id="nr-reset">{t.checklistReset}</button>
   <p class="nr-hint">{t.checklistHint}</p>
 </div>
 
@@ -45,11 +50,17 @@ const steps: { icon: string; label: string }[] = [
 
       <ol class="nr-list">
         {steps.map((step, i) => (
-          <li class="nr-item">
-            <span class="nr-num">{i + 1}</span>
-            <span class="nr-icon" aria-hidden="true">{step.icon}</span>
-            <span class="nr-label">{step.label}</span>
-            <span class="nr-box"></span>
+          <li class="nr-step">
+            {/* A real checkbox inside a label, so the whole row is the hit area and the keyboard
+                and the screen reader get the control for free. What is ticked prints ticked -
+                the preview is the page - and "Start over" sits next to Print for the blank one
+                that goes on the wall. */}
+            <label class="nr-item">
+              <span class="nr-num">{i + 1}</span>
+              <span class="nr-icon" aria-hidden="true">{step.icon}</span>
+              <span class="nr-label">{step.label}</span>
+              <input type="checkbox" class="nr-box" data-step={i} />
+            </label>
           </li>
         ))}
       </ol>
@@ -63,10 +74,34 @@ const steps: { icon: string; label: string }[] = [
 </div>
 
 <script>
+  import { loadChecklist, saveChecklist } from '../../utils/babySleep/checklist';
+
   // astro:page-load rather than a bare listener: the site routes on the client, so a tab
   // arrived at from the nav above never fires DOMContentLoaded again.
   document.addEventListener('astro:page-load', () => {
-    const btn = document.getElementById('nr-print');
-    if (btn) btn.addEventListener('click', () => window.print());
+    const sheet = document.querySelector('.nr-sheet');
+    if (!sheet) return;
+
+    const boxes = [...sheet.querySelectorAll<HTMLInputElement>('.nr-box')];
+    const print = document.getElementById('nr-print');
+    const reset = document.getElementById('nr-reset');
+
+    // The clock is read at every write rather than once here: a tab left open through the
+    // evening would otherwise keep saving under the night it was opened in.
+    const ticked = () => boxes.flatMap((box, i) => (box.checked ? [i] : []));
+    const save = () => saveChecklist(Date.now(), ticked());
+
+    for (const i of loadChecklist(Date.now(), boxes.length)) {
+      const box = boxes[i];
+      if (box) box.checked = true;
+    }
+
+    for (const box of boxes) box.addEventListener('change', save);
+
+    print?.addEventListener('click', () => window.print());
+    reset?.addEventListener('click', () => {
+      for (const box of boxes) box.checked = false;
+      save();
+    });
   });
 </script>

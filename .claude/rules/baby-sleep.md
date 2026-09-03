@@ -262,11 +262,9 @@ would read as one of the three things it is not.
 
 ### The checklist tab
 
-`/apps/baby-sleep/checklist/` is the bedtime routine as a **sheet to print and hang up**: ten steps
-in the order of the evening, one A4 portrait page, a Print button and nothing else. It holds no
-state and reads none — no hook, no island, no Firestore — which is the point of it being here
-rather than a feature of the log: the routine is the same every night, so what varies is worth
-recording and what does not is worth putting on a wall where a five-year-old can see it.
+`/apps/baby-sleep/checklist/` is the bedtime routine as ten rows you tick as you go, and as one A4
+portrait page to print and hang on the bathroom wall. The same ten rows either way, which is the
+point: whoever is following the paper and whoever is following the phone are on the same step.
 
 A tab of the sleep log rather than an app of its own, which it briefly was. It is read at the same
 hour by the same person who is about to tap *Night routine* on the log, and an app entry of its own
@@ -278,25 +276,65 @@ site-wide table any more — the apps index no longer has a row to label. Nothin
 PWA: `APP_TIERS['baby-sleep']` claims the whole subtree, so the tab precached itself, and the page
 sets `pwa="baby-sleep"` like every other tab.
 
+#### The ticks are tonight's, this device's, and nobody else's
+
+`checklist.ts`, and it is the shortest state in this app on purpose. **Not a record and not synced**
+— a tick means "the teeth are done", it is worthless by morning, and what is worth keeping about a
+routine is already kept as the `RoutineRecord` the log writes and the other parent's phone pulls.
+`BabySleepSettings` is the same kind of thing and lives in the same kind of place: one localStorage
+key, no queue, no collection, no rules block.
+
+It is stored at all so the twenty minutes survive the page: the phone locks between the bath and
+the teeth, or you switch to the log tab to tap *Night routine* and come back — and with
+`ClientRouter` that round trip is a fresh DOM every time.
+
+**Keyed by `sleepDayKey(now, 'night')`**, exactly as a routine record's id is, so a routine still
+going at 00:10 keeps ticking the evening it started in rather than opening a fresh sheet halfway
+through. That key is also the whole of how the sheet clears itself: tomorrow evening asks for a
+different night, and yesterday's ticks are simply not it. There is no expiry to run and no reset to
+schedule. `Date.now()` is read at each write rather than once at load, or a tab left open through
+the evening would go on saving under the night it was opened in.
+
+`parseChecklist` drops an index past the end of today's list, so shortening the sheet cannot leave a
+tick on a row that now means something else, and takes anything unreadable as a blank sheet.
+*Start over* is the same write with an empty list — one path, not a second one that removes the key.
+
+#### What prints
+
+Whatever is on the screen. The preview *is* the page, ticks and strike-throughs included, and
+*Start over* sits next to *Print* for the blank one that goes on the wall. That is also why the
+strike-through rule is not inside `@media screen`.
+
 `src/styles/night-routine.css` is its own stylesheet rather than part of `babySleep.css`, because
-almost all of it is `@media print` and none of the other tabs want it. Three things in there are
+almost all of it is `@media print` and none of the other tabs want it. Four things in there are
 load-bearing:
 
-- **One base unit, everything else in `em`.** The unit is `4.4mm` in print and `2.095cqi` on
-  screen, which are the same length once the sheet is 210mm wide — so the preview lays out exactly
-  as the page prints, and a label that wraps on paper wraps on screen. `cqi` and not `vw`: the
-  sheet is scaled off its own width, so the preview stays faithful inside a window that is
-  narrower than the viewport. A `vw` clamp stays behind `@supports` for browsers without
-  container queries.
+- **One base unit, and everything else in `em` — including the sheet's own padding.** The unit is
+  `4.4mm` in print and `2.095cqi` on screen, the same length once the sheet is 210mm wide. The
+  padding was the one length left in millimetres, and a fixed margin is a far bigger *share* of a
+  350px preview than of an A4 page: it squeezed the rows on a phone and nowhere else, which is
+  exactly the class of bug this whole scheme exists to prevent.
+- **`cqi`, and the preview capped at 210mm.** The unit measures the container, so a wrapper left to
+  fill the window scales the sheet off a width the sheet does not have — an 8% disagreement between
+  print and screen that looks like nothing and is. A `vw` clamp stays behind `@supports` for
+  browsers without container queries.
 - **Printing hides the chrome with `display: none`, not `visibility: hidden`.** A hidden box still
   takes up its space, and a document taller than one page prints a second, blank one. That is also
-  why the sheet is `296mm` and not `297mm`: exactly A4 rounds up on some printers.
-- **Those rules reach the layout's own wrappers** (`.container`, `.baby-sleep-window`), which is
-  only safe because this stylesheet is imported by the two checklist pages and nothing else.
+  why the sheet is `296mm` and not `297mm`: exactly A4 rounds up on some printers. Those rules reach
+  the layout's own wrappers (`.container`, `.baby-sleep-window`), which is only safe because this
+  stylesheet is imported by the two checklist pages and nothing else.
+- **Every state of the tick box is spelled out, and the tick is drawn with borders.**
+  `@tailwindcss/forms` is in the site's global sheet: it paints a checked box its own blue with a
+  tick as a *background image*, and restates that colour for `:hover` and `:focus` besides. Miss any
+  one of those and a stock web checkbox turns up in the middle of a Win95 sheet. Borders rather than
+  a background image or a glyph because a background tick disappears when the print dialog is set to
+  drop background graphics — the one setting this sheet's own hint asks the reader to change — and
+  no font here is guaranteed a check mark.
 
-The tick boxes are Win95 raised buttons and nothing ticks them: it is paper. That is the one place
-in this app where a thing that looks tappable is not, and it is deliberate — the sheet is for the
-wall, and the log is what records that the night happened.
+A real `<input type="checkbox">` inside a `<label>`, so the whole row is the hit area and the
+keyboard and the screen reader get the control for free. On screen a done step is struck through and
+dimmed via `:has`, which is the one part that degrades: a browser without `:has` keeps the tick and
+loses the strike.
 
 ### The config tab, and the one intention in the log
 

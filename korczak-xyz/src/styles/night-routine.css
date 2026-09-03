@@ -12,7 +12,10 @@
   box-sizing: border-box;
   width: 210mm;
   min-height: 297mm;
-  padding: 10mm;
+  /* 10mm, but said in the sheet's own unit like everything else inside it: a margin fixed in
+     millimetres is a *bigger* share of a 350px preview than of the page, which quietly squeezes
+     the rows on a phone and nowhere else. */
+  padding: 2.27em;
   margin: 0 auto;
   background: #ffffff;
   color: var(--nr-ink);
@@ -26,8 +29,13 @@
    label from wrapping on screen where it would not wrap on paper - the preview is only worth
    showing if it lays out exactly like the print. */
 @media screen {
+  /* Capped to the sheet's own width, and that is the whole point of the wrapper: `cqi` measures
+     the *container*, so a preview left to fill the window would scale the sheet off a width the
+     sheet does not have and print and screen would quietly disagree by that difference. */
   .nr-preview {
     container-type: inline-size;
+    max-width: 210mm;
+    margin: 0 auto;
   }
 
   .nr-sheet {
@@ -37,10 +45,22 @@
     width: 100%;
     max-width: 210mm;
     min-height: 0;
+    /* A4's proportions, but as a floor rather than a cage: `overflow: visible` keeps the
+       automatic minimum size, so a row that has grown - a label wrapped by a glyph advance that
+       rounded up at 6px, say - makes the preview taller rather than being clipped out of it.
+       Nothing wraps at any width this has been measured at; this is what happens if something
+       ever does. */
     aspect-ratio: 210 / 297;
-    overflow: hidden;
+    height: auto;
     border: 2px solid var(--retro-dark-gray, #808080);
     box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  /* A floor here too, or the frame keeps filling exactly the ratio box and clips the very rows
+     the sheet just grew to show. On paper it stays `height: 100%` and fills the page. */
+  .nr-frame {
+    height: auto;
+    min-height: 100%;
   }
 }
 
@@ -110,21 +130,48 @@
   justify-content: space-between;
 }
 
+/* The row rules live on the <li> and the layout on the <label> inside it, so the tint and the
+   rule run the full width of a row whose hit area is the label. */
+.nr-step {
+  display: flex;
+  border-bottom: 0.1em dotted var(--retro-dark-gray, #808080);
+}
+
+.nr-step:last-child {
+  border-bottom: 0;
+}
+
+.nr-step:nth-child(even) {
+  background: var(--nr-tint);
+}
+
 .nr-item {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 0.7em;
   min-height: 3.9em;
   padding: 0 0.5em;
-  border-bottom: 0.1em dotted var(--retro-dark-gray, #808080);
 }
 
-.nr-item:last-child {
-  border-bottom: 0;
+@media screen {
+  .nr-item {
+    cursor: pointer;
+  }
+
+  .nr-step:hover {
+    background: #e2e2e2;
+  }
+
 }
 
-.nr-item:nth-child(even) {
-  background: var(--nr-tint);
+/* Done, and still readable: the step you have just finished is the one you look at to be sure you
+   did. Not screen-only, because the preview is the page - what is struck through here is struck
+   through on paper. `:has` is the whole effect, so a browser without it loses the strike and keeps
+   the tick, which is the part that matters. */
+.nr-step:has(.nr-box:checked) .nr-label {
+  text-decoration: line-through;
+  opacity: 0.55;
 }
 
 .nr-num {
@@ -155,16 +202,68 @@
   padding-top: 0.1em;
 }
 
-/* A Win95 button as a tick box: printed it is just a square with a shadow, and it is the one
-   thing on the sheet a five-year-old is meant to touch. */
-.nr-box {
+/* A Win95 button as a tick box - the one thing on the sheet anyone is meant to touch, and on
+   paper just a square with a shadow. `appearance: none` is what lets a real <input> look like
+   this; `font: inherit` is what lets it be sized in the sheet's own em like everything else,
+   since a form control does not inherit the font it sits in.
+
+   Every state is spelled out, and none of it is redundant: `@tailwindcss/forms` is in the site's
+   global sheet, and it paints a checked box its own blue with a tick as a *background image*,
+   restating that colour again for `:hover` and `:focus` and putting a ring shadow under both.
+   Leave any one of those alone and a stock web checkbox turns up in the middle of a Win95 sheet -
+   and a tick made of background image is a tick that vanishes when the print dialog is set to drop
+   background graphics, which is the one setting this sheet asks about. Hence the extra `.nr-sheet`
+   on each selector, which is what outranks the plugin's own two-state rules. */
+.nr-sheet .nr-box,
+.nr-sheet .nr-box:hover,
+.nr-sheet .nr-box:focus {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
   flex: none;
+  margin: 0;
   width: 2.6em;
   height: 2.6em;
   background: var(--retro-gray, #c0c0c0);
+  background-image: none;
+  box-shadow: none;
   border: 0.22em outset #ffffff;
   border-right-color: var(--retro-dark-gray, #808080);
   border-bottom-color: var(--retro-dark-gray, #808080);
+}
+
+/* Ticked, the button is pressed in. */
+.nr-sheet .nr-box:checked,
+.nr-sheet .nr-box:checked:hover,
+.nr-sheet .nr-box:checked:focus {
+  border-style: inset;
+  border-color: var(--retro-dark-gray, #808080);
+  border-right-color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
+/* The tick itself is two borders rather than a background or a glyph: borders print whether or
+   not the dialog is set to print background graphics, and no font on this sheet is guaranteed a
+   check mark. */
+.nr-sheet .nr-box::after {
+  content: '';
+  display: block;
+  width: 0.5em;
+  height: 1.1em;
+  margin: 0.15em auto 0;
+  border: solid var(--nr-frame);
+  border-width: 0 0.3em 0.3em 0;
+  transform: rotate(40deg);
+  opacity: 0;
+}
+
+.nr-sheet .nr-box:checked::after {
+  opacity: 1;
+}
+
+.nr-sheet .nr-box:focus-visible {
+  outline: 0.14em solid var(--nr-frame);
+  outline-offset: 0.15em;
 }
 
 /* Footer */
@@ -195,7 +294,7 @@
   margin-bottom: 20px;
 }
 
-.nr-print-btn {
+.nr-btn {
   font-family: 'VT323', monospace;
   font-size: 1.3rem;
   padding: 6px 18px;
@@ -205,7 +304,7 @@
   cursor: pointer;
 }
 
-.nr-print-btn:active {
+.nr-btn:active {
   border-style: inset;
 }
 
