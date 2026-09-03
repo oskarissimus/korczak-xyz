@@ -1,0 +1,72 @@
+---
+/**
+ * The bedtime routine as a sheet to print and hang up, rather than anything to tap. It holds no
+ * state and reads none: it is the one part of the sleep log that is the same every night, which
+ * is exactly why it belongs on a wall and not in Firestore.
+ */
+import { translations, type Lang } from './translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+
+/* The order is the order of the evening. Ten steps is what fits one A4 page at a size readable
+   from across a bathroom; adding an eleventh means checking the print preview again. */
+const steps: { icon: string; label: string }[] = [
+  { icon: '\u{1F95B}', label: t.checklistDrink },
+  { icon: '\u{1F6C1}', label: t.checklistBath },
+  { icon: '\u{1F9F7}', label: t.checklistNappy },
+  { icon: '\u{1F455}', label: t.checklistPyjamas },
+  { icon: '\u{1FAA5}', label: t.checklistTeeth },
+  { icon: '\u{1F443}', label: t.checklistNose },
+  { icon: '\u{1F6BD}', label: t.checklistWee },
+  { icon: '\u{1F4D6}', label: t.checklistBook },
+  { icon: '\u{1F3B5}', label: t.checklistSong },
+  { icon: '\u{1F534}', label: t.checklistLamp },
+];
+---
+
+<div class="nr-toolbar">
+  <button type="button" class="nr-print-btn" id="nr-print">{t.checklistPrint}</button>
+  <p class="nr-hint">{t.checklistHint}</p>
+</div>
+
+<div class="nr-preview">
+  <div class="nr-sheet">
+    <div class="nr-frame">
+      <header class="nr-head">
+        <span class="nr-moon">{'☾'} {'✦'} {'✧'}</span>
+        <h1 class="nr-title">{t.checklistTitle}</h1>
+        <p class="nr-subtitle">{t.checklistSubtitle}</p>
+      </header>
+
+      <ol class="nr-list">
+        {steps.map((step, i) => (
+          <li class="nr-item">
+            <span class="nr-num">{i + 1}</span>
+            <span class="nr-icon" aria-hidden="true">{step.icon}</span>
+            <span class="nr-label">{step.label}</span>
+            <span class="nr-box"></span>
+          </li>
+        ))}
+      </ol>
+
+      <footer class="nr-foot">
+        <span>{t.checklistGoodnight} {'☾'}</span>
+        <span class="nr-site">korczak.xyz</span>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+  // astro:page-load rather than a bare listener: the site routes on the client, so a tab
+  // arrived at from the nav above never fires DOMContentLoaded again.
+  document.addEventListener('astro:page-load', () => {
+    const btn = document.getElementById('nr-print');
+    if (btn) btn.addEventListener('click', () => window.print());
+  });
+</script>

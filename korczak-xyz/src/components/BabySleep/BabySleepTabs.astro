@@ -6,7 +6,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'log' | 'climate' | 'stats' | 'config' | 'share';
+type View = 'log' | 'checklist' | 'climate' | 'stats' | 'config' | 'share';
 
 interface Props {
   lang: Lang;
@@ -20,6 +20,9 @@ const base = lang === 'pl' ? '/pl/apps/baby-sleep' : '/apps/baby-sleep';
 
 const TABS: { view: View; href: string; label: string }[] = [
   { view: 'log', href: `${base}/`, label: t.navLog },
+  // Next to the log rather than off with the settings: it is read at the same hour, standing in
+  // the bathroom, by whoever is about to tap "night routine" on the log itself.
+  { view: 'checklist', href: `${base}/checklist/`, label: t.navChecklist },
   { view: 'climate', href: `${base}/climate/`, label: t.navClimate },
   { view: 'stats', href: `${base}/stats/`, label: t.navStats },
   // After the stats and before the share: it is what the charts on that page are drawn against.

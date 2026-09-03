@@ -11,8 +11,29 @@ export const translations = {
     // Tabs
     navLabel: 'Baby sleep log sections',
     navLog: 'Log',
+    navChecklist: 'Checklist',
     navStats: 'Stats',
     navShare: 'Share',
+
+    // The bedtime checklist, printed rather than tapped. Ten steps in the order of the
+    // evening; the sheet they are printed on is one A4 page and no more, so this list is not
+    // one to grow casually.
+    checklistTitle: 'Night Routine',
+    checklistSubtitle: 'Step by step to sleep',
+    checklistPrint: 'Print (A4)',
+    checklistHint:
+      'Prints as a single A4 portrait page. Turn on "Background graphics" in the print dialog to keep the colours.',
+    checklistGoodnight: 'Good night',
+    checklistDrink: 'Last drink',
+    checklistBath: 'Bath',
+    checklistNappy: 'Fresh nappy',
+    checklistPyjamas: 'Choosing the pyjamas',
+    checklistTeeth: 'Brushing teeth',
+    checklistNose: 'Blowing the nose',
+    checklistWee: 'Last wee',
+    checklistBook: 'Reading a book together',
+    checklistSong: 'Singing together',
+    checklistLamp: 'Switching on the red lamp',
 
     // Live controls
     awake: 'Awake',
@@ -317,8 +338,27 @@ export const translations = {
     // Tabs
     navLabel: 'Sekcje dziennika snu',
     navLog: 'Dziennik',
+    navChecklist: 'Checklista',
     navStats: 'Statystyki',
     navShare: 'Udostępnianie',
+
+    // Checklista wieczorna, do wydruku.
+    checklistTitle: 'Wieczorna rutyna',
+    checklistSubtitle: 'Krok po kroku do snu',
+    checklistPrint: 'Drukuj (A4)',
+    checklistHint:
+      'Drukuje się na jednej stronie A4 w pionie. Włącz "Grafikę tła" w oknie drukowania, żeby zachować kolory.',
+    checklistGoodnight: 'Dobranoc',
+    checklistDrink: 'Ostatnie picie',
+    checklistBath: 'Kąpiel',
+    checklistNappy: 'Pampers',
+    checklistPyjamas: 'Wybór piżamki',
+    checklistTeeth: 'Mycie zębów',
+    checklistNose: 'Wydmuchanie nosa',
+    checklistWee: 'Ostatnie siku',
+    checklistBook: 'Wspólne czytanie książeczki',
+    checklistSong: 'Wspólne śpiewanie',
+    checklistLamp: 'Zapalenie czerwonej lampki',
 
     // Live controls
     awake: 'Nie śpi',

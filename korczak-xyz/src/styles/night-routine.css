@@ -212,7 +212,9 @@
 .nr-hint {
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
-  color: var(--retro-white);
+  /* The sleep log's own hint colour: this sits on .baby-sleep-content's grey, not on the
+     teal a plain page would give it. */
+  color: var(--retro-dark-gray);
   flex: 1;
   min-width: 240px;
   margin: 0;
@@ -249,23 +251,26 @@
     padding: 0 !important;
   }
 
-  /* The navbar and the footer; the window itself is the one child that survives. */
-  .container > *:not(.night-routine-window) {
+  /* The navbar and the footer; the sleep log's window is the one child that survives. */
+  .container > *:not(.baby-sleep-window) {
     display: none !important;
   }
 
-  .night-routine-window {
+  .baby-sleep-window {
     margin: 0 !important;
     border: 0 !important;
     background: #ffffff !important;
   }
 
-  .night-routine-window .title-bar,
+  /* The window's title bar and the tab strip go with the rest of the chrome: on paper the
+     sheet is the whole document, and a printed tab nobody can click is just ink. */
+  .baby-sleep-window .title-bar,
+  .baby-sleep-window .win-tabs,
   .nr-toolbar {
     display: none !important;
   }
 
-  .night-routine-window .window-content {
+  .baby-sleep-window .window-content {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;

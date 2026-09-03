@@ -38,5 +38,10 @@
 /pl/apps/transpose            /pl/apps/flashcards        301
 /pl/apps/transpose/stats      /pl/apps/flashcards/chords 301
 
+# The bedtime checklist was briefly its own app before it became a tab of the sleep log, which
+# is where it belonged: it is read at the same hour and by the same person.
+/apps/night-routine           /apps/baby-sleep/checklist    301
+/pl/apps/night-routine        /pl/apps/baby-sleep/checklist 301
+
 /games/*                      /apps/:splat               301
 /pl/games/*                   /pl/apps/:splat            301

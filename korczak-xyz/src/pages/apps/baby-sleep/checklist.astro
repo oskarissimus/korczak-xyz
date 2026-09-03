@@ -1,0 +1,29 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import NightRoutineSheet from '../../../components/BabySleep/NightRoutineSheet.astro';
+import BabySleepTabs from '../../../components/BabySleep/BabySleepTabs.astro';
+import { translations } from '../../../components/BabySleep/translations';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/babySleep.css';
+import '../../../styles/night-routine.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${translations[lang].checklistTitle} | korczak.xyz`} lang={lang} pwa="baby-sleep">
+  <div class="window baby-sleep-window">
+    <div class="title-bar">
+      <span>{t('BabySleep')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content baby-sleep-content">
+      <BabySleepTabs lang={lang} active="checklist" />
+      <NightRoutineSheet lang={lang} />
+    </div>
+  </div>
+</Layout>

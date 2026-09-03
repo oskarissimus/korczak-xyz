@@ -1,6 +1,6 @@
 ---
 name: baby-sleep
-description: The baby sleep log at /apps/baby-sleep/ - entries and routines as CRDT-ish unions by id, the stats and spread charts, the climate tab, targets, and sharing with a second account.
+description: The baby sleep log at /apps/baby-sleep/ - entries and routines as CRDT-ish unions by id, the stats and spread charts, the climate tab, the printable checklist, targets, and sharing with a second account.
 paths:
   - "**/utils/babySleep/**"
   - "**/components/BabySleep/**"
@@ -10,6 +10,7 @@ paths:
   - "**/hooks/useSleepTargets.ts"
   - "**/hooks/useDataOwner.ts"
   - "**/styles/babySleep.css"
+  - "**/styles/night-routine.css"
   - "**/pages/**/apps/baby-sleep.astro"
   - "**/pages/**/apps/baby-sleep/**"
   - "firestore.rules"
@@ -17,8 +18,8 @@ paths:
 
 ## Baby Sleep Log
 
-At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab, a config tab and a
-share tab.
+At `/apps/baby-sleep/` — nights and naps as one entry each, with a stats tab, a config tab, a
+share tab and a printable checklist.
 `src/utils/babySleep/` holds the shapes and the pure logic, `useBabySleepData` the state and sync.
 
 The reconciliation is **not** the typing trainer's: these documents are mutable but they are not a
@@ -258,6 +259,44 @@ reported as synced.
 The routine buttons are the plain raised grey, not a colour. Navy is the night, teal is a nap and
 yellow is waking, so every colour on that screen is already spoken for and a coloured routine button
 would read as one of the three things it is not.
+
+### The checklist tab
+
+`/apps/baby-sleep/checklist/` is the bedtime routine as a **sheet to print and hang up**: ten steps
+in the order of the evening, one A4 portrait page, a Print button and nothing else. It holds no
+state and reads none — no hook, no island, no Firestore — which is the point of it being here
+rather than a feature of the log: the routine is the same every night, so what varies is worth
+recording and what does not is worth putting on a wall where a five-year-old can see it.
+
+A tab of the sleep log rather than an app of its own, which it briefly was. It is read at the same
+hour by the same person who is about to tap *Night routine* on the log, and an app entry of its own
+made the apps index list two things for one bedtime. `public/_redirects` keeps `/apps/night-routine`
+pointing here in both locales.
+
+Its strings are in `translations.ts` with the rest of the app's, and nothing of it is in the
+site-wide table any more — the apps index no longer has a row to label. Nothing was needed for the
+PWA: `APP_TIERS['baby-sleep']` claims the whole subtree, so the tab precached itself, and the page
+sets `pwa="baby-sleep"` like every other tab.
+
+`src/styles/night-routine.css` is its own stylesheet rather than part of `babySleep.css`, because
+almost all of it is `@media print` and none of the other tabs want it. Three things in there are
+load-bearing:
+
+- **One base unit, everything else in `em`.** The unit is `4.4mm` in print and `2.095cqi` on
+  screen, which are the same length once the sheet is 210mm wide — so the preview lays out exactly
+  as the page prints, and a label that wraps on paper wraps on screen. `cqi` and not `vw`: the
+  sheet is scaled off its own width, so the preview stays faithful inside a window that is
+  narrower than the viewport. A `vw` clamp stays behind `@supports` for browsers without
+  container queries.
+- **Printing hides the chrome with `display: none`, not `visibility: hidden`.** A hidden box still
+  takes up its space, and a document taller than one page prints a second, blank one. That is also
+  why the sheet is `296mm` and not `297mm`: exactly A4 rounds up on some printers.
+- **Those rules reach the layout's own wrappers** (`.container`, `.baby-sleep-window`), which is
+  only safe because this stylesheet is imported by the two checklist pages and nothing else.
+
+The tick boxes are Win95 raised buttons and nothing ticks them: it is paper. That is the one place
+in this app where a thing that looks tappable is not, and it is deliberate — the sheet is for the
+wall, and the log is what records that the night happened.
 
 ### The config tab, and the one intention in the log
 
