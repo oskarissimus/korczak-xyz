@@ -10,6 +10,8 @@
   --nr-tint: #f1f1f1;
 
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   width: 210mm;
   min-height: 297mm;
   /* 10mm, but said in the sheet's own unit like everything else inside it: a margin fixed in
@@ -39,28 +41,24 @@
   }
 
   .nr-sheet {
-    /* Viewport-based fallback for browsers without container queries; the sheet is at most
-       210mm wide, so on a wide screen the two agree. */
-    --nr: clamp(6px, 2.1vw, 16.5px);
+    /* The fallback for a browser without container queries - an iPhone a couple of iOS versions
+       back is the real one. It has to guess the sheet's width from the viewport's: below 600px
+       the window chrome around it is a constant 38px (its borders and .baby-sleep-content's
+       padding), and 4.4/210 of what is left is the same unit the query would have computed. A
+       guess is all it is, which is what the floor below is for. */
+    --nr: clamp(6px, calc((100vw - 38px) * 0.02095), 16.5px);
     width: 100%;
     max-width: 210mm;
-    min-height: 0;
-    /* A4's proportions, but as a floor rather than a cage: `overflow: visible` keeps the
-       automatic minimum size, so a row that has grown - a label wrapped by a glyph advance that
-       rounded up at 6px, say - makes the preview taller rather than being clipped out of it.
-       Nothing wraps at any width this has been measured at; this is what happens if something
-       ever does. */
-    aspect-ratio: 210 / 297;
-    height: auto;
+
+    /* A4, said in the sheet's own unit: 297mm / 4.4mm = 67.5em. Since the unit is a share of the
+       sheet's width, this *is* the 210:297 ratio - but as a `min-height` it can only ever be a
+       floor, so a preview whose contents come out taller than they do here gets taller with them.
+       That is not hypothetical: with the fallback unit above, the rows are about a tenth too big
+       for the page, and under the `aspect-ratio` this replaces they spilled out of the bottom of
+       the sheet's own white background and over the window behind it. */
+    min-height: 67.5em;
     border: 2px solid var(--retro-dark-gray, #808080);
     box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
-  }
-
-  /* A floor here too, or the frame keeps filling exactly the ratio box and clips the very rows
-     the sheet just grew to show. On paper it stays `height: 100%` and fills the page. */
-  .nr-frame {
-    height: auto;
-    min-height: 100%;
   }
 }
 
@@ -73,9 +71,12 @@
   }
 }
 
+/* `flex: 1` and not `height: 100%`: the sheet's height is a floor on screen (see below), and a
+   percentage against a floor is not a height any browser has to resolve. Flexing fills whatever
+   the sheet turns out to be, on paper and in the preview alike. */
 .nr-frame {
   box-sizing: border-box;
-  height: 100%;
+  flex: 1;
   border: 0.5em solid var(--nr-frame);
   outline: 0.14em solid var(--nr-frame);
   outline-offset: 0.4em;

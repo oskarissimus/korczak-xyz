@@ -314,10 +314,17 @@ load-bearing:
   padding was the one length left in millimetres, and a fixed margin is a far bigger *share* of a
   350px preview than of an A4 page: it squeezed the rows on a phone and nowhere else, which is
   exactly the class of bug this whole scheme exists to prevent.
-- **`cqi`, and the preview capped at 210mm.** The unit measures the container, so a wrapper left to
-  fill the window scales the sheet off a width the sheet does not have — an 8% disagreement between
-  print and screen that looks like nothing and is. A `vw` clamp stays behind `@supports` for
-  browsers without container queries.
+- **`cqi`, the preview capped at 210mm, and the sheet's height a floor rather than a ratio.** The
+  unit measures the container, so a wrapper left to fill the window scales the sheet off a width the
+  sheet does not have — an 8% disagreement between print and screen that looks like nothing and is.
+  The screen height is `min-height: 67.5em`, which is 297mm in the sheet's own unit and therefore
+  *is* the 210:297 ratio, but can only ever be a floor: an `aspect-ratio` here was a cage, and a
+  preview whose rows came out taller spilled its last rows and its footer out of the bottom of its
+  own white background and over the window behind it. That is not hypothetical — it is what an
+  iPhone a couple of iOS versions back did, because a browser without container queries falls back
+  to guessing the sheet's width from the viewport's (the window chrome around it is a constant 38px
+  below 600px), and a guess that comes out a tenth too large has to be survivable rather than
+  merely unlikely.
 - **Printing hides the chrome with `display: none`, not `visibility: hidden`.** A hidden box still
   takes up its space, and a document taller than one page prints a second, blank one. That is also
   why the sheet is `296mm` and not `297mm`: exactly A4 rounds up on some printers. Those rules reach
