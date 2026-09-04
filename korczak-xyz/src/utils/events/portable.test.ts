@@ -28,6 +28,25 @@ describe('src/utils/events stays portable', () => {
     expect(sources.length).toBeGreaterThan(0);
   });
 
+  /*
+   * The other half of being portable, and the half a runner discovers rather than a reader: Vite
+   * resolves a tsconfig by walking UP from the file it transforms, so without one of our own that
+   * walk reaches korczak-xyz/tsconfig.json and its `extends: "astro/tsconfigs/strict"` — which
+   * resolves only where the site's node_modules are installed, and on the functions' CI runner
+   * they are not. The transit directory shipped without this file and took a whole deploy down
+   * with `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, so it is asserted
+   * here rather than remembered.
+   */
+  it('carries a tsconfig that stops the resolver walking out of the directory', () => {
+    const text = readFileSync(join(DIR, 'tsconfig.json'), 'utf8');
+    expect(
+      /"extends"\s*:/.test(text),
+      'tsconfig.json here must extend nothing: whatever it reached for would have to be ' +
+        'installed wherever these modules are compiled, and the runner that builds the Cloud ' +
+        'Functions installs only functions/package.json.',
+    ).toBe(false);
+  });
+
   it.each(sources)('%s imports nothing outside this directory', (file) => {
     const text = readFileSync(join(DIR, file), 'utf8');
     const specifiers = [...text.matchAll(/^\s*(?:import|export)[\s\S]*?from\s+'([^']+)'/gm)].map(

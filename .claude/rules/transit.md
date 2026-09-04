@@ -35,6 +35,25 @@ that directory is proven portable by its own copy of the test, so importing from
 in a DOM global or a Firestore client. It is how `foldText` and `slugKey` are shared rather than
 written again, which this repo's own reasoning says would stay identical only until the first fix.
 
+### The directory's own `tsconfig.json` is part of that portability
+
+`src/utils/transit/tsconfig.json` extends nothing, and that is its entire job. Vite resolves a
+tsconfig by walking **up** from the file it is transforming, so without one here the walk reaches
+`korczak-xyz/tsconfig.json` and its `extends: "astro/tsconfigs/strict"` — resolvable only where the
+site's `node_modules` are installed, which on the runner that installs `functions/package.json`
+alone they are not. The directory shipped without that file and `functions/src/transit/*.test.ts`
+died with `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, naming a source
+file that had nothing wrong with it.
+
+The cost was not a red build, it was a deploy: the tests run **before** `firebase deploy` in
+`firebase-deploy.yml`, so the same commit's Firestore rules never reached the project and the app
+came up reading `transitItems` it had no permission to see — `Missing or insufficient permissions.`
+on a screen whose backend looked fine. Event Watch escaped it only by accident: `functions/` imports
+*types* from `../events/` at runtime, and a type import is erased before anything is transformed.
+
+Both `portable.test.ts` files now assert the file exists and extends nothing, so this is caught in
+the directory that caused it rather than in a runner that installs half the repo.
+
 ### The title is the gate, and it is what makes this nearly free
 
 **Every item in both feeds is headlined with WTP's own list of affected lines** — `Utrudnienia w

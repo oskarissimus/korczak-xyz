@@ -1,0 +1,31 @@
+{
+  // Why this file exists — the same reason `src/utils/events/tsconfig.json` does, and this
+  // directory needing its own copy is the whole point of it.
+  //
+  // This directory is compiled by two projects: Astro for the browser, and `tsc` into the Cloud
+  // Functions bundle (functions/tsconfig.json includes it by path rather than keeping a copy, so
+  // the app and the collector cannot disagree about what touches a route).
+  //
+  // Vite resolves a tsconfig by walking UP from the file it is transforming. Without this file that
+  // walk reaches korczak-xyz/tsconfig.json, which `extends: "astro/tsconfigs/strict"` — resolvable
+  // only where the site's node_modules are installed. On the CI runner that installs only the
+  // functions' dependencies it is not, and `functions/src/transit/*.test.ts` died with
+  // `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, naming a file that has
+  // nothing wrong with it. It cost a deploy: the Metro Watch commit's own rules never reached
+  // Firestore, so the app came up reading a corpus it had no permission to see and said
+  // `Missing or insufficient permissions.` The events directory only escaped because the functions
+  // import types from it at runtime, and a type import is erased before anything is transformed.
+  //
+  // Nothing here may need an Astro or React setting: that is the same constraint portable.test.ts
+  // enforces on the imports, stated once more in the shape the compiler reads.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["*.ts"]
+}
