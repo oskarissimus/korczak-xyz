@@ -146,3 +146,106 @@ describe('stripUndefined', () => {
     expect(stripUndefined({ a: 1, b: undefined, c: null })).toEqual({ a: 1, c: null });
   });
 });
+
+/*
+ * The reader's fields, and the two ways this merge could quietly lose or misread them.
+ *
+ * Both are the same class of bug as the classifier's: a field no source has heard of, written by a
+ * second writer, over a document the upsert rebuilds from scratch every six hours.
+ */
+describe('mergeRecord and the newsroom reader', () => {
+  const article = (over: Partial<EventRecord> = {}): EventRecord => ({
+    ...toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, tags: ['theatre', 'newsroom'] }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      NOW,
+    ),
+    ...over,
+  });
+
+  it('carries a model-supplied onSaleAt forward, the source having none', () => {
+    /*
+     * The one that would have lost the whole feature. `raw.onSaleAt` is undefined for an article
+     * the regex could not phrase-match, `stripUndefined` drops it, and the sale date the reader
+     * learnt would be deleted on the next run — six hours later, silently, notice never fired.
+     */
+    const before = article({ onSaleAt: Date.parse('2027-03-01T09:00:00Z') });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    expect(mergeRecord(incoming, before, LATER).record.onSaleAt).toBe(
+      Date.parse('2027-03-01T09:00:00Z'),
+    );
+  });
+
+  it('lets an adapter that does state a sale date overrule the stored one', () => {
+    // Same rule as `country`: the scrape read the sentence, so it wins.
+    const before = article({ onSaleAt: Date.parse('2027-03-01T09:00:00Z') });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, onSaleAt: Date.parse('2027-04-01T09:00:00Z') }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    expect(mergeRecord(incoming, before, LATER).record.onSaleAt).toBe(
+      Date.parse('2027-04-01T09:00:00Z'),
+    );
+  });
+
+  it('carries the reading itself forward, and re-derives its tag', () => {
+    const before = article({
+      newsroomKind: 'programme',
+      newsroomSummary: 'The 2027/28 season is announced.',
+      newsroomHash: 'abc123',
+      newsroomReadAt: NOW,
+    });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, tags: ['theatre', 'newsroom'] }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    const merged = mergeRecord(incoming, before, LATER).record;
+    expect(merged.newsroomKind).toBe('programme');
+    expect(merged.newsroomSummary).toBe('The 2027/28 season is announced.');
+    expect(merged.newsroomHash).toBe('abc123');
+    // The source rewrites `tags` wholesale and has never heard of `programme`.
+    expect(merged.tags).toEqual(['theatre', 'newsroom', 'programme']);
+  });
+
+  it('does not read a FUTURE sale date as tickets having gone on sale', () => {
+    /*
+     * `hasTickets` used to be `onSaleAt !== undefined`, which was right only while every one came
+     * from Ticketmaster and was months past. Learning that a season opens in three weeks would
+     * otherwise mint an `onsale` notice reading "On sale now" about a box office that is shut —
+     * and consume the latch that `presale` needed three weeks earlier.
+     */
+    const before = article({ onSaleAt: undefined });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, onSaleAt: LATER + 20 * 86400000 }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    const merged = mergeRecord(incoming, before, LATER);
+    expect(merged.newlyOnSale).toBe(false);
+    expect(merged.record.onSaleSeenAt).toBeUndefined();
+  });
+
+  it('still reads a sale date now past as tickets being on sale', () => {
+    // Which is what every Ticketmaster row's `sales.public.startDateTime` is, and what the
+    // `onsale` notice has always meant.
+    const before = article({ onSaleAt: undefined });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, onSaleAt: LATER - 86400000 }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    expect(mergeRecord(incoming, before, LATER).newlyOnSale).toBe(true);
+  });
+});

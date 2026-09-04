@@ -12,6 +12,8 @@
  * `portable.test.ts` fails the build the moment an import reaches outside `./`.
  */
 
+import type { NewsroomKind } from './newsroom';
+
 /** Which adapter produced a record. Also the first half of its id. */
 export type SourceId =
   | 'ticketmaster'
@@ -115,6 +117,32 @@ export interface EventRecord {
   kind?: EventKind;
   /** Why the classifier called it that. Printed on a filtered-out card, like `reachReason`. */
   kindReason?: string;
+  /**
+   * What the **newsroom reader** made of this article, which is a different question from `kind`
+   * directly above and the two are worth keeping straight.
+   *
+   * `kind` asks whether a row belongs in an event feed at all, over the whole corpus, from
+   * `classify.ts`. This asks what one of the theatre's own news items actually says, over the
+   * dozen rows a source tagged `newsroom`, from `readNewsroom.ts` — a separate pass on a separate
+   * version, for the reasons in that file's header. A ticket-sale item is `announcement` on the
+   * first axis and `ticket-sale` on this one; both are true and neither implies the other.
+   *
+   * `newsroomTag` turns this into the tag an interest can match, and `tagsWithNewsroomKind` is the
+   * one place that union is made.
+   */
+  newsroomKind?: NewsroomKind;
+  /**
+   * What the article says, in one line, as the model read it.
+   *
+   * The counterpart of `reachReason` and `kindReason`: the verdict beside it is a single word, and
+   * without the sentence there is no way to tell a correct reading from a confident wrong one. On
+   * rows whose title and teaser are the theatre's Polish, it is also the only thing on the card in
+   * the reader's own language.
+   */
+  newsroomSummary?: string;
+  newsroomReadAt?: number;
+  /** What the reading was computed from — see `newsroomHashOf`. Unchanged, no second call. */
+  newsroomHash?: string;
   classifiedAt?: number;
   /**
    * What the classification was computed from — see `classifyHashOf` in `functions/src/classify.ts`.

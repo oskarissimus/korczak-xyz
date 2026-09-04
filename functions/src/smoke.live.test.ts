@@ -6,6 +6,7 @@ import { seedInterests } from '../../korczak-xyz/src/utils/events/interests';
 import { matchingInterests } from '../../korczak-xyz/src/utils/events/match';
 import { buildFeed } from '../../korczak-xyz/src/utils/events/feed';
 import { classifyEvents } from './classify';
+import { queueForReading, readNewsroom } from './readNewsroom';
 import type { EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
 
 /*
@@ -157,6 +158,83 @@ maybe('live classifier', () => {
        * is not doing the job this feature is built on, and the run should say so.
        */
       expect(agreed).toBeGreaterThanOrEqual(5);
+    },
+    120000,
+  );
+});
+
+/*
+ * The newsroom reader, against the theatre's real news list.
+ *
+ * The unit tests hold the parsing and the guards; what only a live run can settle is whether the
+ * *prompt* works on the sentences the press office actually writes — Polish prose with the year
+ * left out, an obituary, a job advert and a sale announcement in the same ten rows. Same
+ * invocation as the classifier above:
+ *
+ *   gcloud auth application-default login
+ *   GOOGLE_CLOUD_PROJECT=korczak-xyz-501720 LIVE=1 npx vitest run smoke.live
+ *
+ * It prints one line per article, so a bad reading is something to read rather than something to
+ * infer from a red assertion.
+ */
+maybe('live newsroom reader', () => {
+  it(
+    'reads the theatre’s own news',
+    async () => {
+      const project = process.env.GOOGLE_CLOUD_PROJECT;
+      if (!project) {
+        console.log('  no GOOGLE_CLOUD_PROJECT set — skipping');
+        return;
+      }
+
+      const now = Date.now();
+      const ctx = { now, fetch: globalThis.fetch, secret: () => undefined };
+      const source = SOURCES.find((s) => s.id === 'teatr-wielki')!;
+      const records = (await source.fetchEvents(ctx)).map((r) =>
+        toRecord(r, source.id, source.label, now),
+      );
+
+      const queue = queueForReading(records);
+      console.log(`\n  ${queue.length} newsroom items to read`);
+      expect(queue.length).toBeGreaterThan(0);
+
+      const written = new Map<string, Partial<EventRecord>>();
+      const { outcome } = await readNewsroom(records, {
+        now,
+        project,
+        write: async (id, update) => {
+          written.set(id, update);
+        },
+      });
+      if (outcome.error) console.log(`  reader error: ${outcome.error}`);
+
+      for (const article of queue) {
+        const update = written.get(article.id);
+        const when = update?.onSaleAt
+          ? new Date(update.onSaleAt).toISOString().slice(0, 16)
+          : '—';
+        console.log(
+          `    ${String(update?.newsroomKind ?? '—').padEnd(14)} ${when.padEnd(17)}` +
+            ` ${article.title.slice(0, 34).padEnd(35)} ${update?.newsroomSummary ?? ''}`,
+        );
+      }
+
+      console.log(`\n  read ${outcome.read}, unread ${outcome.missing}, sale dates ${outcome.saleDates}`);
+
+      /*
+       * Every article has to come back with a kind. A reply that silently drops rows is the
+       * failure this is really watching for — the sale announcement would be one of them, and
+       * nothing downstream would say so.
+       */
+      expect(outcome.read).toBe(queue.length);
+
+      /*
+       * Not an assertion that a sale date was found. Eleven months of the year the theatre has
+       * none to state, and a test that went red on that would be a test nobody could keep. The
+       * kinds printed above are what a prompt change is checked against.
+       */
+      const kinds = [...written.values()].map((u) => u.newsroomKind);
+      expect(kinds.filter((k) => k === 'institutional').length).toBeGreaterThan(0);
     },
     120000,
   );

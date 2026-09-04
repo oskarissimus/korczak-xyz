@@ -251,6 +251,20 @@
 }
 
 /*
+ * What the newsroom item reader made of an article.
+ *
+ * Grey, and the same grey as `ev-chip--place`, because it is the same kind of claim: this app's own
+ * reading rather than anything the source said. The navy pair beside it (`--sale`, `--presale`) are
+ * facts off a listing, and a reader should be able to tell at a glance which of the chips on a card
+ * a model wrote.
+ */
+.ev-chip--newsroom {
+  background: var(--retro-gray);
+  border-color: var(--retro-dark-gray);
+  color: var(--retro-dark-gray);
+}
+
+/*
  * Dismissed by hand. Drawn as an inset well rather than in a colour, because it is the one chip on
  * a card that reports something *you* did — where `ev-chip--sale` is a fact from a listing and
  * `ev-chip--place` a verdict from the classifier. A fourth colour beside those two would read as a

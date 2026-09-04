@@ -260,7 +260,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
          * hand the keyword-less "Ticket sales opening" interest the theatre's entire press
          * office — which is the mistake this app has now made from three directions.
          */
-        tags: ['theatre', 'teatr-wielki'],
+        tags: ['theatre', 'teatr-wielki', 'newsroom'],
         city: 'Warszawa',
         country: 'PL',
       },

@@ -20,6 +20,7 @@ import {
   synthKey,
 } from '../../korczak-xyz/src/utils/events/normalize';
 import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
+import { tagsWithNewsroomKind } from '../../korczak-xyz/src/utils/events/newsroom';
 import type { RawEvent } from './sources/types';
 
 export interface UpsertResult {
@@ -102,8 +103,21 @@ export function mergeRecord(
     return { record: incoming, created: true, newlyOnSale: false };
   }
 
-  const hadTickets = Boolean(stored.ticketUrl) || stored.onSaleAt !== undefined;
-  const hasTickets = Boolean(incoming.ticketUrl) || incoming.onSaleAt !== undefined;
+  /*
+   * On sale means **purchasable now**, which a sale date in the future is precisely not.
+   *
+   * This used to read `onSaleAt !== undefined`, and it was right only by accident: every
+   * `onSaleAt` in the corpus came from Ticketmaster, where it is the date a sale opened, usually
+   * months ago. Now the theatre's news and the newsroom reader both supply *future* ones — and
+   * under the old reading, learning that a season goes on sale in three weeks would have counted
+   * as tickets appearing, minting an `onsale` notice reading "On sale now" about a box office that
+   * is shut. That is the `presale` notice's job, from the same field, three weeks earlier.
+   */
+  const onSale = (record: EventRecord): boolean =>
+    Boolean(record.ticketUrl) || (record.onSaleAt !== undefined && record.onSaleAt <= now);
+
+  const hadTickets = onSale(stored);
+  const hasTickets = onSale(incoming);
   const newlyOnSale = !hadTickets && hasTickets && stored.onSaleSeenAt === undefined;
 
   return {
@@ -131,6 +145,30 @@ export function mergeRecord(
       kindReason: stored.kindReason,
       classifiedAt: stored.classifiedAt,
       classifyHash: stored.classifyHash,
+      /*
+       * The newsroom reader's fields, carried forward for exactly the same reason — and one of
+       * them, `onSaleAt`, is the reason this list is worth re-reading before adding a writer.
+       *
+       * The reader supplies a sale date the scrape's regex could not phrase-match, and the source
+       * has no opinion about it: `raw.onSaleAt` is undefined, `stripUndefined` drops it, and the
+       * warning would be **deleted on the very next collector run** — six hours after being
+       * learnt, silently, with the notice never fired. An adapter that does state one still wins,
+       * as with `country`, since it read the sentence rather than inferred it.
+       */
+      onSaleAt: incoming.onSaleAt ?? stored.onSaleAt,
+      newsroomKind: stored.newsroomKind,
+      newsroomSummary: stored.newsroomSummary,
+      newsroomReadAt: stored.newsroomReadAt,
+      newsroomHash: stored.newsroomHash,
+      /*
+       * The kind as a tag, folded in here rather than left on the document the reader wrote.
+       *
+       * `batch.set` replaces `tags` wholesale from what the source said, and the source has never
+       * heard of `programme`. Deriving the union at merge time from the stored kind means the
+       * reader never races the upsert, and `tagsWithNewsroomKind` being idempotent means a re-read
+       * cannot leave two copies of one tag.
+       */
+      tags: tagsWithNewsroomKind(incoming.tags, stored.newsroomKind),
       updatedAt: now,
     },
     created: false,

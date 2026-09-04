@@ -163,6 +163,47 @@ gcloud auth application-default login
 GOOGLE_CLOUD_PROJECT=korczak-xyz-501720 LIVE=1 npx vitest run smoke.live
 ```
 
+### The newsroom reader, which is a second model pass
+
+`src/readNewsroom.ts` reads the rows a source tagged `newsroom` — today, the ten items of
+`teatrwielki.pl/teatr/aktualnosci/` — and returns three things per article: a `kind` from a closed
+set, a `summary`, and the one that matters, `saleOpensAt`. That last becomes `EventRecord.onSaleAt`
+and the `presale` notice counts down to it, which is the whole reason the pass exists: the sale
+date is stated only in Polish prose, and the regex in the adapter reads exactly one phrasing of it.
+
+**It shares the classifier's credentials and every one of its failure modes** — same model, same
+Vertex-on-ADC, same "no project is a configuration state, not a failure", same 403 if the API or
+the role is missing. Everything in the section above applies unchanged; its health lands on
+`eventSources/newsroom` rather than `eventSources/classifier`, and both draw under *Also
+reporting* on the Sources tab.
+
+It is a **separate pass and not a second question in the same prompt**, for three reasons worth
+keeping straight:
+
+- **Scope.** The classifier runs over the whole ~1,150-event corpus; this runs over ten articles.
+  One prompt would ask every concert in Poland whether it is a job advert.
+- **Version.** `READER_VERSION` is its own lever over its own hash, so tuning the wording of a
+  sale-date question costs ten calls rather than eleven hundred.
+- **Blast radius.** A wrong `reach` costs a card in the feed. A wrong sale date is a notification
+  on the wrong morning, and a missed one is the season you meant to book.
+
+Two guards are specific to it, and both are there because the article is **text scraped from
+someone else's CMS being handed to a model whose answer schedules a notification**:
+
+- A `kind` outside the closed set is dropped, so a model cannot invent a tag nobody can write an
+  interest against.
+- A `saleOpensAt` is stored **only when it parses to a real calendar day, lands in the future, and
+  lands inside two years**. A hallucinated or injected past date would otherwise count as tickets
+  having gone on sale and mint an "On sale now" push about a shut box office.
+
+The regex path in the adapter is deliberately **kept, and wins where it fires**: it read the
+theatre's literal sentence, and a model is not asked to second-guess a stated fact — the same rule
+that keeps the classifier from overwriting a `country` the scrape knew. It is also what makes the
+sale reminder work at all on a project the model cannot reach.
+
+The same `smoke.live` invocation exercises it against the real news list and prints one line per
+article, so a prompt change is checked against what the press office actually wrote.
+
 ### Redeploying by hand
 
 ```sh

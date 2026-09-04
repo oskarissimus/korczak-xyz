@@ -146,6 +146,18 @@ describe('parseNewsPage', () => {
     expect(news.filter((e) => e.tags!.includes('ticket-sale'))).toHaveLength(1);
   });
 
+  it('marks every row a newsroom item, which is the reader’s whole queue', () => {
+    /*
+     * Page-wide, unlike `ticket-sale`, and legitimately so: every row here IS an article rather
+     * than an event, which is the only sort of fact a page may stamp on everything it yields. It
+     * is a marker for the collector rather than a subject — no interest asks for it.
+     */
+    expect(news.every((e) => e.tags!.includes('newsroom'))).toBe(true);
+    // And the season page's productions are not articles, or the reader would be asked whether a
+    // Salome is a job advert.
+    expect(events.every((e) => !(e.tags ?? []).includes('newsroom'))).toBe(true);
+  });
+
   it('does not read a date after “od” that is about something else', () => {
     /*
      * The same page carries "Od 12 czerwca 2026 roku nasi Widzowie mogą korzystać z 30% zniżki na

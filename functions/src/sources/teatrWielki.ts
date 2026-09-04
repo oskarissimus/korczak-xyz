@@ -32,6 +32,7 @@
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
 import { parsePolishDate, parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
+import { NEWSROOM_TAG } from '../../../korczak-xyz/src/utils/events/newsroom';
 import {
   TEATR_WIELKI_HOST as HOST,
   TEATR_WIELKI_NEWS,
@@ -201,7 +202,22 @@ export function parseNewsPage(html: string): RawEvent[] {
        * interest has no second filter — so stamping it on the whole page would hand that interest
        * the theatre's job adverts. Same mistake, fourth direction; see the rules file.
        */
-      tags: onSaleAt !== null ? ['theatre', 'teatr-wielki', 'ticket-sale'] : ['theatre', 'teatr-wielki'],
+      /*
+       * `newsroom` is what every row on this page **is** — an article rather than an event —
+       * which is the only sort of tag a page may stamp feed-wide. It is a marker for the
+       * collector rather than a subject: it is the newsroom reader's entire queue, so
+       * pointing that reader at another source's article feed is a line there and nothing here.
+       *
+       * `ticket-sale` is the opposite kind of tag and is added per row, only where the regex
+       * actually read a date out of the prose. It is the whole of the keyword-less "Ticket sales
+       * opening" seed, and a keyword-less interest has no second filter — page-wide it would hand
+       * that interest the theatre's job adverts. The reader may add it to a row this missed;
+       * `tagsWithNewsroomKind` is where that union is made, once.
+       */
+      tags:
+        onSaleAt !== null
+          ? ['theatre', 'teatr-wielki', NEWSROOM_TAG, 'ticket-sale']
+          : ['theatre', 'teatr-wielki', NEWSROOM_TAG],
       ...(onSaleAt !== null ? { onSaleAt } : {}),
       description: teaser,
     });

@@ -31,6 +31,7 @@ import { formatDistances } from '../../utils/events/distance';
 import { cityKey } from '../../utils/events/cities';
 import { loadFeedCity, saveFeedCity } from '../../utils/events/browser/storage';
 import type { EventKind, Reach } from '../../utils/events/types';
+import type { NewsroomKind } from '../../utils/events/newsroom';
 import EventsGate from './EventsGate';
 import {
   fill,
@@ -307,6 +308,24 @@ function kindLabel(kind: EventKind | undefined, t: Translation): string | null {
   return null;
 }
 
+/**
+ * What the **newsroom reader** made of an article — a different question from `kindLabel` above.
+ *
+ * That one says whether a row belongs in an event feed at all. This says what one of the theatre's
+ * own news items actually announces, and it is what the `ticket-sale` seed interest matches on.
+ *
+ * `other` deliberately has no label and draws no chip. It is the model saying it could not tell,
+ * and a chip reading "unclassified" would be a claim about the article where there is none — the
+ * same reason `newsroomTag` gives that kind no tag either.
+ */
+function newsroomLabel(kind: NewsroomKind | undefined, t: Translation): string | null {
+  if (kind === 'ticket-sale') return t.newsroomTicketSale;
+  if (kind === 'programme') return t.newsroomProgramme;
+  if (kind === 'practical') return t.newsroomPractical;
+  if (kind === 'institutional') return t.newsroomInstitutional;
+  return null;
+}
+
 function reachLabel(reach: Reach | undefined, t: Translation): string {
   if (reach === 'local') return t.reachLocal;
   if (reach === 'national') return t.reachNational;
@@ -375,6 +394,7 @@ function EventCard({
   const { event } = item;
   const saleWhen = saleWhenLabel(event, localeOf(lang));
   const saleChip = saleWhen ? fill(t.saleOpens, { when: saleWhen }) : null;
+  const newsroom = newsroomLabel(event.newsroomKind, t);
 
   return (
     <li className="ev-card">
@@ -403,6 +423,12 @@ function EventCard({
           * is about to arrive was counting down to.
           */}
         {saleChip ? <span className="ev-chip ev-chip--presale">{saleChip}</span> : null}
+        {/*
+          * What the reader made of an article. On the card for the same reason the country-and-reach
+          * chip is: the tag it stands for is what an interest matches, so a verdict nobody can see
+          * is a filter nobody can check.
+          */}
+        {newsroom ? <span className="ev-chip ev-chip--newsroom">{newsroom}</span> : null}
         {item.matched.length > 0 ? (
           <span>
             {t.matchedBy} {item.matched.map((i) => i.label).join(', ')}
@@ -452,6 +478,16 @@ function EventCard({
         <p className="ev-reason">
           {item.rejectedFor === 'kind' ? event.kindReason : event.reachReason}
         </p>
+      ) : null}
+
+      {/*
+        * What the reader understood the article to say — always, not only when something was
+        * filtered out, because on these rows it is the only thing on the card in the reader's own
+        * language: the title and the teaser above it are the theatre's Polish. It is also the only
+        * way to tell a correct reading from a confident wrong one before the notification arrives.
+        */}
+      {event.newsroomSummary ? (
+        <p className="ev-reason">{event.newsroomSummary}</p>
       ) : null}
 
       <div className="ev-actions">

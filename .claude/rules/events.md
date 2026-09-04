@@ -520,7 +520,8 @@ Four things about it are load-bearing:
   joined the prompt — so the whole corpus re-labels over the few runs after that deploy, at 400 an
   hour, and until it has, every article in the feed is unclassified and therefore still showing.
 
-The order in `runCollection` is `fetch → upsert → classify → notify`, and it is the point rather
+The order in `runCollection` is `fetch → upsert → read → classify → notify` (the `read` step is the
+newsroom reader, one section down), and it is the point rather
 than an implementation detail: `notifyAccount` decides pushes with the same `matchReason`, an
 unclassified event passes the places rule, so notifying first would push about exactly the national
 conferences this exists to stop pushing about. It also made `upsertEvents` return the **merged**
@@ -533,6 +534,87 @@ needed to work at all.
 that reads "nothing after previously returning something" as a failure, which for a classifier is
 the normal steady state — once the corpus is labelled there is nothing to do, and a green row has to
 be able to say so.
+
+#### A second model pass reads the newsroom
+
+`functions/src/readNewsroom.ts`. The classifier above answers three questions about every row in
+the corpus; this answers a fourth about the dozen rows a source tagged `newsroom`, and it is
+deliberately **not** a field in that same prompt.
+
+The reason it exists at all is that `parseSaleAnnouncement` — the regex that reads "Sprzedaż
+biletów od 1 września, g. 11.00" out of a teaser — will go on working right up until the press
+office writes "sprzedaż rusza w poniedziałek", or "bilety dostępne od 1.09", or the same thing in
+English. At that point the scrape is still green, the news list still yields ten rows, and the app
+silently stops warning about the one thing it was built to warn about. A model reads the sentence
+however it is phrased.
+
+Three things come back per article, and each has a job:
+
+- **`saleOpensAt`** → `EventRecord.onSaleAt`, which `presale` counts down to. The point of the
+  whole pass.
+- **`newsroomKind`** → one of five (`newsroom.ts`), which becomes a **tag**. That is the whole of
+  "trigger on it": an interest asking for `ticket-sale` is an ordinary interest, and no new
+  matching mechanism was needed.
+
+  **Not to be confused with `EventRecord.kind`** one section above, which the classifier sets and
+  which is a genuinely different question. `kind` asks *does this row belong in an event feed at
+  all* — listing, announcement, or coverage — over the whole corpus. `newsroomKind` asks *what does
+  this news item say* — a sale, the programme, visiting, the institution — over the theatre's own
+  news. A ticket-sale item is `announcement` on the first axis and `ticket-sale` on the second;
+  both are true and neither implies the other. They compose usefully: the theatre's job adverts and
+  obituaries are `coverage`, so the default `includeCoverage: false` keeps them out of the feed
+  before the newsroom tag ever matters, and what is left for the `Ticket sales opening` seed to
+  reach is the handful of items that actually announce something.
+- **`summary`** → one English line, printed on the card. The counterpart of `reachReason`: the
+  verdict beside it is a single word, and without the sentence there is no telling a correct
+  reading from a confident wrong one — on rows whose title and teaser are Polish, it is also the
+  only thing on the card the reader can check the verdict against.
+
+Kept apart from `classify.ts` on three axes, and it is worth keeping them straight before anybody
+merges the two prompts to save a call:
+
+- **Scope** — 1,150 rows against a dozen. One prompt asks every concert in Poland whether it is a
+  job advert. (`kind` is in the big prompt precisely because it *is* a corpus-wide question; this
+  one is not.)
+- **Version** — `CLASSIFIER_VERSION` re-labels the whole corpus. `READER_VERSION` is its own lever
+  over its own hash, so tuning the sale-date wording costs ten calls rather than eleven hundred.
+- **Blast radius** — a wrong `reach` costs a card in the feed. A wrong sale date is a notification
+  on the wrong morning.
+
+**The article is untrusted text handed to a model whose answer schedules a notification**, which is
+a shape nothing else in this app has. So: the kind is a closed enum, and a `saleOpensAt` is stored
+**only when it parses to a real calendar day, lands in the future, and lands inside two years**. A
+past date is refused rather than kept-and-ignored, because a past `onSaleAt` counts as tickets
+being on sale and would mint an "On sale now" push about a shut box office.
+
+Four mechanics are load-bearing:
+
+- **`newsroomHashOf` deliberately does not read tags**, where `classifyHashOf` does and must.
+  The reader *writes* a tag, so a tag-reading hash would differ from the one just stored the
+  instant a verdict landed, and every article would be re-read on every run for ever.
+- **The reader runs before the classifier**, not after. It writes a tag and `classifyHashOf` reads
+  tags, so the other order re-labels every article it touched, once, for nothing. Both passes see
+  the finished tag list in one run. The order is now `fetch → upsert → read → classify → notify`.
+- **`mergeRecord` carries `onSaleAt` forward**, which it did not before and which would have lost
+  the entire feature. `raw.onSaleAt` is undefined for an article the regex could not phrase-match,
+  `stripUndefined` drops it, and the date the reader learnt would be deleted on the next run — six
+  hours later, silently, with the notice never fired. Same list, same argument, as `firstSeenAt`
+  and the classifier's fields.
+- **`tagsWithNewsroomKind` derives the kind's tag at merge time** from the stored kind, rather than
+  the reader appending to `tags` and hoping. `batch.set` rewrites `tags` wholesale from what the
+  source said, and the source has never heard of `programme`; deriving the union in one place is
+  what stops the reader racing the upsert and what makes a re-read idempotent.
+
+**The regex is kept and wins where it fires.** It read the theatre's literal sentence with a tested
+regex, and a model is not asked to second-guess a stated fact — the same rule as `country`. It is
+also what keeps the sale reminder working on a project the model cannot reach, which is a
+configuration state this app treats as ordinary.
+
+`mergeRecord`'s `hasTickets` had to change with this, and the old reading was wrong in a way that
+only this feature could expose: it was `onSaleAt !== undefined`, which was right only while every
+`onSaleAt` came from Ticketmaster and was months past. **On sale means purchasable now**, so a
+future date does not count — otherwise learning that a season opens in three weeks would fire
+`onsale` immediately and consume the latch `presale` needed.
 
 #### The filter has to be falsifiable from the outside
 

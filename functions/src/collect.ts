@@ -13,6 +13,7 @@ import { SOURCES } from './sources';
 import type { EventSource, SourceContext } from './sources/types';
 import { toRecord, upsertEvents } from './upsert';
 import { classifyEvents, type ClassifyOutcome } from './classify';
+import { readNewsroom, type ReadOutcome } from './readNewsroom';
 import { listAccounts, notifyAccount } from './notify';
 import { sendToAll } from './push';
 
@@ -26,6 +27,7 @@ export interface RunSummary {
   written: number;
   created: number;
   newlyOnSale: number;
+  newsroom: ReadOutcome;
   classified: ClassifyOutcome;
   accounts: number;
   delivered: number;
@@ -42,6 +44,16 @@ export interface RunSummary {
  * is nothing to do, and a green row has to be able to say so.
  */
 const CLASSIFIER_HEALTH_ID = 'classifier';
+
+/**
+ * The newsroom reader's row, beside the classifier's and for the same reasons.
+ *
+ * It is a second model pass over a different set of rows, and it fails the same quiet way: a news
+ * template that changes wording leaves the scrape green and the reader with nothing to read, which
+ * from the outside is indistinguishable from a quiet fortnight at the theatre. Its own row is what
+ * makes the two tellable apart.
+ */
+const READER_HEALTH_ID = 'newsroom';
 
 /**
  * What one run needs, which is a source's context plus what the classifier authenticates with.
@@ -144,6 +156,32 @@ export async function runCollection(
   const upserted = await upsertEvents(db, unique, now);
 
   /*
+   * Read the articles before classifying them, and before notifying — the order is load-bearing
+   * twice over.
+   *
+   * Before **notify**, because `presale` is decided from `onSaleAt` and this is what supplies one
+   * the scrape's regex could not phrase-match. Notify first and the warning is a run late, which
+   * for a fortnight's lead is most of the warning.
+   *
+   * Before **classify**, because the reader writes a tag and `classifyHashOf` reads tags. Run the
+   * other way round, every article the reader touched would look stale to the geography classifier
+   * on the next run and be re-labelled once for nothing. This way both passes see the finished
+   * tag list, in one run.
+   */
+  const { records: readRecords, outcome: newsroom } = await readNewsroom(
+    upserted.records,
+    {
+      now,
+      project: ctx.project,
+      location: ctx.location,
+      write: async (id, update) => {
+        await db.collection('events').doc(id).update(update);
+      },
+    },
+  );
+  await recordReaderHealth(db, now, newsroom);
+
+  /*
    * Classify before notifying, and this order is the point rather than an implementation detail.
    *
    * `notifyAccount` decides pushes with the same `matchReason` the feed filters with, and that
@@ -155,7 +193,7 @@ export async function runCollection(
    * carries no `classifyHash`, so every event would look unclassified and the corpus would be
    * re-labelled every six hours.
    */
-  const { records: labelled, outcome: classified } = await classifyEvents(upserted.records, {
+  const { records: labelled, outcome: classified } = await classifyEvents(readRecords, {
     now,
     project: ctx.project,
     location: ctx.location,
@@ -184,6 +222,7 @@ export async function runCollection(
     written: upserted.written,
     created: upserted.created,
     newlyOnSale: upserted.newlyOnSale,
+    newsroom,
     classified,
     accounts: accounts.length,
     delivered,
@@ -219,6 +258,45 @@ async function recordClassifierHealth(
       ? {
           lastError: (
             outcome.error ?? `${outcome.missing} events came back unlabelled`
+          ).slice(0, 300),
+        }
+      : {}),
+  };
+  await ref.set(health);
+}
+
+/**
+ * The newsroom reader's health row.
+ *
+ * Same shape as the classifier's and same argument for not going through `recordHealth`: nothing
+ * left to read is the steady state, not a fault. A failure is the model erroring, or every article
+ * asked about coming back unusable.
+ *
+ * `lastCount` is the number of articles **read**, not the number of sale dates found. Zero sale
+ * dates is the normal answer for eleven months of the year, and a health row that went red on it
+ * would cry wolf until nobody looked at the one run that mattered.
+ */
+async function recordReaderHealth(
+  db: Firestore,
+  now: number,
+  outcome: ReadOutcome,
+): Promise<void> {
+  const ref = db.collection('eventSources').doc(READER_HEALTH_ID);
+  const snap = await ref.get();
+  const previous = snap.exists ? (snap.data() as SourceHealth) : null;
+
+  const failed = outcome.error !== undefined || (outcome.read === 0 && outcome.missing > 0);
+  const health: SourceHealth = {
+    id: READER_HEALTH_ID,
+    label: 'Newsroom reader',
+    lastRunAt: now,
+    lastOkAt: failed ? (previous?.lastOkAt ?? null) : now,
+    lastCount: outcome.read,
+    consecutiveFailures: failed ? (previous?.consecutiveFailures ?? 0) + 1 : 0,
+    ...(failed
+      ? {
+          lastError: (
+            outcome.error ?? `${outcome.missing} newsroom items came back unread`
           ).slice(0, 300),
         }
       : {}),
