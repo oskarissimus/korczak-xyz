@@ -19,6 +19,7 @@ export interface InterestDraft {
   /** Written however the editor's field was typed; normalised to ISO-2 by `newInterest`. */
   countries?: string[];
   internationalAnywhere?: boolean;
+  includeCoverage?: boolean;
   fromDay?: string;
   toDay?: string;
   leadDays: number;
@@ -198,6 +199,9 @@ export function newInterest(
      */
     countries: optionalCountries(draft.countries),
     internationalAnywhere: draft.internationalAnywhere || undefined,
+    // Off is the default and off is the common case, so it is stored as absent rather than as
+    // `false` — the same shape as `muted`, and one less field on every row that never wanted it.
+    includeCoverage: draft.includeCoverage || undefined,
     fromDay: draft.fromDay || undefined,
     toDay: draft.toDay || undefined,
     leadDays: clampLead(draft.leadDays),

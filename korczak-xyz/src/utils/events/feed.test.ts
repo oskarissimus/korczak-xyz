@@ -154,13 +154,13 @@ describe('buildFeed and the events dismissed by hand', () => {
     expect(buildFeed([scraped, sold], [ALL], NOW, { ignored: ignoring(fp) })).toEqual([]);
   });
 
-  it('keeps it out of the rejected-place view too', () => {
+  it('keeps it out of the rejected view too', () => {
     // Otherwise dismissing something would move it from one visible list to another.
     const abroad = ev({ title: 'PyCon NL', country: 'NL', reach: 'national' });
     const dev: Interest = { ...ALL, keywords: ['pycon'], countries: ['PL'] };
-    expect(buildFeed([abroad], [dev], NOW, { mode: 'rejected-place' })).not.toEqual([]);
+    expect(buildFeed([abroad], [dev], NOW, { mode: 'rejected' })).not.toEqual([]);
     expect(
-      buildFeed([abroad], [dev], NOW, { mode: 'rejected-place', ignored: ignoring(abroad.fingerprint) }),
+      buildFeed([abroad], [dev], NOW, { mode: 'rejected', ignored: ignoring(abroad.fingerprint) }),
     ).toEqual([]);
   });
 
@@ -258,7 +258,7 @@ describe('whenLabel', () => {
   });
 });
 
-describe('buildFeed in rejected-place mode', () => {
+describe('buildFeed in rejected mode', () => {
   // The screenshot that started this, plus the one that has to survive it.
   const pyconNL = ev({ title: 'PyCon NL 2026', country: 'NL', reach: 'national' });
   const pyconCM = ev({ title: 'PyCon Cameroon 2026', country: 'CM', reach: 'national' });
@@ -272,14 +272,14 @@ describe('buildFeed in rejected-place mode', () => {
   };
 
   const corpus = [pyconNL, pyconCM, europython, klezmer];
-  const titles = (mode: 'matched' | 'rejected-place' | 'all') =>
+  const titles = (mode: 'matched' | 'rejected' | 'all') =>
     buildFeed(corpus, [dev], NOW, { mode })
       .flatMap((s) => s.items)
       .map((i) => i.event.title)
       .sort();
 
   it('lists exactly what the places rule removed', () => {
-    expect(titles('rejected-place')).toEqual(['PyCon Cameroon 2026', 'PyCon NL 2026']);
+    expect(titles('rejected')).toEqual(['PyCon Cameroon 2026', 'PyCon NL 2026']);
   });
 
   it('is the complement of what matched, over the events any interest reaches', () => {
@@ -295,23 +295,56 @@ describe('buildFeed in rejected-place mode', () => {
    * one question it is meant to answer becomes unreadable.
    */
   it('never lists an event that failed on something before the places rule', () => {
-    expect(titles('rejected-place')).not.toContain('Koncert klezmerski');
+    expect(titles('rejected')).not.toContain('Koncert klezmerski');
   });
 
   it('does not list an event another interest already lets through', () => {
     const everything: Interest = { ...ALL, id: 'all' };
-    const shown = buildFeed(corpus, [dev, everything], NOW, { mode: 'rejected-place' });
+    const shown = buildFeed(corpus, [dev, everything], NOW, { mode: 'rejected' });
     expect(shown).toEqual([]);
   });
 
   it('carries the interests that did the rejecting, so the card can name them', () => {
-    const items = buildFeed(corpus, [dev], NOW, { mode: 'rejected-place' }).flatMap((s) => s.items);
+    const items = buildFeed(corpus, [dev], NOW, { mode: 'rejected' }).flatMap((s) => s.items);
     expect(items.every((i) => i.rejectedBy?.map((r) => r.id).includes('dev'))).toBe(true);
   });
 
   it('is empty while no interest constrains where, so nothing vanishes unexplained', () => {
     const anywhere: Interest = { ...dev, countries: undefined, internationalAnywhere: undefined };
-    expect(buildFeed(corpus, [anywhere], NOW, { mode: 'rejected-place' })).toEqual([]);
+    expect(buildFeed(corpus, [anywhere], NOW, { mode: 'rejected' })).toEqual([]);
+  });
+
+  /*
+   * The other half of the view. An interest with no geography at all still has one filter running
+   * against it, and this is the only list that says what it took.
+   */
+  it('lists what the kind rule removed, and says which rule it was', () => {
+    const sponsor = ev({
+      title: 'Marki DIP Hot i DIP Rilif Partnerem 48. Maratonu Warszawskiego!',
+      tags: ['running'],
+      kind: 'coverage',
+    });
+    const race = ev({ title: '48. Maraton Warszawski', tags: ['running'], kind: 'listing' });
+    const running: Interest = { ...ALL, id: 'run', label: 'Running', tags: ['running'] };
+
+    const items = buildFeed([sponsor, race], [running], NOW, { mode: 'rejected' }).flatMap(
+      (s) => s.items,
+    );
+    expect(items.map((i) => i.event.title)).toEqual([sponsor.title]);
+    expect(items[0].rejectedFor).toBe('kind');
+    expect(items[0].rejectedBy?.map((i) => i.id)).toEqual(['run']);
+
+    // And the race itself is still in the feed, which is the point of removing the article.
+    expect(
+      buildFeed([sponsor, race], [running], NOW, { mode: 'matched' })
+        .flatMap((s) => s.items)
+        .map((i) => i.event.title),
+    ).toEqual([race.title]);
+  });
+
+  it('marks a geography rejection as such, so the card prints the right sentence', () => {
+    const items = buildFeed(corpus, [dev], NOW, { mode: 'rejected' }).flatMap((s) => s.items);
+    expect(items.every((i) => i.rejectedFor === 'places')).toBe(true);
   });
 });
 
@@ -338,14 +371,25 @@ describe('classificationCoverage', () => {
    * rule, so it is never in that list, and a classifier that has stopped looks exactly like a
    * filter with nothing to remove.
    */
-  it('counts what has a reach, not what has a country', () => {
+  it('counts what has been through the classifier, not what has a country', () => {
     expect(
       classificationCoverage([
-        ev({ title: 'a', country: 'PL', reach: 'local' }),
+        ev({ title: 'a', country: 'PL', reach: 'local', classifiedAt: 1 }),
         ev({ title: 'b', country: 'PL' }),
         ev({ title: 'c' }),
       ]),
     ).toEqual({ classified: 1, total: 3 });
+  });
+
+  /*
+   * A verdict that answered two of the three questions is still a verdict, and the event is not
+   * going back in the queue. Counting one field would report a working classifier as half stopped
+   * every time the model declined to guess a country.
+   */
+  it('counts a verdict that came back without a reach', () => {
+    expect(
+      classificationCoverage([ev({ title: 'a', kind: 'coverage', classifiedAt: 1 })]),
+    ).toEqual({ classified: 1, total: 1 });
   });
 });
 

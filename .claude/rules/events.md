@@ -1,6 +1,6 @@
 ---
 name: events
-description: Event Watch at /apps/events/ - the scraped corpus, the one matcher compiled into both browser and Cloud Function, web push, the geography classifier, and the Terraform project layer.
+description: Event Watch at /apps/events/ - the scraped corpus, the one matcher compiled into both browser and Cloud Function, web push, the classifier that says where an event is and whether it is one, and the Terraform project layer.
 paths:
   - "**/utils/events/**"
   - "**/components/Events/**"
@@ -83,11 +83,16 @@ bear**, and let the raw genre slug carry the rest, which is what it is there for
 The `running` tag is the one place that rule is knowingly bent, and it is written down here so the
 next person does not "fix" it. `RUNNING_LISTINGS` is a running-only listing, so the tag is exactly
 what those pages are; the **Maraton Warszawski feed carries it too**, and that feed is a magazine —
-so the keyword-less `Running in Warszawa` seed picks up its sponsor posts along with the route
+so the keyword-less `Running in Warszawa` seed reaches its sponsor posts along with the route
 announcements. Taken deliberately, for two reasons: a WordPress feed holds ten items, so this is a
 card or two rather than the sixty-seven that made the Klezmer case a disaster; and an announcement
 with no date yet — entries opening, next year's date fixed — is the earliest anything about a race
 is knowable, which is what the app is for.
+
+The card or two turned out to be four in a row — three sponsor posts and a set of pacer times, above
+the race itself — and the answer was **not** to narrow the tag, because that would have cost the
+announcements too. It is `EventRecord.kind`, below: the same call that says where an event is now
+also says whether the row is one, and the tag goes on meaning what those pages are.
 
 ### What may wake me up
 
@@ -389,7 +394,7 @@ two of the three columns would be empty and one tab behaving unlike the other th
 the consistency is worth. No PWA work was needed: `APP_TIERS['events']` already claims the whole
 subtree, so the tab precached itself.
 
-### Where an event is, and who it is for
+### Where an event is, who it is for, and whether it is one
 
 The feed's first real complaint was four PyCons — Cameroon, Africa, Greece, NL — none of them
 attendable, all of them matched by `python`/`pycon`. The app had **no axis for where** at all beyond
@@ -434,6 +439,45 @@ empty feed is the one outcome here indistinguishable from everything working. Pe
 record can know where it is and not yet who it is for: every scraped Polish row is `PL` from the
 moment it lands, with `reach` arriving later.
 
+#### And whether it is an event at all
+
+The second complaint had the same shape and a different axis. The running interest surfaced three
+sponsor posts and a set of pacer times about the 48th Warsaw Marathon — *"Marki DIP Hot i DIP Rilif
+Partnerem 48. Maratonu Warszawskiego!"* — four cards, above the one row that is the race. They are
+not near misses: every one of them is genuinely about running, genuinely in Warszawa, and genuinely
+matched. They are simply **articles rather than events**, which is the trade the RSS adapter names
+in its own header and had until now paid in full.
+
+So a third field, `EventRecord.kind`, from the same call:
+
+- `listing` — the thing itself. A night, a race, a conference; something with a door.
+- `announcement` — an article whose news *is* an event: entries opening, a date fixed, next
+  season's calendar published.
+- `coverage` — everything else written about events. Sponsor posts, results, race reports,
+  interviews, gear, recaps.
+
+**Three values and not a boolean**, and that is the whole care in this feature. The RSS adapter
+exists because most of what a festival or an organiser publishes never reaches a ticketing API, and
+"the 2027 tournament calendar is out" is frequently the only notice an event gets — it carries no
+date of its own, groups under *announced, no dates yet*, and firing `announced` for it is right.
+Collapsing that into "article" alongside the sponsor posts would drop exactly the items the adapter
+was written for, and it would do it invisibly.
+
+For the same reason **no adapter supplies this**, unlike `country`. The one that could — the feed,
+whose items are articles by construction — is precisely the source whose items are sometimes the
+event. A blanket `coverage` on `SourcePage` would be a rule that is right four times in five and
+silently wrong about the fifth, which is what makes this a judgement rather than a field.
+
+`Interest.includeCoverage` is the opt-in, and it is off by default: this is the one filter here
+that runs without being asked for. Nobody sets up an event watcher wanting press releases, where
+"conferences in Poland" is a preference someone has to state. The interest that *does* want them —
+"everything the Maraton Warszawski blog says" — is the unusual one, and the checkbox is how it is
+said. `announcement` is never touched by it either way.
+
+The rule sits **before** `places` in `matchReason`, because a reason is the first thing wrong and
+"this is not an event" is the stronger statement. A sponsor post about a race in Cameroon fails
+both; filed under geography it would be noise in the list that exists to check the country filter.
+
 #### The classifier runs in exactly one place
 
 `functions/src/classify.ts`, in the Cloud Function. The browser never calls a model and neither does
@@ -463,14 +507,18 @@ Four things about it are load-bearing:
   of confident wrong countries with nothing anywhere to say so.
 - **`classifyHash` is a digest of only the fields the prompt shows.** Over the whole record it would
   include `updatedAt`, which moves every run — so nothing would ever match its stored hash and the
-  entire corpus would be re-labelled every six hours. It is written even for a half-verdict, or an
-  event the model has no country for goes back in the queue for the rest of its life.
+  entire corpus would be re-labelled every six hours. It is written even for a partial verdict, or an
+  event the model has no country for goes back in the queue for the rest of its life. `sourceName`
+  is in both the prompt and the hash: it is most of the answer to whether a row is an event or an
+  article about one, since a theatre publishes nights and an organiser's blog publishes prose.
 - **`mergeRecord` carries the classification fields forward.** `batch.set` replaces the whole
   document and `stripUndefined` drops absent fields, so a field no source has heard of is *deleted*
   on the next upsert unless it is named there. Same reason `firstSeenAt` is named there.
 - **`CLASSIFIER_VERSION` is the only lever for re-labelling**, bumped in the code when the prompt
   changes. There is deliberately no button: "the prompt changed" is a fact about a build, and a
-  re-run nobody can date afterwards is worse than no re-run.
+  re-run nobody can date afterwards is worse than no re-run. It is at **2**, bumped when `kind`
+  joined the prompt — so the whole corpus re-labels over the few runs after that deploy, at 400 an
+  hour, and until it has, every article in the feed is unclassified and therefore still showing.
 
 The order in `runCollection` is `fetch → upsert → classify → notify`, and it is the point rather
 than an implementation detail: `notifyAccount` decides pushes with the same `matchReason`, an
@@ -492,7 +540,13 @@ A geography filter is otherwise unprovable: a thing that stopped appearing and a
 never announced look identical, which is the whole reason this half exists. So the Feed's one
 `Show everything` link became three states — `Matched` / `Filtered out` / `Everything` — where the
 middle one lists events that satisfied everything an interest asked about their *content* and were
-turned away only on `places`.
+turned away only on `kind` or `places` — the two rules a model decides, and the two that therefore
+need a list.
+
+Each row records **which** of the two did it (`FeedItem.rejectedFor`), because the classifier writes
+a sentence about each and they are not interchangeable: printing the geography reasoning under a row
+removed for being a press release would look like the wrong filter had fired. The tallies split on
+the same field for the same reason.
 
 **It is built from the same call the real filter makes.** `matchesInterest` is now
 `matchReason(...) === null`, `matchReason` returning the first failing rule, and the rejected view
@@ -507,15 +561,26 @@ Three things are drawn, and they answer three different questions:
 - **The country-and-reach chip is on every card in every view**, not only the rejected ones. Without
   it there is no telling whether something stayed because the filter judged it right or because it
   has not been judged at all — and `?` / *not labelled yet* is its own state for exactly that.
-- **The tally** over the rejected list says what shape the removal has. Four countries once each
-  reads very differently from forty rows filed under one, which is a classifier getting a country
-  wrong at scale.
+- **The tally** over the place-rejected rows says what shape the removal has. Four countries once
+  each reads very differently from forty rows filed under one, which is a classifier getting a
+  country wrong at scale. The kind-rejected rows get a plain count beside it rather than a
+  breakdown: only one of the three kinds is ever removed, so there is nothing to break down — but
+  it is a separate line, because folded into the country tally a press release would read as a
+  country getting it wrong.
 - **The coverage line** (`{classified} of {total} labelled`) is the half the rejected list
-  structurally *cannot* show: an unclassified event passes the places rule, so it is never in that
-  list, and a classifier that has quietly stopped looks exactly like a filter with nothing to remove.
+  structurally *cannot* show: an unclassified event passes both rules, so it is never in that list,
+  and a classifier that has quietly stopped looks exactly like a filter with nothing to remove. It
+  counts `classifiedAt`, not `reach` — the call answers three questions and may come back with two
+  of them, and counting one field would report a working classifier as half stopped every time the
+  model declined to guess a country.
 
-The model's own sentence (`reachReason`) is printed under each rejected card, so a verdict can be
-argued with rather than only obeyed. A wrong *rejection* is still corrected with a second interest
+The model's own sentence (`reachReason`, or `kindReason` for a row the kind rule took) is printed
+under each rejected card, so a verdict can be argued with rather than only obeyed. The kind also
+gets a **chip on the card in every view**, but only when it is not `listing`: an article an interest
+kept because it asked for articles and one nobody has judged yet are different rows, and this is
+what tells them apart. There is deliberately no chip saying "yes, this is an event" — that is a
+label on every card in the corpus that nobody would read twice, and the unjudged case is already on
+screen as the place chip's `?`. A wrong *rejection* is still corrected with a second interest
 naming the event — there is no per-event way to force something back in, and the geography verdict
 itself is not editable. A wrong *admission* now has two answers: the `excludeKeywords` that already
 existed, and the Ignore button below.

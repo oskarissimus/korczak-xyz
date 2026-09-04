@@ -105,6 +105,8 @@ describe('mergeRecord', () => {
       country: 'NL',
       reach: 'national',
       reachReason: 'Dutch community conference',
+      kind: 'listing',
+      kindReason: 'A conference with dates and a venue',
       classifiedAt: 1000,
       classifyHash: 'abc123',
     });
@@ -112,6 +114,8 @@ describe('mergeRecord', () => {
     const merged = mergeRecord(incoming, before, LATER);
     expect(merged.record.reach).toBe('national');
     expect(merged.record.reachReason).toBe('Dutch community conference');
+    expect(merged.record.kind).toBe('listing');
+    expect(merged.record.kindReason).toBe('A conference with dates and a venue');
     expect(merged.record.classifyHash).toBe('abc123');
     expect(merged.record.classifiedAt).toBe(1000);
   });

@@ -41,6 +41,7 @@ function ev(partial: Partial<EventRecord> & { title: string; description?: strin
     venue: partial.venue,
     country: partial.country,
     reach: partial.reach,
+    kind: partial.kind,
     tags: partial.tags ?? [],
     fingerprint: fingerprintOf({ title: partial.title, day, city: partial.city }),
     firstSeenAt: partial.firstSeenAt ?? NOW,
@@ -259,6 +260,72 @@ describe('the places rule', () => {
   });
 });
 
+/*
+ * The screenshot this rule came from: three sponsor posts and a pacer-times piece about the 48th
+ * Warsaw Marathon, each matched by the running interest, above the one row that is the race.
+ */
+describe('the kind rule', () => {
+  const running = interest({ id: 'run', keywords: [], tags: ['running'] });
+  const sponsor = ev({
+    title: 'Twoje mięśnie, nasze wsparcie. Marki DIP Hot i DIP Rilif Partnerem 48. Maratonu Warszawskiego!',
+    tags: ['running'],
+    kind: 'coverage',
+    country: 'PL',
+  });
+  const race = ev({ title: '48. Maraton Warszawski', tags: ['running'], kind: 'listing' });
+  const entriesOpen = ev({
+    title: 'Zapisy na 48. Maraton Warszawski otwarte',
+    tags: ['running'],
+    kind: 'announcement',
+  });
+
+  it('turns away an article written about an event', () => {
+    expect(matchReason(sponsor, running)).toBe('kind');
+    expect(matchesInterest(race, running)).toBe(true);
+  });
+
+  /*
+   * The case the RSS adapter was built to carry, and the reason this is not a boolean: an article
+   * announcing an event is often the only notice that event ever gets, and it is not coverage.
+   */
+  it('keeps an article that announces one', () => {
+    expect(matchesInterest(entriesOpen, running)).toBe(true);
+  });
+
+  it('keeps coverage for an interest that asked for it', () => {
+    const blog = interest({ id: 'blog', keywords: [], tags: ['running'], includeCoverage: true });
+    expect(matchesInterest(sponsor, blog)).toBe(true);
+  });
+
+  /*
+   * Which way this fails when the classifier is down — and it matters more here than on the places
+   * axis, because no source supplies a kind at all: between an event being scraped and the next
+   * classifier run, a closed rule would hide every genuinely new listing in the corpus.
+   */
+  it('lets an unclassified row through', () => {
+    expect(matchesInterest(ev({ title: 'Bieg Ziemi Puckiej', tags: ['running'] }), running)).toBe(
+      true,
+    );
+  });
+
+  /*
+   * Ahead of `places`, because "this is not an event" is the stronger thing to say — and because
+   * the rejected view splits on the reason, a sponsor post filed under geography would be noise in
+   * the list that exists to check the country filter.
+   */
+  it('is named ahead of the places rule when a row fails both', () => {
+    const abroad = interest({ id: 'run-pl', keywords: [], tags: ['running'], countries: ['PL'] });
+    const foreignSponsor = ev({
+      title: 'Brand X partnerem maratonu',
+      tags: ['running'],
+      kind: 'coverage',
+      country: 'DE',
+      reach: 'national',
+    });
+    expect(matchReason(foreignSponsor, abroad)).toBe('kind');
+  });
+});
+
 describe('matchReason', () => {
   it('is null exactly when matchesInterest is true', () => {
     const i = interest({ id: 'i', keywords: ['pycon'], countries: ['PL'] });
@@ -294,6 +361,19 @@ describe('matchReason', () => {
         i,
       ),
     ).toBe('places');
+  });
+
+  it('takes a list of reasons, which is what the two-filter view is built on', () => {
+    const mine = interest({ id: 'i', keywords: ['pycon'], countries: ['PL'] });
+    const sponsor = ev({ title: 'PyCon PL sponsor announcement', country: 'PL', kind: 'coverage' });
+    const abroad = ev({ title: 'PyCon NL', country: 'NL', reach: 'national', kind: 'listing' });
+    for (const event of [sponsor, abroad]) {
+      expect(
+        interestsRejectingFor(event, [mine], ['kind', 'places'], { forPush: false }).map(
+          (i) => i.id,
+        ),
+      ).toEqual(['i']);
+    }
   });
 
   it('names each of the other rules', () => {

@@ -1,7 +1,7 @@
 /*
- * Where an event is, and who it is for.
+ * Where an event is, who it is for, and whether it is an event at all.
  *
- * The one question in this app nothing in a listing answers. A scrape gives a title, a date and a
+ * Three questions nothing in a listing answers. A scrape gives a title, a date and a
  * free-text location; none of that distinguishes PyCon NL — a Dutch conference the Dutch attend —
  * from EuroPython, which people fly to. They can be in the same country in the same year. So this
  * is a judgement, and it is the only judgement here a language model makes.
@@ -29,8 +29,8 @@
 
 import { createHash } from 'node:crypto';
 import { GoogleGenAI, Type, type Schema } from '@google/genai';
-import type { EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
-import { REACHES } from '../../korczak-xyz/src/utils/events/types';
+import type { EventKind, EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
+import { KINDS, REACHES } from '../../korczak-xyz/src/utils/events/types';
 import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
 
 /**
@@ -59,7 +59,7 @@ const LOCATION = 'global';
  * afterwards which verdicts came from which prompt. It feeds `classifyHashOf`, so bumping it
  * invalidates every stored hash at once and the backlog drains over the next few runs.
  */
-const CLASSIFIER_VERSION = 1;
+const CLASSIFIER_VERSION = 2;
 
 /** Enough context to judge, few enough that a short reply loses little. */
 const BATCH_SIZE = 25;
@@ -80,6 +80,8 @@ export interface Verdict {
   country?: string;
   reach?: Reach;
   reason?: string;
+  kind?: EventKind;
+  kindReason?: string;
 }
 
 export interface ClassifyOutcome {
@@ -111,8 +113,10 @@ const RESPONSE_SCHEMA: Schema = {
           country: { type: Type.STRING },
           reach: { type: Type.STRING, enum: [...REACHES] },
           reason: { type: Type.STRING },
+          kind: { type: Type.STRING, enum: [...KINDS] },
+          kindReason: { type: Type.STRING },
         },
-        required: ['id', 'country', 'reach', 'reason'],
+        required: ['id', 'country', 'reach', 'reason', 'kind', 'kindReason'],
       },
     },
   },
@@ -131,6 +135,7 @@ export function classifyHashOf(event: {
   subtitle?: string;
   venue?: string;
   city?: string;
+  sourceName?: string;
   tags?: string[];
 }): string {
   const parts = [
@@ -139,6 +144,10 @@ export function classifyHashOf(event: {
     event.subtitle ?? '',
     event.venue ?? '',
     event.city ?? '',
+    // Shown to the model because it is most of the answer to the third question: `Teatr Wielki`
+    // publishes nights and a running organiser's blog publishes prose about them, and a title
+    // alone often cannot tell a sponsor post from the race it is about.
+    event.sourceName ?? '',
     (event.tags ?? []).join(','),
   ];
   return createHash('sha1').update(parts.join(' ')).digest('hex').slice(0, 16);
@@ -163,14 +172,17 @@ export function buildPrompt(events: EventRecord[]): string {
     subtitle: event.subtitle,
     venue: event.venue,
     city: event.city,
+    source: event.sourceName,
     tags: event.tags.slice(0, 6),
     date: event.day ?? undefined,
   }));
 
   return [
-    'You are labelling public events for a personal event-watching app.',
+    'You are labelling rows in a personal event-watching app. Each row was scraped from a',
+    'ticketing site, a venue programme, a race listing, or the RSS feed of a publication —',
+    'so a row is not necessarily an event. `source` is the publication or site it came from.',
     '',
-    'For each event, return two facts:',
+    'For each row, return three facts:',
     '',
     '1. `country` — the ISO 3166-1 alpha-2 code of the country it is held in, uppercase.',
     `   Use "${ONLINE}" if it is an online-only event. Use "" if you genuinely cannot tell.`,
@@ -192,7 +204,24 @@ export function buildPrompt(events: EventRecord[]): string {
     '',
     '3. `reason` — under 100 characters, in English, saying why you chose that reach.',
     '',
-    'Reply with one object per event, echoing the `id` exactly as given.',
+    '4. `kind` — whether this row is an event, or writing about one:',
+    '   - "listing": the event itself. A concert, a race, a conference, an exhibition —',
+    '     something with a date or a season and a door to walk through.',
+    '   - "announcement": an article whose news IS an event or its practicalities.',
+    '     Entries opening, tickets going on sale, a date or route fixed, next season\'s',
+    '     calendar published, a new edition confirmed.',
+    '   - "coverage": anything else written about events. Sponsor and partner posts,',
+    '     results, pacer times, race reports, interviews, training and gear articles,',
+    '     recaps, photo galleries, thank-you notes.',
+    '',
+    'A title that reads like a press release about a race ("Brand X is a partner of the',
+    '48th Warsaw Marathon", "Pacer times for the 10k") is "coverage", not "listing" — the',
+    'race it is about is listed separately. When a row is plainly a ticketed listing from a',
+    'venue or a ticketing site, it is "listing" whatever its title says.',
+    '',
+    '5. `kindReason` — under 100 characters, in English, saying why you chose that kind.',
+    '',
+    'Reply with one object per row, echoing the `id` exactly as given.',
     '',
     JSON.stringify(rows),
   ].join('\n');
@@ -227,7 +256,7 @@ export function parseClassification(text: string | undefined, asked: string[]): 
   const wanted = new Set(asked);
   for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
-    const { id, country, reach, reason } = row as Record<string, unknown>;
+    const { id, country, reach, reason, kind, kindReason } = row as Record<string, unknown>;
     if (typeof id !== 'string' || !wanted.has(id)) continue;
 
     const verdict: Verdict = {};
@@ -241,9 +270,16 @@ export function parseClassification(text: string | undefined, asked: string[]): 
       verdict.reach = reach as Reach;
     }
     if (typeof reason === 'string' && reason.trim()) verdict.reason = reason.trim().slice(0, 200);
+    if (typeof kind === 'string' && (KINDS as readonly string[]).includes(kind)) {
+      verdict.kind = kind as EventKind;
+    }
+    if (typeof kindReason === 'string' && kindReason.trim()) {
+      verdict.kindReason = kindReason.trim().slice(0, 200);
+    }
 
-    // A row that produced neither fact is not a verdict; storing it would mark the event done.
-    if (verdict.country || verdict.reach) out.set(id, verdict);
+    // A row that produced none of the three facts is not a verdict; storing it would mark the
+    // event done. A reason without the field it explains is not one either.
+    if (verdict.country || verdict.reach || verdict.kind) out.set(id, verdict);
   }
 
   return out;
@@ -251,6 +287,12 @@ export function parseClassification(text: string | undefined, asked: string[]): 
 
 /**
  * The fields to write for one verdict.
+ *
+ * Unlike the country, **the kind is always the model's**: no adapter has an opinion about whether
+ * the row it produced is an event, and the one that could — the RSS feed, whose items are articles
+ * by construction — is exactly the source whose items are sometimes the only announcement an event
+ * gets. A blanket `coverage` on the feed adapter would drop those, which is the whole reason this
+ * is a judgement and not a field on `SourcePage`.
  *
  * **A country the adapter supplied wins.** Teatr Wielki is in Warsaw and Ticketmaster is queried
  * `countryCode=PL`; those are facts, and a model is not asked to second-guess them. It fills in
@@ -272,6 +314,8 @@ export function classificationUpdate(
   if (!event.country && verdict.country) update.country = verdict.country;
   if (verdict.reach) update.reach = verdict.reach;
   if (verdict.reason) update.reachReason = verdict.reason;
+  if (verdict.kind) update.kind = verdict.kind;
+  if (verdict.kindReason) update.kindReason = verdict.kindReason;
   return update;
 }
 

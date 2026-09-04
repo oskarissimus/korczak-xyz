@@ -15,11 +15,13 @@ import { foldText } from './normalize';
 /**
  * Why an event did not match, named by the rule that turned it away.
  *
- * `places` is the one the feed's verification view filters on: it means the event satisfied
- * everything the interest asked about its *content* and was turned away only for where it is or
- * who it is for. That is the near miss worth reading; a keyword miss is not one.
+ * `kind` and `places` are the two the feed's verification view filters on: between them they mean
+ * the event satisfied everything the interest asked about its *content* and was turned away only
+ * for what sort of thing it is, where it is, or who it is for. Those are the near misses worth
+ * reading, and they are the two rules a language model decides — which is exactly why they need a
+ * list. A keyword miss is neither.
  */
-export type MatchReason = 'keywords' | 'exclude' | 'tags' | 'places' | 'cities' | 'dates';
+export type MatchReason = 'keywords' | 'exclude' | 'tags' | 'kind' | 'places' | 'cities' | 'dates';
 
 /*
  * `dates` rather than `window`, which is what the rule is called in prose two paragraphs down.
@@ -105,6 +107,14 @@ export function matchReason(event: EventRecord, interest: Interest): MatchReason
     if (!interest.tags.every((tag) => tags.has(foldText(tag)))) return 'tags';
   }
 
+  /*
+   * Before `places`, because "this is not an event" is a stronger thing to say about a row than
+   * "this event is in the wrong country", and a reason is the first thing wrong. A sponsor post
+   * about a marathon in Cameroon fails both; filing it under geography would put it in the list
+   * that exists to check the country filter, where it would be noise about a different filter.
+   */
+  if (!passesKind(event, interest)) return 'kind';
+
   if (!passesPlaces(event, interest)) return 'places';
 
   /*
@@ -134,6 +144,26 @@ export function matchReason(event: EventRecord, interest: Interest): MatchReason
   }
 
   return null;
+}
+
+/**
+ * Whether an article about an event counts as one.
+ *
+ * Only `coverage` is turned away, and only when the interest has not asked for it. `announcement`
+ * always passes: an article whose news *is* an event — entries opening, a calendar published — is
+ * the case the RSS adapter was written to carry, and it is usually the only notice such an event
+ * ever gets.
+ *
+ * An unclassified row **passes**, for the reason `passesPlaces` gives at length: the classifier
+ * being down has to bring the noise back visibly rather than empty the feed, because an empty feed
+ * is the one outcome indistinguishable from everything working. It also matters more here than it
+ * does there — every scraped row arrives with a country and none arrives with a kind, so between a
+ * source adding an event and the next classifier run, this rule is the only thing standing between
+ * a real listing and a feed that never showed it.
+ */
+function passesKind(event: EventRecord, interest: Interest): boolean {
+  if (interest.includeCoverage) return true;
+  return event.kind !== 'coverage';
 }
 
 /**
@@ -200,7 +230,7 @@ export function matchingInterests(
 }
 
 /**
- * Every live interest that turned this event away for the given reason and nothing sooner.
+ * Every live interest that turned this event away for one of the given reasons and nothing sooner.
  *
  * What the feed's verification view is built on. Asking `matchReason` rather than re-deriving the
  * near miss is the whole point — see its header.
@@ -208,12 +238,15 @@ export function matchingInterests(
 export function interestsRejectingFor(
   event: EventRecord,
   interests: Interest[],
-  reason: MatchReason,
+  reason: MatchReason | readonly MatchReason[],
   opts: { forPush: boolean },
 ): Interest[] {
-  return interests.filter(
-    (interest) => isInterestActive(interest, opts) && matchReason(event, interest) === reason,
-  );
+  const wanted = typeof reason === 'string' ? [reason] : reason;
+  return interests.filter((interest) => {
+    if (!isInterestActive(interest, opts)) return false;
+    const actual = matchReason(event, interest);
+    return actual !== null && wanted.includes(actual);
+  });
 }
 
 /**

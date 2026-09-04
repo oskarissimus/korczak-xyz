@@ -32,6 +32,28 @@ export type Reach = 'local' | 'national' | 'international';
 
 export const REACHES: readonly Reach[] = ['local', 'national', 'international'];
 
+/**
+ * Whether this row **is** an event, or is writing about one.
+ *
+ * The RSS adapter's honest null dates were only half the problem it names in its own header: a feed
+ * item is an article, and most of what a running organiser or a festival publishes is not an
+ * announcement of anything. Three sponsor posts and a pacer-times piece about the 48th Warsaw
+ * Marathon are four cards for a race that is already in the corpus once, under its own listing.
+ *
+ * `listing` is the thing itself — a night, a race, a conference, something with a door to walk
+ * through. `announcement` is an article whose news *is* an event: entries opening, a date fixed, a
+ * calendar published. That is the case the RSS adapter was built to keep, and it is why this is not
+ * a boolean — "the 2027 tournament calendar is out" carries no date of its own and is still exactly
+ * what an announcement feed is for. `coverage` is everything else written about events: results,
+ * interviews, race reports, gear, and the sponsor post that is the reason this field exists.
+ *
+ * A judgement, like `reach`, and made by the same call. Absent means unclassified, and the matcher
+ * treats it the way it treats an absent reach — see `passesKind`.
+ */
+export type EventKind = 'listing' | 'announcement' | 'coverage';
+
+export const KINDS: readonly EventKind[] = ['listing', 'announcement', 'coverage'];
+
 export interface EventRecord {
   /** `${source}_${slugKey(sourceKey)}` — derived, never random, so two runs converge. */
   id: string;
@@ -85,6 +107,14 @@ export interface EventRecord {
   reach?: Reach;
   /** The classifier's one line of reasoning, so its verdict can be argued with rather than obeyed. */
   reachReason?: string;
+  /**
+   * Whether this row is an event or an article about one. Set by the classifier and by nothing
+   * else. Absent means unclassified — which is not `listing`, and `passesKind` reads it as its own
+   * state for the same reason an absent `reach` is one.
+   */
+  kind?: EventKind;
+  /** Why the classifier called it that. Printed on a filtered-out card, like `reachReason`. */
+  kindReason?: string;
   classifiedAt?: number;
   /**
    * What the classification was computed from — see `classifyHashOf` in `functions/src/classify.ts`.
@@ -178,6 +208,19 @@ export interface Interest {
    * along with PyCon NL.
    */
   internationalAnywhere?: boolean;
+  /**
+   * Whether articles *about* events count as matches — see `EventKind`.
+   *
+   * Off by default, and it is the one filter here that is on without being asked for: a feed of
+   * sponsor posts about a race is not a feed of races, and nobody sets up an event watcher wanting
+   * one. It is an opt-in rather than an opt-out because the interest that wants coverage is the
+   * unusual one — "everything the Maraton Warszawski blog says" is a readable thing to ask for,
+   * and this is how it is asked for.
+   *
+   * `announcement` is never filtered by this: an article announcing an event is the case the RSS
+   * adapter exists to carry, and dropping it would take the ticket-sale and calendar posts with it.
+   */
+  includeCoverage?: boolean;
   /** `YYYY-MM-DD` window, compared lexically against `EventRecord.day`. */
   fromDay?: string;
   toDay?: string;

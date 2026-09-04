@@ -30,7 +30,7 @@ import { countryLabel } from '../../utils/events/countries';
 import { formatDistances } from '../../utils/events/distance';
 import { cityKey } from '../../utils/events/cities';
 import { loadFeedCity, saveFeedCity } from '../../utils/events/browser/storage';
-import type { Reach } from '../../utils/events/types';
+import type { EventKind, Reach } from '../../utils/events/types';
 import EventsGate from './EventsGate';
 import {
   fill,
@@ -127,9 +127,13 @@ function FeedPanel({ lang }: Props) {
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
   const inAnyCity = built.reduce((total, section) => total + section.items.length, 0);
-  const rejecting = mode === 'rejected-place';
+  const rejecting = mode === 'rejected';
   const ignoring = mode === 'ignored';
   const coverage = classificationCoverage(feed.events);
+  // The two filters this view verifies, counted apart: they are answered by the same model call
+  // and they are not the same question, and one number over both would hide either going wrong.
+  const placeRows = items.filter((item) => item.rejectedFor === 'places');
+  const kindRows = items.filter((item) => item.rejectedFor === 'kind');
 
   return (
     <div className="ev-feed">
@@ -146,7 +150,7 @@ function FeedPanel({ lang }: Props) {
             {(
               [
                 ['matched', t.viewMatched],
-                ['rejected-place', t.viewRejected],
+                ['rejected', t.viewRejected],
                 ['all', t.viewAll],
                 /*
                  * The fourth button appears only once there is something behind it, and it carries
@@ -218,13 +222,23 @@ function FeedPanel({ lang }: Props) {
               * places rule, so it is never here, and a classifier that has stopped looks exactly
               * like a filter with nothing to remove.
               */}
-            {shown > 0 ? (
+            {placeRows.length > 0 ? (
               <p className="ev-tally">
                 <span className="ev-tally-head">{t.placesTally}</span>{' '}
-                {countryTally(items.map((i) => i.event))
+                {countryTally(placeRows.map((i) => i.event))
                   .map(({ code, count }) => `${countryLabel(code)} ${count}`)
                   .join(' · ')}
               </p>
+            ) : null}
+            {/*
+              * The other filter's shape, and a plain count is the whole of it: only one of the
+              * three kinds is ever removed, so there is nothing to break down the way the
+              * countries are. It is on its own line because it is a different filter — folded into
+              * the tally above, a row removed for being a press release would read as a country
+              * getting it wrong.
+              */}
+            {kindRows.length > 0 ? (
+              <p className="ev-tally">{fill(t.kindTally, { count: kindRows.length })}</p>
             ) : null}
             <p className="ev-tally">
               {fill(t.classifiedCount, {
@@ -284,6 +298,15 @@ function FeedPanel({ lang }: Props) {
  * a label that has not arrived yet look identical, and only one of them is a reason for an event
  * to still be in the feed.
  */
+function kindLabel(kind: EventKind | undefined, t: Translation): string | null {
+  if (kind === 'announcement') return t.kindAnnouncement;
+  if (kind === 'coverage') return t.kindCoverage;
+  // `listing` and unclassified both draw nothing. Not for want of a word for them — a chip on
+  // every card in the corpus saying "yes, this is an event" is a label nobody reads twice, and the
+  // unlabelled case is already on the card: the place chip says `?` until this call has been made.
+  return null;
+}
+
 function reachLabel(reach: Reach | undefined, t: Translation): string {
   if (reach === 'local') return t.reachLocal;
   if (reach === 'national') return t.reachNational;
@@ -317,13 +340,13 @@ function withSelected(options: CityOption[], city: string): CityOption[] {
  * with nothing upcoming in it at all.
  */
 function emptyHeading(mode: FeedMode, t: Translation): string {
-  if (mode === 'rejected-place') return t.rejectedEmpty;
+  if (mode === 'rejected') return t.rejectedEmpty;
   if (mode === 'ignored') return t.ignoredEmpty;
   return t.feedEmpty;
 }
 
 function emptyHint(mode: FeedMode, t: Translation): string {
-  if (mode === 'rejected-place') return t.rejectedEmptyHint;
+  if (mode === 'rejected') return t.rejectedEmptyHint;
   if (mode === 'ignored') return t.ignoredEmptyHint;
   return t.feedEmptyHint;
 }
@@ -400,6 +423,15 @@ function EventCard({
           {countryLabel(event.country)} · {reachLabel(event.reach, t)}
         </span>
         {/*
+          * Only when the classifier says this row is not a listing, which is the only case the
+          * word adds anything to. It is drawn in every view rather than only the rejected one, for
+          * the reason above it: an article kept by an interest that asked for articles and one
+          * nobody has judged yet are different rows, and this is what tells them apart.
+          */}
+        {kindLabel(event.kind, t) ? (
+          <span className="ev-chip ev-chip--kind">{kindLabel(event.kind, t)}</span>
+        ) : null}
+        {/*
           * Only `all` and `ignored` can draw a dismissed row, and in `all` the chip is the whole
           * difference between the two views: without it, a card present in Everything and absent
           * from Matched looks like the matcher disagreeing with itself.
@@ -410,9 +442,16 @@ function EventCard({
         <span>{fill(t.announcedAgo, { when: relativeTime(event.firstSeenAt, now, t) })}</span>
       </div>
 
-      {/* The model's own sentence, so a verdict can be argued with rather than only obeyed. */}
-      {item.rejectedBy?.length && event.reachReason ? (
-        <p className="ev-reason">{event.reachReason}</p>
+      {/*
+        * The model's own sentence, so a verdict can be argued with rather than only obeyed — the
+        * one for the rule that actually turned the row away. There are two sentences on a
+        * classified record and they answer different questions; printing the geography reasoning
+        * under a row removed for being a press release would look like the wrong filter fired.
+        */}
+      {item.rejectedBy?.length ? (
+        <p className="ev-reason">
+          {item.rejectedFor === 'kind' ? event.kindReason : event.reachReason}
+        </p>
       ) : null}
 
       <div className="ev-actions">

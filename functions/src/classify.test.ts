@@ -35,6 +35,11 @@ describe('classifyHashOf', () => {
     const base = ev({ id: 'a', title: 'PyCon NL' });
     expect(classifyHashOf(base)).toBe(classifyHashOf(ev({ id: 'b', title: 'PyCon NL' })));
     expect(classifyHashOf(base)).not.toBe(classifyHashOf(ev({ id: 'a', title: 'PyCon PL' })));
+    // The source name is in the prompt because it is most of the answer to "is this an event or
+    // an article about one", so it has to be in the hash too — same rule as every other field.
+    expect(classifyHashOf(base)).not.toBe(
+      classifyHashOf(ev({ id: 'a', title: 'PyCon NL', sourceName: 'Maraton Warszawski' })),
+    );
     expect(classifyHashOf(base)).not.toBe(
       classifyHashOf(ev({ id: 'a', title: 'PyCon NL', city: 'Utrecht' })),
     );
@@ -175,10 +180,38 @@ describe('parseClassification', () => {
     expect(got.get('a')?.country).toBe('ONLINE');
   });
 
-  it('yields nothing for a row that answered neither question', () => {
-    const got = parseClassification(reply([{ id: 'a', country: 'nope', reach: 'nope' }]), ['a']);
+  it('yields nothing for a row that answered none of the questions', () => {
+    const got = parseClassification(
+      reply([{ id: 'a', country: 'nope', reach: 'nope', kind: 'nope' }]),
+      ['a'],
+    );
     // Storing an empty verdict would write a hash and mark the event permanently done.
     expect(got.has('a')).toBe(false);
+  });
+
+  it('reads the kind, and refuses one that is not one of the three', () => {
+    const got = parseClassification(
+      reply([
+        { id: 'a', country: 'PL', reach: 'local', reason: 'x', kind: 'coverage', kindReason: 'sponsor post' },
+        { id: 'b', country: 'PL', reach: 'local', reason: 'x', kind: 'article', kindReason: 'y' },
+      ]),
+      ['a', 'b'],
+    );
+    expect(got.get('a')?.kind).toBe('coverage');
+    expect(got.get('a')?.kindReason).toBe('sponsor post');
+    expect(got.get('b')?.kind).toBeUndefined();
+    // And the rest of that row still came through — one unreadable field is not a lost verdict.
+    expect(got.get('b')?.reach).toBe('local');
+  });
+
+  /*
+   * The kind alone is a verdict. It is the only one of the three that no adapter can supply, so a
+   * reply that answered just this one still has to be stored — otherwise the event goes back in the
+   * queue and is asked about again on every run for the rest of its life.
+   */
+  it('stores a verdict that is only a kind', () => {
+    const got = parseClassification(reply([{ id: 'a', kind: 'listing' }]), ['a']);
+    expect(got.get('a')).toEqual({ kind: 'listing' });
   });
 });
 
@@ -201,6 +234,19 @@ describe('classificationUpdate', () => {
    * Written even for a partial verdict. Writing it only on a complete one puts an event the model
    * has no country for back in the queue on every run for the rest of its life.
    */
+  it('takes the kind from the model, whatever the source is', () => {
+    // Unlike the country, no adapter has an opinion here — and the one that could, the RSS feed,
+    // is exactly the source whose items are sometimes the only announcement an event gets.
+    const event = ev({ id: 'a', title: 'Brand X partnerem maratonu', country: 'PL' });
+    const update = classificationUpdate(
+      event,
+      { kind: 'coverage', kindReason: 'sponsor announcement' },
+      NOW,
+    );
+    expect(update.kind).toBe('coverage');
+    expect(update.kindReason).toBe('sponsor announcement');
+  });
+
   it('always stamps the hash, so a partial verdict is not retried forever', () => {
     const event = ev({ id: 'a', title: 'Something vague' });
     const update = classificationUpdate(event, { reach: 'local' }, NOW);

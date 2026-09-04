@@ -48,6 +48,7 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
   const [internationalAnywhere, setInternationalAnywhere] = useState(
     existing?.internationalAnywhere ?? false,
   );
+  const [includeCoverage, setIncludeCoverage] = useState(existing?.includeCoverage ?? false);
   const [leadDays, setLeadDays] = useState(String(existing?.leadDays ?? DEFAULT_LEAD_DAYS));
   const [error, setError] = useState<DraftError | null>(null);
 
@@ -61,6 +62,7 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
       cities: parseKeywords(cities),
       countries: parseKeywords(countries),
       internationalAnywhere,
+      includeCoverage,
       leadDays: Number(leadDays),
       muted: existing?.muted,
     };
@@ -169,6 +171,25 @@ export default function InterestForm({ lang, existing, onSubmit, onCancel }: Pro
           <span>{t.fieldInternational}</span>
         </label>
         <p className="ev-hint">{t.fieldInternationalHint}</p>
+      </div>
+
+      {/*
+        * Its own field rather than a second checkbox inside the countries one, because it is a
+        * separate rule with a separate answer behind it: the countries box and its checkbox are
+        * one thought read with an OR, and this is not part of that thought. It sits after them
+        * because it is the rule almost nobody will touch — off is right for every interest the app
+        * seeds, and the hint says so rather than leaving the reader to work out which way is safe.
+        */}
+      <div className="ev-field">
+        <label className="ev-check">
+          <input
+            type="checkbox"
+            checked={includeCoverage}
+            onChange={(e) => setIncludeCoverage(e.target.checked)}
+          />
+          <span>{t.fieldCoverage}</span>
+        </label>
+        <p className="ev-hint">{t.fieldCoverageHint}</p>
       </div>
 
       <div className="ev-field">

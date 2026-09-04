@@ -8,6 +8,7 @@
 
 import type { EventRecord, Interest } from './types';
 import { NO_IGNORES } from './ignores';
+import type { MatchReason } from './match';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
 import { cityKey, isEndonym } from './cities';
 import { foldText } from './normalize';
@@ -18,10 +19,16 @@ export interface FeedItem {
   /** Why it is here. Empty when the reader asked to see everything. */
   matched: Interest[];
   /**
-   * Which interests turned it away on the `places` rule alone. Only ever populated in
-   * `rejected-place` mode, where it is the whole point of the row.
+   * Which interests turned it away on the `kind` or `places` rule alone. Only ever populated in
+   * `rejected` mode, where it is the whole point of the row.
    */
   rejectedBy?: Interest[];
+  /**
+   * Which of the two rules did it, so the card can print the right sentence — the classifier writes
+   * one line about the reach and another about the kind, and showing the geography reasoning under
+   * a row removed for being a press release is worse than showing nothing.
+   */
+  rejectedFor?: MatchReason;
   /**
    * Dismissed by hand. Set in every mode that can show such a row — so `all` can mark one rather
    * than draw it as though nothing had happened to it, which would make "Everything" and "Matched"
@@ -33,11 +40,12 @@ export interface FeedItem {
 /**
  * What the feed is being asked for.
  *
- * `rejected-place` is the verification view: events that satisfied everything an interest asked
- * about their *content* and were turned away only for where they are or who they are for. It
- * exists because a geography filter is otherwise unfalsifiable from the outside — a thing that
- * stopped appearing and a thing that was never announced look identical, and the whole question
- * being asked of this feature is which of the two just happened.
+ * `rejected` is the verification view: events that satisfied everything an interest asked about
+ * their *content* and were turned away only by one of the two rules a language model decides —
+ * what sort of thing it is, or where it is and who it is for. It exists because either filter is
+ * otherwise unfalsifiable from the outside: a thing that stopped appearing and a thing that was
+ * never announced look identical, and the whole question being asked of both features is which of
+ * the two just happened.
  *
  * Built from the same `matchReason` call the real filter makes, so this view cannot show a
  * different set from the one being filtered on. See `matchReason`'s header.
@@ -47,7 +55,7 @@ export interface FeedItem {
  * an ignored event would be remembering it existed. It is also the *only* way back — the Ignore
  * button is on the card, so the card has to be reachable.
  */
-export type FeedMode = 'matched' | 'rejected-place' | 'all' | 'ignored';
+export type FeedMode = 'matched' | 'rejected' | 'all' | 'ignored';
 
 export type FeedGroup = 'week' | 'month' | 'later' | 'undated';
 
@@ -147,16 +155,27 @@ export function buildFeed(
 
     const matched = matchingInterests(event, interests, { forPush: false });
 
-    if (mode === 'rejected-place') {
+    if (mode === 'rejected') {
       /*
        * An event another interest already lets through is not something the filter is keeping from
        * you, so it does not belong in a list of what the filter removed — however near a miss it
        * was for this one.
        */
       if (matched.length > 0) continue;
-      const rejectedBy = interestsRejectingFor(event, interests, 'places', { forPush: false });
+      /*
+       * Asked one rule at a time rather than for both at once, because the row has to say which
+       * one did it. `kind` first: it is the earlier rule, so an interest that rejects on it was
+       * never going to reach `places`, and where two different interests disagree the stronger
+       * statement — this is not an event — is the one worth printing.
+       */
+      const byKind = interestsRejectingFor(event, interests, 'kind', { forPush: false });
+      const rejectedFor: MatchReason = byKind.length > 0 ? 'kind' : 'places';
+      const rejectedBy =
+        byKind.length > 0
+          ? byKind
+          : interestsRejectingFor(event, interests, 'places', { forPush: false });
       if (rejectedBy.length === 0) continue;
-      items.push({ event, matched, rejectedBy });
+      items.push({ event, matched, rejectedBy, rejectedFor });
       continue;
     }
 
@@ -352,7 +371,10 @@ export function classificationCoverage(events: EventRecord[]): {
   total: number;
 } {
   let classified = 0;
-  for (const event of events) if (event.reach !== undefined) classified += 1;
+  // `classifiedAt` rather than any one verdict field: the call answers three questions and can come
+  // back with two of them, so counting on `reach` alone would report a working classifier as
+  // partly stopped whenever it declined to guess.
+  for (const event of events) if (event.classifiedAt !== undefined) classified += 1;
   return { classified, total: events.length };
 }
 

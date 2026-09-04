@@ -390,6 +390,20 @@
   color: var(--retro-dark-gray);
 }
 
+/*
+ * That this row is an article rather than an event. The same grey as `ev-chip--place`, because it
+ * is the same claim from the same call — a colour of its own would say the two verdicts came from
+ * different places. Italic is the whole difference, and it is doing one job: the chip beside it
+ * always reads as a place, so two grey chips in a row need something that says they are answering
+ * different questions.
+ */
+.ev-chip--kind {
+  background: var(--retro-gray);
+  border-color: var(--retro-dark-gray);
+  color: var(--retro-dark-gray);
+  font-style: italic;
+}
+
 .ev-reason {
   margin: 4px 0 0;
   font-size: 1.05rem;

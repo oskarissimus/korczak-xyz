@@ -122,6 +122,12 @@ function InterestRow({
     ...(interest.cities ?? []).map((city) => `@${city}`),
     ...(interest.countries ?? []).map((code) => `@${countryLabel(code)}`),
     ...(interest.internationalAnywhere ? [`+${t.reachInternational}`] : []),
+    /*
+     * Only when it is on, unlike the rules above it — this is the one filter that runs whether or
+     * not an interest mentions it, so what is worth showing is the interest that has turned it
+     * off. A chip on every row saying "and not press releases" would be a rule nobody set.
+     */
+    ...(interest.includeCoverage ? [`+${t.kindCoverage}`] : []),
   ];
 
   return (

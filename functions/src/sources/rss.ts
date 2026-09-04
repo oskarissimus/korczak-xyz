@@ -14,6 +14,12 @@
  * usually no event date. That is handled honestly rather than guessed at — `startsAt` stays null,
  * the item shows in the feed's "announced, no dates yet" group, and it can still fire an
  * `announced` notification, which for "the 2027 tournament calendar is out" is the right outcome.
+ *
+ * The other half of that trade is that plenty of what a publication puts out is *about* events
+ * rather than announcing one — sponsor posts, results, race reports. Nothing here tries to tell
+ * those apart, and deliberately: the adapter cannot, because the same feed carries both, and a
+ * blanket verdict on this source would drop exactly the announcements it exists to catch. That is
+ * `EventRecord.kind`, decided per item by the classifier. See `classify.ts`.
  */
 
 import type { EventSource, RawEvent, SourceContext } from './types';

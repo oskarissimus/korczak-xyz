@@ -127,6 +127,8 @@ export function mergeRecord(
       country: incoming.country ?? stored.country,
       reach: stored.reach,
       reachReason: stored.reachReason,
+      kind: stored.kind,
+      kindReason: stored.kindReason,
       classifiedAt: stored.classifiedAt,
       classifyHash: stored.classifyHash,
       updatedAt: now,
