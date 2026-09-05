@@ -86,8 +86,11 @@ export const translations = {
     kindsCoverage: 'News',
     kindsUnlabelled: 'Not labelled',
     kindClear: 'Show every kind',
-    kindEmptyHint:
-      'Nothing here is one of the kinds you picked. This filter only narrows what you are looking at — the coverage switch on an interest is what changes which of these notify you.',
+    newsroomFilter: 'Article',
+    newsroomOther: 'unclear',
+    newsroomClear: 'Show every article',
+    labelEmptyHint:
+      'Nothing here carries every label you picked. These filters only narrow what you are looking at — the coverage switch and the tags on an interest are what change which of them notify you.',
 
     // Interests
     interestsHeading: 'What to watch for',
@@ -277,8 +280,11 @@ export const translations = {
     kindsCoverage: 'Teksty',
     kindsUnlabelled: 'Bez etykiety',
     kindClear: 'Pokaż wszystkie rodzaje',
-    kindEmptyHint:
-      'Nic tutaj nie jest jednego z wybranych rodzajów. Ten filtr zawęża tylko widok — o tym, które z nich powiadamiają, decyduje przełącznik tekstów w zainteresowaniu.',
+    newsroomFilter: 'Artykuł',
+    newsroomOther: 'nierozpoznane',
+    newsroomClear: 'Pokaż wszystkie artykuły',
+    labelEmptyHint:
+      'Nic tutaj nie ma wszystkich wybranych etykiet. Te filtry zawężają tylko widok — o tym, co powiadamia, decydują przełącznik tekstów i tagi wpisane w zainteresowaniu.',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:

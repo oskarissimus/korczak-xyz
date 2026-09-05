@@ -23,7 +23,7 @@
 
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
-import { KIND_KEYS, type KindKey } from '../feed';
+import { KIND_KEYS, NEWSROOM_KEYS, type KindKey, type NewsroomKey } from '../feed';
 import type { EventRecord, Ignore, Interest, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
@@ -38,6 +38,7 @@ export const EVENT_KEYS = {
   settings: 'events-push-settings',
   feedCity: 'events-feed-city',
   feedKinds: 'events-feed-kinds',
+  feedNewsroom: 'events-feed-newsroom',
 } as const;
 
 /** How many events the offline cache keeps. Roughly 60 kB at ~300 bytes a row. */
@@ -66,6 +67,7 @@ const CACHED_PER_OWNER = [
   // Same argument, same cost: a feed narrowed to announcements is one the next account never
   // narrowed, and it hides rows with nothing on the screen saying who asked for it.
   EVENT_KEYS.feedKinds,
+  EVENT_KEYS.feedNewsroom,
 ] as const;
 
 const OWNER_KEY = 'events-owner';
@@ -380,31 +382,52 @@ export function saveFeedCity(city: string): boolean {
   return writeEventsKey(EVENT_KEYS.feedCity, city);
 }
 
-/**
- * Which kinds the feed is narrowed to — an empty list for all of them.
+/*
+ * The two multi-select filters in the Feed toolbar, stored the same way and for the same reasons.
  *
- * Validated against the keys this build knows rather than read as written, so a value stored by a
- * future build that has a fourth kind cannot narrow this one to nothing: an unknown key would
- * match no row and silently empty the feed, where dropping it leaves the filter honest about what
- * it can do. An empty result is stored as a removal, so "everything" is the absence of a key.
+ * Validated against the keys this build knows rather than read as written: a value stored by a
+ * future build that has one more kind cannot narrow this one to nothing, because an unknown key
+ * matches no row and would silently empty the feed, where dropping it leaves the filter honest
+ * about what this build can do.
+ *
+ * An empty selection is stored as a *removal*, so "everything" is the absence of a key rather than
+ * an empty array to be told apart from a missing one.
  */
-export function loadFeedKinds(): KindKey[] {
-  const raw = readJSON<unknown>(EVENT_KEYS.feedKinds, []);
+function loadFeedKeys<K extends string>(key: string, known: readonly K[]): K[] {
+  const raw = readJSON<unknown>(key, []);
   if (!Array.isArray(raw)) return [];
-  const known = new Set<string>(KIND_KEYS);
-  return [...new Set(raw.filter((k): k is KindKey => typeof k === 'string' && known.has(k)))];
+  const allowed = new Set<string>(known);
+  return [...new Set(raw.filter((k): k is K => typeof k === 'string' && allowed.has(k)))];
 }
 
-export function saveFeedKinds(kinds: KindKey[]): boolean {
-  if (kinds.length === 0) {
+function saveFeedKeys(key: string, values: readonly string[]): boolean {
+  if (values.length === 0) {
     try {
-      localStorage.removeItem(EVENT_KEYS.feedKinds);
+      localStorage.removeItem(key);
       return true;
     } catch {
       return false;
     }
   }
-  return writeEventsKey(EVENT_KEYS.feedKinds, JSON.stringify(kinds));
+  return writeEventsKey(key, JSON.stringify(values));
+}
+
+/** Which kinds the feed is narrowed to — an empty list for all of them. */
+export function loadFeedKinds(): KindKey[] {
+  return loadFeedKeys(EVENT_KEYS.feedKinds, KIND_KEYS);
+}
+
+export function saveFeedKinds(kinds: KindKey[]): boolean {
+  return saveFeedKeys(EVENT_KEYS.feedKinds, kinds);
+}
+
+/** Which newsroom verdicts the feed is narrowed to — an empty list for all of them. */
+export function loadFeedNewsroom(): NewsroomKey[] {
+  return loadFeedKeys(EVENT_KEYS.feedNewsroom, NEWSROOM_KEYS);
+}
+
+export function saveFeedNewsroom(kinds: NewsroomKey[]): boolean {
+  return saveFeedKeys(EVENT_KEYS.feedNewsroom, kinds);
 }
 
 export function loadPushSettings(): PushSettings {

@@ -818,7 +818,7 @@ The picker in the Feed toolbar, persisted in `events-feed-city`. Three tours of 
 Rzeszów, Warszawa and Gdańsk are three cards you cannot go to two of, and the interest that matched
 them is right — so this is a **view preference on one device**, not a rule.
 
-That is why `filterSectionsByCity` is a lens over the *output* of `buildFeed` rather than another
+That is why `narrowSections` is a lens over the *output* of `buildFeed` rather than another
 `FeedOptions` field, and why `PlanContext` never hears about it: a filter set once and persisted
 would otherwise be silently deciding, months later, which concerts are allowed to wake you. The
 durable form of "only Warszawa" already exists and the collector already reads it —
@@ -861,20 +861,26 @@ Four things about it:
 It joins `CACHED_PER_OWNER`. It is a preference rather than data, but it is one that hides rows, and
 inherited across a sign-in it would empty a feed nobody in that account had narrowed.
 
-### Narrowing the feed to a kind
+### Narrowing the feed to a label
 
-The second lens over the same output — `filterSectionsByKinds`, persisted in `events-feed-kinds`,
-every argument above holding unchanged: a view preference on one device, never a `FeedOptions`
-field, never anything `PlanContext` hears about. The durable form of "no articles, thank you" is
-`Interest.includeCoverage`, and the empty-state hint says so.
+Two more filters over the same output — the classifier's `kind` (`events-feed-kinds`) and the
+newsroom reader's verdict (`events-feed-newsroom`) — every argument above holding unchanged: view
+preferences on one device, never `FeedOptions` fields, never anything `PlanContext` hears about.
+The durable forms are `Interest.includeCoverage` and `Interest.tags`, and the empty-state hint says
+so.
 
-It is **multi-select** because the useful questions are plural — "announcements and news, not the
-listings I have already read" is one filter and not three visits — and that is the whole reason it
-is a row of `aria-pressed` buttons rather than a second `<select>`. A `<select multiple>` on iOS
-draws as a list nobody can tell is multi-select, and choosing two means holding a modifier a touch
-screen does not have.
+Both are **multi-select** because the useful questions are plural — "announcements and news, not the
+listings I have already read" is one filter and not three visits — and that is the whole reason they
+are rows of `aria-pressed` buttons rather than `<select>`s. A `<select multiple>` on iOS draws as a
+list nobody can tell is multi-select, and choosing two means holding a modifier a touch screen does
+not have.
 
-Four things it does not share with the city picker:
+They are **two rows and not one**, each on its own line, because they are different questions:
+`kind` says whether a row belongs in an event feed at all, over the whole corpus, and the reader
+says what one theatre's news item announces. Mixed together, pressing `programme` and
+`announcement` would read as narrowing twice on one axis where it is in fact an AND across two.
+
+Four things they do not share with the city picker:
 
 - **`unlabelled` is a key of its own, not folded into `listing`.** An unclassified row *passes*
   every rule the classifier feeds, so it is in the feed because nothing has judged it rather than
@@ -888,19 +894,32 @@ Four things it does not share with the city picker:
 - **Nothing chosen is no constraint**, which is `match.ts`'s rule for a keyword-less interest
   arriving in the UI. Read the other way the tab opens on a blank feed for everyone who has never
   touched the control.
-- **`KIND_KEYS` fixes the order**, unlike `countryTally`'s commonest-first. These are buttons, and
-  a row whose buttons swap places as the corpus changes is one you press the wrong half of.
+- **`KIND_KEYS` and `NEWSROOM_KEYS` fix the order**, unlike `countryTally`'s commonest-first. These
+  are buttons, and a row whose buttons swap places as the corpus changes is one you press the wrong
+  half of.
 
-The two filters are **each built from the view the other has already narrowed**, which is what keeps
-both sets of counts honest: `Warszawa (12)` under a kind filter has to mean twelve of the kind on
-screen, or pressing it lands on a smaller number than it promised, and `Anywhere` is the rest of the
-toolbar minus the city rather than the whole corpus. `withSelectedKinds` is `withSelected`'s
-argument reaching this control — a chosen kind that has fallen to zero keeps its button, or the
-feed would be narrowed to nothing with nothing on screen to press.
+The **newsroom row takes the opposite decision about an absent verdict**, and that asymmetry is the
+one thing here worth reading twice. The classifier judges the whole corpus, so a row without a
+`kind` is one nothing has looked at. The reader's queue is one page of one theatre, so a row
+without a `newsroomKind` is overwhelmingly just a concert — a bucket holding every listing in the
+corpus is not a kind of article anyone picks, and `cityOptions` already declines to offer the same
+bucket for the rows no source placed. What the reader read and could not place is `other`, which
+*is* offered where the corpus holds it: the card draws it no chip (that would be a claim where the
+reader made none) but a filter is a question rather than a claim, and it is the only way to go and
+look at what the reader failed on.
 
-`loadFeedKinds` validates against `KIND_KEYS` rather than reading what is stored: a key written by a
-future build with a fourth kind matches no row here, so kept it would silently empty the feed where
-dropping it leaves the filter honest about what this build can do.
+Each control's options are **built from the feed with every filter but its own applied**, which is
+what keeps all three sets of counts honest: `Warszawa (12)` under a kind filter has to mean twelve
+of that kind on screen, or pressing it lands on a smaller number than it promised, and `Anywhere` is
+the rest of the toolbar minus the city rather than the whole corpus. That is four narrowings per
+render over the same three predicates, which is why `narrowSections` takes all of them at once
+rather than being three lenses to chain. `withSelectedKeys` is `withSelected`'s argument reaching
+these controls — a chosen label that has fallen to zero keeps its button, or the feed would be
+narrowed to nothing with nothing on screen to press.
+
+`loadFeedKinds` and `loadFeedNewsroom` validate against those key lists rather than reading what is
+stored: a key written by a future build with one more kind matches no row here, so kept it would
+silently empty the feed where dropping it leaves the filter honest about what this build can do.
 
 ### Deploying it
 

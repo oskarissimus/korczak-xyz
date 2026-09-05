@@ -17,10 +17,11 @@ import {
   cityOptions,
   classificationCoverage,
   countryTally,
-  filterSectionsByCity,
-  filterSectionsByKinds,
   kindOptions,
   KIND_KEYS,
+  narrowSections,
+  newsroomOptions,
+  NEWSROOM_KEYS,
   placeLabel,
   saleWhenLabel,
   whenLabel,
@@ -28,8 +29,9 @@ import {
   type FeedGroup,
   type FeedItem,
   type FeedMode,
+  type FeedSection,
   type KindKey,
-  type KindOption,
+  type NewsroomKey,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
 import { formatDistances } from '../../utils/events/distance';
@@ -37,8 +39,10 @@ import { cityKey } from '../../utils/events/cities';
 import {
   loadFeedCity,
   loadFeedKinds,
+  loadFeedNewsroom,
   saveFeedCity,
   saveFeedKinds,
+  saveFeedNewsroom,
 } from '../../utils/events/browser/storage';
 import type { EventKind, Reach } from '../../utils/events/types';
 import type { NewsroomKind } from '../../utils/events/newsroom';
@@ -88,27 +92,21 @@ function FeedPanel({ lang }: Props) {
   };
 
   /*
-   * Which kinds are being shown — the classifier's own verdict, the word the card draws as a chip.
-   * Several at once, because the useful questions are plural: "announcements and news, not the
-   * listings I have already read" is one filter and not three visits.
+   * The two label filters: what the classifier called the row, and what the newsroom reader made
+   * of the article. Both are words the card already draws as a chip, and a chip you can read and
+   * not act on is half a feature.
    *
-   * **Nothing chosen means everything**, the rule `match.ts` states for a keyword-less interest.
-   * Read from localStorage on the first render for the reason the city is, and stored as the list
-   * rather than as a set: it is what goes to JSON, and one shape means the two cannot disagree.
+   * They are separate controls rather than one row of every label, because they answer different
+   * questions — `kind` says whether a row belongs in an event feed at all, over the whole corpus;
+   * the reader says what one theatre's news item announces. Mixed into one row, pressing
+   * `programme` and `announcement` would read as narrowing twice on one axis when it is in fact an
+   * AND across two.
    */
-  const [kinds, setKinds] = useState<KindKey[]>(() => loadFeedKinds());
-  const chosenKinds = useMemo(() => new Set(kinds), [kinds]);
-
-  const toggleKind = (key: KindKey) => {
-    const next = chosenKinds.has(key) ? kinds.filter((k) => k !== key) : [...kinds, key];
-    setKinds(next);
-    saveFeedKinds(next);
-  };
-
-  const clearKinds = () => {
-    setKinds([]);
-    saveFeedKinds([]);
-  };
+  const kindFilter = useKeyFilter(loadFeedKinds, saveFeedKinds);
+  const newsroomFilter = useKeyFilter(loadFeedNewsroom, saveFeedNewsroom);
+  const chosenKinds = kindFilter.chosen;
+  const chosenNewsroom = newsroomFilter.chosen;
+  const narrowedByLabel = chosenKinds.size > 0 || chosenNewsroom.size > 0;
 
   // Re-arm silently. Nothing is rendered for it here — the Alerts tab is where push has a UI.
   useWebPush(auth.user, lang, { verifyOnly: true });
@@ -124,28 +122,45 @@ function FeedPanel({ lang }: Props) {
   );
 
   /*
-   * Each picker is built from the view with the *other* filter applied but not its own, so its
-   * counts say what each choice would show rather than what the current choice left. That is why
-   * these are two half-filtered lists rather than one: `Warszawa (12)` under a kind filter has to
-   * mean twelve of the kind being shown, or pressing it lands on a smaller number than it
-   * promised. A selection the corpus no longer holds is kept in either control — see
-   * `withSelected` and `withSelectedKinds`.
+   * Each control's options are built from the feed with every filter *but its own* applied, so its
+   * counts say what pressing a choice would show rather than what the current choice left. That is
+   * what these three half-narrowed views are for: `Warszawa (12)` under a kind filter has to mean
+   * twelve of the kind being shown, or pressing it lands on a smaller number than it promised.
+   *
+   * A selection the corpus no longer holds is kept in whichever control holds it — see
+   * `withSelected` and `withSelectedKeys`.
    */
-  const byKind = useMemo(() => filterSectionsByKinds(built, chosenKinds), [built, chosenKinds]);
-  const byCity = useMemo(() => filterSectionsByCity(built, selectedCity), [built, selectedCity]);
-  const cities = useMemo(
-    () => withSelected(cityOptions(byKind.flatMap((s) => s.items).map((i) => i.event)), city),
-    [byKind, city],
+  const forCity = useMemo(
+    () => narrowSections(built, { kinds: chosenKinds, newsroom: chosenNewsroom }),
+    [built, chosenKinds, chosenNewsroom],
   );
-  const kindChoices = useMemo(
+  const forKinds = useMemo(
+    () => narrowSections(built, { city: selectedCity, newsroom: chosenNewsroom }),
+    [built, selectedCity, chosenNewsroom],
+  );
+  const forNewsroom = useMemo(
+    () => narrowSections(built, { city: selectedCity, kinds: chosenKinds }),
+    [built, selectedCity, chosenKinds],
+  );
+  const sections = useMemo(
     () =>
-      withSelectedKinds(
-        kindOptions(byCity.flatMap((s) => s.items).map((i) => i.event)),
-        chosenKinds,
-      ),
-    [byCity, chosenKinds],
+      narrowSections(built, {
+        city: selectedCity,
+        kinds: chosenKinds,
+        newsroom: chosenNewsroom,
+      }),
+    [built, selectedCity, chosenKinds, chosenNewsroom],
   );
-  const sections = useMemo(() => filterSectionsByKinds(byCity, chosenKinds), [byCity, chosenKinds]);
+
+  const cities = useMemo(() => withSelected(cityOptions(eventsOf(forCity)), city), [forCity, city]);
+  const kindChoices = useMemo(
+    () => withSelectedKeys(kindOptions(eventsOf(forKinds)), chosenKinds, KIND_KEYS),
+    [forKinds, chosenKinds],
+  );
+  const newsroomChoices = useMemo(
+    () => withSelectedKeys(newsroomOptions(eventsOf(forNewsroom)), chosenNewsroom, NEWSROOM_KEYS),
+    [forNewsroom, chosenNewsroom],
+  );
 
   /*
    * How many dismissed events there are to go back to — which is a second pass over the corpus and
@@ -156,18 +171,16 @@ function FeedPanel({ lang }: Props) {
    */
   const ignoredCount = useMemo(
     () =>
-      filterSectionsByKinds(
-        filterSectionsByCity(
-          buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }),
-          selectedCity,
-        ),
-        chosenKinds,
-      ).reduce((total, section) => total + section.items.length, 0),
-    // Both filters are dependencies: the button's number and the list it opens are the same
-    // question, and a count taken over rows either one hides would offer a view that opens on
+      narrowSections(buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }), {
+        city: selectedCity,
+        kinds: chosenKinds,
+        newsroom: chosenNewsroom,
+      }).reduce((total, section) => total + section.items.length, 0),
+    // Every filter is a dependency: the button's number and the list it opens are the same
+    // question, and a count taken over rows any of them hides would offer a view that opens on
     // nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, ignored, selectedCity, chosenKinds],
+    [feed.events, interests, ignored, selectedCity, chosenKinds, chosenNewsroom],
   );
 
   if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
@@ -178,9 +191,9 @@ function FeedPanel({ lang }: Props) {
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
   // What `Anywhere` would show, which is the rest of the toolbar's narrowing minus the city — not
-  // the whole corpus. A count larger than the feed a kind filter is already limiting would be
+  // the whole corpus. A count larger than the feed the label filters already limit would be
   // promising rows that clearing the city cannot bring back.
-  const inAnyCity = byKind.reduce((total, section) => total + section.items.length, 0);
+  const inAnyCity = forCity.reduce((total, section) => total + section.items.length, 0);
   const rejecting = mode === 'rejected';
   const ignoring = mode === 'ignored';
   const coverage = classificationCoverage(feed.events);
@@ -261,40 +274,35 @@ function FeedPanel({ lang }: Props) {
             </label>
           ) : null}
           {/*
-            * The kinds, as buttons rather than a second `<select multiple>`.
+            * The two label filters, as buttons rather than a `<select multiple>`.
             *
             * A multiple-select is the wrong control on a phone — iOS draws it as a list nobody can
             * tell is multi-select, and choosing two means knowing to hold a modifier that a touch
-            * screen does not have. There are four options at most, so a row of toggles fits, says
-            * how many each holds, and shows the whole state at a glance. `aria-pressed` rather
+            * screen does not have. There are five options at most in either row, so toggles fit,
+            * say how many each holds, and show the whole state at a glance. `aria-pressed` rather
             * than a checkbox for the reason the view picker uses it: the pressed button is the
             * answer, and these live in the same toolbar.
-            *
-            * Drawn only where there is a choice to make — one kind in the corpus is not a filter —
-            * but never taken away while something is chosen, or the way back would go with it.
             */}
-          {kindChoices.length > 1 || chosenKinds.size > 0 ? (
-            <div className="ev-kinds" role="group" aria-label={t.kindFilter}>
-              {/* The group carries the name; the visible copy of it would be announced twice. */}
-              <span className="ev-kinds-label" aria-hidden="true">
-                {t.kindFilter}
-              </span>
-              {kindChoices.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={`ev-kind${chosenKinds.has(option.key) ? ' ev-kind--on' : ''}`}
-                  aria-pressed={chosenKinds.has(option.key)}
-                  onClick={() => toggleKind(option.key)}
-                >
-                  {fill(t.kindOption, {
-                    kind: kindOptionLabel(option.key, t),
-                    count: option.count,
-                  })}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          <FilterChips
+            label={t.kindFilter}
+            options={kindChoices}
+            chosen={chosenKinds}
+            labelOf={(key) => kindOptionLabel(key, t)}
+            onToggle={kindFilter.toggle}
+          />
+          {/*
+            * The reader's verdict, and the row that is usually not drawn at all: it appears only
+            * where the corpus holds more than one kind of newsroom article, which today is one
+            * theatre's news list and nothing else. A row of buttons for a distinction that is not
+            * in the feed today would be a control that does nothing on most visits.
+            */}
+          <FilterChips
+            label={t.newsroomFilter}
+            options={newsroomChoices}
+            chosen={chosenNewsroom}
+            labelOf={(key) => newsroomOptionLabel(key, t)}
+            onToggle={newsroomFilter.toggle}
+          />
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
 
@@ -349,13 +357,13 @@ function FeedPanel({ lang }: Props) {
             * how an app comes to look broken weeks after the choice was made.
             */}
           <p className="ev-hint">
-            {narrowedHint(selectedCity ? cityName : '', chosenKinds.size > 0, mode, t)}
+            {narrowedHint(selectedCity ? cityName : '', narrowedByLabel, mode, t)}
           </p>
           {/*
-            * A way out for each filter that is on, and both when both are. Only one of them can be
-            * named in the sentence above, so the buttons are what say which narrowings are in
-            * force — with one of them missing, clearing the city on an empty list would look like
-            * the app refusing to show anything.
+            * A way out for every filter that is on. Only one of them can be named in the sentence
+            * above, so the buttons are what say which narrowings are in force — with one missing,
+            * clearing the city on a list that a label filter is also emptying would look like the
+            * app refusing to show anything.
             */}
           {selectedCity ? (
             <button className="ev-link" type="button" onClick={() => chooseCity('')}>
@@ -363,8 +371,13 @@ function FeedPanel({ lang }: Props) {
             </button>
           ) : null}
           {chosenKinds.size > 0 ? (
-            <button className="ev-link" type="button" onClick={clearKinds}>
+            <button className="ev-link" type="button" onClick={kindFilter.clear}>
               {t.kindClear}
+            </button>
+          ) : null}
+          {chosenNewsroom.size > 0 ? (
+            <button className="ev-link" type="button" onClick={newsroomFilter.clear}>
+              {t.newsroomClear}
             </button>
           ) : null}
         </div>
@@ -450,23 +463,106 @@ function withSelected(options: CityOption[], city: string): CityOption[] {
 }
 
 /**
- * The picker's options with the chosen kinds in them, whatever the corpus currently holds.
+ * One multi-select filter's state, persisted as it changes.
  *
- * `withSelected`'s argument, reaching the other filter: a kind chosen on a day the theatre had
+ * Shared by the two label rows because they are the same control over different fields, and a
+ * second copy of "toggle, store, and read back on the first render" is the sort of duplication
+ * that stays in step until the day one of them gains a rule.
+ *
+ * The list is the state and the set is derived, rather than the other way round: the list is what
+ * goes to JSON, so one shape is stored and the two cannot come to disagree about what is chosen.
+ * Read from localStorage in the initialiser for the reason the city is — this hides rows, and a
+ * frame of the unfiltered feed before it applied is the app appearing to forget the setting every
+ * time it opens.
+ */
+function useKeyFilter<K extends string>(load: () => K[], save: (keys: K[]) => void) {
+  const [keys, setKeys] = useState<K[]>(load);
+  const chosen = useMemo(() => new Set(keys), [keys]);
+
+  const toggle = (key: K) => {
+    const next = chosen.has(key) ? keys.filter((k) => k !== key) : [...keys, key];
+    setKeys(next);
+    save(next);
+  };
+
+  const clear = () => {
+    setKeys([]);
+    save([]);
+  };
+
+  return { chosen, toggle, clear };
+}
+
+/**
+ * A row of toggles for one field, or nothing when there is no choice to make.
+ *
+ * One option is not a filter — pressing it can only empty the screen — so the row waits until the
+ * corpus holds two. It is never taken away while something is chosen, though: the way back out of
+ * a narrowing has to outlive the corpus that offered it.
+ */
+function FilterChips<K extends string>({
+  label,
+  options,
+  chosen,
+  labelOf,
+  onToggle,
+}: {
+  label: string;
+  options: Array<{ key: K; count: number }>;
+  chosen: ReadonlySet<K>;
+  labelOf: (key: K) => string;
+  onToggle: (key: K) => void;
+}) {
+  if (options.length < 2 && chosen.size === 0) return null;
+  return (
+    <div className="ev-kinds" role="group" aria-label={label}>
+      {/* The group carries the name; the visible copy of it would be announced twice. */}
+      <span className="ev-kinds-label" aria-hidden="true">
+        {label}
+      </span>
+      {options.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          className={`ev-kind${chosen.has(option.key) ? ' ev-kind--on' : ''}`}
+          aria-pressed={chosen.has(option.key)}
+          onClick={() => onToggle(option.key)}
+        >
+          {`${labelOf(option.key)} (${option.count})`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The events behind a set of sections, which is what every option list is counted over. */
+function eventsOf(sections: FeedSection[]) {
+  return sections.flatMap((section) => section.items).map((item) => item.event);
+}
+
+/**
+ * A picker's options with the chosen keys in them, whatever the corpus currently holds.
+ *
+ * `withSelected`'s argument, reaching the two label filters: a kind chosen on a day the theatre had
  * announced something and gone to zero since would otherwise take its own button off the screen,
  * leaving a feed narrowed to nothing with no control saying so and nothing to press to undo it.
  * Kept at zero, the row says the true thing: this is on, and there is nothing behind it.
  */
-function withSelectedKinds(options: KindOption[], chosen: ReadonlySet<KindKey>): KindOption[] {
+function withSelectedKeys<K extends string>(
+  options: Array<{ key: K; count: number }>,
+  chosen: ReadonlySet<K>,
+  order: readonly K[],
+): Array<{ key: K; count: number }> {
   const missing = [...chosen].filter((key) => !options.some((option) => option.key === key));
   if (missing.length === 0) return options;
   return [...options, ...missing.map((key) => ({ key, count: 0 }))].sort(
-    (a, b) => KIND_KEYS.indexOf(a.key) - KIND_KEYS.indexOf(b.key),
+    (a, b) => order.indexOf(a.key) - order.indexOf(b.key),
   );
 }
 
 /**
- * The word on a filter button — plural, and there is one for `listing` where the card has none.
+ * The word on a kind's filter button — plural, and there is one for `listing` where the card has
+ * none.
  *
  * The card deliberately draws no chip for a listing (a label on every row saying "yes, this is an
  * event" is one nobody reads twice) but a filter that offered every kind except the commonest
@@ -482,20 +578,37 @@ function kindOptionLabel(key: KindKey, t: Translation): string {
 }
 
 /**
+ * The word on a newsroom verdict's button — the same word the chip on the card carries.
+ *
+ * Deliberately not the kind row's capitalised plurals: this row exists to go and find the rows
+ * showing a particular chip, and a button reading exactly what the chip reads is the shortest
+ * distance between the two. `other` is the exception and needs a word of its own, the chip having
+ * none — it is the reader saying it could not tell, and the button is how you go and look at what
+ * it could not read.
+ */
+function newsroomOptionLabel(key: NewsroomKey, t: Translation): string {
+  if (key === 'ticket-sale') return t.newsroomTicketSale;
+  if (key === 'programme') return t.newsroomProgramme;
+  if (key === 'practical') return t.newsroomPractical;
+  if (key === 'institutional') return t.newsroomInstitutional;
+  return t.newsroomOther;
+}
+
+/**
  * What an empty list says, naming the narrowing that most likely caused it.
  *
- * The city first when both are on: it is the filter that hides most, and the buttons under this
+ * The city first when several are on: it is the filter that hides most, and the buttons under this
  * sentence say what else is in force. A persisted filter with no visible cause is how an app comes
  * to look broken weeks after the choice was made.
  */
 function narrowedHint(
   city: string,
-  narrowedByKind: boolean,
+  narrowedByLabel: boolean,
   mode: FeedMode,
   t: Translation,
 ): string {
   if (city) return fill(t.cityEmptyHint, { city });
-  if (narrowedByKind) return t.kindEmptyHint;
+  if (narrowedByLabel) return t.labelEmptyHint;
   return emptyHint(mode, t);
 }
 

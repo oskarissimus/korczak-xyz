@@ -8,6 +8,7 @@
 
 import type { EventKind, EventRecord, Interest } from './types';
 import { KINDS } from './types';
+import { NEWSROOM_KINDS, type NewsroomKind } from './newsroom';
 import { NO_IGNORES } from './ignores';
 import type { MatchReason } from './match';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
@@ -346,28 +347,6 @@ export function cityOptions(events: Array<{ city?: string }>): CityOption[] {
 }
 
 /**
- * One city's rows out of a built feed.
- *
- * A lens over the finished list rather than an argument to `buildFeed`, and that is the whole
- * design of this filter: it is a **view preference on one device**, not a fact about what matches.
- * An interest's `cities` is the durable form of "only Warsaw" and it is what the collector reads,
- * so narrowing the picker never quietly stops a notification — which is the failure a persisted
- * filter would otherwise cause months later, on a phone whose owner has forgotten it is set.
- *
- * Grouping survives untouched: filtering after `buildFeed` cannot reorder anything, and a section
- * left with nothing in it is dropped rather than drawn as an empty heading.
- */
-export function filterSectionsByCity(sections: FeedSection[], cityKey: string): FeedSection[] {
-  if (!cityKey) return sections;
-  return sections
-    .map((section) => ({
-      group: section.group,
-      items: section.items.filter((item) => cityKeyOf(item.event) === cityKey),
-    }))
-    .filter((section) => section.items.length > 0);
-}
-
-/**
  * What the classifier called a row, as the one value a filter can be keyed on.
  *
  * `unlabelled` is a key of its own rather than being folded into `listing`, and that is the whole
@@ -406,7 +385,7 @@ export interface KindOption {
  *
  * A kind with nothing behind it is left out. There are four at most and the reader is choosing
  * from what is actually there — the selected-but-empty case is kept on screen by
- * `withSelectedKinds` in the component, which is where it belongs: it is a fact about the
+ * `withSelectedKeys` in the component, which is where it belongs: it is a fact about the
  * selection, not the corpus.
  */
 export function kindOptions(events: Array<{ kind?: EventKind }>): KindOption[] {
@@ -421,26 +400,99 @@ export function kindOptions(events: Array<{ kind?: EventKind }>): KindOption[] {
 }
 
 /**
- * The rows of the chosen kinds out of a built feed — every row when nothing is chosen.
+ * What the **newsroom reader** made of an article, as the one value a filter can be keyed on — and
+ * `''` for every row it never read.
  *
- * A lens over the finished list, exactly as `filterSectionsByCity` is, and for the same reason: it
- * is a view preference on one device and never a fact about what matches, so narrowing it cannot
- * quietly stop a notification. The durable form of "no articles, thank you" is an interest's
- * `coverage` flag, which is what the collector reads.
+ * The opposite policy from `kindKeyOf`, deliberately. The classifier judges the whole corpus, so a
+ * row without its verdict is one nothing has looked at and `unlabelled` is a state worth seeing.
+ * The reader's queue is one page of one theatre, so a row without *its* verdict is overwhelmingly
+ * just a concert — not an article the reader gave up on, which is what `other` is for. A bucket
+ * holding every listing in the corpus is not a kind of article anyone picks, and `cityOptions`
+ * already declines to offer the same bucket for the rows no source placed.
+ */
+export type NewsroomKey = NewsroomKind;
+
+/** Every newsroom verdict, in the order they are drawn in — `KIND_KEYS`' argument. */
+export const NEWSROOM_KEYS: readonly NewsroomKey[] = NEWSROOM_KINDS;
+
+export function newsroomKeyOf(event: { newsroomKind?: NewsroomKind }): NewsroomKey | '' {
+  return event.newsroomKind ?? '';
+}
+
+export interface NewsroomOption {
+  key: NewsroomKey;
+  count: number;
+}
+
+/**
+ * The newsroom verdicts present in a built feed, with how many rows each holds.
+ *
+ * `kindOptions`' contract, over the other field. `other` is offered where the corpus holds it,
+ * although the card draws it no chip: the chip would be a claim about the article where the reader
+ * made none, and a filter is a question rather than a claim — it is how you go and look at the
+ * rows the reader could not read, which is the only way that failure is visible from this tab.
+ */
+export function newsroomOptions(
+  events: Array<{ newsroomKind?: NewsroomKind }>,
+): NewsroomOption[] {
+  const counts = new Map<NewsroomKey | '', number>();
+  for (const event of events) {
+    const key = newsroomKeyOf(event);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return NEWSROOM_KEYS.map((key) => ({ key, count: counts.get(key) ?? 0 })).filter(
+    (option) => option.count > 0,
+  );
+}
+
+/**
+ * Every filter in the toolbar, applied in one pass — an unset field is no constraint.
+ *
+ * A lens over the finished list rather than arguments to `buildFeed`, and that is the whole design
+ * of all three of them: they are **view preferences on one device**, not facts about what matches.
+ * `Interest.cities`, `Interest.includeCoverage` and `Interest.tags` are the durable forms and they
+ * are what the collector reads, so narrowing anything here can never quietly stop a notification —
+ * which is the failure a persisted filter would otherwise cause months later, on a phone whose
+ * owner has forgotten it is set.
  *
  * **An empty selection is no constraint, not "matches nothing"** — the rule `match.ts` states for
  * a keyword-less interest, and the same reasoning: nothing chosen is a reader who has not chosen,
  * and reading it as unsatisfiable would open the tab on a blank feed.
+ *
+ * One function rather than three lenses chained, because they are asked four different questions
+ * per render: what the feed shows, and what each control's counts would be with every filter *but
+ * its own* applied. Chaining those combinations builds a pile of intermediate arrays to answer
+ * what is one predicate per row. The identity return when nothing is set is not an optimisation
+ * either — it is what keeps the component's `useMemo` chain from rebuilding its option lists for
+ * filters nobody has touched.
+ *
+ * Grouping survives untouched: filtering after `buildFeed` cannot reorder anything, and a section
+ * left with nothing in it is dropped rather than drawn as an empty heading.
  */
-export function filterSectionsByKinds(
-  sections: FeedSection[],
-  kinds: ReadonlySet<KindKey>,
-): FeedSection[] {
-  if (kinds.size === 0) return sections;
+export interface FeedNarrowing {
+  /** Folded, as `cityKeyOf` returns it. Empty or absent for every city. */
+  city?: string;
+  kinds?: ReadonlySet<KindKey>;
+  newsroom?: ReadonlySet<NewsroomKey>;
+}
+
+export function narrowSections(sections: FeedSection[], narrowing: FeedNarrowing): FeedSection[] {
+  const { city = '', kinds, newsroom } = narrowing;
+  const byKind = kinds && kinds.size > 0 ? kinds : null;
+  // Read as strings, so the `''` a row the reader never saw returns is simply a key no chosen set
+  // holds — rather than a cast, or a second branch saying the same thing.
+  const byNewsroom: ReadonlySet<string> | null =
+    newsroom && newsroom.size > 0 ? newsroom : null;
+  if (!city && !byKind && !byNewsroom) return sections;
   return sections
     .map((section) => ({
       group: section.group,
-      items: section.items.filter((item) => kinds.has(kindKeyOf(item.event))),
+      items: section.items.filter(
+        (item) =>
+          (!city || cityKeyOf(item.event) === city) &&
+          (!byKind || byKind.has(kindKeyOf(item.event))) &&
+          (!byNewsroom || byNewsroom.has(newsroomKeyOf(item.event))),
+      ),
     }))
     .filter((section) => section.items.length > 0);
 }

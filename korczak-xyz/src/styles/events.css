@@ -368,7 +368,7 @@
 }
 
 /*
- * The kind filter — several at once, so buttons rather than the city's `<select>`.
+ * The label filters — several at once, so buttons rather than the city's `<select>`.
  *
  * `.ev-view`'s two-selectors-and-hover arithmetic, for the same reason: `Layout.astro`'s global
  * `button:hover` at (0,1,1) beats a bare class, so an unnamed hover state would grey out whichever
@@ -377,12 +377,19 @@
  * Unlike the view picker these do not butt together with a negative margin: any number of them can
  * be pressed, and a shared border between two pressed buttons reads as one wide control rather
  * than two separate answers.
+ *
+ * `flex-basis: 100%` gives each row a line of its own in the toolbar. There are two of them and
+ * they are different questions — what sort of row this is, and what the theatre's article says —
+ * so run together on one line their buttons would read as one long list of alternatives instead of
+ * an AND across two axes. The label at the head of each row is what says which is which, and it
+ * only does that job at the start of a line.
  */
 .ev-kinds {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  flex-basis: 100%;
 }
 
 .ev-kind,
