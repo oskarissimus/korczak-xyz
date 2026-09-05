@@ -6,7 +6,8 @@
  * collector notifies about" drifting into two different ideas of the same list.
  */
 
-import type { EventRecord, Interest } from './types';
+import type { EventKind, EventRecord, Interest } from './types';
+import { KINDS } from './types';
 import { NO_IGNORES } from './ignores';
 import type { MatchReason } from './match';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
@@ -362,6 +363,84 @@ export function filterSectionsByCity(sections: FeedSection[], cityKey: string): 
     .map((section) => ({
       group: section.group,
       items: section.items.filter((item) => cityKeyOf(item.event) === cityKey),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/**
+ * What the classifier called a row, as the one value a filter can be keyed on.
+ *
+ * `unlabelled` is a key of its own rather than being folded into `listing`, and that is the whole
+ * care in this file. An unclassified row *passes* every rule the classifier feeds — it is in the
+ * feed because nothing has judged it, not because something judged it an event — so counting it as
+ * a listing would let a reader narrow to listings and be shown rows that may be press releases,
+ * with nothing on the screen saying so. It is the same distinction `classificationCoverage` exists
+ * to make visible in the rejected view.
+ */
+export type KindKey = EventKind | 'unlabelled';
+
+/**
+ * Every kind, in the order they are drawn in.
+ *
+ * Fixed rather than by count, unlike `countryTally`: these are buttons rather than a line of
+ * prose, and a row whose buttons swap places as the corpus changes is one you press the wrong half
+ * of. `listing` first because it is what the app is mostly for, `unlabelled` last because it is the
+ * absence of an answer rather than one of them.
+ */
+export const KIND_KEYS: readonly KindKey[] = [...KINDS, 'unlabelled'];
+
+export function kindKeyOf(event: { kind?: EventKind }): KindKey {
+  return event.kind ?? 'unlabelled';
+}
+
+export interface KindOption {
+  key: KindKey;
+  count: number;
+}
+
+/**
+ * The kinds present in a built feed, with how many rows each holds.
+ *
+ * Counts for `cityOptions`' reason — this control can empty the screen, and a choice should say
+ * what pressing it does. In `KIND_KEYS` order, which is fixed; see there.
+ *
+ * A kind with nothing behind it is left out. There are four at most and the reader is choosing
+ * from what is actually there — the selected-but-empty case is kept on screen by
+ * `withSelectedKinds` in the component, which is where it belongs: it is a fact about the
+ * selection, not the corpus.
+ */
+export function kindOptions(events: Array<{ kind?: EventKind }>): KindOption[] {
+  const counts = new Map<KindKey, number>();
+  for (const event of events) {
+    const key = kindKeyOf(event);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return KIND_KEYS.map((key) => ({ key, count: counts.get(key) ?? 0 })).filter(
+    (option) => option.count > 0,
+  );
+}
+
+/**
+ * The rows of the chosen kinds out of a built feed — every row when nothing is chosen.
+ *
+ * A lens over the finished list, exactly as `filterSectionsByCity` is, and for the same reason: it
+ * is a view preference on one device and never a fact about what matches, so narrowing it cannot
+ * quietly stop a notification. The durable form of "no articles, thank you" is an interest's
+ * `coverage` flag, which is what the collector reads.
+ *
+ * **An empty selection is no constraint, not "matches nothing"** — the rule `match.ts` states for
+ * a keyword-less interest, and the same reasoning: nothing chosen is a reader who has not chosen,
+ * and reading it as unsatisfiable would open the tab on a blank feed.
+ */
+export function filterSectionsByKinds(
+  sections: FeedSection[],
+  kinds: ReadonlySet<KindKey>,
+): FeedSection[] {
+  if (kinds.size === 0) return sections;
+  return sections
+    .map((section) => ({
+      group: section.group,
+      items: section.items.filter((item) => kinds.has(kindKeyOf(item.event))),
     }))
     .filter((section) => section.items.length > 0);
 }

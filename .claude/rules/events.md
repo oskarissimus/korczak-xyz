@@ -861,6 +861,47 @@ Four things about it:
 It joins `CACHED_PER_OWNER`. It is a preference rather than data, but it is one that hides rows, and
 inherited across a sign-in it would empty a feed nobody in that account had narrowed.
 
+### Narrowing the feed to a kind
+
+The second lens over the same output — `filterSectionsByKinds`, persisted in `events-feed-kinds`,
+every argument above holding unchanged: a view preference on one device, never a `FeedOptions`
+field, never anything `PlanContext` hears about. The durable form of "no articles, thank you" is
+`Interest.includeCoverage`, and the empty-state hint says so.
+
+It is **multi-select** because the useful questions are plural — "announcements and news, not the
+listings I have already read" is one filter and not three visits — and that is the whole reason it
+is a row of `aria-pressed` buttons rather than a second `<select>`. A `<select multiple>` on iOS
+draws as a list nobody can tell is multi-select, and choosing two means holding a modifier a touch
+screen does not have.
+
+Four things it does not share with the city picker:
+
+- **`unlabelled` is a key of its own, not folded into `listing`.** An unclassified row *passes*
+  every rule the classifier feeds, so it is in the feed because nothing has judged it rather than
+  because something judged it an event. Counted as a listing, narrowing to listings would quietly
+  show press releases; kept apart, the absence of a verdict is a thing you can look at directly —
+  which is a second way a stalled classifier gets noticed from this tab, beside
+  `classificationCoverage`.
+- **`listing` gets a word here although the card draws no chip for it.** A label on every row saying
+  "yes, this is an event" is one nobody reads twice, but a filter offering every kind except the
+  commonest is one you cannot use to see only events.
+- **Nothing chosen is no constraint**, which is `match.ts`'s rule for a keyword-less interest
+  arriving in the UI. Read the other way the tab opens on a blank feed for everyone who has never
+  touched the control.
+- **`KIND_KEYS` fixes the order**, unlike `countryTally`'s commonest-first. These are buttons, and
+  a row whose buttons swap places as the corpus changes is one you press the wrong half of.
+
+The two filters are **each built from the view the other has already narrowed**, which is what keeps
+both sets of counts honest: `Warszawa (12)` under a kind filter has to mean twelve of the kind on
+screen, or pressing it lands on a smaller number than it promised, and `Anywhere` is the rest of the
+toolbar minus the city rather than the whole corpus. `withSelectedKinds` is `withSelected`'s
+argument reaching this control — a chosen kind that has fallen to zero keeps its button, or the
+feed would be narrowed to nothing with nothing on screen to press.
+
+`loadFeedKinds` validates against `KIND_KEYS` rather than reading what is stored: a key written by a
+future build with a fourth kind matches no row here, so kept it would silently empty the feed where
+dropping it leaves the filter honest about what this build can do.
+
 ### Deploying it
 
 `firestore.rules` gained `events/` and `eventSources/` — top-level collections are outside the

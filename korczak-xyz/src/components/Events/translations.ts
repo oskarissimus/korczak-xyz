@@ -79,6 +79,15 @@ export const translations = {
     cityClear: 'Show every city',
     cityEmptyHint:
       'Nothing here is in {city}. This filter only narrows what you are looking at — set the cities on an interest to change what notifies you.',
+    kindFilter: 'Kind',
+    kindOption: '{kind} ({count})',
+    kindsListings: 'Listings',
+    kindsAnnouncements: 'Announcements',
+    kindsCoverage: 'News',
+    kindsUnlabelled: 'Not labelled',
+    kindClear: 'Show every kind',
+    kindEmptyHint:
+      'Nothing here is one of the kinds you picked. This filter only narrows what you are looking at — the coverage switch on an interest is what changes which of these notify you.',
 
     // Interests
     interestsHeading: 'What to watch for',
@@ -261,6 +270,15 @@ export const translations = {
     cityClear: 'Pokaż wszystkie miasta',
     cityEmptyHint:
       'Nic tutaj nie odbywa się w takim mieście: {city}. Ten filtr zawęża tylko widok — o powiadomieniach decydują miasta wpisane w zainteresowaniu.',
+    kindFilter: 'Rodzaj',
+    kindOption: '{kind} ({count})',
+    kindsListings: 'Wydarzenia',
+    kindsAnnouncements: 'Ogłoszenia',
+    kindsCoverage: 'Teksty',
+    kindsUnlabelled: 'Bez etykiety',
+    kindClear: 'Pokaż wszystkie rodzaje',
+    kindEmptyHint:
+      'Nic tutaj nie jest jednego z wybranych rodzajów. Ten filtr zawęża tylko widok — o tym, które z nich powiadamiają, decyduje przełącznik tekstów w zainteresowaniu.',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:

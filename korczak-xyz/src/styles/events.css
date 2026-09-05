@@ -350,7 +350,8 @@
   gap: 6px;
 }
 
-.ev-city-label {
+.ev-city-label,
+.ev-kinds-label {
   color: var(--retro-dark-gray);
 }
 
@@ -364,6 +365,42 @@
   color: var(--retro-black);
   max-width: 100%;
   cursor: pointer;
+}
+
+/*
+ * The kind filter — several at once, so buttons rather than the city's `<select>`.
+ *
+ * `.ev-view`'s two-selectors-and-hover arithmetic, for the same reason: `Layout.astro`'s global
+ * `button:hover` at (0,1,1) beats a bare class, so an unnamed hover state would grey out whichever
+ * button is under the pointer and the pressed one has to out-specify it back. See `.ev-views`.
+ *
+ * Unlike the view picker these do not butt together with a negative margin: any number of them can
+ * be pressed, and a shared border between two pressed buttons reads as one wide control rather
+ * than two separate answers.
+ */
+.ev-kinds {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ev-kind,
+.ev-kind:hover {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 6px 10px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.ev-kind--on,
+.ev-kind--on:hover {
+  border-style: inset;
+  background: var(--retro-white);
 }
 
 /*

@@ -23,6 +23,7 @@
 
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
+import { KIND_KEYS, type KindKey } from '../feed';
 import type { EventRecord, Ignore, Interest, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
@@ -36,6 +37,7 @@ export const EVENT_KEYS = {
   pushSeen: 'events-push-seen-at',
   settings: 'events-push-settings',
   feedCity: 'events-feed-city',
+  feedKinds: 'events-feed-kinds',
 } as const;
 
 /** How many events the offline cache keeps. Roughly 60 kB at ~300 bytes a row. */
@@ -61,6 +63,9 @@ const CACHED_PER_OWNER = [
    * Cheap to clear, since the whole cost of losing it is one tap on the picker.
    */
   EVENT_KEYS.feedCity,
+  // Same argument, same cost: a feed narrowed to announcements is one the next account never
+  // narrowed, and it hides rows with nothing on the screen saying who asked for it.
+  EVENT_KEYS.feedKinds,
 ] as const;
 
 const OWNER_KEY = 'events-owner';
@@ -373,6 +378,33 @@ export function saveFeedCity(city: string): boolean {
     }
   }
   return writeEventsKey(EVENT_KEYS.feedCity, city);
+}
+
+/**
+ * Which kinds the feed is narrowed to — an empty list for all of them.
+ *
+ * Validated against the keys this build knows rather than read as written, so a value stored by a
+ * future build that has a fourth kind cannot narrow this one to nothing: an unknown key would
+ * match no row and silently empty the feed, where dropping it leaves the filter honest about what
+ * it can do. An empty result is stored as a removal, so "everything" is the absence of a key.
+ */
+export function loadFeedKinds(): KindKey[] {
+  const raw = readJSON<unknown>(EVENT_KEYS.feedKinds, []);
+  if (!Array.isArray(raw)) return [];
+  const known = new Set<string>(KIND_KEYS);
+  return [...new Set(raw.filter((k): k is KindKey => typeof k === 'string' && known.has(k)))];
+}
+
+export function saveFeedKinds(kinds: KindKey[]): boolean {
+  if (kinds.length === 0) {
+    try {
+      localStorage.removeItem(EVENT_KEYS.feedKinds);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return writeEventsKey(EVENT_KEYS.feedKinds, JSON.stringify(kinds));
 }
 
 export function loadPushSettings(): PushSettings {

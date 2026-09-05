@@ -9,12 +9,16 @@ import {
   countryTally,
   dedupeByFingerprint,
   filterSectionsByCity,
+  filterSectionsByKinds,
   groupOf,
+  kindKeyOf,
+  kindOptions,
   placeLabel,
   saleWhenLabel,
   whenLabel,
 } from './feed';
 import { fingerprintOf, haystackOf } from './normalize';
+import type { KindKey } from './feed';
 import type { EventRecord, Interest } from './types';
 
 const DAY = 86400000;
@@ -553,6 +557,66 @@ describe('the city filter', () => {
   it('is a lens over a built feed, so anywhere is what buildFeed said', () => {
     const all = sections();
     expect(filterSectionsByCity(all, '')).toBe(all);
+  });
+});
+
+describe('the kind filter', () => {
+  const sections = () =>
+    buildFeed(
+      [
+        ev({ title: 'Wesele Figara', day: '2026-10-21', kind: 'listing' }),
+        ev({ title: 'Sprzedaż biletów rusza', day: '2026-10-22', kind: 'announcement' }),
+        ev({ title: 'Relacja z premiery', day: '2026-10-23', kind: 'coverage' }),
+        ev({ title: 'Something nobody has judged', day: '2026-10-24' }),
+      ],
+      // `includeCoverage`, or the article about the premiere never reaches the feed to be filtered
+      // — the interest's own rule runs first, and this control is a lens over what it let through.
+      [{ ...ALL, includeCoverage: true }],
+      NOW,
+    );
+
+  it('counts a row nothing has judged apart from a listing', () => {
+    // The two are not the same claim: an unclassified row is in the feed because nothing has
+    // looked at it, and folding it into `listing` would show press releases to a reader who asked
+    // for events with nothing on the screen saying so.
+    expect(kindKeyOf({ kind: 'listing' })).toBe('listing');
+    expect(kindKeyOf({})).toBe('unlabelled');
+  });
+
+  it('offers each kind present, in a fixed order, with what pressing it would show', () => {
+    const options = kindOptions(sections().flatMap((s) => s.items).map((i) => i.event));
+    expect(options).toEqual([
+      { key: 'listing', count: 1 },
+      { key: 'announcement', count: 1 },
+      { key: 'coverage', count: 1 },
+      { key: 'unlabelled', count: 1 },
+    ]);
+  });
+
+  it('leaves out a kind the corpus does not hold', () => {
+    // A button for nothing is one that empties the screen when pressed. The selected-but-empty
+    // case is the component's to keep, and it is a fact about the selection rather than the feed.
+    expect(kindOptions([{ kind: 'listing' }, { kind: 'listing' }])).toEqual([
+      { key: 'listing', count: 2 },
+    ]);
+  });
+
+  it('keeps several kinds at once, grouping untouched', () => {
+    const filtered = filterSectionsByKinds(
+      sections(),
+      new Set<KindKey>(['announcement', 'coverage']),
+    );
+    expect(filtered.flatMap((s) => s.items).map((i) => i.event.kind)).toEqual([
+      'announcement',
+      'coverage',
+    ]);
+  });
+
+  it('reads nothing chosen as no constraint, not as matching nothing', () => {
+    // `match.ts`'s rule for a keyword-less interest. Read the other way, the tab would open on a
+    // blank feed for every reader who has never touched this control.
+    const all = sections();
+    expect(filterSectionsByKinds(all, new Set())).toBe(all);
   });
 });
 
