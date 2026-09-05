@@ -3,6 +3,7 @@ import {
   newsroomHashOf,
   buildReaderPrompt,
   needsReading,
+  parseEventMoment,
   parseReadings,
   parseSaleMoment,
   queueForReading,
@@ -48,6 +49,18 @@ describe('newsroomHashOf', () => {
     );
   });
 
+  it('changes with the publication date, which the prompt now shows', () => {
+    /*
+     * The rule `classifyHashOf` follows: the hash covers exactly the fields the prompt shows. The
+     * published day is what a yearless "6 lipca" is resolved against, so a reading made without it
+     * is not the reading this article would get now.
+     */
+    const base = article({ id: 'a', title: 'Ogrody Muzyczne' });
+    expect(newsroomHashOf({ ...base, publishedAt: Date.parse('2026-07-06T00:00:00Z') })).not.toBe(
+      newsroomHashOf(base),
+    );
+  });
+
   it('ignores tags, which the reader itself writes', () => {
     /*
      * The loop this prevents: the reader adds a `programme` tag, a tag-reading hash therefore
@@ -88,6 +101,27 @@ describe('buildReaderPrompt', () => {
     expect(buildReaderPrompt([article({ id: 'a', title: 'x' })], NOW)).toContain('2026-09-03');
   });
 
+  it('gives each item its own publication date to resolve a yearless date against', () => {
+    /*
+     * Better than `today` for the case this was added for: an article published in July saying
+     * "6 lipca" means that July, and resolving it against September rolls it into next year — a
+     * festival that is over turning up in the feed as one still to come.
+     */
+    const prompt = buildReaderPrompt(
+      [article({ id: 'a', title: 'Ogrody', publishedAt: Date.parse('2026-07-06T10:00:00Z') })],
+      NOW,
+    );
+    expect(prompt).toContain('"published":"2026-07-06"');
+    expect(prompt).toMatch(/published/);
+  });
+
+  it('asks for the date of the event the item is about, and says what it is not', () => {
+    const prompt = buildReaderPrompt([article({ id: 'a', title: 'x' })], NOW);
+    expect(prompt).toContain('eventAt');
+    // The three dates an article carries that are not the event's own.
+    expect(prompt).toMatch(/Never the sale date/);
+  });
+
   it('says the article text is content, never an instruction', () => {
     // It is scraped from someone else's CMS and the answer schedules a notification.
     expect(buildReaderPrompt([article({ id: 'a', title: 'x' })], NOW)).toMatch(
@@ -125,6 +159,27 @@ describe('parseSaleMoment', () => {
     expect(parseSaleMoment('soon')).toBeNull();
     expect(parseSaleMoment('2026-09-01T25:00')).toBeNull();
     expect(parseSaleMoment('1 September 2026')).toBeNull();
+  });
+});
+
+describe('parseEventMoment', () => {
+  it('lands a bare day inside the right Warsaw day, with no hour claimed', () => {
+    // Midday, because the sentence never said a time — see DEFAULT_EVENT_HOUR. 12:00 Warsaw in
+    // July is 10:00 UTC.
+    expect(new Date(parseEventMoment('2026-07-06')!).toISOString()).toBe(
+      '2026-07-06T10:00:00.000Z',
+    );
+  });
+
+  it('keeps an hour where the article gave one', () => {
+    expect(new Date(parseEventMoment('2026-11-22T19:00')!).toISOString()).toBe(
+      '2026-11-22T18:00:00.000Z',
+    );
+  });
+
+  it('refuses a day that does not exist, exactly as the sale reading does', () => {
+    expect(parseEventMoment('2027-02-31')).toBeNull();
+    expect(parseEventMoment('lipiec')).toBeNull();
   });
 });
 
@@ -187,6 +242,43 @@ describe('parseReadings', () => {
       NOW,
     );
     expect(got.get('a')!.saleOpensAt).toBeUndefined();
+  });
+
+  it('keeps an event date that has already passed, which is the point of asking', () => {
+    /*
+     * The case this field was added for: "OGRODY MUZYCZNE 2026", published in July, met by the
+     * collector in September and shown under *announced, no dates yet* as though it were news.
+     * A past date here is the answer, not a fault — the opposite of the sale rule directly above.
+     */
+    const got = parseReadings(
+      reply([{ id: 'a', kind: 'programme', saleOpensAt: '', eventAt: '2026-07-06', summary: 'x' }]),
+      asked,
+      NOW,
+    );
+    expect(new Date(got.get('a')!.eventAt!).toISOString()).toBe('2026-07-06T10:00:00.000Z');
+  });
+
+  it('drops an event date so far out it can only be a misread year', () => {
+    // The one failure a model resolving "6 lipca" against nothing actually has. It schedules
+    // nothing, so this window is all the guard the field needs.
+    for (const eventAt of ['2035-07-06', '2009-07-06']) {
+      const got = parseReadings(
+        reply([{ id: 'a', kind: 'programme', saleOpensAt: '', eventAt, summary: 'x' }]),
+        asked,
+        NOW,
+      );
+      expect(got.get('a')!.kind).toBe('programme');
+      expect(got.get('a')!.eventAt).toBeUndefined();
+    }
+  });
+
+  it('leaves the event date absent when the item states none', () => {
+    const got = parseReadings(
+      reply([{ id: 'a', kind: 'institutional', saleOpensAt: '', eventAt: '', summary: 'x' }]),
+      asked,
+      NOW,
+    );
+    expect(got.get('a')!.eventAt).toBeUndefined();
   });
 
   it('drops a kind it has never heard of', () => {
@@ -255,6 +347,24 @@ describe('readingUpdate', () => {
       NOW,
     );
     expect(update.onSaleAt).toBeUndefined();
+  });
+
+  it('writes the date of the event the article is about', () => {
+    const at = Date.parse('2026-07-06T10:00:00Z');
+    const update = readingUpdate(article({ id: 'a', title: 'x' }), { kind: 'programme', eventAt: at }, NOW);
+    expect(update.newsroomEventAt).toBe(at);
+    // And it is emphatically not the sale date, which schedules a notification.
+    expect(update.onSaleAt).toBeUndefined();
+  });
+
+  it('does not clear an event date the model declined to repeat', () => {
+    /*
+     * A reading that finds no date on an article that already has one is the model failing to
+     * repeat itself, not the festival being called off — and clearing would put the row back in
+     * the undated group it was rescued from.
+     */
+    const known = article({ id: 'a', title: 'x', newsroomEventAt: NOW + 30 * DAY });
+    expect(readingUpdate(known, { kind: 'programme' }, NOW).newsroomEventAt).toBeUndefined();
   });
 
   it('marks a dateless article read, so it is not asked about for ever', () => {

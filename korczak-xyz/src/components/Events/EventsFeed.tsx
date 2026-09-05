@@ -465,7 +465,22 @@ function EventCard({
         {item.ignored ? <span className="ev-chip ev-chip--ignored">{t.ignoredChip}</span> : null}
         {placeLabel(event) ? <span>{placeLabel(event)}</span> : null}
         <span>{event.sourceName}</span>
-        <span>{fill(t.announcedAgo, { when: relativeTime(event.firstSeenAt, now, t) })}</span>
+        {/*
+          * When the *source* published it, where the source said so — and only the collector's own
+          * first sighting when it did not.
+          *
+          * These are different facts and the card was printing the second while implying the
+          * first. A news list holds ten items and a feed twenty, so the run that first reaches one
+          * is reading a back catalogue: a piece the theatre published in July was met in
+          * September and captioned `Announced 2 d ago`, which made two-month-old news the freshest
+          * thing on the screen. `firstSeenAt` is still what `announced` notices fire on, and still
+          * what this says where nothing else is known.
+          */}
+        {event.publishedAt !== undefined ? (
+          <span>{fill(t.publishedAgo, { when: relativeTime(event.publishedAt, now, t) })}</span>
+        ) : (
+          <span>{fill(t.announcedAgo, { when: relativeTime(event.firstSeenAt, now, t) })}</span>
+        )}
       </div>
 
       {/*

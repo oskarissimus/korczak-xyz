@@ -169,6 +169,26 @@ describe('parseNewsPage', () => {
     expect(parking!.onSaleAt).toBeUndefined();
   });
 
+  it('keeps the day the theatre published each item', () => {
+    /*
+     * The row's `<time datetime>`, which was read for the sale's missing year and then dropped.
+     * Without it the feed can only say when the *collector* first saw a piece — so an article from
+     * July, met in September, was captioned `Announced 2 d ago` and read as the freshest thing on
+     * the screen. Midnight Warsaw on 31 August 2026 is 22:00 UTC on the 30th, summer time.
+     */
+    const sale = news.find((e) => e.title === 'Edukacja w nowym sezonie')!;
+    expect(new Date(sale.publishedAt!).toISOString()).toBe('2026-08-30T22:00:00.000Z');
+    expect(news.every((e) => typeof e.publishedAt === 'number')).toBe(true);
+  });
+
+  it('does not let the publication date become the event date', () => {
+    // The rule the RSS adapter is built on, now with a second date on the row to get wrong: an
+    // article is not an event happening on the day it was written.
+    const sale = news.find((e) => e.title === 'Edukacja w nowym sezonie')!;
+    expect(sale.startsAt).toBeNull();
+    expect(sale.publishedAt).not.toBe(sale.onSaleAt);
+  });
+
   it('leaves startsAt null on every row, an article having no date of its own', () => {
     // The rule the RSS adapter is built on. Put the publication date here and every announcement
     // is filed as happening today, and `soon` fires about it.

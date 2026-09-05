@@ -206,9 +206,21 @@ export function buildFeed(
  * this rather than reading `startsAt` directly — and because `onSaleAt` is only ever set where a
  * source stated it ahead of time, nothing else in the feed moves.
  */
-export function actionableAt(event: Pick<EventRecord, 'startsAt' | 'onSaleAt'>): number | null {
+export function actionableAt(
+  event: Pick<EventRecord, 'startsAt' | 'onSaleAt' | 'newsroomEventAt'>,
+): number | null {
   if (event.startsAt !== null) return event.startsAt;
-  return event.onSaleAt ?? null;
+  /*
+   * The sale first, and only then the date of the thing being sold. Both can be on one row — the
+   * theatre announces a season and the morning its tickets go — and of the two it is the sale you
+   * can be late for.
+   *
+   * `newsroomEventAt` is a reading rather than a stated fact, and this is the whole of what it
+   * moves: an article about a festival held in July stops being *undated* and starts being *over*,
+   * so the feed drops it exactly as it drops a concert that has been and gone. Nothing counts down
+   * to it — `noticesFor` reads `startsAt` and `onSaleAt`, and neither is written by a model.
+   */
+  return event.onSaleAt ?? event.newsroomEventAt ?? null;
 }
 
 /**
@@ -231,16 +243,34 @@ export function groupOf(event: EventRecord, now: number): FeedGroup {
  *
  * The match score is only a tiebreak within one day — it exists so that on a night when a broad
  * interest and a specific keyword both matched, the specific one is read first. Undated events
- * fall to the end and order by when they were announced.
+ * fall to the end and order by when they were announced — by `announcedAt`, which is the source's
+ * publication date where there is one and not the day the collector happened to meet the row.
  */
 function compareItems(a: FeedItem, b: FeedItem): number {
   const at = actionableAt(a.event);
   const bt = actionableAt(b.event);
-  if (at === null && bt === null) return b.event.firstSeenAt - a.event.firstSeenAt;
+  if (at === null && bt === null) return announcedAt(b.event) - announcedAt(a.event);
   if (at === null) return 1;
   if (bt === null) return -1;
   if (at !== bt) return at - bt;
   return bestScore(b) - bestScore(a) || a.event.id.localeCompare(b.event.id);
+}
+
+/**
+ * When this was announced, as the world would say it rather than as the collector would.
+ *
+ * `firstSeenAt` is when *this app* met the row, which for anything scraped off a page holding ten
+ * items is when the collector started rather than when the news broke. A feed read for the first
+ * time hands over its whole back catalogue in one run, and every one of those rows carries the
+ * same `firstSeenAt` to the millisecond — so the undated group ordered by it is not ordered by
+ * anything at all, and a two-month-old article sits above this morning's.
+ *
+ * The publication date is what a source states about its own item, so where there is one it is
+ * the answer. `firstSeenAt` remains the fallback, and remains what `announced` notices fire on:
+ * a late-discovered article is still new to a reader who has never seen it.
+ */
+export function announcedAt(event: Pick<EventRecord, 'publishedAt' | 'firstSeenAt'>): number {
+  return event.publishedAt ?? event.firstSeenAt;
 }
 
 function bestScore(item: FeedItem): number {
@@ -431,11 +461,38 @@ export function saleWhenLabel(
 }
 
 export function whenLabel(
-  event: { startsAt: number | null; dateText?: string; allDay?: boolean },
+  event: {
+    startsAt: number | null;
+    dateText?: string;
+    allDay?: boolean;
+    newsroomEventAt?: number;
+  },
   locale: string,
   timeZone = 'Europe/Warsaw',
 ): string {
-  if (event.startsAt === null) return event.dateText ?? '—';
+  if (event.startsAt === null) {
+    /*
+     * The date the reader found in the article, where the row has no date of its own.
+     *
+     * Ahead of `dateText`, which on these rows is the theatre's Polish sale sentence, and well
+     * ahead of the em dash that was there before — a card reading `—` for something that happened
+     * in July is the app declining to say the one thing that would place it. The year is printed
+     * with it, because past is a state this label can now be in and `6 Jul` alone would read as
+     * next summer.
+     *
+     * No clock, and no weekday. The hour was never in the sentence (see `DEFAULT_EVENT_HOUR`), and
+     * printing one would claim a precision the article did not have.
+     */
+    if (event.newsroomEventAt !== undefined) {
+      return new Intl.DateTimeFormat(locale, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone,
+      }).format(new Date(event.newsroomEventAt));
+    }
+    return event.dateText ?? '—';
+  }
   return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',

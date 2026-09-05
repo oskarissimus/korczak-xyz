@@ -69,6 +69,7 @@ export function toRecord(
     day,
     allDay: raw.allDay,
     dateText: raw.dateText,
+    publishedAt: raw.publishedAt,
     city: raw.city,
     venue: raw.venue,
     country: raw.country,
@@ -156,8 +157,24 @@ export function mergeRecord(
        * as with `country`, since it read the sentence rather than inferred it.
        */
       onSaleAt: incoming.onSaleAt ?? stored.onSaleAt,
+      /*
+       * The publication date, from the source where it still states one.
+       *
+       * Same shape as `country`: an incoming value wins because the source read its own page, and
+       * the stored one fills in behind it — so a row that has scrolled off page one of a news list
+       * keeps the date it was published on instead of losing it the moment the page it came from
+       * no longer mentions it.
+       */
+      publishedAt: incoming.publishedAt ?? stored.publishedAt,
       newsroomKind: stored.newsroomKind,
       newsroomSummary: stored.newsroomSummary,
+      /*
+       * The date the article is *about*, which no source has ever heard of — it is the reader's
+       * reading of a sentence of prose. Unnamed here it would be deleted six hours after being
+       * learnt, exactly as `onSaleAt` would, and the feed would go back to filing an article about
+       * a finished festival as news with no dates yet.
+       */
+      newsroomEventAt: stored.newsroomEventAt,
       newsroomReadAt: stored.newsroomReadAt,
       newsroomHash: stored.newsroomHash,
       /*

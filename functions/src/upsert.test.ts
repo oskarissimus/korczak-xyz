@@ -217,6 +217,50 @@ describe('mergeRecord and the newsroom reader', () => {
     expect(merged.tags).toEqual(['theatre', 'newsroom', 'programme']);
   });
 
+  it('carries the date the article is about forward, no source having heard of it', () => {
+    /*
+     * Exactly the `onSaleAt` argument, on the field that stops an article about a finished
+     * festival reading as news with no dates yet. Unnamed in the merge it would be deleted six
+     * hours after the model read it, and the feed would go back to what the screenshot showed.
+     */
+    const at = Date.parse('2026-07-06T10:00:00Z');
+    const before = article({ newsroomEventAt: at });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, tags: ['theatre', 'newsroom'] }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    const merged = mergeRecord(incoming, before, LATER).record;
+    expect(merged.newsroomEventAt).toBe(at);
+    // And it stays out of `startsAt`, which is what notices count down to.
+    expect(merged.startsAt).toBeNull();
+  });
+
+  it('keeps a publication date the page no longer shows', () => {
+    /*
+     * A news list holds ten items. An article that has scrolled off it is still in the corpus and
+     * must not lose the day it was published just because the run that met it could not see one.
+     */
+    const published = Date.parse('2026-07-06T00:00:00Z');
+    const before = article({ publishedAt: published });
+    const incoming = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    expect(mergeRecord(incoming, before, LATER).record.publishedAt).toBe(published);
+    // The source still wins where it states one, as it does for `country`.
+    const restated = toRecord(
+      raw({ sourceKey: 'aktualnosci/x', startsAt: null, publishedAt: LATER }),
+      'teatr-wielki',
+      'Teatr Wielki',
+      LATER,
+    );
+    expect(mergeRecord(restated, before, LATER).record.publishedAt).toBe(LATER);
+  });
+
   it('does not read a FUTURE sale date as tickets having gone on sale', () => {
     /*
      * `hasTickets` used to be `onSaleAt !== undefined`, which was right only while every one came

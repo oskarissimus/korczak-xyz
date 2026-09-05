@@ -32,6 +32,40 @@ describe('parseFeed', () => {
     expect(parseFeed(rss, feed).every((e) => e.startsAt === null)).toBe(true);
   });
 
+  it('keeps the publication date, which is a fact the item states about itself', () => {
+    /*
+     * Not `startsAt` — see above — and not nothing either, which is what it used to be. A feed
+     * holds twenty items and the first run meets all of them at once, so `firstSeenAt` says when
+     * this app arrived rather than how old the news is.
+     */
+    expect(new Date(parseFeed(rss, feed)[0].publishedAt!).toISOString()).toBe(
+      '2027-01-27T08:00:00.000Z',
+    );
+    // An item that states none stays honest about it rather than being stamped with the run clock.
+    expect(parseFeed(rss, feed)[1].publishedAt).toBeUndefined();
+  });
+
+  it('reads the date under whichever name the feed uses for it', () => {
+    const atom = `<feed><entry>
+      <title>Festiwal</title>
+      <link rel="alternate" href="https://x.test/a"/>
+      <published>2027-03-04T10:00:00Z</published>
+    </entry><entry>
+      <title>Jarmark</title>
+      <link rel="alternate" href="https://x.test/b"/>
+      <updated>2027-03-05T10:00:00Z</updated>
+    </entry></feed>`;
+    const items = parseFeed(atom, feed);
+    expect(new Date(items[0].publishedAt!).toISOString()).toBe('2027-03-04T10:00:00.000Z');
+    expect(new Date(items[1].publishedAt!).toISOString()).toBe('2027-03-05T10:00:00.000Z');
+  });
+
+  it('ignores a date it cannot parse rather than storing NaN', () => {
+    const junk = `<rss><item><title>T</title><link>https://x.test/a</link>
+      <pubDate>whenever</pubDate></item></rss>`;
+    expect(parseFeed(junk, feed)[0].publishedAt).toBeUndefined();
+  });
+
   it('decodes entities in a plain title', () => {
     expect(parseFeed(rss, feed)[1].title).toBe('Jarmark & Turniej');
   });

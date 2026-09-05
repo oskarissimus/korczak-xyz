@@ -172,8 +172,10 @@ export function parseNewsPage(html: string): RawEvent[] {
     if (!slug) continue;
 
     // `datetime` is machine-readable and already ISO, so the publication day needs no parsing —
-    // which matters, because it is what resolves the year the sale sentence leaves out.
+    // which matters, because it is what resolves the year the sale sentence leaves out, and
+    // because it is the one thing on the row that says how old the news is.
     const publishedDay = /datetime="(\d{4}-\d{2}-\d{2})"/.exec(block)?.[1] ?? null;
+    const publishedAt = publishedDay ? warsawEpoch(publishedDay, 0) : null;
 
     // The teaser, with the category chip ("Aktualności |") stripped off the front.
     const teaser = stripTags(/<p[^>]*>([\s\S]*?)<\/p>/.exec(block)?.[1] ?? '')
@@ -190,6 +192,18 @@ export function parseNewsPage(html: string): RawEvent[] {
       subtitle: teaser || undefined,
       url: href.startsWith('http') ? href : `${HOST}${href}`,
       startsAt: null,
+      /*
+       * The day the theatre published it — kept, where before it was read for the sale's missing
+       * year and then dropped on the floor.
+       *
+       * A news list holds ten items and the collector meets them all in one run, so `firstSeenAt`
+       * says only when this app arrived. A piece written in July and first seen in September was
+       * shown as `Announced 2 d ago`, which is the collector's history stated as though it were
+       * the theatre's, and it is why a two-month-old festival read as tonight's news.
+       *
+       * Still not `startsAt`. An article is not an event happening on the day it was written.
+       */
+      ...(publishedAt !== null ? { publishedAt } : {}),
       // The theatre's own sentence, so a card is never dateless-and-mute and so a wrong parse can
       // be argued with against what was actually written.
       dateText: sale ? teaser || title : undefined,

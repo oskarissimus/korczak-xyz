@@ -90,6 +90,26 @@ export interface EventRecord {
   allDay?: boolean;
   /** The raw date string, kept when it could not be parsed, so a card is never dateless-and-mute. */
   dateText?: string;
+  /**
+   * When the **source published** this, where it says so. Not when the collector first saw it.
+   *
+   * The two are the same thing for a listing that appears the day it is announced, and nothing
+   * like each other for an article: a news page holds ten items and a feed holds twenty, so the
+   * run that first reaches one is reading a back catalogue. A festival written up in July was
+   * first seen in September, and a card saying `Announced 2 d ago` about it is stating the
+   * collector's history as though it were the theatre's.
+   *
+   * Stated by the source and never inferred — `<time datetime>` on the theatre's news list, the
+   * `pubDate` of a feed item — so it is a fact rather than a reading, and it is deliberately
+   * **not** put in `startsAt`: that would file every article as happening on its publication day
+   * and let `soon` fire about it, which is the rule the RSS adapter is built on.
+   *
+   * It is what the card prints, what the undated rows sort by, and what the reader resolves a
+   * yearless date against. It is not read by `isFresh`: `announced` is about when *this app*
+   * learnt of something, and an article discovered late is still news to a reader who has never
+   * seen it.
+   */
+  publishedAt?: number;
   city?: string;
   venue?: string;
   /**
@@ -140,6 +160,29 @@ export interface EventRecord {
    * the reader's own language.
    */
   newsroomSummary?: string;
+  /**
+   * When the event this article is **about** takes place, as the reader understood it.
+   *
+   * The gap this fills is the one an article has by construction: `startsAt` is null on every
+   * newsroom row, because the row is a piece of writing rather than a night out — and until now
+   * that meant a piece about a festival held in July and one announcing next season's premiere
+   * were the same shape of card, filed together under *announced, no dates yet*, both of them
+   * looking equally like news. The date is usually stated plainly in the prose, in Polish, in
+   * whatever phrasing the press office chose, which is exactly the sort of fact `readNewsroom.ts`
+   * exists to read.
+   *
+   * Kept in its own field rather than written into `startsAt`, for two reasons that pull the same
+   * way. It is a **reading**, not a fact the source stated in a field, and this app keeps those
+   * apart everywhere else (`reach` beside `country`, `newsroomKind` beside `tags`); and `startsAt`
+   * is what `noticesFor` counts down to, so a model that misreads a year would put a `soon`
+   * notification on a stranger's calendar. Here the blast radius is a card: the feed groups,
+   * orders and expires by it through `actionableAt`, so an article about something already over
+   * drops out of the list the way a past concert does, and nothing wakes anybody up.
+   *
+   * Unlike `onSaleAt` a **past** value is kept and is the whole point — it is what says this is old
+   * news. See `parseEventMoment` for the window that separates old news from a misread year.
+   */
+  newsroomEventAt?: number;
   newsroomReadAt?: number;
   /** What the reading was computed from — see `newsroomHashOf`. Unchanged, no second call. */
   newsroomHash?: string;

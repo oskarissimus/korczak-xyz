@@ -285,6 +285,10 @@ so a new adapter cannot get normalisation subtly different.
     keyword-less interest has no second filter — page-wide it would hand that interest the
     theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
 
+  The row's `<time datetime>` is now **kept** as `publishedAt` as well as being read for the sale's
+  missing year — see *An article had no date at all* below for why a card that could only say
+  `Announced 2 d ago` made two-month-old news the freshest thing on the screen.
+
   `startsAt` stays null on those rows, sale or not: a news item is an article, which is the rule the
   RSS adapter is built on. `feed.ts`'s `actionableAt` is what stops that filing the one row with a
   deadline under *announced, no dates yet* — it reads `startsAt` where there is one and `onSaleAt`
@@ -296,7 +300,9 @@ so a new adapter cannot get normalisation subtly different.
   worth naming: miss it and every long `SUMMARY` truncates at 75 octets, which looks like the feed
   having short titles.
 - **RSS feeds** leave `startsAt` null on purpose. A feed item is an *article*: putting its `pubDate`
-  in `startsAt` would file every post as happening today and then let `soon` fire about it.
+  in `startsAt` would file every post as happening today and then let `soon` fire about it. The
+  `pubDate` is kept as `publishedAt`, which is a different field answering a different question —
+  how old is this news, not when is the event.
 - **elektronicznezapisy.pl** is the second bespoke scrape, and it is there because a race is not
   repertoire and Ticketmaster does not sell one. Organisers publish, but each on its own WordPress —
   the RSS route would have been a line in `FEEDS` per club and still no dates. An **entry platform**
@@ -548,7 +554,7 @@ English. At that point the scrape is still green, the news list still yields ten
 silently stops warning about the one thing it was built to warn about. A model reads the sentence
 however it is phrased.
 
-Three things come back per article, and each has a job:
+Four things come back per article, and each has a job:
 
 - **`saleOpensAt`** → `EventRecord.onSaleAt`, which `presale` counts down to. The point of the
   whole pass.
@@ -565,6 +571,9 @@ Three things come back per article, and each has a job:
   obituaries are `coverage`, so the default `includeCoverage: false` keeps them out of the feed
   before the newsroom tag ever matters, and what is left for the `Ticket sales opening` seed to
   reach is the handful of items that actually announce something.
+- **`newsroomEventAt`** → when the thing the article is *about* happens, which is the one date an
+  article cannot have of its own. See *An article had no date at all* below; it is why
+  `READER_VERSION` is at **2**.
 - **`summary`** → one English line, printed on the card. The counterpart of `reachReason`: the
   verdict beside it is a single word, and without the sentence there is no telling a correct
   reading from a confident wrong one — on rows whose title and teaser are Polish, it is also the
@@ -615,6 +624,65 @@ only this feature could expose: it was `onSaleAt !== undefined`, which was right
 `onSaleAt` came from Ticketmaster and was months past. **On sale means purchasable now**, so a
 future date does not count — otherwise learning that a season opens in three weeks would fire
 `onsale` immediately and consume the latch `presale` needed.
+
+#### An article had no date at all, and the feed was reading that as freshness
+
+The screenshot: **OGRODY MUZYCZNE 2026**, a festival at the Royal Castle courtyard, published by
+the theatre on 6 July, met by the collector in September, and shown as a new `programme` under
+*announced, no dates yet* — captioned *Announced 2 d ago*. Every field on that card was correct.
+The row simply had no date anywhere on it, and two months of staleness had nowhere to show.
+
+Two halves, and only one of them needs a model.
+
+**`EventRecord.publishedAt`, which both sources were already reading and throwing away.** The news
+list states it in `<time datetime="2026-07-06">` — the adapter parsed it, used it to resolve the
+year the sale sentence omits, and dropped it. Every RSS item carries `pubDate` (or `published`,
+`updated`, `dc:date`) and the same was true there. So the only date the card could print was
+`firstSeenAt`, which is **when this app arrived**, not when the news broke: a news list holds ten
+items and a feed twenty, so the first run that reaches one is reading a back catalogue, and every
+row in it shares a `firstSeenAt` to the millisecond. Three consequences, all now fixed by a fact
+the source states outright:
+
+- the card prints `Published 61 d ago` where it used to print `Announced 2 d ago` (`relativeTime`
+  stops at days, which for this is precise rather than coarse);
+- `announcedAt` orders the undated group by it, so the group is ordered by something at all;
+- the reader's prompt carries it per row, which is a **better anchor than `today`** for a yearless
+  "6 lipca" — resolving that against September rolls a July festival into next year, which is the
+  same failure one layer along.
+
+It is emphatically **not `startsAt`**, and that is the rule the RSS adapter is built on: an article
+is not an event happening on the day it was written. It is also **not read by `isFresh`** — an
+article discovered late is still news to a reader who has never seen it, and gating `announced` on
+publication age is a notification rule, not a display one. `mergeRecord` names it with `country`'s
+shape: incoming wins, stored fills in, so a row that scrolls off page one keeps its date.
+
+**`EventRecord.newsroomEventAt`, which no source can supply.** The date of the thing being written
+about is in the prose, in Polish, in whatever phrasing the press office chose — exactly what this
+pass exists to read. `actionableAt` now reads `startsAt → onSaleAt → newsroomEventAt` (the sale
+stays ahead of it: it is the one you can be *late* for), so the feed groups, sorts and **expires**
+by it, and an article about a festival that is over drops out the way a past concert does. The
+card's date slot prints it in place of the em dash, with the year and no clock.
+
+Three things about it are load-bearing, and the first is the one to argue with:
+
+- **The window is two-sided, and the past is the point.** `saleOpensAt` is refused unless it is in
+  the future; a past event date is the answer being asked for. What is left of the guard is ±2
+  years, which catches the one failure a model resolving a yearless date actually has — the
+  misread year — and nothing subtler. It can afford that because **nothing counts down to it**:
+  `noticesFor` reads `startsAt` and `onSaleAt`, so a wrong reading costs a card in the wrong week
+  and never a notification on the wrong morning. That is the same trade `reach` makes.
+- **Its own field, never `startsAt`.** A reading and a stated fact are kept apart everywhere else
+  here (`reach` beside `country`, `newsroomKind` beside `tags`), and `startsAt` is what wakes
+  somebody up. Writing a model's date there would hand the notifier a number no test can bound.
+- **`mergeRecord` carries it forward**, for the `onSaleAt` reason exactly: no source has heard of
+  it, `stripUndefined` drops what is absent, and unnamed it would be deleted six hours after being
+  learnt — putting the row straight back under *announced, no dates yet*.
+
+The expiry is worth stating plainly, because it is a model's verdict removing a card: a wrong past
+date hides a real announcement, and this app's usual answer to that is the rejected view. It is
+accepted here on the precedent already set — `onSaleAt` can itself be model-written and has expired
+rows on the day it names since the reader shipped — and because the alternative is worse: a row
+kept but sorted by a date nobody trusts is the noise the whole `kind` axis was added to remove.
 
 #### The filter has to be falsifiable from the outside
 

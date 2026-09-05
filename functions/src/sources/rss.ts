@@ -37,6 +37,28 @@ function tag(xml: string, name: string): string | undefined {
   return decodeEntities(inner).trim() || undefined;
 }
 
+/**
+ * When the item says it was published, or undefined.
+ *
+ * Every flavour of feed spells this differently — RSS `pubDate`, Atom `published`, `updated` on a
+ * feed that only ever updates, `dc:date` on the WordPress installs that still emit it — so all
+ * four are tried in the order of how much they mean. `Date.parse` is safe here where it is wrong
+ * for a bare local datetime: these carry an offset (`Tue, 06 Jan 2026 09:12:00 +0100`), so there
+ * is no zone to guess at.
+ *
+ * It does **not** become `startsAt`. See the header: this is when the article was written, and the
+ * whole point of the honest null is that the two are different questions.
+ */
+export function publishedAtOf(item: string): number | undefined {
+  for (const name of ['pubDate', 'published', 'updated', 'dc:date']) {
+    const raw = tag(item, name);
+    if (!raw) continue;
+    const at = Date.parse(raw);
+    if (Number.isFinite(at)) return at;
+  }
+  return undefined;
+}
+
 /** Atom puts the link in an attribute; RSS puts it in the element. */
 function linkOf(xml: string): string | undefined {
   const atom = /<link[^>]+href="([^"]+)"/i.exec(xml)?.[1];
@@ -67,6 +89,13 @@ export function parseFeed(xml: string, feed: SourcePage): RawEvent[] {
        * "announced, no dates yet", which is what these actually are.
        */
       startsAt: null,
+      /*
+       * The publication date, kept as what it is rather than discarded for not being an event
+       * date. A feed holds twenty items and the run that first reaches one is reading a back
+       * catalogue, so `firstSeenAt` says when this app arrived and nothing about how old the news
+       * is — which is what made a piece from July read as `Announced 31 h ago` in September.
+       */
+      publishedAt: publishedAtOf(item),
       city: feed.city,
       country: feed.country,
       tags: feed.tags,

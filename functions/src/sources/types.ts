@@ -31,6 +31,15 @@ export interface RawEvent {
   allDay?: boolean;
   /** The source's own words, kept when the date could not be parsed. */
   dateText?: string;
+  /**
+   * When the source says it published this. Epoch ms.
+   *
+   * Only where the source states it — `<time datetime>`, an RSS `pubDate` — and never guessed at
+   * from the run's clock, which would make every row look published the day it was scraped and is
+   * precisely the confusion this field exists to end. It is not `startsAt` and must never be put
+   * there: see the header of `rss.ts`.
+   */
+  publishedAt?: number;
   city?: string;
   venue?: string;
   /**

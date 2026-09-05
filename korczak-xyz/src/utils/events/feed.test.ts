@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actionableAt,
+  announcedAt,
   buildFeed,
   cityKeyOf,
   cityOptions,
@@ -246,6 +248,33 @@ describe('whenLabel', () => {
     expect(whenLabel(allDay, 'en-GB')).toMatch(/27/);
   });
 
+  it('prints the date the reader found in an article, in place of the em dash', () => {
+    /*
+     * A newsroom row has no date of its own — it is a piece of writing — so this slot read `—` on
+     * every one of them, and an article about a festival held two months ago was
+     * indistinguishable from one announcing next season. The year is printed because past is a
+     * state this label can now be in, and no clock, because the sentence never gave one.
+     */
+    const article = { startsAt: null, newsroomEventAt: Date.parse('2026-07-06T10:00:00Z') };
+    expect(whenLabel(article, 'en-GB')).toMatch(/2026/);
+    expect(whenLabel(article, 'en-GB')).toMatch(/6 Jul/);
+    expect(whenLabel(article, 'en-GB')).not.toMatch(/\d\d:\d\d/);
+  });
+
+  it('prefers the date it read to the sale sentence it read it from', () => {
+    // `dateText` on these rows is the theatre's Polish prose. A date is what the slot is for.
+    expect(
+      whenLabel(
+        {
+          startsAt: null,
+          dateText: 'Sprzedaż biletów od 1 września',
+          newsroomEventAt: Date.parse('2026-09-20T10:00:00Z'),
+        },
+        'en-GB',
+      ),
+    ).toMatch(/20 Sep/);
+  });
+
   it('falls back to the source’s own words when the date could not be parsed', () => {
     // "Premiera: jesień 2027" is genuinely what the theatre said, and a blank reads as a bug.
     expect(whenLabel({ startsAt: null, dateText: 'Premiera: jesień 2027' }, 'en-GB')).toBe(
@@ -255,6 +284,83 @@ describe('whenLabel', () => {
 
   it('is never blank', () => {
     expect(whenLabel({ startsAt: null }, 'en-GB')).toBe('—');
+  });
+});
+
+/*
+ * The date an article is *about*, which is the only date a newsroom row can have.
+ *
+ * The screenshot that prompted it: "OGRODY MUZYCZNE 2026", a festival held in July, published in
+ * July, first seen by the collector in September — and shown under *announced, no dates yet* as a
+ * new `programme`, captioned `Announced 2 d ago`. Nothing on the row was wrong; there was simply
+ * no date anywhere on it.
+ */
+describe('an article with the date the reader found', () => {
+  const past = ev({
+    title: 'OGRODY MUZYCZNE 2026',
+    startsAt: null,
+    day: null,
+    newsroomEventAt: Date.parse('2026-07-06T10:00:00Z'),
+    firstSeenAt: NOW - 2 * DAY,
+  });
+  const soon = ev({
+    title: 'Sezon 2026/27',
+    startsAt: null,
+    day: null,
+    newsroomEventAt: NOW + 3 * DAY,
+  });
+
+  it('is the moment the row asks something of the reader, after any sale date', () => {
+    expect(actionableAt(past)).toBe(Date.parse('2026-07-06T10:00:00Z'));
+    // A sale is the thing you can be late for, so it still wins where a row carries both.
+    const both = { ...soon, onSaleAt: NOW + DAY };
+    expect(actionableAt(both)).toBe(NOW + DAY);
+  });
+
+  it('groups by it rather than falling to the end of the list', () => {
+    expect(groupOf(soon, NOW)).toBe('week');
+    // And a row that genuinely has no date anywhere is still undated, not misfiled.
+    expect(groupOf(ev({ title: 'x', startsAt: null, day: null }), NOW)).toBe('undated');
+  });
+
+  it('drops an article about something already over, as a past concert is dropped', () => {
+    const sections = buildFeed([past, soon], [ALL], NOW);
+    const shown = sections.flatMap((s) => s.items.map((i) => i.event.title));
+    expect(shown).toEqual(['Sezon 2026/27']);
+  });
+});
+
+describe('announcedAt', () => {
+  it('is what the source published, not when the collector arrived', () => {
+    /*
+     * A news list holds ten items and a feed twenty, so the first run meets a whole back
+     * catalogue at one `firstSeenAt` — ordering the undated group by it is ordering by nothing,
+     * with a two-month-old article above this morning's.
+     */
+    const published = Date.parse('2026-07-06T00:00:00Z');
+    expect(announcedAt({ publishedAt: published, firstSeenAt: NOW })).toBe(published);
+    expect(announcedAt({ firstSeenAt: NOW })).toBe(NOW);
+  });
+
+  it('orders the undated group by it', () => {
+    const seen = NOW - DAY;
+    const old = ev({
+      title: 'From July',
+      startsAt: null,
+      day: null,
+      firstSeenAt: seen,
+      publishedAt: Date.parse('2026-07-06T00:00:00Z'),
+    });
+    const fresh = ev({
+      title: 'From yesterday',
+      startsAt: null,
+      day: null,
+      firstSeenAt: seen,
+      publishedAt: NOW - DAY,
+    });
+    const [section] = buildFeed([old, fresh], [ALL], NOW);
+    expect(section.group).toBe('undated');
+    expect(section.items.map((i) => i.event.title)).toEqual(['From yesterday', 'From July']);
   });
 });
 
