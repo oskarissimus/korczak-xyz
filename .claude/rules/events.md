@@ -1145,7 +1145,7 @@ silently. Full sequence in `functions/README.md`.
 
 `terraform/` holds what the GCP project must have switched on and granted: the API list, the role
 grants, the secret **containers**, `sendTestPush`'s public invoker binding, the `gcf-artifacts`
-cleanup policy, and the two Firestore backup schedules. It exists because two deploys in a row failed for reasons that were not in the code
+cleanup policy, the two Firestore backup schedules, and the nightly export that feeds the NAS. It exists because two deploys in a row failed for reasons that were not in the code
 — a secret container that did not exist stopped the CLI deploying anything, and whether the
 classifier's identity could reach Vertex AI was a question you answered by running commands.
 
@@ -1173,6 +1173,14 @@ Five things there are load-bearing, each written up in `terraform/README.md`:
   restore is a *new* database with a day's granularity, never an in-place undo. What is really
   being protected is `users/{uid}/babySleep` — the events and transit collections rebuild
   themselves on the next collector run; the sleep log is typed in by hand and exists nowhere else.
+- **A backup and an export are different features, and both are here.** The schedules in
+  `firestore.tf` live inside Firestore and answer "undo our mistake". They are worth nothing if the
+  Google account goes, since the database and its backups vanish together. `firestore-export.tf` is
+  the other half: Cloud Scheduler calls `firestore:exportDocuments` directly — no function, it is
+  one POST — into a 30-day bucket that a QNAP pulls over HBS. `outputUriPrefix` is the bare bucket
+  on purpose, because that is what makes the API name a fresh folder per run instead of overwriting
+  one. The NAS reads with a dedicated `objectViewer` account whose key is minted by hand and never
+  enters Terraform state.
 - **The gate is "no plan may destroy anything"**, enforced in the workflow over the whole directory,
   plus `prevent_destroy` on the secrets, the registry and both backup schedules — deleting a backup
   schedule deletes the backups it made. This repo commits straight to `main`, so

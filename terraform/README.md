@@ -27,6 +27,7 @@ Both are project state. Project state that is not written down is state that get
 | `run.invoker` on `sendTestPush` | the code, the schedule |
 | the `gcf-artifacts` cleanup policy | |
 | the Firestore backup **schedules** | the Firestore **database** itself |
+| the export bucket, its schedule and its two accounts | the **key** for the NAS account |
 
 Nothing may be in both columns. Two owners of one resource is permanent drift: every
 `terraform apply` reverts what the last `firebase deploy` did, and back again, with neither tool
@@ -88,11 +89,17 @@ for ROLE in roles/serviceusage.serviceUsageAdmin \
             roles/secretmanager.admin \
             roles/artifactregistry.admin \
             roles/run.admin \
-            roles/storage.admin; do
+            roles/storage.admin \
+            roles/iam.serviceAccountAdmin; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:$SA" --role="$ROLE"
 done
 ```
+
+`iam.serviceAccountAdmin` was added later than the rest, when `firestore-export.tf` introduced the
+first service accounts this directory creates. The account already held `serviceAccountUser` — the
+right to *act as* an account — which is a different thing from the right to make one, and a plan
+that creates a service account fails without it.
 
 Then push anything, or re-run the workflow.
 
@@ -161,6 +168,54 @@ Backup storage is billed per GiB-month with no free tier. This database holds a 
 thousand scraped events and some feed-health rows, so the bill is cents — but it is a new non-zero
 line where there was none, and that is the thing being bought: `users/{uid}/babySleep` is typed in
 by hand and exists nowhere else.
+
+## The copy that leaves Google
+
+Backups protect against us. They do not protect against losing the account — a suspended project
+takes the database and every backup of it at once, because they are the same vendor. So
+`firestore-export.tf` builds the other half:
+
+```
+Cloud Scheduler ──OAuth as firestore-export@──▶ firestore:exportDocuments
+   03:30 Europe/Warsaw                                   │
+                                                         ▼
+                              gs://korczak-xyz-501720-firestore-export
+                                     30-day lifecycle, one folder per run
+                                                         │
+                                  nas-backup-reader@ ◀───┘  objectViewer only
+                                          │
+                                          ▼  HBS on the QNAP
+```
+
+There is **no Cloud Function** in that path. Scheduler calls the Admin API directly; the export is
+one POST with no logic in it, and a function would have added a deploy, a runtime and a language.
+
+Two details in `firestore-export.tf` are the kind that look like style and are not:
+
+- **`outputUriPrefix` is the bare bucket, with no path.** Given a bucket alone the API names each
+  run's folder after its start time. Add a path and every night overwrites one prefix, which turns
+  thirty days of history into a single folder and makes the lifecycle rule a countdown on the only
+  copy.
+- **The writer is not the caller.** `firestore-export@` asks for the export; Firestore's own service
+  agent writes the files, so that agent is granted `storage.admin` on the bucket explicitly. Being
+  in the same project often makes this work unstated — which is the reason to state it, because an
+  implicit permission changes without a commit.
+
+**The NAS key is not in Terraform and must not be.** `google_service_account_key` writes the private
+key into state in the clear, the same rule that keeps `VAPID_PRIVATE_KEY` out. Mint it once by hand:
+
+```sh
+gcloud iam service-accounts keys create hbs.json \
+  --iam-account=nas-backup-reader@korczak-xyz-501720.iam.gserviceaccount.com
+```
+
+Upload that file in HBS, then delete the local copy. `nas-backup-reader@` can read the objects in
+one bucket and do nothing else anywhere — which matters because its key is a file on a device on the
+LAN. The deploy account's key in the same place would be a `projectIamAdmin` credential sitting in a
+QNAP settings pane.
+
+To rotate: `gcloud iam service-accounts keys list --iam-account=…`, create a new one, re-upload,
+then delete the old key id. Nothing in Terraform changes.
 
 ## Guards, and what it means when one fires
 
