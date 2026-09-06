@@ -196,20 +196,28 @@ Ruled out individually: the key itself (it lists and reads the bucket fine from 
 laptop, and from the NAS via rclone), the clock, the QTS session, an outdated
 myQNAPcloud, the proxy setting, and a full reboot.
 
-**The most likely cause is that `nas-backup-reader@` is too locked down for HBS.**
-Community reports say HBS wants `resourcemanager.projects.get`/`.list` at *project*
-scope plus `storage.buckets.list`, `storage.buckets.update` and object *create* —
-far past read-only-on-one-bucket. Note the trap: `roles/storage.objectViewer`
-contains `resourcemanager.projects.get`, so it looks satisfied, but we bind it at
-bucket scope and a project-scoped permission granted on a bucket is inert.
+**The cause was that `nas-backup-reader@` was bound at the wrong scope**, and this was
+established by experiment rather than inference. A throwaway account was granted, in turn,
+project-wide `storage.admin` (worked), project-scoped `roles/storage.objectViewer` (worked),
+bucket-scoped `objectViewer` alone (failed, reproducing the original error exactly), and finally
+bucket-scoped `objectViewer` plus a custom project role containing nothing but
+`resourcemanager.projects.get` — which **worked**.
 
-This was NOT proven. An earlier version of this file claimed no outbound request to
-Google was ever made; that was an overreach from instrumenting the *browser*, which
-cannot observe NAS→Google traffic. Confirming it would mean widening the account's
-permissions and retrying — which is a privilege increase on a key that sits on a
-device on the LAN, and the reason it has not been done. Container Station is not an
-alternative either — the NAS is a TS-431P3, `armv7l`, and Container Station needs
-arm64/x86.
+So the real minimum for HBS against a GCS bucket is:
+
+```
+project scope :  resourcemanager.projects.get      (one read-only metadata permission)
+bucket scope  :  roles/storage.objectViewer        (on the one bucket)
+```
+
+**No write access of any kind is required** — the widely repeated advice that HBS needs
+"Storage Object Creator" is wrong. Nor is `storage.buckets.list`, nor access to any other bucket.
+
+The trap that made this expensive to find: `roles/storage.objectViewer` *contains*
+`resourcemanager.projects.get`, so reading the role suggests the requirement is met. It is not,
+because the binding is on the bucket, and a project-scoped permission granted on a bucket resource
+is inert. HBS then reports "Authentication error. Cannot connect to cloud service." and the NAS's
+cc3 layer returns `cloud_unauthorized`, none of which points at scope.
 
 So the puller is `rclone v1.75.1` (linux-arm-v7) at
 `/share/CE_CACHEDEV1_DATA/firestore-backup/`, run by `0 5 * * *` in
