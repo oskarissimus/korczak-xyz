@@ -1144,8 +1144,8 @@ silently. Full sequence in `functions/README.md`.
 ### The project layer is Terraform, the app is the Firebase CLI
 
 `terraform/` holds what the GCP project must have switched on and granted: the API list, the role
-grants, the secret **containers**, `sendTestPush`'s public invoker binding, and the `gcf-artifacts`
-cleanup policy. It exists because two deploys in a row failed for reasons that were not in the code
+grants, the secret **containers**, `sendTestPush`'s public invoker binding, the `gcf-artifacts`
+cleanup policy, and the two Firestore backup schedules. It exists because two deploys in a row failed for reasons that were not in the code
 — a secret container that did not exist stopped the CLI deploying anything, and whether the
 classifier's identity could reach Vertex AI was a question you answered by running commands.
 
@@ -1155,7 +1155,7 @@ owners of one resource is permanent drift, where every `apply` reverts the last 
 again with neither tool wrong — which is why the functions are not in Terraform even though they
 could be.
 
-Four things there are load-bearing, each written up in `terraform/README.md`:
+Five things there are load-bearing, each written up in `terraform/README.md`:
 
 - **Secret values are not in Terraform.** State stores them in the clear, and `VAPID_PRIVATE_KEY` in
   a state file is worse than the problem being solved. Only containers — their *absence* is what
@@ -1166,8 +1166,16 @@ Four things there are load-bearing, each written up in `terraform/README.md`:
   drops every binding not written in the file, including the ones that let CI back in.
 - **`disable_on_destroy = false` on every API**, or deleting a line — or a typo renaming a resource
   — disables that API and takes live functions down to fix a text file.
+- **Backups are schedules, not the database.** `firestore.tf` declares a daily kept 7 days and a
+  weekly kept 14 weeks — the API's maximums, and one of each kind is the per-database limit. The
+  `google_firestore_database` resource is deliberately absent: reaching in for point-in-time
+  recovery would make Terraform an owner of the thing every other tool reads and writes. So a
+  restore is a *new* database with a day's granularity, never an in-place undo. What is really
+  being protected is `users/{uid}/babySleep` — the events and transit collections rebuild
+  themselves on the next collector run; the sleep log is typed in by hand and exists nowhere else.
 - **The gate is "no plan may destroy anything"**, enforced in the workflow over the whole directory,
-  plus `prevent_destroy` on the secrets and the registry. This repo commits straight to `main`, so
+  plus `prevent_destroy` on the secrets, the registry and both backup schedules — deleting a backup
+  schedule deletes the backups it made. This repo commits straight to `main`, so
   there is no pull request at which somebody reads the plan; that check is what stands in for it.
   The acceptance test after the first apply is an **empty plan** — a non-empty one means the files
   describe something other than the project, and `apply` would change it.

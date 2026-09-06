@@ -26,6 +26,7 @@ Both are project state. Project state that is not written down is state that get
 | secret **containers** | `firestore.indexes.json` |
 | `run.invoker` on `sendTestPush` | the code, the schedule |
 | the `gcf-artifacts` cleanup policy | |
+| the Firestore backup **schedules** | the Firestore **database** itself |
 
 Nothing may be in both columns. Two owners of one resource is permanent drift: every
 `terraform apply` reverts what the last `firebase deploy` did, and back again, with neither tool
@@ -37,6 +38,13 @@ their *absence* is what broke the deploy. Values still go in with
 `firebase functions:secrets:set NAME`.
 
 Adding a secret is therefore: a line in `secrets.tf`, push, then set the value once.
+
+**The database is not in the right-hand column by accident** — nothing owns it, and that is
+deliberate. `firestore.tf` declares the two backup *schedules*, which are standalone resources that
+touch nothing else. Declaring `google_firestore_database` to reach the one field next door
+(point-in-time recovery) would put every other tool's read-write target under Terraform's
+management for a feature with a seven-day window and a continuous bill. See the header of
+`firestore.tf`.
 
 ## The accepted trade
 
@@ -122,9 +130,41 @@ matters: two runs a month apart resolve the same provider, and upgrading is a de
 commit. What it gives up is the lock's checksum pinning, which is a supply-chain guarantee rather
 than a determinism one.
 
+## Backups, and how a restore actually goes
+
+`firestore.tf` declares two schedules on `(default)`: **daily, kept 7 days** and **weekly on Sunday,
+kept 14 weeks**. Those are the API's maximums for each kind, and one schedule of each kind per
+database is also the maximum, so this is as much as scheduled backups can give.
+
+Nothing new had to be granted for it. The deploy account already holds `roles/firebase.admin`,
+which carries every `datastore.backupSchedules.*` permission — so unlike the roles in the bootstrap
+block, this needed no round trip through a console.
+
+**A restore is not an undo.** Two things about it are worth knowing before the day you need it,
+because neither is what the word suggests:
+
+- It creates a **new database**. `(default)` is never overwritten, so recovering means restoring
+  beside it and then pointing something at the copy, or copying documents back by hand. There is no
+  in-place rollback.
+- Granularity is a day. Everything written since the last backup ran is gone. That is the trade
+  against point-in-time recovery, which is a database-level flag this directory deliberately does
+  not own — see the header of `firestore.tf`.
+
+```sh
+gcloud firestore backups list --location=europe-central2 --project=korczak-xyz-501720
+gcloud firestore databases restore \
+  --source-backup=projects/korczak-xyz-501720/locations/europe-central2/backups/BACKUP_ID \
+  --destination-database=restored-YYYYMMDD
+```
+
+Backup storage is billed per GiB-month with no free tier. This database holds a sleep log, a few
+thousand scraped events and some feed-health rows, so the bill is cents — but it is a new non-zero
+line where there was none, and that is the thing being bought: `users/{uid}/babySleep` is typed in
+by hand and exists nowhere else.
+
 ## Guards, and what it means when one fires
 
-- **`prevent_destroy`** on the secrets and on `gcf-artifacts`: any plan that would replace or remove
+- **`prevent_destroy`** on the secrets, on `gcf-artifacts` and on both backup schedules: any plan that would replace or remove
   them fails the apply instead. `VAPID_PUBLIC_KEY` can never be reissued — rotating it silently
   invalidates every push subscription on every device, and 403 is deliberately not a code that
   prunes one, so nothing self-heals and nothing says why.

@@ -12,8 +12,11 @@ snapshot-crawler/node_modules/
 # Terraform. State, plans and the plugin cache never belong in git: state holds real resource
 # attributes, and a saved plan is a credentialed snapshot of them. There is no .terraform.lock.hcl
 # to commit — nothing here runs Terraform outside CI, so the provider is pinned to an exact version
-# in main.tf instead; see the comment there.
+# in main.tf instead; see the comment there. It is ignored rather than merely absent because a local
+# `terraform init` writes one unasked, and a lock generated on a Mac carries darwin hashes only —
+# committing it fails the linux CI init on a checksum, which reads as anything but the real cause.
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 tfplan
