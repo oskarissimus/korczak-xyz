@@ -5,9 +5,11 @@ paths:
   - "**/utils/events/**"
   - "**/components/Events/**"
   - "**/hooks/useEventFeed.ts"
+  - "**/hooks/useEventCorpus.ts"
   - "**/hooks/useEventInterests.ts"
   - "**/hooks/useWebPush.ts"
   - "**/styles/events.css"
+  - "**/utils/jsonView.ts"
   - "**/pages/**/apps/events.astro"
   - "**/pages/**/apps/events/**"
   - "functions/**"
@@ -22,11 +24,11 @@ paths:
 
 ## Event Watch
 
-At `/apps/events/` — four tabs (Feed, Interests, Alerts, Sources) over a shared corpus of scraped
-listings,
-with web push when something matching an interest is announced, goes on sale, or gets close. The
-first app here that watches the outside world rather than recording what I did, which is why it is
-**signed-in only**: the collecting happens on a server and the notifications have to know where to go.
+At `/apps/events/` — five tabs (Feed, Interests, Alerts, Sources, Pipeline) over a shared corpus of
+scraped listings, with web push when something matching an interest is announced, goes on sale, or
+gets close. The first app here that watches the outside world rather than recording what I did,
+which is why it is **signed-in only**: the collecting happens on a server and the notifications have
+to know where to go.
 
 Two halves. `korczak-xyz/src/utils/events/` and `src/components/Events/` are the client;
 `functions/` is a scheduled Cloud Function that collects and sends.
@@ -920,6 +922,111 @@ narrowed to nothing with nothing on screen to press.
 `loadFeedKinds` and `loadFeedNewsroom` validate against those key lists rather than reading what is
 stored: a key written by a future build with one more kind matches no row here, so kept it would
 silently empty the feed where dropping it leaves the filter honest about what this build can do.
+
+### The Pipeline tab, and reading a row backwards
+
+The other four tabs are about events. `/apps/events/pipeline/` is about the **extraction** — and the
+question it answers is the one that had no answer anywhere in the app: a card looks wrong, and there
+was no way to tell whether the page said something odd, `toRecord` derived something odd from it, or
+a model made something up. A feed card is the end of the pipeline with every intermediate fact
+thrown away. No haystack, no fingerprint, no hashes, and — the expensive half — no row at all for
+the thing that is missing.
+
+Three things it does that no other tab does, and they are three different questions:
+
+- **It lists the whole corpus.** Interests ignored, past rows included. "Is this in the feed" and
+  "did the collector get this" are different questions and only the second one says whether a
+  scrape works. That is why `pullAllEvents` exists rather than a flag on the feed's two queries:
+  those both mean *what is on*, so one starts two days ago and the other takes only the undated
+  rows — and a scrape that has started producing dates in the past is in neither of them, which is
+  precisely the failure worth seeing. It orders on `updatedAt`, which is safe for the reason
+  `pullIgnores` states in the negative: a Firestore `orderBy` drops any document lacking the field,
+  and this is the one field `toRecord` writes unconditionally on every record. Rows a source has
+  stopped listing sink to the bottom on their own.
+- **Every field with a vocabulary at all gets a multi-select over it** (`pipeline.ts`), and **the
+  counts are the report**. `publishedAt (312)` against 1,150 rows is the state of that extraction in
+  one number, and `Kind — not set (400)` is the classifier's queue. That is the whole reason the
+  `field` facet counts *presence* rather than value: nothing per-row can tell you that four races in
+  five carry no distance, and that ratio is the thing you came to find out.
+- **A row opens into its own JSON**, split by the pass that wrote each field.
+
+#### The stage map is exhaustive by type, and still keeps an `other` bucket
+
+`FIELD_STAGES` is a `Record<keyof EventRecord, …>`, so a field added to the record without being
+placed in it is a **compile error** rather than a field that quietly stops being shown — the same
+trick `sourceNames.ts` uses to stop a fifth source shipping unnamed. What that cannot catch is a
+field a *different build* wrote into a document this one has never heard of, which is a rollback or
+a deploy still going out, so `stageBlocks` sweeps the leftovers into `other`. It is the Sources
+tab's *Also reporting* argument exactly: on the one screen whose job is showing what is stored, a
+field that vanishes is the failure.
+
+Every other stage is returned **even when empty**, and that is the point rather than an oversight. A
+row the classifier has not reached and a row it labelled are different things, and a heading that is
+simply not drawn says neither — an empty `Classifier` block is the pipeline visibly not having got
+here yet, which is *why that row is still in the feed*.
+
+`shared` is the stage that needs defending, and it is the honest answer rather than a hedge. Three
+fields have more than one writer by design: `mergeRecord` takes an incoming `country` and `onSaleAt`
+where the source stated one and keeps the stored value (usually a model's) otherwise, and `tags` is
+the union of what the source said and the tag `tagsWithNewsroomKind` derives. Filing any of the
+three under one pass would be a claim the record cannot support, and this tab exists to stop people
+guessing about exactly that.
+
+#### The facets are the Feed's toolbar, generalised
+
+Same rules, and they are the ones this app keeps arriving at:
+
+- **Any-of within an axis, all-of across them**, and **an empty selection is no constraint** —
+  `match.ts`'s rule for a keyword-less interest, reaching the UI for the third time. Read the other
+  way this tab opens on nothing for anyone who has never pressed a button.
+- **Each axis is counted over what the *other* axes leave**, so a count says what pressing it would
+  show. Counted over the fully filtered set instead, every unpicked option in a narrowed view reads
+  zero, which is the one number that makes a filter look broken.
+- **A chosen value the corpus no longer holds stays at zero** — `withSelectedKeys`, made general. A
+  button that takes itself off the screen leaves a view narrowed with nothing to press to undo it.
+- **Closed vocabularies keep a fixed order; open ones sort by count.** `KIND_KEYS`' argument: these
+  are buttons, and a row whose buttons swap places is one you press the wrong half of. Commonest
+  first is right for the open ones, because the long tail of a mis-tagging is then at the end of the
+  row where it can be seen.
+
+Two places it deliberately departs from the Feed:
+
+- **`ABSENT` is an option on every axis**, where `newsroomOptions` declines to offer it. There the
+  bucket would hold every listing in the corpus and is not a kind of article anyone picks; here the
+  rows nothing has judged, nothing placed and nothing tagged are exactly what is being counted, and
+  a facet that cannot ask for them cannot show the hole.
+- **Nothing is persisted.** The Feed's three filters hide rows from a list read every day, so
+  forgetting them would be the app losing a setting. Here each visit is its own question, and a
+  stored narrowing means coming back weeks later to a corpus that *looks* empty — on the one screen
+  whose job is telling you whether the corpus is empty. Nothing joins `CACHED_PER_OWNER`, and
+  nothing joins the localStorage budget.
+
+`useEventCorpus` also **does not write the offline cache**. `events-feed` holds the top 200 rows of
+the feed and is what an installed app draws on the underground; overwriting it from a debugging
+screen with a different sample would make the app worse for the sake of a tab opened twice a week.
+The cost is that this tab needs the network, and it says so — an inspection tool that quietly shows
+stale rows is one that will be believed.
+
+#### The JSON is tokens, never markup
+
+`src/utils/jsonView.ts` returns `{kind, text}` pairs and the component maps them to `<span>`s, which
+is the one decision in it worth defending. The usual highlighter builds an HTML string for
+`dangerouslySetInnerHTML` — and every string in this panel is somebody else's: a scraped title, a
+venue name off a page, a sentence a model wrote about an article it was handed. Tokens go through
+React's own escaping like any other text, so the shape of the data cannot become the shape of the
+document. The scan matches strings *first*, which is what stops a `null` or a year inside a title
+being read as a token of its own; `jsonView.test.ts` holds that case and the property everything
+rests on — the tokens concatenate back to exactly what `JSON.stringify` produced.
+
+The panel is the one place in this app that is **not** in VT323. It is a display face with no
+distinction between `l`, `1` and `I`, and this is a panel read character by character: a
+fingerprint, a hash, an id. The four token colours are hexes rather than the retro palette for the
+same reason — pure `#ff0000` at 0.8rem on white vibrates, and these are the same hues darkened to
+something readable for a paragraph at a time.
+
+The tab strip is five wide now; `.win-tabs` already wrapped, which the sleep log's five Polish
+labels bought. No PWA work was needed either — `APP_TIERS['events']` claims the whole subtree, so
+the page precached itself, exactly as the Sources tab did.
 
 ### Deploying it
 

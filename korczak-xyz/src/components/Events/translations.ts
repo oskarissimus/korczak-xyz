@@ -15,6 +15,7 @@ export const translations = {
     navInterests: 'Interests',
     navAlerts: 'Alerts',
     navSources: 'Sources',
+    navPipeline: 'Pipeline',
     navLabel: 'Event Watch sections',
 
     // Auth gate
@@ -194,6 +195,52 @@ export const translations = {
     sourcesUnlistedHint:
       'Reporting its health beside the sources without being a page — the classifier is one. A scrape here is one that was removed from the list and is still collecting.',
 
+    // Pipeline
+    pipelineHeading: 'Every row, and what wrote it',
+    pipelineIntro:
+      'The corpus as it is stored — every row the collector has, whether or not an interest matches it and whether or not its date has passed. The filters narrow what is listed; opening a row shows its fields grouped by the pass that wrote them.',
+    pipelineShowing: '{shown} of {total} rows',
+    pipelineCapped: 'The first {shown} of {matching}. Narrow the filters to reach the rest.',
+    pipelineEmpty: 'No row carries every label you picked.',
+    pipelineEmptyHint:
+      'Each row of buttons is an any-of, and a row has to satisfy every one of them. Clear a row to widen it again.',
+    pipelineClearAll: 'Clear every filter',
+    pipelineFilters: 'Filters',
+    pipelineFiltersOn: '{count} on',
+    pipelineOpen: 'Fields',
+    pipelineOffline:
+      'These rows come straight from the collector and are not cached — this tab needs a connection, so what you see here is never stale.',
+    pipelineRetry: 'Try again',
+    pipelineNoFields: 'nothing yet',
+    facetSource: 'Source',
+    facetKind: 'Kind',
+    facetReach: 'Reach',
+    facetCountry: 'Country',
+    facetCity: 'City',
+    facetTag: 'Tag',
+    facetNewsroom: 'Article',
+    facetField: 'Fields present',
+    facetAbsent: 'not set',
+    stageScraped: 'Scraped',
+    stageScrapedNote: 'What the page itself said. An adapter reads these and derives nothing.',
+    stageDerived: 'Derived',
+    stageDerivedNote:
+      'Worked out from the row above by the upsert, in one place, so no adapter can normalise it differently.',
+    stageNewsroom: 'Newsroom reader',
+    stageNewsroomNote: 'A model reading one theatre’s news items. Empty on everything else.',
+    stageClassifier: 'Classifier',
+    stageClassifierNote:
+      'A model over the whole corpus. Empty means it has not reached this row yet, which is why the row is still in the feed.',
+    stageShared: 'More than one writer',
+    stageSharedNote:
+      'The source states these where it can and a later pass fills them in otherwise, so neither can be credited with them.',
+    stageBookkeeping: 'Book-keeping',
+    stageBookkeepingNote:
+      'What only the upsert can know, because it is about the change rather than the event: when this app first saw the row, and when it first saw a ticket link on it.',
+    stageOther: 'Not in this build',
+    stageOtherNote:
+      'Fields stored by a build this one does not know about — a rollback, or a deploy still going out.',
+
     // Sync badge
     syncOff: 'Not signed in — nothing is being saved to your account',
     syncSynced: 'Synced',
@@ -211,6 +258,7 @@ export const translations = {
     navInterests: 'Zainteresowania',
     navAlerts: 'Powiadomienia',
     navSources: 'Źródła',
+    navPipeline: 'Potok',
     navLabel: 'Sekcje aplikacji',
 
     signedOutTitle: 'Zaloguj się, żeby śledzić wydarzenia',
@@ -382,6 +430,52 @@ export const translations = {
     sourcesUnlistedHeading: 'Zgłasza się też',
     sourcesUnlistedHint:
       'Raportuje swój stan obok źródeł, nie będąc stroną — tak działa klasyfikator. Jeśli trafi tu scraper, znaczy że wypadł z listy, a nadal zbiera.',
+
+    // Pipeline
+    pipelineHeading: 'Każdy wiersz i co go zapisało',
+    pipelineIntro:
+      'Korpus tak, jak jest zapisany — każdy wiersz, który ma kolektor, niezależnie od tego, czy pasuje do zainteresowania i czy jego data już minęła. Filtry zawężają listę; po otwarciu wiersza widać jego pola pogrupowane według przebiegu, który je zapisał.',
+    pipelineShowing: '{shown} z {total} wierszy',
+    pipelineCapped: 'Pierwsze {shown} z {matching}. Zawęź filtry, żeby dotrzeć do reszty.',
+    pipelineEmpty: 'Żaden wiersz nie ma wszystkich wybranych etykiet.',
+    pipelineEmptyHint:
+      'Każdy rząd przycisków to „dowolne z”, a wiersz musi spełnić każdy z rzędów. Wyczyść rząd, żeby znów poszerzyć listę.',
+    pipelineClearAll: 'Wyczyść wszystkie filtry',
+    pipelineFilters: 'Filtry',
+    pipelineFiltersOn: 'włączone: {count}',
+    pipelineOpen: 'Pola',
+    pipelineOffline:
+      'Te wiersze idą prosto od kolektora i nie są zapisywane lokalnie — ta zakładka potrzebuje połączenia, więc to, co widzisz, nigdy nie jest nieaktualne.',
+    pipelineRetry: 'Spróbuj ponownie',
+    pipelineNoFields: 'jeszcze nic',
+    facetSource: 'Źródło',
+    facetKind: 'Rodzaj',
+    facetReach: 'Zasięg',
+    facetCountry: 'Kraj',
+    facetCity: 'Miasto',
+    facetTag: 'Tag',
+    facetNewsroom: 'Artykuł',
+    facetField: 'Wypełnione pola',
+    facetAbsent: 'brak',
+    stageScraped: 'Ze strony',
+    stageScrapedNote: 'To, co napisała sama strona. Adapter je czyta i niczego nie wylicza.',
+    stageDerived: 'Wyliczone',
+    stageDerivedNote:
+      'Policzone z wiersza powyżej przy zapisie, w jednym miejscu, żeby żaden adapter nie znormalizował tego inaczej.',
+    stageNewsroom: 'Czytnik aktualności',
+    stageNewsroomNote: 'Model czytający aktualności jednego teatru. Przy reszcie pusto.',
+    stageClassifier: 'Klasyfikator',
+    stageClassifierNote:
+      'Model przechodzący cały korpus. Pusto znaczy, że jeszcze tu nie dotarł — i dlatego ten wiersz wciąż jest na liście.',
+    stageShared: 'Więcej niż jeden autor',
+    stageSharedNote:
+      'Źródło podaje je, kiedy potrafi, a w przeciwnym razie uzupełnia je późniejszy przebieg, więc nie da się przypisać ich żadnemu z nich.',
+    stageBookkeeping: 'Księgowanie',
+    stageBookkeepingNote:
+      'To, co wie tylko zapis, bo dotyczy zmiany, a nie wydarzenia: kiedy aplikacja zobaczyła wiersz po raz pierwszy i kiedy pierwszy raz zobaczyła przy nim link do biletów.',
+    stageOther: 'Spoza tej wersji',
+    stageOtherNote:
+      'Pola zapisane przez wersję, której ta nie zna — po cofnięciu wdrożenia albo w trakcie wdrażania nowej.',
 
     syncOff: 'Nie zalogowano — nic nie jest zapisywane na koncie',
     syncSynced: 'Zsynchronizowano',

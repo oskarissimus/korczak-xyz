@@ -772,3 +772,213 @@
   margin: 2px 0 0;
   flex: 0 0 auto;
 }
+
+/* --- the pipeline tab ----------------------------------------------------------------------- */
+
+.ev-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+.ev-pipe-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ev-pipe-row {
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-pipe-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+/* The stored `day`, printed as it is stored — `YYYY-MM-DD` or an em dash. Not localised on
+   purpose: every other tab formats a date for a reader, and this one shows the field. */
+.ev-pipe-day {
+  font-variant-numeric: tabular-nums;
+  color: var(--retro-dark-gray);
+  font-size: 1.05rem;
+}
+
+.ev-pipe-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  margin: 0;
+  font-weight: normal;
+}
+
+/* The document id, in the monospace the rest of this tab's machine text uses. It is the string
+   every other collection joins back to, and the reason to be able to select it is to paste it
+   into a console — so it wraps anywhere rather than being truncated. */
+.ev-pipe-id {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--retro-dark-gray);
+  overflow-wrap: anywhere;
+}
+
+.ev-pipe-more {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+/*
+ * A filter button for the rows with no answer on an axis.
+ *
+ * Italic, and the only difference: it is the same control doing the same thing, but "not set" is
+ * the absence of a value rather than one of them — the same distinction `ev-chip--kind` draws with
+ * the same italics one panel up. A colour would make it look like a warning, and a corpus with
+ * unclassified rows in it is the normal state between collector runs.
+ */
+.ev-kind--absent {
+  font-style: italic;
+}
+
+/* --- one row's fields, by the pass that wrote them ------------------------------------------ */
+
+.ev-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--retro-dark-gray);
+  padding-top: 8px;
+}
+
+.ev-stage-head {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  margin: 0;
+  color: var(--retro-black);
+}
+
+.ev-stage-note {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+/* A pass that wrote nothing on this row. A word rather than an empty panel: "has not run yet" is
+   a state, and blank space is not a way of saying it. */
+.ev-stage-empty {
+  margin: 0;
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--retro-dark-gray);
+}
+
+/*
+ * The stored fields, as JSON.
+ *
+ * A black terminal panel, which is what `pre` and `code` are everywhere else on this site — a blog
+ * listing, a course snippet. That is not only consistency: the global `code` rule paints its own
+ * background and would have shown through anything lighter put behind it, and a highlighter fighting
+ * the cascade for a white ground is one bad merge away from black text on black. So every property
+ * that matters is set here on both elements rather than inherited, and the panel reads as the one
+ * thing on the tab that is machine output.
+ *
+ * A real monospace stack rather than VT323, which is the one place in this app that font is wrong:
+ * it is a display face with no distinction between `l`, `1` and `I`, and this is a panel read
+ * character by character — a fingerprint, a hash, an id.
+ *
+ * `pre-wrap` with `overflow-wrap: anywhere` rather than a horizontal scroller: a haystack is a
+ * couple of hundred characters of folded text on one line, and a panel you scroll sideways to read
+ * on a phone is one you do not read.
+ */
+.ev-json,
+.ev-json code {
+  background: var(--retro-black);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 0;
+}
+
+.ev-json {
+  margin: 0;
+  padding: 8px;
+  border: 2px inset var(--retro-dark-gray);
+  tab-size: 2;
+}
+
+.ev-json code {
+  padding: 0;
+}
+
+/*
+ * The five token colours.
+ *
+ * The retro palette's own primaries, pulled off their corners: `#00ffff` and `#ff00ff` at 0.8rem
+ * fringe and vibrate even on black, and this is a panel read a paragraph at a time. Green for the
+ * strings because green on black is what every other `pre` on this site already is, and a string is
+ * most of what is in one of these — the other four are what stands out against it.
+ */
+.ev-json-key {
+  color: #6fd3ff;
+}
+
+.ev-json-string {
+  color: #6ee66e;
+}
+
+.ev-json-number {
+  color: #ff9de0;
+}
+
+.ev-json-literal {
+  color: #ffc45c;
+  font-style: italic;
+}
+
+.ev-json-punct {
+  color: #9aa09a;
+}
+
+/*
+ * The eight filter rows, behind a disclosure.
+ *
+ * Open by default — the counts are half of what the tab is for — but a real `<details>`, because
+ * eight axes over a live corpus is twenty-odd cities plus every tag any source applies, and at
+ * 320px that is several screens of buttons above the first row. Its summary says how many filters
+ * are on, so a closed panel can never be hiding a narrowing.
+ */
+.ev-facets {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-facets-summary {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  cursor: pointer;
+  /* The marker is the whole affordance here; a list-style bullet would read as a list item. */
+  list-style-position: inside;
+}
+
+.ev-facets-summary:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: 2px;
+}

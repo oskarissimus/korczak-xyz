@@ -177,6 +177,29 @@ export async function pullUndatedEvents(): Promise<EventRecord[]> {
   return snap.docs.map((d) => ({ ...(d.data() as EventRecord), id: d.id }));
 }
 
+/**
+ * The whole corpus, most recently collected first — what the pipeline tab reads.
+ *
+ * Deliberately **not** the two queries the feed makes. Those exist to answer "what is on", so one
+ * of them starts two days ago and the other takes only the undated rows; a row whose date has
+ * passed is in neither, and a scrape that has started producing dates in the past is then invisible
+ * from the one screen whose job is showing what the scrape produced.
+ *
+ * `updatedAt` is the order because every run writes it on every row it still sees, so the rows a
+ * source has stopped listing sink to the bottom on their own. It is safe to order on for the reason
+ * `pullIgnores` explains in the negative: a Firestore `orderBy` drops any document lacking the
+ * field it names, and this is the one field `toRecord` writes unconditionally on every record.
+ */
+export async function pullAllEvents(): Promise<EventRecord[]> {
+  if (!getDb()) return [];
+  const snap = await runCloud('events.corpus.pull.all', () =>
+    getDocs(
+      query(collection(getDb()!, 'events'), orderBy('updatedAt', 'desc'), limit(EVENT_PULL_LIMIT)),
+    ),
+  );
+  return snap.docs.map((d) => ({ ...(d.data() as EventRecord), id: d.id }));
+}
+
 // --- push subscriptions ---------------------------------------------------------------------
 
 function subsCollection(uid: string) {

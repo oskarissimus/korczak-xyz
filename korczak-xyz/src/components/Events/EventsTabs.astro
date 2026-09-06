@@ -8,7 +8,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'feed' | 'interests' | 'alerts' | 'sources';
+type View = 'feed' | 'interests' | 'alerts' | 'sources' | 'pipeline';
 
 interface Props {
   lang: Lang;
@@ -25,6 +25,7 @@ const TABS: { view: View; href: string; label: string }[] = [
   { view: 'interests', href: `${base}/interests/`, label: t.navInterests },
   { view: 'alerts', href: `${base}/alerts/`, label: t.navAlerts },
   { view: 'sources', href: `${base}/sources/`, label: t.navSources },
+  { view: 'pipeline', href: `${base}/pipeline/`, label: t.navPipeline },
 ];
 ---
 
