@@ -190,12 +190,24 @@ Cloud Scheduler ──OAuth as firestore-export@──▶ firestore:exportDocume
 **The NAS end is rclone on a cron entry, not HBS** — and that is not a preference,
 it is the only thing that works. HBS 3 refuses to create a Google Cloud Storage
 storage space at all: it answers "Authentication error. Cannot connect to cloud
-service.", and the real error, read off the wire, is a 401 from the NAS's *own*
-cloud layer — `POST /cc3/v1/users/system/accounts` returning
-`{"error_code":"cloud_unauthorized"}`. **No outbound request to Google is ever
-made**, so the credential is never tested and nothing about this project can fix
-it. Ruled out individually: the key, the clock, the QTS session, an outdated
-myQNAPcloud, the proxy setting, and a full reboot. Container Station is not an
+service.", and the underlying error is a 401 from the NAS's own cloud layer —
+`POST /cc3/v1/users/system/accounts` returning `{"error_code":"cloud_unauthorized"}`.
+Ruled out individually: the key itself (it lists and reads the bucket fine from a
+laptop, and from the NAS via rclone), the clock, the QTS session, an outdated
+myQNAPcloud, the proxy setting, and a full reboot.
+
+**The most likely cause is that `nas-backup-reader@` is too locked down for HBS.**
+Community reports say HBS wants `resourcemanager.projects.get`/`.list` at *project*
+scope plus `storage.buckets.list`, `storage.buckets.update` and object *create* —
+far past read-only-on-one-bucket. Note the trap: `roles/storage.objectViewer`
+contains `resourcemanager.projects.get`, so it looks satisfied, but we bind it at
+bucket scope and a project-scoped permission granted on a bucket is inert.
+
+This was NOT proven. An earlier version of this file claimed no outbound request to
+Google was ever made; that was an overreach from instrumenting the *browser*, which
+cannot observe NAS→Google traffic. Confirming it would mean widening the account's
+permissions and retrying — which is a privilege increase on a key that sits on a
+device on the LAN, and the reason it has not been done. Container Station is not an
 alternative either — the NAS is a TS-431P3, `armv7l`, and Container Station needs
 arm64/x86.
 
