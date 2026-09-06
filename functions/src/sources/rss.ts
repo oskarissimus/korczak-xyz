@@ -80,6 +80,15 @@ export function parseFeed(xml: string, feed: SourcePage): RawEvent[] {
       // The permalink is the identity. A guid would do, but plenty of feeds emit a guid that is
       // just the link, and one of the two is always present.
       sourceKey: link,
+      /*
+       * The publication rather than this adapter's label. `Watched feeds` is the name of the
+       * mechanism, and stored on the row it made three unrelated magazines one source: the card
+       * could not say where a piece came from, the pipeline tab could not filter on it, and the
+       * classifier — whose prompt and hash both read `sourceName` — was told the least useful
+       * thing available about whether a row is an event or an article about one. `Maraton
+       * Warszawski` answers that almost on its own.
+       */
+      sourceName: feed.label,
       title,
       url: link,
       /*

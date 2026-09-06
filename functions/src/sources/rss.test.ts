@@ -17,6 +17,16 @@ describe('parseFeed', () => {
     </item>
   </channel></rss>`;
 
+  it('names the publication, not this adapter', () => {
+    /*
+     * One adapter over a list of unrelated magazines. Stored as the adapter's own `Watched feeds`,
+     * a history article and a race report were one source — unfilterable on the pipeline tab,
+     * unnameable on a card, and the least useful thing this app could have told the classifier,
+     * whose prompt and hash both read `sourceName`.
+     */
+    expect(parseFeed(rss, feed).map((e) => e.sourceName)).toEqual(['X', 'X']);
+  });
+
   it('reads CDATA titles and links', () => {
     const [first] = parseFeed(rss, feed);
     expect(first.title).toBe('Turnieje rycerskie w Polsce 2027 — kalendarz');

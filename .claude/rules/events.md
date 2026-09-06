@@ -305,6 +305,29 @@ so a new adapter cannot get normalisation subtly different.
   in `startsAt` would file every post as happening today and then let `soon` fire about it. The
   `pubDate` is kept as `publishedAt`, which is a different field answering a different question —
   how old is this news, not when is the event.
+
+  It is also the one adapter that **names its own publication**. `toRecord` takes `sourceName` from
+  the adapter's label, which is right for the four sources that are one place — a Teatr Wielki night
+  comes from Teatr Wielki — and wrong for this one, where the label is `Watched feeds`: the name of
+  a *mechanism*, stamped identically on a history magazine, a festival's blog and a running
+  publication. `EventRecord.sourceName` always meant the publication (its own comment gives
+  `historia.org.pl` as the example) and the adapter simply never supplied it, so `RawEvent` gained an
+  optional `sourceName` and `parseFeed` sets `feed.label`. Three things were wrong until it did: a
+  card could not say where a piece came from, the pipeline tab's source filter collapsed three
+  unrelated magazines into one button, and **the classifier was told the least useful thing
+  available** — `sourceName` is in its prompt *and* its hash precisely because a theatre publishes
+  nights and an organiser's blog publishes prose, and `Watched feeds` says neither. `Maraton
+  Warszawski` nearly answers the `kind` question on its own.
+
+  The hash is the cost, and it is worth naming: `classifyHashOf` reads `sourceName`, so every feed
+  row's stored hash stops matching once and those rows re-classify over the next run or two. That is
+  a few dozen calls, and they are the rows whose verdicts stood on the worst evidence.
+
+  The entry platform deliberately does **not** do this, although `parseListing` already has the page
+  in hand. Its several pages are disciplines of one platform rather than different publications, and
+  their labels are `displayUrl` URLs rather than names — so it would put a URL on every race card,
+  re-hash several hundred rows, and tell the model nothing it did not have. A race comes from
+  Elektroniczne Zapisy whichever listing page it was on.
 - **elektronicznezapisy.pl** is the second bespoke scrape, and it is there because a race is not
   repertoire and Ticketmaster does not sell one. Organisers publish, but each on its own WordPress —
   the RSS route would have been a line in `FEEDS` per club and still no dates. An **entry platform**
@@ -948,6 +971,15 @@ Three things it does that no other tab does, and they are three different questi
   one number, and `Kind — not set (400)` is the classifier's queue. That is the whole reason the
   `field` facet counts *presence* rather than value: nothing per-row can tell you that four races in
   five carry no distance, and that ratio is the thing you came to find out.
+
+  **`source` and `publication` are two rows and not one**, and the difference is the RSS adapter.
+  `source` is which *adapter* ran — five of them, the first half of every event id, and what
+  `eventSources` health and the Sources tab are keyed on. `publication` is `sourceName`, which is
+  which *place* the words came off; on the four sources that are one place the two rows say the same
+  thing, which is the true thing, and on `feed` one button becomes three. Judging an extraction is
+  per-publication work — a history magazine and an entry platform fail differently — so collapsing
+  them would have left the commonest source of noise in this corpus unfilterable. See the RSS bullet
+  above for the collector half of it.
 - **A row opens into its own JSON**, split by the pass that wrote each field.
 
 #### The stage map is exhaustive by type, and still keeps an `other` bucket

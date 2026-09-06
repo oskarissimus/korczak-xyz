@@ -18,6 +18,15 @@ const raw = (over: Partial<RawEvent> = {}): RawEvent => ({
 });
 
 describe('toRecord', () => {
+  it('takes the publication from the row where the adapter names one', () => {
+    // The adapter's label is the fallback, not the answer: `feed` reads several magazines, and
+    // `Watched feeds` on the row is the name of the mechanism rather than of the source.
+    expect(toRecord(raw(), 'feed', 'Watched feeds', NOW).sourceName).toBe('Watched feeds');
+    expect(
+      toRecord(raw({ sourceName: 'Maraton Warszawski' }), 'feed', 'Watched feeds', NOW).sourceName,
+    ).toBe('Maraton Warszawski');
+  });
+
   it('derives everything the adapters must not', () => {
     const record = toRecord(raw(), 'teatr-wielki', 'Teatr Wielki', NOW);
     expect(record.id).toBe('teatr-wielki_abc');

@@ -218,6 +218,7 @@ export function hasValue(event: EventRecord, field: keyof EventRecord): boolean 
  */
 export type FacetKey =
   | 'source'
+  | 'publication'
   | 'kind'
   | 'reach'
   | 'country'
@@ -228,6 +229,7 @@ export type FacetKey =
 
 export const FACET_KEYS: readonly FacetKey[] = [
   'source',
+  'publication',
   'kind',
   'reach',
   'country',
@@ -252,7 +254,20 @@ export const FACET_KEYS: readonly FacetKey[] = [
 export const ABSENT = '';
 
 const FACET_VALUES: Record<FacetKey, (event: EventRecord) => string[]> = {
+  /*
+   * Which *adapter* produced the row — the first half of its id, and what `eventSources` health and
+   * the Sources tab are both keyed on. Five of them, and they are how a scrape is named everywhere
+   * else in this app.
+   */
   source: (event) => [event.source],
+  /*
+   * Which *publication* it came off, which is a finer question and not the same one. The RSS
+   * adapter reads a list of unrelated magazines, so `feed` alone cannot tell a race report on
+   * Maraton Warszawski from a history article on historia.org.pl — and those are exactly the rows
+   * whose extraction is worth judging separately. A hierarchy rather than a duplicate: on the four
+   * sources that are one place, the two rows say the same thing, which is the true thing.
+   */
+  publication: (event) => [event.sourceName || ABSENT],
   kind: (event) => [event.kind ?? ABSENT],
   reach: (event) => [event.reach ?? ABSENT],
   country: (event) => [event.country ?? ABSENT],

@@ -204,6 +204,27 @@ describe('facetsOf', () => {
     expect(cities.options[0]).toMatchObject({ value: 'warszawa', label: 'Warszawa', count: 2 });
   });
 
+  it('separates the adapter from the publication it read', () => {
+    // The whole reason there are two rows: the RSS adapter is one `source` over a list of
+    // unrelated magazines, and `feed` alone cannot tell a race report from a history article.
+    const feeds = [
+      event({ id: 'a', source: 'feed', sourceName: 'Maraton Warszawski' }),
+      event({ id: 'b', source: 'feed', sourceName: 'historia.org.pl' }),
+      event({ id: 'c', source: 'feed', sourceName: 'historia.org.pl' }),
+    ];
+    const sources = facetsOf(feeds, NO_FACETS).find((f) => f.key === 'source')!;
+    expect(sources.options).toEqual([{ value: 'feed', label: 'feed', count: 3 }]);
+
+    const publications = facetsOf(feeds, NO_FACETS).find((f) => f.key === 'publication')!;
+    expect(publications.options.map((o) => [o.value, o.count])).toEqual([
+      ['historia.org.pl', 2],
+      ['Maraton Warszawski', 1],
+    ]);
+    expect(applyFacets(feeds, pick([['publication', ['historia.org.pl']]])).map((e) => e.id)).toEqual(
+      ['b', 'c'],
+    );
+  });
+
   it('returns every axis, in one fixed order', () => {
     expect(facetsOf(corpus, NO_FACETS).map((f) => f.key)).toEqual([...FACET_KEYS]);
   });

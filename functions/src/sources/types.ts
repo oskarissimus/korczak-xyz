@@ -15,6 +15,22 @@ export interface SourceContext {
 
 export interface RawEvent {
   /**
+   * Which publication this row came off, where the adapter reads more than one.
+   *
+   * Absent means the adapter's own label, which is right for the four sources that are one place:
+   * a Teatr Wielki night comes from Teatr Wielki. The RSS adapter is the exception it exists for —
+   * it is one adapter over a list of unrelated magazines, and without this every item from
+   * historia.org.pl, the Jewish Culture Festival and Maraton Warszawski is stored as `Watched
+   * feeds`, which is the name of a *mechanism* and tells a reader nothing about where the words
+   * came from. `EventRecord.sourceName` always meant the publication — its own comment gives
+   * `historia.org.pl` as the example — so this is the adapter finally supplying it.
+   *
+   * Deliberately **not** used by the entry-platform scrape, whose several pages are disciplines of
+   * one platform rather than different publications, and whose labels are URLs rather than names.
+   * A race comes from Elektroniczne Zapisy whichever listing page it was on.
+   */
+  sourceName?: string;
+  /**
    * The source's own stable identifier, or null to have one synthesised from title + day + venue.
    *
    * Whatever goes here must not move when the price, the description or the availability does: a

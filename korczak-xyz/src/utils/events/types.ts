@@ -62,7 +62,13 @@ export interface EventRecord {
   source: SourceId;
   /** The source's own stable identifier, unnormalized. Kept for debugging a bad id. */
   sourceKey: string;
-  /** Human name of the origin, shown on the card: 'Teatr Wielki', 'historia.org.pl'. */
+  /**
+   * Human name of the origin, shown on the card: 'Teatr Wielki', 'historia.org.pl'.
+   *
+   * The **publication**, not the adapter — `source` above is the adapter, and one of them reads a
+   * list of unrelated magazines. `RawEvent.sourceName` is how an adapter that knows the difference
+   * says so; `toRecord` falls back to the adapter's label for the four sources that are one place.
+   */
   sourceName: string;
   title: string;
   /** Composer, genre, artist — whatever the source offers as a second line. */

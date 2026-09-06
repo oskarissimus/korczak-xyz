@@ -52,7 +52,12 @@ export function toRecord(
     id: eventIdFor(source, sourceKey),
     source: source as SourceId,
     sourceKey,
-    sourceName,
+    /*
+     * The publication where the adapter names one, and the adapter's own label otherwise. One
+     * adapter can read many places — see `RawEvent.sourceName` — and `Watched feeds` on a row from
+     * a running magazine is the name of the mechanism rather than of the source.
+     */
+    sourceName: raw.sourceName ?? sourceName,
     title: raw.title.trim(),
     subtitle: raw.subtitle,
     haystack: haystackOf({

@@ -370,6 +370,7 @@ function Json({ value }: { value: unknown }) {
 
 function facetLabel(key: FacetKey, t: Translation): string {
   if (key === 'source') return t.facetSource;
+  if (key === 'publication') return t.facetPublication;
   if (key === 'kind') return t.facetKind;
   if (key === 'reach') return t.facetReach;
   if (key === 'country') return t.facetCountry;
