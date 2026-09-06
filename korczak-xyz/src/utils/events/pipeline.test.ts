@@ -7,6 +7,7 @@ import {
   facetsOf,
   FIELD_STAGES,
   matchesFacets,
+  matchesQuery,
   NO_FACETS,
   OPTIONAL_FIELDS,
   PIPELINE_STAGES,
@@ -255,5 +256,28 @@ describe('toggleFacet', () => {
     const before = pick([['kind', ['listing']]]);
     toggleFacet(before, 'kind', 'coverage');
     expect([...before.get('kind')!]).toEqual(['listing']);
+  });
+});
+
+describe('matchesQuery', () => {
+  it('matches through the app’s one folding, so ascii finds the diacritics', () => {
+    // The reason this is not an inline `includes`: a filter box has to behave the way the matcher
+    // does, or typing what is on the screen finds nothing.
+    expect(matchesQuery('Kraków', 'krakow')).toBe(true);
+    expect(matchesQuery('Festiwal Kultury Żydowskiej', 'zydowsk')).toBe(true);
+    expect(matchesQuery('COPPÉLIA', 'coppelia')).toBe(true);
+  });
+
+  it('requires every term, in any order', () => {
+    // `teatr opera` has to find `Teatr Wielki – Opera Narodowa`, which one substring cannot.
+    expect(matchesQuery('Teatr Wielki – Opera Narodowa', 'teatr opera')).toBe(true);
+    expect(matchesQuery('Teatr Wielki – Opera Narodowa', 'opera teatr')).toBe(true);
+    expect(matchesQuery('Teatr Wielki – Opera Narodowa', 'teatr ballet')).toBe(false);
+  });
+
+  it('matches everything on an empty or blank query', () => {
+    // An unfiltered list is what a focused box shows, and it is where the counts are read.
+    expect(matchesQuery('anything', '')).toBe(true);
+    expect(matchesQuery('anything', '   ')).toBe(true);
   });
 });

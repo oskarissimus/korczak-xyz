@@ -840,18 +840,6 @@
   color: var(--retro-dark-gray);
 }
 
-/*
- * A filter button for the rows with no answer on an axis.
- *
- * Italic, and the only difference: it is the same control doing the same thing, but "not set" is
- * the absence of a value rather than one of them — the same distinction `ev-chip--kind` draws with
- * the same italics one panel up. A colour would make it look like a warning, and a corpus with
- * unclassified rows in it is the normal state between collector runs.
- */
-.ev-kind--absent {
-  font-style: italic;
-}
-
 /* --- one row's fields, by the pass that wrote them ------------------------------------------ */
 
 .ev-stages {
@@ -955,12 +943,13 @@
 }
 
 /*
- * The eight filter rows, behind a disclosure.
+ * The eight filter axes, behind a disclosure.
  *
- * Open by default — the counts are half of what the tab is for — but a real `<details>`, because
- * eight axes over a live corpus is twenty-odd cities plus every tag any source applies, and at
- * 320px that is several screens of buttons above the first row. Its summary says how many filters
- * are on, so a closed panel can never be hiding a narrowing.
+ * Open by default, and now affordable to be: each axis is one line rather than a wrapped row of
+ * buttons, so the whole panel is eight lines instead of the several screens that made a row of
+ * toggles the wrong control here. The disclosure stays anyway — it is the way to put the panel
+ * away once a filter is set — and its summary says how many are on, so a closed one can never be
+ * hiding a narrowing.
  */
 .ev-facets {
   flex-basis: 100%;
@@ -981,4 +970,153 @@
 .ev-facets-summary:focus-visible {
   outline: 1px dotted var(--retro-black);
   outline-offset: 2px;
+}
+
+/* --- one axis, as a box you type into ------------------------------------------------------- */
+
+/*
+ * The label beside the box rather than above it.
+ *
+ * Eight axes stacked two lines each is half a phone screen of chrome before the first row, which is
+ * the problem a row of toggles had in a milder form. Beside it they are eight lines, and the labels
+ * are short enough to share one with a box that still fits `Elektroniczne Zapisy` — the chips wrap
+ * onto their own line underneath, which is what `flex-basis: 100%` on the list below is for.
+ */
+.ev-facet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.ev-facet-label {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  /* Aligned down the column, so the boxes start in one place and the panel reads as a form. */
+  flex: 0 0 auto;
+  min-width: 6.5em;
+}
+
+/* The anchor for the list, which is positioned rather than in flow: a dropdown that pushed the
+   rows below it down the page would move the thing you are about to read every time you focused a
+   box. */
+.ev-combo {
+  position: relative;
+  /* `min-width: 0` or the input's own intrinsic width stops this shrinking, and the label is
+     pushed off the side at 320px. */
+  flex: 1 1 8em;
+  min-width: 0;
+}
+
+.ev-combo-input {
+  width: 100%;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  padding: 4px 6px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+  color: var(--retro-black);
+}
+
+/*
+ * The options.
+ *
+ * `40vh` and a scroller rather than the whole list: twenty-odd countries is a list longer than a
+ * phone, and a dropdown you scroll the *page* to see the end of is one whose top has gone. Above
+ * everything, because it overlaps the rows it is filtering.
+ */
+.ev-combo-list {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--retro-white);
+  border: 2px outset var(--retro-white);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.ev-combo-option {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* Where the keyboard is. The same navy the rest of the site selects with, so an arrow key and a
+   hover do not look like two different states. */
+.ev-combo-option--active {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.ev-combo-option--on {
+  font-weight: bold;
+}
+
+/* The rows with no answer on this axis — italic, as `ev-chip--kind` is, because it is the absence
+   of a value rather than one of them. */
+.ev-combo-option--absent {
+  font-style: italic;
+}
+
+/* Right-aligned and tabular so the numbers line up down the list: reading this column is the whole
+   reason the box is worth opening — `publishedAt 312` against 1,440 rows is a coverage report. */
+.ev-combo-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--retro-dark-gray);
+  flex: 0 0 auto;
+}
+
+.ev-combo-option--active .ev-combo-count {
+  color: var(--retro-white);
+}
+
+.ev-combo-word {
+  overflow-wrap: anywhere;
+}
+
+.ev-combo-none {
+  padding: 5px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--retro-dark-gray);
+}
+
+/*
+ * What is picked, under the box it came out of.
+ *
+ * Once the list is closed these chips are the whole of what the filter is doing, which is why they
+ * are buttons: the way out of a narrowing has to be where the narrowing is shown. Pressed-in rather
+ * than outset, so they read as a state rather than as more controls to try.
+ */
+.ev-chosen-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  /* Its own line under the box, whatever the label and box left over. */
+  flex-basis: 100%;
+}
+
+.ev-chosen,
+.ev-chosen:hover {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 5px 8px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-white);
+  color: var(--retro-black);
+  cursor: pointer;
 }

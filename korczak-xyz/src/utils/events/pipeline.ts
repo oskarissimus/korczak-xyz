@@ -25,6 +25,7 @@
 
 import { cityKeyOf, cityOptions } from './feed';
 import { NEWSROOM_KINDS } from './newsroom';
+import { foldText } from './normalize';
 import { KINDS, REACHES, type EventRecord } from './types';
 
 /**
@@ -413,4 +414,26 @@ export function chosenCount(selection: FacetSelection): number {
   let total = 0;
   for (const key of FACET_KEYS) total += selection.get(key)?.size ?? 0;
   return total;
+}
+
+/**
+ * Whether a typed query matches the words on an option.
+ *
+ * Through `foldText`, which is the whole reason this is here rather than an inline `includes`: it
+ * is the one normalisation this app compares anything with, so typing `krakow` reaches `Kraków`,
+ * `zydowsk` reaches `Żydowski`, and a filter box behaves like the matcher does. A second folding
+ * written beside it would agree until the first bug fix.
+ *
+ * Every whitespace-separated term must appear, in any order — `teatr opera` finds
+ * `Teatr Wielki – Opera Narodowa` where a single substring would not. An empty query matches
+ * everything, which is what makes an unfiltered list the thing a focused box shows.
+ *
+ * It matches the **text on the option**, not its stored value: the button reading `Poland` is keyed
+ * `PL`, and somebody typing `pol` is looking at the word, not at the code.
+ */
+export function matchesQuery(text: string, query: string): boolean {
+  const terms = foldText(query).split(' ').filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = foldText(text);
+  return terms.every((term) => haystack.includes(term));
 }

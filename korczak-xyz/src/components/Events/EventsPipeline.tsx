@@ -21,7 +21,7 @@
  * Behind the sign-in gate like every other tab: it reads the same shared corpus, under the same
  * rules.
  */
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventCorpus } from '../../hooks/useEventCorpus';
 import { countryLabel } from '../../utils/events/countries';
@@ -30,6 +30,7 @@ import {
   applyFacets,
   chosenCount,
   facetsOf,
+  matchesQuery,
   NO_FACETS,
   stageBlocks,
   toggleFacet,
@@ -164,7 +165,7 @@ function PipelinePanel({ lang }: Props) {
                 : t.pipelineFilters}
             </summary>
             {facets.map((facet) => (
-              <FacetRow
+              <FacetCombo
                 key={facet.key}
                 facet={facet}
                 chosen={selection.get(facet.key) ?? EMPTY}
@@ -214,14 +215,32 @@ function PipelinePanel({ lang }: Props) {
 }
 
 /**
- * One axis, as a row of toggles — the Feed toolbar's control, over eight fields instead of two.
+ * One axis, as a box you type into.
  *
- * Drawn even at one option, unlike the Feed's `FilterChips`. There the row is a filter and one
- * option cannot narrow anything; here the count beside the only value is the answer to "what does
- * this corpus hold on this axis", which is most of what the tab is for. An axis with nothing at all
- * on it is the one that is left out.
+ * It began as the Feed toolbar's row of toggles, which is the right control for four kinds and the
+ * wrong one here: over a live corpus these eight axes are 1,440 rows' worth of vocabulary — twenty-odd
+ * cities, every country a conference is held in, every tag any source applies — and at phone width
+ * that is one button per line and several screens of them above the first row. The counts were
+ * readable and nothing else was.
+ *
+ * So each axis is a combobox: one line closed, the whole counted list on focus, and typing narrows
+ * it through `matchesQuery` — the app's own folding, so `krakow` finds `Kraków` and `teatr opera`
+ * finds `Teatr Wielki – Opera Narodowa`. What is lost is the report being on screen without asking
+ * for it; the placeholder keeps the shape of it by saying how many values the axis holds, and the
+ * list behind it is the same counted list it always was.
+ *
+ * Multi-select, so it is still any-of within an axis: picking does not close the list, and what is
+ * picked drops out of the box and into a row of chips underneath. The chips are the whole of "what
+ * is this filter doing" once the box is closed — a narrowing with nothing on screen saying who asked
+ * for it is how an app comes to look broken, which is the same reason the disclosure's summary
+ * carries a count.
+ *
+ * Not a `<select multiple>` and not a `<datalist>`, for the reason the Feed states about the first
+ * and a second about both: iOS draws a multiple-select as a list nobody can tell is multi-select,
+ * and a datalist cannot show a count, cannot be styled into this century's decade, and picks one
+ * value rather than several.
  */
-function FacetRow({
+function FacetCombo({
   facet,
   chosen,
   t,
@@ -232,28 +251,146 @@ function FacetRow({
   t: Translation;
   onToggle: (value: string) => void;
 }) {
+  const id = useId();
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+
   if (facet.options.length === 0) return null;
+
   const label = facetLabel(facet.key, t);
+  const wordFor = (value: string, optionLabelText: string) =>
+    optionLabel(facet.key, value, optionLabelText, t);
+
+  const matches = facet.options.filter((option) =>
+    matchesQuery(wordFor(option.value, option.label), query),
+  );
+  const clamped = Math.min(active, Math.max(matches.length - 1, 0));
+
+  const pick = (value: string) => {
+    onToggle(value);
+    // Cleared rather than kept: the chip below now says what was picked, and the box is free for
+    // the next value — which on a multi-select is what the next keystroke is usually for.
+    setQuery('');
+    setActive(0);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setOpen(true);
+      setActive((current) => {
+        const next = e.key === 'ArrowDown' ? current + 1 : current - 1;
+        return Math.max(0, Math.min(next, matches.length - 1));
+      });
+      return;
+    }
+    if (e.key === 'Enter' && open && matches[clamped]) {
+      e.preventDefault();
+      pick(matches[clamped].value);
+      return;
+    }
+    if (e.key === 'Escape') {
+      setOpen(false);
+      return;
+    }
+    // Backspace on an empty box takes back the last thing picked, which is where a hand that has
+    // just mistyped one already is.
+    if (e.key === 'Backspace' && query === '' && chosen.size > 0) {
+      onToggle([...chosen][chosen.size - 1]);
+    }
+  };
 
   return (
-    <div className="ev-kinds" role="group" aria-label={label}>
-      {/* The group carries the name; a visible copy of it would be announced twice. */}
-      <span className="ev-kinds-label" aria-hidden="true">
+    <div
+      className="ev-facet"
+      // One handler for the whole control rather than one on the input: a click on an option is a
+      // blur of the input, and closing on that would close before the click landed.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <label className="ev-facet-label" htmlFor={`${id}-input`}>
         {label}
-      </span>
-      {facet.options.map((option) => (
-        <button
-          key={option.value || 'absent'}
-          type="button"
-          className={`ev-kind${chosen.has(option.value) ? ' ev-kind--on' : ''}${
-            option.value === ABSENT ? ' ev-kind--absent' : ''
-          }`}
-          aria-pressed={chosen.has(option.value)}
-          onClick={() => onToggle(option.value)}
-        >
-          {`${optionLabel(facet.key, option.value, option.label, t)} (${option.count})`}
-        </button>
-      ))}
+      </label>
+      <div className="ev-combo">
+        <input
+          id={`${id}-input`}
+          className="ev-combo-input"
+          type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={`${id}-list`}
+          aria-autocomplete="list"
+          aria-activedescendant={open && matches[clamped] ? `${id}-opt-${clamped}` : undefined}
+          autoComplete="off"
+          /* How many values this axis holds, which is the half of the report a closed box can
+             still carry: `any of 24` says there are 24 countries in the corpus without opening. */
+          placeholder={fill(t.facetAnyOf, { count: facet.options.length })}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            setActive(0);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+        />
+        {open ? (
+          <ul className="ev-combo-list" id={`${id}-list`} role="listbox" aria-label={label}>
+            {matches.length === 0 ? (
+              <li className="ev-combo-none">{t.facetNoMatch}</li>
+            ) : (
+              matches.map((option, index) => {
+                const on = chosen.has(option.value);
+                return (
+                  <li
+                    key={option.value || 'absent'}
+                    id={`${id}-opt-${index}`}
+                    role="option"
+                    aria-selected={on}
+                    className={`ev-combo-option${on ? ' ev-combo-option--on' : ''}${
+                      option.value === ABSENT ? ' ev-combo-option--absent' : ''
+                    }${index === clamped ? ' ev-combo-option--active' : ''}`}
+                    // Keeps the focus in the input, so the blur above never fires and the list
+                    // survives a pick — which is what makes this multi-select rather than a menu.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pick(option.value)}
+                  >
+                    <span className="ev-combo-word">
+                      {on ? '✓ ' : ''}
+                      {wordFor(option.value, option.label)}
+                    </span>
+                    {/* The count, still. It is why this control is worth opening at all. */}
+                    <span className="ev-combo-count">{option.count}</span>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        ) : null}
+      </div>
+      {chosen.size > 0 ? (
+        <div className="ev-chosen-list">
+          {[...chosen].map((value) => {
+            const word = wordFor(
+              value,
+              facet.options.find((option) => option.value === value)?.label ?? value,
+            );
+            return (
+              <button
+                key={value || 'absent'}
+                type="button"
+                className="ev-chosen"
+                aria-label={fill(t.facetRemove, { value: word })}
+                onClick={() => onToggle(value)}
+              >
+                {word} <span aria-hidden="true">×</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

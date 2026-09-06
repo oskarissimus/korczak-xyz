@@ -1004,7 +1004,7 @@ the union of what the source said and the tag `tagsWithNewsroomKind` derives. Fi
 three under one pass would be a claim the record cannot support, and this tab exists to stop people
 guessing about exactly that.
 
-#### The facets are the Feed's toolbar, generalised
+#### The facets are the Feed's toolbar, generalised — but not its buttons
 
 Same rules, and they are the ones this app keeps arriving at:
 
@@ -1016,10 +1016,47 @@ Same rules, and they are the ones this app keeps arriving at:
   zero, which is the one number that makes a filter look broken.
 - **A chosen value the corpus no longer holds stays at zero** — `withSelectedKeys`, made general. A
   button that takes itself off the screen leaves a view narrowed with nothing to press to undo it.
-- **Closed vocabularies keep a fixed order; open ones sort by count.** `KIND_KEYS`' argument: these
-  are buttons, and a row whose buttons swap places is one you press the wrong half of. Commonest
-  first is right for the open ones, because the long tail of a mis-tagging is then at the end of the
-  row where it can be seen.
+- **Closed vocabularies keep a fixed order; open ones sort by count.** `KIND_KEYS`' argument, and it
+  outlived the buttons it was written for: a list whose entries swap places between visits is one
+  you pick the wrong line of. Commonest first is right for the open ones, because the long tail of a
+  mis-tagging is then at the end of the list where it can be seen.
+
+#### The control is a box you type into, and a row of toggles was wrong here
+
+It shipped as the Feed's row of `aria-pressed` buttons, which is the right control for four kinds
+and the wrong one for this: over the live corpus these eight axes carry 1,440 rows' worth of
+vocabulary — twenty-odd cities, every country a conference is held in, every tag any source applies
+— and at phone width that is one button per line and *several screens of them* above the first row.
+The counts were readable and nothing else was.
+
+So each axis is a combobox instead. One line closed, the whole counted list on focus, and typing
+narrows it — through **`matchesQuery`, which folds with `foldText`**, so `krakow` finds `Kraków`,
+`zydowsk` finds `Żydowski`, and the box behaves the way the matcher does. Every whitespace term must
+appear in any order, which is what lets `teatr opera` find `Teatr Wielki – Opera Narodowa`.
+
+Four things about it:
+
+- **It matches the words on the option, not the stored value**, which needed `countryAliases`.
+  `countryLabel` prints the bare code and is right to — on a card, beside one word of reach, `PL` is
+  shorter and no less clear — but in a filter box the question runs the other way, and somebody
+  hunting for Poland types `poland`. The aliases come off `NAMES`, the same table `toCountryCode`
+  accepts, so the box takes exactly what the interest editor takes, in both languages: `niemcy` and
+  `germany` both reach `DE`.
+- **What is lost is the report being on screen unasked**, and that is the trade. The placeholder
+  keeps its shape — `any of 24` says how many countries the corpus holds without opening anything —
+  and the counted list behind it is the same list it always was, one tap away.
+- **Picking does not close the list and clears the box.** It is multi-select, so `onMouseDown` on an
+  option calls `preventDefault`: a click on an option is a blur of the input, and closing on that
+  would close before the click landed. What is picked drops out of the box into a row of chips
+  underneath, which are buttons — once the list is closed they are the whole of what the filter is
+  doing, and the way out of a narrowing has to be where the narrowing is shown.
+- **Keyboard-complete**: arrows move `aria-activedescendant`, Enter takes the active option, Escape
+  closes, and Backspace on an empty box takes back the last thing picked — where a hand that has
+  just mistyped one already is.
+
+Not a `<select multiple>` and not a `<datalist>`. The Feed already states the first (iOS draws it as
+a list nobody can tell is multi-select, and choosing two means a modifier a touch screen has not
+got); the second cannot show a count, cannot be styled, and picks one value rather than several.
 
 Two places it deliberately departs from the Feed:
 
@@ -1031,7 +1068,10 @@ Two places it deliberately departs from the Feed:
   forgetting them would be the app losing a setting. Here each visit is its own question, and a
   stored narrowing means coming back weeks later to a corpus that *looks* empty — on the one screen
   whose job is telling you whether the corpus is empty. Nothing joins `CACHED_PER_OWNER`, and
-  nothing joins the localStorage budget.
+  nothing joins the localStorage budget. The eight boxes still sit in a `<details>`, open by default:
+  one line each is affordable where a wrapped row of buttons was not, and the disclosure is now the
+  way to put the panel away once a filter is set rather than the only thing making the tab usable.
+  Its summary carries how many filters are on, so a closed panel can never hide a narrowing.
 
 `useEventCorpus` also **does not write the offline cache**. `events-feed` holds the top 200 rows of
 the feed and is what an installed app draws on the underground; overwriting it from a debugging

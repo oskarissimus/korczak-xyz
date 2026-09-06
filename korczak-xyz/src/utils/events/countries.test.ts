@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ONLINE, countryLabel, toCountryCode, toCountryCodes } from './countries';
+import { ONLINE, countryAliases, countryLabel, toCountryCode, toCountryCodes } from './countries';
 
 describe('toCountryCode', () => {
   it('reads a code, a name, and an abbreviation as the same country', () => {
@@ -70,5 +70,23 @@ describe('countryLabel', () => {
     expect(countryLabel('PL')).toBe('PL');
     expect(countryLabel(ONLINE)).toBe('online');
     expect(countryLabel(undefined)).toBe('?');
+  });
+});
+
+describe('countryAliases', () => {
+  it('gives every spelling the interest editor accepts, in both languages', () => {
+    // A filter box searching on these accepts exactly what `toCountryCode` does — one table, so
+    // typing `niemcy` on the Polish page finds the same rows `germany` finds on the English one.
+    expect(countryAliases('PL').sort()).toEqual(['poland', 'polska']);
+    expect(countryAliases('DE').sort()).toEqual(['deutschland', 'germany', 'niemcy']);
+  });
+
+  it('is empty for a code no name maps to, rather than guessing one', () => {
+    expect(countryAliases('ZZ')).toEqual([]);
+    expect(countryAliases(undefined)).toEqual([]);
+  });
+
+  it('round-trips through toCountryCode', () => {
+    for (const name of countryAliases('CZ')) expect(toCountryCode(name)).toBe('CZ');
   });
 });

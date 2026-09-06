@@ -196,6 +196,25 @@ export function toCountryCodes(input: readonly string[] | undefined): string[] {
  * Only ever decoration — the card's chip and the rejected view's summary line — so an unknown code
  * printing as itself is the right outcome rather than a case to handle.
  */
+/**
+ * Every spelling this app accepts for a code.
+ *
+ * `countryLabel` prints the code and that is right where it prints — a chip on a card, beside one
+ * word of reach, where `PL` is shorter and no less clear. It is wrong in a *filter box*, where the
+ * question is the other way round: somebody hunting for Poland types `poland`, or `polska`, and a
+ * list of sixteen two-letter codes is one they have to decode before they can use it.
+ *
+ * So this is the search half rather than the display half, and it comes off `NAMES` rather than a
+ * second table: both spellings of every country are already there because `toCountryCode` has to
+ * accept both, so a box searching on this accepts exactly what the interest editor accepts.
+ */
+export function countryAliases(code: string | undefined): string[] {
+  if (!code) return [];
+  return Object.entries(NAMES)
+    .filter(([, value]) => value === code)
+    .map(([name]) => name);
+}
+
 export function countryLabel(code: string | undefined): string {
   if (!code) return '?';
   if (code === ONLINE) return 'online';
