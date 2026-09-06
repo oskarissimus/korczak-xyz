@@ -184,8 +184,27 @@ Cloud Scheduler ──OAuth as firestore-export@──▶ firestore:exportDocume
                                                          │
                                   nas-backup-reader@ ◀───┘  objectViewer only
                                           │
-                                          ▼  HBS on the QNAP
+                                          ▼  rclone on cron, on the QNAP
 ```
+
+**The NAS end is rclone on a cron entry, not HBS** — and that is not a preference,
+it is the only thing that works. HBS 3 refuses to create a Google Cloud Storage
+storage space at all: it answers "Authentication error. Cannot connect to cloud
+service.", and the real error, read off the wire, is a 401 from the NAS's *own*
+cloud layer — `POST /cc3/v1/users/system/accounts` returning
+`{"error_code":"cloud_unauthorized"}`. **No outbound request to Google is ever
+made**, so the credential is never tested and nothing about this project can fix
+it. Ruled out individually: the key, the clock, the QTS session, an outdated
+myQNAPcloud, the proxy setting, and a full reboot. Container Station is not an
+alternative either — the NAS is a TS-431P3, `armv7l`, and Container Station needs
+arm64/x86.
+
+So the puller is `rclone v1.75.1` (linux-arm-v7) at
+`/share/CE_CACHEDEV1_DATA/firestore-backup/`, run by `0 5 * * *` in
+`/etc/config/crontab`, with its own README next to it. It uses **`rclone copy`,
+never `sync`** — the bucket's 30-day lifecycle deletes old exports, and `sync`
+would mirror those deletions and give the NAS the same 30-day horizon it exists to
+outlive.
 
 There is **no Cloud Function** in that path. Scheduler calls the Admin API directly; the export is
 one POST with no logic in it, and a function would have added a deploy, a runtime and a language.
@@ -209,13 +228,14 @@ gcloud iam service-accounts keys create hbs.json \
   --iam-account=nas-backup-reader@korczak-xyz-501720.iam.gserviceaccount.com
 ```
 
-Upload that file in HBS, then delete the local copy. `nas-backup-reader@` can read the objects in
+That key now lives at `/share/CE_CACHEDEV1_DATA/firestore-backup/gcs-key.json` on
+the NAS, mode 600. `nas-backup-reader@` can read the objects in
 one bucket and do nothing else anywhere — which matters because its key is a file on a device on the
 LAN. The deploy account's key in the same place would be a `projectIamAdmin` credential sitting in a
 QNAP settings pane.
 
-To rotate: `gcloud iam service-accounts keys list --iam-account=…`, create a new one, re-upload,
-then delete the old key id. Nothing in Terraform changes.
+To rotate: `gcloud iam service-accounts keys list --iam-account=…`, create a new one, replace
+`gcs-key.json` on the NAS, then delete the old key id. Nothing in Terraform changes.
 
 ## Guards, and what it means when one fires
 

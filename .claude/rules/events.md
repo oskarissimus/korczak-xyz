@@ -1177,7 +1177,9 @@ Five things there are load-bearing, each written up in `terraform/README.md`:
   `firestore.tf` live inside Firestore and answer "undo our mistake". They are worth nothing if the
   Google account goes, since the database and its backups vanish together. `firestore-export.tf` is
   the other half: Cloud Scheduler calls `firestore:exportDocuments` directly — no function, it is
-  one POST — into a 30-day bucket that a QNAP pulls over HBS. `outputUriPrefix` is the bare bucket
+  one POST — into a 30-day bucket that a QNAP pulls with `rclone` on a cron entry (**not**
+  HBS: it fails before contacting Google at all, with `cloud_unauthorized` from the NAS's own
+  cc3 layer, and the box is `armv7l` so Container Station is out too). `outputUriPrefix` is the bare bucket
   on purpose, because that is what makes the API name a fresh folder per run instead of overwriting
   one. The NAS reads with a dedicated `objectViewer` account whose key is minted by hand and never
   enters Terraform state.
