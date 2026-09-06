@@ -196,28 +196,38 @@ Ruled out individually: the key itself (it lists and reads the bucket fine from 
 laptop, and from the NAS via rclone), the clock, the QTS session, an outdated
 myQNAPcloud, the proxy setting, and a full reboot.
 
-**The cause was that `nas-backup-reader@` was bound at the wrong scope**, and this was
-established by experiment rather than inference. A throwaway account was granted, in turn,
-project-wide `storage.admin` (worked), project-scoped `roles/storage.objectViewer` (worked),
-bucket-scoped `objectViewer` alone (failed, reproducing the original error exactly), and finally
-bucket-scoped `objectViewer` plus a custom project role containing nothing but
-`resourcemanager.projects.get` — which **worked**.
+**Two separate things were wrong, and the second one is fatal to the idea.**
 
-So the real minimum for HBS against a GCS bucket is:
+*Scope.* `nas-backup-reader@` holds `roles/storage.objectViewer` bound at **bucket** scope. That
+role contains `resourcemanager.projects.get`, so it reads as sufficient — but a project-scoped
+permission granted on a bucket is inert, so HBS's project check failed and returned
+"Authentication error. Cannot connect to cloud service." over a cc3 `cloud_unauthorized`. Nothing in
+that wording points at scope.
+
+*Capability.* Fixing the scope is not enough. A throwaway account was walked up the ladder:
 
 ```
-project scope :  resourcemanager.projects.get      (one read-only metadata permission)
-bucket scope  :  roles/storage.objectViewer        (on the one bucket)
+projects.get (project) + objectViewer (bucket)   -> connection created OK
+  + storage.buckets.list                          -> job wizard can list buckets and objects
+  + objectCreator (bucket)                        -> still "Cannot upload... Permission denied"
+  + objectAdmin (bucket)                          -> still "Cannot upload... Permission denied"
+  + storage.admin (project)                       -> upload error clears
 ```
 
-**No write access of any kind is required** — the widely repeated advice that HBS needs
-"Storage Object Creator" is wrong. Nor is `storage.buckets.list`, nor access to any other bucket.
+So **HBS does need write access**, even to build a *Restore* (download-only) job, and
+bucket-scoped write is not enough — it wanted project-wide storage admin. The widely repeated
+claim that read-only suffices is wrong; so was an earlier version of this file, which had only
+tested that a *connection* could be created.
 
-The trap that made this expensive to find: `roles/storage.objectViewer` *contains*
-`resourcemanager.projects.get`, so reading the role suggests the requirement is met. It is not,
-because the binding is on the bucket, and a project-scoped permission granted on a bucket resource
-is inert. HBS then reports "Authentication error. Cannot connect to cloud service." and the NAS's
-cc3 layer returns `cloud_unauthorized`, none of which points at scope.
+**And then it still does not work.** With full `storage.admin` the wizard fails at the last step
+with *"No backup data detected. Check the destination path."* while showing `Selected: 1 folders`.
+HBS Restore only understands data written by an HBS **backup job**; a bucket of Firestore export
+files it did not create is not restorable. HBS Sync is no help either — one-way sync goes NAS to
+cloud, and there is no scheduled cloud-to-NAS pull of foreign data anywhere in the product.
+
+**Conclusion: HBS cannot do this job at any permission level.** It is a push-to-cloud tool that can
+restore its own backups. Pulling somebody else's bucket down on a schedule is outside what it does.
+That, and not the permissions, is why the NAS end is rclone.
 
 So the puller is `rclone v1.75.1` (linux-arm-v7) at
 `/share/CE_CACHEDEV1_DATA/firestore-backup/`, run by `0 5 * * *` in

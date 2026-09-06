@@ -1178,11 +1178,11 @@ Five things there are load-bearing, each written up in `terraform/README.md`:
   Google account goes, since the database and its backups vanish together. `firestore-export.tf` is
   the other half: Cloud Scheduler calls `firestore:exportDocuments` directly — no function, it is
   one POST — into a 30-day bucket that a QNAP pulls with `rclone` on a cron entry (**not**
-  HBS: it failed with `cloud_unauthorized` because `nas-backup-reader@` is bound at bucket
-  scope only. Proven by experiment: HBS needs exactly `resourcemanager.projects.get` at *project*
-  scope plus `objectViewer` on the bucket — no write, no `buckets.list`, no other bucket. The trap
-  is that `objectViewer` contains `projects.get`, so a bucket-scoped grant looks sufficient and is
-  not. The box is also `armv7l`, so Container Station is out regardless). `outputUriPrefix` is the bare bucket
+  HBS **cannot** do it at all, at any permission level: its Restore job only understands data
+  written by an HBS backup job and rejects a bucket of foreign files with "No backup data detected",
+  while its Sync only pushes NAS to cloud. Along the way it also turns out to need project-wide
+  `storage.admin` — bucket-scoped write is refused with "Cannot upload... Permission denied" — so the
+  read-only story is wrong too. The box is also `armv7l`, so Container Station is out regardless). `outputUriPrefix` is the bare bucket
   on purpose, because that is what makes the API name a fresh folder per run instead of overwriting
   one. The NAS reads with a dedicated `objectViewer` account whose key is minted by hand and never
   enters Terraform state.
