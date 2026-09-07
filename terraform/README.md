@@ -219,15 +219,30 @@ bucket-scoped write is not enough — it wanted project-wide storage admin. The 
 claim that read-only suffices is wrong; so was an earlier version of this file, which had only
 tested that a *connection* could be created.
 
-**And then it still does not work.** With full `storage.admin` the wizard fails at the last step
-with *"No backup data detected. Check the destination path."* while showing `Selected: 1 folders`.
-HBS Restore only understands data written by an HBS **backup job**; a bucket of Firestore export
-files it did not create is not restorable. HBS Sync is no help either — one-way sync goes NAS to
-cloud, and there is no scheduled cloud-to-NAS pull of foreign data anywhere in the product.
+**And then Restore still does not work.** With full `storage.admin` the wizard fails at the last
+step with *"No backup data detected. Check the destination path."* while showing
+`Selected: 1 folders`. That one is by design and QNAP documents it: a restore job exists for when
+*"you have run a backup job in HBS 3 before, but the destination of that job — the backup data — is
+no longer linked to an existing backup job"*, and backup jobs write `.qdff` (QuDedup) blocks that
+only HBS or the QuDedup Extract Tool can open. A bucket of Firestore export files HBS did not write
+is not backup data, so Restore will never see it.
 
-**Conclusion: HBS cannot do this job at any permission level.** It is a push-to-cloud tool that can
-restore its own backups. Pulling somebody else's bucket down on a schedule is outside what it does.
-That, and not the permissions, is why the NAS end is rclone.
+**The Sync side was not tested, and the docs say it exists.** HBS's own job table lists *Active
+sync — "Data is copied from the destination to the NAS"*, which is exactly a scheduled cloud-to-NAS
+pull, and nothing in the documentation excludes a Google Cloud Storage space from it. Whether the
+HBS build on this NAS actually offers Active Sync for a GCS bucket, and whether it copies raw
+objects rather than looking for `.qdff`, is unknown — the run above went down the Restore path and
+stopped there. **Do not read this section as "HBS cannot pull a bucket at all."** What is measured
+is narrower and still decisive for the choice made here:
+
+- Restore cannot read a foreign bucket, confirmed by test and by QNAP's documentation.
+- Any HBS path at all costs project-wide `roles/storage.admin`, measured on the ladder above.
+
+That second line is the reason the NAS end is rclone even if Active Sync would have worked: rclone
+pulls the same bucket with `objectViewer` on that one bucket and no project-level role whatsoever.
+Trading a read-only, single-bucket credential for storage admin over the whole project — the same
+project that holds the tfstate bucket and Firestore itself — is not a trade worth making to save a
+cron entry.
 
 So the puller is `rclone v1.75.1` (linux-arm-v7) at
 `/share/CE_CACHEDEV1_DATA/firestore-backup/`, run by `0 5 * * *` in
