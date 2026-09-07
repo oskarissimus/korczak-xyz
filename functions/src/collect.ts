@@ -174,6 +174,9 @@ export async function runCollection(
       now,
       project: ctx.project,
       location: ctx.location,
+      // The same fetch the sources used, so the article bodies go out through whatever this run
+      // was given — the injected one in a test, the real one in the function.
+      fetch: ctx.fetch,
       write: async (id, update) => {
         await db.collection('events').doc(id).update(update);
       },

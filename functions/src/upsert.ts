@@ -20,7 +20,7 @@ import {
   synthKey,
 } from '../../korczak-xyz/src/utils/events/normalize';
 import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
-import { tagsWithNewsroomKind } from '../../korczak-xyz/src/utils/events/newsroom';
+import { tagsWithTicketSale } from '../../korczak-xyz/src/utils/events/newsroom';
 import type { RawEvent } from './sources/types';
 
 export interface UpsertResult {
@@ -171,26 +171,30 @@ export function mergeRecord(
        * no longer mentions it.
        */
       publishedAt: incoming.publishedAt ?? stored.publishedAt,
-      newsroomKind: stored.newsroomKind,
-      newsroomSummary: stored.newsroomSummary,
       /*
-       * The date the article is *about*, which no source has ever heard of — it is the reader's
-       * reading of a sentence of prose. Unnamed here it would be deleted six hours after being
-       * learnt, exactly as `onSaleAt` would, and the feed would go back to filing an article about
-       * a finished festival as news with no dates yet.
+       * The reader's verdict, which no source has ever heard of — it is a model's reading of a
+       * sentence of prose. Unnamed here it would be deleted six hours after being learnt, exactly
+       * as `onSaleAt` would, and every article on the page would be re-read on every run.
        */
-      newsroomEventAt: stored.newsroomEventAt,
+      newsroomTicketSale: stored.newsroomTicketSale,
       newsroomReadAt: stored.newsroomReadAt,
       newsroomHash: stored.newsroomHash,
       /*
-       * The kind as a tag, folded in here rather than left on the document the reader wrote.
+       * The sale date as a tag, folded in here rather than left on the document the reader wrote.
        *
-       * `batch.set` replaces `tags` wholesale from what the source said, and the source has never
-       * heard of `programme`. Deriving the union at merge time from the stored kind means the
-       * reader never races the upsert, and `tagsWithNewsroomKind` being idempotent means a re-read
-       * cannot leave two copies of one tag.
+       * `batch.set` replaces `tags` wholesale from what the source said, and the source has not
+       * heard of a date the reader found. Deriving the union at merge time from the date this very
+       * merge settles on means the reader never races the upsert, and `tagsWithTicketSale` being
+       * idempotent means a re-read cannot leave two copies of one tag.
+       *
+       * Keyed on the date rather than on the boolean beside it, deliberately: `ticket-sale` is the
+       * whole of a keyword-less seeded interest, so it has to mean "there is a deadline on this
+       * row" and not "a model thought this was about a sale". See `tagsWithTicketSale`.
        */
-      tags: tagsWithNewsroomKind(incoming.tags, stored.newsroomKind),
+      tags: tagsWithTicketSale(
+        incoming.tags,
+        (incoming.onSaleAt ?? stored.onSaleAt) !== undefined,
+      ),
       updatedAt: now,
     },
     created: false,

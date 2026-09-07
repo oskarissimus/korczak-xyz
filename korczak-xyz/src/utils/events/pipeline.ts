@@ -15,7 +15,7 @@
  *     heard of, which is why `stageBlocks` keeps an `other` bucket — the same argument the Sources
  *     tab's "Also reporting" list is built on.
  *   - **The facets**, which are the same multi-select shape the Feed toolbar uses (`kindOptions`,
- *     `newsroomOptions`), generalised over every field that has a vocabulary worth picking from.
+ *     `cityOptions`), generalised over every field that has a vocabulary worth picking from.
  *
  * Portable like everything else in this directory — no DOM, no React, no prose. The words on the
  * buttons are the component's job, exactly as they are for `sources.ts`: this file holds facts, and
@@ -24,7 +24,7 @@
  */
 
 import { cityKeyOf, cityOptions } from './feed';
-import { NEWSROOM_KINDS } from './newsroom';
+import { TICKET_SALE_VERDICTS, ticketSaleVerdictOf } from './newsroom';
 import { foldText } from './normalize';
 import { KINDS, REACHES, type EventRecord } from './types';
 
@@ -34,7 +34,7 @@ import { KINDS, REACHES, type EventRecord } from './types';
  * `shared` is the one that needs explaining and it is the honest answer rather than a hedge: three
  * fields have more than one writer, by design. `mergeRecord` takes an incoming `country` and
  * `onSaleAt` where the source stated one and keeps the stored value otherwise (usually a model's),
- * and `tags` is the union of what the source said and the tag the newsroom reader derived. Filing
+ * and `tags` is the union of what the source said and the tag a reader's sale date earns. Filing
  * any of the three under one stage would be a claim the record cannot support.
  *
  * `other` is never assigned here — it is what `stageBlocks` puts a field it does not recognise in.
@@ -97,9 +97,7 @@ export const FIELD_STAGES: Record<keyof EventRecord, Exclude<PipelineStage, 'oth
   fingerprint: 'derived',
 
   // `readNewsroom.ts`, over the rows a source tagged `newsroom`.
-  newsroomKind: 'newsroom',
-  newsroomSummary: 'newsroom',
-  newsroomEventAt: 'newsroom',
+  newsroomTicketSale: 'newsroom',
   newsroomReadAt: 'newsroom',
   newsroomHash: 'newsroom',
 
@@ -197,9 +195,7 @@ export const OPTIONAL_FIELDS: ReadonlyArray<keyof EventRecord> = [
   'reach',
   'kind',
   'classifiedAt',
-  'newsroomKind',
-  'newsroomSummary',
-  'newsroomEventAt',
+  'newsroomTicketSale',
 ];
 
 /** Present, for the purposes of the `field` facet: not undefined, not null, not empty. */
@@ -244,10 +240,11 @@ export const FACET_KEYS: readonly FacetKey[] = [
  * The value standing for "this row has no answer on this axis".
  *
  * A key of its own on **every** facet here, which is deliberately not what the Feed does: there,
- * `newsroomOptions` declines to offer the absent bucket because it would hold every listing in the
- * corpus and is not a kind of article anyone picks. This tab is the opposite question — the rows
- * nothing has judged, nothing placed, or nothing tagged are exactly what you come here to count,
- * and a facet that cannot ask for them cannot show you the hole.
+ * `cityOptions` declines to offer the absent bucket because "somewhere unspecified" is not a place
+ * anyone picks. This tab is the opposite question — the rows nothing has judged, nothing placed, or
+ * nothing tagged are exactly what you come here to count, and a facet that cannot ask for them
+ * cannot show you the hole. The `newsroom` axis is the clearest case: its two values are what the
+ * reader decided, and `ABSENT` is every row it has never looked at.
  *
  * The empty string, because that is what a missing optional string field already is once folded,
  * and because it can never collide with a real value: no tag, city, code or verdict is empty.
@@ -278,7 +275,7 @@ const FACET_VALUES: Record<FacetKey, (event: EventRecord) => string[]> = {
   // The one multi-valued facet among the vocabularies: a row carries every tag it was given, and
   // picking two tags asks for rows carrying either, like every other row of buttons here.
   tag: (event) => (event.tags?.length ? event.tags : [ABSENT]),
-  newsroom: (event) => [event.newsroomKind ?? ABSENT],
+  newsroom: (event) => [ticketSaleVerdictOf(event) ?? ABSENT],
   /*
    * Presence rather than value, and the one facet that can answer with nothing at all: a row
    * carrying none of the optional fields has no value on this axis, so it survives no selection of
@@ -300,7 +297,7 @@ const FACET_VALUES: Record<FacetKey, (event: EventRecord) => string[]> = {
 const FACET_ORDER: Partial<Record<FacetKey, readonly string[]>> = {
   kind: KINDS,
   reach: REACHES,
-  newsroom: NEWSROOM_KINDS,
+  newsroom: TICKET_SALE_VERDICTS,
   field: OPTIONAL_FIELDS.map(String),
 };
 

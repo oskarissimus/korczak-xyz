@@ -205,10 +205,10 @@ describe('mergeRecord and the newsroom reader', () => {
     );
   });
 
-  it('carries the reading itself forward, and re-derives its tag', () => {
+  it('carries the reading itself forward, and re-derives its tag from the date', () => {
     const before = article({
-      newsroomKind: 'programme',
-      newsroomSummary: 'The 2027/28 season is announced.',
+      newsroomTicketSale: true,
+      onSaleAt: Date.parse('2027-03-01T09:00:00Z'),
       newsroomHash: 'abc123',
       newsroomReadAt: NOW,
     });
@@ -219,21 +219,18 @@ describe('mergeRecord and the newsroom reader', () => {
       LATER,
     );
     const merged = mergeRecord(incoming, before, LATER).record;
-    expect(merged.newsroomKind).toBe('programme');
-    expect(merged.newsroomSummary).toBe('The 2027/28 season is announced.');
+    expect(merged.newsroomTicketSale).toBe(true);
     expect(merged.newsroomHash).toBe('abc123');
-    // The source rewrites `tags` wholesale and has never heard of `programme`.
-    expect(merged.tags).toEqual(['theatre', 'newsroom', 'programme']);
+    // The source rewrites `tags` wholesale and has never heard of the date the reader found.
+    expect(merged.tags).toEqual(['theatre', 'newsroom', 'ticket-sale']);
   });
 
-  it('carries the date the article is about forward, no source having heard of it', () => {
+  it('re-derives no tag for a verdict whose date did not survive', () => {
     /*
-     * Exactly the `onSaleAt` argument, on the field that stops an article about a finished
-     * festival reading as news with no dates yet. Unnamed in the merge it would be deleted six
-     * hours after the model read it, and the feed would go back to what the screenshot showed.
+     * `ticket-sale` means "there is a deadline on this row", not "a model thought this was about a
+     * sale" — it is the whole of a keyword-less seeded interest, which has no second filter.
      */
-    const at = Date.parse('2026-07-06T10:00:00Z');
-    const before = article({ newsroomEventAt: at });
+    const before = article({ newsroomTicketSale: true, newsroomHash: 'abc123' });
     const incoming = toRecord(
       raw({ sourceKey: 'aktualnosci/x', startsAt: null, tags: ['theatre', 'newsroom'] }),
       'teatr-wielki',
@@ -241,9 +238,8 @@ describe('mergeRecord and the newsroom reader', () => {
       LATER,
     );
     const merged = mergeRecord(incoming, before, LATER).record;
-    expect(merged.newsroomEventAt).toBe(at);
-    // And it stays out of `startsAt`, which is what notices count down to.
-    expect(merged.startsAt).toBeNull();
+    expect(merged.newsroomTicketSale).toBe(true);
+    expect(merged.tags).toEqual(['theatre', 'newsroom']);
   });
 
   it('keeps a publication date the page no longer shows', () => {

@@ -8,7 +8,6 @@
 
 import type { EventKind, EventRecord, Interest } from './types';
 import { KINDS } from './types';
-import { NEWSROOM_KINDS, type NewsroomKind } from './newsroom';
 import { NO_IGNORES } from './ignores';
 import type { MatchReason } from './match';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
@@ -209,20 +208,10 @@ export function buildFeed(
  * source stated it ahead of time, nothing else in the feed moves.
  */
 export function actionableAt(
-  event: Pick<EventRecord, 'startsAt' | 'onSaleAt' | 'newsroomEventAt'>,
+  event: Pick<EventRecord, 'startsAt' | 'onSaleAt'>,
 ): number | null {
   if (event.startsAt !== null) return event.startsAt;
-  /*
-   * The sale first, and only then the date of the thing being sold. Both can be on one row — the
-   * theatre announces a season and the morning its tickets go — and of the two it is the sale you
-   * can be late for.
-   *
-   * `newsroomEventAt` is a reading rather than a stated fact, and this is the whole of what it
-   * moves: an article about a festival held in July stops being *undated* and starts being *over*,
-   * so the feed drops it exactly as it drops a concert that has been and gone. Nothing counts down
-   * to it — `noticesFor` reads `startsAt` and `onSaleAt`, and neither is written by a model.
-   */
-  return event.onSaleAt ?? event.newsroomEventAt ?? null;
+  return event.onSaleAt ?? null;
 }
 
 /**
@@ -400,52 +389,6 @@ export function kindOptions(events: Array<{ kind?: EventKind }>): KindOption[] {
 }
 
 /**
- * What the **newsroom reader** made of an article, as the one value a filter can be keyed on — and
- * `''` for every row it never read.
- *
- * The opposite policy from `kindKeyOf`, deliberately. The classifier judges the whole corpus, so a
- * row without its verdict is one nothing has looked at and `unlabelled` is a state worth seeing.
- * The reader's queue is one page of one theatre, so a row without *its* verdict is overwhelmingly
- * just a concert — not an article the reader gave up on, which is what `other` is for. A bucket
- * holding every listing in the corpus is not a kind of article anyone picks, and `cityOptions`
- * already declines to offer the same bucket for the rows no source placed.
- */
-export type NewsroomKey = NewsroomKind;
-
-/** Every newsroom verdict, in the order they are drawn in — `KIND_KEYS`' argument. */
-export const NEWSROOM_KEYS: readonly NewsroomKey[] = NEWSROOM_KINDS;
-
-export function newsroomKeyOf(event: { newsroomKind?: NewsroomKind }): NewsroomKey | '' {
-  return event.newsroomKind ?? '';
-}
-
-export interface NewsroomOption {
-  key: NewsroomKey;
-  count: number;
-}
-
-/**
- * The newsroom verdicts present in a built feed, with how many rows each holds.
- *
- * `kindOptions`' contract, over the other field. `other` is offered where the corpus holds it,
- * although the card draws it no chip: the chip would be a claim about the article where the reader
- * made none, and a filter is a question rather than a claim — it is how you go and look at the
- * rows the reader could not read, which is the only way that failure is visible from this tab.
- */
-export function newsroomOptions(
-  events: Array<{ newsroomKind?: NewsroomKind }>,
-): NewsroomOption[] {
-  const counts = new Map<NewsroomKey | '', number>();
-  for (const event of events) {
-    const key = newsroomKeyOf(event);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return NEWSROOM_KEYS.map((key) => ({ key, count: counts.get(key) ?? 0 })).filter(
-    (option) => option.count > 0,
-  );
-}
-
-/**
  * Every filter in the toolbar, applied in one pass — an unset field is no constraint.
  *
  * A lens over the finished list rather than arguments to `buildFeed`, and that is the whole design
@@ -473,25 +416,19 @@ export interface FeedNarrowing {
   /** Folded, as `cityKeyOf` returns it. Empty or absent for every city. */
   city?: string;
   kinds?: ReadonlySet<KindKey>;
-  newsroom?: ReadonlySet<NewsroomKey>;
 }
 
 export function narrowSections(sections: FeedSection[], narrowing: FeedNarrowing): FeedSection[] {
-  const { city = '', kinds, newsroom } = narrowing;
+  const { city = '', kinds } = narrowing;
   const byKind = kinds && kinds.size > 0 ? kinds : null;
-  // Read as strings, so the `''` a row the reader never saw returns is simply a key no chosen set
-  // holds — rather than a cast, or a second branch saying the same thing.
-  const byNewsroom: ReadonlySet<string> | null =
-    newsroom && newsroom.size > 0 ? newsroom : null;
-  if (!city && !byKind && !byNewsroom) return sections;
+  if (!city && !byKind) return sections;
   return sections
     .map((section) => ({
       group: section.group,
       items: section.items.filter(
         (item) =>
           (!city || cityKeyOf(item.event) === city) &&
-          (!byKind || byKind.has(kindKeyOf(item.event))) &&
-          (!byNewsroom || byNewsroom.has(newsroomKeyOf(item.event))),
+          (!byKind || byKind.has(kindKeyOf(item.event))),
       ),
     }))
     .filter((section) => section.items.length > 0);
@@ -596,34 +533,11 @@ export function whenLabel(
     startsAt: number | null;
     dateText?: string;
     allDay?: boolean;
-    newsroomEventAt?: number;
   },
   locale: string,
   timeZone = 'Europe/Warsaw',
 ): string {
-  if (event.startsAt === null) {
-    /*
-     * The date the reader found in the article, where the row has no date of its own.
-     *
-     * Ahead of `dateText`, which on these rows is the theatre's Polish sale sentence, and well
-     * ahead of the em dash that was there before — a card reading `—` for something that happened
-     * in July is the app declining to say the one thing that would place it. The year is printed
-     * with it, because past is a state this label can now be in and `6 Jul` alone would read as
-     * next summer.
-     *
-     * No clock, and no weekday. The hour was never in the sentence (see `DEFAULT_EVENT_HOUR`), and
-     * printing one would claim a precision the article did not have.
-     */
-    if (event.newsroomEventAt !== undefined) {
-      return new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone,
-      }).format(new Date(event.newsroomEventAt));
-    }
-    return event.dateText ?? '—';
-  }
+  if (event.startsAt === null) return event.dateText ?? '—';
   return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',

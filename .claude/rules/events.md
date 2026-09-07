@@ -579,30 +579,30 @@ English. At that point the scrape is still green, the news list still yields ten
 silently stops warning about the one thing it was built to warn about. A model reads the sentence
 however it is phrased.
 
-Four things come back per article, and each has a job:
+**Two things come back, and it used to be four.** `isTicketSale`, a boolean, and `saleOpensAt`,
+which becomes `EventRecord.onSaleAt` for `presale` to count down to. That is the pass.
 
-- **`saleOpensAt`** → `EventRecord.onSaleAt`, which `presale` counts down to. The point of the
-  whole pass.
-- **`newsroomKind`** → one of five (`newsroom.ts`), which becomes a **tag**. That is the whole of
-  "trigger on it": an interest asking for `ticket-sale` is an ordinary interest, and no new
-  matching mechanism was needed.
+It answered a five-way `newsroomKind` as well (`ticket-sale` / `programme` / `practical` /
+`institutional` / `other`), plus a `newsroomEventAt` and an English `summary`, and all three are
+gone at `READER_VERSION` **3**. Four of the five kinds were only ever *read* — nothing counted
+down to them, no seeded interest asked for them, and their whole effect was a chip on a card and a
+row of filter buttons over one theatre's news list. A taxonomy is also a materially harder question
+than a boolean, which is the second reason: the point of this pass is the one fact on that page
+with a deadline, and everything else it was asked was competing for the same judgement.
 
-  **Not to be confused with `EventRecord.kind`** one section above, which the classifier sets and
-  which is a genuinely different question. `kind` asks *does this row belong in an event feed at
-  all* — listing, announcement, or coverage — over the whole corpus. `newsroomKind` asks *what does
-  this news item say* — a sale, the programme, visiting, the institution — over the theatre's own
-  news. A ticket-sale item is `announcement` on the first axis and `ticket-sale` on the second;
-  both are true and neither implies the other. They compose usefully: the theatre's job adverts and
-  obituaries are `coverage`, so the default `includeCoverage: false` keeps them out of the feed
-  before the newsroom tag ever matters, and what is left for the `Ticket sales opening` seed to
-  reach is the handful of items that actually announce something.
-- **`newsroomEventAt`** → when the thing the article is *about* happens, which is the one date an
-  article cannot have of its own. See *An article had no date at all* below; it is why
-  `READER_VERSION` is at **2**.
-- **`summary`** → one English line, printed on the card. The counterpart of `reachReason`: the
-  verdict beside it is a single word, and without the sentence there is no telling a correct
-  reading from a confident wrong one — on rows whose title and teaser are Polish, it is also the
-  only thing on the card the reader can check the verdict against.
+What that costs, stated plainly because it was a deliberate loss and not an oversight: an article
+about a festival held in July is undated again, so it sits under *announced, no dates yet* until it
+scrolls off the news list, where `newsroomEventAt` used to expire it. See *An article had no date
+at all* below — `publishedAt`, the half of that fix that needs no model, is untouched and still
+does most of the work.
+
+**The measurement, because a prompt change is otherwise a matter of opinion.** Against fifty real
+articles off this page — a year's worth, fetched with their bodies — the two that announce a sale
+come back with the right day and hour, and none of the other forty-eight is claimed. The near
+misses are the ones worth naming, since each carries a date and the word *bilet*: a parking
+discount running "od 12 czerwca", an apology for a sale that had already opened, a tour whose
+ticket details were "podamy wkrótce", and two education programmes whose tickets were already on
+sale. They are enumerated in the prompt as false cases for exactly that reason.
 
 Kept apart from `classify.ts` on three axes, and it is worth keeping them straight before anybody
 merges the two prompts to save a call:
@@ -615,17 +615,51 @@ merges the two prompts to save a call:
 - **Blast radius** — a wrong `reach` costs a card in the feed. A wrong sale date is a notification
   on the wrong morning.
 
-**The article is untrusted text handed to a model whose answer schedules a notification**, which is
-a shape nothing else in this app has. So: the kind is a closed enum, and a `saleOpensAt` is stored
-**only when it parses to a real calendar day, lands in the future, and lands inside two years**. A
-past date is refused rather than kept-and-ignored, because a past `onSaleAt` counts as tickets
-being on sale and would mint an "On sale now" push about a shut box office.
+#### It was reading the teaser, and the date is in the body
 
-Four mechanics are load-bearing:
+This pass shipped being shown the news list's own row — a title and a one-line teaser — and that is
+where it was failing, silently, at the one job it has. **The 2026/27 season's sale date was never
+seen by this app.** It was announced on 15 April 2026 in an item titled *Wkrótce ogłoszenie nowego
+sezonu!*, whose teaser reads "Niebawem ogłosimy długo wyczekiwany sezon artystyczny 2026/27" and
+whose body reads "21 maja 2026, godz. 11:00 — Start sprzedaży biletów". The regex had no sentence
+to match, the model had no sentence to read, the news list went on returning ten healthy rows, and
+the season opened unannounced.
+
+So `articleText` (in `sources/html.ts`) fetches the page behind the row, narrowed to its one
+`<article>` element — the whole document would be a thousand words of identical chrome around the
+needle. Block tags become newlines first, which is not cosmetic: the theatre writes its schedules
+as table cells, and flattened without breaks `godz. 11:00Start sprzedaży biletów` joins two facts
+that were never adjacent.
+
+It is fetched at **read** time, not at scrape time, which is what keeps it nearly free — an article
+is read once, when `newsroomHashOf` says the list row is new or changed, so the steady state is one
+fetch per new article rather than ten per run. A page that will not load returns `''` and the
+reading falls back to the teaser, which is what it always had.
+
+`ReadOutcome.fetched` counts the bodies, and it is a health signal rather than bookkeeping: a fetch
+that quietly stops working degrades this pass to exactly the teaser-only reading described above —
+same green health, same ten rows, no date. The live smoke test asserts `fetched === read`.
+
+**The article is untrusted text handed to a model whose answer schedules a notification**, which is
+a shape nothing else in this app has — and fetching the body widens what a stranger's CMS can put
+in front of it. So: the verdict is a boolean, and a `saleOpensAt` is stored **only when the verdict
+was `true`, it parses to a real calendar day, it lands in the future, and it lands inside two
+years**. A past date is refused rather than kept-and-ignored, because a past `onSaleAt` counts as
+tickets being on sale and would mint an "On sale now" push about a shut box office. The worst a
+prompt buried in an article can win is a `ticket-sale` tag on its own row and a date inside the
+next two years, on a feed one person reads.
+
+Five mechanics are load-bearing:
 
 - **`newsroomHashOf` deliberately does not read tags**, where `classifyHashOf` does and must.
   The reader *writes* a tag, so a tag-reading hash would differ from the one just stored the
   instant a verdict landed, and every article would be re-read on every run for ever.
+- **It deliberately does not read the body either**, and that one is a trade rather than a rule.
+  Hashing the body means fetching every article every run to find out none of them moved — ten
+  requests an hour to someone else's server to learn nothing. The list row is the theatre's own
+  summary of its article, so an edit worth re-reading almost always shows in the title or teaser;
+  what is given up is a silent edit adding a sale date to a body while leaving the teaser alone.
+  `READER_VERSION` is the lever if that proves wrong.
 - **The reader runs before the classifier**, not after. It writes a tag and `classifyHashOf` reads
   tags, so the other order re-labels every article it touched, once, for nothing. Both passes see
   the finished tag list in one run. The order is now `fetch → upsert → read → classify → notify`.
@@ -634,10 +668,16 @@ Four mechanics are load-bearing:
   `stripUndefined` drops it, and the date the reader learnt would be deleted on the next run — six
   hours later, silently, with the notice never fired. Same list, same argument, as `firstSeenAt`
   and the classifier's fields.
-- **`tagsWithNewsroomKind` derives the kind's tag at merge time** from the stored kind, rather than
-  the reader appending to `tags` and hoping. `batch.set` rewrites `tags` wholesale from what the
-  source said, and the source has never heard of `programme`; deriving the union in one place is
-  what stops the reader racing the upsert and what makes a re-read idempotent.
+- **`tagsWithTicketSale` derives the tag at merge time**, rather than the reader appending to
+  `tags` and hoping. `batch.set` rewrites `tags` wholesale from what the source said, and the
+  source has not heard of a date the reader found; deriving the union in one place is what stops
+  the reader racing the upsert and what makes a re-read idempotent.
+
+  **It is keyed on the date, not on the boolean.** `ticket-sale` is the whole of the keyword-less
+  `Ticket sales opening` seed, so it has to mean *there is a deadline on this row* — a `true` whose
+  date the guards refused is a card with nothing to count down to. Both writers stamp it: the
+  adapter's regex where it fired, the reader where it did not, and which pass established the
+  deadline is not something an interest should have to know.
 
 **The regex is kept and wins where it fires.** It read the theatre's literal sentence with a tested
 regex, and a model is not asked to second-guess a stated fact — the same rule as `country`. It is
@@ -681,33 +721,18 @@ article discovered late is still news to a reader who has never seen it, and gat
 publication age is a notification rule, not a display one. `mergeRecord` names it with `country`'s
 shape: incoming wins, stored fills in, so a row that scrolls off page one keeps its date.
 
-**`EventRecord.newsroomEventAt`, which no source can supply.** The date of the thing being written
-about is in the prose, in Polish, in whatever phrasing the press office chose — exactly what this
-pass exists to read. `actionableAt` now reads `startsAt → onSaleAt → newsroomEventAt` (the sale
-stays ahead of it: it is the one you can be *late* for), so the feed groups, sorts and **expires**
-by it, and an article about a festival that is over drops out the way a past concert does. The
-card's date slot prints it in place of the em dash, with the year and no clock.
+**`EventRecord.newsroomEventAt` was the other half, and it has since been removed.** The date of
+the thing being written about is in the prose, and a model read it into a field of its own that
+`actionableAt` grouped, sorted and expired by — so an article about a finished festival dropped out
+of the feed the way a past concert does. It went when the reader was cut to its one question (see
+*A second model pass reads the newsroom* above): nothing counted down to it, and it was one more
+judgement competing with the sale date for the same call.
 
-Three things about it are load-bearing, and the first is the one to argue with:
-
-- **The window is two-sided, and the past is the point.** `saleOpensAt` is refused unless it is in
-  the future; a past event date is the answer being asked for. What is left of the guard is ±2
-  years, which catches the one failure a model resolving a yearless date actually has — the
-  misread year — and nothing subtler. It can afford that because **nothing counts down to it**:
-  `noticesFor` reads `startsAt` and `onSaleAt`, so a wrong reading costs a card in the wrong week
-  and never a notification on the wrong morning. That is the same trade `reach` makes.
-- **Its own field, never `startsAt`.** A reading and a stated fact are kept apart everywhere else
-  here (`reach` beside `country`, `newsroomKind` beside `tags`), and `startsAt` is what wakes
-  somebody up. Writing a model's date there would hand the notifier a number no test can bound.
-- **`mergeRecord` carries it forward**, for the `onSaleAt` reason exactly: no source has heard of
-  it, `stripUndefined` drops what is absent, and unnamed it would be deleted six hours after being
-  learnt — putting the row straight back under *announced, no dates yet*.
-
-The expiry is worth stating plainly, because it is a model's verdict removing a card: a wrong past
-date hides a real announcement, and this app's usual answer to that is the rejected view. It is
-accepted here on the precedent already set — `onSaleAt` can itself be model-written and has expired
-rows on the day it names since the reader shipped — and because the alternative is worse: a row
-kept but sorted by a date nobody trusts is the noise the whole `kind` axis was added to remove.
+So an article whose event is over is undated again, and sits under *announced, no dates yet* until
+it scrolls off the theatre's news list — which is at most ten items, so it is bounded. What did
+**not** go is `publishedAt`, which is the half of this fix needing no model at all, and which does
+most of the work: the card says `Published 61 d ago` rather than `Announced 2 d ago`, and the
+undated group is ordered by something real.
 
 #### The filter has to be falsifiable from the outside
 
@@ -888,24 +913,24 @@ inherited across a sign-in it would empty a feed nobody in that account had narr
 
 ### Narrowing the feed to a label
 
-Two more filters over the same output — the classifier's `kind` (`events-feed-kinds`) and the
-newsroom reader's verdict (`events-feed-newsroom`) — every argument above holding unchanged: view
-preferences on one device, never `FeedOptions` fields, never anything `PlanContext` hears about.
-The durable forms are `Interest.includeCoverage` and `Interest.tags`, and the empty-state hint says
-so.
+One more filter over the same output — the classifier's `kind` (`events-feed-kinds`) — every
+argument above holding unchanged: a view preference on one device, never a `FeedOptions` field,
+never anything `PlanContext` hears about. The durable form is `Interest.includeCoverage`, and the
+empty-state hint says so.
 
-Both are **multi-select** because the useful questions are plural — "announcements and news, not the
-listings I have already read" is one filter and not three visits — and that is the whole reason they
-are rows of `aria-pressed` buttons rather than `<select>`s. A `<select multiple>` on iOS draws as a
+It is **multi-select** because the useful questions are plural — "announcements and news, not the
+listings I have already read" is one filter and not three visits — and that is the whole reason it
+is a row of `aria-pressed` buttons rather than a `<select>`. A `<select multiple>` on iOS draws as a
 list nobody can tell is multi-select, and choosing two means holding a modifier a touch screen does
 not have.
 
-They are **two rows and not one**, each on its own line, because they are different questions:
-`kind` says whether a row belongs in an event feed at all, over the whole corpus, and the reader
-says what one theatre's news item announces. Mixed together, pressing `programme` and
-`announcement` would read as narrowing twice on one axis where it is in fact an AND across two.
+**There was a second row beside it** (`events-feed-newsroom`), over the newsroom reader's five-way
+verdict, and it went with the taxonomy — see *A second model pass reads the newsroom*. A filter is
+worth its line when the distinction it draws is one you would act on, and four of those five values
+were only ever chips to look at. What the reader now finds is on the card already, as the
+`Sale opens …` chip that `onSaleAt` draws, and in the `ticket-sale` tag an interest can ask for.
 
-Four things they do not share with the city picker:
+Three things it does not share with the city picker:
 
 - **`unlabelled` is a key of its own, not folded into `listing`.** An unclassified row *passes*
   every rule the classifier feeds, so it is in the feed because nothing has judged it rather than
@@ -919,32 +944,19 @@ Four things they do not share with the city picker:
 - **Nothing chosen is no constraint**, which is `match.ts`'s rule for a keyword-less interest
   arriving in the UI. Read the other way the tab opens on a blank feed for everyone who has never
   touched the control.
-- **`KIND_KEYS` and `NEWSROOM_KEYS` fix the order**, unlike `countryTally`'s commonest-first. These
-  are buttons, and a row whose buttons swap places as the corpus changes is one you press the wrong
-  half of.
 
-The **newsroom row takes the opposite decision about an absent verdict**, and that asymmetry is the
-one thing here worth reading twice. The classifier judges the whole corpus, so a row without a
-`kind` is one nothing has looked at. The reader's queue is one page of one theatre, so a row
-without a `newsroomKind` is overwhelmingly just a concert — a bucket holding every listing in the
-corpus is not a kind of article anyone picks, and `cityOptions` already declines to offer the same
-bucket for the rows no source placed. What the reader read and could not place is `other`, which
-*is* offered where the corpus holds it: the card draws it no chip (that would be a claim where the
-reader made none) but a filter is a question rather than a claim, and it is the only way to go and
-look at what the reader failed on.
+`KIND_KEYS` fixes the order, unlike `countryTally`'s commonest-first: these are buttons, and a row
+whose buttons swap places as the corpus changes is one you press the wrong half of. `loadFeedKinds`
+validates against that list rather than reading what is stored — a key written by a future build
+with one more kind matches no row here, so kept it would silently empty the feed where dropping it
+leaves the filter honest about what this build can do.
 
-Each control's options are **built from the feed with every filter but its own applied**, which is
-what keeps all three sets of counts honest: `Warszawa (12)` under a kind filter has to mean twelve
-of that kind on screen, or pressing it lands on a smaller number than it promised, and `Anywhere` is
-the rest of the toolbar minus the city rather than the whole corpus. That is four narrowings per
-render over the same three predicates, which is why `narrowSections` takes all of them at once
-rather than being three lenses to chain. `withSelectedKeys` is `withSelected`'s argument reaching
-these controls — a chosen label that has fallen to zero keeps its button, or the feed would be
-narrowed to nothing with nothing on screen to press.
-
-`loadFeedKinds` and `loadFeedNewsroom` validate against those key lists rather than reading what is
-stored: a key written by a future build with one more kind matches no row here, so kept it would
-silently empty the feed where dropping it leaves the filter honest about what this build can do.
+Each control's options are **built from the feed with the other filter applied**, which is what
+keeps both sets of counts honest: `Warszawa (12)` under a kind filter has to mean twelve of that
+kind on screen, or pressing it lands on a smaller number than it promised, and `Anywhere` is the
+rest of the toolbar minus the city rather than the whole corpus. `withSelectedKeys` is
+`withSelected`'s argument reaching this control — a chosen label that has fallen to zero keeps its
+button, or the feed would be narrowed to nothing with nothing on screen to press.
 
 ### The Pipeline tab, and reading a row backwards
 
@@ -1000,7 +1012,7 @@ here yet, which is *why that row is still in the feed*.
 `shared` is the stage that needs defending, and it is the honest answer rather than a hedge. Three
 fields have more than one writer by design: `mergeRecord` takes an incoming `country` and `onSaleAt`
 where the source stated one and keeps the stored value (usually a model's) otherwise, and `tags` is
-the union of what the source said and the tag `tagsWithNewsroomKind` derives. Filing any of the
+the union of what the source said and the tag `tagsWithTicketSale` derives. Filing any of the
 three under one pass would be a claim the record cannot support, and this tab exists to stop people
 guessing about exactly that.
 
@@ -1060,10 +1072,13 @@ got); the second cannot show a count, cannot be styled, and picks one value rath
 
 Two places it deliberately departs from the Feed:
 
-- **`ABSENT` is an option on every axis**, where `newsroomOptions` declines to offer it. There the
-  bucket would hold every listing in the corpus and is not a kind of article anyone picks; here the
-  rows nothing has judged, nothing placed and nothing tagged are exactly what is being counted, and
-  a facet that cannot ask for them cannot show the hole.
+- **`ABSENT` is an option on every axis**, where `cityOptions` declines to offer it. There the
+  bucket would hold every row no source placed, and "somewhere unspecified" is not a place anyone
+  picks; here the rows nothing has judged, nothing placed and nothing tagged are exactly what is
+  being counted, and a facet that cannot ask for them cannot show the hole. The `newsroom` axis is
+  the clearest case: its two values are the reader's verdict, and `ABSENT` is every row it has
+  never looked at — which is the whole corpus bar a dozen, and also the only way to see that the
+  reader has stopped running.
 - **Nothing is persisted.** The Feed's three filters hide rows from a list read every day, so
   forgetting them would be the app losing a setting. Here each visit is its own question, and a
   stored narrowing means coming back weeks later to a corpus that *looks* empty — on the one screen

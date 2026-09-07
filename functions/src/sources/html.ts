@@ -29,6 +29,41 @@ function safeChar(code: number): string {
   return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
 }
 
+/**
+ * The readable text of one article page, or `''` where the page has no article on it.
+ *
+ * Narrowed to `<article>` on purpose. The whole document would carry the theatre's navigation,
+ * its accessibility toolbar and its footer on every row — a thousand words of chrome, identical
+ * across every article, in which the one sentence being looked for is a needle. TYPO3 wraps the
+ * body in exactly one `<article>`, so that element is the article and nothing else is.
+ *
+ * Block tags become newlines before the rest are dropped, which is not cosmetic: the theatre
+ * writes its schedules as list items —
+ *
+ *     <li>21 maja 2026, godz. 11:00</li><li>Start sprzedaży biletów</li>
+ *
+ * — and flattening those without a break gives `godz. 11:00Start sprzedaży biletów`, a line that
+ * reads as one token to anything downstream and joins two facts that were never adjacent.
+ *
+ * Returns `''` rather than falling back to the whole page: a page whose markup moved should hand
+ * the reader nothing to read, so the reading falls back to the news list's own teaser, rather than
+ * a menu the model would have to be trusted to see through.
+ */
+export function articleText(html: string, limit = 2000): string {
+  const inner = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(html)?.[1];
+  if (!inner) return '';
+  const text = decodeEntities(
+    inner
+      .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<(?:p|div|li|br|tr|h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<[^>]*>/g, ''),
+  )
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n[ \n]*/g, '\n')
+    .trim();
+  return text.length > limit ? text.slice(0, limit) : text;
+}
+
 /** Every match of a tag pair, inner HTML only. */
 export function matchAll(html: string, pattern: RegExp): string[] {
   return [...html.matchAll(pattern)].map((m) => m[1] ?? '');

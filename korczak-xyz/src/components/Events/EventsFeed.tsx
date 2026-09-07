@@ -20,8 +20,6 @@ import {
   kindOptions,
   KIND_KEYS,
   narrowSections,
-  newsroomOptions,
-  NEWSROOM_KEYS,
   placeLabel,
   saleWhenLabel,
   whenLabel,
@@ -31,7 +29,6 @@ import {
   type FeedMode,
   type FeedSection,
   type KindKey,
-  type NewsroomKey,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
 import { formatDistances } from '../../utils/events/distance';
@@ -39,13 +36,10 @@ import { cityKey } from '../../utils/events/cities';
 import {
   loadFeedCity,
   loadFeedKinds,
-  loadFeedNewsroom,
   saveFeedCity,
   saveFeedKinds,
-  saveFeedNewsroom,
 } from '../../utils/events/browser/storage';
 import type { EventKind, Reach } from '../../utils/events/types';
-import type { NewsroomKind } from '../../utils/events/newsroom';
 import EventsGate from './EventsGate';
 import {
   fill,
@@ -92,21 +86,12 @@ function FeedPanel({ lang }: Props) {
   };
 
   /*
-   * The two label filters: what the classifier called the row, and what the newsroom reader made
-   * of the article. Both are words the card already draws as a chip, and a chip you can read and
-   * not act on is half a feature.
-   *
-   * They are separate controls rather than one row of every label, because they answer different
-   * questions — `kind` says whether a row belongs in an event feed at all, over the whole corpus;
-   * the reader says what one theatre's news item announces. Mixed into one row, pressing
-   * `programme` and `announcement` would read as narrowing twice on one axis when it is in fact an
-   * AND across two.
+   * The label filter: what the classifier called the row. A word the card already draws as a chip,
+   * and a chip you can read and not act on is half a feature.
    */
   const kindFilter = useKeyFilter(loadFeedKinds, saveFeedKinds);
-  const newsroomFilter = useKeyFilter(loadFeedNewsroom, saveFeedNewsroom);
   const chosenKinds = kindFilter.chosen;
-  const chosenNewsroom = newsroomFilter.chosen;
-  const narrowedByLabel = chosenKinds.size > 0 || chosenNewsroom.size > 0;
+  const narrowedByLabel = chosenKinds.size > 0;
 
   // Re-arm silently. Nothing is rendered for it here — the Alerts tab is where push has a UI.
   useWebPush(auth.user, lang, { verifyOnly: true });
@@ -122,34 +107,25 @@ function FeedPanel({ lang }: Props) {
   );
 
   /*
-   * Each control's options are built from the feed with every filter *but its own* applied, so its
-   * counts say what pressing a choice would show rather than what the current choice left. That is
-   * what these three half-narrowed views are for: `Warszawa (12)` under a kind filter has to mean
-   * twelve of the kind being shown, or pressing it lands on a smaller number than it promised.
+   * Each control's options are built from the feed with the *other* filter applied, so its counts
+   * say what pressing a choice would show rather than what the current choice left. That is what
+   * these two half-narrowed views are for: `Warszawa (12)` under a kind filter has to mean twelve
+   * of the kind being shown, or pressing it lands on a smaller number than it promised.
    *
    * A selection the corpus no longer holds is kept in whichever control holds it — see
    * `withSelected` and `withSelectedKeys`.
    */
   const forCity = useMemo(
-    () => narrowSections(built, { kinds: chosenKinds, newsroom: chosenNewsroom }),
-    [built, chosenKinds, chosenNewsroom],
+    () => narrowSections(built, { kinds: chosenKinds }),
+    [built, chosenKinds],
   );
   const forKinds = useMemo(
-    () => narrowSections(built, { city: selectedCity, newsroom: chosenNewsroom }),
-    [built, selectedCity, chosenNewsroom],
-  );
-  const forNewsroom = useMemo(
-    () => narrowSections(built, { city: selectedCity, kinds: chosenKinds }),
-    [built, selectedCity, chosenKinds],
+    () => narrowSections(built, { city: selectedCity }),
+    [built, selectedCity],
   );
   const sections = useMemo(
-    () =>
-      narrowSections(built, {
-        city: selectedCity,
-        kinds: chosenKinds,
-        newsroom: chosenNewsroom,
-      }),
-    [built, selectedCity, chosenKinds, chosenNewsroom],
+    () => narrowSections(built, { city: selectedCity, kinds: chosenKinds }),
+    [built, selectedCity, chosenKinds],
   );
 
   const cities = useMemo(() => withSelected(cityOptions(eventsOf(forCity)), city), [forCity, city]);
@@ -157,11 +133,6 @@ function FeedPanel({ lang }: Props) {
     () => withSelectedKeys(kindOptions(eventsOf(forKinds)), chosenKinds, KIND_KEYS),
     [forKinds, chosenKinds],
   );
-  const newsroomChoices = useMemo(
-    () => withSelectedKeys(newsroomOptions(eventsOf(forNewsroom)), chosenNewsroom, NEWSROOM_KEYS),
-    [forNewsroom, chosenNewsroom],
-  );
-
   /*
    * How many dismissed events there are to go back to — which is a second pass over the corpus and
    * not a `filter` on the ignore list, deliberately. An ignore outlives the event: a concert that
@@ -174,13 +145,12 @@ function FeedPanel({ lang }: Props) {
       narrowSections(buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }), {
         city: selectedCity,
         kinds: chosenKinds,
-        newsroom: chosenNewsroom,
       }).reduce((total, section) => total + section.items.length, 0),
     // Every filter is a dependency: the button's number and the list it opens are the same
     // question, and a count taken over rows any of them hides would offer a view that opens on
     // nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, ignored, selectedCity, chosenKinds, chosenNewsroom],
+    [feed.events, interests, ignored, selectedCity, chosenKinds],
   );
 
   if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
@@ -290,19 +260,6 @@ function FeedPanel({ lang }: Props) {
             labelOf={(key) => kindOptionLabel(key, t)}
             onToggle={kindFilter.toggle}
           />
-          {/*
-            * The reader's verdict, and the row that is usually not drawn at all: it appears only
-            * where the corpus holds more than one kind of newsroom article, which today is one
-            * theatre's news list and nothing else. A row of buttons for a distinction that is not
-            * in the feed today would be a control that does nothing on most visits.
-            */}
-          <FilterChips
-            label={t.newsroomFilter}
-            options={newsroomChoices}
-            chosen={chosenNewsroom}
-            labelOf={(key) => newsroomOptionLabel(key, t)}
-            onToggle={newsroomFilter.toggle}
-          />
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
 
@@ -375,11 +332,6 @@ function FeedPanel({ lang }: Props) {
               {t.kindClear}
             </button>
           ) : null}
-          {chosenNewsroom.size > 0 ? (
-            <button className="ev-link" type="button" onClick={newsroomFilter.clear}>
-              {t.newsroomClear}
-            </button>
-          ) : null}
         </div>
       ) : (
         sections.map((section) => (
@@ -417,24 +369,6 @@ function kindLabel(kind: EventKind | undefined, t: Translation): string | null {
   // `listing` and unclassified both draw nothing. Not for want of a word for them — a chip on
   // every card in the corpus saying "yes, this is an event" is a label nobody reads twice, and the
   // unlabelled case is already on the card: the place chip says `?` until this call has been made.
-  return null;
-}
-
-/**
- * What the **newsroom reader** made of an article — a different question from `kindLabel` above.
- *
- * That one says whether a row belongs in an event feed at all. This says what one of the theatre's
- * own news items actually announces, and it is what the `ticket-sale` seed interest matches on.
- *
- * `other` deliberately has no label and draws no chip. It is the model saying it could not tell,
- * and a chip reading "unclassified" would be a claim about the article where there is none — the
- * same reason `newsroomTag` gives that kind no tag either.
- */
-function newsroomLabel(kind: NewsroomKind | undefined, t: Translation): string | null {
-  if (kind === 'ticket-sale') return t.newsroomTicketSale;
-  if (kind === 'programme') return t.newsroomProgramme;
-  if (kind === 'practical') return t.newsroomPractical;
-  if (kind === 'institutional') return t.newsroomInstitutional;
   return null;
 }
 
@@ -578,23 +512,6 @@ function kindOptionLabel(key: KindKey, t: Translation): string {
 }
 
 /**
- * The word on a newsroom verdict's button — the same word the chip on the card carries.
- *
- * Deliberately not the kind row's capitalised plurals: this row exists to go and find the rows
- * showing a particular chip, and a button reading exactly what the chip reads is the shortest
- * distance between the two. `other` is the exception and needs a word of its own, the chip having
- * none — it is the reader saying it could not tell, and the button is how you go and look at what
- * it could not read.
- */
-function newsroomOptionLabel(key: NewsroomKey, t: Translation): string {
-  if (key === 'ticket-sale') return t.newsroomTicketSale;
-  if (key === 'programme') return t.newsroomProgramme;
-  if (key === 'practical') return t.newsroomPractical;
-  if (key === 'institutional') return t.newsroomInstitutional;
-  return t.newsroomOther;
-}
-
-/**
  * What an empty list says, naming the narrowing that most likely caused it.
  *
  * The city first when several are on: it is the filter that hides most, and the buttons under this
@@ -656,7 +573,6 @@ function EventCard({
   const { event } = item;
   const saleWhen = saleWhenLabel(event, localeOf(lang));
   const saleChip = saleWhen ? fill(t.saleOpens, { when: saleWhen }) : null;
-  const newsroom = newsroomLabel(event.newsroomKind, t);
 
   return (
     <li className="ev-card">
@@ -685,12 +601,6 @@ function EventCard({
           * is about to arrive was counting down to.
           */}
         {saleChip ? <span className="ev-chip ev-chip--presale">{saleChip}</span> : null}
-        {/*
-          * What the reader made of an article. On the card for the same reason the country-and-reach
-          * chip is: the tag it stands for is what an interest matches, so a verdict nobody can see
-          * is a filter nobody can check.
-          */}
-        {newsroom ? <span className="ev-chip ev-chip--newsroom">{newsroom}</span> : null}
         {item.matched.length > 0 ? (
           <span>
             {t.matchedBy} {item.matched.map((i) => i.label).join(', ')}
@@ -755,16 +665,6 @@ function EventCard({
         <p className="ev-reason">
           {item.rejectedFor === 'kind' ? event.kindReason : event.reachReason}
         </p>
-      ) : null}
-
-      {/*
-        * What the reader understood the article to say — always, not only when something was
-        * filtered out, because on these rows it is the only thing on the card in the reader's own
-        * language: the title and the teaser above it are the theatre's Polish. It is also the only
-        * way to tell a correct reading from a confident wrong one before the notification arrives.
-        */}
-      {event.newsroomSummary ? (
-        <p className="ev-reason">{event.newsroomSummary}</p>
       ) : null}
 
       <div className="ev-actions">

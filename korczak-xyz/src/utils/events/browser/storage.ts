@@ -23,7 +23,7 @@
 
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
-import { KIND_KEYS, NEWSROOM_KEYS, type KindKey, type NewsroomKey } from '../feed';
+import { KIND_KEYS, type KindKey } from '../feed';
 import type { EventRecord, Ignore, Interest, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
@@ -38,7 +38,6 @@ export const EVENT_KEYS = {
   settings: 'events-push-settings',
   feedCity: 'events-feed-city',
   feedKinds: 'events-feed-kinds',
-  feedNewsroom: 'events-feed-newsroom',
 } as const;
 
 /** How many events the offline cache keeps. Roughly 60 kB at ~300 bytes a row. */
@@ -419,15 +418,6 @@ export function loadFeedKinds(): KindKey[] {
 
 export function saveFeedKinds(kinds: KindKey[]): boolean {
   return saveFeedKeys(EVENT_KEYS.feedKinds, kinds);
-}
-
-/** Which newsroom verdicts the feed is narrowed to — an empty list for all of them. */
-export function loadFeedNewsroom(): NewsroomKey[] {
-  return loadFeedKeys(EVENT_KEYS.feedNewsroom, NEWSROOM_KEYS);
-}
-
-export function saveFeedNewsroom(kinds: NewsroomKey[]): boolean {
-  return saveFeedKeys(EVENT_KEYS.feedNewsroom, kinds);
 }
 
 export function loadPushSettings(): PushSettings {

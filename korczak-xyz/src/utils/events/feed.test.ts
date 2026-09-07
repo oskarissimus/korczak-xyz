@@ -12,14 +12,12 @@ import {
   kindKeyOf,
   kindOptions,
   narrowSections,
-  newsroomKeyOf,
-  newsroomOptions,
   placeLabel,
   saleWhenLabel,
   whenLabel,
 } from './feed';
 import { fingerprintOf, haystackOf } from './normalize';
-import type { KindKey, NewsroomKey } from './feed';
+import type { KindKey } from './feed';
 import type { EventRecord, Interest } from './types';
 
 const DAY = 86400000;
@@ -253,33 +251,6 @@ describe('whenLabel', () => {
     expect(whenLabel(allDay, 'en-GB')).toMatch(/27/);
   });
 
-  it('prints the date the reader found in an article, in place of the em dash', () => {
-    /*
-     * A newsroom row has no date of its own — it is a piece of writing — so this slot read `—` on
-     * every one of them, and an article about a festival held two months ago was
-     * indistinguishable from one announcing next season. The year is printed because past is a
-     * state this label can now be in, and no clock, because the sentence never gave one.
-     */
-    const article = { startsAt: null, newsroomEventAt: Date.parse('2026-07-06T10:00:00Z') };
-    expect(whenLabel(article, 'en-GB')).toMatch(/2026/);
-    expect(whenLabel(article, 'en-GB')).toMatch(/6 Jul/);
-    expect(whenLabel(article, 'en-GB')).not.toMatch(/\d\d:\d\d/);
-  });
-
-  it('prefers the date it read to the sale sentence it read it from', () => {
-    // `dateText` on these rows is the theatre's Polish prose. A date is what the slot is for.
-    expect(
-      whenLabel(
-        {
-          startsAt: null,
-          dateText: 'Sprzedaż biletów od 1 września',
-          newsroomEventAt: Date.parse('2026-09-20T10:00:00Z'),
-        },
-        'en-GB',
-      ),
-    ).toMatch(/20 Sep/);
-  });
-
   it('falls back to the source’s own words when the date could not be parsed', () => {
     // "Premiera: jesień 2027" is genuinely what the theatre said, and a blank reads as a bug.
     expect(whenLabel({ startsAt: null, dateText: 'Premiera: jesień 2027' }, 'en-GB')).toBe(
@@ -289,49 +260,6 @@ describe('whenLabel', () => {
 
   it('is never blank', () => {
     expect(whenLabel({ startsAt: null }, 'en-GB')).toBe('—');
-  });
-});
-
-/*
- * The date an article is *about*, which is the only date a newsroom row can have.
- *
- * The screenshot that prompted it: "OGRODY MUZYCZNE 2026", a festival held in July, published in
- * July, first seen by the collector in September — and shown under *announced, no dates yet* as a
- * new `programme`, captioned `Announced 2 d ago`. Nothing on the row was wrong; there was simply
- * no date anywhere on it.
- */
-describe('an article with the date the reader found', () => {
-  const past = ev({
-    title: 'OGRODY MUZYCZNE 2026',
-    startsAt: null,
-    day: null,
-    newsroomEventAt: Date.parse('2026-07-06T10:00:00Z'),
-    firstSeenAt: NOW - 2 * DAY,
-  });
-  const soon = ev({
-    title: 'Sezon 2026/27',
-    startsAt: null,
-    day: null,
-    newsroomEventAt: NOW + 3 * DAY,
-  });
-
-  it('is the moment the row asks something of the reader, after any sale date', () => {
-    expect(actionableAt(past)).toBe(Date.parse('2026-07-06T10:00:00Z'));
-    // A sale is the thing you can be late for, so it still wins where a row carries both.
-    const both = { ...soon, onSaleAt: NOW + DAY };
-    expect(actionableAt(both)).toBe(NOW + DAY);
-  });
-
-  it('groups by it rather than falling to the end of the list', () => {
-    expect(groupOf(soon, NOW)).toBe('week');
-    // And a row that genuinely has no date anywhere is still undated, not misfiled.
-    expect(groupOf(ev({ title: 'x', startsAt: null, day: null }), NOW)).toBe('undated');
-  });
-
-  it('drops an article about something already over, as a past concert is dropped', () => {
-    const sections = buildFeed([past, soon], [ALL], NOW);
-    const shown = sections.flatMap((s) => s.items.map((i) => i.event.title));
-    expect(shown).toEqual(['Sezon 2026/27']);
   });
 });
 
@@ -620,57 +548,6 @@ describe('the kind filter', () => {
   });
 });
 
-describe('the newsroom filter', () => {
-  const sections = () =>
-    buildFeed(
-      [
-        ev({ title: 'Sprzedaż biletów rusza', day: '2026-10-21', newsroomKind: 'ticket-sale' }),
-        ev({ title: 'OGRODY MUZYCZNE 2026', day: '2026-10-22', newsroomKind: 'programme' }),
-        ev({ title: 'Zmiana godzin kasy', day: '2026-10-23', newsroomKind: 'practical' }),
-        ev({ title: 'Wesele Figara', day: '2026-10-24' }),
-      ],
-      [ALL],
-      NOW,
-    );
-
-  it('gives a row the reader never saw no key at all', () => {
-    // The opposite of `kindKeyOf`. The classifier judges the whole corpus, so its absence is a
-    // state worth seeing; the reader's queue is one theatre's news list, so its absence is just a
-    // concert — and `other` is what a row it read and could not place looks like.
-    expect(newsroomKeyOf({ newsroomKind: 'programme' })).toBe('programme');
-    expect(newsroomKeyOf({ newsroomKind: 'other' })).toBe('other');
-    expect(newsroomKeyOf({})).toBe('');
-  });
-
-  it('offers no bucket for every row the reader never read', () => {
-    // `cityOptions`' rule, one field along: "not an article at all" is not a kind of article
-    // anyone picks, and the option would hold most of the corpus.
-    const options = newsroomOptions(sections().flatMap((s) => s.items).map((i) => i.event));
-    expect(options).toEqual([
-      { key: 'ticket-sale', count: 1 },
-      { key: 'programme', count: 1 },
-      { key: 'practical', count: 1 },
-    ]);
-  });
-
-  it('offers the rows the reader could not place, where there are any', () => {
-    // The card draws `other` no chip — that would be a claim where the reader made none — but a
-    // filter is a question, and it is the only way to go and look at what the reader failed on.
-    expect(newsroomOptions([{ newsroomKind: 'other' }, {}])).toEqual([{ key: 'other', count: 1 }]);
-  });
-
-  it('keeps the chosen verdicts and reads nothing chosen as no constraint', () => {
-    const filtered = narrowSections(sections(), {
-      newsroom: new Set<NewsroomKey>(['programme']),
-    });
-    expect(filtered.flatMap((s) => s.items).map((i) => i.event.title)).toEqual([
-      'OGRODY MUZYCZNE 2026',
-    ]);
-    const all = sections();
-    expect(narrowSections(all, { newsroom: new Set() })).toBe(all);
-  });
-});
-
 describe('narrowSections', () => {
   const sections = () =>
     buildFeed(
@@ -680,21 +557,18 @@ describe('narrowSections', () => {
           day: '2026-10-21',
           city: 'Warszawa',
           kind: 'announcement',
-          newsroomKind: 'programme',
         }),
         ev({
           title: 'Sezon 2026/27 ogłoszony',
           day: '2026-10-22',
           city: 'Rzeszów',
           kind: 'announcement',
-          newsroomKind: 'programme',
         }),
         ev({
           title: 'Sprzedaż biletów rusza',
           day: '2026-10-23',
           city: 'Warszawa',
-          kind: 'announcement',
-          newsroomKind: 'ticket-sale',
+          kind: 'listing',
         }),
         ev({ title: 'Wesele Figara', day: '2026-10-24', city: 'Warszawa', kind: 'listing' }),
       ],
@@ -703,12 +577,11 @@ describe('narrowSections', () => {
     );
 
   it('applies every filter given, and only those', () => {
-    // Three controls, one AND across them — pressing `programme` in one row and `Warszawa` in the
+    // Two controls, one AND across them — pressing `announcement` in one row and `Warszawa` in the
     // other is a narrowing on two axes, not two narrowings on one.
     const filtered = narrowSections(sections(), {
       city: 'warszawa',
       kinds: new Set<KindKey>(['announcement']),
-      newsroom: new Set<NewsroomKey>(['programme']),
     });
     expect(filtered.flatMap((s) => s.items).map((i) => i.event.title)).toEqual([
       'OGRODY MUZYCZNE 2026',
@@ -720,7 +593,7 @@ describe('narrowSections', () => {
     // on every render for filters nobody has touched.
     const all = sections();
     expect(narrowSections(all, {})).toBe(all);
-    expect(narrowSections(all, { city: '', kinds: new Set(), newsroom: new Set() })).toBe(all);
+    expect(narrowSections(all, { city: '', kinds: new Set() })).toBe(all);
   });
 });
 

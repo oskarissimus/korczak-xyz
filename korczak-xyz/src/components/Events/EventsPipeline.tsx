@@ -39,6 +39,7 @@ import {
   type FacetSelection,
   type PipelineStage,
 } from '../../utils/events/pipeline';
+import { ticketSaleVerdictOf } from '../../utils/events/newsroom';
 import { tokenizeJson } from '../../utils/jsonView';
 import type { EventRecord } from '../../utils/events/types';
 import EventsGate from './EventsGate';
@@ -413,6 +414,7 @@ function PipelineRow({
   onToggle: () => void;
   t: Translation;
 }) {
+  const verdict = ticketSaleVerdictOf(event);
   return (
     <li className="ev-pipe-row">
       <div className="ev-pipe-head">
@@ -435,9 +437,7 @@ function PipelineRow({
          * a blank where a verdict goes is exactly what is being looked for.
          */}
         <span className="ev-chip ev-chip--kind">{kindWordOf(event.kind ?? '', t)}</span>
-        {event.newsroomKind ? (
-          <span className="ev-chip ev-chip--newsroom">{newsroomWord(event.newsroomKind, t)}</span>
-        ) : null}
+        {verdict ? <span className="ev-chip ev-chip--newsroom">{newsroomWord(verdict, t)}</span> : null}
         {/*
          * Every tag, as it is stored. On a feed card these are behind the matcher; here a tag
          * applied feed-wide is the thing to be able to see, since a keyword-less interest has no
@@ -551,12 +551,9 @@ function reachWordOf(reach: string, t: Translation): string {
   return t.reachUnknown;
 }
 
-function newsroomWord(kind: string, t: Translation): string {
-  if (kind === 'ticket-sale') return t.newsroomTicketSale;
-  if (kind === 'programme') return t.newsroomProgramme;
-  if (kind === 'practical') return t.newsroomPractical;
-  if (kind === 'institutional') return t.newsroomInstitutional;
-  return t.newsroomOther;
+/** The reader's verdict, as the two words the facet's buttons carry. */
+function newsroomWord(verdict: string, t: Translation): string {
+  return verdict === 'ticket-sale' ? t.newsroomTicketSale : t.newsroomNoSale;
 }
 
 function stageLabel(stage: PipelineStage, t: Translation): string {

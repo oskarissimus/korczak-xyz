@@ -12,7 +12,6 @@
  * `portable.test.ts` fails the build the moment an import reaches outside `./`.
  */
 
-import type { NewsroomKind } from './newsroom';
 
 /** Which adapter produced a record. Also the first half of its id. */
 export type SourceId =
@@ -144,51 +143,24 @@ export interface EventRecord {
   /** Why the classifier called it that. Printed on a filtered-out card, like `reachReason`. */
   kindReason?: string;
   /**
-   * What the **newsroom reader** made of this article, which is a different question from `kind`
-   * directly above and the two are worth keeping straight.
+   * Whether the **newsroom reader** found a stated ticket-sale date on this article.
    *
+   * A different question from `kind` directly above, and the two are worth keeping straight.
    * `kind` asks whether a row belongs in an event feed at all, over the whole corpus, from
-   * `classify.ts`. This asks what one of the theatre's own news items actually says, over the
-   * dozen rows a source tagged `newsroom`, from `readNewsroom.ts` — a separate pass on a separate
-   * version, for the reasons in that file's header. A ticket-sale item is `announcement` on the
-   * first axis and `ticket-sale` on this one; both are true and neither implies the other.
+   * `classify.ts`. This asks the one thing worth knowing about a theatre's own news item — do
+   * tickets go on sale on a date it states — over the dozen rows a source tagged `newsroom`, from
+   * `readNewsroom.ts`, a separate pass on a separate version for the reasons in that file's header.
    *
-   * `newsroomTag` turns this into the tag an interest can match, and `tagsWithNewsroomKind` is the
+   * Stored rather than inferred from `onSaleAt`, because the two can disagree and the disagreement
+   * is the thing worth being able to see: `true` here with no `onSaleAt` beside it is the reader
+   * saying "this announces a sale" and its date failing the guards — a sale already open, or a
+   * year the model misread. Inferring the boolean from the date would make that case look
+   * identical to a parking notice.
+   *
+   * `tagsWithTicketSale` turns a *dated* verdict into the tag an interest can match, and is the
    * one place that union is made.
    */
-  newsroomKind?: NewsroomKind;
-  /**
-   * What the article says, in one line, as the model read it.
-   *
-   * The counterpart of `reachReason` and `kindReason`: the verdict beside it is a single word, and
-   * without the sentence there is no way to tell a correct reading from a confident wrong one. On
-   * rows whose title and teaser are the theatre's Polish, it is also the only thing on the card in
-   * the reader's own language.
-   */
-  newsroomSummary?: string;
-  /**
-   * When the event this article is **about** takes place, as the reader understood it.
-   *
-   * The gap this fills is the one an article has by construction: `startsAt` is null on every
-   * newsroom row, because the row is a piece of writing rather than a night out — and until now
-   * that meant a piece about a festival held in July and one announcing next season's premiere
-   * were the same shape of card, filed together under *announced, no dates yet*, both of them
-   * looking equally like news. The date is usually stated plainly in the prose, in Polish, in
-   * whatever phrasing the press office chose, which is exactly the sort of fact `readNewsroom.ts`
-   * exists to read.
-   *
-   * Kept in its own field rather than written into `startsAt`, for two reasons that pull the same
-   * way. It is a **reading**, not a fact the source stated in a field, and this app keeps those
-   * apart everywhere else (`reach` beside `country`, `newsroomKind` beside `tags`); and `startsAt`
-   * is what `noticesFor` counts down to, so a model that misreads a year would put a `soon`
-   * notification on a stranger's calendar. Here the blast radius is a card: the feed groups,
-   * orders and expires by it through `actionableAt`, so an article about something already over
-   * drops out of the list the way a past concert does, and nothing wakes anybody up.
-   *
-   * Unlike `onSaleAt` a **past** value is kept and is the whole point — it is what says this is old
-   * news. See `parseEventMoment` for the window that separates old news from a misread year.
-   */
-  newsroomEventAt?: number;
+  newsroomTicketSale?: boolean;
   newsroomReadAt?: number;
   /** What the reading was computed from — see `newsroomHashOf`. Unchanged, no second call. */
   newsroomHash?: string;

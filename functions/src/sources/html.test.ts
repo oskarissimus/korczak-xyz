@@ -1,5 +1,14 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { SALE_DEFAULT_HOUR, decodeEntities, parsePolishDate, parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
+import {
+  SALE_DEFAULT_HOUR,
+  articleText,
+  decodeEntities,
+  parsePolishDate,
+  parseSaleAnnouncement,
+  stripTags,
+  warsawEpoch,
+} from './html';
 
 describe('stripTags', () => {
   it('drops markup and collapses whitespace', () => {
@@ -123,5 +132,46 @@ describe('parseSaleAnnouncement', () => {
 
   it('refuses a month it cannot read rather than guessing one', () => {
     expect(on('Sprzedaż biletów od 4 brumaire 2026')).toBeNull();
+  });
+});
+
+describe('articleText', () => {
+  const html = readFileSync(
+    new URL('./fixtures/teatr-wielki-article.html', import.meta.url),
+    'utf8',
+  );
+
+  it('reads the sentence the news list’s teaser never carried', () => {
+    /*
+     * The article this whole pass was rebuilt around. Its teaser says only "Niebawem ogłosimy
+     * sezon 2026/27"; the date the season's tickets went on sale is here, in the body, and until
+     * the body was fetched nothing in this app had ever seen it.
+     */
+    expect(articleText(html)).toContain('21 maja 2026, godz. 11:00');
+    expect(articleText(html)).toContain('Start sprzedaży biletów');
+  });
+
+  it('keeps the theatre’s table rows apart', () => {
+    // Written as table cells: `<strong>21 maja…</strong><br>Start sprzedaży biletów`. Flattened
+    // without breaks the schedule becomes one run-on line joining facts that were never adjacent.
+    expect(articleText(html)).toMatch(/11 maja 2026, godz\. 12:00\s*\n/);
+  });
+
+  it('leaves the navigation and the footer out of it', () => {
+    // A thousand words of chrome, identical on every article, is a haystack around one needle.
+    const text = articleText(html);
+    expect(text).not.toContain('Cennik w sezonie');
+    expect(text).not.toContain('plac Teatralny');
+    expect(text).not.toContain('TYPO3');
+  });
+
+  it('returns nothing at all when the page has no article on it', () => {
+    // A page whose markup moved hands the reader nothing rather than a menu, so the reading falls
+    // back to the news list's own teaser.
+    expect(articleText('<html><body><div>Coś zupełnie innego</div></body></html>')).toBe('');
+  });
+
+  it('caps what it quotes', () => {
+    expect(articleText(html, 40).length).toBe(40);
   });
 });

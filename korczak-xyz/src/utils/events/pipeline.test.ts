@@ -51,7 +51,7 @@ describe('stageBlocks', () => {
 
   it('files each field under the pass that wrote it', () => {
     const blocks = stageBlocks(
-      event({ city: 'Warszawa', reach: 'local', newsroomKind: 'ticket-sale', country: 'PL' }),
+      event({ city: 'Warszawa', reach: 'local', newsroomTicketSale: true, country: 'PL' }),
     );
     const fieldsOf = (stage: string) =>
       Object.keys(blocks.find((b) => b.stage === stage)!.fields);
@@ -59,7 +59,7 @@ describe('stageBlocks', () => {
     expect(fieldsOf('scraped')).toContain('city');
     expect(fieldsOf('derived')).toContain('haystack');
     expect(fieldsOf('classifier')).toContain('reach');
-    expect(fieldsOf('newsroom')).toContain('newsroomKind');
+    expect(fieldsOf('newsroom')).toContain('newsroomTicketSale');
     // More than one pass can write these, and saying otherwise would be a claim the record
     // cannot support — `mergeRecord` takes the source's country and keeps the model's otherwise.
     expect(fieldsOf('shared')).toEqual(expect.arrayContaining(['country', 'tags']));

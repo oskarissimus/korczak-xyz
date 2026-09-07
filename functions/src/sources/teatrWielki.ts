@@ -32,7 +32,10 @@
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
 import { parsePolishDate, parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
-import { NEWSROOM_TAG } from '../../../korczak-xyz/src/utils/events/newsroom';
+import {
+  NEWSROOM_TAG,
+  TICKET_SALE_TAG,
+} from '../../../korczak-xyz/src/utils/events/newsroom';
 import {
   TEATR_WIELKI_HOST as HOST,
   TEATR_WIELKI_NEWS,
@@ -226,11 +229,11 @@ export function parseNewsPage(html: string): RawEvent[] {
        * actually read a date out of the prose. It is the whole of the keyword-less "Ticket sales
        * opening" seed, and a keyword-less interest has no second filter — page-wide it would hand
        * that interest the theatre's job adverts. The reader may add it to a row this missed;
-       * `tagsWithNewsroomKind` is where that union is made, once.
+       * `tagsWithTicketSale` is where that union is made, once.
        */
       tags:
         onSaleAt !== null
-          ? ['theatre', 'teatr-wielki', NEWSROOM_TAG, 'ticket-sale']
+          ? ['theatre', 'teatr-wielki', NEWSROOM_TAG, TICKET_SALE_TAG]
           : ['theatre', 'teatr-wielki', NEWSROOM_TAG],
       ...(onSaleAt !== null ? { onSaleAt } : {}),
       description: teaser,

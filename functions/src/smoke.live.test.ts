@@ -202,6 +202,7 @@ maybe('live newsroom reader', () => {
       const { outcome } = await readNewsroom(records, {
         now,
         project,
+        fetch: globalThis.fetch,
         write: async (id, update) => {
           written.set(id, update);
         },
@@ -214,27 +215,38 @@ maybe('live newsroom reader', () => {
           ? new Date(update.onSaleAt).toISOString().slice(0, 16)
           : '—';
         console.log(
-          `    ${String(update?.newsroomKind ?? '—').padEnd(14)} ${when.padEnd(17)}` +
-            ` ${article.title.slice(0, 34).padEnd(35)} ${update?.newsroomSummary ?? ''}`,
+          `    ${(update?.newsroomTicketSale ? 'ticket-sale' : '—').padEnd(12)} ${when.padEnd(17)}` +
+            ` ${article.title.slice(0, 48)}`,
         );
       }
 
-      console.log(`\n  read ${outcome.read}, unread ${outcome.missing}, sale dates ${outcome.saleDates}`);
+      console.log(
+        `\n  read ${outcome.read}, unread ${outcome.missing}, sale dates ${outcome.saleDates},` +
+          ` bodies ${outcome.fetched}`,
+      );
 
       /*
-       * Every article has to come back with a kind. A reply that silently drops rows is the
+       * Every article has to come back with a verdict. A reply that silently drops rows is the
        * failure this is really watching for — the sale announcement would be one of them, and
        * nothing downstream would say so.
        */
       expect(outcome.read).toBe(queue.length);
 
       /*
-       * Not an assertion that a sale date was found. Eleven months of the year the theatre has
-       * none to state, and a test that went red on that would be a test nobody could keep. The
-       * kinds printed above are what a prompt change is checked against.
+       * The bodies, which is the half that cannot be checked from a unit test. A run that read
+       * every article and fetched none of them is this pass degraded to exactly the teaser-only
+       * reading that missed the 2026/27 season — same green health, same ten rows, no date.
        */
-      const kinds = [...written.values()].map((u) => u.newsroomKind);
-      expect(kinds.filter((k) => k === 'institutional').length).toBeGreaterThan(0);
+      expect(outcome.fetched).toBe(outcome.read);
+
+      /*
+       * Not an assertion that a sale date was found. Eleven months of the year the theatre has
+       * none to state, and a test that went red on that would be a test nobody could keep. What
+       * is asserted is the other side: this page is mostly job adverts and obituaries, so a run
+       * calling every row a sale announcement is a prompt that has stopped discriminating.
+       */
+      const sales = [...written.values()].filter((u) => u.newsroomTicketSale).length;
+      expect(sales).toBeLessThan(queue.length);
     },
     120000,
   );

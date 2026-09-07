@@ -62,9 +62,7 @@ export const translations = {
     kindAnnouncement: 'announcement',
     kindCoverage: 'news',
     newsroomTicketSale: 'ticket sale',
-    newsroomProgramme: 'programme',
-    newsroomPractical: 'visiting',
-    newsroomInstitutional: 'the theatre',
+    newsroomNoSale: 'no sale date',
     viewIgnored: 'Ignored ({count})',
     ignoreEvent: 'Ignore',
     unignoreEvent: 'Show again',
@@ -87,9 +85,6 @@ export const translations = {
     kindsCoverage: 'News',
     kindsUnlabelled: 'Not labelled',
     kindClear: 'Show every kind',
-    newsroomFilter: 'Article',
-    newsroomOther: 'unclear',
-    newsroomClear: 'Show every article',
     labelEmptyHint:
       'Nothing here carries every label you picked. These filters only narrow what you are looking at — the coverage switch and the tags on an interest are what change which of them notify you.',
 
@@ -307,9 +302,7 @@ export const translations = {
     kindAnnouncement: 'ogłoszenie',
     kindCoverage: 'tekst',
     newsroomTicketSale: 'sprzedaż biletów',
-    newsroomProgramme: 'repertuar',
-    newsroomPractical: 'wizyta',
-    newsroomInstitutional: 'teatr o sobie',
+    newsroomNoSale: 'bez daty sprzedaży',
     viewIgnored: 'Ukryte ({count})',
     ignoreEvent: 'Ukryj',
     unignoreEvent: 'Przywróć',
@@ -332,9 +325,6 @@ export const translations = {
     kindsCoverage: 'Teksty',
     kindsUnlabelled: 'Bez etykiety',
     kindClear: 'Pokaż wszystkie rodzaje',
-    newsroomFilter: 'Artykuł',
-    newsroomOther: 'nierozpoznane',
-    newsroomClear: 'Pokaż wszystkie artykuły',
     labelEmptyHint:
       'Nic tutaj nie ma wszystkich wybranych etykiet. Te filtry zawężają tylko widok — o tym, co powiadamia, decydują przełącznik tekstów i tagi wpisane w zainteresowaniu.',
 
