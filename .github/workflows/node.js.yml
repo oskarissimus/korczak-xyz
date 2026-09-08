@@ -9,10 +9,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Every action pinned in this repo is on the major that declares `node24`. The runner already
+    # forces node20 actions onto 24 and warns about it on every single run, so staying behind buys
+    # nothing and costs an annotation. wrangler-action@v4 changed its default wrangler to v4, which
+    # is moot here: `npm ci` has already put wrangler 4.x in node_modules and the action uses that.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js 22.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # Astro 7 requires >=22.12.0, which korczak-xyz/package.json now states as `engines`.
           # This is the only place that floor is enforced: nothing checks `engines` on its own.
@@ -45,7 +49,7 @@ jobs:
       # leaves a real .git, so the status bar keeps reporting the commit it was built from.
       - name: Deploy
         if: github.ref == 'refs/heads/main'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -54,9 +58,9 @@ jobs:
   functions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js 22.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
           cache: "npm"
