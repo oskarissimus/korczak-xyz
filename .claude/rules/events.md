@@ -1033,6 +1033,24 @@ Three things it does that no other tab does, and they are three different questi
   above for the collector half of it.
 - **A row opens into its own JSON**, split by the pass that wrote each field.
 
+#### The answer first, then the workings
+
+An open row leads with `businessOf` — `newsroomTicketSale`, `onSaleAt`, `reach`, `kind`, in one
+object — and puts the pass-by-pass split behind a closed disclosure. Those four are what the
+filters, the interests and `notices.ts` actually key on, and they were spread across three of the
+seven panels with thirty fields of hashes, haystacks and timestamps between them: the grouping
+answers *who wrote this value*, which is the right question when a value looks wrong and the wrong
+one when you are simply reading the row.
+
+Two things about that object are deliberate. **An absent field is written as `null` rather than
+left out**, for the same reason an empty stage prints a word — a key missing from a four-key object
+is something you have to already know to notice. And **`onSaleAt` arrives in words**, formatted by
+the caller through `saleWhenLabel`: a millisecond stamp is the one field on that list nobody can
+read, and a locale is the one thing `utils/events/` may not have.
+
+Nothing is dropped — the disclosure holds the same seven panels it always did, and is still the
+only place a fingerprint or a hash is printed.
+
 #### The stage map is exhaustive by type, and still keeps an `other` bucket
 
 `FIELD_STAGES` is a `Record<keyof EventRecord, …>`, so a field added to the record without being

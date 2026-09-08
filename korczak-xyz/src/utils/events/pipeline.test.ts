@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ABSENT,
   applyFacets,
+  businessOf,
   chosenCount,
   FACET_KEYS,
   facetsOf,
@@ -279,5 +280,35 @@ describe('matchesQuery', () => {
     // An unfiltered list is what a focused box shows, and it is where the counts are read.
     expect(matchesQuery('anything', '')).toBe(true);
     expect(matchesQuery('anything', '   ')).toBe(true);
+  });
+});
+
+describe('businessOf', () => {
+  it('writes an absent verdict as null rather than leaving the key out', () => {
+    // A four-key object missing a key is a thing you have to already know to notice, and the
+    // classifier not having reached a row is the state this tab exists to show.
+    expect(businessOf(event(), null)).toEqual({
+      newsroomTicketSale: null,
+      onSaleAt: null,
+      reach: null,
+      kind: null,
+    });
+  });
+
+  it('keeps false apart from unread', () => {
+    expect(businessOf(event({ newsroomTicketSale: false }), null).newsroomTicketSale).toBe(false);
+  });
+
+  it('takes the sale moment in the caller’s words', () => {
+    const facts = businessOf(
+      event({ onSaleAt: 1_788_253_200_000, reach: 'local', kind: 'announcement' }),
+      '1 Sept, 11:00',
+    );
+    expect(facts).toEqual({
+      newsroomTicketSale: null,
+      onSaleAt: '1 Sept, 11:00',
+      reach: 'local',
+      kind: 'announcement',
+    });
   });
 });

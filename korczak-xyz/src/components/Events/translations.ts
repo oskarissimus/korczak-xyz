@@ -207,6 +207,10 @@ export const translations = {
       'These rows come straight from the collector and are not cached — this tab needs a connection, so what you see here is never stale.',
     pipelineRetry: 'Try again',
     pipelineNoFields: 'nothing yet',
+    pipelineBusiness: 'What it means',
+    pipelineBusinessNote:
+      'The four fields a decision is made on: whether tickets go on sale, when, how far the event reaches, and whether the row is an event at all. Everything else is below.',
+    pipelineMore: 'Every field, by the pass that wrote it',
     facetSource: 'Source',
     facetPublication: 'Publication',
     facetKind: 'Kind',
@@ -442,6 +446,10 @@ export const translations = {
       'Te wiersze idą prosto od kolektora i nie są zapisywane lokalnie — ta zakładka potrzebuje połączenia, więc to, co widzisz, nigdy nie jest nieaktualne.',
     pipelineRetry: 'Spróbuj ponownie',
     pipelineNoFields: 'jeszcze nic',
+    pipelineBusiness: 'Co to znaczy',
+    pipelineBusinessNote:
+      'Cztery pola, na których opiera się decyzja: czy bilety trafiają do sprzedaży, kiedy, jak daleko sięga wydarzenie i czy wiersz w ogóle nim jest. Cała reszta jest niżej.',
+    pipelineMore: 'Wszystkie pola, według przebiegu, który je zapisał',
     facetSource: 'Źródło',
     facetPublication: 'Wydawca',
     facetKind: 'Rodzaj',

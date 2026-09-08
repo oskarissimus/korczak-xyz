@@ -25,9 +25,11 @@ import { useId, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventCorpus } from '../../hooks/useEventCorpus';
 import { countryLabel } from '../../utils/events/countries';
+import { saleWhenLabel } from '../../utils/events/feed';
 import {
   ABSENT,
   applyFacets,
+  businessOf,
   chosenCount,
   facetsOf,
   matchesQuery,
@@ -44,7 +46,7 @@ import { tokenizeJson } from '../../utils/jsonView';
 import type { EventRecord } from '../../utils/events/types';
 import EventsGate from './EventsGate';
 import { sourceName } from './sourceNames';
-import { fill, translations, type Lang, type Translation } from './translations';
+import { fill, localeOf, translations, type Lang, type Translation } from './translations';
 
 interface Props {
   lang: Lang;
@@ -197,6 +199,7 @@ function PipelinePanel({ lang }: Props) {
                 event={event}
                 open={open.has(event.id)}
                 onToggle={() => toggleRow(event.id)}
+                lang={lang}
                 t={t}
               />
             ))}
@@ -407,11 +410,13 @@ function PipelineRow({
   event,
   open,
   onToggle,
+  lang,
   t,
 }: {
   event: EventRecord;
   open: boolean;
   onToggle: () => void;
+  lang: Lang;
   t: Translation;
 }) {
   const verdict = ticketSaleVerdictOf(event);
@@ -462,22 +467,42 @@ function PipelineRow({
 
       {open ? (
         <div className="ev-stages">
-          {stageBlocks(event).map(({ stage, fields }) => (
-            <section className="ev-stage" key={stage}>
-              <h5 className="ev-stage-head">{stageLabel(stage, t)}</h5>
-              <p className="ev-stage-note">{stageNote(stage, t)}</p>
-              {/*
-               * An empty stage prints a word rather than being left out. A pass that has not run
-               * and a pass that ran and wrote nothing are the two states this tab exists to tell
-               * apart, and a missing heading says neither.
-               */}
-              {Object.keys(fields).length === 0 ? (
-                <p className="ev-stage-empty">{t.pipelineNoFields}</p>
-              ) : (
-                <Json value={fields} />
-              )}
-            </section>
-          ))}
+          {/*
+           * The answer first, and only then the workings.
+           *
+           * Seven panels grouped by which pass wrote them is the right shape for "this value looks
+           * wrong, who put it there" and the wrong one for "what is this row" — the four fields the
+           * filters, the interests and the notices key on were spread across three of those panels
+           * and thirty fields of hashes, haystacks and timestamps. So they are lifted into one
+           * object at the top, and the grouping they came from goes behind a disclosure that is
+           * closed by default. Nothing is dropped: the pass-by-pass view is one click away, and it
+           * is still the only place a hash or a fingerprint is printed.
+           */}
+          <section className="ev-stage">
+            <h5 className="ev-stage-head">{t.pipelineBusiness}</h5>
+            <p className="ev-stage-note">{t.pipelineBusinessNote}</p>
+            <Json value={businessOf(event, saleWhenLabel(event, localeOf(lang)))} />
+          </section>
+
+          <details className="ev-more">
+            <summary className="ev-more-summary">{t.pipelineMore}</summary>
+            {stageBlocks(event).map(({ stage, fields }) => (
+              <section className="ev-stage" key={stage}>
+                <h5 className="ev-stage-head">{stageLabel(stage, t)}</h5>
+                <p className="ev-stage-note">{stageNote(stage, t)}</p>
+                {/*
+                 * An empty stage prints a word rather than being left out. A pass that has not run
+                 * and a pass that ran and wrote nothing are the two states this tab exists to tell
+                 * apart, and a missing heading says neither.
+                 */}
+                {Object.keys(fields).length === 0 ? (
+                  <p className="ev-stage-empty">{t.pipelineNoFields}</p>
+                ) : (
+                  <Json value={fields} />
+                )}
+              </section>
+            ))}
+          </details>
         </div>
       ) : null}
     </li>

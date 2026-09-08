@@ -434,3 +434,37 @@ export function matchesQuery(text: string, query: string): boolean {
   const haystack = foldText(text);
   return terms.every((term) => haystack.includes(term));
 }
+
+/**
+ * The four fields a decision is made on, as one object.
+ *
+ * The stage blocks below answer "which pass wrote this", which is the right question when a value
+ * looks wrong and the wrong one when you are just reading the row: seven panels and thirty fields
+ * to find out whether tickets go on sale and when. These four are what the filters, the interests
+ * and the notices actually key on — is it a sale announcement, when does the sale open, how far
+ * does the event reach, and is the row an event at all — so they are lifted out and everything
+ * else goes behind a disclosure.
+ *
+ * **Absent is written as `null` rather than left out**, for the same reason an empty stage prints a
+ * word: a key missing from a four-key object is a thing you have to already know to notice, and
+ * "the classifier has not reached this row" is exactly what a reader is here to see.
+ *
+ * `onSaleAt` arrives already in words — `saleWhenLabel` in `feed.ts`, in the reader's locale —
+ * because a millisecond stamp is the one field on this list nobody can read, and a locale is the
+ * one thing this directory may not have. It is the caller's, like every other word on the tab.
+ */
+export interface BusinessFacts {
+  newsroomTicketSale: boolean | null;
+  onSaleAt: string | null;
+  reach: string | null;
+  kind: string | null;
+}
+
+export function businessOf(event: EventRecord, onSaleAt: string | null): BusinessFacts {
+  return {
+    newsroomTicketSale: event.newsroomTicketSale ?? null,
+    onSaleAt,
+    reach: event.reach ?? null,
+    kind: event.kind ?? null,
+  };
+}

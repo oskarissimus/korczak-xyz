@@ -874,6 +874,34 @@
 }
 
 /*
+ * The pass-by-pass view, put away.
+ *
+ * Closed by default, which is the opposite of the filter disclosure above and for the opposite
+ * reason: those counts are half of what the tab is for, and these thirty fields are what you open
+ * a row *second* to see. The summary says what is behind it rather than "more", because a
+ * disclosure that does not name its contents is one nobody opens twice.
+ */
+.ev-more {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ev-more-summary {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  cursor: pointer;
+  /* The marker is the whole affordance here; a list-style bullet would read as a list item. */
+  list-style-position: inside;
+}
+
+.ev-more-summary:focus-visible {
+  outline: 1px dotted var(--retro-black);
+  outline-offset: 2px;
+}
+
+/*
  * The stored fields, as JSON.
  *
  * A black terminal panel, which is what `pre` and `code` are everywhere else on this site — a blog
