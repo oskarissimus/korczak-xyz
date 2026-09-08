@@ -1,5 +1,5 @@
 /*
- * A copy of Firestore that leaves Google, for the NAS to pull.
+ * A copy of Firestore that leaves Google.
  *
  * WHY THIS EXISTS ALONGSIDE firestore.tf, WHICH ALREADY SAYS "BACKUP":
  *
@@ -12,11 +12,11 @@
  * and every backup of it in the same movement, because they are the same vendor and, as far as any
  * of this is concerned, the same object.
  *
- * An export is the other half: real files, in a bucket, in a format that leaves. That is what the
- * QNAP pulls over HBS, and why the pipeline below exists even though backups are already running.
+ * An export is the other half: real files, in a bucket, in a format that leaves. That is why the
+ * pipeline below exists even though backups are already running.
  *
  *   firestore.tf         undo a mistake            7 days / 14 weeks, restore = a NEW database
- *   this file            survive losing Google     a nightly folder of files the NAS holds
+ *   this file            survive losing Google     a nightly folder of files, fetchable offsite
  *
  * NO CLOUD FUNCTION. Cloud Scheduler calls the Firestore Admin API directly with an OAuth token —
  * the export is a single POST, and wrapping it in a function would add a deploy, a runtime and a
@@ -47,7 +47,7 @@ resource "google_storage_bucket" "firestore_export" {
    * tidiness rather than money, but an unbounded bucket of daily full copies is how a hobby
    * project grows a bill nobody looks at.
    *
-   * It is longer than the NAS's own pull interval by a wide margin ON PURPOSE: if HBS stops
+   * It is longer than the offsite pull interval by a wide margin ON PURPOSE: if that pull stops
    * working, this is how many days you have to notice before the only copies are the ones inside
    * Google again.
    */
@@ -111,27 +111,23 @@ resource "google_storage_bucket_iam_member" "firestore_agent_writes" {
 }
 
 /*
- * The NAS.
+ * The offsite reader.
  *
  * A separate account whose entire authority is "read the objects in one bucket", because its key
- * is a FILE ON A DEVICE ON THE LAN. That is the opposite of the deploy account, whose key would be
- * a projectIamAdmin credential — the right to grant itself anything — sitting in a QNAP app's
- * settings pane.
+ * is a FILE ON A MACHINE THIS PROJECT DOES NOT CONTROL. That is the opposite of the deploy
+ * account, whose key would be a projectIamAdmin credential — the right to grant itself anything.
  *
  * THE KEY IS NOT IN TERRAFORM, and must not be. `google_service_account_key` puts the private key
  * in state in the clear, which is the same rule that keeps VAPID_PRIVATE_KEY out — see the header
- * of main.tf. Mint it by hand, once:
- *
- *   gcloud iam service-accounts keys create hbs.json \
- *     --iam-account=nas-backup-reader@korczak-xyz-501720.iam.gserviceaccount.com
- *
- * then upload it in HBS and delete the local copy.
+ * of main.tf. Mint it by hand, once, with
+ * `gcloud iam service-accounts keys create`, install it wherever it is needed, and delete the
+ * local copy.
  */
 resource "google_service_account" "nas_backup_reader" {
   project      = local.project_id
   account_id   = "nas-backup-reader"
-  display_name = "QNAP HBS read-only puller"
-  description  = "Read-only on the export bucket. Its key lives on the NAS. Managed in terraform/firestore-export.tf."
+  display_name = "Export bucket read-only puller"
+  description  = "Read-only on the export bucket. Its key is held offsite. Managed in terraform/firestore-export.tf."
 }
 
 resource "google_storage_bucket_iam_member" "nas_reads_exports" {
@@ -141,9 +137,9 @@ resource "google_storage_bucket_iam_member" "nas_reads_exports" {
 }
 
 /*
- * objectViewer covers the objects but not the bucket itself, and HBS calls buckets.get when you
- * pick the bucket in its UI. Without this the connection tests fine and then shows an empty list,
- * which reads as "no backups" rather than as a permission problem.
+ * objectViewer covers the objects but not the bucket itself, and a client that calls buckets.get
+ * before listing needs this too. Without it the connection tests fine and then shows an empty
+ * list, which reads as "nothing there" rather than as a permission problem.
  */
 resource "google_storage_bucket_iam_member" "nas_reads_bucket" {
   bucket = google_storage_bucket.firestore_export.name
@@ -167,7 +163,7 @@ resource "google_cloud_scheduler_job" "firestore_export" {
   project     = local.project_id
   region      = local.region
   name        = "firestore-nightly-export"
-  description = "Full Firestore export to gs://${local.export_bucket} for the NAS to pull."
+  description = "Full Firestore export to gs://${local.export_bucket}."
   schedule    = "30 3 * * *"
   time_zone   = "Europe/Warsaw"
 

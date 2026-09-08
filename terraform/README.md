@@ -27,7 +27,7 @@ Both are project state. Project state that is not written down is state that get
 | `run.invoker` on `sendTestPush` | the code, the schedule |
 | the `gcf-artifacts` cleanup policy | |
 | the Firestore backup **schedules** | the Firestore **database** itself |
-| the export bucket, its schedule and its two accounts | the **key** for the NAS account |
+| the export bucket, its schedule and its two accounts | the **key** for the reader account |
 
 Nothing may be in both columns. Two owners of one resource is permanent drift: every
 `terraform apply` reverts what the last `firebase deploy` did, and back again, with neither tool
@@ -182,74 +182,13 @@ Cloud Scheduler ──OAuth as firestore-export@──▶ firestore:exportDocume
                               gs://korczak-xyz-501720-firestore-export
                                      30-day lifecycle, one folder per run
                                                          │
-                                  nas-backup-reader@ ◀───┘  objectViewer only
-                                          │
-                                          ▼  rclone on cron, on the QNAP
+                                  a read-only puller ◀───┘  objectViewer only
 ```
 
-**The NAS end is rclone on a cron entry, not HBS** — and that is not a preference,
-it is the only thing that works. HBS 3 refuses to create a Google Cloud Storage
-storage space at all: it answers "Authentication error. Cannot connect to cloud
-service.", and the underlying error is a 401 from the NAS's own cloud layer —
-`POST /cc3/v1/users/system/accounts` returning `{"error_code":"cloud_unauthorized"}`.
-Ruled out individually: the key itself (it lists and reads the bucket fine from a
-laptop, and from the NAS via rclone), the clock, the QTS session, an outdated
-myQNAPcloud, the proxy setting, and a full reboot.
-
-**Two separate things were wrong, and the second one is fatal to the idea.**
-
-*Scope.* `nas-backup-reader@` holds `roles/storage.objectViewer` bound at **bucket** scope. That
-role contains `resourcemanager.projects.get`, so it reads as sufficient — but a project-scoped
-permission granted on a bucket is inert, so HBS's project check failed and returned
-"Authentication error. Cannot connect to cloud service." over a cc3 `cloud_unauthorized`. Nothing in
-that wording points at scope.
-
-*Capability.* Fixing the scope is not enough. A throwaway account was walked up the ladder:
-
-```
-projects.get (project) + objectViewer (bucket)   -> connection created OK
-  + storage.buckets.list                          -> job wizard can list buckets and objects
-  + objectCreator (bucket)                        -> still "Cannot upload... Permission denied"
-  + objectAdmin (bucket)                          -> still "Cannot upload... Permission denied"
-  + storage.admin (project)                       -> upload error clears
-```
-
-So **HBS does need write access**, even to build a *Restore* (download-only) job, and
-bucket-scoped write is not enough — it wanted project-wide storage admin. The widely repeated
-claim that read-only suffices is wrong; so was an earlier version of this file, which had only
-tested that a *connection* could be created.
-
-**And then Restore still does not work.** With full `storage.admin` the wizard fails at the last
-step with *"No backup data detected. Check the destination path."* while showing
-`Selected: 1 folders`. That one is by design and QNAP documents it: a restore job exists for when
-*"you have run a backup job in HBS 3 before, but the destination of that job — the backup data — is
-no longer linked to an existing backup job"*, and backup jobs write `.qdff` (QuDedup) blocks that
-only HBS or the QuDedup Extract Tool can open. A bucket of Firestore export files HBS did not write
-is not backup data, so Restore will never see it.
-
-**The Sync side was not tested, and the docs say it exists.** HBS's own job table lists *Active
-sync — "Data is copied from the destination to the NAS"*, which is exactly a scheduled cloud-to-NAS
-pull, and nothing in the documentation excludes a Google Cloud Storage space from it. Whether the
-HBS build on this NAS actually offers Active Sync for a GCS bucket, and whether it copies raw
-objects rather than looking for `.qdff`, is unknown — the run above went down the Restore path and
-stopped there. **Do not read this section as "HBS cannot pull a bucket at all."** What is measured
-is narrower and still decisive for the choice made here:
-
-- Restore cannot read a foreign bucket, confirmed by test and by QNAP's documentation.
-- Any HBS path at all costs project-wide `roles/storage.admin`, measured on the ladder above.
-
-That second line is the reason the NAS end is rclone even if Active Sync would have worked: rclone
-pulls the same bucket with `objectViewer` on that one bucket and no project-level role whatsoever.
-Trading a read-only, single-bucket credential for storage admin over the whole project — the same
-project that holds the tfstate bucket and Firestore itself — is not a trade worth making to save a
-cron entry.
-
-So the puller is `rclone v1.75.1` (linux-arm-v7) at
-`/share/CE_CACHEDEV1_DATA/firestore-backup/`, run by `0 5 * * *` in
-`/etc/config/crontab`, with its own README next to it. It uses **`rclone copy`,
-never `sync`** — the bucket's 30-day lifecycle deletes old exports, and `sync`
-would mirror those deletions and give the NAS the same 30-day horizon it exists to
-outlive.
+**How that copy gets pulled off Google is deliberately not documented here.** The bucket, its
+lifecycle rule and the read-only account are the parts this repo owns. Whatever consumes them runs
+elsewhere, and writing its details down here would put the shape of a private network in a public
+repository for no benefit to anyone reading this directory.
 
 There is **no Cloud Function** in that path. Scheduler calls the Admin API directly; the export is
 one POST with no logic in it, and a function would have added a deploy, a runtime and a language.
@@ -265,22 +204,20 @@ Two details in `firestore-export.tf` are the kind that look like style and are n
   in the same project often makes this work unstated — which is the reason to state it, because an
   implicit permission changes without a commit.
 
-**The NAS key is not in Terraform and must not be.** `google_service_account_key` writes the private
-key into state in the clear, the same rule that keeps `VAPID_PRIVATE_KEY` out. Mint it once by hand:
+**The reader account's key is not in Terraform and must not be.** `google_service_account_key`
+writes the private key into state in the clear, the same rule that keeps `VAPID_PRIVATE_KEY` out.
+Mint it once by hand, `--iam-account` being the reader account declared in `firestore-export.tf`:
 
 ```sh
-gcloud iam service-accounts keys create hbs.json \
-  --iam-account=nas-backup-reader@korczak-xyz-501720.iam.gserviceaccount.com
+gcloud iam service-accounts keys create key.json --iam-account=…
 ```
 
-That key now lives at `/share/CE_CACHEDEV1_DATA/firestore-backup/gcs-key.json` on
-the NAS, mode 600. `nas-backup-reader@` can read the objects in
-one bucket and do nothing else anywhere — which matters because its key is a file on a device on the
-LAN. The deploy account's key in the same place would be a `projectIamAdmin` credential sitting in a
-QNAP settings pane.
+That account can read the objects in one bucket and do nothing else anywhere, which is the whole
+point: its key is a file sitting on a machine this project does not control. The deploy account's
+key in the same place would be a `projectIamAdmin` credential — the right to grant itself anything.
 
-To rotate: `gcloud iam service-accounts keys list --iam-account=…`, create a new one, replace
-`gcs-key.json` on the NAS, then delete the old key id. Nothing in Terraform changes.
+To rotate: `gcloud iam service-accounts keys list --iam-account=…`, create a new one, replace the
+file wherever it lives, then delete the old key id. Nothing in Terraform changes.
 
 ## Guards, and what it means when one fires
 

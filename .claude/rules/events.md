@@ -1199,7 +1199,8 @@ silently. Full sequence in `functions/README.md`.
 
 `terraform/` holds what the GCP project must have switched on and granted: the API list, the role
 grants, the secret **containers**, `sendTestPush`'s public invoker binding, the `gcf-artifacts`
-cleanup policy, the two Firestore backup schedules, and the nightly export that feeds the NAS. It exists because two deploys in a row failed for reasons that were not in the code
+cleanup policy, the two Firestore backup schedules, and the nightly export. It exists because
+two deploys in a row failed for reasons that were not in the code
 — a secret container that did not exist stopped the CLI deploying anything, and whether the
 classifier's identity could reach Vertex AI was a question you answered by running commands.
 
@@ -1231,17 +1232,11 @@ Five things there are load-bearing, each written up in `terraform/README.md`:
   `firestore.tf` live inside Firestore and answer "undo our mistake". They are worth nothing if the
   Google account goes, since the database and its backups vanish together. `firestore-export.tf` is
   the other half: Cloud Scheduler calls `firestore:exportDocuments` directly — no function, it is
-  one POST — into a 30-day bucket that a QNAP pulls with `rclone` on a cron entry (**not HBS**: its
-  Restore job only understands data written by an HBS backup job and rejects a bucket of foreign
-  files with "No backup data detected", which QNAP's own docs confirm is by design. Its Active Sync
-  *is* documented as cloud-to-NAS and was never tested — the claim that HBS cannot pull a bucket at
-  all is more than was measured. What was measured is that any HBS path needs project-wide
-  `storage.admin`: bucket-scoped write is refused with "Cannot upload... Permission denied". rclone
-  does the same job with `objectViewer` on one bucket, which settles it either way. The box is also
-  `armv7l`, so Container Station is out regardless). `outputUriPrefix` is the bare bucket
-  on purpose, because that is what makes the API name a fresh folder per run instead of overwriting
-  one. The NAS reads with a dedicated `objectViewer` account whose key is minted by hand and never
-  enters Terraform state.
+  one POST — into a 30-day bucket. `outputUriPrefix` is the bare bucket on purpose, because that is
+  what makes the API name a fresh folder per run instead of overwriting one. A dedicated
+  `objectViewer` account exists so the exports can be pulled back out; its key is minted by hand and
+  never enters Terraform state. What does the pulling, and where it runs, is out of scope for this
+  repo and intentionally not written down in it.
 - **The gate is "no plan may destroy anything"**, enforced in the workflow over the whole directory,
   plus `prevent_destroy` on the secrets, the registry and both backup schedules — deleting a backup
   schedule deletes the backups it made. This repo commits straight to `main`, so
