@@ -357,7 +357,20 @@ export interface Notice {
   distancesM?: number[];
 }
 
-/** A browser's push registration. One per device, keyed by a hash of the endpoint. */
+/**
+ * One of the two apps that send push. See `pushApps.ts` for what a subscription's claim means.
+ */
+export type PushApp = 'events' | 'transit';
+
+/**
+ * A browser's push registration, keyed by a hash of the endpoint.
+ *
+ * **Not one per device.** It was written as one per device and that was wrong: on iOS every
+ * installed app is its own storage container with its own service worker registration, so a phone
+ * with both Event Watch and Metro Watch on its home screen registers *two* subscriptions with two
+ * endpoints, and a collector that fans out to every row on the account delivers each app's
+ * notifications to both. `apps` is what stops that; `pushApps.ts` has the whole argument.
+ */
 export interface PushSub {
   id: string;
   endpoint: string;
@@ -372,6 +385,16 @@ export interface PushSub {
   lastPushAt?: number;
   lastError?: string;
   retiredAt?: number;
+  /**
+   * Which apps may push to this endpoint.
+   *
+   * A map rather than an array so a merge-write from one app cannot drop the other's claim: a
+   * `setDoc(..., { merge: true })` replaces an array wholesale but merges a map key by key, and on
+   * a desktop browser — where one registration really does serve both apps — both write this same
+   * field from two different tabs. Absent means "every app", which is what every row written before
+   * this field existed has to mean; see `claimsApp`.
+   */
+  apps?: Partial<Record<PushApp, boolean>>;
 }
 
 /** Per-user notification settings. `armedAt` is the first line of defence against the storm. */

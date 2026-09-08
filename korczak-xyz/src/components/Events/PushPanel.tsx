@@ -4,9 +4,11 @@
  * Extracted from `EventsAlerts` so the transport app can render the same one. It is shared rather
  * than copied because **every state it names is a fact about the platform, not about the app** —
  * iOS refusing push outside an installed app, a permission the browser has already denied, a
- * subscription granted but not yet stored. Two apps on one origin share a service worker and a
- * single push subscription, so they are literally in the same state at the same moment, and two
+ * subscription granted but not yet stored. Not one of those distinguishes the two apps, so two
  * panels wording that state differently would be two answers to one question.
+ *
+ * Note it is the *state* they share and not the subscription: each app arms its own endpoint, and
+ * which app a subscription may be pushed to is `pushApps.ts`'s subject.
  *
  * The strings stay in `Events/translations.ts` for the same reason: one mechanism, one wording. The
  * transport app passes its own `lang` and gets the same sentences.

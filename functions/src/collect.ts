@@ -9,6 +9,7 @@
 
 import type { Firestore } from 'firebase-admin/firestore';
 import type { EventRecord, PushSub, SourceHealth } from '../../korczak-xyz/src/utils/events/types';
+import { subsForApp } from '../../korczak-xyz/src/utils/events/pushApps';
 import { SOURCES } from './sources';
 import type { EventSource, SourceContext } from './sources/types';
 import { toRecord, upsertEvents } from './upsert';
@@ -314,12 +315,18 @@ async function reportBrokenSources(
   broken: string[],
 ): Promise<void> {
   for (const uid of accounts) {
-    const subs = await db.collection('users').doc(uid).collection('pushSubs').get();
-    if (subs.empty) continue;
+    const snap = await db.collection('users').doc(uid).collection('pushSubs').get();
+    // This app's endpoints only — see `pushApps.ts`. A source that stopped working is Event
+    // Watch's news, and Metro Watch's icon is the wrong thing to put it under.
+    const subs = subsForApp(
+      snap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      'events',
+    );
+    if (subs.length === 0) continue;
     await sendToAll(
       db,
       uid,
-      subs.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      subs,
       {
         title: 'An event source has stopped working',
         body: `${broken.join(', ')} — check the Alerts tab.`,

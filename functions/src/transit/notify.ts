@@ -22,6 +22,7 @@ import type {
   WatchedSegment,
 } from '../../../korczak-xyz/src/utils/transit/types';
 import { DEFAULT_TRANSIT_SETTINGS } from '../../../korczak-xyz/src/utils/transit/types';
+import { subsForApp } from '../../../korczak-xyz/src/utils/events/pushApps';
 import { alertRecordFor, planAlerts, type PendingAlert } from '../../../korczak-xyz/src/utils/transit/notices';
 import { sendToAll, type PushPayload } from '../push';
 import { stripUndefined } from './upsert';
@@ -51,12 +52,14 @@ async function loadAccount(
     user.collection('transitSegments').get(),
     user.collection('transitSettings').doc('push').get(),
     /*
-     * The same `pushSubs` collection the events app registers devices in, deliberately.
+     * The same `pushSubs` collection the events app registers devices in, deliberately: a second
+     * collection would be a second copy of the same rows going stale independently, and the stale
+     * one would be pushing at an endpoint Apple stopped honouring months ago.
      *
-     * One subscription per device per browser is what the Push API gives out; two apps on one
-     * origin share a service worker and therefore share the endpoint. A second collection would be
-     * a second copy of the same rows, going stale independently — and the one that went stale would
-     * be pushing at an endpoint Apple stopped honouring months ago.
+     * Shared, but not undifferentiated — the rows are filtered to this app's below. Two apps on one
+     * origin share a service worker only in a browser; on iOS each installed app is its own storage
+     * container with its own registration and its own endpoint, and the app owning the endpoint is
+     * the one that shows the banner.
      */
     user.collection('pushSubs').get(),
     // Every alert id already claimed. The only thing between a re-run and a repeat.
@@ -68,7 +71,10 @@ async function loadAccount(
     settings: settingsSnap.exists
       ? { ...DEFAULT_TRANSIT_SETTINGS, ...(settingsSnap.data() as TransitSettings) }
       : DEFAULT_TRANSIT_SETTINGS,
-    subs: subsSnap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+    subs: subsForApp(
+      subsSnap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      'transit',
+    ),
     seen: new Set(alertsSnap.docs.map((d) => d.id)),
   };
 }
@@ -220,12 +226,17 @@ export async function reportBrokenFeeds(
   broken: string[],
 ): Promise<void> {
   for (const uid of accounts) {
-    const subs = await db.collection('users').doc(uid).collection('pushSubs').get();
-    if (subs.empty) continue;
+    const snap = await db.collection('users').doc(uid).collection('pushSubs').get();
+    // This app's endpoints only — see `pushApps.ts`.
+    const subs = subsForApp(
+      snap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      'transit',
+    );
+    if (subs.length === 0) continue;
     await sendToAll(
       db,
       uid,
-      subs.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      subs,
       {
         title: 'Nie można odczytać komunikatów WTP',
         body: `${broken.join(', ')} — aplikacja nie wie, co dzieje się na liniach.`,

@@ -87,8 +87,25 @@ export function sameOriginPath(value) {
   return value.startsWith('/') ? value : `/${value}`;
 }
 
+/**
+ * The artwork for a notification, from where tapping it goes.
+ *
+ * Two apps send push through this one worker, and the icon used to be Event Watch's for both — so a
+ * metro closure arrived wearing a ticket and a calendar. iOS ignores this and draws the installed
+ * app's own icon, which is precisely why it went unnoticed; a desktop browser draws what it is
+ * given. Derived from the target path rather than carried in the payload so an old sender, or a
+ * payload that fell back to the defaults, still gets it right.
+ */
+export function pushIconFor(url) {
+  // The locale is dropped: `/songs` and `/pl/songs` are separate installable apps, but they are
+  // one app's artwork, and a Polish notification wearing the wrong icon is the bug being fixed.
+  const scope = scopeKeyOf(safePath(url)).replace(/^\/pl/, '');
+  return scope === '/apps/transit' ? '/icons/transit-192.png' : '/icons/events-192.png';
+}
+
 /** The second argument to showNotification. */
 export function notificationOptions(payload) {
+  const icon = pushIconFor(payload.url);
   return {
     body: payload.body,
     tag: payload.tag,
@@ -96,8 +113,8 @@ export function notificationOptions(payload) {
     // Same tag means "replace", but without renotify a replacement arrives silently — and a `soon`
     // reminder that supersedes an `announced` one is worth a buzz.
     renotify: true,
-    icon: '/icons/events-192.png',
-    badge: '/icons/events-192.png',
+    icon,
+    badge: icon,
   };
 }
 

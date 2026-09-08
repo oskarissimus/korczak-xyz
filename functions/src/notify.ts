@@ -17,6 +17,7 @@ import type {
 } from '../../korczak-xyz/src/utils/events/types';
 import { DEFAULT_PUSH_SETTINGS } from '../../korczak-xyz/src/utils/events/types';
 import { ignoredFingerprints } from '../../korczak-xyz/src/utils/events/ignores';
+import { subsForApp } from '../../korczak-xyz/src/utils/events/pushApps';
 import { planRun, type PendingNotice } from '../../korczak-xyz/src/utils/events/notices';
 import { noticeIdFor } from '../../korczak-xyz/src/utils/events/normalize';
 import { formatDistances } from '../../korczak-xyz/src/utils/events/distance';
@@ -70,7 +71,17 @@ async function loadAccount(
     settings: settingsSnap.exists
       ? { ...DEFAULT_PUSH_SETTINGS, ...(settingsSnap.data() as PushSettings) }
       : DEFAULT_PUSH_SETTINGS,
-    subs: subsSnap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+    /*
+     * This app's endpoints, not the account's. An iPhone with both apps on its home screen holds a
+     * subscription per app — separate storage, separate registration, separate endpoint — and the
+     * app that owns the endpoint is the one whose name and icon iOS puts on the banner. Sending to
+     * every row is what put opera announcements in Metro Watch. Rows predating the claim still
+     * match, so nobody's phone goes quiet waiting for the next launch; `pushApps.ts` has why.
+     */
+    subs: subsForApp(
+      subsSnap.docs.map((d) => ({ ...(d.data() as PushSub), id: d.id })),
+      'events',
+    ),
     seen: new Set(noticesSnap.docs.map((d) => d.id)),
     ignored: ignoredFingerprints(
       ignoresSnap.docs.map((d) => ({ ...(d.data() as Ignore), id: d.id })),

@@ -3,6 +3,7 @@ import {
   notificationOptions,
   parsePushPayload,
   pickClientToFocus,
+  pushIconFor,
   PUSH_FALLBACK_TITLE,
   sameOriginPath,
   scopeKeyOf,
@@ -163,5 +164,33 @@ describe('notificationOptions', () => {
 
   it('renotifies, so a soon reminder replacing an announcement still buzzes', () => {
     expect(notificationOptions(parsePushPayload('{}')).renotify).toBe(true);
+  });
+
+  /*
+   * One worker draws for two apps, and it drew Event Watch's ticket on a metro closure until this
+   * was derived from the target path. iOS overrides it with the installed app's own icon, which is
+   * why nothing on a phone ever showed the mismatch — a desktop browser shows exactly this.
+   */
+  it('wears the icon of the app the tap opens', () => {
+    const transit = notificationOptions(parsePushPayload('{"url":"/apps/transit/raw"}'));
+    expect(transit.icon).toBe('/icons/transit-192.png');
+    expect(transit.badge).toBe(transit.icon);
+
+    expect(notificationOptions(parsePushPayload('{"url":"/apps/events/alerts"}')).icon).toBe(
+      '/icons/events-192.png',
+    );
+  });
+
+  it.each([
+    ['/apps/transit', '/icons/transit-192.png'],
+    ['/pl/apps/transit/alerts', '/icons/transit-192.png'],
+    ['/apps/events', '/icons/events-192.png'],
+    ['/pl/apps/events/alerts', '/icons/events-192.png'],
+    // Anything else is the events app's, which is where the fallback URL points too.
+    ['/songs', '/icons/events-192.png'],
+    ['', '/icons/events-192.png'],
+    [undefined, '/icons/events-192.png'],
+  ])('pushIconFor(%s)', (url, icon) => {
+    expect(pushIconFor(url)).toBe(icon);
   });
 });

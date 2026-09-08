@@ -1,9 +1,12 @@
 /*
  * Sending one notification, and pruning what is no longer reachable.
  *
- * Raw Web Push over VAPID, not FCM: there is exactly one service worker on this origin (iOS shares
- * a single registration across every installed app), and FCM's web SDK wants its own worker file
- * plus an importScripts of the compat bundle. This is forty lines and adds nothing to the browser.
+ * Raw Web Push over VAPID, not FCM: this origin ships exactly one service worker *file*, and FCM's
+ * web SDK wants its own plus an importScripts of the compat bundle. This is forty lines and adds
+ * nothing to the browser.
+ *
+ * One worker file is not one subscription. Which endpoints a given app may send to is decided
+ * before anything gets here — see `pushApps.ts` and the callers of `subsForApp`.
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
@@ -110,7 +113,12 @@ export async function sendTo(
   }
 }
 
-/** Sends to every device on the account. Succeeds if any one of them took it. */
+/**
+ * Sends to every subscription it is handed. Succeeds if any one of them took it.
+ *
+ * Handed, not looked up: the caller decides which of the account's endpoints belong to the app
+ * doing the sending, and it decides that with `subsForApp`.
+ */
 export async function sendToAll(
   db: Firestore,
   uid: string,

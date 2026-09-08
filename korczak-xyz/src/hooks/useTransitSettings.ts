@@ -7,8 +7,9 @@
  * corpora — sharing it would mean turning on metro alerts silently re-arms, or silently suppresses,
  * a fortnight of opera announcements.
  *
- * The *subscription* is shared, and correctly so: one origin, one service worker, one endpoint per
- * device. `useWebPush` owns that, and this hook only watches for the moment it goes `ready`.
+ * The *subscription* is `useWebPush`'s, armed here with `app: 'transit'` so the endpoint it
+ * registers is claimed for this app and Event Watch's collector leaves it alone. This hook only
+ * watches for the moment it goes `ready`.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

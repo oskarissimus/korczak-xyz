@@ -51,7 +51,7 @@ function FeedPanel({ lang }: Props) {
   };
 
   // Re-arm silently. Nothing is rendered for it here — the Alerts tab is where push has a UI.
-  useWebPush(auth.user, lang, { verifyOnly: true, stampArmedAt: false });
+  useWebPush(auth.user, lang, { verifyOnly: true, app: 'transit' });
 
   const now = Date.now();
   const built = useMemo(

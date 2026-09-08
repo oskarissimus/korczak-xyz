@@ -17,16 +17,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { pullPushSubs, pushPushSub, pushSettings, removePushSub } from '../utils/events/browser/cloud';
 import {
+  loadPushApps,
   loadPushSeenAt,
   loadPushSettings,
   loadPushSubId,
+  savePushApps,
   savePushSeenAt,
   savePushSettings,
   savePushSubId,
 } from '../utils/events/browser/storage';
+import { claimFor, subsForApp } from '../utils/events/pushApps';
 import { pushUiState, type PushUiState } from '../utils/events/pushState';
 import { subIdFor, urlBase64ToUint8Array } from '../utils/events/vapid';
-import type { PushSub } from '../utils/events/types';
+import type { PushApp, PushSub } from '../utils/events/types';
 import type { AuthUser } from './useAuth';
 
 /** Published at build time. Absent means push was never configured for this deploy. */
@@ -51,17 +54,21 @@ interface Options {
   /** Re-verify and record, but skip the device list — for islands that show no push UI. */
   verifyOnly?: boolean;
   /**
-   * Whether arming here also stamps Event Watch's `armedAt`. Default true.
+   * Which app this hook is arming. Default `'events'`; the transport app passes `'transit'`.
    *
-   * The subscription is shared — one origin, one service worker, one endpoint per device — but
-   * `armedAt` is not: it means "nothing already in this app's corpus may fire", and the two apps
-   * are switched on at different moments over different corpora. Left at the default, pressing
-   * *Turn on notifications* on the transport app's Alerts tab would also arm Event Watch, and the
-   * next collector run would announce a fortnight of opera to somebody who asked about the metro.
+   * It decides two things that used to be one option apiece, and they are the same fact twice:
    *
-   * The transport app passes `false` and stamps its own, in `useTransitSettings`.
+   *   - **The subscription is claimed for this app**, so the collector on the other side sends
+   *     only here. On iOS an installed app is its own storage container with its own endpoint, so
+   *     a phone with both apps registers two rows — and without the claim each collector pushes to
+   *     both, which is how Event Watch's announcements came to arrive under Metro Watch's name.
+   *   - **Only the events app stamps Event Watch's `armedAt`.** That field means "nothing already
+   *     in *this app's* corpus may fire", and the two apps are switched on at different moments
+   *     over different corpora. Stamped from the transport app's Alerts tab, the next collector run
+   *     would announce a fortnight of opera to somebody who asked about the metro. The transport
+   *     app stamps its own, in `useTransitSettings`.
    */
-  stampArmedAt?: boolean;
+  app?: PushApp;
 }
 
 const supported = () =>
@@ -90,7 +97,8 @@ function isInstalled(): boolean {
 }
 
 export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Options = {}): WebPushApi {
-  const stampArmedAt = options.stampArmedAt !== false;
+  const app: PushApp = options.app ?? 'events';
+  const stampArmedAt = app === 'events';
   const [hasSubscription, setHasSubscription] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,6 +117,7 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
       const id = await subIdFor(subscription.endpoint);
       const now = Date.now();
       const previous = loadPushSubId();
+      const claimed = loadPushApps(previous);
 
       const record: PushSub = {
         id,
@@ -118,6 +127,9 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
         lang,
         ua: (navigator.userAgent || '').slice(0, 180),
         createdAt: now,
+        // Merged rather than replaced, so the app that wrote this row first keeps its claim on a
+        // browser where one endpoint really does serve both.
+        apps: claimFor(app),
         lastSeenAt: now,
       };
 
@@ -136,11 +148,17 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
           }
         }
         savePushSubId(id);
+        savePushApps(id, [app]);
         savePushSeenAt(now);
-      } else if (now - loadPushSeenAt() > HEARTBEAT_MS) {
-        // The heartbeat is what lets a device that is simply gone be pruned without waiting for a
-        // 410 that may never arrive.
+      } else if (!claimed.includes(app) || now - loadPushSeenAt() > HEARTBEAT_MS) {
+        /*
+         * Two reasons to write an unchanged subscription. The heartbeat, which is what lets a device
+         * that is simply gone be pruned without waiting for a 410 that may never arrive — and a
+         * missing claim, which cannot wait twelve hours for it: until the row says which app it
+         * belongs to it is treated as belonging to both, and both apps go on notifying it.
+         */
         await pushPushSub(uid, { ...record, lastSeenAt: now });
+        savePushApps(id, [...claimed, app]);
         savePushSeenAt(now);
       }
 
@@ -148,7 +166,7 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
       setSavedAt(now);
       setHasSubscription(true);
     },
-    [lang],
+    [app, lang],
   );
 
   /**
@@ -204,12 +222,17 @@ export function useWebPush(user: AuthUser | null, lang: 'en' | 'pl', options: Op
     if (!user || options.verifyOnly) return;
     void (async () => {
       try {
-        setDevices(await pullPushSubs(user.uid));
+        /*
+         * This app's rows, not the account's. The list is the answer to "which devices will this
+         * app notify?", and it carries a Remove button — offering the other app's endpoint under
+         * that heading invites turning off the metro alerts from Event Watch's Alerts tab.
+         */
+        setDevices(subsForApp(await pullPushSubs(user.uid), app));
       } catch (e) {
         log.warn('events.push.devices.failed', describeError(e));
       }
     })();
-  }, [user, options.verifyOnly, savedAt]);
+  }, [app, user, options.verifyOnly, savedAt]);
 
   const arm = useCallback(async () => {
     if (!user || !supported()) return;

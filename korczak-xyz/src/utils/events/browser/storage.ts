@@ -24,7 +24,8 @@
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
 import { KIND_KEYS, type KindKey } from '../feed';
-import type { EventRecord, Ignore, Interest, PushSettings } from '../types';
+import { PUSH_APPS } from '../pushApps';
+import type { EventRecord, Ignore, Interest, PushApp, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
 export const EVENT_KEYS = {
@@ -34,6 +35,7 @@ export const EVENT_KEYS = {
   ignoresUnsynced: 'events-ignores-unsynced',
   feed: 'events-feed',
   pushSubId: 'events-push-sub-id',
+  pushApps: 'events-push-sub-apps',
   pushSeen: 'events-push-seen-at',
   settings: 'events-push-settings',
   feedCity: 'events-feed-city',
@@ -66,7 +68,6 @@ const CACHED_PER_OWNER = [
   // Same argument, same cost: a feed narrowed to announcements is one the next account never
   // narrowed, and it hides rows with nothing on the screen saying who asked for it.
   EVENT_KEYS.feedKinds,
-  EVENT_KEYS.feedNewsroom,
 ] as const;
 
 const OWNER_KEY = 'events-owner';
@@ -334,12 +335,35 @@ export function savePushSubId(id: string | null): boolean {
   if (id === null) {
     try {
       localStorage.removeItem(EVENT_KEYS.pushSubId);
+      // The claims describe that subscription and nothing else; left behind, they would be read
+      // against whatever endpoint comes next and stop it ever being stamped.
+      localStorage.removeItem(EVENT_KEYS.pushApps);
       return true;
     } catch {
       return false;
     }
   }
   return writeEventsKey(EVENT_KEYS.pushSubId, id);
+}
+
+/**
+ * Which apps this browser has already recorded against the subscription it holds.
+ *
+ * Kept locally purely to answer "does the stored row already say this app pushes here?" without a
+ * read: the heartbeat that would otherwise carry the claim is throttled to twelve hours, and the
+ * whole point of the claim is that it lands on the first launch after the fix ships. Stored with
+ * the id it belongs to, so a subscription iOS replaced silently cannot inherit the old one's
+ * stamps.
+ */
+export function loadPushApps(subId: string | null): PushApp[] {
+  if (!subId) return [];
+  const raw = readJSON<{ id?: unknown; apps?: unknown }>(EVENT_KEYS.pushApps, {});
+  if (!raw || raw.id !== subId || !Array.isArray(raw.apps)) return [];
+  return raw.apps.filter((app): app is PushApp => PUSH_APPS.includes(app as PushApp));
+}
+
+export function savePushApps(subId: string, apps: PushApp[]): boolean {
+  return writeEventsKey(EVENT_KEYS.pushApps, JSON.stringify({ id: subId, apps: [...new Set(apps)] }));
 }
 
 /** When the heartbeat was last written. Throttles it to once every twelve hours. */

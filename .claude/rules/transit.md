@@ -249,9 +249,16 @@ summary would throw away the station names that are the whole content.
 
 ### What is shared with Event Watch, and what deliberately is not
 
-- **`pushSubs` is shared.** One origin, one service worker, one endpoint per device. A second
-  collection would be a second copy of the same rows going stale independently, and the stale one
-  would be pushing at an endpoint Apple stopped honouring months ago.
+- **`pushSubs` is shared, and every row in it says which app may push to it.** A second collection
+  would be a second copy of the same rows going stale independently, and the stale one would be
+  pushing at an endpoint Apple stopped honouring months ago. But sharing the collection is not
+  sharing the endpoints: an iPhone with both apps installed holds one subscription per app, because
+  iOS gives each installed app its own storage container and its own registration, and it puts the
+  owning app's name and icon on whatever is delivered there. Shipped without the claim, this app's
+  collector delivered metro closures to Event Watch and Event Watch's collector announced a
+  fortnight of opera under **Metro Watch**'s name, which is how it was noticed. `useWebPush` is
+  called here with `app: 'transit'`, `loadAccount` filters with `subsForApp`, and `events.md` has
+  the rest — including why a row with no claim at all still belongs to both.
 - **`PushPanel` is shared**, extracted out of `EventsAlerts` for this. Every state it names is a fact
   about the *platform* — iOS refusing push outside an installed app, a denied permission — so the two
   apps are literally in the same state at the same moment, and two panels wording that differently
@@ -264,7 +271,9 @@ summary would throw away the station names that are the whole content.
   about the metro. The transport app stamps its own, in `useTransitSettings`, and **only once push
   is actually `ready`** — a press that ends in a denied permission has armed nothing, and a corpus
   marked armed with no subscription behind it silently consumes the whole backlog the first time a
-  device does subscribe.
+  device does subscribe. It is no longer its own option: `useWebPush` derives it from `app`, since
+  the reason this app does not stamp Event Watch's `armedAt` is precisely that it is not Event
+  Watch.
 - **`transit.css` imports `events.css`** rather than copying it. The two apps are the same kind of
   thing and two stylesheets describing one visual language would drift at the first change to
   either. What is genuinely this app's own is short: the line badges, the station chips, one border.

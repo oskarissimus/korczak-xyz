@@ -192,6 +192,45 @@ endpoint the collector pushes to until it earns a 410 that may never come. On th
 **404 and 410 are the only codes that delete a subscription**: a 403 is a VAPID key mismatch, and
 deleting on that would wipe every device the first time a secret is fumbled.
 
+### A subscription belongs to one app, not to the account
+
+`pushSubs` was written as one row per device, on the reasoning that one origin serves one service
+worker and therefore hands out one endpoint per browser. **That is true in a browser and false on a
+home screen.** iOS gives every installed app its own storage container, its own registration and its
+own subscription, and it attributes a delivered notification to the app that owns the endpoint —
+name, icon and grouping. So a phone with Event Watch *and* Metro Watch installed holds two rows, and
+a collector that fanned out to every row on the account put a fortnight of opera announcements in
+the app somebody installed to hear about the metro, under Metro Watch's name. Both collectors were
+correct on their own terms; the collection was the thing that was wrong.
+
+`PushSub.apps` fixes it and `pushApps.ts` is the whole of it: `useWebPush` takes the app it is
+arming for, stamps the row, and each collector filters with `subsForApp` before it sends. Three
+things about that are load-bearing.
+
+- **A map, not an array.** `setDoc(..., { merge: true })` replaces an array wholesale and merges a
+  map key by key. On a desktop browser one endpoint really does serve both apps, and two tabs
+  writing an array would each silently drop the other's claim — leaving whichever app was opened
+  last as the only one that could reach the machine.
+- **An unclaimed row belongs to every app.** Every subscription registered before this field existed
+  carries no claim, and reading that as "nobody may push here" is a silence with no symptom. Read as
+  "both", the behaviour is exactly the build being replaced, for as long as it takes each app to be
+  opened once — and the launch check stamps the row on that first open rather than waiting for the
+  twelve-hour heartbeat, which is what `loadPushApps` is for.
+- **The device list is filtered too.** The Alerts tab answers "which devices will *this* app
+  notify?", and it carries a Remove button — offering Metro Watch's endpoint under Event Watch's
+  heading is an invitation to turn off the metro alerts from the wrong screen.
+
+`pushTargets.test.ts` reads `functions/src/` as text and fails any file that reads the whole
+`pushSubs` collection without `subsForApp`, because the thing that goes wrong here is not a wrong
+answer from a function anybody wrote — it is a fourth place that reads the collection and forgets. A
+read of a single row by id is exempt: `sendTestPush` is handed the device to test by the person
+pressing the button.
+
+The same mistake had a cosmetic half. `notificationOptions` hardcoded the events icon, so a metro
+closure arrived wearing a ticket and a calendar — invisible on iOS, which draws the installed app's
+own icon, and plain in a desktop browser. `pushIconFor` derives it from the path the tap opens, so
+an old sender and a payload that fell back to the defaults both still get it right.
+
 ### How long the race is
 
 `distance.ts` pulls a race's distances out of its title and `toRecord` stores them as

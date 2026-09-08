@@ -40,7 +40,7 @@ function AlertsPanel({ lang }: Props) {
    * See the option's note in `useWebPush` — this app stamps its own, in `useTransitSettings`, and
    * only once an endpoint actually exists.
    */
-  const push = useWebPush(auth.user, lang, { stampArmedAt: false });
+  const push = useWebPush(auth.user, lang, { app: 'transit' });
   const { settings, update } = useTransitSettings(auth.user, push.state);
   const t = translations[lang];
   const now = Date.now();
