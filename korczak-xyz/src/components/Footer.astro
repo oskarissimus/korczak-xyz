@@ -8,6 +8,7 @@ interface Props {
 const { lang = 'en' } = Astro.props;
 const t = useTranslations(lang);
 const homeLink = lang === 'en' ? '/' : '/pl/';
+const prefix = lang === 'en' ? '' : '/pl';
 ---
 
 <footer class="retro-footer">
@@ -25,6 +26,12 @@ const homeLink = lang === 'en' ? '/' : '/pl/';
     <div class="visitor-counter">
       <span>{t('hero.visitors')}: 1337420</span>
     </div>
+  </div>
+
+  <div class="footer-legal">
+    <a href={`${prefix}/privacy`}>{t('privacy.title')}</a>
+    <span aria-hidden="true">*</span>
+    <a href={`${prefix}/terms`}>{t('terms.title')}</a>
   </div>
 </footer>
 
@@ -55,5 +62,16 @@ const homeLink = lang === 'en' ? '/' : '/pl/';
     display: flex;
     justify-content: center;
     margin-top: 10px;
+  }
+
+  .footer-legal {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    color: var(--retro-yellow);
+  }
+
+  .footer-legal a {
+    color: var(--retro-cyan);
   }
 </style>

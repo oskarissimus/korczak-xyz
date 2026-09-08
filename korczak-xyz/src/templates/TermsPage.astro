@@ -1,0 +1,52 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import { useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+
+const sections = [
+  ['terms.nature.title', 'terms.nature.body'],
+  ['terms.availability.title', 'terms.availability.body'],
+  ['terms.yourData.title', 'terms.yourData.body'],
+  ['terms.accounts.title', 'terms.accounts.body'],
+  ['terms.content.title', 'terms.content.body'],
+  ['terms.liability.title', 'terms.liability.body'],
+  ['terms.contact.title', 'terms.contact.body'],
+] as const;
+---
+
+<Layout title={`${t('terms.title')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('terms.title')}>
+    <p class="legal-updated">{t('terms.updated')}</p>
+    {
+      sections.map(([title, body]) => (
+        <section class="legal-section">
+          <h2>{t(title)}</h2>
+          <p>{t(body)}</p>
+        </section>
+      ))
+    }
+  </PageContent>
+</Layout>
+
+<style>
+  .legal-updated {
+    color: var(--retro-yellow);
+  }
+
+  .legal-section h2 {
+    color: var(--retro-cyan);
+    margin-bottom: 10px;
+  }
+
+  .legal-section p {
+    color: var(--retro-white);
+    text-align: justify;
+  }
+</style>
