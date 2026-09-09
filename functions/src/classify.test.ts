@@ -74,6 +74,24 @@ describe('needsClassifying', () => {
     // Retitled by a source that fixed its markup: the verdict was about the old words.
     expect(needsClassifying({ ...done, title: 'PyCon Netherlands' })).toBe(true);
   });
+
+  it('never asks about a newsroom item, whatever its hash says', () => {
+    /*
+     * The theatre's news has its own model pass — `readNewsroom.ts`, which asks the one question
+     * anyone acts on there — and every row of it arrives placed by the page. Asking this pass too
+     * spent two calls per article to label a job advert `announcement`, which the matcher treats
+     * exactly as it treats the absent label.
+     */
+    const article = ev({
+      id: 'teatr-wielki_aktualnosci-x',
+      title: 'Wkrótce ogłoszenie nowego sezonu!',
+      tags: ['theatre', 'teatr-wielki', 'newsroom'],
+      city: 'Warszawa',
+      country: 'PL',
+    });
+    expect(needsClassifying(article)).toBe(false);
+    expect(queueForClassification([article])).toEqual([]);
+  });
 });
 
 describe('buildPrompt', () => {

@@ -5,7 +5,6 @@ import {
   SOURCE_CATALOGUE,
   catalogueEntry,
   displayUrl,
-  seasonPaths,
 } from './sources';
 
 describe('SOURCE_CATALOGUE', () => {
@@ -114,29 +113,28 @@ describe('RUNNING_LISTINGS', () => {
   });
 });
 
-describe('seasonPaths', () => {
-  it('watches the current and the next season, since a new page IS the announcement', () => {
-    const paths = seasonPaths(Date.parse('2026-08-23T00:00:00Z'));
-    expect(paths).toEqual([
-      'https://teatrwielki.pl/repertuar/sezon-2026/27/',
-      'https://teatrwielki.pl/repertuar/sezon-2027/28/',
-    ]);
-  });
-
-  it('still points at the running season in January', () => {
-    // A season announced in spring 2026 runs into summer 2027, so in January 2027 the current
-    // pair is still 2026/27.
-    expect(seasonPaths(Date.parse('2027-01-15T00:00:00Z'))[0]).toContain('sezon-2026/27');
-  });
-
-  it('pads the second year, so 2029/30 does not become 2029/3', () => {
-    expect(seasonPaths(Date.parse('2029-06-01T00:00:00Z'))[0]).toContain('sezon-2029/30');
-    expect(seasonPaths(Date.parse('2099-06-01T00:00:00Z'))[0]).toContain('sezon-2099/00');
-  });
-
-  it('marks next season optional, its 404 being the ordinary case', () => {
+describe('the theatre', () => {
+  it('reads the news list and nothing else', () => {
+    /*
+     * The season repertoire pages were dropped: they answered "is Figaro programmed", which is
+     * never urgent, and could not answer the one question with a deadline on it. This asserts the
+     * catalogue and the adapter still agree about that — a season URL back in this list would be
+     * a page the collector never fetches, which is exactly the drift `index.test.ts` exists to
+     * catch one level up.
+     */
     const pages = catalogueEntry('teatr-wielki')!.pages(Date.parse('2026-08-23T00:00:00Z'));
+    expect(pages).toHaveLength(1);
+    expect(pages[0].url).toBe('https://teatrwielki.pl/teatr/aktualnosci/');
+    // Not optional: a theatre always has current news, so an unreachable one is a fault.
     expect(pages[0].optional).toBeFalsy();
-    expect(pages[1].optional).toBe(true);
+  });
+
+  it('stamps newsroom on the page, and never ticket-sale', () => {
+    // `newsroom` is what every row on that page IS, which is the only sort of tag a page may
+    // stamp feed-wide. `ticket-sale` is the keyword-less seeded interest's whole filter and is
+    // applied per row — page-wide it would hand that interest the theatre's job adverts.
+    const [news] = catalogueEntry('teatr-wielki')!.pages(Date.now());
+    expect(news.tags).toContain('newsroom');
+    expect(news.tags).not.toContain('ticket-sale');
   });
 });

@@ -173,7 +173,7 @@ export const translations = {
     sourceNameFeed: 'Watched feeds',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
-      'The season repertoire pages, plus the theatre’s own news. Which productions are programmed and when they premiere — not the individual nights, which live behind a calendar drawn in JavaScript — and, from the news, the morning the tickets go on sale, which is the only thing here with a deadline.',
+      'The theatre’s own news list, and nothing else from this house. It is read for one thing: the morning the tickets go on sale, which the theatre states in prose a fortnight or more ahead and which is the only fact here with a deadline on it. The season repertoire pages were dropped — what is programmed is never urgent, and they could not answer this.',
     notePythonOrg:
       'Worldwide, and deliberately not narrowed by country: whether PyCon US is worth knowing about is your interest’s call, not the collector’s.',
     noteElektroniczneZapisy:
@@ -233,7 +233,7 @@ export const translations = {
     stageNewsroomNote: 'A model reading one theatre’s news items. Empty on everything else.',
     stageClassifier: 'Classifier',
     stageClassifierNote:
-      'A model over the whole corpus. Empty means it has not reached this row yet, which is why the row is still in the feed.',
+      'A model over the rest of the corpus — it is never asked about a newsroom item, which has the reader above instead. Empty otherwise means it has not reached this row yet, which is why the row is still in the feed.',
     stageShared: 'More than one writer',
     stageSharedNote:
       'The source states these where it can and a later pass fills them in otherwise, so neither can be credited with them.',
@@ -412,7 +412,7 @@ export const translations = {
     sourceNameFeed: 'Śledzone kanały',
     sourceNameTicketmaster: 'Ticketmaster (PL)',
     noteTeatrWielki:
-      'Strony repertuaru sezonu i aktualności teatru. Które spektakle są w planie i kiedy mają premierę — bez pojedynczych wieczorów, te siedzą za kalendarzem rysowanym JavaScriptem — a z aktualności ranek, w którym rusza sprzedaż biletów, czyli jedyna rzecz tutaj z terminem.',
+      'Same aktualności teatru i nic więcej z tego domu. Czytane dla jednej rzeczy: ranka, w którym rusza sprzedaż biletów — teatr pisze o tym prostym zdaniem, zwykle z dwutygodniowym wyprzedzeniem, i to jedyny fakt tutaj z terminem. Strony repertuaru sezonu odpadły: co jest w planie, nigdy nie jest pilne, a tej daty i tak nie podawały.',
     notePythonOrg:
       'Cały świat i celowo bez filtra kraju: czy PyCon US jest wart uwagi, decyduje Twoje zainteresowanie, a nie kolektor.',
     noteElektroniczneZapisy:
@@ -472,7 +472,7 @@ export const translations = {
     stageNewsroomNote: 'Model czytający aktualności jednego teatru. Przy reszcie pusto.',
     stageClassifier: 'Klasyfikator',
     stageClassifierNote:
-      'Model przechodzący cały korpus. Pusto znaczy, że jeszcze tu nie dotarł — i dlatego ten wiersz wciąż jest na liście.',
+      'Model przechodzący resztę korpusu — o aktualności nigdy nie pyta, od nich jest czytnik powyżej. Poza nimi pusto znaczy, że jeszcze tu nie dotarł — i dlatego ten wiersz wciąż jest na liście.',
     stageShared: 'Więcej niż jeden autor',
     stageSharedNote:
       'Źródło podaje je, kiedy potrafi, a w przeciwnym razie uzupełnia je późniejszy przebieg, więc nie da się przypisać ich żadnemu z nich.',

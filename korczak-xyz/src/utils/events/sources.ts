@@ -9,7 +9,7 @@
  * made for: the collector fetches these URLs, the tab lists them, and there is one list.
  *
  * So the adapters import their targets from here rather than declaring them. `FEEDS` drives the
- * RSS adapter, `seasonPaths` the theatre scrape, `RUNNING_LISTINGS` the entry-platform one, and
+ * RSS adapter, `TEATR_WIELKI_NEWS` the theatre scrape, `RUNNING_LISTINGS` the entry-platform one, and
  * `index.test.ts` in that directory checks the live sources and this catalogue still name the same
  * five things — a source added there and forgotten here would collect events the tab claims
  * nothing produces.
@@ -59,7 +59,14 @@ export interface SourceCatalogueEntry {
   kind: SourceKind;
   /** The secret this source does nothing without. Absent means it needs none. */
   needsKey?: string;
-  /** `now` because the theatre's pages are a function of the season; the rest ignore it. */
+  /**
+   * The pages this source reads, as of `now`.
+   *
+   * Every entry ignores the argument today — the theatre's season pages, which were a function of
+   * the date, are gone. It stays because a catalogue of *pages* is the wrong place to learn that a
+   * URL can carry a year in it: dropping the parameter would make the next seasonal source a
+   * change to this interface and to both its callers, rather than a change to one entry.
+   */
   pages(now: number): SourcePage[];
 }
 
@@ -68,39 +75,24 @@ export interface SourceCatalogueEntry {
 export const TEATR_WIELKI_HOST = 'https://teatrwielki.pl';
 
 /**
- * Which season pages to read.
+ * The theatre's own news page, and the whole of what is read from this house.
  *
- * Both the current and the next, because the whole point is catching the announcement — and a new
- * season page appearing *is* the announcement. The URL shape is `/repertuar/sezon-2026/27/`, which
- * is the theatre's own odd split of the year pair.
- */
-export function seasonPaths(now: number): string[] {
-  const year = new Date(now).getUTCFullYear();
-  const month = new Date(now).getUTCMonth() + 1;
-  // A season is announced in spring and runs to the following summer, so from about March the
-  // interesting pair is this year's; before that, last year's is still current.
-  const first = month >= 3 ? year : year - 1;
-  return [first, first + 1].map(
-    (start) =>
-      `${TEATR_WIELKI_HOST}/repertuar/sezon-${start}/${String((start + 1) % 100).padStart(2, '0')}/`,
-  );
-}
-
-/**
- * The theatre's own news page, and why a *scrape of articles* earns its place beside the season.
- *
- * The season page answers "what is programmed". It cannot answer the question that actually costs
- * money to get wrong: **when do the tickets go on sale**. A season's sale opens on one morning at
- * one hour, and by the time a ticket link appears on a production — which is all `onsale` can ever
- * observe — the good seats are gone.
+ * It is here for the question that costs money to get wrong: **when do the tickets go on sale**. A
+ * season's sale opens on one morning at one hour, and by the time a ticket link appears on a
+ * production — which is all `onsale` can ever observe — the good seats are gone.
  *
  * The theatre states it in advance, in prose, in its own news list: "Sprzedaż biletów od
  * 1 września, g. 11.00", published a fortnight or more ahead. That sentence is the whole reason
  * this page is fetched, and `parseNewsPage` reads it into `onSaleAt` so the `presale` notice can
  * count down to it.
  *
- * Not optional, unlike next season's page: a theatre always has current news, so an empty or
- * unreachable news list means the markup moved rather than that nothing is happening.
+ * The season repertoire pages (`/repertuar/sezon-2026/27/`) used to be read beside it and are not
+ * any more — see `teatrWielki.ts` for why. They were the one place `optional` was used, a page
+ * whose 404 was the ordinary case rather than a fault; the flag stays on `SourcePage` because it
+ * is a property of a page, not of that adapter, and the next seasonal URL will want it.
+ *
+ * Not optional itself: a theatre always has current news, so an empty or unreachable news list
+ * means the markup moved rather than that nothing is happening.
  */
 export const TEATR_WIELKI_NEWS = `${TEATR_WIELKI_HOST}/teatr/aktualnosci/`;
 
@@ -238,17 +230,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'teatr-wielki',
     label: 'Teatr Wielki – Opera Narodowa',
     kind: 'scrape',
-    pages: (now) => [
-      ...seasonPaths(now).map((url, index) => ({
-        url,
-        label: displayUrl(url),
-        // The first is the running season and must be there; the second is next season's, which
-        // 404s until it is announced.
-        optional: index > 0,
-        tags: ['theatre', 'teatr-wielki'],
-        city: 'Warszawa',
-        country: 'PL',
-      })),
+    pages: () => [
       {
         url: TEATR_WIELKI_NEWS,
         label: displayUrl(TEATR_WIELKI_NEWS),

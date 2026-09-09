@@ -4,7 +4,6 @@ import {
   SALE_DEFAULT_HOUR,
   articleText,
   decodeEntities,
-  parsePolishDate,
   parseSaleAnnouncement,
   stripTags,
   warsawEpoch,
@@ -26,26 +25,6 @@ describe('decodeEntities', () => {
 
   it('leaves an unknown entity alone rather than eating it', () => {
     expect(decodeEntities('&notreal;')).toBe('&notreal;');
-  });
-});
-
-describe('parsePolishDate', () => {
-  it('reads the genitive month a real date uses', () => {
-    expect(parsePolishDate('Premiera: 22 listopada 2026')).toBe('2026-11-22');
-    expect(parsePolishDate('6 grudnia 2026')).toBe('2026-12-06');
-  });
-
-  it('folds diacritics, including the ł that NFD does not decompose', () => {
-    expect(parsePolishDate('8 października 2026')).toBe('2026-10-08');
-    expect(parsePolishDate('3 pazdziernika 2026')).toBe('2026-10-03');
-  });
-
-  it('returns null rather than guessing', () => {
-    // An unparseable date becomes dateText and is printed as the theatre wrote it, which beats a
-    // wrong day.
-    expect(parsePolishDate('Premiera: jesień 2027')).toBeNull();
-    expect(parsePolishDate('')).toBeNull();
-    expect(parsePolishDate('40 listopada 2026')).toBeNull();
   });
 });
 

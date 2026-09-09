@@ -56,6 +56,23 @@ describe('payloadFor', () => {
     ).toBe('42.2 km · Tickets on sale from 1 Sept 2026, 11:00');
   });
 
+  /*
+   * The theatre's own news, which is the whole reason that page is scraped: an article has no date
+   * of its own, and the sale date it states in prose is the only thing on it to act on. This body
+   * said `Announced — no dates yet.` about exactly those rows until the sale date was let into it.
+   */
+  it('names the sale date on an announcement that has no date of its own', () => {
+    expect(
+      payloadFor(
+        notice({
+          title: 'Wkrótce ogłoszenie nowego sezonu!',
+          startsAt: null,
+          onSaleAt: Date.parse('2026-05-21T09:00:00Z'),
+        }),
+      ).body,
+    ).toBe('Tickets on sale from 21 May 2026, 11:00');
+  });
+
   it('still says the distance for a race announced without a date', () => {
     expect(payloadFor(notice({ startsAt: null, distancesM: [21097] })).body).toBe(
       '21.1 km · Announced — no dates yet.',

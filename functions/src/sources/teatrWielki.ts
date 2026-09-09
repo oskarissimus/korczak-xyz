@@ -1,37 +1,39 @@
 /*
- * Teatr Wielki – Opera Narodowa, from the season repertoire pages.
+ * Teatr Wielki – Opera Narodowa, from the theatre's own news list.
  *
- * This is the source the app was really asked for: "tell me when new repertoire is announced", with
- * a season of lead time on a Figaro or a Salome.
+ * One page, `/teatr/aktualnosci/`, and one question asked of it: **when do the tickets go on
+ * sale.** A season's sale opens on one morning at one hour and the house is half sold by
+ * lunchtime, so that sentence — published a fortnight or more ahead, in prose, in the theatre's
+ * own news — is the only thing this house publishes with a deadline attached.
  *
- * The obvious page, `/kalendarium/`, is useless to us — it is a TYPO3 shell whose calendar is drawn
- * by JavaScript, so the HTML contains `data-day` attributes and no events at all. The *season* page
- * is plain server-rendered markup and carries more than the calendar would anyway:
+ * ### It used to scrape the season repertoire too, and does not
  *
- *     <a href="https://teatrwielki.pl/kalendarium/2026-2027/salome/" class="-layer">
- *       <div class="teaser">
- *         <h2>SALOME</h2>
- *         <p>OPERA</p>
- *         <p>Richard Strauss</p>
- *         <p><strong>Premiera: 22 listopada 2026</strong></p>
+ * `/repertuar/sezon-2026/27/` is plain server-rendered markup carrying a title, a genre, a
+ * composer and a premiere date per production, and this adapter read all of it into sixty-odd
+ * rows a season. What none of it could answer is the question above: a production's page grows a
+ * ticket link on the morning the sale opens, which is news that arrives too late to act on. The
+ * repertoire was answering "is Figaro programmed" — worth knowing, never urgent, and knowable
+ * from the theatre's own site in ten seconds whenever the question comes up.
  *
- * — a title, a genre, a composer, a premiere date, and a slug that makes a stable id. Note
- * `<h2>COPP<span>É</span>LIA</h2>`: the titles contain inner tags, so they must be stripped rather
- * than read raw.
+ * So the season pages are gone, along with the sixty-odd rows a season they minted, and what is
+ * left is the page with the deadline on it. Two consequences worth knowing before reviving them:
+ * nothing here stamps `opera` or `ballet` any more (`tagsFor` read the genre line off a season
+ * teaser, and there is no genre line on a news item), and the corpus no longer carries a single
+ * Teatr Wielki *performance* — every row from this source is an article.
  *
- * What this cannot give us is individual performance nights; those live behind the JS calendar. That
- * is an acceptable gap — the question is "is Figaro programmed this season", not "which Tuesday".
+ * ### The news list
  *
- * The season page cannot answer the *other* question either, and that one has a deadline: **when
- * the tickets go on sale.** A season's sale opens on one morning at one hour and the house is half
- * sold by lunchtime, so noticing a ticket link has appeared — which is all `onsale` can ever do —
- * is noticing too late. The theatre says it in advance, in prose, in its own news list, so
- * `parseNewsPage` reads that sentence into `onSaleAt` and the `presale` notice counts down to it.
+ * `parseSaleAnnouncement` reads "Sprzedaż biletów od 1 września, g. 11.00" into `onSaleAt` so the
+ * `presale` notice can count down to it, and `readNewsroom.ts` reads the article body behind each
+ * row for the sale dates that sentence is phrased too loosely to catch. A **committed HTML
+ * fixture** is what turns the inevitable redesign into a red build rather than a silently empty
+ * feed — which for this source now means no warning before a season sale, since there is no
+ * second page left to look healthy in its place.
  */
 
 import type { EventSource, RawEvent, SourceContext } from './types';
 import { fetchText } from './types';
-import { parsePolishDate, parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
+import { parseSaleAnnouncement, stripTags, warsawEpoch } from './html';
 import {
   NEWSROOM_TAG,
   TICKET_SALE_TAG,
@@ -39,102 +41,7 @@ import {
 import {
   TEATR_WIELKI_HOST as HOST,
   TEATR_WIELKI_NEWS,
-  seasonPaths,
 } from '../../../korczak-xyz/src/utils/events/sources';
-
-/** One `<li class="page">…</li>` block per production. */
-const BLOCK = /<li class="page">([\s\S]*?)<\/li>/g;
-
-/**
- * Pulls the productions out of one season page.
- *
- * Exported and pure so `teatrWielki.test.ts` can run it against a committed fixture. When the
- * theatre redesigns — and it will — that test is what turns a silent empty feed into a red build.
- */
-export function parseSeasonPage(html: string): RawEvent[] {
-  const out: RawEvent[] = [];
-
-  for (const match of html.matchAll(BLOCK)) {
-    const block = match[1];
-
-    const href = /<a[^>]+href="([^"]+)"/.exec(block)?.[1];
-    // Inner tags: COPP<span>É</span>LIA.
-    const title = stripTags(/<h2[^>]*>([\s\S]*?)<\/h2>/.exec(block)?.[1] ?? '');
-    if (!href || !title) continue;
-
-    /*
-     * A production, and not one of the education tiles the season page also carries.
-     *
-     * Two of the sixty-four blocks link outside /kalendarium/ — "PRÓBY OTWARTE" (open rehearsals)
-     * and "WYCIECZKI PO TEATRZE" (guided tours). They are things the house does, not things it has
-     * programmed, and they were previously kept with a key synthesised from the season page's own
-     * URL: `teatr-wielki_https-teatrwielki-pl-repertuar-sezon-2026-27-WYCIECZKI-PO-TEATRZE`. That
-     * is stable enough not to re-announce, and still wrong — the slug is the theatre's own
-     * identifier for a production, so its absence is the signal that this is not one.
-     */
-    const slug = slugOf(href);
-    if (!slug) continue;
-
-    const paragraphs = [...block.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)]
-      .map((p) => stripTags(p[1]))
-      .filter(Boolean);
-
-    // The teaser's paragraphs are, in order: genre, composer/creators, and the premiere line.
-    const premiereLine = paragraphs.find((p) => /premiera/i.test(p));
-    const rest = paragraphs.filter((p) => p !== premiereLine);
-    const genre = rest[0];
-    const composer = rest.slice(1).join(' · ') || undefined;
-
-    const day = premiereLine ? parsePolishDate(premiereLine) : null;
-
-    out.push({
-      // The slug is the id. It survives a redesign of everything around it, and it is what the
-      // theatre itself uses to identify the production.
-      sourceKey: slug,
-      title,
-      subtitle: composer,
-      url: href.startsWith('http') ? href : `${HOST}${href}`,
-      startsAt: day ? warsawEpoch(day, 19) : null,
-      // Kept whatever happens: "Premiera: jesień 2027" is genuinely what the theatre said, and a
-      // card with no date at all reads as a bug.
-      dateText: premiereLine,
-      city: 'Warszawa',
-      country: 'PL',
-      venue: 'Teatr Wielki – Opera Narodowa',
-      tags: tagsFor(genre),
-      description: [genre, composer].filter(Boolean).join(' '),
-    });
-  }
-
-  return out;
-}
-
-/** `https://teatrwielki.pl/kalendarium/2026-2027/salome/` -> `2026-2027/salome`. */
-export function slugOf(href: string): string | null {
-  const match = /\/kalendarium\/([^?#]+)/.exec(href);
-  if (!match) return null;
-  return match[1].replace(/^\/+|\/+$/g, '') || null;
-}
-
-/**
- * The genre line as tags.
- *
- * `opera` is what the seeded Opera Narodowa interest matches on — it has no keywords at all, so
- * this tag is the entire reason that interest works. Ballet gets its own so it can be excluded.
- */
-export function tagsFor(genre: string | undefined): string[] {
-  const tags = ['theatre', 'teatr-wielki'];
-  const value = (genre ?? '').toLowerCase();
-  if (value.includes('balet') || value.includes('ballet')) tags.push('ballet');
-  else if (value.includes('opera')) tags.push('opera');
-  // Anything else — a gala, a recital, a concert — gets neither. It used to fall through to
-  // `opera`, which meant the keyword-less Opera Narodowa interest claimed the entire season
-  // including the things that are not operas. `teatr-wielki` still marks the house, so an
-  // interest that genuinely wants everything from here can ask for that tag instead.
-  return tags;
-}
-
-/* --- the news list, which is where a sale date is stated in advance ---------------------------- */
 
 /** One `<li>` of `<ul id="content" class="white-list cal-list">`. */
 const NEWS_ROW = /<li>\s*<time class="date"([\s\S]*?)<\/li>/g;
@@ -254,45 +161,15 @@ export const teatrWielki: EventSource = {
   id: 'teatr-wielki',
   label: 'Teatr Wielki – Opera Narodowa',
   async fetchEvents(ctx: SourceContext): Promise<RawEvent[]> {
-    const out: RawEvent[] = [];
-    const paths = seasonPaths(ctx.now);
-    let reached = 0;
-
-    for (const url of paths) {
-      let html: string;
-      try {
-        html = await fetchText(ctx, url);
-      } catch {
-        // A season page that does not exist yet is the normal case for half the year, not a
-        // failure — next season's URL 404s until it is announced, and that announcement is the
-        // very thing being watched for.
-        continue;
-      }
-      reached += 1;
-      out.push(...parseSeasonPage(html));
-    }
-
     /*
-     * The news list, and it is fetched even when both season pages failed.
+     * One page, and a failure to reach it is a failure of the source.
      *
-     * A theatre always has current news, so unlike next season's page a 404 here is a fault rather
-     * than the ordinary state of half the year. But it is caught all the same and does not fail
-     * the source on its own: the season pages are what the app was built for, and losing an opera
-     * season from the feed because a news template moved would be the fragile half taking the
-     * sturdy half down with it.
+     * It was caught and swallowed while the season pages were the sturdy half of this scrape —
+     * losing an opera season from the feed because a news template moved would have been the
+     * fragile half taking the sturdy half down with it. There is no other half now: an
+     * unreachable news list means this source has nothing to say and nobody would be told, which
+     * is exactly what `eventSources` health exists to make visible.
      */
-    try {
-      out.push(...parseNewsPage(await fetchText(ctx, TEATR_WIELKI_NEWS)));
-      reached += 1;
-    } catch {
-      // Recorded only by its absence from the count below.
-    }
-
-    // Every page unreachable is different from "the current season has nothing on", and only the
-    // first is worth recording as a broken source.
-    if (reached === 0) {
-      throw new Error(`no page reachable (${[...paths, TEATR_WIELKI_NEWS].join(', ')})`);
-    }
-    return out;
+    return parseNewsPage(await fetchText(ctx, TEATR_WIELKI_NEWS));
   },
 };

@@ -40,6 +40,14 @@ export interface InterestDraft {
  *     the opera house announces" — which is what "I want to know when new repertoire is announced"
  *     actually asks for, and which no keyword list could express. This is the case
  *     `matchesInterest` treats an empty keyword array as *no constraint* for.
+ *
+ *     Its premise moved under it in Sep 2026: the Teatr Wielki season scrape, which stamped
+ *     `opera` off each production's genre line, was dropped in favour of the theatre's news list
+ *     alone, and a news item has no genre. So the only `opera` left is what Ticketmaster stamps
+ *     where a listing really says so. The seed is kept because the tag is still the right way to
+ *     ask this question and the ticketed catalogue can answer it, but a reader who wants the
+ *     opera house specifically now wants `events-seed-ticket-sale` — the sale date is the thing
+ *     that source publishes.
  *   - `events-seed-running` has no keywords either, and no tag that a source's *subject* supplies:
  *     it is `tags: ['running']` narrowed by `cities: ['Warszawa']`, because "what can I run here"
  *     is a question about a place and the app's durable way to ask one is an interest's city list.

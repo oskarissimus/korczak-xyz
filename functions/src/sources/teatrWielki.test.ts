@@ -1,118 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { newsSlugOf, parseNewsPage, parseSeasonPage, slugOf, tagsFor } from './teatrWielki';
-
-/*
- * A committed fixture of the real page.
- *
- * teatrwielki.pl will be redesigned, and when it is this test is what turns a silently empty feed
- * into a red build. Re-saving the fixture and adjusting the regex is then a fifteen-minute job with
- * a green light at the end, instead of an afternoon wondering why no opera has been announced.
- */
-const html = readFileSync(new URL('./fixtures/teatr-wielki-season.html', import.meta.url), 'utf8');
-const events = parseSeasonPage(html);
-
-describe('parseSeasonPage', () => {
-  it('finds the productions', () => {
-    expect(events.length).toBeGreaterThanOrEqual(10);
-  });
-
-  it('reads a title, a composer and a premiere date', () => {
-    const salome = events.find((e) => e.title === 'SALOME');
-    expect(salome).toBeDefined();
-    expect(salome!.subtitle).toContain('Richard Strauss');
-    expect(salome!.url).toBe('https://teatrwielki.pl/kalendarium/2026-2027/salome/');
-    // 22 November 2026, 19:00 Warsaw — which is winter time, so 18:00 UTC.
-    expect(new Date(salome!.startsAt!).toISOString()).toBe('2026-11-22T18:00:00.000Z');
-  });
-
-  it('strips the inner tags real titles contain', () => {
-    // <h2>COPP<span>É</span>LIA</h2> — read raw, this becomes "COPPLIA" or keeps the markup.
-    expect(events.map((e) => e.title)).toContain('COPPÉLIA');
-  });
-
-  it('keeps the theatre’s own words for the date, whatever we parsed', () => {
-    const salome = events.find((e) => e.title === 'SALOME')!;
-    expect(salome.dateText).toMatch(/Premiera/i);
-  });
-
-  it('uses the slug as the id, so a redesign around it does not re-announce everything', () => {
-    expect(events.find((e) => e.title === 'SALOME')!.sourceKey).toBe('2026-2027/salome');
-  });
-
-  it('skips the education tiles, which are not repertoire', () => {
-    /*
-     * Two of the season page's blocks link outside /kalendarium/ — open rehearsals and guided
-     * tours. They are things the house does rather than things it has programmed, and they used
-     * to be kept under a key synthesised from the season page's own URL.
-     */
-    const titles = events.map((e) => e.title);
-    expect(titles).not.toContain('WYCIECZKI PO TEATRZE');
-    expect(titles).not.toContain('PRÓBY OTWARTE');
-  });
-
-  it('keys every event on the production slug, never on the page URL', () => {
-    for (const event of events) {
-      expect(event.sourceKey).toMatch(/^\d{4}-\d{4}\//);
-      expect(event.sourceKey).not.toContain('http');
-    }
-  });
-
-  it('tags operas so the keyword-less Opera Narodowa interest can match them', () => {
-    // That interest has NO keywords — the tag is the entire reason it works.
-    const salome = events.find((e) => e.title === 'SALOME')!;
-    expect(salome.tags).toContain('opera');
-  });
-
-  it('sets the venue and city, which the page never states per production', () => {
-    expect(events[0].venue).toBe('Teatr Wielki – Opera Narodowa');
-    expect(events[0].city).toBe('Warszawa');
-  });
-
-  it('returns nothing rather than garbage for mangled markup', () => {
-    // A redesign should produce an empty source (which the health table reports), never rows made
-    // of navigation chrome.
-    expect(parseSeasonPage('<div>completely different</div>')).toEqual([]);
-    expect(parseSeasonPage('')).toEqual([]);
-  });
-
-  it('skips a block with no title or no link', () => {
-    expect(parseSeasonPage('<li class="page"><div class="teaser"></div></li>')).toEqual([]);
-  });
-});
-
-describe('slugOf', () => {
-  it('extracts the production slug', () => {
-    expect(slugOf('https://teatrwielki.pl/kalendarium/2026-2027/salome/')).toBe('2026-2027/salome');
-  });
-
-  it('is null for a link that is not a production', () => {
-    expect(slugOf('https://teatrwielki.pl/repertuar/')).toBeNull();
-  });
-});
-
-describe('tagsFor', () => {
-  it('separates ballet from opera so one can be excluded', () => {
-    expect(tagsFor('BALET')).toContain('ballet');
-    expect(tagsFor('BALET')).not.toContain('opera');
-    expect(tagsFor('OPERA')).toContain('opera');
-  });
-
-  it('does not call a gala an opera', () => {
-    // It used to fall through, which let the keyword-less Opera Narodowa interest claim the whole
-    // season including the things that are not operas.
-    expect(tagsFor('GALA BALETOWA')).not.toContain('opera');
-    expect(tagsFor('KONCERT')).not.toContain('opera');
-    // The house tag is still there for an interest that genuinely wants everything from here.
-    expect(tagsFor('KONCERT')).toContain('teatr-wielki');
-  });
-});
+import { newsSlugOf, parseNewsPage } from './teatrWielki';
 
 /*
  * The news list, which is where the theatre says when the tickets go on sale.
  *
- * A second committed fixture, for the same reason as the first: this scrape is the only thing that
- * can warn *before* a season sale opens, and the way it fails is silently.
+ * A committed fixture of the real page, and the only one this adapter has left — the season
+ * repertoire scrape and its fixture are gone. teatrwielki.pl will be redesigned, and when it is
+ * this test is what turns a silently empty feed into a red build; with the season pages gone
+ * there is no second page to look healthy in its place, so it is also the only thing standing
+ * between a redesign and a season sale nobody is warned about.
  */
 const newsHtml = readFileSync(new URL('./fixtures/teatr-wielki-news.html', import.meta.url), 'utf8');
 const news = parseNewsPage(newsHtml);
@@ -153,9 +50,6 @@ describe('parseNewsPage', () => {
      * is a marker for the collector rather than a subject — no interest asks for it.
      */
     expect(news.every((e) => e.tags!.includes('newsroom'))).toBe(true);
-    // And the season page's productions are not articles, or the reader would be asked whether a
-    // Salome is a job advert.
-    expect(events.every((e) => !(e.tags ?? []).includes('newsroom'))).toBe(true);
   });
 
   it('does not read a date after “od” that is about something else', () => {

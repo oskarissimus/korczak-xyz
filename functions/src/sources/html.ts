@@ -69,6 +69,14 @@ export function matchAll(html: string, pattern: RegExp): string[] {
   return [...html.matchAll(pattern)].map((m) => m[1] ?? '');
 }
 
+/**
+ * The month names `parseSaleAnnouncement` reads, genitive and nominative.
+ *
+ * Genitive is what a real date uses ("1 września", not "wrzesień"), and both forms are here
+ * because a page may write a bare month. Keys are folded — see `foldPolish` — so `października`
+ * and `pazdziernika` are one entry; ł does not decompose under NFD, hence the explicit replace
+ * there.
+ */
 const PL_MONTHS: Record<string, number> = {
   stycznia: 1, lutego: 2, marca: 3, kwietnia: 4, maja: 5, czerwca: 6,
   lipca: 7, sierpnia: 8, wrzesnia: 9, pazdziernika: 10, listopada: 11, grudnia: 12,
@@ -76,32 +84,6 @@ const PL_MONTHS: Record<string, number> = {
   styczen: 1, luty: 2, marzec: 3, kwiecien: 4, maj: 5, czerwiec: 6,
   lipiec: 7, sierpien: 8, wrzesien: 9, pazdziernik: 10, listopad: 11, grudzien: 12,
 };
-
-/**
- * A Polish long-form date — "22 listopada 2026" — as `YYYY-MM-DD`.
- *
- * The month is genitive on a real date ("listopada", not "listopad"), which is why both forms are
- * in the table. Diacritics are folded before the lookup so `października` and `pazdziernika` are
- * one key; ł does not decompose under NFD, hence the explicit replace.
- *
- * Returns null rather than guessing: an unparseable date becomes `dateText` on the event and is
- * printed as the theatre wrote it, which is better than a wrong day.
- */
-export function parsePolishDate(text: string): string | null {
-  const folded = text
-    .replace(/ł/g, 'l')
-    .replace(/Ł/g, 'L')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-  const match = folded.match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
-  if (!match) return null;
-  const month = PL_MONTHS[match[2]];
-  if (!month) return null;
-  const day = Number(match[1]);
-  if (day < 1 || day > 31) return null;
-  return `${match[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
 
 /** When a sale announcement names a day but no hour. Box offices open in the morning. */
 export const SALE_DEFAULT_HOUR = 10;
@@ -115,7 +97,7 @@ export const SALE_DEFAULT_HOUR = 10;
  */
 const SALE_PHRASE = /sprzeda[zż]\w*/;
 
-/** Folded to the alphabet `parsePolishDate`'s month table is keyed on. */
+/** Folded to the alphabet `PL_MONTHS` is keyed on. */
 function foldPolish(text: string): string {
   return text
     .replace(/\u0142/g, 'l')
@@ -130,7 +112,7 @@ function foldPolish(text: string): string {
  * a sale opening at all.
  *
  * This exists because the sentence Teatr Wielki publishes is "Sprzedaż biletów od 1 września,
- * g. 11.00", and **there is no year in it**. `parsePolishDate` requires one and rightly refuses to
+ * g. 11.00", and **there is no year in it**. A general date parser has to refuse that rather than
  * guess; here the guess is safe and has to be made, because a year-less date is what the source
  * actually says. The article's own publication day settles it: a sale is announced before it
  * opens, so the answer is the next occurrence of that day and month at or after publication, which

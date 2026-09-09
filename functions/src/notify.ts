@@ -118,6 +118,18 @@ export function payloadFor(notice: PendingNotice): PushPayload {
  * part of that one — "1 Sep" and "1 Sep, 11:00" are different instructions when the house sells
  * out by lunchtime.
  *
+ * **A dateless row with a sale date names the sale**, whatever kind of notice it is, and that is
+ * the line the theatre's news exists to produce. The article announcing a season states the
+ * morning its tickets go on sale and has no date of its own; announced first and warned about
+ * later, this body used to say `Announced — no dates yet.` about precisely the row that carried
+ * the one date worth having. The `presale` reminder that follows a fortnight before says the same
+ * sentence, and repeating it is the point — the first tells you a date exists, the second that it
+ * is close.
+ *
+ * No clock is needed to choose the wording. "Tickets on sale from 1 Sep 2026, 11:00" is true of a
+ * sale that opens then and of one that opened then, which is why this can stay a pure function of
+ * the notice.
+ *
  * Language-neutral by construction, like everything else this function sends: `5 km · 21.1 km` is
  * read the same in both, and the date is already an `en-GB` short form for every subscriber.
  */
@@ -125,7 +137,7 @@ function bodyFor(notice: PendingNotice): string {
   const distances = formatDistances(notice.distancesM);
   const parts = distances ? [distances] : [];
 
-  if (notice.kind === 'presale' && notice.onSaleAt !== undefined) {
+  if (notice.onSaleAt !== undefined && (notice.kind === 'presale' || notice.startsAt === null)) {
     parts.push(`Tickets on sale from ${when(notice.onSaleAt, true)}`);
   } else if (notice.startsAt === null) {
     parts.push('Announced — no dates yet.');

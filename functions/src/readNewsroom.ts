@@ -66,8 +66,10 @@
  * cost of being wrong, and merging the two would tie all three together:
  *
  *   - **Scope.** The geography classifier runs over the whole corpus, 1,100-odd rows. This runs
- *     over the dozen tagged `newsroom`. One prompt would ask every concert in Poland whether
- *     it is a job advert — and would fetch 1,100 article bodies to do it.
+ *     over the dozen tagged `newsroom` — and, since the two passes were separated, those dozen are
+ *     the *only* rows this one reads and the only rows that one skips (`needsClassifying`). One
+ *     prompt would ask every concert in Poland whether it is a job advert — and would fetch 1,100
+ *     article bodies to do it.
  *   - **Version.** `CLASSIFIER_VERSION` re-labels the entire corpus when it moves. Tuning the
  *     wording of a sale-date question must not cost 1,100 model calls, so `READER_VERSION` is its
  *     own lever over its own hash.

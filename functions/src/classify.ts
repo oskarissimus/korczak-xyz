@@ -19,6 +19,10 @@
  *      `eventSources/classifier` records that nothing came back. The failure mode is the noise
  *      coming back visibly, never a feed that quietly empties.
  *
+ * One set of rows is deliberately **never asked**: the theatre's newsroom items, which have their
+ * own model pass in `readNewsroom.ts` and arrive already placed. `needsClassifying` says why, and
+ * it is the only exception — everything else in the corpus comes through here.
+ *
  * There is **no API key**. Vertex AI on Application Default Credentials, which inside a Cloud
  * Function is the function's own runtime service account — it is already inside the project the
  * model is billed to, so a credential to prove that would be a credential to leak and to rotate.
@@ -32,6 +36,7 @@ import { GoogleGenAI, Type, type Schema } from '@google/genai';
 import type { EventKind, EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
 import { KINDS, REACHES } from '../../korczak-xyz/src/utils/events/types';
 import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
+import { isNewsroomItem } from '../../korczak-xyz/src/utils/events/newsroom';
 
 /**
  * Cheapest and fastest of the family, which is the right trade for a two-field judgement over a
@@ -153,8 +158,27 @@ export function classifyHashOf(event: {
   return createHash('sha1').update(parts.join(' ')).digest('hex').slice(0, 16);
 }
 
-/** Whether this record's stored verdict was computed from what it says now. */
+/**
+ * Whether this record still needs a verdict from this pass.
+ *
+ * Two ways to answer no. The stored hash matching what the row says now is the ordinary one. The
+ * other is that the row is a **newsroom item**, and those are deliberately never asked:
+ *
+ *   - The theatre's news list is the one source whose rows are read by a second model pass, and
+ *     `readNewsroom.ts` asks the only question anyone acts on there — does a sale open, and when.
+ *     A `reach` on a job advert is a label nothing reads, and a `kind` on it is a label the
+ *     matcher already treats the same whether it is `announcement` or absent.
+ *   - Every row from that page arrives placed — `Warszawa`, `PL`, stamped by the page — so the
+ *     geography question this pass exists for has no work to do on it either.
+ *
+ * The cost of asking anyway was two model calls per article and a second verdict to keep in sync
+ * with the first; the cost of not asking is that these rows show as `unlabelled` in the Pipeline
+ * tab's `kind` facet, which is what they are. Unclassified passes both `passesKind` and
+ * `passesPlaces`, so nothing is filtered out by this and no notification is lost — see the
+ * rules those functions carry.
+ */
 export function needsClassifying(event: EventRecord): boolean {
+  if (isNewsroomItem(event)) return false;
   return event.classifyHash !== classifyHashOf(event);
 }
 

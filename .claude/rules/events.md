@@ -62,7 +62,9 @@ deliberately do not.
 
 **An empty keyword list means NO constraint, not "matches nothing".** The Opera Narodowa seed is
 `tags: ['opera']` with no keywords at all, because "tell me when new repertoire is announced" is not
-a keyword search. Reading empty as unsatisfiable makes that interest silently dead — matching
+a keyword search. Since the season scrape was dropped nothing in the corpus carries `opera` except
+a Ticketmaster listing that really says so, so that seed is a live interest with nothing to match
+most weeks — which is a fact about the sources, not a bug in the rule below. Reading empty as unsatisfiable makes that interest silently dead — matching
 nothing forever, with nothing in the UI to say why. It is the first test in `match.test.ts`.
 
 `haystackOf` deliberately does **not** read tags. It used to, and the result was that any tag a
@@ -70,7 +72,9 @@ source applies feed-wide became a blanket keyword hit for every row: tagging the
 Festival's feed `klezmer` made the Klezmer interest match all 67 of its articles, one of which was
 about Ted Kaczynski. Tags are matched all-of and structurally, by `interest.tags`. That live run also
 found `tagsFor` in the Teatr Wielki adapter falling through to `opera` for anything that was not
-ballet, which handed the keyword-less Opera interest the entire season, galas included.
+ballet, which handed the keyword-less Opera interest the entire season, galas included. That
+function went with the season scrape (Sep 2026) and the lesson did not: it is the same one the
+three cases below are about.
 
 **A keyword-less interest has no second filter, so a generous tag is the whole of what reaches it**
 — which is why that mistake keeps arriving from a new direction. The third time was Ticketmaster's
@@ -139,6 +143,15 @@ as `soon` counts down to `startsAt`, on the same `leadDays`. Four things about i
 - **It shares `maxOnSalePerRun` with `onsale`** rather than getting a budget of its own. They are one
   category of noise, and a source that starts stating sale dates across its whole catalogue must not
   walk past the cap by arriving under a second name.
+
+**The `announced` push names the sale date too**, where the row has one and no date of its own.
+`bodyFor` used to reserve that line for `presale` and print `Announced — no dates yet.` on
+everything else dateless — which was precisely wrong for the theatre's news, since the article
+announcing a season *is* the row carrying the one date worth having, and the announcement arrives
+weeks before the `presale` reminder does. The two now say the same sentence, and repeating it is
+the point: the first says a date exists, the second that it is close. No clock is needed to choose
+the wording — "Tickets on sale from 1 Sep 2026, 11:00" is true of a sale that opens then and of one
+that opened then — so `payloadFor` stays a pure function of the notice.
 
 `Interest.leadDays` now means two things at once — how long before the curtain, and how long before
 the sale — and that is on purpose rather than an economy. Both answer "how much warning do I want
@@ -293,26 +306,39 @@ more running discipline a line in `RUNNING_LISTINGS`, not code. An adapter retur
 **nothing derived**: the id, the haystack, the fingerprint and the day are computed by `upsert.ts`,
 so a new adapter cannot get normalisation subtly different.
 
-- **teatrwielki.pl** is the first bespoke scrape, and the source the app was really asked for. Note
-  `/kalendarium/` is useless — a TYPO3 shell whose calendar is drawn by JavaScript, containing
-  `data-day` attributes and no events. The **season page** (`/repertuar/sezon-2026/27/`) is plain
-  server-rendered markup carrying title, genre, composer, premiere date and a stable slug. Titles
-  contain inner tags (`<h2>COPP<span>É</span>LIA</h2>`), so they must be stripped. Individual
-  performance nights stay behind the JS calendar; that is an accepted gap, since the question is
-  whether Figaro is programmed, not which Tuesday. A **committed HTML fixture** is what turns the
-  inevitable redesign into a red build rather than a silently empty feed.
+- **teatrwielki.pl** is the source the app was really asked for, and it is now **one page**:
+  `/teatr/aktualnosci/`, the theatre's own news list. It is read for one fact — the morning the
+  tickets go on sale — because that is the only thing this house publishes with a deadline on it.
 
-  The **news list** (`/teatr/aktualnosci/`) is fetched beside it, and it is the only page in this
-  app that answers a question with a deadline: *when does the sale open*. The theatre states it in
-  prose — "Sprzedaż biletów od 1 września, g. 11.00" — a fortnight or more ahead, and
-  `parseSaleAnnouncement` reads that sentence into `onSaleAt` so `presale` can count down to it.
-  Four things about that read:
+  **The season repertoire scrape is gone** (Sep 2026), and it is worth knowing what was given up
+  before anybody restores it. `/repertuar/sezon-2026/27/` is plain server-rendered markup carrying
+  a title, a genre, a composer, a premiere date and a stable slug per production, and it minted
+  about sixty rows a season; `parseSeasonPage`, `slugOf` and `tagsFor` read it and a committed
+  fixture guarded it. What it could never answer is the question above — a production's page grows
+  a ticket link on the morning of the sale, which is the wrong side of the event — and the question
+  it did answer, *is Figaro programmed*, is never urgent and is on the theatre's own site in ten
+  seconds. Two consequences, neither reversible by wanting them otherwise:
 
-  - **There is no year in the sentence.** `parsePolishDate` requires one and rightly refuses to
+  - **Nothing stamps `opera` or `ballet` any more.** Those came off the season teaser's genre line,
+    and a news item has no genre line. The keyword-less `Opera Narodowa` seed (`tags: ['opera']`)
+    therefore matches nothing this source produces; Ticketmaster's `tagsOf` still stamps `opera`
+    where a listing really says so, which is the whole of what can now reach it.
+  - **The corpus carries no Teatr Wielki *performance*.** Every row from this source is an article,
+    so `startsAt` is null on all of them and the house contributes nothing to the dated half of the
+    feed. `/kalendarium/` cannot fill the gap: it is a TYPO3 shell whose calendar is drawn in
+    JavaScript, `data-day` attributes and no events.
+
+  The **news list** is the only page in this app that answers a question with a deadline: *when does
+  the sale open*. The theatre states it in prose — "Sprzedaż biletów od 1 września, g. 11.00" — a
+  fortnight or more ahead, and `parseSaleAnnouncement` reads that sentence into `onSaleAt` so
+  `presale` can count down to it. Four things about that read:
+
+  - **There is no year in the sentence.** `parsePolishDate` required one and rightly refused to
     guess; here the guess has to be made, and the article's own `datetime` attribute is what makes
     it safe — a sale is announced before it opens, so the answer is the next occurrence of that
     day and month at or after publication. That rolls a December announcement of a January sale
-    into the next year without a special case.
+    into the next year without a special case. (`parsePolishDate` itself went with the season
+    scrape, its only caller; `yearFor` inside `parseSaleAnnouncement` is what does this now.)
   - **The sale wording is required, and the date must follow it.** The same list carries "Od 12
     czerwca 2026 roku nasi Widzowie mogą korzystać z 30% zniżki na parking" — a date after "od",
     about a car park. A reader that took any such date would put that on the calendar as a ticket
@@ -320,21 +346,31 @@ so a new adapter cannot get normalisation subtly different.
   - **Every row is kept, not only the ones announcing a sale.** `eventSources` reads zero as a
     failure only where there used to be something, so a page that legitimately yields nothing for
     months could not be told apart from one whose wording moved. Ten articles a run is a health
-    signal that stays honest.
+    signal that stays honest — and it is now the *only* health signal this source has, the season
+    pages having been the other half of it.
   - **`ticket-sale` is applied per row and never stamped on the page**, and only where a date was
     actually parsed. That tag is the whole of the keyword-less `Ticket sales opening` seed, and a
     keyword-less interest has no second filter — page-wide it would hand that interest the
     theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
 
-  The row's `<time datetime>` is now **kept** as `publishedAt` as well as being read for the sale's
+  **The page holds ten articles and there is no pagination**, which is a reach limit rather than a
+  parse limit and the reason a real announcement can still be missed: the 15 April 2026 item
+  *Wkrótce ogłoszenie nowego sezonu!* — the one carrying the 2026/27 sale date, see below — was two
+  pages back by the time this scrape first ran on 3 September, so it was never ingested at all and
+  no reading of any prompt could have recovered it. `/teatr/aktualnosci/p/2/` exists if that ever
+  needs fixing; at six-hourly runs, ten articles is a fortnight of news, so going forward the front
+  page is enough.
+
+  The row's `<time datetime>` is **kept** as `publishedAt` as well as being read for the sale's
   missing year — see *An article had no date at all* below for why a card that could only say
   `Announced 2 d ago` made two-month-old news the freshest thing on the screen.
 
-  `startsAt` stays null on those rows, sale or not: a news item is an article, which is the rule the
+  `startsAt` stays null on every row, sale or not: a news item is an article, which is the rule the
   RSS adapter is built on. `feed.ts`'s `actionableAt` is what stops that filing the one row with a
   deadline under *announced, no dates yet* — it reads `startsAt` where there is one and `onSaleAt`
   otherwise, so the announcement is grouped, sorted and expired by the morning it is about. Nothing
   else in the feed moves, `onSaleAt` being set only where a source stated it in advance.
+
 - **python.org** is an iCal feed — 874 VEVENTs, mostly historical, so `collect.ts` drops anything
   already past. Geography is deliberately *not* filtered there: PyCon US may still be worth knowing
   about, and deciding that is the interest's job. RFC 5545 line unfolding is the one parsing bug
@@ -402,13 +438,14 @@ bug and the opera over-tagging; run it after touching an adapter.
 The feed answers what is on. `/apps/events/sources/` answers *and how would I know if that were
 wrong* — every page the collector requests, as a link, so the claim is checkable rather than stated.
 The Alerts tab's health table already named sources; it never said what a source **is**, and a
-`teatr-wielki` row reading `ok, 64 events` tells you nothing about which pages produced them.
+`teatr-wielki` row reading `ok, 64 events` told you nothing about which pages produced them — that
+count was the season scrape, and the row now reads `ok, 10 events` off one news page.
 
 **The catalogue is in `src/utils/events/sources.ts`, not beside the adapters.** That is this app's
 one-matcher-two-runtimes argument reaching a second fact: the browser cannot import a Cloud
 Function, so a list of URLs next to the scrapers would have had a copy in the island, correct until
 the first time a feed moved. So the adapters now *import* their targets — `FEEDS` drives the RSS
-adapter, `RUNNING_LISTINGS` the entry-platform scrape, `seasonPaths` the theatre one, and
+adapter, `RUNNING_LISTINGS` the entry-platform scrape, `TEATR_WIELKI_NEWS` the theatre one, and
 `PYTHON_ORG_ICAL` and `TICKETMASTER_ENDPOINT` the other two — and the tab lists the same objects the
 collector fetches. `functions/src/sources/index.test.ts`
 asserts `SOURCES` and the catalogue still name the same five things: the drift is one-sided and
@@ -555,6 +592,14 @@ the matcher; what crosses into `src/utils/events/` is the *result*, as two ordin
 feed and the collector still answer "does this match?" with one pure function and `portable.test.ts`
 has nothing new to police. `gemini-2.5-flash-lite` via `@google/genai`.
 
+**It is never asked about a newsroom item**, and that is the one exception in the corpus.
+`needsClassifying` returns false for anything tagged `newsroom`, because those rows have their own
+model pass — the reader below, asking the only question anyone acts on there — and they arrive
+already placed by the page (`Warszawa`, `PL`). What it cost to ask anyway was two model calls per
+article and a second verdict to keep in step with the first; what it costs not to is that these
+rows sit under `unlabelled` in the Pipeline tab's `kind` facet, which is what they are. Nothing is
+filtered out by it: unclassified passes both `passesKind` and `passesPlaces`, deliberately.
+
 **There is no API key.** Vertex AI on Application Default Credentials, which in this runtime is the
 function's own service account — the code already runs inside the project the model is billed to, so
 a credential to prove that would be one to store, rotate and leak. It also keeps the classifier off
@@ -646,9 +691,10 @@ sale. They are enumerated in the prompt as false cases for exactly that reason.
 Kept apart from `classify.ts` on three axes, and it is worth keeping them straight before anybody
 merges the two prompts to save a call:
 
-- **Scope** — 1,150 rows against a dozen. One prompt asks every concert in Poland whether it is a
-  job advert. (`kind` is in the big prompt precisely because it *is* a corpus-wide question; this
-  one is not.)
+- **Scope** — 1,150 rows against a dozen, and since Sep 2026 the two sets are disjoint: the
+  classifier skips `newsroom` rows outright (`needsClassifying`) and this pass reads nothing else.
+  One prompt asks every concert in Poland whether it is a job advert. (`kind` is in the big prompt
+  precisely because it *is* a corpus-wide question; this one is not.)
 - **Version** — `CLASSIFIER_VERSION` re-labels the whole corpus. `READER_VERSION` is its own lever
   over its own hash, so tuning the sale-date wording costs ten calls rather than eleven hundred.
 - **Blast radius** — a wrong `reach` costs a card in the feed. A wrong sale date is a notification
