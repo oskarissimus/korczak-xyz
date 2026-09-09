@@ -14,7 +14,7 @@ import type { Interest } from './types';
 const CTX = { writerId: 'w', now: 1_700_000_000_000 };
 
 describe('the seeded interests', () => {
-  it('covers the seven things he asked for', () => {
+  it('covers the eight things he asked for', () => {
     expect(SEED_INTERESTS.map((s) => s.label)).toEqual([
       'Klezmer',
       'Pink Floyd',
@@ -23,7 +23,21 @@ describe('the seeded interests', () => {
       'Running in Warszawa',
       'Opera Narodowa',
       'Ticket sales opening',
+      'A new season announced',
     ]);
+  });
+
+  it('catches the teaser that precedes a sale date, and not every mention of a season', () => {
+    /*
+     * The 2026/27 season was teased on 15 April and its tickets went on sale on 21 May. The
+     * teaser carries no `ticket-sale` tag — nothing had a date yet — so the keyword-less sale
+     * interest cannot see it, and this one is the only thing watching for the announcement
+     * itself. Phrases rather than a `sezon*` stem: the stem also claims an audition notice.
+     */
+    const season = SEED_INTERESTS.find((s) => s.id === 'events-seed-new-season')!;
+    expect(season.tags).toEqual(['teatr-wielki']);
+    expect(season.keywords).toContain('nowego sezonu');
+    expect(season.keywords.some((k) => k.endsWith('*'))).toBe(false);
   });
 
   it('gives the opera interest NO keywords, which is the point of it', () => {

@@ -76,6 +76,15 @@ ballet, which handed the keyword-less Opera interest the entire season, galas in
 function went with the season scrape (Sep 2026) and the lesson did not: it is the same one the
 three cases below are about.
 
+`events-seed-new-season` is the counterweight to that, and the reason both exist: a
+`ticket-sale` tag only appears once a **date** has been read out of the prose, which is the last
+moment in the sequence rather than the first. The house teases the season five weeks earlier —
+*Wkrótce ogłoszenie nowego sezonu!* — in an article that states no date and therefore carries no
+tag. That seed is keyword-shaped (`nowego sezonu`, `nowy sezon`, `ogloszenie sezonu`) and narrowed
+by `tags: ['teatr-wielki']`, and the phrases are phrases rather than a `sezon*` stem on purpose:
+the stem also claims "przesłuchania … na sezon 2026/27" and the season page's own trailer, which
+are about a season without being the news that one is coming.
+
 **A keyword-less interest has no second filter, so a generous tag is the whole of what reaches it**
 — which is why that mistake keeps arriving from a new direction. The third time was Ticketmaster's
 `tagsOf` mapping `genre.includes('classical')` onto `opera`, on the reasonable-sounding grounds
@@ -353,13 +362,22 @@ so a new adapter cannot get normalisation subtly different.
     keyword-less interest has no second filter — page-wide it would hand that interest the
     theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
 
-  **The page holds ten articles and there is no pagination**, which is a reach limit rather than a
-  parse limit and the reason a real announcement can still be missed: the 15 April 2026 item
-  *Wkrótce ogłoszenie nowego sezonu!* — the one carrying the 2026/27 sale date, see below — was two
-  pages back by the time this scrape first ran on 3 September, so it was never ingested at all and
-  no reading of any prompt could have recovered it. `/teatr/aktualnosci/p/2/` exists if that ever
-  needs fixing; at six-hourly runs, ten articles is a fortnight of news, so going forward the front
-  page is enough.
+  **Three pages are read, not one** — `/teatr/aktualnosci/` and `p/2/`, `p/3/` behind it, per
+  `TEATR_WIELKI_NEWS_PAGES`. The front page holds ten articles, which is about two months, and
+  that was a **reach** limit rather than a parse one: the 15 April 2026 item *Wkrótce ogłoszenie
+  nowego sezonu!* — the one carrying the 2026/27 sale date, see below — was two pages back by the
+  time this scrape first ran on 3 September, so it was never ingested at all and no reading of any
+  prompt could have recovered it. Six-hourly runs cover the front page comfortably for news
+  published from *now* on; they do nothing about the spring before, which is when a theatre
+  announces a season. Thirty articles reached five months back when this was written.
+
+  The failure contract differs by page and it is the interesting half. **The front page failing is
+  the source failing** and is not caught — it means the markup moved, and there is no season
+  scrape left to look healthy in its place. **An archive page failing is not**: `p/3/` stops
+  existing the day the theatre has fewer than thirty articles, and a source that went red over its
+  own depth would cry wolf. What that forgiveness costs is a `p/2/` which silently 404s leaving
+  this back on ten rows — visible in the count rather than in a flag, so `smoke.live.test.ts`
+  asserts more than ten rows for this source specifically.
 
   The row's `<time datetime>` is **kept** as `publishedAt` as well as being read for the sale's
   missing year — see *An article had no date at all* below for why a card that could only say

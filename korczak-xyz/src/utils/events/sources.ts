@@ -87,14 +87,44 @@ export const TEATR_WIELKI_HOST = 'https://teatrwielki.pl';
  * count down to it.
  *
  * The season repertoire pages (`/repertuar/sezon-2026/27/`) used to be read beside it and are not
- * any more — see `teatrWielki.ts` for why. They were the one place `optional` was used, a page
- * whose 404 was the ordinary case rather than a fault; the flag stays on `SourcePage` because it
- * is a property of a page, not of that adapter, and the next seasonal URL will want it.
+ * any more — see `teatrWielki.ts` for why.
  *
  * Not optional itself: a theatre always has current news, so an empty or unreachable news list
  * means the markup moved rather than that nothing is happening.
  */
 export const TEATR_WIELKI_NEWS = `${TEATR_WIELKI_HOST}/teatr/aktualnosci/`;
+
+/**
+ * How many pages of the news archive to read, the front page included.
+ *
+ * **The front page holds ten articles, which is about two months of news, and that is a reach
+ * limit rather than a parse one.** It is how the 2026/27 season's sale date was missed outright:
+ * it was announced on 15 April 2026 in an article that was two pages back by the time this scrape
+ * first ran in September, so no amount of reading the front page could ever have found it. Six
+ * hourly runs cover the front page comfortably from here on, but only for news published from
+ * here on — a source watched from today knows nothing about last spring, and the *last* spring is
+ * exactly when a theatre announces a season.
+ *
+ * Three pages is thirty articles, which reached back five months when this was written — past the
+ * April teaser and past the season announcement that followed it in May. It is deliberately a
+ * small number rather than "the whole archive": the older pages are re-fetched on every run (they
+ * are three requests, and a page that has stopped changing costs one GET to establish that), and
+ * every article on them is a row in a corpus every client pulls whole. `newsroomHashOf` means the
+ * bodies behind them are read once, not once a run.
+ */
+export const TEATR_WIELKI_NEWS_PAGES = 3;
+
+/**
+ * The news pages, front page first.
+ *
+ * The archive is `/teatr/aktualnosci/p/2/` and so on — the front page has no `p/1/` form, which is
+ * why this is a function rather than a template applied to a range.
+ */
+export function teatrWielkiNewsPages(): string[] {
+  return Array.from({ length: TEATR_WIELKI_NEWS_PAGES }, (_, index) =>
+    index === 0 ? TEATR_WIELKI_NEWS : `${TEATR_WIELKI_NEWS}p/${index + 1}/`,
+  );
+}
 
 /* --- python.org ------------------------------------------------------------------------------- */
 
@@ -230,12 +260,18 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'teatr-wielki',
     label: 'Teatr Wielki – Opera Narodowa',
     kind: 'scrape',
-    pages: () => [
-      {
-        url: TEATR_WIELKI_NEWS,
-        label: displayUrl(TEATR_WIELKI_NEWS),
+    pages: () =>
+      teatrWielkiNewsPages().map((url, index) => ({
+        url,
+        label: displayUrl(url),
         /*
-         * `ticket-sale` is deliberately NOT here, though it is the tag this page exists to
+         * The front page must be there; the archive behind it need not be. A theatre always has
+         * current news, so a 404 on the first is the markup having moved — but `p/3/` stops
+         * existing the day the archive is shorter than thirty articles, and that is not a fault.
+         */
+        optional: index > 0,
+        /*
+         * `ticket-sale` is deliberately NOT here, though it is the tag these pages exist to
          * produce. A page may only stamp feed-wide what every row on it *is*, and most of these
          * rows are a job advert or a parking notice; the tag is applied per row, by the adapter,
          * and only where a sale date was actually read out of the prose. Stamping it here would
@@ -245,8 +281,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
         tags: ['theatre', 'teatr-wielki', 'newsroom'],
         city: 'Warszawa',
         country: 'PL',
-      },
-    ],
+      })),
   },
   {
     id: 'python-org',

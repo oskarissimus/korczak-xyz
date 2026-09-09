@@ -27,7 +27,7 @@ export interface InterestDraft {
 }
 
 /**
- * The seven interests a new account starts with — the owner's own list, expressed in this app's
+ * The eight interests a new account starts with — the owner's own list, expressed in this app's
  * vocabulary.
  *
  * Seeded as ordinary rows, not hard-coded and not special-cased, so every one can be edited,
@@ -174,6 +174,35 @@ export const SEED_INTERESTS: ReadonlyArray<{ id: string } & InterestDraft> = [
      */
     keywords: [],
     tags: ['ticket-sale'],
+    leadDays: DEFAULT_LEAD_DAYS,
+  },
+  {
+    id: 'events-seed-new-season',
+    label: 'A new season announced',
+    /*
+     * The article that comes *before* the one with the date on it.
+     *
+     * `events-seed-ticket-sale` fires on a row where a sale date was read out of the prose, which
+     * is the strongest signal here and also the last one: by the time a date is stated the season
+     * is already public. A house teases it first — "Wkrótce ogłoszenie nowego sezonu!", 15 April
+     * 2026, five weeks before that season's tickets went on sale — and that teaser carries no tag
+     * of its own, because no date was parsed out of a sentence that says "niebawem".
+     *
+     * So this one is keyword-shaped, which is the opposite of the two above it and is why they
+     * sit together: what identifies a teaser is that it says *new season* and nothing else about
+     * it is machine-readable. The phrases are the theatre's own, `nowy sezon` and `nowego sezonu`
+     * being how it writes them, and they are phrases rather than a `sezon*` stem for a reason —
+     * the stem also matches "przesłuchania na sezon 2026/27" and "sezon 2026/27 – nowe
+     * przestrzenie", which are an audition notice and the season page's own trailer. Both are
+     * about a season; neither is the news that one is coming.
+     *
+     * `tags: ['teatr-wielki']` narrows it to this house rather than to `newsroom`, deliberately:
+     * the phrase is generic enough that a magazine's feed would reach it, and "a new season" from
+     * a history blog is a football result. A second house watched later wants its own tag here,
+     * or this one widened to `theatre` once more than one theatre is scraped.
+     */
+    keywords: ['nowego sezonu', 'nowy sezon', 'ogloszenie sezonu'],
+    tags: ['teatr-wielki'],
     leadDays: DEFAULT_LEAD_DAYS,
   },
 ];

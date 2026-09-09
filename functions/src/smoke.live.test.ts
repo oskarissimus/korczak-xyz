@@ -41,6 +41,14 @@ maybe('live sources', () => {
         console.log(`    ${r.day ?? r.dateText ?? '—'}  ${r.title}  [${r.tags.join(',')}]`);
       }
       if (id !== 'ticketmaster') expect(raw.length).toBeGreaterThan(0);
+      /*
+       * The theatre's archive, specifically: one page of news is ten rows, so anything at or
+       * under ten means the `p/N/` pages stopped coming back and this source is quietly watching
+       * two months of history again — the state in which the announcement it exists for was
+       * missed. It is not a health-table failure (an archive page may legitimately 404), which is
+       * exactly why it is asserted here.
+       */
+      if (id === 'teatr-wielki') expect(raw.length).toBeGreaterThan(10);
     },
     60000,
   );

@@ -1,10 +1,16 @@
 /*
  * Teatr Wielki – Opera Narodowa, from the theatre's own news list.
  *
- * One page, `/teatr/aktualnosci/`, and one question asked of it: **when do the tickets go on
- * sale.** A season's sale opens on one morning at one hour and the house is half sold by
- * lunchtime, so that sentence — published a fortnight or more ahead, in prose, in the theatre's
- * own news — is the only thing this house publishes with a deadline attached.
+ * One page and the two behind it — `/teatr/aktualnosci/` and its archive — and one question asked
+ * of them: **when do the tickets go on sale.** A season's sale opens on one morning at one hour
+ * and the house is half sold by lunchtime, so that sentence, published a fortnight or more ahead
+ * in prose in the theatre's own news, is the only thing this house publishes with a deadline
+ * attached.
+ *
+ * The archive is read because the front page holds ten articles and that is about two months:
+ * the 2026/27 sale date was announced in April and this scrape first ran in September, so the one
+ * announcement it exists for had been off the front page for four months before anybody looked.
+ * `TEATR_WIELKI_NEWS_PAGES` in the catalogue has the reasoning and the depth.
  *
  * ### It used to scrape the season repertoire too, and does not
  *
@@ -40,7 +46,7 @@ import {
 } from '../../../korczak-xyz/src/utils/events/newsroom';
 import {
   TEATR_WIELKI_HOST as HOST,
-  TEATR_WIELKI_NEWS,
+  teatrWielkiNewsPages,
 } from '../../../korczak-xyz/src/utils/events/sources';
 
 /** One `<li>` of `<ul id="content" class="white-list cal-list">`. */
@@ -160,16 +166,41 @@ export function newsSlugOf(href: string): string | null {
 export const teatrWielki: EventSource = {
   id: 'teatr-wielki',
   label: 'Teatr Wielki – Opera Narodowa',
+  /**
+   * The front page and the archive behind it.
+   *
+   * **The front page's failure is the source's failure**, and it is not swallowed. It was, while
+   * the season pages were the sturdy half of this scrape — losing an opera season from the feed
+   * because a news template moved would have been the fragile half taking the sturdy half down
+   * with it. There is no other half now: an unreachable news list means this source has nothing
+   * to say, and `eventSources` health exists to make exactly that visible.
+   *
+   * **An archive page's failure is not.** `p/3/` stops existing the day the theatre has fewer
+   * than thirty articles to show, and a source that went red over that would be crying wolf about
+   * its own depth. What it costs is the thing worth naming: a `p/2/` that silently 404s leaves
+   * this looking healthy on ten rows, which is the state this pagination exists to get out of. It
+   * is visible in the count — thirty rows against ten — rather than in a health flag, which is
+   * the same signal `ReadOutcome.fetched` carries for the reader.
+   *
+   * Rows are returned in page order, newest first, because that is the order the pages are in and
+   * `upsert.ts` derives everything else. A duplicate across two pages — an article that shifts
+   * while the run is in flight — is deduped by id in `collect.ts`, which is where that already
+   * happens for a feed that republishes.
+   */
   async fetchEvents(ctx: SourceContext): Promise<RawEvent[]> {
-    /*
-     * One page, and a failure to reach it is a failure of the source.
-     *
-     * It was caught and swallowed while the season pages were the sturdy half of this scrape —
-     * losing an opera season from the feed because a news template moved would have been the
-     * fragile half taking the sturdy half down with it. There is no other half now: an
-     * unreachable news list means this source has nothing to say and nobody would be told, which
-     * is exactly what `eventSources` health exists to make visible.
-     */
-    return parseNewsPage(await fetchText(ctx, TEATR_WIELKI_NEWS));
+    const [front, ...archive] = teatrWielkiNewsPages();
+    const out = parseNewsPage(await fetchText(ctx, front));
+
+    for (const url of archive) {
+      try {
+        out.push(...parseNewsPage(await fetchText(ctx, url)));
+      } catch {
+        // The archive ran out, or one page of it is having a bad day. Neither is this source
+        // failing: the front page is what says whether the scrape still understands this site.
+        continue;
+      }
+    }
+
+    return out;
   },
 };

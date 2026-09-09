@@ -114,7 +114,7 @@ describe('RUNNING_LISTINGS', () => {
 });
 
 describe('the theatre', () => {
-  it('reads the news list and nothing else', () => {
+  it('reads the news list and its archive, and nothing else', () => {
     /*
      * The season repertoire pages were dropped: they answered "is Figaro programmed", which is
      * never urgent, and could not answer the one question with a deadline on it. This asserts the
@@ -123,10 +123,21 @@ describe('the theatre', () => {
      * catch one level up.
      */
     const pages = catalogueEntry('teatr-wielki')!.pages(Date.parse('2026-08-23T00:00:00Z'));
-    expect(pages).toHaveLength(1);
-    expect(pages[0].url).toBe('https://teatrwielki.pl/teatr/aktualnosci/');
-    // Not optional: a theatre always has current news, so an unreachable one is a fault.
+    expect(pages.map((p) => p.url)).toEqual([
+      'https://teatrwielki.pl/teatr/aktualnosci/',
+      'https://teatrwielki.pl/teatr/aktualnosci/p/2/',
+      'https://teatrwielki.pl/teatr/aktualnosci/p/3/',
+    ]);
+  });
+
+  it('requires the front page and forgives the archive', () => {
+    /*
+     * The front page 404ing means the markup moved, which is a broken source. `p/3/` 404s the day
+     * the theatre has fewer than thirty articles to show, which is not.
+     */
+    const pages = catalogueEntry('teatr-wielki')!.pages(Date.now());
     expect(pages[0].optional).toBeFalsy();
+    expect(pages.slice(1).every((p) => p.optional)).toBe(true);
   });
 
   it('stamps newsroom on the page, and never ticket-sale', () => {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { newsSlugOf, parseNewsPage } from './teatrWielki';
+import { newsSlugOf, parseNewsPage, teatrWielki } from './teatrWielki';
 
 /*
  * The news list, which is where the theatre says when the tickets go on sale.
@@ -120,5 +120,51 @@ describe('newsSlugOf', () => {
     // The listing's own link, and the category filters, are not articles.
     expect(newsSlugOf('/teatr/aktualnosci/')).toBeNull();
     expect(newsSlugOf('/teatr/aktualnosci/c/109/')).toBeNull();
+  });
+});
+
+/*
+ * The archive behind the front page.
+ *
+ * Ten articles is about two months, and this scrape started four months after the announcement it
+ * exists for — so reading only the front page could never have found the 2026/27 sale date, whole
+ * and correctly parsed on page three. The failure contract is the interesting half: the front
+ * page must be there, the archive need not be.
+ */
+describe('fetchEvents', () => {
+  const ctxWith = (pages: Record<string, string | null>) => ({
+    now: Date.parse('2026-09-09T06:00:00Z'),
+    secret: () => undefined,
+    fetch: (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = pages[url];
+      if (body === undefined || body === null) return new Response('nope', { status: 404 });
+      return new Response(body, { status: 200 });
+    }) as typeof globalThis.fetch,
+  });
+
+  const FRONT = 'https://teatrwielki.pl/teatr/aktualnosci/';
+  const SECOND = 'https://teatrwielki.pl/teatr/aktualnosci/p/2/';
+
+  it('reads the archive as well as the front page', async () => {
+    // The same fixture served twice would dedupe by id downstream, so page two is one row with a
+    // slug of its own — enough to show both pages reached the parser.
+    const older = newsHtml.replace(/aktualnosci\/aktualnosc\//g, 'aktualnosci/aktualnosc/older-');
+    const events = await teatrWielki.fetchEvents(ctxWith({ [FRONT]: newsHtml, [SECOND]: older }));
+    expect(events.length).toBe(news.length * 2);
+    expect(events.some((e) => e.sourceKey?.startsWith('aktualnosci/older-'))).toBe(true);
+  });
+
+  it('forgives an archive page that is not there', async () => {
+    // `p/3/` stops existing the day the theatre has fewer than thirty articles to show. A source
+    // that went red over its own depth would be crying wolf.
+    const events = await teatrWielki.fetchEvents(ctxWith({ [FRONT]: newsHtml }));
+    expect(events.length).toBe(news.length);
+  });
+
+  it('fails the source when the front page is gone', async () => {
+    // That one is the markup having moved, which is the failure `eventSources` health exists to
+    // show — and with the season pages gone there is nothing else to look healthy in its place.
+    await expect(teatrWielki.fetchEvents(ctxWith({}))).rejects.toThrow();
   });
 });
