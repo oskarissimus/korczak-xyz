@@ -1315,10 +1315,13 @@ Five things there are load-bearing, each written up in `terraform/README.md`:
   Google account goes, since the database and its backups vanish together. `firestore-export.tf` is
   the other half: Cloud Scheduler calls `firestore:exportDocuments` directly — no function, it is
   one POST — into a 30-day bucket. `outputUriPrefix` is the bare bucket on purpose, because that is
-  what makes the API name a fresh folder per run instead of overwriting one. A dedicated
+  what makes the API name a fresh folder per run instead of overwriting one. An
   `objectViewer` account exists so the exports can be pulled back out; its key is minted by hand and
   never enters Terraform state. What does the pulling, and where it runs, is out of scope for this
-  repo and intentionally not written down in it.
+  repo and intentionally not written down in it. **Since 10 Sep 2026 the reader account is out of
+  scope too** — the one this file declared was removed with the puller that held it, and the
+  account reading the bucket now was made by hand in the console. So an empty plan no longer means
+  this bucket has exactly the grants Terraform writes down; it is the one place that is true.
 - **The gate is "no plan may destroy anything"**, enforced in the workflow over the whole directory,
   plus `prevent_destroy` on the secrets, the registry and both backup schedules — deleting a backup
   schedule deletes the backups it made. This repo commits straight to `main`, so

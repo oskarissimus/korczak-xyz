@@ -39,7 +39,10 @@ resource "google_storage_bucket" "firestore_export" {
   name     = local.export_bucket
   location = local.region
 
-  /* No ACLs. The only grants on this bucket are the two IAM members below. */
+  /*
+   * No ACLs. The grants on this bucket are the IAM member below plus nas-hbs-sync@, which is not
+   * declared in this file — see the comment further down.
+   */
   uniform_bucket_level_access = true
 
   /*
@@ -111,41 +114,30 @@ resource "google_storage_bucket_iam_member" "firestore_agent_writes" {
 }
 
 /*
- * The offsite reader.
+ * THE OFFSITE READER IS NO LONGER DECLARED HERE.
  *
- * A separate account whose entire authority is "read the objects in one bucket", because its key
- * is a FILE ON A MACHINE THIS PROJECT DOES NOT CONTROL. That is the opposite of the deploy
- * account, whose key would be a projectIamAdmin credential — the right to grant itself anything.
+ * This file used to declare nas-backup-reader, an account whose whole authority was "read the
+ * objects in one bucket". It and its key were removed on 10 Sep 2026 along with the puller that
+ * held it.
  *
- * THE KEY IS NOT IN TERRAFORM, and must not be. `google_service_account_key` puts the private key
- * in state in the clear, which is the same rule that keeps VAPID_PRIVATE_KEY out — see the header
- * of main.tf. Mint it by hand, once, with
- * `gcloud iam service-accounts keys create`, install it wherever it is needed, and delete the
- * local copy.
+ * The bucket still has an offsite reader — `nas-hbs-sync@`, made by hand in the console, holding
+ * roles/storage.objectViewer and nothing else anywhere. It is deliberately NOT declared in this
+ * file, so `terraform plan` being empty is no longer the same as this bucket having exactly the
+ * grants written down. What does the pulling and where it runs stays out of scope for this repo,
+ * as it always was; what is new is that the account doing it is out of scope too.
+ *
+ * TWO THINGS LEARNT THE HARD WAY, WHICH APPLY TO WHATEVER READS THIS BUCKET NEXT:
+ *
+ * objectViewer covers the objects but NOT the bucket itself, and a client that calls buckets.get
+ * before listing needs roles/storage.legacyBucketReader as well. Without it the connection tests
+ * fine and then shows an empty list, which reads as "nothing there" rather than as a permission
+ * problem. nas-hbs-sync does not hold it.
+ *
+ * A KEY MUST NEVER BE MINTED IN TERRAFORM. `google_service_account_key` puts the private key into
+ * state in the clear, which is the same rule that keeps VAPID_PRIVATE_KEY out — see the header of
+ * main.tf. Mint one by hand with `gcloud iam service-accounts keys create`, install it where it is
+ * needed, and delete the local copy.
  */
-resource "google_service_account" "nas_backup_reader" {
-  project      = local.project_id
-  account_id   = "nas-backup-reader"
-  display_name = "Export bucket read-only puller"
-  description  = "Read-only on the export bucket. Its key is held offsite. Managed in terraform/firestore-export.tf."
-}
-
-resource "google_storage_bucket_iam_member" "nas_reads_exports" {
-  bucket = google_storage_bucket.firestore_export.name
-  role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${google_service_account.nas_backup_reader.email}"
-}
-
-/*
- * objectViewer covers the objects but not the bucket itself, and a client that calls buckets.get
- * before listing needs this too. Without it the connection tests fine and then shows an empty
- * list, which reads as "nothing there" rather than as a permission problem.
- */
-resource "google_storage_bucket_iam_member" "nas_reads_bucket" {
-  bucket = google_storage_bucket.firestore_export.name
-  role   = "roles/storage.legacyBucketReader"
-  member = "serviceAccount:${google_service_account.nas_backup_reader.email}"
-}
 
 /*
  * 03:30 Warsaw, nightly.
