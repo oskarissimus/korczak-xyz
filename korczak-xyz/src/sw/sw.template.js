@@ -116,9 +116,18 @@ self.addEventListener('message', (event) => {
   );
 });
 
-/** The cache key for a page: normalized, and without the fragment. */
+/**
+ * The cache key for a page: the normalized path, and nothing else.
+ *
+ * **The query is deliberately not part of it.** Nothing here is server-rendered — a page's bytes
+ * are a build artefact of its path — so `?event=…`, `?redirect=…` and `?share=…` are messages to
+ * the script that page loads, not different pages. Keying on them stored a second identical copy
+ * per distinct query, and, far worse, made every one of those URLs a cache *miss* offline: a
+ * notification tapped on the underground opened the offline page rather than Event Watch, whose
+ * whole reason for keeping its feed in localStorage is that it has to open down there.
+ */
 function documentKey(url) {
-  return new URL(normalizePathname(url.pathname) + url.search, self.location.origin).href;
+  return new URL(normalizePathname(url.pathname), self.location.origin).href;
 }
 
 /**

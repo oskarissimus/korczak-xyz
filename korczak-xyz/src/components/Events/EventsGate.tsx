@@ -34,7 +34,15 @@ export default function EventsGate({ auth, lang, path, children }: Props) {
   if (auth.loading) return <div className="ev-loading" />;
 
   if (!auth.user) {
-    const redirect = lang === 'pl' ? `/pl/apps/events${path}` : `/apps/events${path}`;
+    /*
+     * The query string comes back with you. A notification carries the event it was about in one
+     * (`links.ts`), and that is the whole reason this tab was opened — dropping it here would hand
+     * a signed-out tap the feed's first screen after signing in, which is precisely the bug the
+     * deep link exists to fix, moved one step later where it is harder to notice.
+     */
+    const search = typeof window === 'undefined' ? '' : window.location.search;
+    const redirect =
+      (lang === 'pl' ? `/pl/apps/events${path}` : `/apps/events${path}`) + search;
     const login = lang === 'pl' ? '/pl/login/' : '/login/';
     return (
       <div className="ev-feed">

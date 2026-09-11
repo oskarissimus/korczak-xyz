@@ -11,6 +11,7 @@
 import type { EventRecord, Interest, NoticeKind } from './types';
 import { matchingInterests } from './match';
 import { daysUntil, noticeIdFor } from './normalize';
+import { FEED_PATH } from './links';
 
 export interface PendingNotice {
   kind: NoticeKind;
@@ -257,6 +258,8 @@ export function planRun(
   return {
     send: [...sentAnnounced, ...sale, ...soon],
     suppressed,
-    summary: suppressed.length > 0 ? { count: suppressed.length, url: '/apps/events' } : null,
+    // The feed itself, and deliberately no `?event=`: this banner is about however many rows
+    // were rolled into it, and a link to one of them would be a lie about the other nine.
+    summary: suppressed.length > 0 ? { count: suppressed.length, url: FEED_PATH } : null,
   };
 }

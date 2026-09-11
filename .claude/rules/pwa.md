@@ -227,6 +227,14 @@ searches every cache in *creation* order — oldest first — so the previous bu
 deliberately retains answers before the current one. For a content-hashed asset that is
 harmless; for a document the URL is stable and the markup is a build old.
 
+**A document is keyed by its path, and the query is dropped.** Nothing here is server-rendered, so
+a page's bytes are a build artefact of its path: `?event=…`, `?redirect=…` and `?share=…` are
+messages to the script that page loads, not different pages. Keyed with the query, every distinct
+one stored a second identical copy — and, the half that bit, missed the precache entirely offline,
+so Event Watch's notification deep links opened `/offline` rather than the app whose feed sits in
+localStorage precisely so that it opens down there. Assets are the opposite and unchanged:
+`handleAsset` matches on the whole request, which is what makes `?v=<hash>` on an icon work.
+
 Two things that are load-bearing and look like details:
 
 - **Responses are re-created before being cached** (`cachePut`). `fetch` returns a *decoded*

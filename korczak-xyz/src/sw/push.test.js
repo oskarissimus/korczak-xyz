@@ -9,6 +9,7 @@ import {
   scopeKeyOf,
 } from './push';
 import { appForPath } from '../utils/pwa/scope';
+import { eventFocusOf, eventLink } from '../utils/events/links';
 
 describe('parsePushPayload is total', () => {
   /*
@@ -85,6 +86,23 @@ describe('sameOriginPath', () => {
     expect(sameOriginPath('apps/events')).toBe('/apps/events');
     expect(sameOriginPath('/apps/events')).toBe('/apps/events');
   });
+
+  /*
+   * A notification names one event in its query string, and this function is the only thing between
+   * the sender and the tap. Dropping the query would put every tap back on the feed's first screen
+   * — the bug that looks exactly like the feature working, since the right app still opens.
+   */
+  it('keeps the event a notification was about', () => {
+    const link = eventLink('wesele|2026-10-04|warszawa');
+    expect(eventFocusOf(new URL(sameOriginPath(link), 'https://korczak.xyz').search)).toBe(
+      'wesele|2026-10-04|warszawa',
+    );
+    expect(sameOriginPath(`https://korczak.xyz${link}`)).toBe(link);
+  });
+
+  it('drops the query along with the host when the payload points elsewhere', () => {
+    expect(sameOriginPath('https://evil.test/apps/events/?event=abc')).toBe('/apps/events');
+  });
 });
 
 describe('scopeKeyOf', () => {
@@ -153,6 +171,17 @@ describe('pickClientToFocus', () => {
 
   it('does not treat the pl app as the en one', () => {
     expect(pickClientToFocus(['/pl/apps/events'], target)).toBeNull();
+  });
+
+  /*
+   * A deep link differs from the tab already open only in its query, and `notificationclick`
+   * navigates whatever it focuses — so this has to find that window rather than open a second copy
+   * of the app beside it.
+   */
+  it('focuses the open feed for a link to one event in it', () => {
+    const link = eventLink('wesele|2026-10-04|warszawa');
+    expect(pickClientToFocus(['/songs', 'https://korczak.xyz/apps/events/'], link)).toBe(1);
+    expect(pickClientToFocus(['/apps/events/interests'], link)).toBe(0);
   });
 });
 

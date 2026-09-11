@@ -17,6 +17,7 @@ import type {
 } from '../../korczak-xyz/src/utils/events/types';
 import { DEFAULT_PUSH_SETTINGS } from '../../korczak-xyz/src/utils/events/types';
 import { ignoredFingerprints } from '../../korczak-xyz/src/utils/events/ignores';
+import { eventLink } from '../../korczak-xyz/src/utils/events/links';
 import { subsForApp } from '../../korczak-xyz/src/utils/events/pushApps';
 import { planRun, type PendingNotice } from '../../korczak-xyz/src/utils/events/notices';
 import { noticeIdFor } from '../../korczak-xyz/src/utils/events/normalize';
@@ -101,7 +102,10 @@ export function payloadFor(notice: PendingNotice): PushPayload {
   return {
     title: `${PREFIXES[notice.kind] ?? ''}${notice.title}`.slice(0, 110),
     body: bodyFor(notice),
-    url: '/apps/events',
+    // The one row this banner is about, rather than the tab it lives on — see `eventLink`. The
+    // locale is not decided here: the path is turned into the subscriber's own install in `sendTo`,
+    // which is the only place that knows which device is being written to.
+    url: eventLink(notice.fingerprint),
     tag: notice.noticeId,
     kind: notice.kind,
   };

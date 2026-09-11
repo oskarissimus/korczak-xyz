@@ -164,6 +164,24 @@
   border: 2px outset var(--retro-white);
 }
 
+/*
+ * The one card a notification was about.
+ *
+ * A ring drawn *outside* the border rather than a new border or a fill. The outset bevel is what
+ * makes a card look like a card in this theme, so replacing it costs the card its shape; and a fill
+ * would read as a fourth claim about the event beside the three a card can already carry (`--sale`
+ * navy, `--place` grey, `--ignored` inset) rather than as "this is the one you tapped".
+ * `box-shadow` takes no layout, so nothing reflows under the scroll that arrives with it.
+ */
+.ev-card--focus {
+  box-shadow: 0 0 0 2px var(--retro-navy);
+}
+
+/* The sentence explaining why this visit looks different, and the way out of it. */
+.ev-focus-note {
+  margin-top: 6px;
+}
+
 .ev-card-top {
   display: flex;
   gap: 10px;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { payloadFor } from './notify';
 import type { PendingNotice } from '../../korczak-xyz/src/utils/events/notices';
+import { eventFocusOf } from '../../korczak-xyz/src/utils/events/links';
 
 const notice = (over: Partial<PendingNotice> = {}): PendingNotice => ({
   kind: 'announced',
@@ -77,5 +78,32 @@ describe('payloadFor', () => {
     expect(payloadFor(notice({ startsAt: null, distancesM: [21097] })).body).toBe(
       '21.1 km · Announced — no dates yet.',
     );
+  });
+});
+
+/*
+ * Where the tap goes. Every notification used to open `/apps/events`, which is the feed's first
+ * screen: the banner named one concert and the app opened on twenty, leaving the reader to find it.
+ *
+ * The fingerprint rather than the event id, because the feed shows one row per real-world event and
+ * `dedupeByFingerprint` picks which document that is — an id can name the copy that lost.
+ */
+describe('where a notification lands', () => {
+  it('names the event it is about', () => {
+    const url = payloadFor(notice({ fingerprint: 'weselefigara|2026-10-04|warszawa' })).url;
+    expect(url.startsWith('/apps/events')).toBe(true);
+    expect(eventFocusOf(new URL(url, 'https://korczak.xyz').search)).toBe(
+      'weselefigara|2026-10-04|warszawa',
+    );
+  });
+
+  /*
+   * The locale is deliberately absent here: one payload is built per notice and sent to every
+   * device on the account, and `sendTo` rewrites the path per subscription from the language that
+   * subscription was made in. Asserted so that a "fix" adding /pl here — which would send the wrong
+   * path to the account's other phone — has something to fail against.
+   */
+  it('leaves the path in one locale for sendTo to decide', () => {
+    expect(payloadFor(notice()).url.startsWith('/pl')).toBe(false);
   });
 });

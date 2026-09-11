@@ -253,6 +253,41 @@ closure arrived wearing a ticket and a calendar — invisible on iOS, which draw
 own icon, and plain in a desktop browser. `pushIconFor` derives it from the path the tap opens, so
 an old sender and a payload that fell back to the defaults both still get it right.
 
+### Where a tap lands
+
+A notification names one event; every tap used to open `/apps/events`, which is the feed's first
+screen, so finding the concert the banner had named was left to the reader. `links.ts` is the fix,
+and it is in the portable set because both ends of that string are: the Cloud Function writes
+`?event=<fingerprint>` into the payload and the feed reads it back out. Two copies of one spelling
+in two runtimes is exactly the drift that directory exists to prevent.
+
+**The fingerprint, not the event id.** The feed shows one row per real-world night and
+`dedupeByFingerprint` decides which document that row is — Ticketmaster's copy or the house's own —
+so an id can perfectly well name the copy that lost and point at a card that is not on the screen.
+It is the same reasoning that keys an ignore on the fingerprint rather than on an id.
+
+**A visit from a notification turns every filter off, and says so.** It opens on `all` rather than
+`matched`, and the stored city and label filters are not applied: an interest edited since the push
+was sent, an Ignore pressed on the card afterwards, or a city chosen weeks ago can each hide the one
+row the tap was about — and a highlighted card nobody can see would be the same bug wearing a fix.
+Nothing is written back to localStorage. The note above the list says the filters are off and links
+to the feed without the query, which restores them by reloading. When the row is genuinely gone —
+it happened, or its sale opened — the same note says so, but only once the network has answered:
+the cached feed is hours old and routinely lacks the row the push was about, and announcing it
+missing on the first frame would be wrong about half the taps and then correct itself.
+
+**The locale is decided per subscription, not per notice.** `/apps/events` and `/pl/apps/events` are
+two installed apps with two manifests (`manifestIdentity` in `pwa/scope.ts`), so handing a Polish
+home screen the English path does not merely read English — the tap falls outside that app's scope,
+the worker finds no window of its own to focus, and iOS opens Safari beside the app the notification
+came from. One payload is built per notice, and `sendTo` rewrites its path from `sub.lang`, that
+being the only place in the send path which knows what device is being written to. Everything else
+in a notification stays language-neutral on purpose; where the tap goes is not a matter of wording.
+
+The deep link needed one thing from the worker: `documentKey` used to include the query, so
+`/apps/events/?event=…` was a cache miss and a notification tapped on the underground opened the
+offline page rather than the app. Documents are keyed by path alone now — see `pwa.md`.
+
 ### How long the race is
 
 `distance.ts` pulls a race's distances out of its title and `toRecord` stores them as

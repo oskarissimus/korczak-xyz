@@ -6,7 +6,7 @@
  * only defence is checking on launch — and this is the tab the icon opens. Hanging that check off
  * the Alerts tab alone would mean it never runs.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
 import { useEventIgnores } from '../../hooks/useEventIgnores';
@@ -31,6 +31,7 @@ import {
   type KindKey,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
+import { eventFocusOf, FEED_PATH, localizePath } from '../../utils/events/links';
 import { formatDistances } from '../../utils/events/distance';
 import { cityKey } from '../../utils/events/cities';
 import {
@@ -69,7 +70,24 @@ function FeedPanel({ lang }: Props) {
   const { interests, ready } = useEventInterests(auth.user);
   const ignores = useEventIgnores(auth.user);
   const t = translations[lang];
-  const [mode, setMode] = useState<FeedMode>('matched');
+  /*
+   * The event a notification asked for, read on the very first render rather than in an effect.
+   *
+   * It decides the view and the three filters below, so reading it a frame later would be the app
+   * opening on the ordinary feed and then rearranging itself under the reader's thumb. A `useState`
+   * initialiser rather than a plain call, so the answer is fixed for the life of the island: the
+   * one thing worse than the wrong view is one that changes its mind halfway through a visit.
+   */
+  const [focus] = useState<string | null>(focusFromUrl);
+  /*
+   * `all` when a notification sent us here, and not the tab's usual `matched`.
+   *
+   * The tap is an instruction to show one specific row, so it has to land in the one view that can
+   * show any row: an interest edited since the push was sent, or an Ignore pressed on the card
+   * afterwards, would otherwise answer the tap with a feed that does not contain the thing the
+   * banner named — which is indistinguishable from the app having lost it.
+   */
+  const [mode, setMode] = useState<FeedMode>(focus ? 'all' : 'matched');
   /*
    * The city, held as the spelling that was chosen and compared through `cityKey` — one value, so
    * the label on the picker and the key it filters with cannot drift apart, and a `Warsaw` stored
@@ -77,7 +95,7 @@ function FeedPanel({ lang }: Props) {
    * the first render rather than in an effect: this hides rows, and a frame of the unfiltered feed
    * before it applied would be the app appearing to forget the setting every time it opens.
    */
-  const [city, setCity] = useState<string>(() => loadFeedCity());
+  const [city, setCity] = useState<string>(() => (focus ? '' : loadFeedCity()));
   const selectedCity = cityKey(city);
 
   const chooseCity = (next: string) => {
@@ -88,8 +106,15 @@ function FeedPanel({ lang }: Props) {
   /*
    * The label filter: what the classifier called the row. A word the card already draws as a chip,
    * and a chip you can read and not act on is half a feature.
+   *
+   * Neither this nor the city above reads its stored value on a visit from a notification, for the
+   * same reason the view opens on `all`: a label or a city chosen weeks ago can hide the one row
+   * the tap was about, and a highlighted card nobody can see is the bug this was meant to fix
+   * wearing a fix. Nothing is written back — the choices are still in localStorage, the note above
+   * the list says they are off for this visit, and the link beside it loads the feed without the
+   * query, which is what brings them back.
    */
-  const kindFilter = useKeyFilter(loadFeedKinds, saveFeedKinds);
+  const kindFilter = useKeyFilter<KindKey>(focus ? () => [] : loadFeedKinds, saveFeedKinds);
   const chosenKinds = kindFilter.chosen;
   const narrowedByLabel = chosenKinds.size > 0;
 
@@ -160,6 +185,19 @@ function FeedPanel({ lang }: Props) {
   const cityName = cities.find((option) => option.key === selectedCity)?.label ?? city;
   const items = sections.flatMap((section) => section.items);
   const shown = items.length;
+  /*
+   * Whether the row a notification pointed at is on the screen — by fingerprint, which is what the
+   * link carries and what survives the dedupe, so the card the reader sees answers to it however
+   * the two copies of one night were resolved.
+   */
+  const focusShown = focus !== null && items.some((item) => item.event.fingerprint === focus);
+  /*
+   * Said only once the network has answered, or failed to. A feed restored from the localStorage
+   * cache is a few hours old and routinely lacks the very row the push was about, so announcing it
+   * missing on the first frame would be wrong about half the taps and would correct itself a
+   * second later — which reads as the app changing its mind.
+   */
+  const focusMissing = focus !== null && !focusShown && (feed.fresh || feed.error !== null);
   // What `Anywhere` would show, which is the rest of the toolbar's narrowing minus the city — not
   // the whole corpus. A count larger than the feed the label filters already limit would be
   // promising rows that clearing the city cannot bring back.
@@ -263,6 +301,21 @@ function FeedPanel({ lang }: Props) {
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
 
+        {/*
+          * Why this visit does not look like the last one. Without it a feed with every filter off
+          * and one card outlined is three unexplained changes at once, and the way back to the
+          * ordinary feed is a link rather than a button because that is exactly what it is: the
+          * same page without the query, which restores the stored filters by reloading them.
+          */}
+        {focusShown || focusMissing ? (
+          <p className="ev-note ev-focus-note">
+            {focusShown ? t.focusIntro : t.focusMissing}{' '}
+            <a className="ev-link" href={localizePath(FEED_PATH, lang)}>
+              {t.focusClear}
+            </a>
+          </p>
+        ) : null}
+
         {ignoring ? <p className="ev-hint">{t.ignoredIntro}</p> : null}
 
         {rejecting ? (
@@ -344,6 +397,7 @@ function FeedPanel({ lang }: Props) {
                   item={item}
                   lang={lang}
                   now={now}
+                  focused={item.event.fingerprint === focus}
                   onIgnore={() => ignores.ignore(item.event)}
                   onUnignore={() => ignores.unignore(item.event.fingerprint)}
                 />
@@ -377,6 +431,17 @@ function reachLabel(reach: Reach | undefined, t: Translation): string {
   if (reach === 'national') return t.reachNational;
   if (reach === 'international') return t.reachInternational;
   return t.reachUnknown;
+}
+
+/**
+ * The event a deep link asked to show, or null.
+ *
+ * Guarded rather than trusting the island to be a browser: this component is `client:only`, so it
+ * always is — but the guard costs a line and the alternative is a build-time crash in a component
+ * nobody rendered on the server on purpose.
+ */
+function focusFromUrl(): string | null {
+  return typeof window === 'undefined' ? null : eventFocusOf(window.location.search);
 }
 
 /**
@@ -560,12 +625,15 @@ function EventCard({
   item,
   lang,
   now,
+  focused = false,
   onIgnore,
   onUnignore,
 }: {
   item: FeedItem;
   lang: Lang;
   now: number;
+  /** The row a notification was about: outlined, and scrolled to once. */
+  focused?: boolean;
   onIgnore: () => void;
   onUnignore: () => void;
 }) {
@@ -573,9 +641,25 @@ function EventCard({
   const { event } = item;
   const saleWhen = saleWhenLabel(event, localeOf(lang));
   const saleChip = saleWhen ? fill(t.saleOpens, { when: saleWhen }) : null;
+  const card = useRef<HTMLLIElement>(null);
+
+  /*
+   * Brought into view, centred, and without animation.
+   *
+   * A smooth scroll here would be a page that arrives and then slides, which on a phone opening
+   * from the lock screen reads as the app still loading; `center` rather than the default `start`
+   * because a card pinned to the top edge looks like the top of the list rather than a place in it,
+   * and the group heading above it is half of what says when the event is.
+   *
+   * Depends on `focused` alone: the effect must not re-run when the feed refreshes underneath, or
+   * a pull landing while the reader has scrolled away would yank them back.
+   */
+  useEffect(() => {
+    if (focused) card.current?.scrollIntoView({ block: 'center' });
+  }, [focused]);
 
   return (
-    <li className="ev-card">
+    <li className={`ev-card${focused ? ' ev-card--focus' : ''}`} ref={card}>
       <div className="ev-card-top">
         <span className="ev-card-when">{whenLabel(event, localeOf(lang))}</span>
         <h4 className="ev-card-title">{event.title}</h4>

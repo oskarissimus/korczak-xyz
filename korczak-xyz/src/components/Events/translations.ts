@@ -88,6 +88,13 @@ export const translations = {
     labelEmptyHint:
       'Nothing here carries every label you picked. These filters only narrow what you are looking at — the coverage switch and the tags on an interest are what change which of them notify you.',
 
+    // Arriving from a notification
+    focusIntro:
+      'Opened from a notification. The event it named is highlighted below, and every filter is off for this visit so that it cannot be hidden.',
+    focusMissing:
+      'The event that notification named is not in the feed any more — it has either happened or its sale has opened. Everything still upcoming is below.',
+    focusClear: 'Back to the whole feed',
+
     // Interests
     interestsHeading: 'What to watch for',
     interestsIntro:
@@ -331,6 +338,12 @@ export const translations = {
     kindClear: 'Pokaż wszystkie rodzaje',
     labelEmptyHint:
       'Nic tutaj nie ma wszystkich wybranych etykiet. Te filtry zawężają tylko widok — o tym, co powiadamia, decydują przełącznik tekstów i tagi wpisane w zainteresowaniu.',
+
+    focusIntro:
+      'Otwarte z powiadomienia. Wydarzenie, o którym mówiło, jest podświetlone niżej, a wszystkie filtry są na tę jedną wizytę wyłączone, żeby nie mogły go ukryć.',
+    focusMissing:
+      'Wydarzenia z tego powiadomienia nie ma już na liście — albo się odbyło, albo ruszyła jego sprzedaż. Poniżej jest wszystko, co dopiero przed nami.',
+    focusClear: 'Wróć do pełnej listy',
 
     interestsHeading: 'Czego szukać',
     interestsIntro:

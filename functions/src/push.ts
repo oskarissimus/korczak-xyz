@@ -12,6 +12,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import webpush from 'web-push';
 import type { NoticeKind, PushSub } from '../../korczak-xyz/src/utils/events/types';
+import { localizePath } from '../../korczak-xyz/src/utils/events/links';
 
 export interface PushPayload {
   title: string;
@@ -78,7 +79,17 @@ export async function sendTo(
   sub: PushSub,
   payload: PushPayload,
 ): Promise<SendOutcome> {
-  const body = buildPayload(payload);
+  /*
+   * The path is the one field that is not the same for every device this account holds.
+   *
+   * Everything else a notification says is language-neutral on purpose — the title is the event's
+   * own, the body is a distance and an `en-GB` date — but where the tap goes is not a matter of
+   * wording. `/apps/events` and `/pl/apps/events` are two separate installs with two manifests, so
+   * handing a Polish home-screen app the English path opens Safari beside it rather than the app
+   * itself. `sub.lang` is the language of the page that subscription was made on, and this is the
+   * only place in the send path that has it.
+   */
+  const body = buildPayload({ ...payload, url: localizePath(payload.url, sub.lang) });
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.authKey } },
