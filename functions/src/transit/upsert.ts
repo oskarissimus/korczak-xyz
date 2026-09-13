@@ -18,7 +18,8 @@
 
 import type { DocumentData, Firestore } from 'firebase-admin/firestore';
 import type { FeedFetch, RawFeedItem, TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
-import { contentHashOf, feedHashOf } from '../../../korczak-xyz/src/utils/transit/normalize';
+import { contentHashOf } from '../../../korczak-xyz/src/utils/transit/normalize';
+import { articleStampOf } from './article';
 import type { FetchOutcome } from './wtp';
 
 export interface UpsertResult {
@@ -47,7 +48,8 @@ export function stripUndefined<T extends object>(value: T): DocumentData {
  * **`article` is the one field carried forward conditionally**, and it is the exception that proves
  * the rest. It is not something the feed states and not something the extractor produced: it is a
  * copy of a page that WTP can rewrite without telling us. So it survives only while the RSS row it
- * was fetched against is unchanged — `feedHashOf(incoming) === stored.articleFetchedFor`. An edited
+ * was fetched against is unchanged — `articleStampOf(incoming) === stored.articleFetchedFor`, which
+ * also asks again when this build reads pages differently from the one that stored it. An edited
  * row (the `ZAKOŃCZONO:` prefix that arrives when a closure ends is exactly one) drops the article
  * *and* the latch together, so `needsArticle` asks for the page again on the same run. Carried
  * forward unconditionally it would be a fortnight-old description of a closure sitting under a
@@ -64,7 +66,7 @@ export function mergeItem(
   if (!stored) return { record: { ...incoming, firstSeenAt: now, updatedAt: now }, created: true };
 
   const keepsArticle =
-    stored.articleFetchedFor !== undefined && stored.articleFetchedFor === feedHashOf(incoming);
+    stored.articleFetchedFor !== undefined && stored.articleFetchedFor === articleStampOf(incoming);
 
   return {
     record: {

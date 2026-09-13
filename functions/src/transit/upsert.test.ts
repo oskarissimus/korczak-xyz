@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeItem, stripUndefined } from './upsert';
-import { articleUpdate } from './article';
+import { articleStampOf, articleUpdate } from './article';
 import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 

@@ -132,12 +132,31 @@ export function notAFeed(
   body: string,
   wafAction?: string,
 ): string | undefined {
-  if (wafAction) return `blocked by WAF (${wafAction}), HTTP ${status}`;
+  const challenged = wafChallenge(status, wafAction);
+  if (challenged) return challenged.replace('the page', 'a feed');
   if (!ok) return `HTTP ${status}`;
-  // A 202 is the challenge's own status code, and it is never how a feed is served.
-  if (status === 202) return `HTTP 202 with no feed — the request was challenged, not answered`;
   if (body.length < MIN_FEED_BYTES) return `HTTP ${status} with ${body.length} bytes — not a feed`;
   if (!/<rss[\s>]|<feed[\s>]/i.test(body)) return `HTTP ${status} returned ${body.length} bytes that are not RSS`;
+  return undefined;
+}
+
+/**
+ * Whether this response is the WAF talking rather than wtp.waw.pl.
+ *
+ * Shared with `article.ts`, because it is one fact about one host and it has already cost this app
+ * a whole feature: a challenged request comes back **HTTP 202 with a two-kilobyte page of
+ * Javascript**, and `response.ok` is true for a 202. The article fetch shipped checking only `ok`,
+ * so it read the challenge as a page, found no `<article>` in it, and reported "no <article>
+ * element in the page" — which reads as *WTP redesigned their site* when what happened is *we were
+ * blocked*. Those two call for opposite things from whoever reads the error.
+ *
+ * Each caller keeps its own check for the shape of a body that did arrive; what is here is only the
+ * part that says the body is not from the site at all.
+ */
+export function wafChallenge(status: number, wafAction?: string): string | undefined {
+  if (wafAction) return `blocked by WAF (${wafAction}), HTTP ${status}`;
+  // A 202 is the challenge's own status code, and it is never how the page is served.
+  if (status === 202) return `HTTP 202 with no page — the request was challenged, not answered`;
   return undefined;
 }
 

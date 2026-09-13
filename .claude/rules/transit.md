@@ -182,14 +182,23 @@ its teaser never mentioned. Four things about it:
   `contentHash` covers the article, anything on that page that changes between fetches — a rendered
   *stan na:* timestamp would do it — mints a fresh `alertIdFor` and a fresh push, every ten
   minutes, for as long as the incident lasts.
-- **This half can be taken away from us, and the app has to survive that.** wtp.waw.pl is behind the
-  same AWS WAF the feed fetch documents, and a plain request for an article page from a datacentre
-  address returns CloudFront's `403 Request blocked` — verified from a container while this was
-  written, against a feed fetch that works. If that is what the collector gets, `articleError`
-  records it, `hasProse` stays false, and the app shouts about metro items it cannot read instead of
-  clearing them. **Losing the fetch costs precision; it must never cost the guarantee** — which is
-  the whole reason the two halves are separate and why `needsExtracting` refuses a headline rather
-  than trusting that the article arrived.
+- **This half can be taken away from us, and as of 13 Sep 2026 it has been.** wtp.waw.pl is behind
+  the same AWS WAF the feed fetch documents, and the first production run reported every article
+  page challenged: `HTTP 202`, two kilobytes of Javascript, no content — the shape `wtp.ts`'s header
+  describes, from an egress where both *feeds* are served normally. So `articleError` records it,
+  `hasProse` stays false, and the app shouts about metro items it cannot read instead of clearing
+  them. **Losing the fetch costs precision; it must never cost the guarantee** — which is the whole
+  reason the two halves are separate and why `needsExtracting` refuses a headline rather than
+  trusting that the article arrived. Nothing here should learn to solve a challenge;
+  `functions/README.md` has what to do about the collector's egress.
+
+  That run also bought the one mechanism worth naming here: the failure first came back as
+  `no <article> element in the page`, because `response.ok` is **true for a 202** and this file
+  checked only `ok`. It read the challenge as a page and reported a redesign. `wafChallenge` is now
+  shared out of `wtp.ts` so one host's one failure mode is stated once, and `ARTICLE_VERSION` is the
+  `EXTRACTOR_VERSION`-shaped lever that re-asks for every page when **our reading of them** changes
+  rather than the page — without it, the three items latched on that wrong verdict would have kept
+  it until WTP happened to edit their feed rows.
 
 The card draws the fourth state in its own words (*"WTP published no details here"*), never as "not
 read yet": nothing is queued and nothing is coming, and a badge promising otherwise is a badge that

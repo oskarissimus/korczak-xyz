@@ -4,6 +4,7 @@ import {
   articleUpdate,
   fetchArticle,
   fetchArticles,
+  articleStampOf,
   needsArticle,
   queueForArticles,
 } from './article';
@@ -36,10 +37,16 @@ const PROSE =
   'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
   'Metro kursuje w dwóch pętlach: Młociny <-> Słodowiec oraz Kabaty <-> Dworzec Gdański.';
 
-const PAGE = `<html><body><header>menu</header><article><h1>Utrudnienia</h1><p>${PROSE}</p></article></body></html>`;
+const CHROME = `<nav>${'menu '.repeat(60)}</nav>`;
+const PAGE = `<html><body><header>${CHROME}</header><article><h1>Utrudnienia</h1><p>${PROSE}</p></article></body></html>`;
 
 function ok(body: string): Response {
-  return { ok: true, status: 200, text: async () => body } as unknown as Response;
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    text: async () => body,
+  } as unknown as Response;
 }
 
 describe('which pages get asked for', () => {
@@ -99,16 +106,56 @@ describe('fetching one', () => {
    * recorded failure rather than an empty article that reads as a quiet notice.
    */
   it('turns every refusal into a reason, never into an empty communiqué', async () => {
-    const blocked = { ok: false, status: 403, text: async () => '' } as unknown as Response;
+    const blocked = {
+      ok: false,
+      status: 403,
+      headers: { get: () => null },
+      text: async () => '',
+    } as unknown as Response;
     expect(await fetchArticle(async () => blocked, 'https://x.test/a')).toEqual({ error: 'HTTP 403' });
-    expect(await fetchArticle(async () => ok('<html><body>no article here</body></html>'), 'https://x.test/a')).toEqual({
-      error: 'no <article> element in the page',
-    });
+    expect(
+      await fetchArticle(async () => ok(`<html><body>no article here${'x'.repeat(600)}</body></html>`), 'https://x.test/a'),
+    ).toEqual({ error: expect.stringContaining('no <article> element') });
     expect(
       await fetchArticle(async () => {
         throw new Error('terminated');
       }, 'https://x.test/a'),
     ).toEqual({ error: 'terminated' });
+  });
+
+  /*
+   * The bug this file shipped with, and the reason `wafChallenge` is shared rather than restated.
+   * A challenged request is `HTTP 202` with two kilobytes of Javascript — and `response.ok` is true
+   * for a 202, so the first production run read the challenge as a page, found no `<article>` in
+   * it, and said the markup had moved. "WTP redesigned their site" and "we were blocked" call for
+   * opposite things from whoever reads that line.
+   */
+  it('knows a WAF challenge from a redesign', async () => {
+    const challenge = {
+      ok: true,
+      status: 202,
+      headers: { get: () => null },
+      text: async () => '<!DOCTYPE html><html><head><script>window.gokuProps={}</script></head></html>',
+    } as unknown as Response;
+    expect(await fetchArticle(async () => challenge, 'https://x.test/a')).toEqual({
+      error: expect.stringContaining('challenged'),
+    });
+
+    const flagged = {
+      ok: true,
+      status: 200,
+      headers: { get: (h: string) => (h === 'x-amzn-waf-action' ? 'challenge' : null) },
+      text: async () => 'x'.repeat(5000),
+    } as unknown as Response;
+    expect(await fetchArticle(async () => flagged, 'https://x.test/a')).toEqual({
+      error: expect.stringContaining('WAF'),
+    });
+  });
+
+  it('does not mistake a stub error page for a communiqué', async () => {
+    expect(await fetchArticle(async () => ok('<html></html>'), 'https://x.test/a')).toEqual({
+      error: expect.stringContaining('not a page'),
+    });
   });
 });
 
@@ -128,8 +175,18 @@ describe('what a fetch writes', () => {
 
   it('latches on the feed revision rather than on the one it just minted', () => {
     const row = item();
-    expect(articleUpdate(row, PROSE).articleFetchedFor).toBe(feedHashOf(row));
-    expect(articleFailure(row, 'HTTP 403').articleFetchedFor).toBe(feedHashOf(row));
+    expect(articleUpdate(row, PROSE).articleFetchedFor).toContain(feedHashOf(row));
+    expect(articleFailure(row, 'HTTP 403').articleFetchedFor).toBe(articleStampOf(row));
+  });
+
+  /*
+   * The stamp carries the build as well as the revision, so a change to how pages are *read* asks
+   * for them again. Without it the three items the first production run latched on a wrong verdict
+   * would have kept it until WTP happened to edit their feed rows.
+   */
+  it('asks again when this build reads pages differently from the one that latched it', () => {
+    const stale = { ...item(), articleFetchedFor: `1:${feedHashOf(item())}`, articleError: 'x' };
+    expect(needsArticle(stale, NOW + 30 * 86400000)).toBe(true);
   });
 
   it('clears a previous failure rather than leaving it beside a page that read fine', () => {
@@ -163,7 +220,8 @@ describe('a run', () => {
   it('records a block without losing the run', async () => {
     const { items, outcome } = await fetchArticles([item()], {
       now: NOW,
-      fetch: async () => ({ ok: false, status: 403, text: async () => '' }) as unknown as Response,
+      fetch: async () =>
+        ({ ok: false, status: 403, headers: { get: () => null }, text: async () => '' }) as unknown as Response,
       write: async () => {},
     });
     expect(outcome).toMatchObject({ fetched: 0, failed: 1, error: 'HTTP 403' });

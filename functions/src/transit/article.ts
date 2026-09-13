@@ -26,12 +26,16 @@
  * whatever happens here. This file is the half that makes the reading possible at all — it fetches
  * the page behind the row and stores its prose as `article`, which `proseOf` then prefers.
  *
- * They are separate because this one can be taken away from us. wtp.waw.pl is behind AWS WAF (see
- * `wtp.ts`), and although the feed is served, the article pages may not be from every egress — a
- * plain request for one from a datacentre address returns CloudFront's `403 Request blocked`. If
- * that is what this collector gets, `articleError` records it, `hasProse` stays false, and the app
- * shouts about metro items it cannot read rather than clearing them. Losing the fetch costs
- * precision; it cannot cost the guarantee.
+ * They are separate because this one can be taken away from us, and — measured on the first
+ * production run, 13 Sep 2026 — **it currently is**. wtp.waw.pl is behind AWS WAF (see `wtp.ts`),
+ * and while the two feeds are served, an article page from this collector's egress comes back as a
+ * challenge: `HTTP 202`, two kilobytes of Javascript, no content. `articleError` records it,
+ * `hasProse` stays false, and the app shouts about metro items it cannot read rather than clearing
+ * them. Losing the fetch costs precision; it cannot cost the guarantee — which is the whole reason
+ * `needsExtracting` refuses a headline on its own rather than trusting that the article arrived.
+ *
+ * Nothing here should learn to solve a WAF challenge; `functions/README.md` holds what to do about
+ * the collector's egress if this is to be fixed.
  *
  * ### Once per feed revision, and nothing on a timer
  *
@@ -51,12 +55,31 @@
  */
 
 import { articleText } from '../sources/html';
+import { wafChallenge } from './wtp';
 import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 import { isExtractable } from './extract';
 
 /** One page. Short: a page that hangs must not hold up a run that is due again in ten minutes. */
 const REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * Below this, nothing that came back is a communiqué page.
+ *
+ * `wtp.ts`'s `MIN_FEED_BYTES` reasoning, for a document rather than a feed. The WAF challenge is
+ * caught by its status before this ever runs; this is for a stub error page served with a 200.
+ */
+const MIN_PAGE_BYTES = 500;
+/**
+ * Bump to ask for every page again.
+ *
+ * The same lever, for the same reason, as `EXTRACTOR_VERSION`: `articleFetchedFor` latches an item
+ * against asking twice, and when the thing that changes is **our reading of the page** rather than
+ * the page, nothing about the stored row says the answer is stale. It shipped at 1 and went to 2
+ * the same evening — the first production run reported `no <article> element in the page` for
+ * three items, which was this file taking an HTTP 202 WAF challenge for a redesign. Without a lever
+ * those three would have stayed latched on a wrong verdict until WTP happened to edit them.
+ */
+const ARTICLE_VERSION = 2;
 /** The same cap `wtp.ts` puts on a feed body. Enough for the whole of a long communiqué. */
 const ARTICLE_CHARS = 4000;
 /**
@@ -112,7 +135,8 @@ const RETRY_FAILURE_MS = 2 * 3600_000;
 export function needsArticle(item: TransitItem, now: number): boolean {
   if (!isExtractable(item)) return false;
   if (hasProse(item)) return false;
-  if (item.articleFetchedFor === undefined) return true;
+  // Never asked at this revision, or asked by a build that read pages differently.
+  if (item.articleFetchedFor !== articleStampOf(item)) return true;
   // Tried at this revision. Only a failure is worth asking about again, and only while it matters.
   return Boolean(item.articleError) && now - item.publishedAt < RETRY_FAILURE_MS;
 }
@@ -142,9 +166,18 @@ export async function fetchArticle(
         'user-agent': 'korczak.xyz transit watch (+https://korczak.xyz)',
       },
     });
+    const challenged = wafChallenge(response.status, response.headers.get('x-amzn-waf-action') ?? undefined);
+    if (challenged) return { error: challenged };
     if (!response.ok) return { error: `HTTP ${response.status}` };
-    const text = articleText(await response.text(), ARTICLE_CHARS);
-    if (!text) return { error: 'no <article> element in the page' };
+
+    const body = await response.text();
+    if (body.length < MIN_PAGE_BYTES) {
+      return { error: `HTTP ${response.status} with ${body.length} bytes — not a page` };
+    }
+    const text = articleText(body, ARTICLE_CHARS);
+    // A page that arrived and holds no <article> is the markup having moved, and it has to be
+    // distinguishable from a page that never arrived — see `wafChallenge`.
+    if (!text) return { error: `no <article> element in ${body.length} bytes` };
     return { text };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
@@ -164,7 +197,7 @@ export function articleUpdate(item: TransitItem, text: string): Partial<TransitI
   return {
     article: text,
     contentHash: contentHashOf({ title: item.title, body: item.body, article: text }),
-    articleFetchedFor: feedHashOf(item),
+    articleFetchedFor: articleStampOf(item),
     // Cleared explicitly rather than dropped: `stripUndefined` would leave last week's failure
     // sitting beside a page that has just been read perfectly well.
     articleError: '',
@@ -173,7 +206,12 @@ export function articleUpdate(item: TransitItem, text: string): Partial<TransitI
 
 /** The fields to write when the page could not be read. The article already held, if any, stands. */
 export function articleFailure(item: TransitItem, error: string): Partial<TransitItem> {
-  return { articleFetchedFor: feedHashOf(item), articleError: error.slice(0, 300) };
+  return { articleFetchedFor: articleStampOf(item), articleError: error.slice(0, 300) };
+}
+
+/** What a fetch records having been made against: this build, and the feed revision it saw. */
+export function articleStampOf(item: Pick<TransitItem, 'title' | 'body'>): string {
+  return `${ARTICLE_VERSION}:${feedHashOf(item)}`;
 }
 
 /**
