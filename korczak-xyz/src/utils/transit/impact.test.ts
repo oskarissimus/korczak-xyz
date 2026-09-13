@@ -9,6 +9,16 @@ const SEGMENTS: WatchedSegment[] = SEED_SEGMENTS.map(
   (seed) => newSegment(seed, seed.id, 'w', NOW)!,
 );
 
+/*
+ * A whole communiqué, because `hasProse` is one of the rules under test: an item carrying only
+ * WTP's headline is escalated whatever it stores, so a fixture with no body would silently be
+ * testing that rule and nothing else. See `MIN_PROSE_CHARS`.
+ */
+const PROSE =
+  'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+  'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+  'Trwa uruchamianie zastępczej komunikacji autobusowej ZA METRO.';
+
 function item(patch: Partial<TransitItem> = {}): TransitItem {
   return {
     id: 'impediment_x',
@@ -16,6 +26,7 @@ function item(patch: Partial<TransitItem> = {}): TransitItem {
     guid: 'https://www.wtp.waw.pl/utrudnienia/2026/09/03/x/',
     title: 'Utrudnienia w komunikacji: M1',
     url: 'https://www.wtp.waw.pl/utrudnienia/2026/09/03/x/',
+    body: PROSE,
     publishedAt: NOW,
     titleLines: ['M1'],
     contentHash: 'abcd1234abcd1234',
@@ -92,6 +103,21 @@ describe('what happens when the reading fails', () => {
    */
   it('escalates an unread item to route level, marked uncertain', () => {
     expect(impactOf(item(), SEGMENTS)).toMatchObject({ impact: 'route', certain: false, stops: [] });
+  });
+
+  /*
+   * The card that started this, as a rule. The 12 Sep 2026 M1 suspension is stored with a *current*
+   * reading of `closedStops: []` — taken, before `hasProse` existed, from the one sentence WTP's
+   * feed carried. Read as a reading it is a confident all-clear about a line running in two halves,
+   * so the absence of prose overrides what was stored rather than merely gating the next reading.
+   */
+  it('escalates a reading that was taken from a headline, however current it is', () => {
+    const headline = item({
+      body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.',
+      closedStops: [],
+      extractHash: 'abcd1234abcd1234',
+    });
+    expect(impactOf(headline, SEGMENTS)).toMatchObject({ impact: 'route', certain: false, stops: [] });
   });
 
   it('escalates a station name this build cannot place', () => {

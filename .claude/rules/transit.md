@@ -147,7 +147,17 @@ Two fixes, deliberately independent, because only one of them is ours to keep.
 
 **`hasProse` (`normalize.ts`) is the half that needs no network.** A body shorter than
 `MIN_PROSE_CHARS` is never read at all: `needsExtracting` refuses it, no `extractHash` is written,
-`closedStops` stays absent, and `impactOf` escalates. The threshold is 140 and it is measured rather
+`closedStops` stays absent, and `impactOf` escalates.
+
+**And it overrides a reading that is already stored**, which is the half that had to be got right
+twice. Gating only *new* readings leaves the corpus exactly as it was — every metro item read before
+this existed carries a confident `closedStops: []` taken from a headline, with a current
+`extractHash` beside it — so the 12 Sep card would have gone on saying **No station closed** for the
+rest of its life, and the fix would have looked like it worked while changing nothing on screen. So
+`impactOf` tests `hasProse` **before** it reads `closedStops`, `NoticeCard` draws no stop list,
+reason or times for such an item, and `extractedCount` does not count it as read. Done in the
+verdict rather than by a migration: it is then true of every row the moment it ships, and stays true
+of a row an older build writes tomorrow. The threshold is 140 and it is measured rather
 than chosen — the longest headline-only body in the corpus is 75 characters, and the 12 Sep article
 states which stretch is shut within its first 164. The accepted cost is stated where the constant
 is: a genuinely terse notice (*"Nie kursują pociągi metra M1 na odcinku Centrum – Wilanowska."*, 61

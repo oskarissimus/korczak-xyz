@@ -9,6 +9,15 @@ const ARMED = NOW - 86400000;
 
 const SEGMENTS: WatchedSegment[] = SEED_SEGMENTS.map((seed) => newSegment(seed, seed.id, 'w', ARMED)!);
 
+/*
+ * A whole communiqué. `hasProse` treats an item carrying only WTP's headline as unread whatever it
+ * stores, so a fixture with no body would put every row here in that state — see `MIN_PROSE_CHARS`.
+ */
+const PROSE =
+  'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+  'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+  'Trwa uruchamianie zastępczej komunikacji autobusowej ZA METRO.';
+
 function item(n: number, patch: Partial<TransitItem> = {}): TransitItem {
   const guid = `https://www.wtp.waw.pl/utrudnienia/2026/09/03/x${n}/`;
   return {
@@ -17,6 +26,7 @@ function item(n: number, patch: Partial<TransitItem> = {}): TransitItem {
     guid,
     title: 'Utrudnienia w komunikacji: M1',
     url: guid,
+    body: PROSE,
     publishedAt: NOW - n * 60000,
     titleLines: ['M1'],
     contentHash: `hash${n}`,

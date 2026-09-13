@@ -10,6 +10,15 @@ import type { TransitItem, WatchedSegment } from '../../../korczak-xyz/src/utils
 const NOW = Date.parse('2026-08-27T18:10:00Z');
 const SEGMENTS: WatchedSegment[] = SEED_SEGMENTS.map((seed) => newSegment(seed, seed.id, 'w', NOW)!);
 
+/*
+ * A whole communiqué. `hasProse` treats an item carrying only WTP's headline as unread whatever it
+ * stores, so a fixture with no body would make every banner here the uncertain one.
+ */
+const PROSE =
+  'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+  'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+  'Trwa uruchamianie zastępczej komunikacji autobusowej ZA METRO.';
+
 function item(patch: Partial<TransitItem> = {}): TransitItem {
   return {
     id: 'impediment_a',
@@ -17,6 +26,7 @@ function item(patch: Partial<TransitItem> = {}): TransitItem {
     guid: 'https://www.wtp.waw.pl/utrudnienia/a/',
     title: 'Utrudnienia w komunikacji: M1',
     url: 'https://www.wtp.waw.pl/utrudnienia/a/',
+    body: PROSE,
     publishedAt: NOW,
     titleLines: ['M1'],
     contentHash: 'aaaaaaaaaaaaaaaa',

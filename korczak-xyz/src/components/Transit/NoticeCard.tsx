@@ -29,11 +29,18 @@ interface Props {
 
 export default function NoticeCard({ item, verdict, lang }: Props) {
   const t = translations[lang];
-  const unread = item.extractHash === undefined;
-  const stale = extractionIsStale(item);
-  // Only worth saying about an item somebody was going to read. A bus communiqué is a headline too,
-  // and nothing was ever going to open it — `isMetro` is the same gate the coverage line counts on.
-  const unreadable = unread && isMetro(item) && !hasProse(item);
+  /*
+   * Only worth saying about an item somebody was going to read: a bus communiqué is a headline too
+   * and nothing was ever going to open it. `isMetro` is the same gate the coverage line counts on.
+   *
+   * It is **not** conditioned on `extractHash` being absent, which is what makes it work on the
+   * corpus as it stands: every metro item read before `hasProse` existed carries a reading taken
+   * from a headline, and drawn as a reading it is the card that started all this — *No station
+   * closed*, about a line cut in half. `impactOf` makes the same call for the same reason.
+   */
+  const unreadable = isMetro(item) && !hasProse(item);
+  const unread = item.extractHash === undefined || unreadable;
+  const stale = !unreadable && extractionIsStale(item);
 
   return (
     <article className={`ev-card tr-card${verdict?.impact === 'route' ? ' tr-card--route' : ''}`}>
@@ -70,39 +77,49 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
         {stale ? <span className="ev-chip tr-chip--stale">{t.stale}</span> : null}
       </p>
 
-      {item.wholeLine ? (
-        <p className="tr-stops tr-stops--whole">{t.wholeLine}</p>
-      ) : item.closedStops && item.closedStops.length > 0 ? (
-        <p className="tr-stops">
-          <span className="tr-stops-label">{t.closedStops}:</span>{' '}
-          {item.closedStops.map((stop) => (
-            <span
-              key={stop}
-              className={`tr-stop${verdict?.stops.includes(stop) ? ' tr-stop--mine' : ''}`}
-            >
-              {stop}
-            </span>
-          ))}
-        </p>
-      ) : item.closedStops ? (
-        <p className="tr-stops tr-stops--none">{t.noClosure}</p>
-      ) : null}
+      {/*
+        * The whole reading, and it is drawn only when there was something to read it from. A stored
+        * `closedStops: []` on a headline-only item is not "no station is closed" — it is a model
+        * answering the only question it could about one sentence — and printing it is precisely the
+        * card that started this: **No station closed**, above a line running in two halves.
+        */}
+      {unreadable ? null : (
+        <>
+          {item.wholeLine ? (
+            <p className="tr-stops tr-stops--whole">{t.wholeLine}</p>
+          ) : item.closedStops && item.closedStops.length > 0 ? (
+            <p className="tr-stops">
+              <span className="tr-stops-label">{t.closedStops}:</span>{' '}
+              {item.closedStops.map((stop) => (
+                <span
+                  key={stop}
+                  className={`tr-stop${verdict?.stops.includes(stop) ? ' tr-stop--mine' : ''}`}
+                >
+                  {stop}
+                </span>
+              ))}
+            </p>
+          ) : item.closedStops ? (
+            <p className="tr-stops tr-stops--none">{t.noClosure}</p>
+          ) : null}
 
-      <p className="ev-card-sub">
-        {item.reason ? (
-          <span className="tr-reason">
-            {t.reason}: {item.reason}
-          </span>
-        ) : null}
-        {item.effectiveFrom !== undefined ? (
-          <span className="tr-when">
-            {t.from} {whenLabel(item.effectiveFrom, lang)}
-            {item.effectiveUntil !== undefined
-              ? ` ${t.until} ${whenLabel(item.effectiveUntil, lang)}`
-              : ''}
-          </span>
-        ) : null}
-      </p>
+          <p className="ev-card-sub">
+            {item.reason ? (
+              <span className="tr-reason">
+                {t.reason}: {item.reason}
+              </span>
+            ) : null}
+            {item.effectiveFrom !== undefined ? (
+              <span className="tr-when">
+                {t.from} {whenLabel(item.effectiveFrom, lang)}
+                {item.effectiveUntil !== undefined
+                  ? ` ${t.until} ${whenLabel(item.effectiveUntil, lang)}`
+                  : ''}
+              </span>
+            ) : null}
+          </p>
+        </>
+      )}
 
       {/*
         * The headline is drawn even though the summary took the title's place above it. It is WTP's

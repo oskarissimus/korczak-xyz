@@ -102,7 +102,8 @@ export function buildTransitFeed(
   return {
     sections,
     metroCount: metro.length,
-    extractedCount: metro.filter((row) => row.item.extractHash !== undefined).length,
+    // `hasProse` too: a reading taken from a headline is not one, however current its hash.
+    extractedCount: metro.filter((row) => row.item.extractHash !== undefined && hasProse(row.item)).length,
     noProseCount: metro.filter((row) => !hasProse(row.item)).length,
     totalCount: rows.length,
   };

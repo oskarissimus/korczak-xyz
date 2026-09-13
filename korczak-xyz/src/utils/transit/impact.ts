@@ -26,6 +26,7 @@
  */
 
 import { canonicalStation, metroLinesInTitle } from './lines';
+import { hasProse } from './normalize';
 import { segmentStations } from './segments';
 import type { ImpactVerdict, MetroLine, TransitItem, WatchedSegment } from './types';
 import { METRO_LINES } from './types';
@@ -47,11 +48,19 @@ export function impactOf(item: TransitItem, segments: WatchedSegment[]): ImpactV
   const onLine = live.filter((segment) => lines.includes(segment.line));
 
   /*
-   * Nobody has read the prose yet, or the reading failed. Uncertain, and resolved upward — see the
-   * header. An item still in the extraction queue looks exactly like one the model failed on, and
-   * both are things you would rather be told about.
+   * Nobody has read the prose yet, the reading failed, or there was no prose to read. Uncertain, and
+   * resolved upward — see the header. An item still in the extraction queue looks exactly like one
+   * the model failed on, and both are things you would rather be told about.
+   *
+   * **`hasProse` is checked before the reading, not after**, and it overrides a reading that is
+   * there. A verdict taken from WTP's one-sentence headline is not a verdict about the world, and
+   * the corpus is full of them: every metro item read before `hasProse` existed carries a confident
+   * `closedStops: []` extracted from a sentence naming no station. Gating only *new* readings would
+   * have left the 12 Sep 2026 M1 closure still saying **No station closed** for its whole life,
+   * which is the exact card this rule was written for. Cleared here rather than by a migration, so
+   * it is true of every row the moment this ships and stays true of any row an older build writes.
    */
-  if (item.closedStops === undefined && !item.wholeLine) {
+  if (!hasProse(item) || (item.closedStops === undefined && !item.wholeLine)) {
     return { impact: 'route', certain: false, segmentIds: onLine.map((s) => s.id), lines, stops: [] };
   }
 
