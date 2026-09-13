@@ -1,22 +1,32 @@
 /*
- * One collector run: fetch both feeds, archive what arrived, store it, read the metro ones, notify.
+ * One collector run: fetch both feeds, archive what arrived, store it, fetch the pages the feeds
+ * only gestured at, read the metro ones, notify.
  *
- * The order is `fetch → archive → upsert → extract → notify`, and the last two are in that order
- * for the reason the events app puts `classify` before `notify`: `impactOf` escalates an *unread*
- * metro item to route priority, so notifying first would send an uncertain high-priority alert
- * about every communiqué seconds before reading it — and the latch would then stop the correct,
- * quieter alert ever being sent.
+ * The order is `fetch → archive → upsert → article → extract → notify`, and every adjacency in it
+ * is load-bearing.
  *
- * The archive is written before the upsert, not after, and that is not arbitrary either. It exists
- * to answer "what did the feed actually say" on the run where something went wrong, and a run that
- * dies during the upsert is exactly such a run.
+ * **`extract` before `notify`**, for the reason the events app puts `classify` before `notify`:
+ * `impactOf` escalates an *unread* metro item to route priority, so notifying first would send an
+ * uncertain high-priority alert about every communiqué seconds before reading it — and the latch
+ * would then stop the correct, quieter alert ever being sent.
+ *
+ * **`article` before `extract`**, and it is the same argument one step earlier. WTP's RSS carries
+ * the headline and not the communiqué, so without this step the extractor is shown one sentence
+ * naming no station — which `needsExtracting` now refuses outright, leaving every metro item in the
+ * loud-and-uncertain state for ever. The fetch is what gives it something to read; run after the
+ * extractor it would be a page fetched ten minutes before anybody looked at it.
+ *
+ * **The archive is written before the upsert**, not after. It exists to answer "what did the feed
+ * actually say" on the run where something went wrong, and a run that dies during the upsert is
+ * exactly such a run.
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 import { fetchWtpFeeds, type FetchContext } from './wtp';
-import { archiveRaw, recordFetch, upsertItems } from './upsert';
+import { archiveRaw, recordFetch, stripUndefined, upsertItems } from './upsert';
 import { extractItems, isExtractable, type ExtractOutcome } from './extract';
+import { fetchArticles, type ArticleOutcome } from './article';
 import { notifyAccount, reportBrokenFeeds } from './notify';
 import { listAccounts } from '../notify';
 
@@ -36,6 +46,7 @@ export interface TransitRunSummary {
   written: number;
   created: number;
   archived: number;
+  articles: ArticleOutcome;
   extracted: ExtractOutcome;
   accounts: number;
   delivered: number;
@@ -81,7 +92,22 @@ export async function runTransitCollection(
    * back out of the corpus is what makes the queue drain rather than accumulate.
    */
   const backlog = await loadExtractionBacklog(db, now, upserted.items);
-  const { items: read, outcome: extracted } = await extractItems(backlog, {
+
+  /*
+   * The pages behind the rows that arrived without one. See `article.ts` for what WTP's feeds
+   * actually contain; the short version is that a metro communiqué's `description` is its own
+   * headline, so this is where the prose naming stations comes from.
+   */
+  const { items: withArticles, outcome: articles } = await fetchArticles(backlog, {
+    now,
+    fetch: ctx.fetch,
+    write: async (id, update) => {
+      await db.collection('transitItems').doc(id).update(stripUndefined(update));
+    },
+  });
+  if (articles.failed > 0) console.warn(`transit articles: ${articles.failed} unreadable`, articles.error);
+
+  const { items: read, outcome: extracted } = await extractItems(withArticles, {
     now,
     project: ctx.project,
     location: ctx.location,
@@ -117,6 +143,7 @@ export async function runTransitCollection(
     written: upserted.written,
     created: upserted.created,
     archived,
+    articles,
     extracted,
     accounts: accounts.length,
     delivered,

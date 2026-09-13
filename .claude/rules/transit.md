@@ -110,9 +110,92 @@ push body say which kind of answer this is — the banner leads with *"Nie udał
 szczegółów"* rather than shouting about nothing, because a loud alert that turns out to know
 nothing teaches the reader that the loud kind is unreliable.
 
-Three states, and the card draws all three, because **"no station is closed" and "nobody has
-looked" must never blur together**: `closedStops` absent is unread, `closedStops: []` is read and
-nothing closed, and `extractHash !== contentHash` is read and since edited.
+Four states, and the card draws all four, because **"no station is closed" and "nobody has looked"
+must never blur together**: `closedStops` absent is unread, `closedStops: []` is read and nothing
+closed, `extractHash !== contentHash` is read and since edited, and `!hasProse` is *there was
+nothing to read* — the state the next section is about, and the one whose absence made this app
+confidently wrong for a fortnight.
+
+### The feed publishes headlines, not communiqués
+
+The failure that made the fourth state necessary, and it had been running since the app shipped.
+
+On 12 Sep 2026 the M1 was suspended between Słodowiec and Dworzec Gdański and ran as two loops. The
+card for it said **No station closed**, with no unread badge and no stale badge — a current reading,
+confidently wrong. Nothing in the chain had a bug. WTP's RSS item, in full, both in `<description>`
+and in `<content:encoded>`:
+
+```
+ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.
+```
+
+That is the article's own H1, restated, and it is **every item in both feeds** — 45 consecutive rows
+of the live corpus, metro and bus alike, carry one sentence of exactly that shape. The prose naming
+stations, the stretch, the replacement buses and the reason is only ever on the web page. So the
+extractor was asked "which stations does this close" about a sentence naming none, answered
+correctly, and `readingUpdate` stored `closedStops: []` — which `impactOf` reads as **read and
+nothing closed**, `certain: true`, filed at line level.
+
+Note what this defeated. The escalate-when-unread rule one section up fires on `closedStops ===
+undefined`; here the item *was* read, with a matching `extractHash`, so every guarantee that
+section describes was satisfied and the app still produced a quiet all-clear. The rule was right and
+its precondition was false: it assumes the absence of a reading is the only way to have no
+knowledge. **The station tables, the range expansion and the interval overlap — the whole apparatus
+this app is — had never once been shown prose containing a station name.**
+
+Two fixes, deliberately independent, because only one of them is ours to keep.
+
+**`hasProse` (`normalize.ts`) is the half that needs no network.** A body shorter than
+`MIN_PROSE_CHARS` is never read at all: `needsExtracting` refuses it, no `extractHash` is written,
+`closedStops` stays absent, and `impactOf` escalates. The threshold is 140 and it is measured rather
+than chosen — the longest headline-only body in the corpus is 75 characters, and the 12 Sep article
+states which stretch is shut within its first 164. The accepted cost is stated where the constant
+is: a genuinely terse notice (*"Nie kursują pociągi metra M1 na odcinku Centrum – Wilanowska."*, 61
+characters, and complete) is escalated rather than read. That is a loud alert about something real;
+what it replaces was silence about something real.
+
+**`article.ts` is the half that fetches the page**, storing its prose as `TransitItem.article`, which
+`proseOf` prefers over the feed's `body`. It reuses `articleText` from `sources/html.ts` — the same
+function, for the same reason, as the newsroom reader that found the theatre's sale date in a body
+its teaser never mentioned. Four things about it:
+
+- **`contentHashOf` hashes `proseOf`, so the article is inside the hash.** That is the only way a
+  developing closure gets re-read: WTP rewrites the page as a shutdown grows while the RSS row
+  stays the sentence it always was. A digest over the feed's own text would freeze the first
+  reading in place. An item with no article hashes exactly as it did before the field existed, so
+  the deploy re-reads and re-alerts nothing.
+- **`feedHashOf` is a second digest over the feed's text alone**, and it exists for `mergeItem`. The
+  stored article survives only while the RSS row it was fetched against is unchanged; the
+  `ZAKOŃCZONO:` prefix *is* such a change, so it drops the article and the latch together and the
+  page is fetched again on the same run. Carried forward unconditionally it would be a description
+  of a live closure sitting under a headline saying it is over, with `contentHash` covering it and
+  calling it current. `mergeItem` is also the only place that knows both halves, which is why the
+  hash is recomputed there rather than taken from `parseWtpFeed`.
+- **One fetch per feed revision, and nothing on a timer.** `articleFetchedFor` is stamped on every
+  attempt, so a page that will not load is not asked for every ten minutes across the whole 45-day
+  retention. The single exception is a *failed* fetch on a notice less than two hours old
+  (`RETRY_FAILURE_MS`): the failure this source has is a WAF challenge, which is a property of the
+  moment rather than of the page, and one 403 during the morning the M1 is cut would otherwise
+  freeze that closure into "no details" for its whole life. What the rule gives up is an edit
+  confined to the article body while the RSS row stays identical. Re-reading live items every run
+  is the obvious alternative and it is **not** safe to add without a measurement first: since
+  `contentHash` covers the article, anything on that page that changes between fetches — a rendered
+  *stan na:* timestamp would do it — mints a fresh `alertIdFor` and a fresh push, every ten
+  minutes, for as long as the incident lasts.
+- **This half can be taken away from us, and the app has to survive that.** wtp.waw.pl is behind the
+  same AWS WAF the feed fetch documents, and a plain request for an article page from a datacentre
+  address returns CloudFront's `403 Request blocked` — verified from a container while this was
+  written, against a feed fetch that works. If that is what the collector gets, `articleError`
+  records it, `hasProse` stays false, and the app shouts about metro items it cannot read instead of
+  clearing them. **Losing the fetch costs precision; it must never cost the guarantee** — which is
+  the whole reason the two halves are separate and why `needsExtracting` refuses a headline rather
+  than trusting that the article arrived.
+
+The card draws the fourth state in its own words (*"WTP published no details here"*), never as "not
+read yet": nothing is queued and nothing is coming, and a badge promising otherwise is a badge that
+will be believed. `TransitFeed.noProseCount` is its own line under the coverage count for the same
+reason — a stopped extractor is a model to go and look at, a corpus of headlines is WTP, and one
+number moving for either reason would say neither.
 
 `muted` is deliberately **not** read in `impactOf`. A verdict is a statement about the world; muting
 is a statement about what should ring, and it belongs to `notices.ts`. Folded in, the feed would
@@ -210,12 +293,15 @@ tab exists to let them check.
 gets read is a shared cost. What each reader configures is the route. Widening it to the trams is
 one edit plus a station table per line, and it multiplies the model spend by the lines added.
 
-The order in `runTransitCollection` is `fetch → archive → upsert → extract → notify`, and the last
-two are in that order for the reason Event Watch classifies before notifying: `impactOf` escalates an
-*unread* metro item, so notifying first would send an uncertain high-priority alert about every
-communiqué seconds before reading it — and the latch would then stop the correct, quieter alert ever
-being sent. The archive is written **before** the upsert because it exists to answer "what did the
-feed say" on the run where something went wrong, and a run that dies during the upsert is such a run.
+The order in `runTransitCollection` is `fetch → archive → upsert → article → extract → notify`, and
+the last two are in that order for the reason Event Watch classifies before notifying: `impactOf`
+escalates an *unread* metro item, so notifying first would send an uncertain high-priority alert
+about every communiqué seconds before reading it — and the latch would then stop the correct,
+quieter alert ever being sent. `article` is before `extract` for the same argument one step earlier:
+the feed carries headlines, so without it the extractor has nothing it is allowed to read and every
+metro item stays loud-and-uncertain for ever. The archive is written **before** the upsert because
+it exists to answer "what did the feed say" on the run where something went wrong, and a run that
+dies during the upsert is such a run.
 
 The extractor is shown the corpus, not only this run's fetch. A feed holds twenty items, so a
 communiqué that failed yesterday has scrolled off it and would never be retried — reading the metro

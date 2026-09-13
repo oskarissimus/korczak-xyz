@@ -45,6 +45,12 @@ export const translations = {
       'Notices that name none of your lines. Here so the filter can be checked rather than trusted.',
     coverage: '{read} of {total} metro notices read',
     coverageNone: 'None of the {total} metro notices has been read yet',
+    /*
+     * Its own line rather than a third number in the sentence above. "Read" and "readable" are
+     * different failures with different remedies — a stopped extractor against a feed that carries
+     * only headlines — and one number moving for either reason would say neither.
+     */
+    coverageNoProse: '{count} carry no text to read — WTP published only a headline',
     offline: 'Showing a saved copy — this device is offline.',
     filterAll: 'Both feeds',
     filterImpediment: 'Disruptions',
@@ -63,6 +69,12 @@ export const translations = {
     showSource: 'Source',
     unread: 'Not read yet — treated as if it were on your route',
     unreadFailed: 'Could not be read — treated as if it were on your route',
+    /*
+     * The fourth reading state, and the wording is the point: nothing is queued and nothing is
+     * about to happen, so "not read yet" would be a promise this card cannot keep. WTP's feed
+     * carried the headline alone and the page behind it could not be fetched — open the notice.
+     */
+    noProse: 'WTP published no details here — treated as if it were on your route',
     stale: 'WTP has edited this since it was read',
     yourStops: 'Your stops',
 
@@ -156,6 +168,7 @@ export const translations = {
       'Komunikaty, które nie dotyczą żadnej z Twoich linii. Są tutaj, żeby filtr dało się sprawdzić, a nie tylko przyjąć na wiarę.',
     coverage: 'Odczytano {read} z {total} komunikatów o metrze',
     coverageNone: 'Nie odczytano jeszcze żadnego z {total} komunikatów o metrze',
+    coverageNoProse: 'W {count} nie ma czego czytać — WTP podało sam nagłówek',
     offline: 'To zapisana kopia — urządzenie jest offline.',
     filterAll: 'Oba kanały',
     filterImpediment: 'Utrudnienia',
@@ -173,6 +186,7 @@ export const translations = {
     showSource: 'Źródło',
     unread: 'Jeszcze nieodczytany — traktowany jak dotyczący Twojej trasy',
     unreadFailed: 'Nie udało się odczytać — traktowany jak dotyczący Twojej trasy',
+    noProse: 'WTP nie podało tu szczegółów — traktowany jak dotyczący Twojej trasy',
     stale: 'WTP zmieniło ten komunikat po odczytaniu',
     yourStops: 'Twoje stacje',
 

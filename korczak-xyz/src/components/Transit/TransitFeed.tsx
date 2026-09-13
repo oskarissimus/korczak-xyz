@@ -134,6 +134,17 @@ function FeedPanel({ lang }: Props) {
           {built.extractedCount === 0
             ? fill(t.coverageNone, { total: built.metroCount })
             : fill(t.coverage, { read: built.extractedCount, total: built.metroCount })}
+          {/*
+            * Said separately, and only when it is happening. A notice nobody can read is not a
+            * notice waiting in a queue, and the two have nothing in common but the same number
+            * going down — see `noProseCount`.
+            */}
+          {built.noProseCount > 0 ? (
+            <>
+              <br />
+              {fill(t.coverageNoProse, { count: built.noProseCount })}
+            </>
+          ) : null}
         </p>
       ) : null}
 

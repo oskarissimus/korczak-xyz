@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { alertIdFor, contentHashOf, parseAlertId, transitIdFor } from './normalize';
+import {
+  alertIdFor,
+  contentHashOf,
+  feedHashOf,
+  hasProse,
+  parseAlertId,
+  proseOf,
+  transitIdFor,
+} from './normalize';
+
+/*
+ * The real thing, off `transitItems/impediment_…p-176873` — the 12 Sep 2026 M1 suspension. Both
+ * `<description>` and `<content:encoded>` in the RSS item held exactly this and nothing else.
+ */
+const STUB = 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.';
+/** The opening of the article behind that row, which is where the stations actually were. */
+const ARTICLE =
+  'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+  'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+  'Metro kursuje w dwóch pętlach: Młociny <-> Słodowiec oraz Kabaty <-> Dworzec Gdański.';
 
 describe('ids', () => {
   it('derives a document id from the feed and the permalink, and from nothing else', () => {
@@ -24,6 +43,30 @@ describe('ids', () => {
   });
 });
 
+describe('is there anything here to read', () => {
+  /*
+   * The case this exists for. Read from that sentence the extractor answers "no station is closed",
+   * which is true of the sentence and false of the morning: four stations were shut and the line
+   * ran as two loops. An unreadable item must stay unread, so `impactOf` escalates it.
+   */
+  it('does not call WTP\'s headline a communiqué', () => {
+    expect(hasProse({ body: STUB })).toBe(false);
+    expect(hasProse({ body: 'ZAKOŃCZONO . Utrudnienia w kursowaniu pociągów linii metra M1.' })).toBe(false);
+    expect(hasProse({ body: 'Utrudnienia w kursowaniu linii 112,114,132,134,156,186,326,414,518,705,735.' })).toBe(false);
+    expect(hasProse({})).toBe(false);
+  });
+
+  it('calls the article behind it one', () => {
+    expect(hasProse({ body: STUB, article: ARTICLE })).toBe(true);
+  });
+
+  it('prefers the article, so one accessor decides what "the text" is everywhere', () => {
+    expect(proseOf({ body: STUB, article: ARTICLE })).toBe(ARTICLE);
+    expect(proseOf({ body: STUB })).toBe(STUB);
+    expect(proseOf({})).toBe('');
+  });
+});
+
 describe('contentHashOf', () => {
   it('changes when the prose changes', () => {
     expect(contentHashOf({ title: 'a', body: 'x' })).not.toBe(contentHashOf({ title: 'a', body: 'y' }));
@@ -34,6 +77,31 @@ describe('contentHashOf', () => {
     expect(contentHashOf({ title: 'Metro M1', body: 'Stacja  Centrum ' })).toBe(
       contentHashOf({ title: 'metro m1', body: 'Stacja Centrum' }),
     );
+  });
+
+  /*
+   * The article is in the hash and the feed's own text is not, which is what makes a re-read
+   * possible at all: WTP edits the page as a closure grows while the RSS row stays the one sentence
+   * it has always been, so a digest over the feed alone would freeze the first reading in place.
+   */
+  it('moves when the article arrives, and again when the article changes', () => {
+    const feedOnly = contentHashOf({ title: 'Utrudnienia w komunikacji: M1', body: STUB });
+    const withArticle = contentHashOf({ title: 'Utrudnienia w komunikacji: M1', body: STUB, article: ARTICLE });
+    const grown = contentHashOf({
+      title: 'Utrudnienia w komunikacji: M1',
+      body: STUB,
+      article: `${ARTICLE} Zamknięta jest także stacja Ratusz Arsenał.`,
+    });
+    expect(withArticle).not.toBe(feedOnly);
+    expect(grown).not.toBe(withArticle);
+  });
+
+  /*
+   * Every row written before `article` existed must hash to what it hashed to then, or the first
+   * run after the deploy re-reads the whole corpus and re-alerts on all of it.
+   */
+  it('is unchanged for an item that has no article', () => {
+    expect(contentHashOf({ title: 'a', body: 'x' })).toBe(feedHashOf({ title: 'a', body: 'x' }));
   });
 
   it('is sixteen hex characters, so an alert id stays readable in a console', () => {

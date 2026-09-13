@@ -18,6 +18,7 @@
 
 import type { DocumentData, Firestore } from 'firebase-admin/firestore';
 import type { FeedFetch, RawFeedItem, TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
+import { contentHashOf, feedHashOf } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { FetchOutcome } from './wtp';
 
 export interface UpsertResult {
@@ -42,6 +43,18 @@ export function stripUndefined<T extends object>(value: T): DocumentData {
  * the record of *what was read*, so leaving it in place next to a newer `contentHash` is exactly
  * what makes `needsExtracting` true and what makes the Raw tab able to say "this reading is out of
  * date". Clearing it here would lose the distinction between never-read and read-and-stale.
+ *
+ * **`article` is the one field carried forward conditionally**, and it is the exception that proves
+ * the rest. It is not something the feed states and not something the extractor produced: it is a
+ * copy of a page that WTP can rewrite without telling us. So it survives only while the RSS row it
+ * was fetched against is unchanged — `feedHashOf(incoming) === stored.articleFetchedFor`. An edited
+ * row (the `ZAKOŃCZONO:` prefix that arrives when a closure ends is exactly one) drops the article
+ * *and* the latch together, so `needsArticle` asks for the page again on the same run. Carried
+ * forward unconditionally it would be a fortnight-old description of a closure sitting under a
+ * headline saying the closure is over, and `contentHash` would cover it and call it current.
+ *
+ * Which is why the hash is recomputed here rather than taken from `incoming`. `parseWtpFeed` has no
+ * article to hash, so its digest is the feed's alone; this is the only place that knows both halves.
  */
 export function mergeItem(
   incoming: TransitItem,
@@ -50,9 +63,24 @@ export function mergeItem(
 ): { record: TransitItem; created: boolean } {
   if (!stored) return { record: { ...incoming, firstSeenAt: now, updatedAt: now }, created: true };
 
+  const keepsArticle =
+    stored.articleFetchedFor !== undefined && stored.articleFetchedFor === feedHashOf(incoming);
+
   return {
     record: {
       ...incoming,
+      ...(keepsArticle
+        ? {
+            article: stored.article,
+            articleFetchedFor: stored.articleFetchedFor,
+            articleError: stored.articleError,
+            contentHash: contentHashOf({
+              title: incoming.title,
+              body: incoming.body,
+              article: stored.article,
+            }),
+          }
+        : { article: undefined, articleFetchedFor: undefined, articleError: undefined }),
       firstSeenAt: stored.firstSeenAt,
       lines: stored.lines,
       closedStops: stored.closedStops,

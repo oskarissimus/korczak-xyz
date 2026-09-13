@@ -30,6 +30,7 @@
 
 import { GoogleGenAI, Type, type Schema } from '@google/genai';
 import { STATIONS } from '../../../korczak-xyz/src/utils/transit/lines';
+import { hasProse, proseOf } from '../../../korczak-xyz/src/utils/transit/normalize';
 import { METRO_LINES, type MetroLine, type TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 
 /**
@@ -135,8 +136,23 @@ export function extractHashOf(item: Pick<TransitItem, 'contentHash'>): string {
   return `${EXTRACTOR_VERSION}:${item.contentHash}`;
 }
 
+/**
+ * Whether to spend a model call on this item.
+ *
+ * **`hasProse` is a gate and not a hint.** An item with nothing but a headline is left *unread*
+ * rather than read-and-empty, because those two states are the ones this app must never blur: a
+ * reading taken from one sentence naming no station comes back `closedStops: []`, which is the
+ * string `certain: true` is built on, and the card then says **No station closed** about a line cut
+ * in half. Asking anyway would not merely waste the call — it would launder an absence of evidence
+ * into evidence of absence, and do it with a current `extractHash` beside it saying the reading is
+ * fresh. See `hasProse` for the morning that proved it.
+ *
+ * An item held back here never enters the queue, so it costs nothing per run and `remaining` does
+ * not grow a permanent backlog it can never drain. `fetchArticles` is what changes the answer.
+ */
 export function needsExtracting(item: TransitItem): boolean {
   if (!isExtractable(item)) return false;
+  if (!hasProse(item)) return false;
   return item.extractHash !== extractHashOf(item);
 }
 
@@ -167,7 +183,9 @@ export function buildPrompt(items: TransitItem[]): string {
     id: item.id,
     title: item.title,
     published: new Date(item.publishedAt).toISOString(),
-    text: item.body ?? '',
+    // The article where one was fetched, the feed's sentence otherwise — and `needsExtracting` has
+    // already refused anything that is only the latter. See `proseOf`.
+    text: proseOf(item),
   }));
 
   return [

@@ -20,7 +20,16 @@ function item(patch: Partial<TransitItem> = {}): TransitItem {
     guid: 'https://www.wtp.waw.pl/utrudnienia/a/',
     title: 'Utrudnienia w komunikacji: M1',
     url: 'https://www.wtp.waw.pl/utrudnienia/a/',
-    body: 'Od godz. 20:00 pociągi metra linii M1 nie kursują na odcinku Centrum – Wilanowska.',
+    /*
+     * A whole communiqué rather than one sentence, because that is the shape of the only text this
+     * app ever reads: WTP's feed carries the headline alone, so anything that reaches the model
+     * came off the article page and is several sentences of it. `hasProse` is what draws that line
+     * and it would refuse a one-line fixture — see `MIN_PROSE_CHARS`.
+     */
+    body:
+      'Od godz. 20:00 z powodu awarii taboru pociągi metra linii M1 nie kursują na odcinku ' +
+      'Centrum – Wilanowska. Zamknięte dla pasażerów są stacje Politechnika, Pole Mokotowskie, ' +
+      'Racławicka, Wierzbno oraz Wilanowska. Uruchomiono komunikację zastępczą ZA METRO.',
     publishedAt: NOW,
     titleLines: ['M1'],
     contentHash: 'aaaaaaaaaaaaaaaa',
@@ -46,6 +55,34 @@ describe('the cheap gate', () => {
     const done = { ...fresh, extractHash: extractHashOf(fresh) };
     expect(needsExtracting(done)).toBe(false);
     expect(needsExtracting({ ...done, contentHash: 'bbbbbbbbbbbbbbbb' })).toBe(true);
+  });
+
+  /*
+   * 12 Sep 2026. The RSS item for an M1 suspension carried this sentence and nothing else, the
+   * model was asked about it, and it answered — correctly for that sentence — that no station was
+   * closed. Four were, and the card said `No station closed` with a fresh `extractHash` beside it.
+   *
+   * So a headline is never read. The item keeps no `closedStops`, `impactOf` escalates it, and the
+   * card says WTP published no details. An all-clear has to be earned from prose that exists.
+   */
+  it('refuses to read a headline, so an empty closure list is never invented from one', () => {
+    const headline = item({ body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.' });
+    expect(isExtractable(headline)).toBe(true);
+    expect(needsExtracting(headline)).toBe(false);
+    expect(queueForExtraction([headline])).toEqual([]);
+  });
+
+  it('reads the same item once the article behind it has been fetched', () => {
+    const headline = item({ body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.' });
+    const withArticle = {
+      ...headline,
+      article:
+        'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+        'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+        'Metro kursuje w dwóch pętlach: Młociny <-> Słodowiec oraz Kabaty <-> Dworzec Gdański.',
+    };
+    expect(needsExtracting(withArticle)).toBe(true);
+    expect(buildPrompt([withArticle])).toContain('Słodowiec – Dworzec Gdański');
   });
 
   it('queues newest first, because a push cannot be taken back and a backlog can wait', () => {

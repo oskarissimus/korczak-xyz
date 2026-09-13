@@ -6,13 +6,19 @@
  * depending on its section would make the sections impossible to compare, which is the one thing
  * the `Everything else` section exists for.
  *
- * The badges are the honest half. A card says which of three states its reading is in — read,
- * never read, read and since edited — because "no stations are closed" and "nobody has looked" are
- * the two answers this app must never let blur together, and the second one is why an unread metro
- * notice is sitting in the loud section at all.
+ * The badges are the honest half. A card says which of four states its reading is in — read, never
+ * read, nothing to read, read and since edited — because "no stations are closed" and "nobody has
+ * looked" are the two answers this app must never let blur together, and the second one is why an
+ * unread metro notice is sitting in the loud section at all.
+ *
+ * The fourth state is the newest and it was bought expensively. WTP's feeds carry the headline
+ * rather than the communiqué, so a metro item can be *unreadable* rather than unread — and drawn as
+ * "not read yet" it would look like a queue that is about to move, when in fact nothing is coming.
+ * See `hasProse`.
  */
 import type { ImpactVerdict, TransitItem } from '../../utils/transit/types';
-import { extractionIsStale } from '../../utils/transit/feed';
+import { extractionIsStale, isMetro } from '../../utils/transit/feed';
+import { hasProse } from '../../utils/transit/normalize';
 import { translations, whenLabel, type Lang } from './translations';
 
 interface Props {
@@ -25,6 +31,9 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
   const t = translations[lang];
   const unread = item.extractHash === undefined;
   const stale = extractionIsStale(item);
+  // Only worth saying about an item somebody was going to read. A bus communiqué is a headline too,
+  // and nothing was ever going to open it — `isMetro` is the same gate the coverage line counts on.
+  const unreadable = unread && isMetro(item) && !hasProse(item);
 
   return (
     <article className={`ev-card tr-card${verdict?.impact === 'route' ? ' tr-card--route' : ''}`}>
@@ -55,7 +64,7 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
           */}
         {unread ? (
           <span className="ev-chip tr-chip--unread">
-            {item.extractError ? t.unreadFailed : t.unread}
+            {unreadable ? t.noProse : item.extractError ? t.unreadFailed : t.unread}
           </span>
         ) : null}
         {stale ? <span className="ev-chip tr-chip--stale">{t.stale}</span> : null}

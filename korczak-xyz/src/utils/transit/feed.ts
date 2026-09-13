@@ -15,7 +15,7 @@
  */
 
 import { impactOf } from './impact';
-import { hashOfExtract } from './normalize';
+import { hasProse, hashOfExtract } from './normalize';
 import type { FeedKind, ImpactVerdict, TransitItem, WatchedSegment } from './types';
 
 export type SectionKey = 'route' | 'line' | 'other';
@@ -49,6 +49,16 @@ export interface TransitFeed {
   metroCount: number;
   /** How many of those the extractor has read, so a dead extractor is visible rather than inferred. */
   extractedCount: number;
+  /**
+   * How many carry no prose for anyone to read — the feed gave a headline and the article behind it
+   * could not be fetched.
+   *
+   * Counted apart from `extractedCount` because the two failures need different acts. An extractor
+   * that has stopped is a model or a project to look at; a corpus of headlines is WTP or the WAF,
+   * and no amount of re-running the extractor touches it. Folded together they would read as one
+   * number going down with nothing on screen to say which half moved.
+   */
+  noProseCount: number;
   /** The whole window, buses and trams included. What `other` would show. */
   totalCount: number;
 }
@@ -93,6 +103,7 @@ export function buildTransitFeed(
     sections,
     metroCount: metro.length,
     extractedCount: metro.filter((row) => row.item.extractHash !== undefined).length,
+    noProseCount: metro.filter((row) => !hasProse(row.item)).length,
     totalCount: rows.length,
   };
 }

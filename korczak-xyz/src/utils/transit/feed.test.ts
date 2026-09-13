@@ -88,6 +88,34 @@ describe('buildTransitFeed', () => {
     expect(feed.extractedCount).toBe(1);
     expect(feed.totalCount).toBe(3);
   });
+
+  /*
+   * A second number, because there are two ways for the first one to be low and they need different
+   * acts: a stopped extractor is a model to go and look at, where a corpus of headlines is WTP's
+   * feed carrying no communiqués at all and no amount of re-running the extractor touches it.
+   * Folded into one figure, the morning of 12 Sep 2026 would have read as a healthy extraction.
+   */
+  it('counts separately the metro notices that hold nothing to read', () => {
+    const feed = buildTransitFeed(
+      [
+        item('headline', { body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.' }),
+        item('read', {
+          body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.',
+          article:
+            'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+            'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański. ' +
+            'Metro kursuje w dwóch pętlach: Młociny <-> Słodowiec oraz Kabaty <-> Dworzec Gdański.',
+          closedStops: ['Słodowiec'],
+          extractHash: 'aaaaaaaaaaaaaaaa',
+        }),
+        item('bus', { title: 'Utrudnienia: 189', titleLines: ['189'] }),
+      ],
+      SEGMENTS,
+      { now: NOW },
+    );
+    expect(feed.metroCount).toBe(2);
+    expect(feed.noProseCount).toBe(1);
+  });
 });
 
 describe('the state badges', () => {

@@ -54,8 +54,37 @@ export interface TransitItem {
   /** WTP's own headline, e.g. `Utrudnienia w komunikacji: 189, 401, 402`. */
   title: string;
   url: string;
-  /** The article prose, tags stripped, capped. What the extractor is shown. */
+  /**
+   * The feed's own `description` / `content:encoded`, tags stripped, capped.
+   *
+   * **Not the article.** WTP publishes both fields as the headline restated — the 12 Sep 2026 M1
+   * suspension arrived as `ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.` and
+   * nothing else, while the prose naming Słodowiec, Marymont, Plac Wilsona and Dworzec Gdański sat
+   * on the web page. Kept all the same: it is what the feed said, and `article` is fetched against
+   * it changing.
+   */
   body?: string;
+  /**
+   * The article page's prose, fetched because `body` is a headline. What the extractor is shown.
+   *
+   * Absent means one of three things and the app must not confuse them with each other: this is not
+   * a metro item and was never fetched, the fetch has not run yet, or it ran and failed —
+   * `articleFetchedFor` and `articleError` are what tell those apart. Absent never means "the
+   * notice is about nothing".
+   */
+  article?: string;
+  /**
+   * The feed-only `contentHash` the article fetch last ran for, successful or not.
+   *
+   * A latch keyed on the *feed's* revision rather than the item's, which is what lets `mergeItem`
+   * decide whether a stored article still belongs to the row that arrived: WTP editing the RSS
+   * text drops the article, and a dropped article is re-fetched. Present means "already attempted
+   * at this revision", which is what stops a page that will not load being asked for again every
+   * ten minutes.
+   */
+  articleFetchedFor?: string;
+  /** Why the last article fetch produced nothing. The Raw tab's answer to a card that says little. */
+  articleError?: string;
   /** `pubDate` as epoch ms. A communiqué is an article, so this is the only date the feed states. */
   publishedAt: number;
   /**
@@ -67,10 +96,11 @@ export interface TransitItem {
    */
   titleLines: string[];
   /**
-   * A digest of exactly what the extractor was shown. Unchanged content, no second call — the same
-   * bargain `classifyHash` makes in the events app, and the same reason: WTP edits a live
-   * communiqué as a closure develops, and re-reading it then is the point, while re-reading it
-   * every ten minutes because `updatedAt` moved is a bill for nothing.
+   * A digest of exactly what the extractor was shown — the title and `proseOf`, article included.
+   * Unchanged content, no second call: the same bargain `classifyHash` makes in the events app, and
+   * the same reason. WTP edits a live communiqué as a closure develops, and re-reading it then is
+   * the point, while re-reading it every ten minutes because `updatedAt` moved is a bill for
+   * nothing. The edit lands in the *article* rather than in the feed, which is why this covers it.
    */
   contentHash: string;
 
@@ -83,7 +113,9 @@ export interface TransitItem {
    *
    * Empty is a real answer and is not the same as absent: a communiqué can affect a line without
    * closing a station (a reduced frequency, a lift out of order), and `closedStops: []` says the
-   * extractor read the prose and found no closure. Absent says nobody has read it.
+   * extractor read the prose and found no closure. Absent says it has not been read — because
+   * nobody has looked yet, because the reading failed, or because there was no prose to look at
+   * (`hasProse`). All three escalate; only the empty list clears.
    */
   closedStops?: string[];
   /** True where the prose describes the whole line stopping rather than named stations. */
