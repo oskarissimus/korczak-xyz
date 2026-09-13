@@ -289,6 +289,9 @@ export const translations = {
     shareTitle: 'Share this log',
     shareIntro:
       'Anyone you share with signs in with their own account and sees the same log — the same running sleep, the same history. Either of you can add, correct and delete entries.',
+    // One grant per person rather than one per app, so this has to be said where it is granted.
+    shareScope:
+      'One grant per person, for the household rather than for one app: the same people also see the shopping list, and revoking here takes both away.',
     shareUnavailable:
       'Accounts are not configured on this build, so there is nothing to share the log with. It is still kept on this device.',
     shareSignedOutTitle: 'Sign in to share',
@@ -615,6 +618,8 @@ export const translations = {
     shareTitle: 'Udostępnij ten dziennik',
     shareIntro:
       'Osoba, której udostępnisz dziennik, loguje się na własne konto i widzi ten sam dziennik — ten sam trwający sen, tę samą historię. Każde z was może dodawać, poprawiać i usuwać wpisy.',
+    shareScope:
+      'Jeden dostęp na osobę, dla domu, a nie dla pojedynczej aplikacji: te same osoby widzą też listę zakupów, a odebranie dostępu tutaj zabiera jedno i drugie.',
     shareUnavailable:
       'W tej wersji konta nie są skonfigurowane, więc nie ma komu udostępnić dziennika. Nadal jest zapisywany na tym urządzeniu.',
     shareSignedOutTitle: 'Zaloguj się, aby udostępnić',

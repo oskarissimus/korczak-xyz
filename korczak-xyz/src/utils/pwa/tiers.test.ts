@@ -69,6 +69,7 @@ describe('precache tiers', () => {
       // The routes the merged app replaced belong to no app and must ask for no tier.
       '/apps/fretboard', '/apps/transpose',
       '/apps/baby-sleep', '/apps/baby-sleep/share', '/pl/apps/baby-sleep/stats',
+      '/apps/shopping', '/apps/shopping/share', '/pl/apps/shopping/share',
       '/apps/events', '/apps/events/interests', '/pl/apps/events/alerts',
     ];
     for (const path of paths) {
@@ -88,6 +89,8 @@ describe('precache tiers', () => {
     expect(byTier.get('flashcards')!.test('/pl/apps/flashcards/neck')).toBe(true);
     expect(byTier.get('baby-sleep')!.test('/apps/baby-sleep')).toBe(true);
     expect(byTier.get('baby-sleep')!.test('/pl/apps/baby-sleep/share')).toBe(true);
+    expect(byTier.get('shopping')!.test('/apps/shopping')).toBe(true);
+    expect(byTier.get('shopping')!.test('/pl/apps/shopping/share')).toBe(true);
     expect(byTier.get('events')!.test('/apps/events')).toBe(true);
     expect(byTier.get('events')!.test('/pl/apps/events/alerts')).toBe(true);
   });

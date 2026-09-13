@@ -1,6 +1,6 @@
 ---
 name: pwa
-description: The six installable web apps - manifests per app per locale, the single service worker and its precache tiers, the safe area, and self-hosted fonts.
+description: The seven installable web apps - manifests per app per locale, the single service worker and its precache tiers, the safe area, and self-hosted fonts.
 paths:
   - "**/utils/pwa/**"
   - "**/components/PwaHead.astro"
@@ -20,10 +20,10 @@ paths:
 
 ## Installable web apps (PWA)
 
-The site ships **six** installable apps from one origin: the whole site, the guitar tuner
+The site ships **seven** installable apps from one origin: the whole site, the guitar tuner
 (`/apps/tuner`), the songbook (`/songs`), the flashcards (`/apps/flashcards`), the baby sleep log
-(`/apps/baby-sleep`) and Event Watch (`/apps/events`). What qualifies is a thing you reach for away
-from a desk;
+(`/apps/baby-sleep`), the shopping list (`/apps/shopping`) and Event Watch (`/apps/events`). What
+qualifies is a thing you reach for away from a desk;
 the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
 opening a link outside it leaves the app — which is the point, since most of the site is not
 built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks
@@ -53,18 +53,21 @@ manifests, the icon set, the head tags — follows.
 - `src/assets/icons/*.svg` → `npm run icons` → `public/icons/`. Committed, not built: CI only
   runs `astro build`, and the deploy should not depend on sharp's native binaries.
 
-The five drawn icons are **full bleed**: every platform masks a home screen icon to its own
+The drawn icons are **full bleed**: every platform masks a home screen icon to its own
 shape, so the artwork runs to all four edges with nothing load-bearing within ~40px of them,
 and the convex read comes from a bounce light, a gloss sweep and a perimeter vignette layered at
 the end of each file. The square-on-navy art this replaced left a visible border on all four
 sides once iOS rounded the corners off the navy. `generate-icons.mjs` therefore picks the
-maskable treatment per source: `bleed` ships those five unscaled, `inset` keeps the old shrink-onto-navy
+maskable treatment per source: `bleed` ships the drawn ones unscaled, `inset` keeps the old shrink-onto-navy
 for `logo.png`, whose own square edges a circular mask would clip.
 
-All five are the same Win95 device — navy body, raised bezel, sunken black glass — with only
+All of them are the same Win95 device — navy body, raised bezel, sunken black glass — with only
 what is *on* the glass telling them apart, because they sit side by side on one home screen:
 the tuner's dial, the songbook's yellow chords over green lyrics, the flashcards' stack of cards, the
-sleep log's crescent and Zs, Event Watch's yellow ticket over a green calendar bar. Green and yellow throughout, the site's own phosphor.
+sleep log's crescent and Zs, the shopping list's green trolley carrying a yellow tick, Metro Watch's
+M over the two line colours, Event Watch's yellow ticket over a green calendar bar. Green and yellow
+throughout, the site's own phosphor. (This paragraph used to count them, and the count was a
+release behind more often than not, so it no longer does.)
 The flashcards icon draws **two** frets where the app draws five, on a card front rather than filling
 the glass: an icon is read at 40px two rows down a home screen, where a finer grid stops being a neck
 and becomes texture — and the fret count is not the question the icon is asking. The card behind the
@@ -177,8 +180,10 @@ takes at most two: the shell, and the one named after the app it belongs to.
   worker cannot tell those apart — iOS gives them the same registration — so `register-sw.js`
   checks `display-mode: standalone` and names the tiers it wants.
 - **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `flashcards` (~110 kB gz),
-  `baby-sleep` (~92 kB gz), `events`. Each covers its app's whole subtree, because a tab is a
-  separate document and an uncached tab is a dead link on a dead network.
+  `baby-sleep` (~92 kB gz), `shopping`, `events`. Each covers its app's whole subtree, because a tab
+  is a separate document and an uncached tab is a dead link on a dead network. The shopping list is
+  the tier that most has to be there: it is used in a basement on a dead network, and a list you
+  cannot open is not a list.
 
 The per-app split is what stops the shell growing with the app count. Folding the newest apps into the
 shell instead cost every installed app — including the songbook, which wants none of it — an extra

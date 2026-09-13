@@ -1,8 +1,16 @@
 rules_version = '2';
 
-// Each account's data is private to it, with one deliberate exception: the baby sleep log can be
-// shared with a second account, so both parents can log against one history. Everything else —
-// typing progress, fretboard sittings, diagnostic logs — remains owner-only.
+// Each account's data is private to it, with one deliberate exception: the household apps — the
+// baby sleep log and the shopping list — can be shared with a second account, so both parents work
+// against one history. Everything else — typing progress, fretboard sittings, diagnostic logs —
+// remains owner-only.
+//
+// There is **one grant per person, not one per app**: a single `shares/{email}` document is what
+// every block at the bottom of this file consults, so inviting somebody to the shopping list gives
+// them the sleep log too, and revoking takes both away. That is deliberate — a household is a
+// household, and two lists of the same two people that can silently fall out of step is a worse
+// thing to own than one grant that is honest about its reach — and both share tabs say so on the
+// screen. Splitting it later means a second collection and a second `hasShare()`, not a flag here.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -146,6 +154,19 @@ service cloud.firestore {
     // copy of the rule, for the reason above: rules are a permissive union, and no block above says
     // anything at all about this path.
     match /users/{uid}/babySleepTargets/{recordId} {
+      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+    }
+
+    // The shopping list — one document per line, ticked off by whoever is in the shop. A different
+    // app from everything above it and the same household, so it reads the same grant: anyone who
+    // could already open the sleep log can open this, with nothing to re-invite.
+    //
+    // Another separate collection, so another copy of the rule, for the reason stated at every
+    // block above: rules are a permissive union, and none of them says anything at all about this
+    // path. The owner's own access comes from the `users/{uid}/{document=**}` catch-all and works
+    // whatever this block says — which is exactly what would make a forgotten one invisible to the
+    // person most likely to notice, and leave the *shared* half silently dead.
+    match /users/{uid}/shopping/{itemId} {
       allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
     }
   }

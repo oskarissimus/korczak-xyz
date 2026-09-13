@@ -71,6 +71,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     shortNameKey: 'pwa.babySleep.short',
     descriptionKey: 'babySleep.desc',
   },
+  shopping: {
+    path: '/apps/shopping',
+    nameKey: 'Shopping',
+    shortNameKey: 'pwa.shopping.short',
+    descriptionKey: 'shopping.desc',
+  },
 };
 
 /** The site's own background colour, so the iOS splash screen matches the page behind it. */

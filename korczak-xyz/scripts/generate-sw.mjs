@@ -46,6 +46,7 @@ const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
   flashcards: /^(\/pl)?\/apps\/flashcards(\/|$)/,
   'baby-sleep': /^(\/pl)?\/apps\/baby-sleep(\/|$)/,
+  shopping: /^(\/pl)?\/apps\/shopping(\/|$)/,
   events: /^(\/pl)?\/apps\/events(\/|$)/,
   transit: /^(\/pl)?\/apps\/transit(\/|$)/,
 };

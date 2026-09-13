@@ -1,0 +1,499 @@
+/* Shopping list — retro theme.
+ *
+ * Its own sheet rather than more of babySleep.css: the two apps share a merge and a share document
+ * and nothing on the screen, and a page that imported the sleep log's stylesheet would be paying
+ * for eight charts' worth of rules to draw a list of words.
+ *
+ * The one thing to know before editing: this screen is used one-handed, at arm's length, pushing a
+ * trolley. Every hit area here is deliberately larger than it looks like it needs to be, and the
+ * amount of ink is deliberately small — if a rule below makes a row denser, it is making the app
+ * worse at the only place it is used. */
+
+@import './tabs.css';
+
+.shopping-window {
+  margin-bottom: 20px;
+}
+
+/* Same reasoning as the trainers: this is a property sheet, not a page in a teal window, so the
+   content area is the panel face and the ink has to be reset along with the surface. */
+.shopping-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.sl-list,
+.sl-share {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+}
+
+/* Reserves roughly what the island will occupy, so the tab strip above it does not jump. */
+.sl-loading {
+  min-height: 420px;
+}
+
+.sl-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.35rem;
+  margin: 0 0 8px;
+  color: var(--retro-black);
+}
+
+.sl-count {
+  color: var(--retro-dark-gray);
+  font-size: 1.05rem;
+}
+
+.sl-hint,
+.sl-note {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.sl-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+  margin-bottom: 8px;
+}
+
+/* Visually hidden but read aloud. */
+.sl-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- the add box ---------------------------------------------------------- */
+
+.sl-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.sl-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The name takes what is left and the amount takes a fixed slice, so a phone keeps both on one
+   row — two stacked rows would push the Add button below the fold on a small screen. */
+.sl-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sl-add-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sl-add-field--name {
+  flex: 3 1 160px;
+}
+
+.sl-add-field--note {
+  flex: 1 1 80px;
+}
+
+.sl-field-label {
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+.sl-input {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  background: var(--retro-white);
+  color: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+}
+
+.sl-input--note {
+  max-width: 10em;
+}
+
+/* The one-handed button. Big enough for a thumb without looking at the screen. */
+.sl-big {
+  min-height: 56px;
+  font-family: 'VT323', monospace;
+  font-size: 1.4rem;
+  padding: 10px 14px;
+  border: 3px outset var(--retro-white);
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  cursor: pointer;
+}
+
+.sl-big:active {
+  border-style: inset;
+}
+
+/* The colour is named twice, the second time with :hover. Layout.astro has a global
+   `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a single class — so without the
+   duplicate the button under the pointer goes flat grey and the colour that carries its meaning
+   disappears exactly while it is being used. */
+.sl-big--add,
+.sl-big--add:hover {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+/* --- the suggestion chips ------------------------------------------------- */
+
+.sl-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sl-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.sl-chip {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  /* 40px, which is the smallest target worth offering a thumb; the chips are the fast path onto
+     the list and a miss here costs the typing they exist to save. */
+  min-height: 40px;
+  padding: 4px 10px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 2px outset var(--retro-white);
+  cursor: pointer;
+}
+
+.sl-chip:active {
+  border-style: inset;
+}
+
+/* --- the two halves ------------------------------------------------------- */
+
+.sl-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Bought things are still on the screen — that is the whole point of a tick being a field rather
+   than a delete — but they are not what you are reading, so the half is dimmed as a block. */
+.sl-section--done {
+  opacity: 0.85;
+}
+
+.sl-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+/* The label is the hit area, and it takes the whole row bar the meta column: a tick made while
+   walking has to land on the word, not on a box beside it. */
+.sl-item-main {
+  flex: 1 1 60%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.sl-item-name {
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.sl-item-note {
+  font-size: 1.1rem;
+  color: var(--retro-dark-gray);
+  white-space: nowrap;
+}
+
+/* Struck through and dimmed, and still perfectly readable: the line you have just ticked is the
+   one you look at to be sure you really put it in the trolley. */
+.sl-item--done .sl-item-name,
+.sl-item--done .sl-item-note {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.sl-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sl-item-by {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+/* A Win95 button as a tick box. `appearance: none` is what lets a real <input> look like this.
+   Every state is spelled out, `:checked` above all, and none of it is redundant: `@tailwindcss/forms`
+   is in the site's global sheet and paints a checked box its own blue with a tick as a background
+   image, restating that colour again for :hover and :focus and putting a ring shadow under both.
+   Leave any one of those alone and a stock web checkbox turns up in the middle of a Win95 panel —
+   which is exactly what shipped from the version of this rule that had no `:checked`.
+
+   The extra `.sl-item` on each selector is what outranks the plugin, whose own rules are selectors
+   of the same weight (`[type=checkbox]:checked`): equal specificity would leave this to sheet
+   order, and sheet order is not something a page should have to get right to draw a tick box. */
+.sl-item .sl-check,
+.sl-item .sl-check:hover,
+.sl-item .sl-check:focus,
+.sl-item .sl-check:checked,
+.sl-item .sl-check:checked:hover,
+.sl-item .sl-check:checked:focus {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  flex: none;
+  margin: 0;
+  width: 32px;
+  height: 32px;
+  background: var(--retro-white);
+  background-image: none;
+  box-shadow: none;
+  border: 3px inset var(--retro-dark-gray);
+  cursor: pointer;
+}
+
+/* The tick is two borders rather than a background image or a glyph: no font here is guaranteed a
+   check mark, and a background tick is the first thing a high-contrast mode drops. */
+.sl-item .sl-check::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 16px;
+  margin: 2px auto 0;
+  border: solid var(--retro-navy);
+  border-width: 0 4px 4px 0;
+  transform: rotate(40deg);
+  opacity: 0;
+}
+
+.sl-item .sl-check:checked::after {
+  opacity: 1;
+}
+
+/* --- correcting one line -------------------------------------------------- */
+
+.sl-item--editing {
+  border-style: inset;
+}
+
+.sl-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+
+.sl-edit .sl-input {
+  flex: 3 1 140px;
+  width: auto;
+}
+
+.sl-edit .sl-input--note {
+  flex: 1 1 80px;
+}
+
+.sl-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sl-action {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  min-height: 44px;
+  padding: 6px 14px;
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  border: 2px outset var(--retro-white);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sl-action:active {
+  border-style: inset;
+}
+
+.sl-action:disabled {
+  color: var(--retro-dark-gray);
+  cursor: default;
+}
+
+/* A link-shaped control, for the actions that are not the point of the row. */
+.sl-link {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  /* Still a 44px target even though it does not look like one — Edit and Remove sit next to a
+     checkbox, and a thumb that misses Remove and hits the tick is a different kind of annoying. */
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sl-link:hover {
+  background: none;
+}
+
+.sl-link--danger {
+  color: #a00000;
+}
+
+/* --- sync ---------------------------------------------------------------- */
+
+.sl-sync {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.sl-sync--quiet {
+  color: var(--retro-dark-gray);
+}
+
+.sl-sync--ok {
+  color: #006000;
+}
+
+.sl-sync--error {
+  color: #a00000;
+}
+
+.sl-warn {
+  padding: 10px 12px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  font-size: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sl-warn-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+/* --- sharing ------------------------------------------------------------- */
+
+.sl-share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.sl-share-row .sl-input {
+  flex: 1 1 200px;
+  width: auto;
+}
+
+.sl-share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-share-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.sl-share-email {
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.sl-share-since {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+  margin-right: auto;
+}
+
+/* --- the server-rendered stand-in ----------------------------------------- */
+
+.sl-skel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--retro-dark-gray);
+}
+
+.sl-big.sl-skel {
+  color: var(--retro-gray);
+}
+
+.sl-skel-field {
+  display: block;
+  min-height: 44px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+}

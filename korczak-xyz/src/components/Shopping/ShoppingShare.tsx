@@ -1,14 +1,23 @@
 /*
- * The share tab: who else may write to this log.
+ * The share tab: who else may write to this list.
  *
  * Three audiences, and they need different pages rather than one page with things disabled:
  *   - signed out, where sharing is not a thing that can be described yet;
- *   - the owner, who manages the list;
- *   - an invitee, who has nothing to manage and only needs to know whose log she is in.
+ *   - the owner, who manages the list of people;
+ *   - an invitee, who has nothing to manage and only needs to know whose list they are in.
  *
- * The list is read on mount and kept in local state rather than re-read after every change. There is
- * one writer — the owner, here — so the optimistic copy cannot drift from the server the way a
- * shared document could.
+ * **The grant is the household's, not this app's.** `shares/{email}` is one top-level document per
+ * invited address, and `firestore.rules` names it from every shared collection — the sleep log's and
+ * this one's — so adding somebody here gives them both, and revoking takes both away. That is the
+ * deliberate shape: a household is a household, and two lists of the same two people that can
+ * silently disagree is a worse thing to own than one grant that is honest about its reach. It is
+ * also why this tab can work on the day it ships with nobody re-invited. `shareScope` says so on the
+ * screen, because a grant that reaches further than the page you granted it on must never be a
+ * surprise.
+ *
+ * A near-copy of `BabySleep/BabySleepShare.tsx` rather than a shared component: that one's `bs-*`
+ * classes live in `babySleep.css`, and the two differ in every noun. What is genuinely common — the
+ * share document, its key, the rules — is `utils/babySleep/shares.ts` and is imported.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -21,11 +30,11 @@ import { normalizeShareEmail, type ShareEmailError } from '../../utils/babySleep
 import { addShare, listShares, removeShare, type Share } from '../../utils/babySleep/shares';
 import { fill, localeOf, translations, type Lang } from './translations';
 
-interface BabySleepShareProps {
+interface ShoppingShareProps {
   lang: Lang;
 }
 
-export default function BabySleepShare({ lang }: BabySleepShareProps) {
+export default function ShoppingShare({ lang }: ShoppingShareProps) {
   const t = translations[lang];
   const auth = useAuth();
   const owner = useDataOwner(auth.user);
@@ -54,7 +63,7 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
         const found = await listShares(uid);
         if (!cancelled) setShares(found);
       } catch (e) {
-        log.warn('babySleep.share.list.failed', describeError(e));
+        log.warn('shopping.share.list.failed', describeError(e));
         if (!cancelled) setError(t.shareErrFailed);
       } finally {
         if (!cancelled) setLoading(false);
@@ -104,7 +113,7 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
       setDraft('');
       setNotice(fill(t.shareAdded, { email: share.email }));
     } catch (e) {
-      log.warn('babySleep.share.add.failed', describeError(e));
+      log.warn('shopping.share.add.failed', describeError(e));
       setError(t.shareErrFailed);
     } finally {
       setBusy(false);
@@ -121,14 +130,14 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
       setShares((prev) => prev.filter((s) => s.email !== email));
       setNotice(t.shareRevoked);
     } catch (e) {
-      log.warn('babySleep.share.remove.failed', describeError(e));
+      log.warn('shopping.share.remove.failed', describeError(e));
       setError(t.shareErrFailed);
     } finally {
       setBusy(false);
     }
   };
 
-  // --- nothing to share with ---------------------------------------------------------------------
+  // --- nothing to share with ---------------------------------------------------------------
 
   /*
    * No Firebase config, so there are no accounts at all and sharing is not a thing that can be
@@ -137,10 +146,10 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
    */
   if (!auth.enabled) {
     return (
-      <div className="bs-share">
-        <section className="bs-section">
-          <h2 className="bs-subhead">{t.shareTitle}</h2>
-          <p className="bs-note">{t.shareUnavailable}</p>
+      <div className="sl-share">
+        <section className="sl-section">
+          <h2 className="sl-subhead">{t.shareTitle}</h2>
+          <p className="sl-note">{t.shareUnavailable}</p>
         </section>
       </div>
     );
@@ -152,22 +161,22 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
    * may turn out to be an invitee with nothing to manage.
    */
   if (auth.loading || (auth.user && !owner.resolved && !owner.error)) {
-    return <div className="bs-loading" />;
+    return <div className="sl-loading" />;
   }
 
-  // --- signed out ------------------------------------------------------------------------------
+  // --- signed out --------------------------------------------------------------------------
 
   if (!auth.user) {
     const loginPath =
       lang === 'en'
-        ? '/login/?redirect=/apps/baby-sleep/share/'
-        : '/pl/login/?redirect=/pl/apps/baby-sleep/share/';
+        ? '/login/?redirect=/apps/shopping/share/'
+        : '/pl/login/?redirect=/pl/apps/shopping/share/';
     return (
-      <div className="bs-share">
-        <section className="bs-section">
-          <h2 className="bs-subhead">{t.shareSignedOutTitle}</h2>
-          <p className="bs-note">{t.shareSignedOutBody}</p>
-          <a className="bs-action" href={loginPath}>
+      <div className="sl-share">
+        <section className="sl-section">
+          <h2 className="sl-subhead">{t.shareSignedOutTitle}</h2>
+          <p className="sl-note">{t.shareSignedOutBody}</p>
+          <a className="sl-action" href={loginPath}>
             {t.shareSignIn}
           </a>
         </section>
@@ -175,20 +184,20 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
     );
   }
 
-  // --- the lookup failed -----------------------------------------------------------------------
+  // --- the lookup failed -------------------------------------------------------------------
 
   /*
    * Deliberately distinct from "not shared". `useDataOwner` refuses to guess when it cannot read the
-   * share, because guessing wrong writes the household's entries into the wrong account — so this
-   * state is real and the page has to say what it means rather than showing an empty list.
+   * share, because guessing wrong writes the household's list into the wrong account — so this state
+   * is real and the page has to say what it means rather than showing an empty list.
    */
   if (!owner.resolved && owner.error) {
     return (
-      <div className="bs-share">
-        <section className="bs-warn" role="status">
-          <p className="bs-warn-title">{t.shareUnresolvedTitle}</p>
+      <div className="sl-share">
+        <section className="sl-warn" role="status">
+          <p className="sl-warn-title">{t.shareUnresolvedTitle}</p>
           <p>{t.shareUnresolvedBody}</p>
-          <button type="button" className="bs-action" onClick={owner.retry}>
+          <button type="button" className="sl-action" onClick={owner.retry}>
             {t.shareRetry}
           </button>
         </section>
@@ -196,40 +205,37 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
     );
   }
 
-  // --- an invitee ------------------------------------------------------------------------------
+  // --- an invitee --------------------------------------------------------------------------
 
   if (owner.shared) {
     const ownerName = owner.ownerEmail ? authorLabel(owner.ownerEmail) : t.shareOwnerUnknown;
     return (
-      <div className="bs-share">
-        <section className="bs-section">
-          <h2 className="bs-subhead">{fill(t.shareGuestTitle, { owner: ownerName })}</h2>
-          <p className="bs-note">{t.shareGuestBody}</p>
+      <div className="sl-share">
+        <section className="sl-section">
+          <h2 className="sl-subhead">{fill(t.shareGuestTitle, { owner: ownerName })}</h2>
+          <p className="sl-note">{t.shareGuestBody}</p>
         </section>
       </div>
     );
   }
 
-  // --- the owner -------------------------------------------------------------------------------
+  // --- the owner ---------------------------------------------------------------------------
 
   return (
-    <div className="bs-share">
-      <section className="bs-section">
-        <h2 className="bs-subhead">{t.shareTitle}</h2>
-        <p className="bs-note">{t.shareIntro}</p>
-        {/* The grant is one document per person and every shared collection reads it, so adding
-            somebody here gives them the shopping list too. A reach wider than the page you granted
-            it on must never be a surprise. */}
-        <p className="bs-note">{t.shareScope}</p>
+    <div className="sl-share">
+      <section className="sl-section">
+        <h2 className="sl-subhead">{t.shareTitle}</h2>
+        <p className="sl-note">{t.shareIntro}</p>
+        <p className="sl-note">{t.shareScope}</p>
 
-        <form className="bs-share-form" onSubmit={submit}>
-          <label className="bs-field-label" htmlFor="bs-share-email">
+        <form className="sl-share-form" onSubmit={submit}>
+          <label className="sl-field-label" htmlFor="sl-share-email">
             {t.shareAddLabel}
           </label>
-          <div className="bs-share-row">
+          <div className="sl-share-row">
             <input
-              id="bs-share-email"
-              className="bs-share-input"
+              id="sl-share-email"
+              className="sl-input"
               type="email"
               autoComplete="off"
               inputMode="email"
@@ -237,40 +243,40 @@ export default function BabySleepShare({ lang }: BabySleepShareProps) {
               onChange={(e) => setDraft(e.target.value)}
               disabled={busy || !owner.resolved}
             />
-            <button type="submit" className="bs-action" disabled={busy || !owner.resolved}>
+            <button type="submit" className="sl-action" disabled={busy || !owner.resolved}>
               {busy ? t.shareWorking : t.shareAddButton}
             </button>
           </div>
-          <p className="bs-hint">{t.shareAddHint}</p>
+          <p className="sl-hint">{t.shareAddHint}</p>
         </form>
 
         {error && (
-          <p className="bs-sync bs-sync--error" role="alert">
+          <p className="sl-sync sl-sync--error" role="alert">
             ✕ {error}
           </p>
         )}
         {notice && (
-          <p className="bs-sync bs-sync--ok" role="status">
+          <p className="sl-sync sl-sync--ok" role="status">
             ✓ {notice}
           </p>
         )}
       </section>
 
-      <section className="bs-section">
-        <h3 className="bs-subhead">{t.shareListTitle}</h3>
+      <section className="sl-section">
+        <h3 className="sl-subhead">{t.shareListTitle}</h3>
         {shares.length === 0 ? (
-          <p className="bs-hint">{loading ? '' : t.shareEmpty}</p>
+          <p className="sl-hint">{loading ? '' : t.shareEmpty}</p>
         ) : (
-          <ul className="bs-share-list">
+          <ul className="sl-share-list">
             {shares.map((share) => (
-              <li className="bs-share-item" key={share.email}>
-                <span className="bs-share-email">{share.email}</span>
-                <span className="bs-share-since">
+              <li className="sl-share-item" key={share.email}>
+                <span className="sl-share-email">{share.email}</span>
+                <span className="sl-share-since">
                   {share.createdAt > 0 ? fill(t.shareSince, { date: formatDate(share.createdAt) }) : ''}
                 </span>
                 <button
                   type="button"
-                  className="bs-link"
+                  className="sl-link"
                   onClick={() => void revoke(share.email)}
                   disabled={busy}
                 >

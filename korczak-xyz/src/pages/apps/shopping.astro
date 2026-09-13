@@ -1,0 +1,30 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ShoppingList from '../../components/Shopping/ShoppingList';
+import ShoppingTabs from '../../components/Shopping/ShoppingTabs.astro';
+import ShoppingSkeleton from '../../components/Shopping/skeletons/ShoppingSkeleton.astro';
+import { useTranslations } from '../../i18n';
+import '../../styles/shopping.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Shopping')} | korczak.xyz`} lang={lang} pwa="shopping">
+  <div class="window shopping-window">
+    <div class="title-bar">
+      <span>{t('Shopping')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content shopping-content">
+      <ShoppingTabs lang={lang} active="list" />
+      <ShoppingList client:only="react" lang={lang}>
+        <ShoppingSkeleton slot="fallback" lang={lang} />
+      </ShoppingList>
+    </div>
+  </div>
+</Layout>

@@ -620,6 +620,15 @@ One document does three jobs: it is the grant the rules read, the pointer tellin
 browser whose log to open, and the row the owner revokes. Unlike a sleep entry it is **really
 deleted** on revoke — the rule asks whether it exists, so a tombstone would leave access granted.
 
+**It is one grant per person, not one per app**, and since the shopping list shipped that is no
+longer a distinction without a difference: `shares/{email}` is what `firestore.rules` consults from
+this app's four collections *and* from `users/{uid}/shopping`, so adding somebody here gives them the
+shopping list too and revoking here takes both away. Deliberate — a household is a household, and two
+lists of the same two people that can silently fall out of step is a worse thing to own than one
+grant that is honest about its reach — and `shareScope` says so on both share tabs, because a grant
+reaching further than the page it was given on must never be a surprise. See
+`.claude/rules/shopping.md`.
+
 `useDataOwner` resolves it, and **a failed lookup must never fall back to the user's own uid**.
 "I could not tell" and "you have no share" are indistinguishable from the fallback's side, and
 guessing wrong makes the invitee's device decide it owns a private log and push the household's
