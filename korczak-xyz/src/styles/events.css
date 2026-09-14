@@ -664,6 +664,23 @@
   background: #ffd9d9;
 }
 
+/*
+ * A source this account has switched off.
+ *
+ * Dimmed rather than collapsed, and the switch and the name stay at full strength: the card is
+ * still the place the decision is reviewed, and a source you have to expand to turn back on is one
+ * you forget you turned off. Greyed and not coloured — this is a state somebody chose, where
+ * `ev-source--bad` is something that went wrong, and the two must not read alike.
+ *
+ * Deliberately AFTER `ev-source--bad`, so a failing source that has been switched off still shows
+ * its red: the health is a fact about the collector and stays true whoever is listening.
+ */
+.ev-source--off .ev-source-note,
+.ev-source--off .ev-pages,
+.ev-source--off .ev-source-status {
+  opacity: 0.55;
+}
+
 .ev-source-head {
   display: flex;
   align-items: baseline;
@@ -711,6 +728,17 @@
 .ev-page-meta {
   color: var(--retro-dark-gray);
   font-size: 1rem;
+}
+
+/*
+ * The switch, given room above the pages and below the sentence it is a judgement about.
+ *
+ * `.ev-check`'s own `margin-top: 10px` is for a box at the foot of a form; here it sits between
+ * two blocks that already carry the card's gap, so it is taken back rather than doubled.
+ */
+.ev-source-switch {
+  margin-top: 0;
+  font-size: 1.05rem;
 }
 
 .ev-source-status {

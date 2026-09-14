@@ -25,6 +25,7 @@ import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
 import { KIND_KEYS, type KindKey } from '../feed';
 import { PUSH_APPS } from '../pushApps';
+import { normalizeSourcePrefs, type SourcePrefs } from '../sourcePrefs';
 import type { EventRecord, Ignore, Interest, PushApp, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
@@ -38,6 +39,7 @@ export const EVENT_KEYS = {
   pushApps: 'events-push-sub-apps',
   pushSeen: 'events-push-seen-at',
   settings: 'events-push-settings',
+  sourcePrefs: 'events-source-prefs',
   feedCity: 'events-feed-city',
   feedKinds: 'events-feed-kinds',
 } as const;
@@ -59,6 +61,12 @@ const CACHED_PER_OWNER = [
   EVENT_KEYS.ignoresUnsynced,
   EVENT_KEYS.feed,
   EVENT_KEYS.settings,
+  /*
+   * Not a view preference: switching a source off silences its notifications too, so this is a
+   * setting of the account's rather than of the browser's — and one account's silence must not
+   * follow the next person into a feed they have never narrowed.
+   */
+  EVENT_KEYS.sourcePrefs,
   /*
    * A view preference rather than data, but it is one that hides rows — and a filter to Warszawa
    * inherited by the next account would empty a feed nobody in that account had ever narrowed.
@@ -451,6 +459,23 @@ export function loadPushSettings(): PushSettings {
 
 export function savePushSettings(settings: PushSettings): boolean {
   return writeEventsKey(EVENT_KEYS.settings, JSON.stringify(settings));
+}
+
+/**
+ * The Sources tab's switches, as this browser last knew them.
+ *
+ * Stored locally as well as in the cloud for the reason the interests are — the tab has to draw
+ * the boxes on the first paint rather than after a round trip, and `buildFeed` has to know what is
+ * off before it draws a feed. `normalizeSourcePrefs` rather than a cast: this is parsed from a
+ * store an older build wrote, and a half-written switch that read as `enabled: undefined` would
+ * silence a source with nothing on the screen saying why.
+ */
+export function loadSourcePrefs(): SourcePrefs {
+  return normalizeSourcePrefs(readJSON<unknown>(EVENT_KEYS.sourcePrefs, {}));
+}
+
+export function saveSourcePrefs(prefs: SourcePrefs): boolean {
+  return writeEventsKey(EVENT_KEYS.sourcePrefs, JSON.stringify(prefs));
 }
 
 // --- account switching ----------------------------------------------------------------------

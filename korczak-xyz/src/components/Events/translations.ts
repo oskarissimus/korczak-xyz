@@ -43,6 +43,13 @@ export const translations = {
     onSaleNow: 'On sale',
     saleOpens: 'Sale opens {when}',
     showingCount: '{shown} of {total} upcoming',
+    // The two narrowings that hide a row without an interest having decided anything, named on the
+    // card in `Everything` and pointed at from an empty list. `sourcesOffHint` is a link to the
+    // Sources tab, which is the only place the switch can be moved back.
+    offSourceChip: 'Source off',
+    // Count after the noun, in both languages, so neither has to agree a number with a plural —
+    // Polish has three forms of "źródła" and English would still read "1 sources".
+    sourcesOffHint: 'Sources switched off: {count} — Sources tab',
     viewMatched: 'Matched',
     viewRejected: 'Filtered out',
     viewAll: 'Everything',
@@ -190,6 +197,12 @@ export const translations = {
     noteTicketmaster:
       'The ticketed end of what is watched for. Everything it lists is already on sale, so it can never tell you tickets have just been released.',
     sourceNeedsKey: 'needs {name}',
+    // The switch under each source, and the two states it can be read in. The label is the whole
+    // sentence rather than the source's name again: a box beside `Teatr Wielki` says nothing about
+    // what ticking it does, and this is a control that silences notifications.
+    sourceOn: 'Watching — in your feed, and can notify you',
+    sourceOff: 'Off — not in your feed, and cannot notify you. Still collected.',
+    sourceSwitchFailed: 'That switch is set on this device but was not saved: {error}',
     sourceLastRun: 'ran {when}',
     sourceInCorpus: '{count} in your feed now',
     pageOptional: 'appears when announced',
@@ -294,6 +307,8 @@ export const translations = {
     onSaleNow: 'W sprzedaży',
     saleOpens: 'Sprzedaż od {when}',
     showingCount: '{shown} z {total} nadchodzących',
+    offSourceChip: 'Źródło wyłączone',
+    sourcesOffHint: 'Wyłączone źródła: {count} — zakładka Źródła',
     viewMatched: 'Pasujące',
     viewRejected: 'Odrzucone',
     viewAll: 'Wszystko',
@@ -435,6 +450,9 @@ export const translations = {
     noteTicketmaster:
       'Biletowana część tego, czego szukamy. Wszystko, co tam jest, już jest w sprzedaży, więc stamtąd nie przyjdzie wiadomość o starcie sprzedaży.',
     sourceNeedsKey: 'wymaga {name}',
+    sourceOn: 'Śledzone — jest na liście i może powiadamiać',
+    sourceOff: 'Wyłączone — nie ma go na liście i nie powiadomi. Nadal jest zbierane.',
+    sourceSwitchFailed: 'Ten przełącznik działa na tym urządzeniu, ale nie został zapisany: {error}',
     sourceLastRun: 'ostatnio {when}',
     sourceInCorpus: '{count} na Twojej liście',
     pageOptional: 'pojawi się po ogłoszeniu',

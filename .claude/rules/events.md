@@ -554,6 +554,53 @@ two of the three columns would be empty and one tab behaving unlike the other th
 the consistency is worth. No PWA work was needed: `APP_TIERS['events']` already claims the whole
 subtree, so the tab precached itself.
 
+### The switch on each source, and the two things it does not do
+
+The three facts above answer "is this source worth its fixture?" and left you with nowhere to put
+the answer. A pipeline is tuned by running it, an adapter that turns out to be noisy is fixed in a
+fixture and a deploy, and in between the phone keeps ringing — so each card now carries a checkbox,
+and `src/utils/events/sourcePrefs.ts` is what it writes.
+
+**It is this account's preference, not an instruction to the collector.** `events/` is one shared
+corpus scraped from public pages and `eventSources/` is the health of the scrape; both are facts
+about the world rather than about a reader, and neither may change because one account got tired of
+a feed. So a silenced source is still fetched, still counted in the *"n in your feed now"* chip
+beside it, and still reports health — zeroing that count would make a silenced source look
+identical to a dead one on the one screen where the difference is the question. What stops is it
+reaching this account's feed and this account's lock screen. Turning it back on therefore loses
+nothing, which is the property that makes the switch worth reaching for at all.
+
+**And it is not a view filter.** The three controls on the Feed toolbar are per-device preferences
+that can never stop a notification — `feed.ts` says why at length. This one deliberately can, which
+is most of its point, so it is an account setting that syncs: `users/{uid}/eventSettings/sources`,
+beside the push settings, read by `useEventSourcePrefs` and by `loadAccount` in the collector. One
+document rather than a collection of five, because these are five booleans and not five records;
+`mergeSourcePrefs` settles each switch by whichever device flipped it later, so the phone silencing
+one feed and the laptop silencing another is not a conflict at all. A dead heat goes to **off** —
+of the two ways to be wrong, the quiet one is undone by a tap.
+
+Three rules keep it honest, and the third is the one that is invisible until it bites:
+
+- **`all` still means everything.** The feed obeys the switch exactly where it obeys an ignore, one
+  size up: hidden in Matched, Filtered out and Ignored, drawn in Everything under a `Source off`
+  chip. A row absent from one view and present in another with nothing saying why is the matcher
+  appearing to disagree with itself.
+- **The empty feed says who emptied it.** The switch is on another tab, and a source silenced from
+  a phone empties a laptop that has no filter set at all — so the empty state links to Sources with
+  a count, beside the buttons that clear the city and the label.
+- **Switching a source back on does not replay its backlog.** A fortnight off is a fortnight of
+  rows newer than `armedAt` and newer than every interest, so both of `isFresh`'s existing clocks
+  would let the lot through at once — the exact flood the box was reached for. A switch records
+  *when it was flipped*, and `announceFloor` makes that a third clock: re-enabling arms that source
+  from the moment of the tap, exactly as arming push arms the account from the moment of the tap.
+
+`soon` and `presale` are deliberately not floored, only `announced` and `onsale` — the two that ask
+`isFresh`. A date-based reminder is not an announcement, which is the rule `presale` already states
+for interests: a race next week is next week whenever its row happened to be collected, and hearing
+about it is why anybody switches a source back on. While a source is off, nothing is produced for
+it and — like an ignore — **nothing is latched**, so no notice id is consumed and the reminders
+survive the silence.
+
 ### Where an event is, who it is for, and whether it is one
 
 The feed's first real complaint was four PyCons — Cameroon, Africa, Greece, NL — none of them

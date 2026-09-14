@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
 import { useEventIgnores } from '../../hooks/useEventIgnores';
 import { useEventInterests } from '../../hooks/useEventInterests';
+import { useEventSourcePrefs } from '../../hooks/useEventSourcePrefs';
 import { useWebPush } from '../../hooks/useWebPush';
 import {
   buildFeed,
@@ -31,7 +32,7 @@ import {
   type KindKey,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
-import { eventFocusOf, FEED_PATH, localizePath } from '../../utils/events/links';
+import { eventFocusOf, FEED_PATH, localizePath, SOURCES_PATH } from '../../utils/events/links';
 import { formatDistances } from '../../utils/events/distance';
 import { cityKey } from '../../utils/events/cities';
 import {
@@ -69,6 +70,7 @@ function FeedPanel({ lang }: Props) {
   const feed = useEventFeed(auth.user);
   const { interests, ready } = useEventInterests(auth.user);
   const ignores = useEventIgnores(auth.user);
+  const switches = useEventSourcePrefs(auth.user);
   const t = translations[lang];
   /*
    * The event a notification asked for, read on the very first render rather than in an effect.
@@ -123,12 +125,13 @@ function FeedPanel({ lang }: Props) {
 
   const now = Date.now();
   const ignored = ignores.fingerprints;
+  const sources = switches.prefs;
   const built = useMemo(
-    () => buildFeed(feed.events, interests, now, { mode, ignored }),
+    () => buildFeed(feed.events, interests, now, { mode, ignored, sources }),
     // `now` is deliberately not a dependency: re-grouping on every render would rebuild the list
     // for a clock tick nobody can see. It is recomputed when the data actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, mode, ignored],
+    [feed.events, interests, mode, ignored, sources],
   );
 
   /*
@@ -167,7 +170,7 @@ function FeedPanel({ lang }: Props) {
    */
   const ignoredCount = useMemo(
     () =>
-      narrowSections(buildFeed(feed.events, interests, now, { mode: 'ignored', ignored }), {
+      narrowSections(buildFeed(feed.events, interests, now, { mode: 'ignored', ignored, sources }), {
         city: selectedCity,
         kinds: chosenKinds,
       }).reduce((total, section) => total + section.items.length, 0),
@@ -175,7 +178,7 @@ function FeedPanel({ lang }: Props) {
     // question, and a count taken over rows any of them hides would offer a view that opens on
     // nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, ignored, selectedCity, chosenKinds],
+    [feed.events, interests, ignored, sources, selectedCity, chosenKinds],
   );
 
   if (!feed.ready || !ready || !ignores.ready) return <div className="ev-loading" />;
@@ -384,6 +387,18 @@ function FeedPanel({ lang }: Props) {
             <button className="ev-link" type="button" onClick={kindFilter.clear}>
               {t.kindClear}
             </button>
+          ) : null}
+          {/*
+            * The fourth narrowing, and the only one whose control is on another tab — so it gets a
+            * link out rather than a button that clears it. It is also the only one that can be in
+            * force on a feed that was never narrowed *here*: a source switched off on a phone
+            * weeks ago empties this list on a laptop that has no filter set at all, and without
+            * this line there would be nothing on the screen saying who asked for that.
+            */}
+          {switches.disabled.length > 0 ? (
+            <a className="ev-link" href={localizePath(SOURCES_PATH, lang)}>
+              {fill(t.sourcesOffHint, { count: switches.disabled.length })}
+            </a>
           ) : null}
         </div>
       ) : (
@@ -719,6 +734,13 @@ function EventCard({
           * from Matched looks like the matcher disagreeing with itself.
           */}
         {item.ignored ? <span className="ev-chip ev-chip--ignored">{t.ignoredChip}</span> : null}
+        {/*
+          * Only `all` can draw a row from a source that has been switched off, and there the chip
+          * is the whole difference between the two views — the same argument as the one above it,
+          * one size up: without it, a card present in Everything and absent from Matched reads as
+          * the matcher disagreeing with itself rather than as a switch somebody set.
+          */}
+        {item.offSource ? <span className="ev-chip ev-chip--ignored">{t.offSourceChip}</span> : null}
         {placeLabel(event) ? <span>{placeLabel(event)}</span> : null}
         <span>{event.sourceName}</span>
         {/*

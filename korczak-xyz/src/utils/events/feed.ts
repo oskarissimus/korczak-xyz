@@ -9,6 +9,7 @@
 import type { EventKind, EventRecord, Interest } from './types';
 import { KINDS } from './types';
 import { NO_IGNORES } from './ignores';
+import { ALL_SOURCES_ON, sourceEnabled, type SourcePrefs } from './sourcePrefs';
 import type { MatchReason } from './match';
 import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
 import { cityKey, isEndonym } from './cities';
@@ -36,6 +37,14 @@ export interface FeedItem {
    * differ for a reason nothing on the screen states.
    */
   ignored?: boolean;
+  /**
+   * From a source this account has switched off on the Sources tab.
+   *
+   * Set for exactly the reason `ignored` is, and only ever in `all`: that view claims to be
+   * everything, so it has to draw the row — and a row drawn with nothing saying why it is missing
+   * from every other view is a filter you cannot check.
+   */
+  offSource?: boolean;
 }
 
 /**
@@ -104,6 +113,11 @@ export interface FeedOptions {
    * is a notification at 7am about the concert you already said no to.
    */
   ignored?: ReadonlySet<string>;
+  /**
+   * Which sources this account is still listening to. Defaulted to all of them, for the reason
+   * above — the cost of forgetting it here is rows on a screen, not a phone ringing.
+   */
+  sources?: SourcePrefs;
 }
 
 /**
@@ -126,6 +140,7 @@ export function buildFeed(
 ): FeedSection[] {
   const mode = opts.mode ?? 'matched';
   const ignoredSet = opts.ignored ?? NO_IGNORES;
+  const sources = opts.sources ?? ALL_SOURCES_ON;
 
   const items: FeedItem[] = [];
   for (const event of dedupeByFingerprint(events)) {
@@ -139,6 +154,16 @@ export function buildFeed(
      * the key is not an event id.
      */
     const ignored = ignoredSet.has(event.fingerprint);
+
+    /*
+     * A source switched off on the Sources tab, which is the same shape of instruction as an
+     * ignore one size up — so it is obeyed the same way, and `all` keeps its promise of being
+     * everything. Checked before the `ignored` view as well as the other three: a dismissed row
+     * from a silenced source is hidden twice over, and a list of dismissals holding rows that
+     * nothing can currently show would be the one view in this tab that lies.
+     */
+    const offSource = !sourceEnabled(sources, event.source);
+    if (offSource && mode !== 'all') continue;
 
     // The one view that is *only* the dismissed rows, and the only route back to them.
     if (mode === 'ignored') {
@@ -181,7 +206,12 @@ export function buildFeed(
     }
 
     if (mode === 'matched' && matched.length === 0) continue;
-    items.push({ event, matched, ...(ignored ? { ignored: true } : {}) });
+    items.push({
+      event,
+      matched,
+      ...(ignored ? { ignored: true } : {}),
+      ...(offSource ? { offSource: true } : {}),
+    });
   }
 
   items.sort(compareItems);

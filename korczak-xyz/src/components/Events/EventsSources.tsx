@@ -18,6 +18,16 @@
  *   contributing nothing you would miss. That is not a failure and does not belong in the health
  *   table; it is the thing you look at before deciding a scrape is worth its fixture.
  *
+ * And one control, which is the only thing on this tab that writes anything. A pipeline is tuned
+ * by running it, and a source that turns out to be noisy cannot be fixed from a phone — so the
+ * question this tab answers ("is this one worth its fixture?") now has an answer you can act on
+ * without waiting for a deploy. The box is *here* rather than on the Feed tab for that reason: it
+ * is a judgement about a source, made beside the three facts the judgement is made from.
+ *
+ * `sourcePrefs.ts` has what switching one off does and does not do. In short: it is this account's
+ * preference, not an instruction to the collector — the page is still fetched, still counted, and
+ * still reports its health, so turning it back on costs nothing and loses nothing.
+ *
  * Behind the sign-in gate like every other tab. The catalogue itself is a static fact and would
  * render fine signed out, but two of the three columns would be empty and one tab behaving unlike
  * the other three is worse than the consistency is worth.
@@ -26,6 +36,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { describeError, log } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
+import { useEventSourcePrefs } from '../../hooks/useEventSourcePrefs';
 import { pullSourceHealth } from '../../utils/events/browser/cloud';
 import { countryLabel } from '../../utils/events/countries';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
@@ -50,6 +61,7 @@ export default function EventsSources({ lang }: Props) {
 function SourcesPanel({ lang }: Props) {
   const auth = useAuth();
   const feed = useEventFeed(auth.user);
+  const switches = useEventSourcePrefs(auth.user);
   const t = translations[lang];
   const now = Date.now();
 
@@ -102,14 +114,29 @@ function SourcesPanel({ lang }: Props) {
             {healthError}
           </p>
         ) : null}
+        {/*
+          * A switch that did not save has to say so. The local copy is already applied, so the
+          * boxes and this browser's feed are right and the other device and the collector are
+          * not — which is the one state nothing else on the screen would distinguish from having
+          * worked, and it is the state in which the phone keeps ringing.
+          */}
+        {switches.error ? (
+          <p className="ev-error" role="alert">
+            {fill(t.sourceSwitchFailed, { error: switches.error })}
+          </p>
+        ) : null}
       </section>
 
       <ul className="ev-source-list">
         {SOURCE_CATALOGUE.map((entry) => {
           const row = byId.get(entry.id);
           const failing = (row?.consecutiveFailures ?? 0) > 0;
+          const on = switches.enabled(entry.id);
           return (
-            <li className={`ev-source${failing ? ' ev-source--bad' : ''}`} key={entry.id}>
+            <li
+              className={`ev-source${failing ? ' ev-source--bad' : ''}${on ? '' : ' ev-source--off'}`}
+              key={entry.id}
+            >
               <div className="ev-source-head">
                 <h3 className="ev-source-name">{sourceName(entry.id, entry.label, t)}</h3>
                 <span className="ev-chip">{kindLabel(entry.kind, t)}</span>
@@ -119,6 +146,26 @@ function SourcesPanel({ lang }: Props) {
               </div>
 
               <p className="ev-source-note">{sourceNote(entry.id, t)}</p>
+
+              {/*
+                * The switch, under the sentence describing the source and above the pages it
+                * reads — between the two things it is a judgement about.
+                *
+                * A checkbox and not a styled toggle: this is a setting that stays set, and the
+                * one control on this page whose state has to be readable at a glance from across
+                * a list of five. The label carries the whole sentence so the tap target is the
+                * words as well as the box, which on a phone is the difference between a control
+                * and a decoration.
+                */}
+              <label className="ev-check ev-source-switch">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={!switches.ready}
+                  onChange={(e) => switches.setEnabled(entry.id, e.target.checked)}
+                />
+                <span>{on ? t.sourceOn : t.sourceOff}</span>
+              </label>
 
               <ul className="ev-pages">
                 {entry.pages(now).map((page) => (
@@ -150,6 +197,13 @@ function SourcesPanel({ lang }: Props) {
                   * A chip rather than more grey text after a separator. Spaced apart the two read
                   * as one run-on sentence, and a `·` between them orphans onto the second line at
                   * 320px, where it reads as a bullet. Different shapes need no punctuation.
+                  */}
+                {/*
+                  * Still counted while the source is off, and that is deliberate: the count is
+                  * how much of the shared corpus this source produced, which is a fact about the
+                  * collector rather than about what reaches the reader. Zeroing it would make a
+                  * silenced source indistinguishable from a dead one on the very screen where
+                  * that difference is the question.
                   */}
                 {feed.ready ? (
                   <span className="ev-chip">

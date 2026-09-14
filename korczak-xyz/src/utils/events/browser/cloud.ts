@@ -20,6 +20,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -30,6 +31,7 @@ import {
 import { getDb } from '../../../lib/firebase';
 import { runCloud } from '../../../lib/firestoreHealth';
 import { log } from '../../../lib/logger';
+import { normalizeSourcePrefs, type SourcePrefs } from '../sourcePrefs';
 import type { EventRecord, Ignore, Interest, Notice, PushSettings, PushSub, SourceHealth } from '../types';
 import { normalizeIgnore, normalizeInterest } from './storage';
 
@@ -250,6 +252,36 @@ export async function pullSettings(uid: string): Promise<PushSettings | null> {
   );
   const found = snap.docs.find((d) => d.id === 'push');
   return found ? (found.data() as PushSettings) : null;
+}
+
+/**
+ * The Sources tab's switches, as one document beside the push settings.
+ *
+ * One document rather than a collection of five, because they are five booleans and not five
+ * records: a collection would be five reads on every page load and a rules question of its own,
+ * for state that is smaller than the id of the document holding it. The collector reads the same
+ * path, so a source switched off on the phone is silent on the next run without anything else
+ * being told.
+ *
+ * `setDoc` whole rather than merged. The map IS the value — `mergeSourcePrefs` has already
+ * reconciled this device's copy with what the cloud held, so a field-wise merge here would only
+ * be able to re-add a switch this device has deliberately just replaced.
+ */
+function sourcePrefsDoc(uid: string) {
+  return doc(getDb()!, 'users', uid, 'eventSettings', 'sources');
+}
+
+export async function pullSourcePrefs(uid: string): Promise<SourcePrefs> {
+  if (!getDb()) return {};
+  const snap = await runCloud('events.sourcePrefs.pull', () => getDoc(sourcePrefsDoc(uid)));
+  return snap.exists() ? normalizeSourcePrefs(snap.data()?.sources) : {};
+}
+
+export async function pushSourcePrefs(uid: string, prefs: SourcePrefs): Promise<void> {
+  if (!getDb()) return;
+  await runCloud('events.sourcePrefs.push', () =>
+    setDoc(sourcePrefsDoc(uid), { sources: prefs, updatedAt: Date.now() }),
+  );
 }
 
 /** What has already been sent, newest first. Read-only here; the collector writes it. */

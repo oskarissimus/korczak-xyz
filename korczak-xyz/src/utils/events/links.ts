@@ -16,6 +16,16 @@ export const EVENT_PARAM = 'event';
 export const FEED_PATH = '/apps/events/';
 
 /**
+ * The Sources tab, spelt once.
+ *
+ * Here rather than in the component that links to it because it is the way out of a filter the
+ * Feed tab cannot undo: a source switched off empties a feed from another screen, and the empty
+ * state has to be able to point at the screen that switched it. Both ends go through
+ * `localizePath`, so the Polish install stays inside its own scope — see below.
+ */
+export const SOURCES_PATH = '/apps/events/sources/';
+
+/**
  * The path a notification about one event should open.
  *
  * It carries the **fingerprint**, not the event id. Two sources routinely hold the same night —

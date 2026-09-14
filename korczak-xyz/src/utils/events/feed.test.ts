@@ -16,6 +16,7 @@ import {
   saleWhenLabel,
   whenLabel,
 } from './feed';
+import { setSourceEnabled } from './sourcePrefs';
 import { fingerprintOf, haystackOf } from './normalize';
 import type { KindKey } from './feed';
 import type { EventRecord, Interest } from './types';
@@ -107,6 +108,48 @@ describe('buildFeed', () => {
     const narrow: Interest = { ...ALL, keywords: ['klezmer'] };
     const sections = buildFeed([ev({ title: 'Techno' })], [narrow], NOW, { mode: 'all' });
     expect(sections[0].items[0].matched).toEqual([]);
+  });
+
+  /*
+   * A source switched off on the Sources tab. The same instruction as an ignore one size up, so it
+   * is tested the same way — hidden in the three ordinary views, drawn and labelled in `all`,
+   * which is the view that claims to be everything.
+   */
+  it('hides the events of a source that has been switched off', () => {
+    const off = setSourceEnabled({}, 'feed', false, NOW);
+    expect(buildFeed([ev({ title: 'X' })], [ALL], NOW, { sources: off })).toEqual([]);
+  });
+
+  it('leaves the other sources alone', () => {
+    const off = setSourceEnabled({}, 'feed', false, NOW);
+    const race = ev({ title: 'X', source: 'elektroniczne-zapisy' });
+    expect(buildFeed([race], [ALL], NOW, { sources: off })[0].items).toHaveLength(1);
+  });
+
+  it('still draws it in Everything, marked, so the view keeps its promise', () => {
+    const off = setSourceEnabled({}, 'feed', false, NOW);
+    const [section] = buildFeed([ev({ title: 'X' })], [ALL], NOW, { mode: 'all', sources: off });
+    expect(section.items[0].offSource).toBe(true);
+  });
+
+  it('marks nothing while every source is on', () => {
+    const [section] = buildFeed([ev({ title: 'X' })], [ALL], NOW, { mode: 'all' });
+    expect(section.items[0].offSource).toBeUndefined();
+  });
+
+  it('keeps a silenced source out of the dismissed list too', () => {
+    // A row hidden twice over is still hidden, and a list of dismissals holding rows nothing can
+    // currently show would be the one view in this tab that lies.
+    const event = ev({ title: 'X' });
+    const ignored = new Set([event.fingerprint]);
+    expect(buildFeed([event], [ALL], NOW, { mode: 'ignored', ignored })[0].items).toHaveLength(1);
+    expect(
+      buildFeed([event], [ALL], NOW, {
+        mode: 'ignored',
+        ignored,
+        sources: setSourceEnabled({}, 'feed', false, NOW),
+      }),
+    ).toEqual([]);
   });
 
   it('orders chronologically and groups in reading order', () => {

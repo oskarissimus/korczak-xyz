@@ -10,6 +10,7 @@
 
 import type { EventRecord, Interest, NoticeKind } from './types';
 import { matchingInterests } from './match';
+import { announceFloor, sourceEnabled, type SourcePrefs } from './sourcePrefs';
 import { daysUntil, noticeIdFor } from './normalize';
 import { FEED_PATH } from './links';
 
@@ -61,6 +62,15 @@ export interface PlanContext {
    * that gets the app deleted. A new caller that has no list has to say `NO_IGNORES` out loud.
    */
   ignored: ReadonlySet<string>;
+  /**
+   * Which sources this account is still listening to — the Sources tab's switches.
+   *
+   * Required for the same reason `ignored` is, and it is the more expensive of the two to forget:
+   * an ignore that never reaches here rings the phone about one concert, where a source that
+   * never reaches here rings it about everything a publication puts out, which is the complaint
+   * the switch was built for. A caller with no switches has to say `ALL_SOURCES_ON` out loud.
+   */
+  sources: SourcePrefs;
 }
 
 export interface RunPlan {
@@ -74,19 +84,25 @@ export interface RunPlan {
 /**
  * Whether an event is new enough, to this account and to this interest, to be announced.
  *
- * Two clocks, and both are needed:
+ * Three clocks, and every one of them is needed:
  *
  *   - `armedAt` stops the first run after arming from replaying the entire corpus. Without it, an
  *     app installed ten minutes ago delivers forty notifications in one minute.
  *   - `interest.createdAt` stops *adding an interest* from doing the same thing with the backlog
  *     that interest now matches. This is why `Interest.createdAt` exists separately from
  *     `updatedAt`: editing keywords must not re-arm the backlog.
+ *   - `announceFloor` stops *switching a source back on* from doing it a third time. A fortnight
+ *     with a noisy feed off is a fortnight of rows that are newer than `armedAt` and older than
+ *     the reader's interest in them, and announcing the lot on the next run is precisely the
+ *     flood the switch was reached for. Re-enabling arms that source from the moment of the tap,
+ *     exactly as arming push arms the account from the moment of the tap.
  *
- * The event's own `firstSeenAt` is compared against both, so a genuinely new event passes and a
- * pre-existing one never does, however the interests move around it.
+ * The event's own `firstSeenAt` is compared against all three, so a genuinely new event passes and
+ * a pre-existing one never does, however the interests and the switches move around it.
  */
-function isFresh(seenAt: number, interest: Interest, ctx: PlanContext): boolean {
+function isFresh(seenAt: number, event: EventRecord, interest: Interest, ctx: PlanContext): boolean {
   if (ctx.armedAt === null) return false;
+  if (seenAt < announceFloor(ctx.sources, event.source)) return false;
   return seenAt >= ctx.armedAt && seenAt >= interest.createdAt;
 }
 
@@ -118,6 +134,18 @@ export function noticesFor(
    */
   if (ctx.ignored.has(event.fingerprint)) return [];
 
+  /*
+   * A source switched off on the Sources tab. Checked here beside the ignore, and nothing is
+   * latched for the same reason — a switch is meant to be reversible, and a run that claimed
+   * notice ids while a source was silent would consume the `soon` reminder for a race the reader
+   * turns the source back on precisely to hear about.
+   *
+   * This covers every kind. `announceFloor` above covers only the two that ask `isFresh`, which
+   * is what keeps the backlog quiet *after* the switch comes back on; the two rules are the same
+   * instruction read at two different moments, and neither does the other's job.
+   */
+  if (!sourceEnabled(ctx.sources, event.source)) return [];
+
   const matched = matchingInterests(event, interests, { forPush: true });
   if (matched.length === 0) return [];
 
@@ -132,7 +160,7 @@ export function noticesFor(
     distancesM: event.distancesM,
   };
 
-  const announcedFor = matched.filter((i) => isFresh(event.firstSeenAt, i, ctx));
+  const announcedFor = matched.filter((i) => isFresh(event.firstSeenAt, event, i, ctx));
   if (announcedFor.length > 0) add(out, 'announced', announcedFor, base, seen);
 
   /*
@@ -142,7 +170,7 @@ export function noticesFor(
    */
   const onSaleSeenAt = event.onSaleSeenAt;
   if (onSaleSeenAt !== undefined) {
-    const onSaleFor = matched.filter((i) => isFresh(onSaleSeenAt, i, ctx));
+    const onSaleFor = matched.filter((i) => isFresh(onSaleSeenAt, event, i, ctx));
     if (onSaleFor.length > 0) add(out, 'onsale', onSaleFor, base, seen);
   }
 

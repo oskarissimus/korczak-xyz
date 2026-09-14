@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { noticesFor, planRun, type PlanContext } from './notices';
 import { NO_IGNORES } from './ignores';
+import { ALL_SOURCES_ON, setSourceEnabled } from './sourcePrefs';
 import { fingerprintOf, haystackOf, noticeIdFor } from './normalize';
 import type { EventRecord, Interest } from './types';
 
@@ -14,6 +15,7 @@ const ctx = (over: Partial<PlanContext> = {}): PlanContext => ({
   maxPerRun: 3,
   maxOnSalePerRun: 10,
   ignored: NO_IGNORES,
+  sources: ALL_SOURCES_ON,
   ...over,
 });
 
@@ -358,5 +360,75 @@ describe('presale', () => {
     const event = sale('2026-09-02T09:00:00Z');
     const got = noticesFor(event, [KEEN], new Set(), ctx({ ignored: new Set([event.fingerprint]) }));
     expect(got).toEqual([]);
+  });
+});
+
+/*
+ * The Sources tab's switches, which are the one rule here that can silence a whole publication.
+ *
+ * Two halves that are easy to mistake for one: *while* a source is off nothing at all is produced
+ * for it, and *after* it comes back on its backlog is history rather than news. The second half is
+ * the one worth a test — it is invisible until the day somebody taps the box back on, and getting
+ * it wrong delivers exactly the flood the box exists to stop.
+ */
+describe('a source switched off', () => {
+  const OFF = setSourceEnabled({}, 'feed', false, NOW - 10 * DAY);
+
+  it('says nothing at all about its events', () => {
+    expect(noticesFor(ev({ title: 'X' }), [KEEN], new Set(), ctx())).not.toEqual([]);
+    expect(noticesFor(ev({ title: 'X' }), [KEEN], new Set(), ctx({ sources: OFF }))).toEqual([]);
+  });
+
+  it('silences a sale warning too, not only the announcement', () => {
+    const event = ev({
+      title: 'Season',
+      startsAt: null,
+      day: null,
+      onSaleAt: NOW + 3 * DAY,
+    });
+    expect(kinds(noticesFor(event, [KEEN], new Set(), ctx()))).toContain('presale');
+    expect(noticesFor(event, [KEEN], new Set(), ctx({ sources: OFF }))).toEqual([]);
+  });
+
+  it('leaves the other sources alone', () => {
+    const race = ev({ title: 'X', source: 'elektroniczne-zapisy' });
+    expect(noticesFor(race, [KEEN], new Set(), ctx({ sources: OFF }))).not.toEqual([]);
+  });
+
+  it('latches nothing, so switching it back on does not eat its reminders', () => {
+    const near = ev({ title: 'Soon', day: '2026-08-30' });
+    const plan = planRun([near], [KEEN], new Set(), ctx({ sources: OFF }));
+    expect(plan.send).toEqual([]);
+    expect(plan.suppressed).toEqual([]);
+  });
+});
+
+describe('a source switched back on', () => {
+  const BACK_AT = NOW - 2 * DAY;
+  const BACK = setSourceEnabled(setSourceEnabled({}, 'feed', false, NOW - 30 * DAY), 'feed', true, BACK_AT);
+
+  it('does not announce the backlog collected while it was off', () => {
+    // Newer than `armedAt` and newer than the interest, so both existing clocks let it through —
+    // which is exactly the flood the switch was reached for.
+    const backlog = ev({ title: 'Collected while off', firstSeenAt: BACK_AT - DAY });
+    expect(kinds(noticesFor(backlog, [KEEN], new Set(), ctx()))).toContain('announced');
+    expect(kinds(noticesFor(backlog, [KEEN], new Set(), ctx({ sources: BACK })))).not.toContain(
+      'announced',
+    );
+  });
+
+  it('announces what turns up after the tap', () => {
+    const fresh = ev({ title: 'Collected after', firstSeenAt: BACK_AT + 1000 });
+    expect(kinds(noticesFor(fresh, [KEEN], new Set(), ctx({ sources: BACK })))).toContain(
+      'announced',
+    );
+  });
+
+  it('still reminds about a date that is close, backlog or not', () => {
+    // A date-based reminder is not an announcement — the rule `presale` already states. A race next
+    // week is next week whenever the row happened to be collected, and the reader turned the source
+    // back on to hear about exactly that.
+    const near = ev({ title: 'Soon', day: '2026-08-30', firstSeenAt: BACK_AT - DAY });
+    expect(kinds(noticesFor(near, [KEEN], new Set(), ctx({ sources: BACK })))).toContain('soon');
   });
 });
