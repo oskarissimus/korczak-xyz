@@ -164,8 +164,16 @@ is: a genuinely terse notice (*"Nie kursują pociągi metra M1 na odcinku Centru
 characters, and complete) is escalated rather than read. That is a loud alert about something real;
 what it replaces was silence about something real.
 
-**`article.ts` is the half that fetches the page**, storing its prose as `TransitItem.article`, which
-`proseOf` prefers over the feed's `body`. It reuses `articleText` from `sources/html.ts` — the same
+**`article.ts` is the half that fetches the prose**, storing it as `TransitItem.article`, which
+`proseOf` prefers over the feed's `body`. It asks **two doors** — WordPress's own REST route
+(`wpRestUrlFor`: the guid says `post_type=impediment&p=176873` outright, so `/wp-json/wp/v2/…` is
+derivable, and `content.rendered` is the body without a page of chrome round it) and then the HTML
+page. Both are public endpoints of the same site, asked once each with the same identifying agent.
+The point is not to get past anything — it is that **this WAF rules per path**: both RSS feeds are
+served to the collector while the article pages are challenged, so which side of that line the REST
+route falls on is a fact to measure. Both doors shut is an ordinary outcome and the stored error
+names what each said, because *challenged twice* and *challenged, then the markup moved* send the
+reader to different places. It reuses `articleText` from `sources/html.ts` — the same
 function, for the same reason, as the newsroom reader that found the theatre's sale date in a body
 its teaser never mentioned. Four things about it:
 

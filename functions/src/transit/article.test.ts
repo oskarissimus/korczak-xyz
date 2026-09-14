@@ -7,6 +7,8 @@ import {
   articleStampOf,
   needsArticle,
   queueForArticles,
+  renderedContentOf,
+  wpRestUrlFor,
 } from './article';
 import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
@@ -96,7 +98,7 @@ describe('which pages get asked for', () => {
 
 describe('fetching one', () => {
   it('reads the article element out of the page', async () => {
-    const result = await fetchArticle(async () => ok(PAGE), 'https://x.test/a');
+    const result = await fetchArticle(async () => ok(PAGE), { guid: 'no-id', url: 'https://x.test/a' });
     expect(result).toEqual({ text: expect.stringContaining('Słodowiec – Dworzec Gdański') });
   });
 
@@ -112,15 +114,21 @@ describe('fetching one', () => {
       headers: { get: () => null },
       text: async () => '',
     } as unknown as Response;
-    expect(await fetchArticle(async () => blocked, 'https://x.test/a')).toEqual({ error: 'HTTP 403' });
+    // Prefixed, because an item with a guid asks two doors and the reasons must stay tellable apart.
+    expect(await fetchArticle(async () => blocked, { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
+      error: 'page: HTTP 403',
+    });
     expect(
-      await fetchArticle(async () => ok(`<html><body>no article here${'x'.repeat(600)}</body></html>`), 'https://x.test/a'),
+      await fetchArticle(async () => ok(`<html><body>no article here${'x'.repeat(600)}</body></html>`), {
+        guid: 'no-id',
+        url: 'https://x.test/a',
+      }),
     ).toEqual({ error: expect.stringContaining('no <article> element') });
     expect(
       await fetchArticle(async () => {
         throw new Error('terminated');
-      }, 'https://x.test/a'),
-    ).toEqual({ error: 'terminated' });
+      }, { guid: 'no-id', url: 'https://x.test/a' }),
+    ).toEqual({ error: 'page: terminated' });
   });
 
   /*
@@ -137,7 +145,7 @@ describe('fetching one', () => {
       headers: { get: () => null },
       text: async () => '<!DOCTYPE html><html><head><script>window.gokuProps={}</script></head></html>',
     } as unknown as Response;
-    expect(await fetchArticle(async () => challenge, 'https://x.test/a')).toEqual({
+    expect(await fetchArticle(async () => challenge, { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
       error: expect.stringContaining('challenged'),
     });
 
@@ -147,15 +155,70 @@ describe('fetching one', () => {
       headers: { get: (h: string) => (h === 'x-amzn-waf-action' ? 'challenge' : null) },
       text: async () => 'x'.repeat(5000),
     } as unknown as Response;
-    expect(await fetchArticle(async () => flagged, 'https://x.test/a')).toEqual({
+    expect(await fetchArticle(async () => flagged, { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
       error: expect.stringContaining('WAF'),
     });
   });
 
   it('does not mistake a stub error page for a communiqué', async () => {
-    expect(await fetchArticle(async () => ok('<html></html>'), 'https://x.test/a')).toEqual({
+    expect(await fetchArticle(async () => ok('<html></html>'), { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
       error: expect.stringContaining('not a page'),
     });
+  });
+});
+
+describe('the REST door', () => {
+  /* The guid states the post type and id outright, which is exactly what the REST route wants. */
+  it('derives the route from the guid, not from the pretty permalink', () => {
+    expect(wpRestUrlFor(item())).toBe('https://www.wtp.waw.pl/wp-json/wp/v2/impediment/176873');
+    expect(wpRestUrlFor({ guid: 'https://example.test/some/slug/' })).toBeUndefined();
+  });
+
+  it('reads content.rendered, and is total about everything that is not it', () => {
+    expect(renderedContentOf(JSON.stringify({ content: { rendered: `<p>${PROSE}</p>` } }))).toContain(
+      'Słodowiec – Dworzec Gdański',
+    );
+    expect(renderedContentOf('not json')).toBe('');
+    expect(renderedContentOf('{"content":{}}')).toBe('');
+    expect(renderedContentOf('{"content":{"rendered":7}}')).toBe('');
+  });
+
+  it('prefers the API, and never asks for the page once it has the prose', async () => {
+    const asked: string[] = [];
+    const result = await fetchArticle(async (url) => {
+      asked.push(String(url));
+      return ok(JSON.stringify({ content: { rendered: `<p>${PROSE}</p>` } }));
+    }, item());
+    expect(result).toEqual({ text: expect.stringContaining('Słodowiec – Dworzec Gdański') });
+    expect(asked).toEqual(['https://www.wtp.waw.pl/wp-json/wp/v2/impediment/176873']);
+  });
+
+  it('falls back to the page when the API is the door that is shut', async () => {
+    const asked: string[] = [];
+    const result = await fetchArticle(async (url) => {
+      asked.push(String(url));
+      return String(url).includes('wp-json')
+        ? ({ ok: false, status: 404, headers: { get: () => null }, text: async () => '' } as unknown as Response)
+        : ok(PAGE);
+    }, item());
+    expect(result).toEqual({ text: expect.stringContaining('Słodowiec – Dworzec Gdański') });
+    expect(asked).toHaveLength(2);
+  });
+
+  /*
+   * Both doors shut is an ordinary outcome, and the error has to say so in both halves: "challenged
+   * twice" and "challenged, then the markup moved" send whoever reads it to different places.
+   */
+  it('names what both doors said when both are shut', async () => {
+    const challenge = {
+      ok: true,
+      status: 202,
+      headers: { get: () => null },
+      text: async () => '',
+    } as unknown as Response;
+    const result = await fetchArticle(async () => challenge, item());
+    expect(result).toEqual({ error: expect.stringContaining('api:') });
+    expect((result as { error: string }).error).toContain('page:');
   });
 });
 
@@ -224,7 +287,7 @@ describe('a run', () => {
         ({ ok: false, status: 403, headers: { get: () => null }, text: async () => '' }) as unknown as Response,
       write: async () => {},
     });
-    expect(outcome).toMatchObject({ fetched: 0, failed: 1, error: 'HTTP 403' });
+    expect(outcome).toMatchObject({ fetched: 0, failed: 1, error: expect.stringContaining('HTTP 403') });
     // Still unreadable, which is what keeps `impactOf` escalating it rather than clearing it.
     expect(hasProse(items[0])).toBe(false);
   });

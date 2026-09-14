@@ -19,6 +19,15 @@
  * could produce a station list: the station tables, the range expansion and the interval overlap
  * that this app is built around were being fed prose that has never once named a station.
  *
+ * ### Two doors, and neither is a way through a locked one
+ *
+ * The prose is asked for twice: WordPress's own REST route (`wpRestUrlFor` — the guid states the
+ * post type and id outright) and then the HTML page. Both are public endpoints of the same site,
+ * asked once each with the same identifying agent; the point is not to get past anything but that
+ * **the WAF here rules per path**, serving both RSS feeds to this collector while challenging the
+ * article pages, so which side of that line the REST route falls on is worth measuring. If both
+ * doors are challenged that is the answer, and the item stays unread.
+ *
  * ### The two halves, and why they are separate
  *
  * `hasProse` is the half that needs no network: a headline is never read, so the item stays unread
@@ -77,9 +86,10 @@ const MIN_PAGE_BYTES = 500;
  * the page, nothing about the stored row says the answer is stale. It shipped at 1 and went to 2
  * the same evening — the first production run reported `no <article> element in the page` for
  * three items, which was this file taking an HTTP 202 WAF challenge for a redesign. Without a lever
- * those three would have stayed latched on a wrong verdict until WTP happened to edit them.
+ * those three would have stayed latched on a wrong verdict until WTP happened to edit them. 3 is
+ * `wpRestUrlFor`: a door that was not tried before is a different question, not a stale answer.
  */
-const ARTICLE_VERSION = 2;
+const ARTICLE_VERSION = 3;
 /** The same cap `wtp.ts` puts on a feed body. Enough for the whole of a long communiqué. */
 const ARTICLE_CHARS = 4000;
 /**
@@ -147,41 +157,130 @@ export function queueForArticles(items: TransitItem[], now: number): TransitItem
 }
 
 /**
- * One article's prose, or the reason there is none.
+ * The same communiqué as WordPress's own JSON, or undefined where the guid is not that shape.
  *
- * Never throws and never returns a partial success: a page that 403s, times out, or turns out to
- * have no `<article>` element in it all come back the same way, because all three leave the item in
- * the same state — unread, and escalated by `impactOf` rather than cleared.
+ * wtp.waw.pl is WordPress, and its guid states as much: `?post_type=impediment&p=176873` is a post
+ * type and a post id, which is exactly what the REST route wants. So the article is reachable a
+ * second way — `/wp-json/wp/v2/impediment/176873`, whose `content.rendered` is the body without a
+ * page of chrome around it.
+ *
+ * **This is a second door, not a way through a locked one.** It is the site's own public API, asked
+ * with the same identifying agent, at the same one-request-per-communiqué; if the WAF challenges it
+ * too then that is the answer and the item stays unread. It is worth trying only because the WAF
+ * demonstrably rules per path rather than per client here — both RSS feeds are served to this
+ * collector while the HTML pages are challenged, so which side of that line the REST route falls on
+ * is a fact to measure rather than assume.
+ *
+ * Derived from the guid rather than from `url`, because the guid is the one field guaranteed to
+ * carry the id: `url` is the pretty permalink and says nothing about which post it is.
  */
-export async function fetchArticle(
+export function wpRestUrlFor(item: Pick<TransitItem, 'guid'>): string | undefined {
+  const type = /[?&]post_type=([a-z_]+)/i.exec(item.guid)?.[1];
+  const id = /[?&]p=(\d+)/.exec(item.guid)?.[1];
+  if (!type || !id) return undefined;
+  const host = (() => {
+    try {
+      return new URL(item.guid).origin;
+    } catch {
+      return undefined;
+    }
+  })();
+  return host ? `${host}/wp-json/wp/v2/${type}/${id}` : undefined;
+}
+
+const HEADERS = {
+  'accept-language': 'pl-PL,pl;q=0.9',
+  'user-agent': 'korczak.xyz transit watch (+https://korczak.xyz)',
+};
+
+/** One request, with every way this host says no turned into a reason. Never throws. */
+async function fetchText(
   fetchImpl: typeof globalThis.fetch,
   url: string,
-): Promise<{ text: string } | { error: string }> {
+  accept: string,
+): Promise<{ body: string; status: number } | { error: string }> {
   try {
     const response = await fetchImpl(url, {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        accept: 'text/html,application/xhtml+xml',
-        'accept-language': 'pl-PL,pl;q=0.9',
-        'user-agent': 'korczak.xyz transit watch (+https://korczak.xyz)',
-      },
+      headers: { ...HEADERS, accept },
     });
     const challenged = wafChallenge(response.status, response.headers.get('x-amzn-waf-action') ?? undefined);
     if (challenged) return { error: challenged };
     if (!response.ok) return { error: `HTTP ${response.status}` };
-
-    const body = await response.text();
-    if (body.length < MIN_PAGE_BYTES) {
-      return { error: `HTTP ${response.status} with ${body.length} bytes — not a page` };
-    }
-    const text = articleText(body, ARTICLE_CHARS);
-    // A page that arrived and holds no <article> is the markup having moved, and it has to be
-    // distinguishable from a page that never arrived — see `wafChallenge`.
-    if (!text) return { error: `no <article> element in ${body.length} bytes` };
-    return { text };
+    return { body: await response.text(), status: response.status };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * One communiqué's prose, or the reason there is none.
+ *
+ * Two doors, tried in order, because they fail independently: the REST route returns the body
+ * without chrome and survives a redesign of the page template, and the page survives the REST API
+ * being switched off. Both are public, both are asked once, and **both failing is an ordinary
+ * outcome** — the item stays unread, `impactOf` escalates it, and the card says WTP published no
+ * details. The error names what both doors said, because "challenged twice" and "challenged, then
+ * the markup moved" send whoever reads it to different places.
+ *
+ * Never throws and never returns a partial success: a page that 403s, times out, or turns out to
+ * hold no article all come back the same way.
+ */
+export async function fetchArticle(
+  fetchImpl: typeof globalThis.fetch,
+  item: Pick<TransitItem, 'guid' | 'url'>,
+): Promise<{ text: string } | { error: string }> {
+  const reasons: string[] = [];
+
+  const restUrl = wpRestUrlFor(item);
+  if (restUrl) {
+    const got = await fetchText(fetchImpl, restUrl, 'application/json');
+    if ('error' in got) {
+      reasons.push(`api: ${got.error}`);
+    } else {
+      const text = renderedContentOf(got.body);
+      if (text) return { text };
+      reasons.push(`api: ${got.body.length} bytes with no content.rendered`);
+    }
+  }
+
+  const got = await fetchText(fetchImpl, item.url, 'text/html,application/xhtml+xml');
+  if ('error' in got) {
+    reasons.push(`page: ${got.error}`);
+  } else if (got.body.length < MIN_PAGE_BYTES) {
+    reasons.push(`page: HTTP ${got.status} with ${got.body.length} bytes — not a page`);
+  } else {
+    const text = articleText(got.body, ARTICLE_CHARS);
+    if (text) return { text };
+    // A page that arrived and holds no <article> is the markup having moved, and it has to be
+    // distinguishable from a page that never arrived — see `wafChallenge`.
+    reasons.push(`page: no <article> element in ${got.body.length} bytes`);
+  }
+
+  return { error: reasons.join('; ') };
+}
+
+/**
+ * `content.rendered` out of a WordPress REST reply, as text.
+ *
+ * Total by construction, like `parseReadings`: a body that is not JSON, an object without the
+ * field, a field that is not a string all yield `''`, which the caller reads as this door being
+ * shut. The HTML inside is stripped with `articleText`'s own rules rather than a second set — the
+ * theatre's tables taught this repo that flattening block tags without newlines joins two facts
+ * that were never adjacent.
+ */
+export function renderedContentOf(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return '';
+  }
+  const content = (parsed as { content?: { rendered?: unknown } })?.content?.rendered;
+  if (typeof content !== 'string' || !content) return '';
+  // `articleText` wants an <article> to narrow to; the REST reply is already only the body, so it
+  // is wrapped rather than searched.
+  return articleText(`<article>${content}</article>`, ARTICLE_CHARS);
 }
 
 /**
@@ -240,7 +339,7 @@ export async function fetchArticles(
       const item = queue[next++];
       if (!item) return;
 
-      const result = await fetchArticle(ctx.fetch, item.url);
+      const result = await fetchArticle(ctx.fetch, item);
       const update =
         'text' in result ? articleUpdate(item, result.text) : articleFailure(item, result.error);
 
