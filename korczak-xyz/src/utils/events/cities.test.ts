@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CITY_ALIASES, cityKey, isEndonym } from './cities';
+import { CITY_ALIASES, cityKey } from './cities';
 import { foldText } from './normalize';
 
 describe('cityKey', () => {
@@ -31,16 +31,16 @@ describe('cityKey', () => {
   });
 
   it('is idempotent, so a stored key survives a second pass', () => {
-    // The picker stores what was chosen and keys it on every read; a table whose target was itself
-    // an alias would move the answer on the second call.
+    // A stored interest is keyed on every read; a table whose target was itself an alias would
+    // move the answer on the second call.
     for (const name of Object.keys(CITY_ALIASES)) {
       expect(cityKey(cityKey(name))).toBe(cityKey(name));
     }
   });
 
   it('canonicalises onto the city’s own name', () => {
-    // Which is what the picker prefers to print. An alias whose target folds to another alias
-    // would print an exonym as though it were the endonym.
+    // An alias whose target is itself an alias is a key that means two different places depending
+    // on how many times it has been through here.
     for (const target of Object.values(CITY_ALIASES)) {
       expect(foldText(target)).toBe(target);
       expect(CITY_ALIASES[target]).toBeUndefined();
@@ -48,12 +48,3 @@ describe('cityKey', () => {
   });
 });
 
-describe('isEndonym', () => {
-  it('separates the city’s own name from a name for it', () => {
-    expect(isEndonym('Warszawa')).toBe(true);
-    expect(isEndonym('Warsaw')).toBe(false);
-    // Anything the table says nothing about is its own name, which is what makes the tie-break
-    // reduce to "commonest spelling" everywhere else.
-    expect(isEndonym('Rzeszów')).toBe(true);
-  });
-});

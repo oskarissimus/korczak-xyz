@@ -20,7 +20,7 @@ describe('parseFeed', () => {
   it('names the publication, not this adapter', () => {
     /*
      * One adapter over a list of unrelated magazines. Stored as the adapter's own `Watched feeds`,
-     * a history article and a race report were one source — unfilterable on the pipeline tab,
+     * a history article and a race report were one source — indistinguishable on the Sources tab,
      * unnameable on a card, and the least useful thing this app could have told the classifier,
      * whose prompt and hash both read `sourceName`.
      */

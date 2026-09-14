@@ -1,53 +1,68 @@
 /**
- * The Sources tab: which pages are read to produce this feed.
+ * The Sources tab: where events come from, what a model adds to them, and what filters them.
  *
- * The feed answers "what is on"; this answers "and how would I know if that were wrong". A scrape
- * that has quietly stopped matching, a festival blog nobody remembers adding, a listing that turned
- * up from somewhere unexpected — none of those are visible from a list of events, and the Alerts
- * tab's health table names sources without ever saying what a source *is*.
+ * The feed answers "what is on"; this answers "and how would I know if that were wrong". Since the
+ * Pipeline tab went (Sep 2026) it is also the whole of that second question — and it is organised
+ * per source rather than per corpus, which is the change worth understanding. A tab listing 1,150
+ * rows with eight facets over them could tell you the classifier had reached 71% of everything; it
+ * could not tell you *this scrape's* rows are the unlabelled ones, and that is the shape every
+ * failure in this app has actually had.
  *
- * Three facts are drawn per source and they are three different questions:
+ * Five facts are drawn per source, and they are five different questions:
  *
  * - **The pages**, from `SOURCE_CATALOGUE` — the URLs the collector actually requests, as links, so
  *   the claim is checkable rather than just stated. This half is static: it needs no network, no
  *   pull and no collector run, so the tab says something useful on a dead connection and on an
  *   account whose first collection has not happened yet.
- * - **Health**, from `eventSources` — whether the last run got anything. Already on Alerts; here it
- *   sits against the pages it is about, which is where it can be acted on.
+ * - **Health**, from `eventSources` — whether the last run got anything.
  * - **How much of the corpus is its** — because a source can be green, be read, and still be
- *   contributing nothing you would miss. That is not a failure and does not belong in the health
- *   table; it is the thing you look at before deciding a scrape is worth its fixture.
+ *   contributing nothing you would miss.
+ * - **What a model was asked about its rows, and how much has come back** (`extraction.ts`). Which
+ *   pass reads a row is decided by the row's own tags, so this is counted rather than described:
+ *   an empty classifier column against a full source is the single most likely way this app fails
+ *   quietly, since an unclassified row *passes* every rule the classifier feeds.
+ * - **Which interests reach it, and how much they keep** (`filtering.ts`), read-only, with the same
+ *   editor the Interests tab opens. A filter is written once and applied everywhere, but it is
+ *   *judged* against one source's rows: a tag no source stamps and an interest that keeps
+ *   sixty-seven of a magazine's sixty-eight articles are both invisible from a list of interests.
  *
- * And one control, which is the only thing on this tab that writes anything. A pipeline is tuned
- * by running it, and a source that turns out to be noisy cannot be fixed from a phone — so the
- * question this tab answers ("is this one worth its fixture?") now has an answer you can act on
- * without waiting for a deploy. The box is *here* rather than on the Feed tab for that reason: it
- * is a judgement about a source, made beside the three facts the judgement is made from.
+ * And one control, which is the only thing on this tab that writes anything by itself. A pipeline
+ * is tuned by running it, and a source that turns out to be noisy cannot be fixed from a phone —
+ * so the question this tab answers now has an answer you can act on without waiting for a deploy.
  *
  * `sourcePrefs.ts` has what switching one off does and does not do. In short: it is this account's
  * preference, not an instruction to the collector — the page is still fetched, still counted, and
  * still reports its health, so turning it back on costs nothing and loses nothing.
  *
- * Behind the sign-in gate like every other tab. The catalogue itself is a static fact and would
- * render fine signed out, but two of the three columns would be empty and one tab behaving unlike
- * the other three is worse than the consistency is worth.
+ * Behind the sign-in gate like every other tab.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { describeError, log } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
+import { useEventInterests } from '../../hooks/useEventInterests';
 import { useEventSourcePrefs } from '../../hooks/useEventSourcePrefs';
 import { pullSourceHealth } from '../../utils/events/browser/cloud';
 import { countryLabel } from '../../utils/events/countries';
+import { modelPasses, type ModelPass, type PassCoverage } from '../../utils/events/extraction';
+import { bySource, filteringOf, type SourceFiltering } from '../../utils/events/filtering';
+import type { InterestDraft } from '../../utils/events/interests';
+import { INTERESTS_PATH, localizePath } from '../../utils/events/links';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
 import type { EventRecord, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
+import InterestForm from './InterestForm';
+import InterestRules from './InterestRules';
 import { sourceName, sourceNote } from './sourceNames';
 import { fill, relativeTime, translations, type Lang, type Translation } from './translations';
 
 interface Props {
   lang: Lang;
 }
+
+/** A source with nothing collected yet: no pass to draw, and no rows for a filter to keep. */
+const EMPTY_PASSES: PassCoverage[] = [];
+const NO_ROWS: SourceFiltering = { rows: 0, kept: 0, filters: [], silent: 0 };
 
 export default function EventsSources({ lang }: Props) {
   const auth = useAuth();
@@ -62,11 +77,20 @@ function SourcesPanel({ lang }: Props) {
   const auth = useAuth();
   const feed = useEventFeed(auth.user);
   const switches = useEventSourcePrefs(auth.user);
+  const interests = useEventInterests(auth.user);
   const t = translations[lang];
   const now = Date.now();
 
   const [health, setHealth] = useState<SourceHealth[]>([]);
   const [healthError, setHealthError] = useState<string | null>(null);
+  /*
+   * Which interest is open in the one form slot, for the whole tab rather than per source.
+   *
+   * One slot because an interest is not a fact about the source it is drawn under: the same filter
+   * appears under every source it reaches, and two open copies of one form would be two drafts of
+   * one document, with whichever was saved second winning silently.
+   */
+  const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.user) return;
@@ -91,8 +115,31 @@ function SourcesPanel({ lang }: Props) {
     };
   }, [auth.user]);
 
-  const counts = useMemo(() => countBySource(feed.events), [feed.events]);
+  /*
+   * The corpus split once, and both summaries computed once per source.
+   *
+   * Memoised rather than called in the card, and that is not premature: `filteringOf` asks
+   * `matchReason` per row per interest, which over two thousand rows and half a dozen interests is
+   * ten thousand regex matches — and without this it would be redone on every keystroke in an open
+   * interest form and on every switch flipped.
+   */
+  const rowsBySource = useMemo(() => bySource(feed.events), [feed.events]);
+  const passesBySource = useMemo(() => {
+    const out = new Map<string, PassCoverage[]>();
+    for (const [id, rows] of rowsBySource) out.set(id, modelPasses(rows));
+    return out;
+  }, [rowsBySource]);
+  const filteringBySource = useMemo(() => {
+    const out = new Map<string, SourceFiltering>();
+    for (const [id, rows] of rowsBySource) out.set(id, filteringOf(rows, interests.interests));
+    return out;
+  }, [rowsBySource, interests.interests]);
   const byId = useMemo(() => new Map(health.map((row) => [row.id, row])), [health]);
+
+  const save = (id: string, draft: InterestDraft) => {
+    interests.updateInterest(id, draft);
+    setEditing(null);
+  };
 
   /*
    * A health row nothing in the catalogue describes.
@@ -132,6 +179,7 @@ function SourcesPanel({ lang }: Props) {
           const row = byId.get(entry.id);
           const failing = (row?.consecutiveFailures ?? 0) > 0;
           const on = switches.enabled(entry.id);
+          const rows = rowsBySource.get(entry.id) ?? [];
           return (
             <li
               className={`ev-source${failing ? ' ev-source--bad' : ''}${on ? '' : ' ev-source--off'}`}
@@ -187,7 +235,7 @@ function SourcesPanel({ lang }: Props) {
               <p className="ev-source-status">
                 {/*
                   * Two independent facts on one line, and the order is the order they answer in:
-                  * did the collector get anything last time, and is any of it still in the feed.
+                  * did the collector get anything last time, and how much of what it got is here.
                   * A green source contributing nothing is not a fault and must not read as one.
                   */}
                 <span className={failing ? 'ev-status ev-status--bad' : 'ev-status'}>
@@ -196,21 +244,32 @@ function SourcesPanel({ lang }: Props) {
                 {/*
                   * A chip rather than more grey text after a separator. Spaced apart the two read
                   * as one run-on sentence, and a `·` between them orphans onto the second line at
-                  * 320px, where it reads as a bullet. Different shapes need no punctuation.
-                  */}
-                {/*
-                  * Still counted while the source is off, and that is deliberate: the count is
-                  * how much of the shared corpus this source produced, which is a fact about the
-                  * collector rather than about what reaches the reader. Zeroing it would make a
-                  * silenced source indistinguishable from a dead one on the very screen where
-                  * that difference is the question.
+                  * 320px, where it reads as a bullet.
+                  *
+                  * Still counted while the source is off, and that is deliberate: it is how much
+                  * of the shared corpus this source produced, which is a fact about the collector
+                  * rather than about what reaches the reader. Zeroing it would make a silenced
+                  * source indistinguishable from a dead one on the very screen where that
+                  * difference is the question.
                   */}
                 {feed.ready ? (
-                  <span className="ev-chip">
-                    {fill(t.sourceInCorpus, { count: counts.get(entry.id) ?? 0 })}
-                  </span>
+                  <span className="ev-chip">{fill(t.sourceInCorpus, { count: rows.length })}</span>
                 ) : null}
               </p>
+
+              {feed.ready ? (
+                <Extraction passes={passesBySource.get(entry.id) ?? EMPTY_PASSES} t={t} />
+              ) : null}
+
+              {feed.ready && interests.ready ? (
+                <Filtering
+                  filtering={filteringBySource.get(entry.id) ?? NO_ROWS}
+                  lang={lang}
+                  editing={editing}
+                  onEdit={setEditing}
+                  onSave={save}
+                />
+              ) : null}
             </li>
           );
         })}
@@ -240,11 +299,136 @@ function SourcesPanel({ lang }: Props) {
   );
 }
 
-/** How many of the events this browser holds came from each source. */
-function countBySource(events: EventRecord[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const event of events) counts.set(event.source, (counts.get(event.source) ?? 0) + 1);
-  return counts;
+/**
+ * What a model was asked about this source's rows.
+ *
+ * A pass with no rows is not drawn — the reader never touches four of the five sources, and an
+ * empty heading under each of them would be four sentences about nothing. A pass with rows and no
+ * answers *is* drawn, at zero, because that is the state this block exists for.
+ */
+function Extraction({ passes, t }: { passes: PassCoverage[]; t: Translation }) {
+  return (
+    <section className="ev-source-block">
+      <h4 className="ev-block-head">{t.extractionHeading}</h4>
+      {passes.length === 0 ? (
+        <p className="ev-hint">{t.extractionNone}</p>
+      ) : (
+        passes.map((pass) => <Pass key={pass.pass} pass={pass} t={t} />)
+      )}
+    </section>
+  );
+}
+
+function Pass({ pass, t }: { pass: PassCoverage; t: Translation }) {
+  // Answered against asked, which is the number the block is for: `0 of 412` is a classifier that
+  // has stopped, and it says so without anybody having to count chips.
+  const behind = pass.answered < pass.rows;
+  return (
+    <div className="ev-pass">
+      <p className="ev-pass-head">
+        <span className="ev-pass-name">{passLabel(pass.pass, t)}</span>
+        <span className={`ev-chip${behind ? ' ev-chip--pending' : ''}`}>
+          {fill(t.passAnswered, { answered: pass.answered, rows: pass.rows })}
+        </span>
+      </p>
+      <p className="ev-hint">{passNote(pass.pass, t)}</p>
+      <ul className="ev-extracted">
+        {pass.fields.map((field) => (
+          <li className="ev-extracted-item" key={field.field}>
+            {/* The stored field name beside the word for it, for the reason a page's link text is
+                its URL: the word is what makes it readable and the name is what makes it
+                checkable — against a document in the console, or against `types.ts`. */}
+            <code className="ev-extracted-name">{field.field}</code>
+            <span className="ev-extracted-word">{fieldLabel(field.field, t)}</span>
+            <span className="ev-extracted-count">{field.present}</span>
+            {field.shared ? <span className="ev-chip">{t.fieldShared}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The interests that reach this source, and what they keep of it.
+ *
+ * Read mode by default and editable in place: the question "is this filter doing what I meant?" is
+ * asked here, beside the rows it is being asked about, and an answer that means opening another tab
+ * is one nobody acts on. Saving goes through `useEventInterests` exactly as the Interests tab does,
+ * so there is one writer and one sync queue.
+ *
+ * Only the interests that keep something are listed — the rest are a count. Every interest under
+ * every source is five copies of one list, and the useful reading of a zero is not per source
+ * anyway: an interest matching nothing *anywhere* is a dead interest, which is the Interests tab's
+ * question, and the link goes there.
+ */
+function Filtering({
+  filtering,
+  lang,
+  editing,
+  onEdit,
+  onSave,
+}: {
+  filtering: SourceFiltering;
+  lang: Lang;
+  editing: string | null;
+  onEdit: (id: string | null) => void;
+  onSave: (id: string, draft: InterestDraft) => void;
+}) {
+  const t = translations[lang];
+  return (
+    <section className="ev-source-block">
+      <h4 className="ev-block-head">{t.filtersHeading}</h4>
+      <p className="ev-hint">
+        {fill(t.filtersKept, { kept: filtering.kept, rows: filtering.rows })}
+      </p>
+
+      {filtering.filters.length === 0 ? (
+        <p className="ev-hint">{t.filtersNone}</p>
+      ) : (
+        <ul className="ev-filters">
+          {filtering.filters.map(({ interest, kept }) => (
+            <li className="ev-filter" key={interest.id}>
+              <div className="ev-interest-head">
+                <h5 className="ev-interest-name">{interest.label}</h5>
+                <span className="ev-chip">{fill(t.filterKeeps, { count: kept })}</span>
+                <div className="ev-actions">
+                  <button
+                    type="button"
+                    className="ev-link"
+                    aria-expanded={editing === interest.id}
+                    onClick={() => onEdit(editing === interest.id ? null : interest.id)}
+                  >
+                    {editing === interest.id ? t.cancel : t.editInterest}
+                  </button>
+                </div>
+              </div>
+
+              {editing === interest.id ? (
+                <InterestForm
+                  lang={lang}
+                  existing={interest}
+                  onSubmit={(draft) => onSave(interest.id, draft)}
+                  onCancel={() => onEdit(null)}
+                />
+              ) : (
+                <InterestRules interest={interest} lang={lang} />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {filtering.silent > 0 ? (
+        <p className="ev-hint">
+          {fill(t.filtersSilent, { count: filtering.silent })}{' '}
+          <a className="ev-link" href={localizePath(INTERESTS_PATH, lang)}>
+            {t.filtersAll}
+          </a>
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 function kindLabel(kind: SourceKind, t: Translation): string {
@@ -252,6 +436,30 @@ function kindLabel(kind: SourceKind, t: Translation): string {
   if (kind === 'ical') return t.kindIcal;
   if (kind === 'rss') return t.kindRss;
   return t.kindApi;
+}
+
+function passLabel(pass: ModelPass, t: Translation): string {
+  return pass === 'newsroom' ? t.passNewsroom : t.passClassifier;
+}
+
+function passNote(pass: ModelPass, t: Translation): string {
+  return pass === 'newsroom' ? t.passNewsroomNote : t.passClassifierNote;
+}
+
+/**
+ * The word for a field a model writes.
+ *
+ * Exhaustive over the five that reach here, with the stored name as the fallback: a sixth field
+ * added to a pass is then a name in a monospaced font rather than a blank, which is wrong but
+ * readable — and the `<code>` beside it says the same thing anyway.
+ */
+function fieldLabel(field: keyof EventRecord | string, t: Translation): string {
+  if (field === 'kind') return t.extractKind;
+  if (field === 'reach') return t.extractReach;
+  if (field === 'country') return t.extractCountry;
+  if (field === 'newsroomTicketSale') return t.extractTicketSale;
+  if (field === 'onSaleAt') return t.extractSaleAt;
+  return String(field);
 }
 
 /**

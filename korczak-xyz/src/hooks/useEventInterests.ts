@@ -47,7 +47,7 @@ export interface EventInterestsData {
 
 const OFF: SyncState = { status: 'off', pending: 0, lastSyncedAt: null, lastError: null };
 
-/** Which push queue is this hook's. The ignores have their own; see the note in `storage.ts`. */
+/** Which push queue is this hook's — the only one left; see the note in `storage.ts`. */
 const QUEUE = EVENT_KEYS.unsynced;
 
 /** Newest first, id as the deterministic tiebreak so two devices order identically. */

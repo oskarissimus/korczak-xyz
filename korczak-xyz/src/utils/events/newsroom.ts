@@ -56,24 +56,6 @@ export function isNewsroomItem(event: { tags?: string[] }): boolean {
 }
 
 /**
- * The reader's verdict as a value a facet can be keyed on, or undefined where it never read.
- *
- * Two values rather than a raw boolean because the Pipeline tab draws them as buttons beside
- * `kind` and `reach`, and `true`/`false` as button faces would be the only place in that tab where
- * the corpus's own vocabulary is not what is written on the control.
- */
-export type TicketSaleVerdict = 'ticket-sale' | 'no-sale';
-
-export const TICKET_SALE_VERDICTS: readonly TicketSaleVerdict[] = ['ticket-sale', 'no-sale'];
-
-export function ticketSaleVerdictOf(event: {
-  newsroomTicketSale?: boolean;
-}): TicketSaleVerdict | undefined {
-  if (event.newsroomTicketSale === undefined) return undefined;
-  return event.newsroomTicketSale ? 'ticket-sale' : 'no-sale';
-}
-
-/**
  * An event's tags with the reader's verdict folded in, exactly once.
  *
  * Derived rather than stored-and-appended, and that is load-bearing: `upsertEvents` rewrites the

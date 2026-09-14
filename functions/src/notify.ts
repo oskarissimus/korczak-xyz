@@ -9,14 +9,12 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import type {
   EventRecord,
-  Ignore,
   Interest,
   Notice,
   PushSettings,
   PushSub,
 } from '../../korczak-xyz/src/utils/events/types';
 import { DEFAULT_PUSH_SETTINGS } from '../../korczak-xyz/src/utils/events/types';
-import { ignoredFingerprints } from '../../korczak-xyz/src/utils/events/ignores';
 import {
   normalizeSourcePrefs,
   type SourcePrefs,
@@ -46,21 +44,20 @@ async function loadAccount(
   settings: PushSettings;
   subs: PushSub[];
   seen: Set<string>;
-  ignored: ReadonlySet<string>;
   sources: SourcePrefs;
 }> {
   const user = db.collection('users').doc(uid);
-  const [interestsSnap, settingsSnap, sourcesSnap, subsSnap, noticesSnap, ignoresSnap] =
+  const [interestsSnap, settingsSnap, sourcesSnap, subsSnap, noticesSnap] =
     await Promise.all([
       user.collection('eventInterests').get(),
       user.collection('eventSettings').doc('push').get(),
       /*
        * The Sources tab's switches.
        *
-       * Read here rather than treated as a client-side nicety, for the reason the ignores above are
-       * — and more so. A source switched off in the app and still read here is a feed that has gone
-       * quiet on the screen and still rings the phone about everything it publishes, which is the
-       * exact complaint the switch was built for. `normalizeSourcePrefs` rather than a cast: this
+       * Read here rather than treated as a client-side nicety, and it is the one preference in
+       * this app that must reach the collector. A source switched off in the app and still read
+       * here is a feed that has gone quiet on the screen and still rings the phone about everything
+       * it publishes, which is the exact complaint the switch was built for. `normalizeSourcePrefs` rather than a cast: this
        * document is written by a browser, and a malformed switch must not read as `enabled:
        * undefined` and silence a source nobody asked to silence.
        */
@@ -72,16 +69,6 @@ async function loadAccount(
        * candidate. It is the only thing standing between a re-run and a repeat notification.
        */
       user.collection('eventNotices').select().get(),
-      /*
-       * The events dismissed by hand in the feed.
-       *
-       * Read here, not skipped as a client-side nicety: an ignore the collector never sees is a card
-       * that is gone from the screen and still rings the phone at 7am, which is the reading of
-       * "ignore" nobody means. Whole rather than filtered on `deleted` in the query — a `where` on a
-       * field an un-ignored row may not carry excludes exactly the tombstones that decide the answer,
-       * and `ignoredFingerprints` is the one place that flag is read.
-       */
-      user.collection('eventIgnores').get(),
     ]);
 
   return {
@@ -101,9 +88,6 @@ async function loadAccount(
       'events',
     ),
     seen: new Set(noticesSnap.docs.map((d) => d.id)),
-    ignored: ignoredFingerprints(
-      ignoresSnap.docs.map((d) => ({ ...(d.data() as Ignore), id: d.id })),
-    ),
     sources: normalizeSourcePrefs(sourcesSnap.data()?.sources),
   };
 }
@@ -198,14 +182,13 @@ export async function notifyAccount(
   events: EventRecord[],
   now: number,
 ): Promise<NotifyResult> {
-  const { interests, settings, subs, seen, ignored, sources } = await loadAccount(db, uid);
+  const { interests, settings, subs, seen, sources } = await loadAccount(db, uid);
 
   const plan = planRun(events, interests, seen, {
     now,
     armedAt: settings.armedAt,
     maxPerRun: settings.maxPerRun,
     maxOnSalePerRun: settings.maxOnSalePerRun,
-    ignored,
     sources,
   });
 

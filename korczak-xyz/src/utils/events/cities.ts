@@ -72,22 +72,12 @@ export const CITY_ALIASES: Readonly<Record<string, string>> = {
  * `''` when there is no city — which is a third state and not a place: it is what an RSS article
  * has, and the callers treat it as "unplaced" rather than as somewhere to filter to.
  *
- * Used by the matcher for `Interest.cities` and by the feed's city picker, so a city typed into an
- * interest and a city chosen from the picker mean the same thing. Two normalisations here would
- * mean an interest limited to `Warsaw` matching a feed the picker files under `Warszawa`.
+ * Used by the matcher for `Interest.cities`, which since the feed's city picker went (Sep 2026) is
+ * its only caller. The alias table stays, and it is not tidy-up bait: it is what makes an interest
+ * limited to `Warsaw` reach the nights Ticketmaster's Polish catalogue files under `Warszawa`, in
+ * the browser and in the collector alike.
  */
 export function cityKey(name: string | undefined): string {
   const folded = foldText(name ?? '');
   return CITY_ALIASES[folded] ?? folded;
-}
-
-/**
- * Whether a spelling is the city's own name rather than an exonym.
- *
- * The picker prints the corpus's own words, and this is what breaks the tie when the corpus holds
- * both: `Warszawa` over `Warsaw`, whichever happened to be scraped more often. A label that flips
- * with the majority spelling would also change what is stored on the device.
- */
-export function isEndonym(name: string): boolean {
-  return foldText(name) === cityKey(name);
 }

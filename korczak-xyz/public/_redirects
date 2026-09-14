@@ -43,5 +43,14 @@
 /apps/night-routine           /apps/baby-sleep/checklist    301
 /pl/apps/night-routine        /pl/apps/baby-sleep/checklist 301
 
+# Event Watch's Pipeline tab is gone (Sep 2026). It listed the whole corpus with eight facets over
+# it; what it was actually opened for — has a model read these rows, and what are the filters doing
+# to them — is now drawn under each source on the Sources tab, which is where the judgement is made.
+# Both the bare and the slashed form, because this is a route an installed app precached.
+/apps/events/pipeline         /apps/events/sources          301
+/apps/events/pipeline/*       /apps/events/sources          301
+/pl/apps/events/pipeline      /pl/apps/events/sources       301
+/pl/apps/events/pipeline/*    /pl/apps/events/sources       301
+
 /games/*                      /apps/:splat               301
 /pl/games/*                   /pl/apps/:splat            301

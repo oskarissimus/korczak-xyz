@@ -26,12 +26,21 @@ export const FEED_PATH = '/apps/events/';
 export const SOURCES_PATH = '/apps/events/sources/';
 
 /**
+ * The Interests tab, spelt once, for the same reason as the line above it.
+ *
+ * The Sources tab draws each source's filters and lets them be edited in place, but it lists only
+ * the ones that reach that source — so the way to the rest, and to adding or deleting one, is a
+ * link out of it.
+ */
+export const INTERESTS_PATH = '/apps/events/interests/';
+
+/**
  * The path a notification about one event should open.
  *
  * It carries the **fingerprint**, not the event id. Two sources routinely hold the same night —
  * Ticketmaster and the house's own page — and the feed shows one of them: `dedupeByFingerprint`
  * keeps whichever has a ticket link, which need not be the document the notice was minted from. An
- * id would then name a row that is not on the screen. An ignore is keyed on the fingerprint for
+ * id would then name a row that is not on the screen. A notice id is keyed on the fingerprint for
  * exactly this reason, and the reasoning applies here verbatim.
  */
 export function eventLink(fingerprint: string): string {

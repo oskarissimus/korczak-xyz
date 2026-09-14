@@ -54,21 +54,12 @@ export interface PlanContext {
   maxPerRun: number;
   maxOnSalePerRun: number;
   /**
-   * Fingerprints dismissed by hand — `ignoredFingerprints(...)`.
-   *
-   * Required rather than optional, unlike the feed's, and that is the point of it being on the
-   * context at all: an ignore that reaches the feed and not the collector means the card is gone
-   * from the screen and the phone still rings about it at 7am, which is the reading of "ignore"
-   * that gets the app deleted. A new caller that has no list has to say `NO_IGNORES` out loud.
-   */
-  ignored: ReadonlySet<string>;
-  /**
    * Which sources this account is still listening to — the Sources tab's switches.
    *
-   * Required for the same reason `ignored` is, and it is the more expensive of the two to forget:
-   * an ignore that never reaches here rings the phone about one concert, where a source that
-   * never reaches here rings it about everything a publication puts out, which is the complaint
-   * the switch was built for. A caller with no switches has to say `ALL_SOURCES_ON` out loud.
+   * Required rather than optional, unlike the feed's, and that is the point of it being on the
+   * context at all: a switch that reaches the feed and not the collector means the rows are gone
+   * from the screen and the phone still rings about them at 7am, which is the reading of "off"
+   * that gets an app deleted. A caller with no switches has to say `ALL_SOURCES_ON` out loud.
    */
   sources: SourcePrefs;
 }
@@ -123,22 +114,11 @@ export function noticesFor(
   if (event.startsAt !== null && event.startsAt < ctx.now) return [];
 
   /*
-   * Dismissed by hand. Checked here rather than in `planRun` so both entry points obey it, and
-   * checked before anything is built so **nothing is latched**: an ignored event leaves no claimed
-   * notice behind, and un-ignoring it therefore gets its notifications back.
-   *
-   * That is the one place this app prefers a possible extra send to a lost one, and only because
-   * the send cannot happen without a deliberate act — un-ignoring — by the person who would
-   * receive it. Latching instead would silently consume the `soon` reminder for an event brought
-   * back precisely because its date is wanted after all.
-   */
-  if (ctx.ignored.has(event.fingerprint)) return [];
-
-  /*
-   * A source switched off on the Sources tab. Checked here beside the ignore, and nothing is
-   * latched for the same reason — a switch is meant to be reversible, and a run that claimed
-   * notice ids while a source was silent would consume the `soon` reminder for a race the reader
-   * turns the source back on precisely to hear about.
+   * A source switched off on the Sources tab. Checked here rather than in `planRun` so both entry
+   * points obey it, and checked before anything is built so **nothing is latched** — a switch is
+   * meant to be reversible, and a run that claimed notice ids while a source was silent would
+   * consume the `soon` reminder for a race the reader turns the source back on precisely to hear
+   * about.
    *
    * This covers every kind. `announceFloor` above covers only the two that ask `isFresh`, which
    * is what keeps the backlog quiet *after* the switch comes back on; the two rules are the same

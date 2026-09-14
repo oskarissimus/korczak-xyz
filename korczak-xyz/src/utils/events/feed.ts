@@ -6,66 +6,17 @@
  * collector notifies about" drifting into two different ideas of the same list.
  */
 
-import type { EventKind, EventRecord, Interest } from './types';
-import { KINDS } from './types';
-import { NO_IGNORES } from './ignores';
+import type { EventRecord, Interest } from './types';
 import { ALL_SOURCES_ON, sourceEnabled, type SourcePrefs } from './sourcePrefs';
-import type { MatchReason } from './match';
-import { interestsRejectingFor, matchingInterests, scoreMatch } from './match';
-import { cityKey, isEndonym } from './cities';
+import { matchingInterests, scoreMatch } from './match';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
 
 export interface FeedItem {
   event: EventRecord;
-  /** Why it is here. Empty when the reader asked to see everything. */
+  /** Why it is here. Never empty: the feed is the matched rows and nothing else. */
   matched: Interest[];
-  /**
-   * Which interests turned it away on the `kind` or `places` rule alone. Only ever populated in
-   * `rejected` mode, where it is the whole point of the row.
-   */
-  rejectedBy?: Interest[];
-  /**
-   * Which of the two rules did it, so the card can print the right sentence — the classifier writes
-   * one line about the reach and another about the kind, and showing the geography reasoning under
-   * a row removed for being a press release is worse than showing nothing.
-   */
-  rejectedFor?: MatchReason;
-  /**
-   * Dismissed by hand. Set in every mode that can show such a row — so `all` can mark one rather
-   * than draw it as though nothing had happened to it, which would make "Everything" and "Matched"
-   * differ for a reason nothing on the screen states.
-   */
-  ignored?: boolean;
-  /**
-   * From a source this account has switched off on the Sources tab.
-   *
-   * Set for exactly the reason `ignored` is, and only ever in `all`: that view claims to be
-   * everything, so it has to draw the row — and a row drawn with nothing saying why it is missing
-   * from every other view is a filter you cannot check.
-   */
-  offSource?: boolean;
 }
-
-/**
- * What the feed is being asked for.
- *
- * `rejected` is the verification view: events that satisfied everything an interest asked about
- * their *content* and were turned away only by one of the two rules a language model decides —
- * what sort of thing it is, or where it is and who it is for. It exists because either filter is
- * otherwise unfalsifiable from the outside: a thing that stopped appearing and a thing that was
- * never announced look identical, and the whole question being asked of both features is which of
- * the two just happened.
- *
- * Built from the same `matchReason` call the real filter makes, so this view cannot show a
- * different set from the one being filtered on. See `matchReason`'s header.
- *
- * `ignored` is the same argument reaching the hand-dismissed rows: hiding something with no list
- * that says what is hidden is a filter you cannot check and cannot undo, and the only way back to
- * an ignored event would be remembering it existed. It is also the *only* way back — the Ignore
- * button is on the card, so the card has to be reachable.
- */
-export type FeedMode = 'matched' | 'rejected' | 'all' | 'ignored';
 
 export type FeedGroup = 'week' | 'month' | 'later' | 'undated';
 
@@ -102,20 +53,10 @@ export function dedupeByFingerprint(events: EventRecord[]): EventRecord[] {
 }
 
 export interface FeedOptions {
-  /** Which view. Defaults to `matched`, which is what the tab opens on. */
-  mode?: FeedMode;
   /**
-   * Fingerprints the reader has dismissed by hand — `ignoredFingerprints(...)`.
-   *
-   * Defaulted to empty rather than required, unlike `PlanContext.ignored`, and the asymmetry is
-   * deliberate: a caller here that forgot it would show a row that should be hidden, which is
-   * visible on the screen and one tap from being fixed, where the same omission in the collector
-   * is a notification at 7am about the concert you already said no to.
-   */
-  ignored?: ReadonlySet<string>;
-  /**
-   * Which sources this account is still listening to. Defaulted to all of them, for the reason
-   * above — the cost of forgetting it here is rows on a screen, not a phone ringing.
+   * Which sources this account is still listening to. Defaulted to all of them: the cost of a
+   * caller here forgetting it is rows on a screen, where the same omission in the collector is a
+   * phone ringing about a feed somebody switched off.
    */
   sources?: SourcePrefs;
 }
@@ -123,14 +64,16 @@ export interface FeedOptions {
 /**
  * The feed: matched events, deduped, grouped by how soon they are.
  *
+ * **The whole of what this returns is what the filters kept**, and that is the tab's contract since
+ * Sep 2026: the feed is the output of the pipeline, not a place to inspect it. What a filter turned
+ * away, how much of a source reaches you and which interest is doing it are questions about the
+ * *extraction*, and they are answered on the Sources tab beside the source they are about — see
+ * `filtering.ts`. A feed that could also show the rows it had removed needed a view switcher, and a
+ * view switcher on the one screen that is read every day is a filter somebody leaves set.
+ *
  * `forPush: false` — a muted interest still puts things here. Muting says "do not wake me", not
  * "hide it from me", and conflating the two is how a muted interest becomes indistinguishable from
  * a deleted one.
- *
- * Ignoring is the opposite instruction and is applied here rather than in the matcher, because it
- * is not a fact about whether the event matches: it matched, and was dismissed anyway. Folding it
- * into `matchReason` would make an ignored row indistinguishable from one no interest ever wanted,
- * and there would be nothing left to draw the `ignored` view from.
  */
 export function buildFeed(
   events: EventRecord[],
@@ -138,8 +81,6 @@ export function buildFeed(
   now: number,
   opts: FeedOptions = {},
 ): FeedSection[] {
-  const mode = opts.mode ?? 'matched';
-  const ignoredSet = opts.ignored ?? NO_IGNORES;
   const sources = opts.sources ?? ALL_SOURCES_ON;
 
   const items: FeedItem[] = [];
@@ -148,70 +89,15 @@ export function buildFeed(
     // announcement expires the same way, on the day the sale it announced opens.
     const at = actionableAt(event);
     if (at !== null && daysUntil(at, now) < 0) continue;
-    /*
-     * Dedupe first, then ask. The fingerprint is what an ignore is keyed on, so the survivor of two
-     * copies of one night carries the dismissal however the dedupe went — which is the whole reason
-     * the key is not an event id.
-     */
-    const ignored = ignoredSet.has(event.fingerprint);
 
-    /*
-     * A source switched off on the Sources tab, which is the same shape of instruction as an
-     * ignore one size up — so it is obeyed the same way, and `all` keeps its promise of being
-     * everything. Checked before the `ignored` view as well as the other three: a dismissed row
-     * from a silenced source is hidden twice over, and a list of dismissals holding rows that
-     * nothing can currently show would be the one view in this tab that lies.
-     */
-    const offSource = !sourceEnabled(sources, event.source);
-    if (offSource && mode !== 'all') continue;
-
-    // The one view that is *only* the dismissed rows, and the only route back to them.
-    if (mode === 'ignored') {
-      if (!ignored) continue;
-      items.push({
-        event,
-        matched: matchingInterests(event, interests, { forPush: false }),
-        ignored: true,
-      });
-      continue;
-    }
-
-    // Everywhere else a dismissal hides the row — except in `all`, which claims to be everything.
-    if (ignored && mode !== 'all') continue;
+    // A source this account has switched off on the Sources tab. Applied here rather than in the
+    // matcher because it is not a fact about whether the event matches — it matched, and the reader
+    // has stopped listening to where it came from.
+    if (!sourceEnabled(sources, event.source)) continue;
 
     const matched = matchingInterests(event, interests, { forPush: false });
-
-    if (mode === 'rejected') {
-      /*
-       * An event another interest already lets through is not something the filter is keeping from
-       * you, so it does not belong in a list of what the filter removed — however near a miss it
-       * was for this one.
-       */
-      if (matched.length > 0) continue;
-      /*
-       * Asked one rule at a time rather than for both at once, because the row has to say which
-       * one did it. `kind` first: it is the earlier rule, so an interest that rejects on it was
-       * never going to reach `places`, and where two different interests disagree the stronger
-       * statement — this is not an event — is the one worth printing.
-       */
-      const byKind = interestsRejectingFor(event, interests, 'kind', { forPush: false });
-      const rejectedFor: MatchReason = byKind.length > 0 ? 'kind' : 'places';
-      const rejectedBy =
-        byKind.length > 0
-          ? byKind
-          : interestsRejectingFor(event, interests, 'places', { forPush: false });
-      if (rejectedBy.length === 0) continue;
-      items.push({ event, matched, rejectedBy, rejectedFor });
-      continue;
-    }
-
-    if (mode === 'matched' && matched.length === 0) continue;
-    items.push({
-      event,
-      matched,
-      ...(ignored ? { ignored: true } : {}),
-      ...(offSource ? { offSource: true } : {}),
-    });
+    if (matched.length === 0) continue;
+    items.push({ event, matched });
   }
 
   items.sort(compareItems);
@@ -300,210 +186,6 @@ function bestScore(item: FeedItem): number {
     best = Math.max(best, scoreMatch(item.event, interest));
   }
   return best;
-}
-
-/**
- * The city an event is in, as the one key its spellings agree on — `''` when the source never said.
- *
- * `cityKey` rather than a fold done here: it is the same function the matcher compares
- * `Interest.cities` with, so the picker and that rule cannot disagree about what one city is. It
- * absorbs both halves of the problem — `Kraków`, `KRAKOW` and `Krakow` fold together, and `Warsaw`
- * is mapped onto `Warszawa`, which folding alone will never do.
- */
-export function cityKeyOf(event: { city?: string }): string {
-  return cityKey(event.city);
-}
-
-export interface CityOption {
-  /** Folded. What a selection is stored and compared as. */
-  key: string;
-  /** The spelling to show, chosen from the sources' own words. */
-  label: string;
-  count: number;
-}
-
-/**
- * The cities present in a built feed, with how many rows each holds.
- *
- * Counts rather than a bare list, because a picker is the one control here that can empty the
- * screen: `Warszawa (12)` says what pressing it does, and a city that has fallen to zero says that
- * too rather than looking like a filter that broke. It is computed over the *unfiltered* sections
- * for the view being looked at, so the numbers are what the reader would see, not what the corpus
- * holds.
- *
- * Rows with no city are deliberately not an option. They are the RSS articles, which are pieces of
- * writing rather than nights out, and "somewhere unspecified" is not a place anyone picks — the
- * `Anywhere` count staying larger than the sum of the cities is where they show up.
- *
- * Alphabetical, because the picker is scanned for a name that is already known. The label is the
- * city's own name where the corpus holds it — `Warszawa` over `Warsaw` — then the commonest
- * spelling, then alphabetical, so two equally common spellings do not swap between renders.
- */
-export function cityOptions(events: Array<{ city?: string }>): CityOption[] {
-  const byKey = new Map<string, { count: number; spellings: Map<string, number> }>();
-  for (const event of events) {
-    const key = cityKeyOf(event);
-    if (!key) continue;
-    const entry = byKey.get(key) ?? { count: 0, spellings: new Map<string, number>() };
-    const spelling = (event.city ?? '').trim();
-    entry.count += 1;
-    entry.spellings.set(spelling, (entry.spellings.get(spelling) ?? 0) + 1);
-    byKey.set(key, entry);
-  }
-
-  return [...byKey]
-    .map(([key, { count, spellings }]) => ({
-      key,
-      count,
-      label: [...spellings].sort(
-        (a, b) =>
-          Number(isEndonym(b[0])) - Number(isEndonym(a[0])) ||
-          b[1] - a[1] ||
-          a[0].localeCompare(b[0]),
-      )[0][0],
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-/**
- * What the classifier called a row, as the one value a filter can be keyed on.
- *
- * `unlabelled` is a key of its own rather than being folded into `listing`, and that is the whole
- * care in this file. An unclassified row *passes* every rule the classifier feeds — it is in the
- * feed because nothing has judged it, not because something judged it an event — so counting it as
- * a listing would let a reader narrow to listings and be shown rows that may be press releases,
- * with nothing on the screen saying so. It is the same distinction `classificationCoverage` exists
- * to make visible in the rejected view.
- */
-export type KindKey = EventKind | 'unlabelled';
-
-/**
- * Every kind, in the order they are drawn in.
- *
- * Fixed rather than by count, unlike `countryTally`: these are buttons rather than a line of
- * prose, and a row whose buttons swap places as the corpus changes is one you press the wrong half
- * of. `listing` first because it is what the app is mostly for, `unlabelled` last because it is the
- * absence of an answer rather than one of them.
- */
-export const KIND_KEYS: readonly KindKey[] = [...KINDS, 'unlabelled'];
-
-export function kindKeyOf(event: { kind?: EventKind }): KindKey {
-  return event.kind ?? 'unlabelled';
-}
-
-export interface KindOption {
-  key: KindKey;
-  count: number;
-}
-
-/**
- * The kinds present in a built feed, with how many rows each holds.
- *
- * Counts for `cityOptions`' reason — this control can empty the screen, and a choice should say
- * what pressing it does. In `KIND_KEYS` order, which is fixed; see there.
- *
- * A kind with nothing behind it is left out. There are four at most and the reader is choosing
- * from what is actually there — the selected-but-empty case is kept on screen by
- * `withSelectedKeys` in the component, which is where it belongs: it is a fact about the
- * selection, not the corpus.
- */
-export function kindOptions(events: Array<{ kind?: EventKind }>): KindOption[] {
-  const counts = new Map<KindKey, number>();
-  for (const event of events) {
-    const key = kindKeyOf(event);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return KIND_KEYS.map((key) => ({ key, count: counts.get(key) ?? 0 })).filter(
-    (option) => option.count > 0,
-  );
-}
-
-/**
- * Every filter in the toolbar, applied in one pass — an unset field is no constraint.
- *
- * A lens over the finished list rather than arguments to `buildFeed`, and that is the whole design
- * of all three of them: they are **view preferences on one device**, not facts about what matches.
- * `Interest.cities`, `Interest.includeCoverage` and `Interest.tags` are the durable forms and they
- * are what the collector reads, so narrowing anything here can never quietly stop a notification —
- * which is the failure a persisted filter would otherwise cause months later, on a phone whose
- * owner has forgotten it is set.
- *
- * **An empty selection is no constraint, not "matches nothing"** — the rule `match.ts` states for
- * a keyword-less interest, and the same reasoning: nothing chosen is a reader who has not chosen,
- * and reading it as unsatisfiable would open the tab on a blank feed.
- *
- * One function rather than three lenses chained, because they are asked four different questions
- * per render: what the feed shows, and what each control's counts would be with every filter *but
- * its own* applied. Chaining those combinations builds a pile of intermediate arrays to answer
- * what is one predicate per row. The identity return when nothing is set is not an optimisation
- * either — it is what keeps the component's `useMemo` chain from rebuilding its option lists for
- * filters nobody has touched.
- *
- * Grouping survives untouched: filtering after `buildFeed` cannot reorder anything, and a section
- * left with nothing in it is dropped rather than drawn as an empty heading.
- */
-export interface FeedNarrowing {
-  /** Folded, as `cityKeyOf` returns it. Empty or absent for every city. */
-  city?: string;
-  kinds?: ReadonlySet<KindKey>;
-}
-
-export function narrowSections(sections: FeedSection[], narrowing: FeedNarrowing): FeedSection[] {
-  const { city = '', kinds } = narrowing;
-  const byKind = kinds && kinds.size > 0 ? kinds : null;
-  if (!city && !byKind) return sections;
-  return sections
-    .map((section) => ({
-      group: section.group,
-      items: section.items.filter(
-        (item) =>
-          (!city || cityKeyOf(item.event) === city) &&
-          (!byKind || byKind.has(kindKeyOf(item.event))),
-      ),
-    }))
-    .filter((section) => section.items.length > 0);
-}
-
-/**
- * How many of each country are in a list, commonest first.
- *
- * Drawn over the rejected view, where it answers the question the cards cannot: not "what was
- * removed" one at a time, but *what shape* the removal has. Four national PyCons in four countries
- * reads very differently from forty rows all filed under one — the second is a classifier getting
- * a country wrong at scale, and it is the failure this line exists to make visible at a glance.
- *
- * `?` for a record with no country, so the tally is total and the unplaced are countable rather
- * than merely absent.
- */
-export function countryTally(events: EventRecord[]): Array<{ code: string; count: number }> {
-  const counts = new Map<string, number>();
-  for (const event of events) {
-    const code = event.country ?? '?';
-    counts.set(code, (counts.get(code) ?? 0) + 1);
-  }
-  // Count first, then code, so the line does not reshuffle between renders on a tie.
-  return [...counts]
-    .map(([code, count]) => ({ code, count }))
-    .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
-}
-
-/**
- * How much of the corpus has been through the classifier.
- *
- * The other half of verifying this, and the half the rejected list structurally cannot show: an
- * unclassified event **passes** the places rule, so it is never in that list. Without this number
- * a classifier that has quietly stopped looks exactly like a filter with nothing to remove.
- */
-export function classificationCoverage(events: EventRecord[]): {
-  classified: number;
-  total: number;
-} {
-  let classified = 0;
-  // `classifiedAt` rather than any one verdict field: the call answers three questions and can come
-  // back with two of them, so counting on `reach` alone would report a working classifier as
-  // partly stopped whenever it declined to guess.
-  for (const event of events) if (event.classifiedAt !== undefined) classified += 1;
-  return { classified, total: events.length };
 }
 
 /**

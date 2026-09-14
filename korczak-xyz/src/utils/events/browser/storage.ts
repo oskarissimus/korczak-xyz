@@ -15,33 +15,26 @@
  * What is expendable and what is not:
  *
  *   - `events-interests` is the ONLY local copy of something he typed. Never evicted.
- *   - `events-ignores` is the same: an event dismissed by hand is a decision, and dropping it
- *     brings the card back with nothing to say why. Never evicted either.
  *   - `events-feed` is a cache of a server-owned corpus. First to go, and losing it costs one
  *     online refresh — it exists so an installed app shows something on a dead network.
  */
 
 import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
-import { KIND_KEYS, type KindKey } from '../feed';
 import { PUSH_APPS } from '../pushApps';
 import { normalizeSourcePrefs, type SourcePrefs } from '../sourcePrefs';
-import type { EventRecord, Ignore, Interest, PushApp, PushSettings } from '../types';
+import type { EventRecord, Interest, PushApp, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
 export const EVENT_KEYS = {
   interests: 'events-interests',
   unsynced: 'events-interests-unsynced',
-  ignores: 'events-ignores',
-  ignoresUnsynced: 'events-ignores-unsynced',
   feed: 'events-feed',
   pushSubId: 'events-push-sub-id',
   pushApps: 'events-push-sub-apps',
   pushSeen: 'events-push-seen-at',
   settings: 'events-push-settings',
   sourcePrefs: 'events-source-prefs',
-  feedCity: 'events-feed-city',
-  feedKinds: 'events-feed-kinds',
 } as const;
 
 /** How many events the offline cache keeps. Roughly 60 kB at ~300 bytes a row. */
@@ -57,8 +50,6 @@ const FEED_CACHE_LIMIT = 200;
 const CACHED_PER_OWNER = [
   EVENT_KEYS.interests,
   EVENT_KEYS.unsynced,
-  EVENT_KEYS.ignores,
-  EVENT_KEYS.ignoresUnsynced,
   EVENT_KEYS.feed,
   EVENT_KEYS.settings,
   /*
@@ -67,15 +58,6 @@ const CACHED_PER_OWNER = [
    * follow the next person into a feed they have never narrowed.
    */
   EVENT_KEYS.sourcePrefs,
-  /*
-   * A view preference rather than data, but it is one that hides rows — and a filter to Warszawa
-   * inherited by the next account would empty a feed nobody in that account had ever narrowed.
-   * Cheap to clear, since the whole cost of losing it is one tap on the picker.
-   */
-  EVENT_KEYS.feedCity,
-  // Same argument, same cost: a feed narrowed to announcements is one the next account never
-  // narrowed, and it hides rows with nothing on the screen saying who asked for it.
-  EVENT_KEYS.feedKinds,
 ] as const;
 
 const OWNER_KEY = 'events-owner';
@@ -231,66 +213,17 @@ export function normalizeInterest(raw: unknown): Interest | null {
   };
 }
 
-// --- the ignores ------------------------------------------------------------------------------
-
-/**
- * Every stored ignore, tombstones included — callers filter, through `ignoredFingerprints`.
- *
- * The tombstones have to survive the round trip: a lifted ignore is a *deleted* row, and dropping
- * it here would let the other device's live copy win the next merge and hide the card again.
- */
-export function loadIgnores(): Ignore[] {
-  const raw = readJSON<unknown[]>(EVENT_KEYS.ignores, []);
-  if (!Array.isArray(raw)) return [];
-  const out: Ignore[] = [];
-  for (const item of raw) {
-    const ignore = normalizeIgnore(item);
-    if (ignore) out.push(ignore);
-  }
-  return out;
-}
-
-export function saveIgnores(ignores: Ignore[]): boolean {
-  return writeEventsKey(EVENT_KEYS.ignores, JSON.stringify(ignores));
-}
-
-/**
- * Rebuilds an ignore from an untrusted value, allow-list style — `normalizeInterest`'s contract.
- *
- * A row with no `fingerprint` is dropped rather than kept: the fingerprint is the whole payload,
- * and a row without one is an ignore of nothing that would sit in the list forever, unmatched by
- * any event and so unreachable from the Ignored view.
- */
-export function normalizeIgnore(raw: unknown): Ignore | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.id !== 'string' || !r.id) return null;
-  if (typeof r.rev !== 'number' || typeof r.updatedAt !== 'number') return null;
-  if (typeof r.writerId !== 'string') return null;
-  if (typeof r.fingerprint !== 'string' || !r.fingerprint) return null;
-
-  return {
-    id: r.id,
-    rev: r.rev,
-    updatedAt: r.updatedAt,
-    writerId: r.writerId,
-    ...(r.deleted === true ? { deleted: true as const } : {}),
-    fingerprint: r.fingerprint,
-    title: typeof r.title === 'string' ? r.title : '',
-  };
-}
-
 // --- the push queues ------------------------------------------------------------------------
 
 /*
- * Two queues over one pair of functions, keyed by the store they drain — `EVENT_KEYS.unsynced` for
- * the interests, `EVENT_KEYS.ignoresUnsynced` for the ignores.
+ * A queue of ids waiting to reach the cloud, keyed by the store it drains — `EVENT_KEYS.unsynced`
+ * for the interests, which is the only collection in this app a client writes.
  *
- * The key is a required argument rather than a default, because the two collections hold ids from
- * different id spaces: an interest is a `uuid()` and an ignore is `slugKey(fingerprint)`. Sharing
- * one queue would have each hook's sync loop look up the other's ids, find nothing, and quietly
- * drop them as already-done — a write that never leaves the device, with a drained queue and a
- * Synced badge saying it did.
+ * The key stays a required argument rather than becoming a default. It carried two collections
+ * until the ignores were removed (Sep 2026), and the reason it was parameterised is the reason to
+ * leave it so: two collections hold ids from different id spaces, and one shared queue has each
+ * sync loop look up the other's ids, find nothing, and drop them as already-done — a write that
+ * never leaves the device, with a drained queue and a Synced badge saying it did.
  */
 
 export function loadUnsynced(key: string): string[] {
@@ -384,74 +317,6 @@ export function savePushSeenAt(at: number): boolean {
   return writeEventsKey(EVENT_KEYS.pushSeen, JSON.stringify(at));
 }
 
-/**
- * Which city the feed is narrowed to, as the spelling to show — `''` for anywhere.
- *
- * The *label* is stored rather than the folded key, and one derives the other: the picker has to
- * name the city it is filtering on even when the corpus currently holds nothing from there (a
- * scrape between runs, a season just ended), and a key alone would leave it saying `warszawa`. The
- * comparison key is `foldText` of this, so the two can never drift into disagreeing.
- */
-export function loadFeedCity(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    return localStorage.getItem(EVENT_KEYS.feedCity) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-export function saveFeedCity(city: string): boolean {
-  if (city === '') {
-    try {
-      localStorage.removeItem(EVENT_KEYS.feedCity);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return writeEventsKey(EVENT_KEYS.feedCity, city);
-}
-
-/*
- * The two multi-select filters in the Feed toolbar, stored the same way and for the same reasons.
- *
- * Validated against the keys this build knows rather than read as written: a value stored by a
- * future build that has one more kind cannot narrow this one to nothing, because an unknown key
- * matches no row and would silently empty the feed, where dropping it leaves the filter honest
- * about what this build can do.
- *
- * An empty selection is stored as a *removal*, so "everything" is the absence of a key rather than
- * an empty array to be told apart from a missing one.
- */
-function loadFeedKeys<K extends string>(key: string, known: readonly K[]): K[] {
-  const raw = readJSON<unknown>(key, []);
-  if (!Array.isArray(raw)) return [];
-  const allowed = new Set<string>(known);
-  return [...new Set(raw.filter((k): k is K => typeof k === 'string' && allowed.has(k)))];
-}
-
-function saveFeedKeys(key: string, values: readonly string[]): boolean {
-  if (values.length === 0) {
-    try {
-      localStorage.removeItem(key);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return writeEventsKey(key, JSON.stringify(values));
-}
-
-/** Which kinds the feed is narrowed to — an empty list for all of them. */
-export function loadFeedKinds(): KindKey[] {
-  return loadFeedKeys(EVENT_KEYS.feedKinds, KIND_KEYS);
-}
-
-export function saveFeedKinds(kinds: KindKey[]): boolean {
-  return saveFeedKeys(EVENT_KEYS.feedKinds, kinds);
-}
-
 export function loadPushSettings(): PushSettings {
   const raw = readJSON<Partial<PushSettings>>(EVENT_KEYS.settings, {});
   return { ...DEFAULT_PUSH_SETTINGS, ...(typeof raw === 'object' && raw ? raw : {}) };
@@ -487,7 +352,7 @@ let adoptedSwitched = false;
  * Records which account this browser's cache belongs to, clearing it on a change.
  *
  * Memoised for the page load because more than one caller asks — the interests hook and the
- * ignores hook both mount on the Feed — and the *clearing* must happen exactly once. But the
+ * source-prefs hook both mount on the Feed — and the *clearing* must happen exactly once. But the
  * **answer** is memoised too, not just the guard, and that distinction is the whole of the sleep
  * log's `adoptOwner` bug: whoever asks second reads `previous === uid`, having watched the first
  * caller write it, so a plain re-read tells them nothing happened. They then keep the previous
@@ -496,8 +361,8 @@ let adoptedSwitched = false;
  *
  * So every caller in a page load that switched accounts is told it switched, and every one of them
  * reloads from the (now empty) store. Returning `false` to all but the first is only safe while
- * there is exactly one caller, which stopped being true the moment ignoring an event became its
- * own collection.
+ * there is exactly one caller, which stopped being true the moment the source switches became a
+ * store of their own.
  *
  * An absent value adopts the current account rather than clearing, so an install predating this
  * migrates instead of losing its interests.

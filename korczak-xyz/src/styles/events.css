@@ -268,32 +268,6 @@
   padding: 0 5px;
 }
 
-/*
- * What the newsroom item reader made of an article.
- *
- * Grey, and the same grey as `ev-chip--place`, because it is the same kind of claim: this app's own
- * reading rather than anything the source said. The navy pair beside it (`--sale`, `--presale`) are
- * facts off a listing, and a reader should be able to tell at a glance which of the chips on a card
- * a model wrote.
- */
-.ev-chip--newsroom {
-  background: var(--retro-gray);
-  border-color: var(--retro-dark-gray);
-  color: var(--retro-dark-gray);
-}
-
-/*
- * Dismissed by hand. Drawn as an inset well rather than in a colour, because it is the one chip on
- * a card that reports something *you* did — where `ev-chip--sale` is a fact from a listing and
- * `ev-chip--place` a verdict from the classifier. A fourth colour beside those two would read as a
- * third claim about the event.
- */
-.ev-chip--ignored {
-  background: var(--retro-gray);
-  border: 2px inset var(--retro-white);
-  color: var(--retro-dark-gray);
-}
-
 .ev-empty {
   padding: 24px 12px;
   text-align: center;
@@ -309,148 +283,6 @@
   flex-wrap: wrap;
   font-size: 1.05rem;
   color: var(--retro-dark-gray);
-}
-
-/*
- * The three-state view picker.
- *
- * Named twice, and the pressed state named twice again. `Layout.astro` carries a global
- * `button:hover { background: #a0a0a0 }` at (0,1,1), which beats a bare `.ev-view` at (0,1,0) — so
- * the button under the pointer would go flat grey, and on a row of three that is the one you are
- * about to click. `.ev-view--on` then has to clear `.ev-view:hover` for the same arithmetic, which
- * is the bug `.fb-choice--on` was written up for: without it, hovering the row hides which view
- * you are in.
- */
-.ev-views {
-  display: flex;
-  /* A fourth button appears once something has been ignored, and four of these do not fit on a
-     320px screen. Wrapping is the only option that keeps every label readable — shrinking them
-     puts the pressed state on a word broken across two lines. */
-  flex-wrap: wrap;
-}
-
-.ev-view,
-.ev-view:hover {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 6px 12px;
-  border: 2px outset var(--retro-white);
-  background: var(--retro-gray);
-  color: var(--retro-black);
-  cursor: pointer;
-}
-
-.ev-view + .ev-view {
-  margin-left: -2px;
-}
-
-.ev-view--on,
-.ev-view--on:hover {
-  border-style: inset;
-  background: var(--retro-white);
-}
-
-/*
- * The city picker.
- *
- * A native `<select>`, styled only as far as the retro chrome needs: the option list is the OS's,
- * which on a phone is a full-height wheel that stays usable at twenty-odd cities where a row of
- * buttons would have wrapped into four lines of the toolbar.
- *
- * `font-size` is not decoration here. iOS Safari zooms the whole page when a form control it is
- * focusing is under 16px, and never zooms back out — so the feed would end up scrolled sideways
- * every time a city is chosen. 1.15rem of VT323 clears it.
- */
-.ev-city {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ev-city-label,
-.ev-kinds-label {
-  color: var(--retro-dark-gray);
-}
-
-.ev-city-select {
-  font-family: 'VT323', monospace;
-  font-size: 1.15rem;
-  line-height: 1;
-  padding: 4px 6px;
-  border: 2px inset var(--retro-white);
-  background: var(--retro-white);
-  color: var(--retro-black);
-  max-width: 100%;
-  cursor: pointer;
-}
-
-/*
- * The label filters — several at once, so buttons rather than the city's `<select>`.
- *
- * `.ev-view`'s two-selectors-and-hover arithmetic, for the same reason: `Layout.astro`'s global
- * `button:hover` at (0,1,1) beats a bare class, so an unnamed hover state would grey out whichever
- * button is under the pointer and the pressed one has to out-specify it back. See `.ev-views`.
- *
- * Unlike the view picker these do not butt together with a negative margin: any number of them can
- * be pressed, and a shared border between two pressed buttons reads as one wide control rather
- * than two separate answers.
- *
- * `flex-basis: 100%` gives each row a line of its own in the toolbar. There are two of them and
- * they are different questions — what sort of row this is, and what the theatre's article says —
- * so run together on one line their buttons would read as one long list of alternatives instead of
- * an AND across two axes. The label at the head of each row is what says which is which, and it
- * only does that job at the start of a line.
- */
-.ev-kinds {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  flex-basis: 100%;
-}
-
-.ev-kind,
-.ev-kind:hover {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 6px 10px;
-  border: 2px outset var(--retro-white);
-  background: var(--retro-gray);
-  color: var(--retro-black);
-  cursor: pointer;
-}
-
-.ev-kind--on,
-.ev-kind--on:hover {
-  border-style: inset;
-  background: var(--retro-white);
-}
-
-/*
- * The two verification lines above the rejected list.
- *
- * Deliberately plain: this is instrumentation, and it is read once to answer a question rather
- * than looked at every visit.
- */
-.ev-verify {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.ev-tally {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-  /* A long tally wraps rather than pushing the panel wide; nothing is anchored to its right edge. */
-  overflow-wrap: anywhere;
-}
-
-.ev-tally-head {
-  color: var(--retro-black);
 }
 
 /*
@@ -478,14 +310,6 @@
   border-color: var(--retro-dark-gray);
   color: var(--retro-dark-gray);
   font-style: italic;
-}
-
-.ev-reason {
-  margin: 4px 0 0;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-  border-left: 3px solid var(--retro-dark-gray);
-  padding-left: 8px;
 }
 
 /* --- interests ----------------------------------------------------------------------------- */
@@ -754,6 +578,140 @@
   color: var(--retro-red);
 }
 
+/*
+ * The two blocks under a source: what a model was asked, and what filters its rows.
+ *
+ * Inset wells rather than more of the card, because they answer a different question from the
+ * three lines above them. The pages and the health are about the *fetch* and are read at a glance;
+ * these are read when something looks wrong, and a reader scanning five cards for a red row should
+ * be able to skip them without the eye catching.
+ */
+.ev-source-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 2px inset var(--retro-white);
+}
+
+.ev-block-head {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  margin: 0;
+  color: var(--retro-black);
+}
+
+.ev-pass + .ev-pass {
+  margin-top: 10px;
+}
+
+.ev-pass-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.ev-pass-name {
+  color: var(--retro-black);
+  font-size: 1.1rem;
+}
+
+/*
+ * A pass with rows it has not answered yet.
+ *
+ * Navy rather than red, and that is the judgement: a queue is the ordinary state — the classifier
+ * runs at 400 an hour and every new row starts unanswered — so red would cry wolf on every healthy
+ * source the day after a scrape widens. What it has to do is stand out from the plain count beside
+ * a finished pass, which is exactly what `--presale` does on a card.
+ */
+.ev-chip--pending {
+  background: var(--retro-white);
+  border: 2px solid var(--retro-navy);
+  color: var(--retro-navy);
+  padding: 0 5px;
+}
+
+.ev-extracted {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ev-extracted-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+/*
+ * The field as the record spells it.
+ *
+ * Monospaced and not in VT323, for the Pipeline tab's reason — that face draws `l`, `1` and `I`
+ * alike, and this is a string read character by character to be matched against a document.
+ */
+.ev-extracted-name {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  color: var(--retro-black);
+  overflow-wrap: anywhere;
+}
+
+.ev-extracted-word {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* How many rows carry one. Right of the row, so five fields make a column that can be read down. */
+.ev-extracted-count {
+  color: var(--retro-black);
+  margin-left: auto;
+}
+
+.ev-filters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ev-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--retro-dark-gray);
+}
+
+.ev-filter:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/*
+ * The name and its count read as one thing, and the way in is on the right.
+ *
+ * `.ev-interest-head`'s own `space-between` is for a row of two — a name and a group of buttons —
+ * and with a chip between them it parks the count in the middle of the line, where it reads as
+ * belonging to neither. Pushed left together, then the button pushed away by `margin-left: auto`.
+ */
+.ev-filter .ev-interest-head {
+  justify-content: flex-start;
+}
+
+.ev-filter .ev-actions {
+  margin-left: auto;
+}
+
 /* --- sync badge ---------------------------------------------------------------------------- */
 
 .ev-sync {
@@ -817,380 +775,4 @@
   height: 18px;
   margin: 2px 0 0;
   flex: 0 0 auto;
-}
-
-/* --- the pipeline tab ----------------------------------------------------------------------- */
-
-.ev-pipeline {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  font-family: 'VT323', monospace;
-  color: var(--retro-black);
-}
-
-.ev-pipe-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.ev-pipe-row {
-  border: 2px outset var(--retro-white);
-  background: var(--retro-gray);
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ev-pipe-head {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-/* The stored `day`, printed as it is stored — `YYYY-MM-DD` or an em dash. Not localised on
-   purpose: every other tab formats a date for a reader, and this one shows the field. */
-.ev-pipe-day {
-  font-variant-numeric: tabular-nums;
-  color: var(--retro-dark-gray);
-  font-size: 1.05rem;
-}
-
-.ev-pipe-title {
-  font-family: 'VT323', monospace;
-  font-size: 1.2rem;
-  margin: 0;
-  font-weight: normal;
-}
-
-/* The document id, in the monospace the rest of this tab's machine text uses. It is the string
-   every other collection joins back to, and the reason to be able to select it is to paste it
-   into a console — so it wraps anywhere rather than being truncated. */
-.ev-pipe-id {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.78rem;
-  color: var(--retro-dark-gray);
-  overflow-wrap: anywhere;
-}
-
-.ev-pipe-more {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-}
-
-/* --- one row's fields, by the pass that wrote them ------------------------------------------ */
-
-.ev-stages {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-  border-top: 1px solid var(--retro-dark-gray);
-  padding-top: 8px;
-}
-
-.ev-stage-head {
-  font-family: 'VT323', monospace;
-  font-size: 1.1rem;
-  margin: 0;
-  color: var(--retro-black);
-}
-
-.ev-stage-note {
-  margin: 0 0 4px;
-  font-size: 1rem;
-  color: var(--retro-dark-gray);
-}
-
-/* A pass that wrote nothing on this row. A word rather than an empty panel: "has not run yet" is
-   a state, and blank space is not a way of saying it. */
-.ev-stage-empty {
-  margin: 0;
-  font-size: 1rem;
-  font-style: italic;
-  color: var(--retro-dark-gray);
-}
-
-/*
- * The pass-by-pass view, put away.
- *
- * Closed by default, which is the opposite of the filter disclosure above and for the opposite
- * reason: those counts are half of what the tab is for, and these thirty fields are what you open
- * a row *second* to see. The summary says what is behind it rather than "more", because a
- * disclosure that does not name its contents is one nobody opens twice.
- */
-.ev-more {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.ev-more-summary {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-  cursor: pointer;
-  /* The marker is the whole affordance here; a list-style bullet would read as a list item. */
-  list-style-position: inside;
-}
-
-.ev-more-summary:focus-visible {
-  outline: 1px dotted var(--retro-black);
-  outline-offset: 2px;
-}
-
-/*
- * The stored fields, as JSON.
- *
- * A black terminal panel, which is what `pre` and `code` are everywhere else on this site — a blog
- * listing, a course snippet. That is not only consistency: the global `code` rule paints its own
- * background and would have shown through anything lighter put behind it, and a highlighter fighting
- * the cascade for a white ground is one bad merge away from black text on black. So every property
- * that matters is set here on both elements rather than inherited, and the panel reads as the one
- * thing on the tab that is machine output.
- *
- * A real monospace stack rather than VT323, which is the one place in this app that font is wrong:
- * it is a display face with no distinction between `l`, `1` and `I`, and this is a panel read
- * character by character — a fingerprint, a hash, an id.
- *
- * `pre-wrap` with `overflow-wrap: anywhere` rather than a horizontal scroller: a haystack is a
- * couple of hundred characters of folded text on one line, and a panel you scroll sideways to read
- * on a phone is one you do not read.
- */
-.ev-json,
-.ev-json code {
-  background: var(--retro-black);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  border: 0;
-}
-
-.ev-json {
-  margin: 0;
-  padding: 8px;
-  border: 2px inset var(--retro-dark-gray);
-  tab-size: 2;
-}
-
-.ev-json code {
-  padding: 0;
-}
-
-/*
- * The five token colours.
- *
- * The retro palette's own primaries, pulled off their corners: `#00ffff` and `#ff00ff` at 0.8rem
- * fringe and vibrate even on black, and this is a panel read a paragraph at a time. Green for the
- * strings because green on black is what every other `pre` on this site already is, and a string is
- * most of what is in one of these — the other four are what stands out against it.
- */
-.ev-json-key {
-  color: #6fd3ff;
-}
-
-.ev-json-string {
-  color: #6ee66e;
-}
-
-.ev-json-number {
-  color: #ff9de0;
-}
-
-.ev-json-literal {
-  color: #ffc45c;
-  font-style: italic;
-}
-
-.ev-json-punct {
-  color: #9aa09a;
-}
-
-/*
- * The eight filter axes, behind a disclosure.
- *
- * Open by default, and now affordable to be: each axis is one line rather than a wrapped row of
- * buttons, so the whole panel is eight lines instead of the several screens that made a row of
- * toggles the wrong control here. The disclosure stays anyway — it is the way to put the panel
- * away once a filter is set — and its summary says how many are on, so a closed one can never be
- * hiding a narrowing.
- */
-.ev-facets {
-  flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ev-facets-summary {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-  cursor: pointer;
-  /* The marker is the whole affordance here; a list-style bullet would read as a list item. */
-  list-style-position: inside;
-}
-
-.ev-facets-summary:focus-visible {
-  outline: 1px dotted var(--retro-black);
-  outline-offset: 2px;
-}
-
-/* --- one axis, as a box you type into ------------------------------------------------------- */
-
-/*
- * The label beside the box rather than above it.
- *
- * Eight axes stacked two lines each is half a phone screen of chrome before the first row, which is
- * the problem a row of toggles had in a milder form. Beside it they are eight lines, and the labels
- * are short enough to share one with a box that still fits `Elektroniczne Zapisy` — the chips wrap
- * onto their own line underneath, which is what `flex-basis: 100%` on the list below is for.
- */
-.ev-facet {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-
-.ev-facet-label {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  color: var(--retro-dark-gray);
-  /* Aligned down the column, so the boxes start in one place and the panel reads as a form. */
-  flex: 0 0 auto;
-  min-width: 6.5em;
-}
-
-/* The anchor for the list, which is positioned rather than in flow: a dropdown that pushed the
-   rows below it down the page would move the thing you are about to read every time you focused a
-   box. */
-.ev-combo {
-  position: relative;
-  /* `min-width: 0` or the input's own intrinsic width stops this shrinking, and the label is
-     pushed off the side at 320px. */
-  flex: 1 1 8em;
-  min-width: 0;
-}
-
-.ev-combo-input {
-  width: 100%;
-  font-family: 'VT323', monospace;
-  font-size: 1.1rem;
-  padding: 4px 6px;
-  background: var(--retro-white);
-  border: 2px inset var(--retro-dark-gray);
-  color: var(--retro-black);
-}
-
-/*
- * The options.
- *
- * `40vh` and a scroller rather than the whole list: twenty-odd countries is a list longer than a
- * phone, and a dropdown you scroll the *page* to see the end of is one whose top has gone. Above
- * everything, because it overlaps the rows it is filtering.
- */
-.ev-combo-list {
-  position: absolute;
-  z-index: 5;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 40vh;
-  overflow-y: auto;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  background: var(--retro-white);
-  border: 2px outset var(--retro-white);
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
-}
-
-.ev-combo-option {
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 5px 8px;
-  font-family: 'VT323', monospace;
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-
-/* Where the keyboard is. The same navy the rest of the site selects with, so an arrow key and a
-   hover do not look like two different states. */
-.ev-combo-option--active {
-  background: var(--retro-navy);
-  color: var(--retro-white);
-}
-
-.ev-combo-option--on {
-  font-weight: bold;
-}
-
-/* The rows with no answer on this axis — italic, as `ev-chip--kind` is, because it is the absence
-   of a value rather than one of them. */
-.ev-combo-option--absent {
-  font-style: italic;
-}
-
-/* Right-aligned and tabular so the numbers line up down the list: reading this column is the whole
-   reason the box is worth opening — `publishedAt 312` against 1,440 rows is a coverage report. */
-.ev-combo-count {
-  font-variant-numeric: tabular-nums;
-  color: var(--retro-dark-gray);
-  flex: 0 0 auto;
-}
-
-.ev-combo-option--active .ev-combo-count {
-  color: var(--retro-white);
-}
-
-.ev-combo-word {
-  overflow-wrap: anywhere;
-}
-
-.ev-combo-none {
-  padding: 5px 8px;
-  font-family: 'VT323', monospace;
-  font-size: 1.1rem;
-  font-style: italic;
-  color: var(--retro-dark-gray);
-}
-
-/*
- * What is picked, under the box it came out of.
- *
- * Once the list is closed these chips are the whole of what the filter is doing, which is why they
- * are buttons: the way out of a narrowing has to be where the narrowing is shown. Pressed-in rather
- * than outset, so they read as a state rather than as more controls to try.
- */
-.ev-chosen-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  /* Its own line under the box, whatever the label and box left over. */
-  flex-basis: 100%;
-}
-
-.ev-chosen,
-.ev-chosen:hover {
-  font-family: 'VT323', monospace;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 5px 8px;
-  background: var(--retro-white);
-  border: 2px inset var(--retro-white);
-  color: var(--retro-black);
-  cursor: pointer;
 }

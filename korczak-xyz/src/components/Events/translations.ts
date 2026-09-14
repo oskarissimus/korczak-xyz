@@ -15,7 +15,6 @@ export const translations = {
     navInterests: 'Interests',
     navAlerts: 'Alerts',
     navSources: 'Sources',
-    navPipeline: 'Pipeline',
     navLabel: 'Event Watch sections',
 
     // Auth gate
@@ -43,61 +42,19 @@ export const translations = {
     onSaleNow: 'On sale',
     saleOpens: 'Sale opens {when}',
     showingCount: '{shown} of {total} upcoming',
-    // The two narrowings that hide a row without an interest having decided anything, named on the
-    // card in `Everything` and pointed at from an empty list. `sourcesOffHint` is a link to the
-    // Sources tab, which is the only place the switch can be moved back.
-    offSourceChip: 'Source off',
+    // The one narrowing that can empty the feed without an interest having decided anything, and
+    // whose control is on another tab — so it is a link to Sources rather than a button.
     // Count after the noun, in both languages, so neither has to agree a number with a plural —
     // Polish has three forms of "źródła" and English would still read "1 sources".
     sourcesOffHint: 'Sources switched off: {count} — Sources tab',
-    viewMatched: 'Matched',
-    viewRejected: 'Filtered out',
-    viewAll: 'Everything',
-    rejectedIntro:
-      'Events that matched an interest on everything except what sort of thing they are, where they are, or who they are for. This is what the two labelled filters are keeping from you.',
-    rejectedEmpty: 'Nothing is being filtered out by kind or place.',
-    rejectedEmptyHint:
-      'Either no interest limits where, or nothing was turned away by it and nothing was written about rather than listed. Set the countries on an interest to see what it removes.',
-    rejectedBy: 'Filtered out of',
-    placesTally: 'By country:',
-    kindTally: 'Written about, not listed: {count}',
-    classifiedCount: '{classified} of {total} labelled',
     reachLocal: 'local',
     reachNational: 'national',
     reachInternational: 'international',
     reachUnknown: 'not labelled yet',
     kindAnnouncement: 'announcement',
     kindCoverage: 'news',
-    newsroomTicketSale: 'ticket sale',
-    newsroomNoSale: 'no sale date',
-    viewIgnored: 'Ignored ({count})',
-    ignoreEvent: 'Ignore',
-    unignoreEvent: 'Show again',
-    ignoredChip: 'Ignored',
-    ignoredIntro:
-      'Events you dismissed by hand. They stay out of the other views and never notify you, until you bring one back.',
-    ignoredEmpty: 'Nothing has been ignored.',
-    ignoredEmptyHint:
-      'Ignore is for the one event you are not going to, where narrowing an interest would also lose the next one like it.',
-    cityFilter: 'City',
-    cityAnywhere: 'Anywhere ({count})',
-    cityOption: '{city} ({count})',
-    cityClear: 'Show every city',
-    cityEmptyHint:
-      'Nothing here is in {city}. This filter only narrows what you are looking at — set the cities on an interest to change what notifies you.',
-    kindFilter: 'Kind',
-    kindOption: '{kind} ({count})',
-    kindsListings: 'Listings',
-    kindsAnnouncements: 'Announcements',
-    kindsCoverage: 'News',
-    kindsUnlabelled: 'Not labelled',
-    kindClear: 'Show every kind',
-    labelEmptyHint:
-      'Nothing here carries every label you picked. These filters only narrow what you are looking at — the coverage switch and the tags on an interest are what change which of them notify you.',
 
     // Arriving from a notification
-    focusIntro:
-      'Opened from a notification. The event it named is highlighted below, and every filter is off for this visit so that it cannot be hidden.',
     focusMissing:
       'The event that notification named is not in the feed any more — it has either happened or its sale has opened. Everything still upcoming is below.',
     focusClear: 'Back to the whole feed',
@@ -204,65 +161,39 @@ export const translations = {
     sourceOff: 'Off — not in your feed, and cannot notify you. Still collected.',
     sourceSwitchFailed: 'That switch is set on this device but was not saved: {error}',
     sourceLastRun: 'ran {when}',
-    sourceInCorpus: '{count} in your feed now',
+    sourceInCorpus: '{count} collected',
     pageOptional: 'appears when announced',
+
+    // What a model was asked about this source's rows
+    extractionHeading: 'Read by a model',
+    extractionNone:
+      'Nothing from this source has been collected yet, so no model has been asked anything about it.',
+    passClassifier: 'Classifier',
+    passClassifierNote:
+      'One call per row, over everything this source produces except its newsroom articles. An unanswered row is not filtered out — it passes every rule below — so a count stuck well under the rows is the classifier having stopped rather than the feed going quiet.',
+    passNewsroom: 'Newsroom reader',
+    passNewsroomNote:
+      'One call per article, over the rows a page tagged newsroom, fetching the article behind each one. It is asked a single question, because the answer schedules a notification on a particular morning: do tickets go on sale on a stated date, and when.',
+    passAnswered: '{answered} of {rows} answered',
+    extractKind: 'is it an event, an announcement, or writing about one',
+    extractReach: 'how far it draws people',
+    extractCountry: 'which country it is in',
+    extractTicketSale: 'does it announce a ticket sale',
+    extractSaleAt: 'the morning the sale opens',
+    fieldShared: 'stated by the source where it knows it',
+
+    // Which interests reach this source
+    filtersHeading: 'Filters on this source',
+    filtersKept: '{kept} of {rows} rows reach your feed and your notifications.',
+    filterKeeps: 'keeps {count}',
+    filtersNone:
+      'Nothing you are watching for matches anything from this source. Either its rows are not what you meant to ask for, or a tag you narrowed on is one no page here stamps.',
+    filtersSilent: 'Interests that reach nothing here: {count}.',
+    filtersAll: 'All interests',
     sourcesUnlistedHeading: 'Also reporting',
     sourcesUnlistedHint:
       'Reporting its health beside the sources without being a page — the classifier is one. A scrape here is one that was removed from the list and is still collecting.',
 
-    // Pipeline
-    pipelineHeading: 'Every row, and what wrote it',
-    pipelineIntro:
-      'The corpus as it is stored — every row the collector has, whether or not an interest matches it and whether or not its date has passed. The filters narrow what is listed; opening a row shows its fields grouped by the pass that wrote them.',
-    pipelineShowing: '{shown} of {total} rows',
-    pipelineCapped: 'The first {shown} of {matching}. Narrow the filters to reach the rest.',
-    pipelineEmpty: 'No row carries every label you picked.',
-    pipelineEmptyHint:
-      'Each row of buttons is an any-of, and a row has to satisfy every one of them. Clear a row to widen it again.',
-    pipelineClearAll: 'Clear every filter',
-    pipelineFilters: 'Filters',
-    pipelineFiltersOn: '{count} on',
-    pipelineOpen: 'Fields',
-    pipelineOffline:
-      'These rows come straight from the collector and are not cached — this tab needs a connection, so what you see here is never stale.',
-    pipelineRetry: 'Try again',
-    pipelineNoFields: 'nothing yet',
-    pipelineBusiness: 'What it means',
-    pipelineBusinessNote:
-      'The four fields a decision is made on: whether tickets go on sale, when, how far the event reaches, and whether the row is an event at all. Everything else is below.',
-    pipelineMore: 'Every field, by the pass that wrote it',
-    facetSource: 'Source',
-    facetPublication: 'Publication',
-    facetKind: 'Kind',
-    facetReach: 'Reach',
-    facetCountry: 'Country',
-    facetCity: 'City',
-    facetTag: 'Tag',
-    facetNewsroom: 'Article',
-    facetField: 'Fields present',
-    facetAbsent: 'not set',
-    facetAnyOf: 'any of {count}',
-    facetNoMatch: 'nothing matches',
-    facetRemove: 'Stop filtering on {value}',
-    stageScraped: 'Scraped',
-    stageScrapedNote: 'What the page itself said. An adapter reads these and derives nothing.',
-    stageDerived: 'Derived',
-    stageDerivedNote:
-      'Worked out from the row above by the upsert, in one place, so no adapter can normalise it differently.',
-    stageNewsroom: 'Newsroom reader',
-    stageNewsroomNote: 'A model reading one theatre’s news items. Empty on everything else.',
-    stageClassifier: 'Classifier',
-    stageClassifierNote:
-      'A model over the rest of the corpus — it is never asked about a newsroom item, which has the reader above instead. Empty otherwise means it has not reached this row yet, which is why the row is still in the feed.',
-    stageShared: 'More than one writer',
-    stageSharedNote:
-      'The source states these where it can and a later pass fills them in otherwise, so neither can be credited with them.',
-    stageBookkeeping: 'Book-keeping',
-    stageBookkeepingNote:
-      'What only the upsert can know, because it is about the change rather than the event: when this app first saw the row, and when it first saw a ticket link on it.',
-    stageOther: 'Not in this build',
-    stageOtherNote:
-      'Fields stored by a build this one does not know about — a rollback, or a deploy still going out.',
 
     // Sync badge
     syncOff: 'Not signed in — nothing is being saved to your account',
@@ -281,7 +212,6 @@ export const translations = {
     navInterests: 'Zainteresowania',
     navAlerts: 'Powiadomienia',
     navSources: 'Źródła',
-    navPipeline: 'Potok',
     navLabel: 'Sekcje aplikacji',
 
     signedOutTitle: 'Zaloguj się, żeby śledzić wydarzenia',
@@ -307,55 +237,14 @@ export const translations = {
     onSaleNow: 'W sprzedaży',
     saleOpens: 'Sprzedaż od {when}',
     showingCount: '{shown} z {total} nadchodzących',
-    offSourceChip: 'Źródło wyłączone',
     sourcesOffHint: 'Wyłączone źródła: {count} — zakładka Źródła',
-    viewMatched: 'Pasujące',
-    viewRejected: 'Odrzucone',
-    viewAll: 'Wszystko',
-    rejectedIntro:
-      'Wydarzenia, które pasowały do zainteresowania pod każdym względem oprócz tego, czym właściwie są, gdzie się odbywają i dla kogo są. To właśnie zatrzymują dwa filtry oparte na opisie.',
-    rejectedEmpty: 'Nic nie odpada ze względu na rodzaj ani miejsce.',
-    rejectedEmptyHint:
-      'Albo żadne zainteresowanie nie ogranicza miejsca, albo nic się o nie nie potknęło i nic nie okazało się tekstem o wydarzeniu zamiast wydarzeniem. Ustaw kraje w zainteresowaniu, żeby zobaczyć, co odrzuca.',
-    rejectedBy: 'Odrzucone przez',
-    placesTally: 'Wg krajów:',
-    kindTally: 'Teksty o wydarzeniach, nie wydarzenia: {count}',
-    classifiedCount: 'opisane: {classified} z {total}',
     reachLocal: 'lokalne',
     reachNational: 'krajowe',
     reachInternational: 'międzynarodowe',
     reachUnknown: 'jeszcze nieopisane',
     kindAnnouncement: 'ogłoszenie',
     kindCoverage: 'tekst',
-    newsroomTicketSale: 'sprzedaż biletów',
-    newsroomNoSale: 'bez daty sprzedaży',
-    viewIgnored: 'Ukryte ({count})',
-    ignoreEvent: 'Ukryj',
-    unignoreEvent: 'Przywróć',
-    ignoredChip: 'Ukryte',
-    ignoredIntro:
-      'Wydarzenia ukryte ręcznie. Nie pojawiają się w pozostałych widokach i nigdy nie wysyłają powiadomień, dopóki któregoś nie przywrócisz.',
-    ignoredEmpty: 'Nic nie zostało ukryte.',
-    ignoredEmptyHint:
-      'Ukrywanie jest dla tego jednego wydarzenia, na które nie idziesz — zawężenie zainteresowania odrzuciłoby też następne takie samo.',
-    cityFilter: 'Miasto',
-    cityAnywhere: 'Wszędzie ({count})',
-    cityOption: '{city} ({count})',
-    cityClear: 'Pokaż wszystkie miasta',
-    cityEmptyHint:
-      'Nic tutaj nie odbywa się w takim mieście: {city}. Ten filtr zawęża tylko widok — o powiadomieniach decydują miasta wpisane w zainteresowaniu.',
-    kindFilter: 'Rodzaj',
-    kindOption: '{kind} ({count})',
-    kindsListings: 'Wydarzenia',
-    kindsAnnouncements: 'Ogłoszenia',
-    kindsCoverage: 'Teksty',
-    kindsUnlabelled: 'Bez etykiety',
-    kindClear: 'Pokaż wszystkie rodzaje',
-    labelEmptyHint:
-      'Nic tutaj nie ma wszystkich wybranych etykiet. Te filtry zawężają tylko widok — o tym, co powiadamia, decydują przełącznik tekstów i tagi wpisane w zainteresowaniu.',
 
-    focusIntro:
-      'Otwarte z powiadomienia. Wydarzenie, o którym mówiło, jest podświetlone niżej, a wszystkie filtry są na tę jedną wizytę wyłączone, żeby nie mogły go ukryć.',
     focusMissing:
       'Wydarzenia z tego powiadomienia nie ma już na liście — albo się odbyło, albo ruszyła jego sprzedaż. Poniżej jest wszystko, co dopiero przed nami.',
     focusClear: 'Wróć do pełnej listy',
@@ -454,65 +343,37 @@ export const translations = {
     sourceOff: 'Wyłączone — nie ma go na liście i nie powiadomi. Nadal jest zbierane.',
     sourceSwitchFailed: 'Ten przełącznik działa na tym urządzeniu, ale nie został zapisany: {error}',
     sourceLastRun: 'ostatnio {when}',
-    sourceInCorpus: '{count} na Twojej liście',
+    sourceInCorpus: 'zebrane: {count}',
     pageOptional: 'pojawi się po ogłoszeniu',
+
+    extractionHeading: 'Czytane przez model',
+    extractionNone:
+      'Z tego źródła nie ma jeszcze żadnych wierszy, więc żaden model nie był o nie pytany.',
+    passClassifier: 'Klasyfikator',
+    passClassifierNote:
+      'Jedno zapytanie na wiersz, dla wszystkiego z tego źródła poza aktualnościami. Wiersz bez odpowiedzi nie wypada z listy — przechodzi każdą regułę poniżej — więc licznik, który stoi mocno poniżej liczby wierszy, oznacza zatrzymany klasyfikator, a nie pustą listę.',
+    passNewsroom: 'Czytnik aktualności',
+    passNewsroomNote:
+      'Jedno zapytanie na artykuł, dla wierszy oznaczonych przez stronę jako aktualności, z pobraniem treści każdego z nich. Pytanie jest jedno, bo odpowiedź planuje powiadomienie na konkretny poranek: czy bilety trafiają do sprzedaży w podanym terminie i kiedy.',
+    passAnswered: 'odpowiedzi: {answered} z {rows}',
+    extractKind: 'czy to wydarzenie, ogłoszenie, czy tekst o wydarzeniu',
+    extractReach: 'jak daleko sięga',
+    extractCountry: 'w jakim kraju się odbywa',
+    extractTicketSale: 'czy zapowiada start sprzedaży biletów',
+    extractSaleAt: 'poranek, w którym rusza sprzedaż',
+    fieldShared: 'podaje je źródło, kiedy je zna',
+
+    filtersHeading: 'Filtry na tym źródle',
+    filtersKept: 'Do listy i powiadomień trafia {kept} z {rows} wierszy.',
+    filterKeeps: 'przepuszcza {count}',
+    filtersNone:
+      'Nic, czego szukasz, nie pasuje do niczego z tego źródła. Albo te wiersze to nie to, o co pytasz, albo zawęziłeś filtr tagiem, którego żadna tutejsza strona nie nadaje.',
+    filtersSilent: 'Zainteresowania, które nic tu nie łapią: {count}.',
+    filtersAll: 'Wszystkie zainteresowania',
     sourcesUnlistedHeading: 'Zgłasza się też',
     sourcesUnlistedHint:
       'Raportuje swój stan obok źródeł, nie będąc stroną — tak działa klasyfikator. Jeśli trafi tu scraper, znaczy że wypadł z listy, a nadal zbiera.',
 
-    // Pipeline
-    pipelineHeading: 'Każdy wiersz i co go zapisało',
-    pipelineIntro:
-      'Korpus tak, jak jest zapisany — każdy wiersz, który ma kolektor, niezależnie od tego, czy pasuje do zainteresowania i czy jego data już minęła. Filtry zawężają listę; po otwarciu wiersza widać jego pola pogrupowane według przebiegu, który je zapisał.',
-    pipelineShowing: '{shown} z {total} wierszy',
-    pipelineCapped: 'Pierwsze {shown} z {matching}. Zawęź filtry, żeby dotrzeć do reszty.',
-    pipelineEmpty: 'Żaden wiersz nie ma wszystkich wybranych etykiet.',
-    pipelineEmptyHint:
-      'Każdy rząd przycisków to „dowolne z”, a wiersz musi spełnić każdy z rzędów. Wyczyść rząd, żeby znów poszerzyć listę.',
-    pipelineClearAll: 'Wyczyść wszystkie filtry',
-    pipelineFilters: 'Filtry',
-    pipelineFiltersOn: 'włączone: {count}',
-    pipelineOpen: 'Pola',
-    pipelineOffline:
-      'Te wiersze idą prosto od kolektora i nie są zapisywane lokalnie — ta zakładka potrzebuje połączenia, więc to, co widzisz, nigdy nie jest nieaktualne.',
-    pipelineRetry: 'Spróbuj ponownie',
-    pipelineNoFields: 'jeszcze nic',
-    pipelineBusiness: 'Co to znaczy',
-    pipelineBusinessNote:
-      'Cztery pola, na których opiera się decyzja: czy bilety trafiają do sprzedaży, kiedy, jak daleko sięga wydarzenie i czy wiersz w ogóle nim jest. Cała reszta jest niżej.',
-    pipelineMore: 'Wszystkie pola, według przebiegu, który je zapisał',
-    facetSource: 'Źródło',
-    facetPublication: 'Wydawca',
-    facetKind: 'Rodzaj',
-    facetReach: 'Zasięg',
-    facetCountry: 'Kraj',
-    facetCity: 'Miasto',
-    facetTag: 'Tag',
-    facetNewsroom: 'Artykuł',
-    facetField: 'Wypełnione pola',
-    facetAbsent: 'brak',
-    facetAnyOf: 'dowolne z {count}',
-    facetNoMatch: 'brak dopasowań',
-    facetRemove: 'Przestań filtrować po {value}',
-    stageScraped: 'Ze strony',
-    stageScrapedNote: 'To, co napisała sama strona. Adapter je czyta i niczego nie wylicza.',
-    stageDerived: 'Wyliczone',
-    stageDerivedNote:
-      'Policzone z wiersza powyżej przy zapisie, w jednym miejscu, żeby żaden adapter nie znormalizował tego inaczej.',
-    stageNewsroom: 'Czytnik aktualności',
-    stageNewsroomNote: 'Model czytający aktualności jednego teatru. Przy reszcie pusto.',
-    stageClassifier: 'Klasyfikator',
-    stageClassifierNote:
-      'Model przechodzący resztę korpusu — o aktualności nigdy nie pyta, od nich jest czytnik powyżej. Poza nimi pusto znaczy, że jeszcze tu nie dotarł — i dlatego ten wiersz wciąż jest na liście.',
-    stageShared: 'Więcej niż jeden autor',
-    stageSharedNote:
-      'Źródło podaje je, kiedy potrafi, a w przeciwnym razie uzupełnia je późniejszy przebieg, więc nie da się przypisać ich żadnemu z nich.',
-    stageBookkeeping: 'Księgowanie',
-    stageBookkeepingNote:
-      'To, co wie tylko zapis, bo dotyczy zmiany, a nie wydarzenia: kiedy aplikacja zobaczyła wiersz po raz pierwszy i kiedy pierwszy raz zobaczyła przy nim link do biletów.',
-    stageOther: 'Spoza tej wersji',
-    stageOtherNote:
-      'Pola zapisane przez wersję, której ta nie zna — po cofnięciu wdrożenia albo w trakcie wdrażania nowej.',
 
     syncOff: 'Nie zalogowano — nic nie jest zapisywane na koncie',
     syncSynced: 'Zsynchronizowano',

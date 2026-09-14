@@ -172,10 +172,10 @@ export function classifyHashOf(event: {
  *     geography question this pass exists for has no work to do on it either.
  *
  * The cost of asking anyway was two model calls per article and a second verdict to keep in sync
- * with the first; the cost of not asking is that these rows show as `unlabelled` in the Pipeline
- * tab's `kind` facet, which is what they are. Unclassified passes both `passesKind` and
- * `passesPlaces`, so nothing is filtered out by this and no notification is lost — see the
- * rules those functions carry.
+ * with the first; the cost of not asking is that these rows carry no `kind` at all, and the
+ * Sources tab counts them under the newsroom reader rather than the classifier — which is what
+ * they are. Unclassified passes both `passesKind` and `passesPlaces`, so nothing is filtered out
+ * by this and no notification is lost — see the rules those functions carry.
  */
 export function needsClassifying(event: EventRecord): boolean {
   if (isNewsroomItem(event)) return false;
