@@ -69,6 +69,17 @@ a Ticketmaster listing that really says so, so that seed is a live interest with
 most weeks — which is a fact about the sources, not a bug in the rule below. Reading empty as unsatisfiable makes that interest silently dead — matching
 nothing forever, with nothing in the UI to say why. It is the first test in `match.test.ts`.
 
+**A keyword names what an event is, never where it happens.** `Castles & medieval fairs` carried
+`zamek` and `zamku` alongside `sredniowieczn*`, `rycersk*` and `oblezeni*`, and it was the one
+keyword in that list naming a building rather than the thing inside it — so it kept the theatre's
+`Ogrody Muzyczne` announcement, the Royal Castle courtyard being one of Warsaw's summer concert
+stages. It bought nothing to pay for that: over the live corpus the two words kept three rows —
+that series and two articles about castles being closed and moved — while the one real fair among
+them, `turniej rycerski na zamku w Łęczycy`, is kept by `rycersk*` without help. They are gone
+(Sep 2026), and an exclusion was **not** the answer: `floyd rose` vetoes one fixed product name,
+where this would have been an open-ended list of venues growing for as long as castles host
+concerts. This is the blanket-tag lesson below arriving through the keyword field instead.
+
 `haystackOf` deliberately does **not** read tags. It used to, and the result was that any tag a
 source applies feed-wide became a blanket keyword hit for every row: tagging the Jewish Culture
 Festival's feed `klezmer` made the Klezmer interest match all 67 of its articles, one of which was

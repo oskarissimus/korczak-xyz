@@ -456,6 +456,20 @@ describe('the seeded interests against a realistic corpus', () => {
       ev({ title: 'XXVII Jarmark Średniowieczny i Turniej Rycerski', venue: 'Zamek Chudów' }),
       ['Castles & medieval fairs'],
     ],
+    /*
+     * The castle is the venue and the concert is the event, so the medieval interest must not
+     * reach it — `Ogrody Muzyczne` was the one Teatr Wielki row it kept, on the strength of the
+     * word `zamku` alone. The case above is what makes this one safe to state: a real fair names
+     * itself, and is matched here by its own words rather than by the building it stands in.
+     */
+    [
+      ev({
+        title: 'Ogrody Muzyczne 2026',
+        subtitle: 'Dziedziniec Wielki Zamku Królewskiego w Warszawie',
+        tags: ['newsroom'],
+      }),
+      [],
+    ],
     [ev({ title: 'PyCon PL 2026', tags: ['tech'] }), ['Python & dev']],
     [ev({ title: 'Warsaw Python Meetup #90', tags: ['tech'] }), ['Python & dev']],
     [ev({ title: 'SALOME', subtitle: 'Richard Strauss', tags: ['opera'] }), ['Opera Narodowa']],

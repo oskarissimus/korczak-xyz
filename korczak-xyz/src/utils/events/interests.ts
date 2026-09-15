@@ -98,10 +98,28 @@ export const SEED_INTERESTS: ReadonlyArray<{ id: string } & InterestDraft> = [
       'rekonstrukcj*',
       'oblezeni*',
       'inscenizacj*',
-      'zamek',
-      'zamku',
       'grodzisk*',
     ],
+    /*
+     * There is deliberately no 'zamek'/'zamku' here, and it is the same mistake as the blanket
+     * tag one screen over: a castle is a *venue*, not a subject. The Royal Castle courtyard is
+     * one of Warsaw's summer concert stages, so `zamku` handed this interest the theatre's
+     * `Ogrody Muzyczne` announcement — a row about a music series, kept by the only keyword in
+     * the list that names a building rather than the thing happening in it. Every other keyword
+     * here says what an event *is*, which is why none of them reached that row.
+     *
+     * It bought nothing either. Measured over the live corpus, the two words kept three rows:
+     * that concert series, and two historia.org.pl articles about castles being closed and
+     * moved. The one genuine medieval fair among them — `turniej rycerski na zamku w Łęczycy` —
+     * is kept by `rycersk*` and `sredniowieczn*` without any help, which is the whole argument:
+     * a fair at a castle says so in the words that name the fair.
+     *
+     * An exclusion was the other way round and is the wrong shape here, unlike `floyd rose`:
+     * that veto is one fixed product name, where this one would be an open-ended list of venues
+     * (Zamek Królewski, Zamek Ujazdowski, Zamek Książ…) growing for as long as castles host
+     * concerts. `zamek` is also a lock and a zip in Polish, which is a third reason it was never
+     * a subject word.
+     */
     leadDays: 21,
   },
   {
