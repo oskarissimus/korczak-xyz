@@ -165,15 +165,39 @@ characters, and complete) is escalated rather than read. That is a loud alert ab
 what it replaces was silence about something real.
 
 **`article.ts` is the half that fetches the prose**, storing it as `TransitItem.article`, which
-`proseOf` prefers over the feed's `body`. It asks **two doors** — WordPress's own REST route
-(`wpRestUrlFor`: the guid says `post_type=impediment&p=176873` outright, so `/wp-json/wp/v2/…` is
-derivable, and `content.rendered` is the body without a page of chrome round it) and then the HTML
-page. Both are public endpoints of the same site, asked once each with the same identifying agent.
-The point is not to get past anything — it is that **this WAF rules per path**: both RSS feeds are
-served to the collector while the article pages are challenged, so which side of that line the REST
-route falls on is a fact to measure. Both doors shut is an ordinary outcome and the stored error
-names what each said, because *challenged twice* and *challenged, then the markup moved* send the
-reader to different places. It reuses `articleText` from `sources/html.ts` — the same
+`proseOf` prefers over the feed's `body`. It asks **three doors**, in this order:
+
+1. **The alerts mirror** — `alerts.ts`, over `WTP_ALERTS_URL`. `WarsawGTFS` scrapes those same two
+   WTP pages into a CC0 GTFS-Realtime alerts feed and publishes a JSON rendering beside the
+   protobuf: one row per communiqué, carrying the **full plain-text body**, keyed by **WTP's own
+   post id** — `A/CHANGE/176745` is the number already in our guid, so the join is exact rather than
+   a title match. Fetched **once per run** and indexed, which is cheaper than the per-item fetches
+   it replaces and gentler on a volunteer's server.
+2. **WordPress's REST route** (`wpRestUrlFor`: the guid says `post_type=impediment&p=176873`
+   outright, so `/wp-json/wp/v2/…` is derivable and `content.rendered` is the body without chrome).
+3. **The HTML page.**
+
+Doors 2 and 3 are public endpoints of WTP's own site, asked once each with the same identifying
+agent, and **both are challenged from this collector's egress** — measured 13 and 14 Sep 2026. They
+are kept behind door 1 rather than deleted, because door 1 is one person's server and a door that
+is shut today is the one that still works the day that server stops. The point was never to get
+past anything: **this WAF rules per path** — both RSS feeds are served while the article routes are
+not — which is what made the direct doors worth measuring rather than assuming.
+
+Everything failing is an ordinary outcome, and the stored error names what each door said, because
+*not in the mirror, then challenged twice* and *challenged, then the markup moved* send the reader
+to different places.
+
+Two things the mirror cannot do, and they are the price of it:
+
+- **It carries live alerts only** — nine on a Sunday evening. A communiqué whose disruption has
+  already ended is not in it and there is no backfill, so the 12 Sep M1 closure stays unreadable
+  for good. What it covers is the case the app exists for: the metro is broken *now*. Once a body
+  is stored, `mergeItem` carries it forward and the reading outlives the alert.
+- **It is one volunteer's server.** `ArticleOutcome.alertCount` is on the record for that reason:
+  zero has two meanings — a quiet hour and a mirror that has stopped — and without the count the
+  second is invisible, since every item simply goes on being escalated, which is safe and says
+  nothing about why. It reuses `articleText` from `sources/html.ts` — the same
 function, for the same reason, as the newsroom reader that found the theatre's sale date in a body
 its teaser never mentioned. Four things about it:
 

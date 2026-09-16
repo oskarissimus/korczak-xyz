@@ -35,6 +35,27 @@ export const WTP_FEEDS: ReadonlyArray<{ feed: FeedKind; url: string; path: strin
   },
 ];
 
+/**
+ * The community mirror that carries what WTP's own feeds leave out.
+ *
+ * Both RSS feeds publish the article's headline as their whole body, so the prose naming stations is
+ * only on the web page — and the page is behind an AWS WAF that challenges this collector (see
+ * `article.ts`). `WarsawGTFS` scrapes those same two pages into a GTFS-Realtime alerts feed and
+ * publishes a JSON rendering of it beside the protobuf, under CC0: one row per communiqué, keyed by
+ * **WTP's own post id**, carrying the full plain-text body.
+ *
+ * So this is the same operator's words reaching us by a route that will answer, and the join is
+ * exact rather than fuzzy — `A/CHANGE/176745` is the post id already in our guid.
+ *
+ * **It is one volunteer's server**, which is the thing to know before depending on it. That is why
+ * it is a *first* door rather than the only one: the two direct routes are still tried behind it,
+ * and everything failing leaves an item unread and escalated exactly as before. If this host goes
+ * away the app is as blind as it was on 13 Sep 2026, and no worse.
+ *
+ * https://github.com/MKuranowski/WarsawGTFS — the generator, and what to read if the shape moves.
+ */
+export const WTP_ALERTS_URL = 'https://mkuran.pl/gtfs/warsaw/alerts.json';
+
 export function feedUrl(feed: FeedKind): string {
   return WTP_FEEDS.find((entry) => entry.feed === feed)!.url;
 }

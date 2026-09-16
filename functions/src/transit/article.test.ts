@@ -10,6 +10,7 @@ import {
   renderedContentOf,
   wpRestUrlFor,
 } from './article';
+import { parseAlerts } from './alerts';
 import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 
@@ -114,10 +115,10 @@ describe('fetching one', () => {
       headers: { get: () => null },
       text: async () => '',
     } as unknown as Response;
-    // Prefixed, because an item with a guid asks two doors and the reasons must stay tellable apart.
-    expect(await fetchArticle(async () => blocked, { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
-      error: 'page: HTTP 403',
-    });
+    // Prefixed, because an item asks three doors and the reasons must stay tellable apart.
+    expect(
+      (await fetchArticle(async () => blocked, { guid: 'no-id', url: 'https://x.test/a' })) as { error: string },
+    ).toEqual({ error: expect.stringContaining('page: HTTP 403') });
     expect(
       await fetchArticle(async () => ok(`<html><body>no article here${'x'.repeat(600)}</body></html>`), {
         guid: 'no-id',
@@ -128,7 +129,7 @@ describe('fetching one', () => {
       await fetchArticle(async () => {
         throw new Error('terminated');
       }, { guid: 'no-id', url: 'https://x.test/a' }),
-    ).toEqual({ error: 'page: terminated' });
+    ).toEqual({ error: expect.stringContaining('page: terminated') });
   });
 
   /*
@@ -164,6 +165,66 @@ describe('fetching one', () => {
     expect(await fetchArticle(async () => ok('<html></html>'), { guid: 'no-id', url: 'https://x.test/a' })).toEqual({
       error: expect.stringContaining('not a page'),
     });
+  });
+});
+
+describe('the alerts door', () => {
+  const ALERT_BODY =
+    'Z przyczyn technicznych występują utrudnienia w kursowaniu pociągów metra na linii M1. ' +
+    'Ruch pociągów metra został wstrzymany na odcinku Słodowiec – Dworzec Gdański.';
+  const index = parseAlerts(
+    JSON.stringify({ alerts: [{ id: 'A/IMPEDIMENT/176873', body: ALERT_BODY }] }),
+  );
+
+  /*
+   * The point of the whole source: the prose arrives without a single request to WTP, joined on the
+   * post id that is already in the guid.
+   */
+  it('answers from the index without asking WTP at all', async () => {
+    const asked: string[] = [];
+    const result = await fetchArticle(
+      async (url) => {
+        asked.push(String(url));
+        return ok(PAGE);
+      },
+      item(),
+      index,
+    );
+    expect(result).toEqual({ text: expect.stringContaining('Słodowiec – Dworzec Gdański') });
+    expect(asked).toEqual([]);
+  });
+
+  /*
+   * The mirror carries live alerts only, so an item whose disruption has ended is simply not in it.
+   * That must fall through to the doors behind rather than count as an answer.
+   */
+  it('falls through when the item is not among the live alerts', async () => {
+    const result = await fetchArticle(async () => ok(PAGE), item({ guid: 'https://x.test/?p=999' }), index);
+    expect(result).toEqual({ text: expect.stringContaining('Słodowiec – Dworzec Gdański') });
+  });
+
+  it('says how many live alerts it looked through, so a stopped mirror is not a quiet evening', async () => {
+    const challenge = {
+      ok: true,
+      status: 202,
+      headers: { get: () => null },
+      text: async () => '',
+    } as unknown as Response;
+    const result = await fetchArticle(async () => challenge, item({ guid: 'https://x.test/?p=999' }), index);
+    expect((result as { error: string }).error).toContain('alerts: not among 1 live');
+  });
+
+  it('carries the mirror’s own failure into the reason', async () => {
+    const dead = parseAlerts('not json');
+    const challenge = {
+      ok: true,
+      status: 202,
+      headers: { get: () => null },
+      text: async () => '',
+    } as unknown as Response;
+    const result = await fetchArticle(async () => challenge, item(), dead);
+    expect((result as { error: string }).error).toContain('alerts:');
+    expect((result as { error: string }).error).toContain('not JSON');
   });
 });
 
@@ -263,17 +324,22 @@ describe('what a fetch writes', () => {
 });
 
 describe('a run', () => {
+  /** The mirror, answering with nothing — so a run test exercises the doors behind it. */
+  const noAlerts = JSON.stringify({ alerts: [] });
+  const routed = (page: Response) => async (url: RequestInfo | URL) =>
+    String(url).includes('mkuran.pl') ? ok(noAlerts) : page;
+
   it('writes what it read and hands the updated copies back', async () => {
     const written = new Map<string, Partial<TransitItem>>();
     const { items, outcome } = await fetchArticles([item(), item({ id: 'bus', titleLines: ['189'] })], {
       now: NOW,
-      fetch: async () => ok(PAGE),
+      fetch: routed(ok(PAGE)) as unknown as typeof globalThis.fetch,
       write: async (id, update) => {
         written.set(id, update);
       },
     });
 
-    expect(outcome).toMatchObject({ fetched: 1, failed: 0, readable: 1 });
+    expect(outcome).toMatchObject({ fetched: 1, failed: 0, readable: 1, fromAlerts: 0 });
     expect([...written.keys()]).toEqual(['impediment_p-176873']);
     // The extractor runs next on these, so the prose has to be on the copies it is handed.
     expect(hasProse(items[0])).toBe(true);
@@ -283,8 +349,12 @@ describe('a run', () => {
   it('records a block without losing the run', async () => {
     const { items, outcome } = await fetchArticles([item()], {
       now: NOW,
-      fetch: async () =>
-        ({ ok: false, status: 403, headers: { get: () => null }, text: async () => '' }) as unknown as Response,
+      fetch: routed({
+        ok: false,
+        status: 403,
+        headers: { get: () => null },
+        text: async () => '',
+      } as unknown as Response) as unknown as typeof globalThis.fetch,
       write: async () => {},
     });
     expect(outcome).toMatchObject({ fetched: 0, failed: 1, error: expect.stringContaining('HTTP 403') });
@@ -300,7 +370,7 @@ describe('a run', () => {
   it('does not claim prose a failed write did not store', async () => {
     const { items } = await fetchArticles([item()], {
       now: NOW,
-      fetch: async () => ok(PAGE),
+      fetch: routed(ok(PAGE)) as unknown as typeof globalThis.fetch,
       write: async () => {
         throw new Error('permission denied');
       },
@@ -316,6 +386,6 @@ describe('a run', () => {
       write: async () => {},
     });
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(outcome).toEqual({ fetched: 0, failed: 0, readable: 0 });
+    expect(outcome).toEqual({ fetched: 0, failed: 0, readable: 0, fromAlerts: 0, alertCount: 0 });
   });
 });

@@ -19,14 +19,22 @@
  * could produce a station list: the station tables, the range expansion and the interval overlap
  * that this app is built around were being fed prose that has never once named a station.
  *
- * ### Two doors, and neither is a way through a locked one
+ * ### Three doors, and none of them is a way through a locked one
  *
- * The prose is asked for twice: WordPress's own REST route (`wpRestUrlFor` — the guid states the
- * post type and id outright) and then the HTML page. Both are public endpoints of the same site,
- * asked once each with the same identifying agent; the point is not to get past anything but that
- * **the WAF here rules per path**, serving both RSS feeds to this collector while challenging the
- * article pages, so which side of that line the REST route falls on is worth measuring. If both
- * doors are challenged that is the answer, and the item stays unread.
+ * 1. **The alerts mirror** (`alerts.ts`) — `WarsawGTFS` scrapes the same two WTP pages into a
+ *    CC0 GTFS-Realtime feed and publishes it as JSON, one row per communiqué, keyed by WTP's own
+ *    post id and carrying the full body. One request for the whole run, and as of 14 Sep 2026 the
+ *    only door that answers.
+ * 2. **WordPress's REST route** (`wpRestUrlFor` — the guid states the post type and id outright).
+ * 3. **The HTML page.**
+ *
+ * Doors 2 and 3 are public endpoints of WTP's own site, asked once each with the same identifying
+ * agent. Both are challenged from this egress; they are kept anyway, because door 1 is one
+ * volunteer's server and the doors that are shut today are the ones that still work the day it
+ * stops. Everything failing is an ordinary outcome and the item stays unread.
+ *
+ * The WAF here **rules per path** — both RSS feeds are served to this collector while the article
+ * pages are challenged — which is what made doors 2 and 3 worth measuring rather than assuming.
  *
  * ### The two halves, and why they are separate
  *
@@ -35,13 +43,13 @@
  * whatever happens here. This file is the half that makes the reading possible at all — it fetches
  * the page behind the row and stores its prose as `article`, which `proseOf` then prefers.
  *
- * They are separate because this one can be taken away from us, and — measured on the first
- * production run, 13 Sep 2026 — **it currently is**. wtp.waw.pl is behind AWS WAF (see `wtp.ts`),
- * and while the two feeds are served, an article page from this collector's egress comes back as a
- * challenge: `HTTP 202`, two kilobytes of Javascript, no content. `articleError` records it,
+ * They are separate because this one can be taken away from us, and for WTP's own endpoints it
+ * has been. wtp.waw.pl is behind AWS WAF (see `wtp.ts`), and while the two feeds are served, an
+ * article page or REST route from this collector's egress comes back as a challenge: `HTTP 202`,
+ * two kilobytes of Javascript, no content — measured 13 and 14 Sep 2026. `articleError` records it,
  * `hasProse` stays false, and the app shouts about metro items it cannot read rather than clearing
- * them. Losing the fetch costs precision; it cannot cost the guarantee — which is the whole reason
- * `needsExtracting` refuses a headline on its own rather than trusting that the article arrived.
+ * them. Losing every door costs precision; it cannot cost the guarantee — which is the whole reason
+ * `needsExtracting` refuses a headline on its own rather than trusting that the prose arrived.
  *
  * Nothing here should learn to solve a WAF challenge; `functions/README.md` holds what to do about
  * the collector's egress if this is to be fixed.
@@ -65,6 +73,7 @@
 
 import { articleText } from '../sources/html';
 import { wafChallenge } from './wtp';
+import { EMPTY_INDEX, fetchAlerts, postIdOf, type AlertIndex } from './alerts';
 import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 import { isExtractable } from './extract';
@@ -87,9 +96,10 @@ const MIN_PAGE_BYTES = 500;
  * the same evening — the first production run reported `no <article> element in the page` for
  * three items, which was this file taking an HTTP 202 WAF challenge for a redesign. Without a lever
  * those three would have stayed latched on a wrong verdict until WTP happened to edit them. 3 is
- * `wpRestUrlFor`: a door that was not tried before is a different question, not a stale answer.
+ * `wpRestUrlFor`: a door that was not tried before is a different question, not a stale answer, and
+ * 4 is the alerts mirror — the first door that has ever actually answered.
  */
-const ARTICLE_VERSION = 3;
+const ARTICLE_VERSION = 4;
 /** The same cap `wtp.ts` puts on a feed body. Enough for the whole of a long communiqué. */
 const ARTICLE_CHARS = 4000;
 /**
@@ -104,12 +114,22 @@ const MAX_PER_RUN = 10;
 const CONCURRENCY = 2;
 
 export interface ArticleOutcome {
-  /** Pages fetched that yielded text. */
+  /** Communiqués whose prose was got, by whichever door. */
   fetched: number;
   /** Asked for and not got: a block, a timeout, a page with no `<article>` in it. */
   failed: number;
-  /** Of the fetched ones, how many now carry enough prose to be worth reading. */
+  /** Of those, how many now carry enough prose to be worth reading. */
   readable: number;
+  /** How many came from the alerts mirror rather than from WTP directly. */
+  fromAlerts: number;
+  /**
+   * How many live alerts the mirror held this run.
+   *
+   * On the record because zero has two meanings that need telling apart: a quiet evening, and a
+   * mirror that has stopped. Without the count the second one is invisible — every item simply goes
+   * on being escalated, which is safe and says nothing about why.
+   */
+  alertCount: number;
   error?: string;
 }
 
@@ -216,12 +236,22 @@ async function fetchText(
 /**
  * One communiqué's prose, or the reason there is none.
  *
- * Two doors, tried in order, because they fail independently: the REST route returns the body
- * without chrome and survives a redesign of the page template, and the page survives the REST API
- * being switched off. Both are public, both are asked once, and **both failing is an ordinary
- * outcome** — the item stays unread, `impactOf` escalates it, and the card says WTP published no
- * details. The error names what both doors said, because "challenged twice" and "challenged, then
- * the markup moved" send whoever reads it to different places.
+ * Three doors, tried in order, because they fail independently and because the cheapest is also the
+ * only one that currently answers:
+ *
+ *   1. **The alerts mirror**, already fetched once for the whole run and handed in as an index —
+ *      no request per item at all. It is the operator's own body, joined on the operator's own post
+ *      id. It holds *live* alerts only, so it is silent about anything already over.
+ *   2. **WordPress's REST route**, which returns the body without chrome and survives the page
+ *      template being redesigned.
+ *   3. **The page**, which survives the REST API being switched off.
+ *
+ * Both of the direct doors are challenged from this collector's egress as of 14 Sep 2026, and they
+ * are kept anyway: the mirror is one volunteer's server, and a door that is shut today is the one
+ * that still works the day that server stops. **Everything failing is an ordinary outcome** — the
+ * item stays unread, `impactOf` escalates it, and the card says WTP published no details. The error
+ * names what each door said, because "not in the mirror, then challenged twice" and "challenged,
+ * then the markup moved" send whoever reads it to different places.
  *
  * Never throws and never returns a partial success: a page that 403s, times out, or turns out to
  * hold no article all come back the same way.
@@ -229,8 +259,18 @@ async function fetchText(
 export async function fetchArticle(
   fetchImpl: typeof globalThis.fetch,
   item: Pick<TransitItem, 'guid' | 'url'>,
+  alerts: AlertIndex = EMPTY_INDEX,
 ): Promise<{ text: string } | { error: string }> {
   const reasons: string[] = [];
+
+  const postId = postIdOf(item);
+  const alert = postId ? alerts.byPostId.get(postId) : undefined;
+  if (alert) return { text: alert.body };
+  reasons.push(
+    alerts.error
+      ? `alerts: ${alerts.error}`
+      : `alerts: not among ${alerts.count} live`,
+  );
 
   const restUrl = wpRestUrlFor(item);
   if (restUrl) {
@@ -325,11 +365,23 @@ export async function fetchArticles(
   ctx: ArticleContext,
 ): Promise<{ items: TransitItem[]; outcome: ArticleOutcome }> {
   const queue = queueForArticles(items, ctx.now).slice(0, MAX_PER_RUN);
-  if (queue.length === 0) return { items, outcome: { fetched: 0, failed: 0, readable: 0 } };
+  if (queue.length === 0) {
+    return { items, outcome: { fetched: 0, failed: 0, readable: 0, fromAlerts: 0, alertCount: 0 } };
+  }
+
+  /*
+   * One request for the whole run, before any per-item work. It holds every live alert, so asking
+   * per item would be the same bytes fetched six times from a volunteer's server — and the count it
+   * comes back with is a health signal in its own right: a mirror that has quietly started
+   * returning nothing looks exactly like a quiet evening unless the number is on the record.
+   */
+  const alerts = await fetchAlerts(ctx.fetch);
+  if (alerts.error) console.warn('transit alerts mirror', alerts.error);
 
   let fetched = 0;
   let failed = 0;
   let readable = 0;
+  let fromAlerts = 0;
   let firstError: string | undefined;
   const updates = new Map<string, Partial<TransitItem>>();
 
@@ -339,7 +391,9 @@ export async function fetchArticles(
       const item = queue[next++];
       if (!item) return;
 
-      const result = await fetchArticle(ctx.fetch, item);
+      const postId = postIdOf(item);
+      if (postId && alerts.byPostId.has(postId)) fromAlerts += 1;
+      const result = await fetchArticle(ctx.fetch, item, alerts);
       const update =
         'text' in result ? articleUpdate(item, result.text) : articleFailure(item, result.error);
 
@@ -372,6 +426,13 @@ export async function fetchArticles(
       const update = updates.get(item.id);
       return update ? { ...item, ...update } : item;
     }),
-    outcome: { fetched, failed, readable, ...(firstError ? { error: firstError } : {}) },
+    outcome: {
+      fetched,
+      failed,
+      readable,
+      fromAlerts,
+      alertCount: alerts.count,
+      ...(firstError ? { error: firstError } : {}),
+    },
   };
 }
