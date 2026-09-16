@@ -1,7 +1,7 @@
 /*
  * What a source adapter has to provide, and — more importantly — what it does not.
  *
- * An adapter returns `RawEvent[]` and nothing derived: the id, the haystack, the fingerprint and
+ * An adapter returns `RawEvent[]` and nothing derived: the id, the fingerprint, the distances and
  * the day are all computed by the orchestrator, so a new adapter never re-implements normalisation
  * and cannot get it subtly different. Adding a source is one file plus one line in `index.ts`.
  */

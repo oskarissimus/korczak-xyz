@@ -16,7 +16,6 @@ import {
   dayKeyOf,
   eventIdFor,
   fingerprintOf,
-  haystackOf,
   synthKey,
 } from '../../korczak-xyz/src/utils/events/normalize';
 import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
@@ -60,13 +59,6 @@ export function toRecord(
     sourceName: raw.sourceName ?? sourceName,
     title: raw.title.trim(),
     subtitle: raw.subtitle,
-    haystack: haystackOf({
-      title: raw.title,
-      subtitle: raw.subtitle,
-      venue: raw.venue,
-      city: raw.city,
-      description: raw.description,
-    }),
     url: raw.url,
     ticketUrl: raw.ticketUrl,
     startsAt: raw.startsAt,
@@ -81,7 +73,7 @@ export function toRecord(
     tags: raw.tags ?? [],
     /*
      * Derived here with everything else derived, rather than in the running adapter, for the same
-     * reason the haystack and the fingerprint are: a second source of races — and the Maraton
+     * reason the id and the fingerprint are: a second source of races — and the Maraton
      * Warszawski feed already tags itself `running` — would otherwise have to remember to do it,
      * and would get it subtly different.
      */
@@ -187,9 +179,10 @@ export function mergeRecord(
        * merge settles on means the reader never races the upsert, and `tagsWithTicketSale` being
        * idempotent means a re-read cannot leave two copies of one tag.
        *
-       * Keyed on the date rather than on the boolean beside it, deliberately: `ticket-sale` is the
-       * whole of a keyword-less seeded interest, so it has to mean "there is a deadline on this
-       * row" and not "a model thought this was about a sale". See `tagsWithTicketSale`.
+       * Keyed on the date rather than on the boolean beside it, deliberately: the tag has to mean
+       * "there is a deadline on this row" and not "a model thought this was about a sale", because
+       * what counts down to it is `presale`, and a countdown to nothing is a card that says a sale
+       * is coming and cannot say when. See `tagsWithTicketSale`.
        */
       tags: tagsWithTicketSale(
         incoming.tags,

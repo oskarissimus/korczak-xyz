@@ -88,7 +88,7 @@ describe('parseFeed', () => {
     expect(parseFeed(rss, feed)[0].description).toBe('Zestawienie imprez historycznych.');
   });
 
-  it('applies the feed’s tags, which is how an interest narrows to it', () => {
+  it('applies the feed’s tags, which is how a row says what kind of thing it is', () => {
     expect(parseFeed(rss, feed)[0].tags).toEqual(['history', 'festival']);
   });
 

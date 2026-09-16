@@ -1,10 +1,12 @@
 /*
  * Firestore for the events app.
  *
- * Two very different collections, and the difference is the whole design:
+ * Two very different kinds of collection, and the difference is the whole design:
  *
- *   - `users/{uid}/eventInterests` is his, read and written from here. It is covered by the
- *     `users/{uid}/{document=**}` catch-all, so it needed no rules change.
+ *   - everything under `users/{uid}/` is his, read and written from here. It is covered by the
+ *     `users/{uid}/{document=**}` catch-all, so none of it needs a rules change. Since the
+ *     interests went (Sep 2026) the only things a client writes are two `eventSettings` documents
+ *     and its own `pushSubs` row.
  *   - `events/` is a SHARED corpus, written only by the collector (a Cloud Function on the Admin
  *     SDK, which bypasses rules) and read by any signed-in account. That one needed a new rules
  *     block, and until `firebase deploy --only firestore:rules` has been run the feed reads
@@ -31,56 +33,17 @@ import { getDb } from '../../../lib/firebase';
 import { runCloud } from '../../../lib/firestoreHealth';
 import { log } from '../../../lib/logger';
 import { normalizeSourcePrefs, type SourcePrefs } from '../sourcePrefs';
-import type { EventRecord, Interest, Notice, PushSettings, PushSub, SourceHealth } from '../types';
-import { normalizeInterest } from './storage';
+import type { EventRecord, Notice, PushSettings, PushSub, SourceHealth } from '../types';
 
 /**
  * How much of the shared corpus one pull takes.
  *
- * The feed matches locally — Firestore cannot express "any of these keywords" — so this is the
- * window the client reasons over. 2000 rows at ~300 bytes is about 600 kB, which is a lot for a
- * phone on a train and is why `saveFeedCache` keeps only the top 200.
+ * The whole window the client reasons over: it groups, dedupes and counts locally, and the Sources
+ * tab splits the same pull per source. 2000 rows at ~300 bytes is about 600 kB, which is a lot for
+ * a phone on a train and is why `saveFeedCache` keeps only the top 200.
  */
 const EVENT_PULL_LIMIT = 2000;
-const INTEREST_PULL_LIMIT = 500;
 const DAY = 86400000;
-
-// --- interests ------------------------------------------------------------------------------
-
-function interestsCollection(uid: string) {
-  return collection(getDb()!, 'users', uid, 'eventInterests');
-}
-
-/**
- * The whole collection, every time.
- *
- * No `updatedAt` cursor, for the reason the sleep log documents: the timestamps come off client
- * clocks, so a device running a few seconds fast writes rows that slip under a bookmark taken from
- * a slower one and are never seen again. A few hundred small rows is cheap; a lost interest is not.
- */
-export async function pullInterests(uid: string): Promise<Interest[]> {
-  if (!getDb()) return [];
-  const snap = await runCloud('events.interests.pull', () =>
-    getDocs(query(interestsCollection(uid), orderBy('createdAt'), limit(INTEREST_PULL_LIMIT))),
-  );
-  const out: Interest[] = [];
-  let rejected = 0;
-  for (const document of snap.docs) {
-    const interest = normalizeInterest({ ...document.data(), id: document.id });
-    if (interest) out.push(interest);
-    else rejected += 1;
-  }
-  if (rejected > 0) log.warn('events.interests.pull.rejected', { rejected, kept: out.length });
-  return out;
-}
-
-/** Never a deleteDoc — a delete has to reach the other device, so it travels as a tombstone. */
-export async function pushInterest(uid: string, interest: Interest): Promise<void> {
-  if (!getDb()) return;
-  await runCloud('events.interests.push', () =>
-    setDoc(doc(interestsCollection(uid), interest.id), stripUndefined(interest)),
-  );
-}
 
 // --- the shared corpus ----------------------------------------------------------------------
 
@@ -88,9 +51,7 @@ export async function pushInterest(uid: string, interest: Interest): Promise<voi
  * Upcoming events, oldest first.
  *
  * A single-field range plus an order on the *same* field, so Firestore's automatic index covers
- * this one — unlike `pullUndatedEvents` below, which needed a declared composite. Resist
- * `array-contains-any` on tags: it forces a composite index too and still cannot express what an
- * interest actually is.
+ * this one — unlike `pullUndatedEvents` below, which needed a declared composite.
  *
  * The window starts two days back so something happening tonight does not vanish at midnight.
  */
@@ -117,8 +78,8 @@ export async function pullEvents(now: number): Promise<EventRecord[]> {
  *
  * This one DOES need a declared index (`firestore.indexes.json`): an equality filter plus an order
  * on a different field is not something the automatic single-field indexes cover. Missing it is not
- * quiet — the feed renders "nothing matches your interests yet" over a raw Firestore error, which
- * is a sentence about the interests and a lie about the index.
+ * quiet — the feed renders its empty state over a raw Firestore error, which is a sentence about
+ * the collector and a lie about the index.
  */
 export async function pullUndatedEvents(): Promise<EventRecord[]> {
   if (!getDb()) return [];
@@ -245,7 +206,8 @@ export async function pullSourceHealth(): Promise<SourceHealth[]> {
  * Drops keys whose value is `undefined`.
  *
  * `setDoc` rejects an explicit `undefined` outright rather than treating it as absent, and these
- * records are full of optional fields — so a interest with no city would fail to save at all.
+ * records are full of optional fields — so a settings document with no `armedAt` would fail to
+ * save at all.
  */
 function stripUndefined<T extends object>(value: T): T {
   return Object.fromEntries(

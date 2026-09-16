@@ -29,12 +29,12 @@ const ATOMIC: Record<string, string> = {
 };
 
 /**
- * The single normalisation used for every comparison in this app: event text, interest keywords,
- * city names, fingerprints.
+ * The single normalisation used for every comparison in this app: fingerprints, place labels, the
+ * distance rules' own reading of a race title.
  *
- * One function rather than one per call site, because the whole point is that a keyword typed as
- * "Średniowieczny" reaches the same string as a scraped "ŚREDNIOWIECZNY" and a feed-mangled
- * "sredniowieczny". Two implementations that agree today would not agree after the first bug fix.
+ * One function rather than one per call site, because the whole point is that a scraped
+ * "ŚREDNIOWIECZNY", a feed-mangled "sredniowieczny" and a hand-written "Średniowieczny" reach the
+ * same string. Two implementations that agree today would not agree after the first bug fix.
  */
 export function foldText(input: string): string {
   if (!input) return '';
@@ -138,34 +138,3 @@ export function daysUntil(at: number, now: number, timeZone: string = WARSAW): n
   return Math.round((b - a) / 86400000);
 }
 
-/**
- * Everything the *keywords* will be matched against, folded into one string.
- *
- * **Tags are deliberately not in here.** They are matched structurally, by `interest.tags`, and
- * folding them into the keyword text makes the two mechanisms one — with the result that any
- * tag a source applies feed-wide becomes a blanket keyword hit for every row it produces. That
- * is not hypothetical: tagging the Jewish Culture Festival's feed `klezmer` made the Klezmer
- * interest match all 67 of its articles, Ted Kaczynski included, because the word was in every
- * haystack. Keywords ask what an event *says*; tags ask what it *is*.
- *
- * The description is capped: a source that pastes a whole press release would otherwise let a
- * keyword match on a word mentioned once in the ninth paragraph, and would bloat every document
- * in a collection the client pulls whole.
- */
-export function haystackOf(parts: {
-  title: string;
-  subtitle?: string;
-  venue?: string;
-  city?: string;
-  description?: string;
-}): string {
-  return foldText(
-    [
-      parts.title,
-      parts.subtitle ?? '',
-      parts.venue ?? '',
-      parts.city ?? '',
-      (parts.description ?? '').slice(0, 600),
-    ].join(' '),
-  );
-}

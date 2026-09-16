@@ -12,7 +12,6 @@ export type Lang = 'en' | 'pl';
 export const translations = {
   en: {
     navFeed: 'Feed',
-    navInterests: 'Interests',
     navAlerts: 'Alerts',
     navSources: 'Sources',
     navLabel: 'Event Watch sections',
@@ -26,11 +25,9 @@ export const translations = {
 
     // Feed
     feedHeading: 'Coming up',
-    feedEmpty: 'Nothing matches your interests yet.',
+    feedEmpty: 'Nothing has been collected yet.',
     feedEmptyHint:
-      'The collector runs every few hours. If this stays empty, widen a keyword or check the sources on the Alerts tab.',
-    feedLoading: 'Loading events…',
-    matchedBy: 'Matched by',
+      'The collector runs every few hours, and everything it finds lands here. If this stays empty, a source is failing — the Sources tab says which.',
     tickets: 'Tickets',
     moreInfo: 'Details',
     groupThisWeek: 'This week',
@@ -42,8 +39,8 @@ export const translations = {
     onSaleNow: 'On sale',
     saleOpens: 'Sale opens {when}',
     showingCount: '{shown} of {total} upcoming',
-    // The one narrowing that can empty the feed without an interest having decided anything, and
-    // whose control is on another tab — so it is a link to Sources rather than a button.
+    // The one thing that can empty the feed, and its control is on another tab — so it is a link
+    // to Sources rather than a button.
     // Count after the noun, in both languages, so neither has to agree a number with a plural —
     // Polish has three forms of "źródła" and English would still read "1 sources".
     sourcesOffHint: 'Sources switched off: {count} — Sources tab',
@@ -56,45 +53,8 @@ export const translations = {
 
     // Arriving from a notification
     focusMissing:
-      'The event that notification named is not in the feed any more — it has either happened or its sale has opened. Everything still upcoming is below.',
+      'The event that notification named is not in the feed — it has happened, its sale has opened, or its source has since been switched off. Everything still upcoming is below.',
     focusClear: 'Back to the whole feed',
-
-    // Interests
-    interestsHeading: 'What to watch for',
-    interestsIntro:
-      'An interest is a filter, not a category. Anything matching one shows in the feed; anything matching an unmuted one can notify you.',
-    addInterest: 'Add an interest',
-    editInterest: 'Edit',
-    deleteInterest: 'Delete',
-    muteInterest: 'Mute',
-    unmuteInterest: 'Unmute',
-    mutedNote: 'Muted — shows in the feed, never notifies',
-    fieldLabel: 'Name',
-    fieldKeywords: 'Keywords',
-    fieldKeywordsHint:
-      'Any of these, one per line or comma separated. End a word with * to match its other forms — klezmer* also finds "klezmerski". Leave empty to match everything the tags allow.',
-    fieldExclude: 'Never match',
-    fieldExcludeHint: 'Any hit here rules the event out, whatever else matched.',
-    fieldTags: 'Tags',
-    fieldTagsHint: 'All of these must be present. Try opera, music, theatre, tech, festival.',
-    fieldCities: 'Cities',
-    fieldCitiesHint: 'Any of these. Leave empty for anywhere.',
-    fieldCountries: 'Countries',
-    fieldCountriesHint:
-      'Any of these — codes or names, PL, DE, Poland, Czechy. Use ONLINE for events held nowhere. Leave empty for anywhere.',
-    fieldInternational: 'Also keep events that draw people from other countries',
-    fieldInternationalHint:
-      'What a country list alone cannot say. On, a conference people fly in for is kept wherever it is held, while one the host country attends is not — so EuroPython stays and PyCon NL does not.',
-    fieldCoverage: 'Also keep articles written about events',
-    fieldCoverageHint:
-      'Off, and normally leave it off: a sponsor post or a set of pacer times about a race is not the race, which is listed separately. Articles that announce something — entries opening, a date fixed, next season published — are kept either way.',
-    fieldLead: 'Remind me this many days ahead',
-    save: 'Save',
-    cancel: 'Cancel',
-    matchesNow: 'Matches {count} upcoming',
-    errorNeedsLabel: 'Give it a name.',
-    errorNeedsRule: 'Add at least one keyword or tag, or it would match everything.',
-    confirmDelete: 'Delete “{label}”?',
 
     // Alerts
     alertsHeading: 'Notifications',
@@ -131,7 +91,7 @@ export const translations = {
     // Sources
     sourcesTabHeading: 'Where events come from',
     sourcesIntro:
-      'Every page the collector reads, as a link, so the list can be checked rather than taken on trust. It runs every few hours; nothing here is watched that is not on this page.',
+      'Every page the collector reads, as a link, so the list can be checked rather than taken on trust. It runs every few hours; nothing is watched that is not on this page, and everything that is reaches your feed unless you switch it off here.',
     kindScrape: 'scraped page',
     kindIcal: 'calendar feed',
     kindRss: 'RSS',
@@ -146,9 +106,9 @@ export const translations = {
     noteTeatrWielki:
       'The theatre’s own news list, and nothing else from this house. It is read for one thing: the morning the tickets go on sale, which the theatre states in prose a fortnight or more ahead and which is the only fact here with a deadline on it. The season repertoire pages were dropped — what is programmed is never urgent, and they could not answer this.',
     notePythonOrg:
-      'Worldwide, and deliberately not narrowed by country: whether PyCon US is worth knowing about is your interest’s call, not the collector’s.',
+      'Worldwide, and deliberately not narrowed by country: what is collected is a fact about the world, so PyCon US is here whether or not you would go. Each card says which country it is in.',
     noteElektroniczneZapisy:
-      'The running listings on an entry platform, nationwide — road, cross, obstacle and ultra. Each row says its own town, so which of them is Warsaw is your interest’s call; the sign-up form is a page of its own, which is what lets this one tell you entries have opened.',
+      'The running listings on an entry platform, nationwide — road, cross, obstacle and ultra. Each row says its own town, and there are well over a hundred of them, so this is the source to switch off first if the feed is too long; the sign-up form is a page of its own, which is what lets this one tell you entries have opened.',
     noteFeed:
       'Blogs and magazines that publish what they are putting on. A feed item is an article, so it carries no date of its own and shows under “announced, no dates yet”.',
     noteTicketmaster:
@@ -170,7 +130,7 @@ export const translations = {
       'Nothing from this source has been collected yet, so no model has been asked anything about it.',
     passClassifier: 'Classifier',
     passClassifierNote:
-      'One call per row, over everything this source produces except its newsroom articles. An unanswered row is not filtered out — it passes every rule below — so a count stuck well under the rows is the classifier having stopped rather than the feed going quiet.',
+      'One call per row, over everything this source produces except its newsroom articles. Nothing is filtered on what it decides, so a count stuck well under the rows costs you the labels on the cards rather than the cards — which is why it is worth looking at here.',
     passNewsroom: 'Newsroom reader',
     passNewsroomNote:
       'One call per article, over the rows a page tagged newsroom, fetching the article behind each one. It is asked a single question, because the answer schedules a notification on a particular morning: do tickets go on sale on a stated date, and when.',
@@ -182,24 +142,9 @@ export const translations = {
     extractSaleAt: 'the morning the sale opens',
     fieldShared: 'stated by the source where it knows it',
 
-    // Which interests reach this source
-    filtersHeading: 'Filters on this source',
-    filtersKept: '{kept} of {rows} rows reach your feed and your notifications.',
-    filterKeeps: 'keeps {count}',
-    filtersNone:
-      'Nothing you are watching for matches anything from this source. Either its rows are not what you meant to ask for, or a tag you narrowed on is one no page here stamps.',
-    filtersSilent: 'Interests that reach nothing here: {count}.',
-    filtersAll: 'All interests',
     sourcesUnlistedHeading: 'Also reporting',
     sourcesUnlistedHint:
       'Reporting its health beside the sources without being a page — the classifier is one. A scrape here is one that was removed from the list and is still collecting.',
-
-
-    // Sync badge
-    syncOff: 'Not signed in — nothing is being saved to your account',
-    syncSynced: 'Synced',
-    syncFailed: 'Sync failed',
-    syncPending: '{count} waiting to sync',
 
     // Relative time
     justNow: 'just now',
@@ -209,7 +154,6 @@ export const translations = {
   },
   pl: {
     navFeed: 'Wydarzenia',
-    navInterests: 'Zainteresowania',
     navAlerts: 'Powiadomienia',
     navSources: 'Źródła',
     navLabel: 'Sekcje aplikacji',
@@ -221,11 +165,9 @@ export const translations = {
     unavailable: 'Śledzenie wydarzeń nie jest skonfigurowane w tej wersji.',
 
     feedHeading: 'Nadchodzące',
-    feedEmpty: 'Nic jeszcze nie pasuje do Twoich zainteresowań.',
+    feedEmpty: 'Nic jeszcze nie zostało zebrane.',
     feedEmptyHint:
-      'Zbieranie danych działa co kilka godzin. Jeśli nadal jest pusto, poszerz słowa kluczowe albo sprawdź źródła w zakładce Powiadomienia.',
-    feedLoading: 'Wczytywanie wydarzeń…',
-    matchedBy: 'Pasuje do',
+      'Kolektor działa co kilka godzin, a wszystko, co znajdzie, trafia tutaj. Jeśli nadal jest pusto, jakieś źródło nie działa — zakładka Źródła powie które.',
     tickets: 'Bilety',
     moreInfo: 'Szczegóły',
     groupThisWeek: 'W tym tygodniu',
@@ -246,44 +188,9 @@ export const translations = {
     kindCoverage: 'tekst',
 
     focusMissing:
-      'Wydarzenia z tego powiadomienia nie ma już na liście — albo się odbyło, albo ruszyła jego sprzedaż. Poniżej jest wszystko, co dopiero przed nami.',
+      'Wydarzenia z tego powiadomienia nie ma na liście — odbyło się, ruszyła jego sprzedaż albo jego źródło zostało w międzyczasie wyłączone. Poniżej jest wszystko, co dopiero przed nami.',
     focusClear: 'Wróć do pełnej listy',
 
-    interestsHeading: 'Czego szukać',
-    interestsIntro:
-      'Zainteresowanie to filtr, nie kategoria. Wszystko, co pasuje, pojawia się na liście; wszystko, co pasuje do niewyciszonego, może wysłać powiadomienie.',
-    addInterest: 'Dodaj zainteresowanie',
-    editInterest: 'Edytuj',
-    deleteInterest: 'Usuń',
-    muteInterest: 'Wycisz',
-    unmuteInterest: 'Włącz',
-    mutedNote: 'Wyciszone — widoczne na liście, bez powiadomień',
-    fieldLabel: 'Nazwa',
-    fieldKeywords: 'Słowa kluczowe',
-    fieldKeywordsHint:
-      'Wystarczy jedno z nich, po przecinku lub w osobnych liniach. Zakończ gwiazdką, żeby złapać odmiany — klezmer* znajdzie też „klezmerski”. Puste pole znaczy: wszystko, co przepuszczą tagi.',
-    fieldExclude: 'Nigdy nie pasuje',
-    fieldExcludeHint: 'Trafienie tutaj wyklucza wydarzenie, cokolwiek innego pasowało.',
-    fieldTags: 'Tagi',
-    fieldTagsHint: 'Wszystkie muszą wystąpić. Np. opera, music, theatre, tech, festival.',
-    fieldCities: 'Miasta',
-    fieldCitiesHint: 'Wystarczy jedno. Puste pole znaczy: gdziekolwiek.',
-    fieldCountries: 'Kraje',
-    fieldCountriesHint:
-      'Wystarczy jeden — kody albo nazwy: PL, DE, Polska, Czechy. ONLINE dla wydarzeń bez miejsca. Puste pole znaczy: gdziekolwiek.',
-    fieldInternational: 'Przepuszczaj też wydarzenia, na które ludzie przyjeżdżają z innych krajów',
-    fieldInternationalHint:
-      'Tego sama lista krajów nie powie. Włączone — konferencja, na którą się lata, zostaje niezależnie od kraju, a taka, na którą przychodzą mieszkańcy, nie. Czyli EuroPython zostaje, a PyCon NL odpada.',
-    fieldCoverage: 'Przepuszczaj też teksty o wydarzeniach',
-    fieldCoverageHint:
-      'Wyłączone i zwykle warto tak zostawić: wpis o sponsorze albo czasy zajęcy to nie bieg — bieg jest na liście osobno. Teksty, które coś ogłaszają — otwarcie zapisów, ustaloną datę, nowy kalendarz — zostają tak czy inaczej.',
-    fieldLead: 'Przypomnij tyle dni wcześniej',
-    save: 'Zapisz',
-    cancel: 'Anuluj',
-    matchesNow: 'Pasuje do {count} nadchodzących',
-    errorNeedsLabel: 'Podaj nazwę.',
-    errorNeedsRule: 'Dodaj słowo kluczowe albo tag — inaczej pasowałoby wszystko.',
-    confirmDelete: 'Usunąć „{label}”?',
 
     alertsHeading: 'Powiadomienia',
     pushUnsupported: 'Ta przeglądarka nie obsługuje powiadomień push.',
@@ -318,7 +225,7 @@ export const translations = {
 
     sourcesTabHeading: 'Skąd biorą się wydarzenia',
     sourcesIntro:
-      'Każda strona, którą czyta kolektor, jako link — żeby dało się to sprawdzić, a nie tylko przyjąć na słowo. Działa co kilka godzin; nie śledzimy niczego, czego nie ma na tej liście.',
+      'Każda strona, którą czyta kolektor, jako link — żeby dało się to sprawdzić, a nie tylko przyjąć na słowo. Działa co kilka godzin; nie śledzimy niczego, czego nie ma na tej liście, a wszystko, co na niej jest, trafia na Twoją listę, dopóki tego tutaj nie wyłączysz.',
     kindScrape: 'strona',
     kindIcal: 'kalendarz',
     kindRss: 'RSS',
@@ -331,9 +238,9 @@ export const translations = {
     noteTeatrWielki:
       'Same aktualności teatru i nic więcej z tego domu. Czytane dla jednej rzeczy: ranka, w którym rusza sprzedaż biletów — teatr pisze o tym prostym zdaniem, zwykle z dwutygodniowym wyprzedzeniem, i to jedyny fakt tutaj z terminem. Strony repertuaru sezonu odpadły: co jest w planie, nigdy nie jest pilne, a tej daty i tak nie podawały.',
     notePythonOrg:
-      'Cały świat i celowo bez filtra kraju: czy PyCon US jest wart uwagi, decyduje Twoje zainteresowanie, a nie kolektor.',
+      'Cały świat i celowo bez filtra kraju: to, co zbieramy, jest faktem o świecie, więc PyCon US jest tu niezależnie od tego, czy pojedziesz. Każda karta mówi, w jakim kraju się odbywa.',
     noteElektroniczneZapisy:
-      'Biegowe listy na platformie zapisów, z całej Polski — szosa, przełaje, przeszkody i ultra. Każdy wiersz podaje własne miasto, więc o to, które z nich jest warszawskie, pyta Twoje zainteresowanie; formularz zapisów to osobna strona i stąd wiadomo, kiedy ruszyły zapisy.',
+      'Biegowe listy na platformie zapisów, z całej Polski — szosa, przełaje, przeszkody i ultra. Każdy wiersz podaje własne miasto, a wierszy jest grubo ponad sto, więc to pierwsze źródło do wyłączenia, jeśli lista robi się za długa; formularz zapisów to osobna strona i stąd wiadomo, kiedy ruszyły zapisy.',
     noteFeed:
       'Blogi i czasopisma, które piszą o tym, co organizują. Wpis w kanale to artykuł, więc nie ma własnej daty i trafia do „ogłoszone, bez dat”.',
     noteTicketmaster:
@@ -351,7 +258,7 @@ export const translations = {
       'Z tego źródła nie ma jeszcze żadnych wierszy, więc żaden model nie był o nie pytany.',
     passClassifier: 'Klasyfikator',
     passClassifierNote:
-      'Jedno zapytanie na wiersz, dla wszystkiego z tego źródła poza aktualnościami. Wiersz bez odpowiedzi nie wypada z listy — przechodzi każdą regułę poniżej — więc licznik, który stoi mocno poniżej liczby wierszy, oznacza zatrzymany klasyfikator, a nie pustą listę.',
+      'Jedno zapytanie na wiersz, dla wszystkiego z tego źródła poza aktualnościami. Nic nie jest filtrowane na podstawie jego odpowiedzi, więc licznik stojący mocno poniżej liczby wierszy kosztuje opisy na kartach, a nie same karty — i dlatego warto na niego patrzeć tutaj.',
     passNewsroom: 'Czytnik aktualności',
     passNewsroomNote:
       'Jedno zapytanie na artykuł, dla wierszy oznaczonych przez stronę jako aktualności, z pobraniem treści każdego z nich. Pytanie jest jedno, bo odpowiedź planuje powiadomienie na konkretny poranek: czy bilety trafiają do sprzedaży w podanym terminie i kiedy.',
@@ -363,22 +270,11 @@ export const translations = {
     extractSaleAt: 'poranek, w którym rusza sprzedaż',
     fieldShared: 'podaje je źródło, kiedy je zna',
 
-    filtersHeading: 'Filtry na tym źródle',
-    filtersKept: 'Do listy i powiadomień trafia {kept} z {rows} wierszy.',
-    filterKeeps: 'przepuszcza {count}',
-    filtersNone:
-      'Nic, czego szukasz, nie pasuje do niczego z tego źródła. Albo te wiersze to nie to, o co pytasz, albo zawęziłeś filtr tagiem, którego żadna tutejsza strona nie nadaje.',
-    filtersSilent: 'Zainteresowania, które nic tu nie łapią: {count}.',
-    filtersAll: 'Wszystkie zainteresowania',
     sourcesUnlistedHeading: 'Zgłasza się też',
     sourcesUnlistedHint:
       'Raportuje swój stan obok źródeł, nie będąc stroną — tak działa klasyfikator. Jeśli trafi tu scraper, znaczy że wypadł z listy, a nadal zbiera.',
 
 
-    syncOff: 'Nie zalogowano — nic nie jest zapisywane na koncie',
-    syncSynced: 'Zsynchronizowano',
-    syncFailed: 'Błąd synchronizacji',
-    syncPending: '{count} czeka na wysłanie',
 
     justNow: 'przed chwilą',
     minutesAgo: '{n} min temu',

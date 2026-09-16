@@ -3,7 +3,7 @@
  *
  * This is what makes the fuzzy categories tractable. There is no aggregator API for medieval fairs
  * or klezmer festivals in Poland — but the people who run them publish, and most of what they
- * publish is WordPress, which means a feed. So instead of one bespoke scraper per interest, there is
+ * publish is WordPress, which means a feed. So instead of one bespoke scraper per publication, there is
  * one adapter and a list: adding "watch this festival's blog" later is a line in `FEEDS`, not code.
  *
  * That list lives in `src/utils/events/sources.ts` rather than here, so the Sources tab can name

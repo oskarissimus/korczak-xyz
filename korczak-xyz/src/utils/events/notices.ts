@@ -5,21 +5,41 @@
  * a pure function over plain values: no Firestore, no network, no clock of its own. The Cloud
  * Function does the I/O and calls `planRun`; every rule below is reachable from a unit test.
  *
+ * **Everything an enabled source collects is push-eligible.** The interests used to stand between
+ * the corpus and the lock screen, and they are gone (Sep 2026) — so what narrows this is the source
+ * switches, which are a per-account preference, and the caps, which are per run. That trade is why
+ * `maxSoonPerRun` exists: a reminder used to fire only for a row somebody had named, and now fires
+ * for every dated row in the corpus.
+ *
  * Portable: browser and Node, no imports outside this directory. See types.ts.
  */
 
-import type { EventRecord, Interest, NoticeKind } from './types';
-import { matchingInterests } from './match';
+import type { EventRecord, NoticeKind } from './types';
 import { announceFloor, sourceEnabled, type SourcePrefs } from './sourcePrefs';
 import { daysUntil, noticeIdFor } from './normalize';
 import { FEED_PATH } from './links';
+
+/**
+ * How much warning is wanted before a date — a curtain, or a sale opening.
+ *
+ * One number for the whole app, where it used to be `Interest.leadDays` and could differ per
+ * interest: forty-five days for a season, a fortnight for a ticket sale, thirty for a marathon.
+ * Nothing replaces that, and it should be said plainly rather than explained away — a race is now
+ * warned about on the same schedule as a concert. A fortnight is the old default and the one that
+ * suits a ticket: long enough to put in a diary, short enough that the notice still reads as being
+ * about this event rather than about the season.
+ *
+ * If a per-source lead is ever wanted, it belongs on the source catalogue beside its pages, not on
+ * a second per-account collection: a theatre's season and an entry platform's races differ because
+ * of what they publish, which is a fact about the source.
+ */
+export const LEAD_DAYS = 14;
 
 export interface PendingNotice {
   kind: NoticeKind;
   noticeId: string;
   fingerprint: string;
   eventId: string;
-  interestIds: string[];
   title: string;
   startsAt: number | null;
   /**
@@ -53,6 +73,7 @@ export interface PlanContext {
   armedAt: number | null;
   maxPerRun: number;
   maxOnSalePerRun: number;
+  maxSoonPerRun: number;
   /**
    * Which sources this account is still listening to — the Sources tab's switches.
    *
@@ -60,6 +81,9 @@ export interface PlanContext {
    * context at all: a switch that reaches the feed and not the collector means the rows are gone
    * from the screen and the phone still rings about them at 7am, which is the reading of "off"
    * that gets an app deleted. A caller with no switches has to say `ALL_SOURCES_ON` out loud.
+   *
+   * It is also the **only** thing between the corpus and the lock screen now that the interests are
+   * gone, which is a good deal more weight than it was carrying when it was written.
    */
   sources: SourcePrefs;
 }
@@ -73,40 +97,39 @@ export interface RunPlan {
 }
 
 /**
- * Whether an event is new enough, to this account and to this interest, to be announced.
+ * Whether an event is new enough, to this account, to be announced.
  *
- * Three clocks, and every one of them is needed:
+ * Two clocks, and both are needed:
  *
  *   - `armedAt` stops the first run after arming from replaying the entire corpus. Without it, an
  *     app installed ten minutes ago delivers forty notifications in one minute.
- *   - `interest.createdAt` stops *adding an interest* from doing the same thing with the backlog
- *     that interest now matches. This is why `Interest.createdAt` exists separately from
- *     `updatedAt`: editing keywords must not re-arm the backlog.
- *   - `announceFloor` stops *switching a source back on* from doing it a third time. A fortnight
- *     with a noisy feed off is a fortnight of rows that are newer than `armedAt` and older than
- *     the reader's interest in them, and announcing the lot on the next run is precisely the
- *     flood the switch was reached for. Re-enabling arms that source from the moment of the tap,
- *     exactly as arming push arms the account from the moment of the tap.
+ *   - `announceFloor` stops *switching a source back on* from doing it again. A fortnight with a
+ *     noisy feed off is a fortnight of rows that are newer than `armedAt`, and announcing the lot
+ *     on the next run is precisely the flood the switch was reached for. Re-enabling arms that
+ *     source from the moment of the tap, exactly as arming push arms the account from the moment
+ *     of the tap.
  *
- * The event's own `firstSeenAt` is compared against all three, so a genuinely new event passes and
- * a pre-existing one never does, however the interests and the switches move around it.
+ * There used to be a third — `interest.createdAt`, which stopped *adding an interest* from
+ * surfacing its whole backlog as announcements. It went with the interests, and nothing takes its
+ * place because nothing can: there is no per-reader act left that widens what matches.
+ *
+ * The event's own `firstSeenAt` is compared against both, so a genuinely new event passes and a
+ * pre-existing one never does, however the switches move around it.
  */
-function isFresh(seenAt: number, event: EventRecord, interest: Interest, ctx: PlanContext): boolean {
+function isFresh(seenAt: number, event: EventRecord, ctx: PlanContext): boolean {
   if (ctx.armedAt === null) return false;
   if (seenAt < announceFloor(ctx.sources, event.source)) return false;
-  return seenAt >= ctx.armedAt && seenAt >= interest.createdAt;
+  return seenAt >= ctx.armedAt;
 }
 
 /**
  * The notices one event owes, before capping.
  *
- * At most one notice per kind per event, however many interests matched — the interests are *why*
- * it fired, not *what* fired, so two interests matching one Floyd tribute is one notification with
- * two reasons, not two notifications.
+ * At most one notice per kind per event: the same concert listed twice is one notification, which
+ * is what keying the id on the fingerprint is for.
  */
 export function noticesFor(
   event: EventRecord,
-  interests: Interest[],
   seen: ReadonlySet<string>,
   ctx: PlanContext,
 ): PendingNotice[] {
@@ -126,9 +149,6 @@ export function noticesFor(
    */
   if (!sourceEnabled(ctx.sources, event.source)) return [];
 
-  const matched = matchingInterests(event, interests, { forPush: true });
-  if (matched.length === 0) return [];
-
   const out: PendingNotice[] = [];
   const base = {
     fingerprint: event.fingerprint,
@@ -140,8 +160,7 @@ export function noticesFor(
     distancesM: event.distancesM,
   };
 
-  const announcedFor = matched.filter((i) => isFresh(event.firstSeenAt, event, i, ctx));
-  if (announcedFor.length > 0) add(out, 'announced', announcedFor, base, seen);
+  if (isFresh(event.firstSeenAt, event, ctx)) add(out, 'announced', base, seen);
 
   /*
    * On sale. The transition cannot be recovered from the merged document — only the upsert knows
@@ -149,9 +168,8 @@ export function noticesFor(
    * `onSaleSeenAt` and this reads it back.
    */
   const onSaleSeenAt = event.onSaleSeenAt;
-  if (onSaleSeenAt !== undefined) {
-    const onSaleFor = matched.filter((i) => isFresh(onSaleSeenAt, event, i, ctx));
-    if (onSaleFor.length > 0) add(out, 'onsale', onSaleFor, base, seen);
+  if (onSaleSeenAt !== undefined && isFresh(onSaleSeenAt, event, ctx)) {
+    add(out, 'onsale', base, seen);
   }
 
   /*
@@ -161,28 +179,22 @@ export function noticesFor(
    * morning is news that arrives too late to act on. But the date is usually *known in advance* —
    * Teatr Wielki prints it in its own news weeks ahead, and Ticketmaster carries it as
    * `sales.public.startDateTime` — so where a source states it, this counts down to it exactly as
-   * `soon` counts down to a curtain, on the same `leadDays`.
+   * `soon` counts down to a curtain, on the same `LEAD_DAYS`.
    *
    * `> ctx.now` and not merely "present": a sale that opened last month is the ordinary state of
    * most of the corpus, and warning about it is warning about the past. Note this deliberately
-   * does *not* ask `isFresh` — a date-based reminder is not an announcement, and an interest added
+   * does *not* ask `isFresh` — a date-based reminder is not an announcement, and a source armed
    * today should still be able to warn about a sale announced last week, which is the whole reason
-   * anyone would add it.
+   * anyone would switch it on.
    */
   const onSaleAt = event.onSaleAt;
   if (onSaleAt !== undefined && ctx.armedAt !== null && onSaleAt > ctx.now) {
-    const lead = Math.max(...matched.map((i) => i.leadDays));
-    if (daysUntil(onSaleAt, ctx.now) <= lead) add(out, 'presale', matched, base, seen);
+    if (daysUntil(onSaleAt, ctx.now) <= LEAD_DAYS) add(out, 'presale', base, seen);
   }
 
-  /*
-   * Getting close. `max` of the matching interests' leadDays, not `min`: leadDays says how much
-   * warning is wanted, so if any matching interest asked for thirty days it gets thirty. Undated
-   * events cannot be close to anything.
-   */
+  // Getting close. Undated events cannot be close to anything.
   if (event.startsAt !== null && ctx.armedAt !== null) {
-    const lead = Math.max(...matched.map((i) => i.leadDays));
-    if (daysUntil(event.startsAt, ctx.now) <= lead) add(out, 'soon', matched, base, seen);
+    if (daysUntil(event.startsAt, ctx.now) <= LEAD_DAYS) add(out, 'soon', base, seen);
   }
 
   return out;
@@ -203,30 +215,38 @@ function noticeAt(notice: PendingNotice): number {
 function add(
   out: PendingNotice[],
   kind: NoticeKind,
-  interests: Interest[],
-  base: Omit<PendingNotice, 'kind' | 'noticeId' | 'interestIds'>,
+  base: Omit<PendingNotice, 'kind' | 'noticeId'>,
   seen: ReadonlySet<string>,
 ): void {
   const noticeId = noticeIdFor(base.fingerprint, kind);
   if (seen.has(noticeId)) return;
-  out.push({ ...base, kind, noticeId, interestIds: interests.map((i) => i.id) });
+  out.push({ ...base, kind, noticeId });
 }
 
 /**
  * One collector run's worth of notifications.
  *
- * Two caps, for two different reasons. `announced` is capped hard (3) and the overflow becomes a
- * single summary — because the realistic way this floods is a scrape whose markup shifted, every
- * synthesised key changed, and an entire opera season looks new. `onsale` and `presale` share
- * their own, looser cap (10) and never become a summary: tickets going on sale — and the warning
- * that they are about to — is the thing he asked for, and it is not noise.
+ * Three caps, for three different reasons. `announced` is capped hardest (3) and the overflow
+ * becomes a single summary — because the realistic way this floods is a scrape whose markup
+ * shifted, every synthesised key changed, and an entire opera season looks new. `onsale` and
+ * `presale` share their own, looser cap (10) and never become a summary: tickets going on sale —
+ * and the warning that they are about to — is the thing he asked for, and it is not noise. `soon`
+ * has one now too (5), which it did not need while an interest had to name a row before a reminder
+ * could fire; with the whole corpus eligible, a fortnight's lead over a national race listing is a
+ * morning of buzzing.
  *
- * Suppressed notices are still returned so the caller latches them. They must never be left
- * unclaimed to fire individually on the next run — that would only postpone the flood.
+ * The overflow of the two ticket caps and of `soon` is simply dropped rather than latched. That is
+ * deliberate and it is the opposite of what `announced` does: an announcement is a one-off, so
+ * suppressing it without claiming the id only postpones the flood, where a countdown is asked again
+ * on the next run and the next — the soonest event keeps rising to the top of the sort until it is
+ * either sent or past. Latching a dropped reminder would silence exactly the event that was closest
+ * to being worth a reminder.
+ *
+ * Suppressed `announced` notices are returned so the caller latches them. They must never be left
+ * unclaimed to fire individually on the next run.
  */
 export function planRun(
   events: EventRecord[],
-  interests: Interest[],
   seen: ReadonlySet<string>,
   ctx: PlanContext,
 ): RunPlan {
@@ -236,7 +256,7 @@ export function planRun(
   // runs — `seen` only covers what previous runs claimed.
   const within = new Set<string>();
   for (const event of events) {
-    for (const notice of noticesFor(event, interests, seen, ctx)) {
+    for (const notice of noticesFor(event, seen, ctx)) {
       if (within.has(notice.noticeId)) continue;
       within.add(notice.noticeId);
       all.push(notice);
@@ -257,7 +277,7 @@ export function planRun(
   const sale = all
     .filter((n) => n.kind === 'onsale' || n.kind === 'presale')
     .slice(0, Math.max(0, ctx.maxOnSalePerRun));
-  const soon = all.filter((n) => n.kind === 'soon');
+  const soon = all.filter((n) => n.kind === 'soon').slice(0, Math.max(0, ctx.maxSoonPerRun));
 
   const keep = Math.max(0, ctx.maxPerRun);
   const sentAnnounced = announced.slice(0, keep);

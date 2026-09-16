@@ -3,7 +3,7 @@
  *
  * Everything in `src/utils/events/` is pure and **portable**: it runs unchanged in the browser and
  * in a Cloud Function on Node, because the collector and the feed have to agree exactly about what
- * matches an interest. If they ever disagree, the feed shows things you were never told about and
+ * reaches a reader. If they ever disagree, the feed shows things you were never told about and
  * pushes arrive for things the feed does not list.
  *
  * That portability is a real constraint and it is load-bearing: no DOM, no `import.meta.env`, no
@@ -48,8 +48,13 @@ export const REACHES: readonly Reach[] = ['local', 'national', 'international'];
  * what an announcement feed is for. `coverage` is everything else written about events: results,
  * interviews, race reports, gear, and the sponsor post that is the reason this field exists.
  *
- * A judgement, like `reach`, and made by the same call. Absent means unclassified, and the matcher
- * treats it the way it treats an absent reach — see `passesKind`.
+ * A judgement, like `reach`, and made by the same call. Absent means unclassified.
+ *
+ * **It filters nothing.** `Interest.includeCoverage` was the opt-in that let `coverage` through,
+ * and it went with the interests (Sep 2026): the feed is what the enabled sources collected, and
+ * which of a source's rows are worth reading is that source's own business — a scrape yielding
+ * sponsor posts is fixed in its adapter or switched off on the Sources tab. What the field still
+ * does is put a word on the card, so an article among the listings says it is one.
  */
 export type EventKind = 'listing' | 'announcement' | 'coverage';
 
@@ -72,14 +77,6 @@ export interface EventRecord {
   title: string;
   /** Composer, genre, artist — whatever the source offers as a second line. */
   subtitle?: string;
-  /**
-   * Folded title + subtitle + venue + tags + the head of any description. What the matcher reads.
-   *
-   * Precomputed by the collector so the browser never folds diacritics across two thousand
-   * documents per render, and — more importantly — so both sides match against a byte-identical
-   * string rather than two independently derived ones.
-   */
-  haystack: string;
   url: string;
   /** May appear later than the event itself, which is what `onsale` watches for. */
   ticketUrl?: string;
@@ -120,8 +117,9 @@ export interface EventRecord {
   /**
    * ISO-3166-1 alpha-2, or `ONLINE`. Supplied by the adapter where the source knows it for free
    * (Teatr Wielki is in Warsaw; Ticketmaster is queried `countryCode=PL`) and by the classifier
-   * otherwise. Absent means nobody has worked it out yet — which is a third state, not a fourth
-   * country, and `matchesInterest` treats it as such.
+   * otherwise. Absent means nobody has worked it out yet — which is a third state and not a fourth
+   * country. Nothing filters on it since the interests went; it is read on the card, where `?` is
+   * how "not labelled yet" is said.
    */
   country?: string;
   /**
@@ -136,11 +134,11 @@ export interface EventRecord {
   reachReason?: string;
   /**
    * Whether this row is an event or an article about one. Set by the classifier and by nothing
-   * else. Absent means unclassified — which is not `listing`, and `passesKind` reads it as its own
-   * state for the same reason an absent `reach` is one.
+   * else. Absent means unclassified — which is not `listing`, and is its own state for the same
+   * reason an absent `reach` is one.
    */
   kind?: EventKind;
-  /** Why the classifier called it that. Printed on a filtered-out card, like `reachReason`. */
+  /** Why the classifier called it that. Kept beside the verdict, like `reachReason`. */
   kindReason?: string;
   /**
    * Whether the **newsroom reader** found a stated ticket-sale date on this article.
@@ -213,79 +211,6 @@ export interface EventRecord {
 }
 
 /**
- * A saved interest. Not a category — a matcher, so "medieval fairs at castles" and "everything the
- * Opera announces" are both expressible without the app shipping a taxonomy.
- *
- * Extends `Versioned` structurally (id / rev / updatedAt / writerId / deleted) so the sleep log's
- * reconciler merges these without being told anything about them. Declared here rather than
- * imported because this directory may not import outside itself; `interests.test.ts` asserts the
- * two shapes stay compatible.
- */
-export interface Interest {
-  id: string;
-  rev: number;
-  updatedAt: number;
-  writerId: string;
-  deleted?: boolean;
-
-  label: string;
-  /**
-   * Any-of, folded, matched on word boundaries. **An empty array is no constraint, not "matches
-   * nothing"** — the Opera Narodowa interest is `tags: ['opera']` with no keywords at all, and
-   * reading empty as unsatisfiable silently kills it.
-   */
-  keywords: string[];
-  /** Any hit vetoes. How 'Pink Floyd' stops matching guitar-hardware listings. */
-  excludeKeywords?: string[];
-  /** All-of against `EventRecord.tags`. Absent or empty is no constraint. */
-  tags?: string[];
-  /** Any-of against `EventRecord.city`. Absent or empty means anywhere. */
-  cities?: string[];
-  /**
-   * Any-of against `EventRecord.country`, as ISO-2 codes. Absent or empty means anywhere.
-   *
-   * Read together with `internationalAnywhere` as **one** rule rather than as two constraints —
-   * see the `places` case in `matchReason`. Two independent all-of constraints would mean "in
-   * Poland AND international", which is nobody's question.
-   */
-  countries?: string[];
-  /**
-   * Whether an `international` event passes wherever it is held.
-   *
-   * This is the half `countries` cannot express. "Conferences in Poland, plus the ones worth
-   * flying to" is a single thought, and a country list alone answers it by dropping EuroPython
-   * along with PyCon NL.
-   */
-  internationalAnywhere?: boolean;
-  /**
-   * Whether articles *about* events count as matches — see `EventKind`.
-   *
-   * Off by default, and it is the one filter here that is on without being asked for: a feed of
-   * sponsor posts about a race is not a feed of races, and nobody sets up an event watcher wanting
-   * one. It is an opt-in rather than an opt-out because the interest that wants coverage is the
-   * unusual one — "everything the Maraton Warszawski blog says" is a readable thing to ask for,
-   * and this is how it is asked for.
-   *
-   * `announcement` is never filtered by this: an article announcing an event is the case the RSS
-   * adapter exists to carry, and dropping it would take the ticket-sale and calendar posts with it.
-   */
-  includeCoverage?: boolean;
-  /** `YYYY-MM-DD` window, compared lexically against `EventRecord.day`. */
-  fromDay?: string;
-  toDay?: string;
-  /** How much warning is wanted before the date. Days. */
-  leadDays: number;
-  /** Matches the feed, never pushes. */
-  muted?: boolean;
-  /**
-   * Distinct from `updatedAt` on purpose: `announced` only fires for events first seen after the
-   * interest existed, so a new interest surfaces its backlog in the feed and pushes about nothing.
-   * Were this `updatedAt`, editing an interest's keywords would re-arm its whole backlog.
-   */
-  createdAt: number;
-}
-
-/**
  * Why a notification fired.
  *
  * `presale` and `onsale` are the two halves of one question asked at two different times, and only
@@ -303,8 +228,6 @@ export interface Notice {
   fingerprint: string;
   /** Whichever document won the fingerprint. */
   eventId: string;
-  /** Why it fired. Rendered in the alerts history. */
-  interestIds: string[];
   /** Set by the create() that claims the send. */
   claimedAt: number;
   /** Set once web-push resolves. Null means claimed-but-not-delivered. */
@@ -369,12 +292,24 @@ export interface PushSettings {
   armedAt: number | null;
   maxPerRun: number;
   maxOnSalePerRun: number;
+  /**
+   * How many `soon` reminders one run may send.
+   *
+   * It had no cap while the interests existed, and did not need one: a reminder fired only for a
+   * row somebody had asked about by name, so the ceiling was the size of a hand-written list. The
+   * feed is now everything the enabled sources collect, and the entry platform alone lists a
+   * hundred-odd races nationally — a fortnight's lead over that is a morning of buzzing about
+   * events in towns nobody named. So it is capped like the other two, and looser than `announced`
+   * because a date arriving is the thing being watched for rather than a scrape twitching.
+   */
+  maxSoonPerRun: number;
 }
 
 export const DEFAULT_PUSH_SETTINGS: PushSettings = {
   armedAt: null,
   maxPerRun: 3,
   maxOnSalePerRun: 10,
+  maxSoonPerRun: 5,
 };
 
 /** Health of one collector source, so a scrape that quietly returns nothing is visible. */

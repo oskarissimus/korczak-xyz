@@ -16,7 +16,6 @@ function ev(p: Partial<EventRecord> & { id: string; title: string }): EventRecor
     source: 'python-org',
     sourceKey: p.id,
     sourceName: 'python.org events',
-    haystack: p.title.toLowerCase(),
     url: 'https://example.test/e',
     startsAt: NOW + 86400000,
     day: '2026-10-01',

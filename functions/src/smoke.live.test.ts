@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SOURCES } from './sources';
 import { toRecord } from './upsert';
 import { isWorthKeeping } from './collect';
-import { seedInterests } from '../../korczak-xyz/src/utils/events/interests';
-import { matchingInterests } from '../../korczak-xyz/src/utils/events/match';
-import { buildFeed } from '../../korczak-xyz/src/utils/events/feed';
+import { buildFeed, bySource } from '../../korczak-xyz/src/utils/events/feed';
 import { classifyEvents } from './classify';
 import { queueForReading, readNewsroom } from './readNewsroom';
 import type { EventRecord, Reach } from '../../korczak-xyz/src/utils/events/types';
@@ -53,24 +51,20 @@ maybe('live sources', () => {
     60000,
   );
 
-  it('matches the seeded interests against what came back', () => {
-    const seeds = seedInterests({ writerId: 'smoke', now: 0 });
-    const hits = new Map<string, number>();
-    for (const record of collected) {
-      for (const interest of matchingInterests(record, seeds, { forPush: false })) {
-        hits.set(interest.label, (hits.get(interest.label) ?? 0) + 1);
-      }
-    }
-    console.log('\n  matches by interest:');
-    for (const seed of seeds) console.log(`    ${seed.label}: ${hits.get(seed.label) ?? 0}`);
+  /*
+   * What the reader would actually be handed. It used to be counted per seeded interest; there are
+   * no interests, so the useful breakdown is the one the Sources tab draws — per source, since the
+   * switch beside it is the only thing that can now narrow this.
+   */
+  it('builds a feed out of what came back', () => {
+    console.log('\n  collected by source:');
+    for (const [id, rows] of bySource(collected)) console.log(`    ${id}: ${rows.length}`);
 
-    const sections = buildFeed(collected, seeds, now);
-    console.log(`\n  feed: ${sections.map((s) => `${s.group}=${s.items.length}`).join(' ')}`);
+    const sections = buildFeed(collected, now);
+    console.log(`\n  feed: ${sections.map((s) => `${s.group}=${s.events.length}`).join(' ')}`);
     for (const section of sections) {
-      for (const item of section.items.slice(0, 4)) {
-        console.log(
-          `    [${section.group}] ${item.event.title} — ${item.matched.map((i) => i.label).join(', ')}`,
-        );
+      for (const event of section.events.slice(0, 4)) {
+        console.log(`    [${section.group}] ${event.title} — ${event.sourceName}`);
       }
     }
     expect(collected.length).toBeGreaterThan(0);

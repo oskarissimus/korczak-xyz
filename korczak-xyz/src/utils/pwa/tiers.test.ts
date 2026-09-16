@@ -70,7 +70,7 @@ describe('precache tiers', () => {
       '/apps/fretboard', '/apps/transpose',
       '/apps/baby-sleep', '/apps/baby-sleep/share', '/pl/apps/baby-sleep/stats',
       '/apps/shopping', '/apps/shopping/share', '/pl/apps/shopping/share',
-      '/apps/events', '/apps/events/interests', '/pl/apps/events/alerts',
+      '/apps/events', '/apps/events/sources', '/pl/apps/events/alerts',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);

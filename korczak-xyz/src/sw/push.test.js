@@ -128,7 +128,7 @@ describe('scopeKeyOf', () => {
      * app arrives.
      */
     const paths = [
-      '/apps/events', '/apps/events/alerts', '/apps/events/interests',
+      '/apps/events', '/apps/events/alerts', '/apps/events/sources',
       '/apps/baby-sleep', '/apps/baby-sleep/stats',
       '/apps/flashcards', '/apps/flashcards/neck',
       '/apps/tuner', '/songs', '/songs/mother',
@@ -181,7 +181,7 @@ describe('pickClientToFocus', () => {
   it('focuses the open feed for a link to one event in it', () => {
     const link = eventLink('wesele|2026-10-04|warszawa');
     expect(pickClientToFocus(['/songs', 'https://korczak.xyz/apps/events/'], link)).toBe(1);
-    expect(pickClientToFocus(['/apps/events/interests'], link)).toBe(0);
+    expect(pickClientToFocus(['/apps/events/sources'], link)).toBe(0);
   });
 });
 

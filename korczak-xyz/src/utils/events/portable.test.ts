@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 /*
  * This directory is compiled twice: once by Astro for the browser, and once by `tsc` into the
  * Cloud Functions bundle (see functions/tsconfig.json, which includes it by path rather than
- * keeping a copy). That is what guarantees the feed and the collector answer "does this event
- * match this interest?" identically — a copy would only be identical until the first bug fix.
+ * keeping a copy). That is what guarantees the feed and the collector answer "does this event reach
+ * this reader?" identically — a copy would only be identical until the first bug fix.
  *
  * The price is that nothing here may reach for anything the other runtime lacks. A single
  * `import { getDb } from '../../lib/firebase'` breaks the functions build, and it breaks it at

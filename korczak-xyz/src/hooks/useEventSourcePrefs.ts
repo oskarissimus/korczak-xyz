@@ -1,9 +1,10 @@
 /*
  * The Sources tab's switches, and their cloud sync.
  *
- * Much smaller than `useEventInterests` and `useEventIgnores`, and deliberately not built like
- * them: those reconcile a *collection* of mutable records, so they need derived ids, tombstones
- * and a per-record revision. This is one document holding five booleans. There is nothing to
+ * The only writing hook this app has left, and deliberately not built like the two it outlived
+ * (`useEventInterests`, `useEventIgnores`) or like `useTransitSegments` next door: those reconcile
+ * a *collection* of mutable records, so they need derived ids, tombstones and a per-record
+ * revision. This is one document holding five booleans. There is nothing to
  * delete — a source switched back on is a switch that says so, not a row that is gone — so the
  * whole reconciler collapses into `mergeSourcePrefs`, which settles each switch by whichever
  * device flipped it later.

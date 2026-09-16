@@ -4,8 +4,8 @@
  * A segment is two station names and a line, and both names have to be spellings this app can find
  * on that line — otherwise `stationsBetween` returns nothing and the segment is a rule that matches
  * nothing forever, with an entry in the UI insisting it is watching something. So `normalizeSegment`
- * is where a draft becomes a segment, and it is the only way one is made: the same role
- * `newInterest` plays for the events app's country codes.
+ * is where a draft becomes a segment, and it is the only way one is made — the single choke point
+ * `sanitizeSettings` is for the chord cards.
  */
 
 import type { MetroLine, WatchedSegment } from './types';
@@ -29,9 +29,8 @@ export interface SegmentDraft {
  * it is a change at Świętokrzyska and belongs in the app as two rows.
  *
  * Endpoints are stored canonicalised, so what the matcher compares and what the editor prints are
- * the same string. That is the rule `cityKey` keeps for the events app's city picker, and it is
- * what stops a segment saved as `swietokrzyska` from looking, months later, like a station this
- * build has never heard of.
+ * the same string — which is what stops a segment saved as `swietokrzyska` from looking, months
+ * later, like a station this build has never heard of.
  */
 export function normalizeSegment(draft: SegmentDraft): Omit<SegmentDraft, 'muted'> & { muted?: boolean } | null {
   if (!METRO_LINES.includes(draft.line)) return null;
@@ -135,9 +134,8 @@ export const SEED_SEGMENTS: ReadonlyArray<{ id: string } & SegmentDraft> = [
 /**
  * The seeds an account is missing, as full records.
  *
- * Keyed by id and never editing an existing row, exactly as `withMissingSeeds` is for the events
- * app's interests: a seed the reader deleted stays deleted, because its tombstone is a row with
- * that id, and a seed they rewrote keeps their version.
+ * Keyed by id and never editing an existing row: a seed the reader deleted stays deleted, because
+ * its tombstone is a row with that id, and a seed they rewrote keeps their version.
  */
 export function withMissingSeeds(existing: WatchedSegment[], writerId: string, now: number): WatchedSegment[] {
   const known = new Set(existing.map((segment) => segment.id));

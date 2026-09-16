@@ -11,7 +11,7 @@
  *
  * So each article is read by a model, and one thing comes back: **is this a ticket-sale
  * announcement, and if so, when**. `saleOpensAt` becomes `EventRecord.onSaleAt`, and `presale`
- * counts down to it on the interest's `leadDays`. That is the whole of it.
+ * counts down to it on `LEAD_DAYS`. That is the whole of it.
  *
  * ### It used to ask for four things
  *
@@ -431,7 +431,7 @@ export function readingUpdate(
   /*
    * Whether this row ends up with a sale date at all — from the reading, or from the adapter's
    * regex having already found one. Both are grounds for the tag: it means "there is a deadline on
-   * this row", and which pass established that is not something an interest should have to know.
+   * this row", and which pass established that is not something the notice layer should have to know.
    */
   const hasSaleDate = event.onSaleAt !== undefined || reading.saleOpensAt !== undefined;
 

@@ -8,7 +8,6 @@ const notice = (over: Partial<PendingNotice> = {}): PendingNotice => ({
   noticeId: 'x|announced',
   fingerprint: 'x',
   eventId: 'elektroniczne-zapisy_15822',
-  interestIds: ['running-warszawa'],
   title: '48. Maraton Warszawski',
   startsAt: Date.parse('2026-09-27T08:00:00Z'),
   url: 'https://elektronicznezapisy.pl/event/15822/strona.html',

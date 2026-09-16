@@ -20,7 +20,6 @@ function article(p: Partial<EventRecord> & { id: string; title: string }): Event
     source: 'teatr-wielki',
     sourceKey: `aktualnosci/${p.id}`,
     sourceName: 'Teatr Wielki – Opera Narodowa',
-    haystack: p.title.toLowerCase(),
     url: 'https://teatrwielki.pl/teatr/aktualnosci/aktualnosc/x/',
     startsAt: null,
     day: null,
@@ -269,7 +268,7 @@ describe('parseReadings', () => {
 });
 
 describe('readingUpdate', () => {
-  it('tags a row that ends up with a sale date, which is what an interest matches', () => {
+  it('tags a row that ends up with a sale date, which is what presale counts down to', () => {
     const at = NOW + 20 * DAY;
     const update = readingUpdate(
       article({ id: 'a', title: 'Wkrótce ogłoszenie' }),
@@ -314,7 +313,7 @@ describe('readingUpdate', () => {
   });
 
   it('keeps the tag on a row the adapter’s own regex dated', () => {
-    // Two writers, one tag: which pass established the deadline is not something an interest
+    // Two writers, one tag: which pass established the deadline is not something a reader
     // should have to know.
     const scraped = article({ id: 'a', title: 'x', onSaleAt: NOW + 5 * DAY });
     expect(readingUpdate(scraped, { isTicketSale: true }, NOW).tags).toContain(TICKET_SALE_TAG);

@@ -79,7 +79,7 @@ describe('displayUrl', () => {
 });
 
 describe('FEEDS', () => {
-  it('names a real feed and the tags an interest can narrow by', () => {
+  it('names a real feed and says what that feed is', () => {
     expect(FEEDS.length).toBeGreaterThan(0);
     for (const entry of FEEDS) {
       expect(entry.url).toMatch(/^https:\/\//);
@@ -90,7 +90,7 @@ describe('FEEDS', () => {
 });
 
 describe('RUNNING_LISTINGS', () => {
-  it('tags every listing `running`, which is the seeded interest’s whole filter', () => {
+  it('tags every listing `running`, which is what gates the distance rules', () => {
     expect(RUNNING_LISTINGS.length).toBeGreaterThan(0);
     for (const page of RUNNING_LISTINGS) {
       expect(page.tags).toEqual(['running']);
@@ -103,7 +103,7 @@ describe('RUNNING_LISTINGS', () => {
     /*
      * The one thing separating these pages from every other entry in this file. A `city` here
      * would be one reader's Warsaw written onto races in eighty other towns, in a corpus every
-     * account shares — and `Interest.cities` is where that question already lives.
+     * account shares. `splitPlace` reads each row's own town instead.
      */
     for (const page of RUNNING_LISTINGS) expect(page.city).toBeUndefined();
   });
@@ -142,8 +142,8 @@ describe('the theatre', () => {
 
   it('stamps newsroom on the page, and never ticket-sale', () => {
     // `newsroom` is what every row on that page IS, which is the only sort of tag a page may
-    // stamp feed-wide. `ticket-sale` is the keyword-less seeded interest's whole filter and is
-    // applied per row — page-wide it would hand that interest the theatre's job adverts.
+    // stamp feed-wide. `ticket-sale` says a row carries a deadline and is applied per row —
+    // page-wide it would put a `presale` countdown on the theatre's job adverts.
     const [news] = catalogueEntry('teatr-wielki')!.pages(Date.now());
     expect(news.tags).toContain('newsroom');
     expect(news.tags).not.toContain('ticket-sale');

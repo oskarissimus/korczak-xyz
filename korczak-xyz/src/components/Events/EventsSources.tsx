@@ -1,5 +1,5 @@
 /**
- * The Sources tab: where events come from, what a model adds to them, and what filters them.
+ * The Sources tab: where events come from, what a model adds to them, and which of them you hear.
  *
  * The feed answers "what is on"; this answers "and how would I know if that were wrong". Since the
  * Pipeline tab went (Sep 2026) it is also the whole of that second question — and it is organised
@@ -8,7 +8,7 @@
  * could not tell you *this scrape's* rows are the unlabelled ones, and that is the shape every
  * failure in this app has actually had.
  *
- * Five facts are drawn per source, and they are five different questions:
+ * Four facts are drawn per source, and they are four different questions:
  *
  * - **The pages**, from `SOURCE_CATALOGUE` — the URLs the collector actually requests, as links, so
  *   the claim is checkable rather than just stated. This half is static: it needs no network, no
@@ -19,16 +19,18 @@
  *   contributing nothing you would miss.
  * - **What a model was asked about its rows, and how much has come back** (`extraction.ts`). Which
  *   pass reads a row is decided by the row's own tags, so this is counted rather than described:
- *   an empty classifier column against a full source is the single most likely way this app fails
- *   quietly, since an unclassified row *passes* every rule the classifier feeds.
- * - **Which interests reach it, and how much they keep** (`filtering.ts`), read-only, with the same
- *   editor the Interests tab opens. A filter is written once and applied everywhere, but it is
- *   *judged* against one source's rows: a tag no source stamps and an interest that keeps
- *   sixty-seven of a magazine's sixty-eight articles are both invisible from a list of interests.
+ *   an empty classifier column against a full source is what a stopped pass looks like.
+ *
+ * There used to be a fifth — the interests reaching each source, read-only, editable in place. It
+ * went with the interests themselves (Sep 2026), and so did the question it answered: there is no
+ * per-reader filter left to check against a source's rows, so `n collected` and the switch beside
+ * it are the whole of what this tab says about what reaches you.
  *
  * And one control, which is the only thing on this tab that writes anything by itself. A pipeline
  * is tuned by running it, and a source that turns out to be noisy cannot be fixed from a phone —
- * so the question this tab answers now has an answer you can act on without waiting for a deploy.
+ * so the question this tab answers has an answer you can act on without waiting for a deploy. It
+ * is also, since the interests went, the **only** filter in the app: a switched-off source reaches
+ * neither the feed nor the lock screen, and everything else a source publishes does both.
  *
  * `sourcePrefs.ts` has what switching one off does and does not do. In short: it is this account's
  * preference, not an instruction to the collector — the page is still fetched, still counted, and
@@ -40,19 +42,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { describeError, log } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
-import { useEventInterests } from '../../hooks/useEventInterests';
 import { useEventSourcePrefs } from '../../hooks/useEventSourcePrefs';
 import { pullSourceHealth } from '../../utils/events/browser/cloud';
 import { countryLabel } from '../../utils/events/countries';
 import { modelPasses, type ModelPass, type PassCoverage } from '../../utils/events/extraction';
-import { bySource, filteringOf, type SourceFiltering } from '../../utils/events/filtering';
-import type { InterestDraft } from '../../utils/events/interests';
-import { INTERESTS_PATH, localizePath } from '../../utils/events/links';
+import { bySource } from '../../utils/events/feed';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
 import type { EventRecord, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
-import InterestForm from './InterestForm';
-import InterestRules from './InterestRules';
 import { sourceName, sourceNote } from './sourceNames';
 import { fill, relativeTime, translations, type Lang, type Translation } from './translations';
 
@@ -60,9 +57,8 @@ interface Props {
   lang: Lang;
 }
 
-/** A source with nothing collected yet: no pass to draw, and no rows for a filter to keep. */
+/** A source with nothing collected yet: no pass to draw. */
 const EMPTY_PASSES: PassCoverage[] = [];
-const NO_ROWS: SourceFiltering = { rows: 0, kept: 0, filters: [], silent: 0 };
 
 export default function EventsSources({ lang }: Props) {
   const auth = useAuth();
@@ -77,21 +73,11 @@ function SourcesPanel({ lang }: Props) {
   const auth = useAuth();
   const feed = useEventFeed(auth.user);
   const switches = useEventSourcePrefs(auth.user);
-  const interests = useEventInterests(auth.user);
   const t = translations[lang];
   const now = Date.now();
 
   const [health, setHealth] = useState<SourceHealth[]>([]);
   const [healthError, setHealthError] = useState<string | null>(null);
-  /*
-   * Which interest is open in the one form slot, for the whole tab rather than per source.
-   *
-   * One slot because an interest is not a fact about the source it is drawn under: the same filter
-   * appears under every source it reaches, and two open copies of one form would be two drafts of
-   * one document, with whichever was saved second winning silently.
-   */
-  const [editing, setEditing] = useState<string | null>(null);
-
   useEffect(() => {
     if (!auth.user) return;
     let cancelled = false;
@@ -116,12 +102,10 @@ function SourcesPanel({ lang }: Props) {
   }, [auth.user]);
 
   /*
-   * The corpus split once, and both summaries computed once per source.
+   * The corpus split once, and each source's coverage computed once.
    *
-   * Memoised rather than called in the card, and that is not premature: `filteringOf` asks
-   * `matchReason` per row per interest, which over two thousand rows and half a dozen interests is
-   * ten thousand regex matches — and without this it would be redone on every keystroke in an open
-   * interest form and on every switch flipped.
+   * Memoised rather than called in the card: `modelPasses` walks a source's rows once per field it
+   * counts, and without this it would be redone on every switch flipped.
    */
   const rowsBySource = useMemo(() => bySource(feed.events), [feed.events]);
   const passesBySource = useMemo(() => {
@@ -129,17 +113,7 @@ function SourcesPanel({ lang }: Props) {
     for (const [id, rows] of rowsBySource) out.set(id, modelPasses(rows));
     return out;
   }, [rowsBySource]);
-  const filteringBySource = useMemo(() => {
-    const out = new Map<string, SourceFiltering>();
-    for (const [id, rows] of rowsBySource) out.set(id, filteringOf(rows, interests.interests));
-    return out;
-  }, [rowsBySource, interests.interests]);
   const byId = useMemo(() => new Map(health.map((row) => [row.id, row])), [health]);
-
-  const save = (id: string, draft: InterestDraft) => {
-    interests.updateInterest(id, draft);
-    setEditing(null);
-  };
 
   /*
    * A health row nothing in the catalogue describes.
@@ -260,16 +234,6 @@ function SourcesPanel({ lang }: Props) {
               {feed.ready ? (
                 <Extraction passes={passesBySource.get(entry.id) ?? EMPTY_PASSES} t={t} />
               ) : null}
-
-              {feed.ready && interests.ready ? (
-                <Filtering
-                  filtering={filteringBySource.get(entry.id) ?? NO_ROWS}
-                  lang={lang}
-                  editing={editing}
-                  onEdit={setEditing}
-                  onSave={save}
-                />
-              ) : null}
             </li>
           );
         })}
@@ -349,88 +313,6 @@ function Pass({ pass, t }: { pass: PassCoverage; t: Translation }) {
   );
 }
 
-/**
- * The interests that reach this source, and what they keep of it.
- *
- * Read mode by default and editable in place: the question "is this filter doing what I meant?" is
- * asked here, beside the rows it is being asked about, and an answer that means opening another tab
- * is one nobody acts on. Saving goes through `useEventInterests` exactly as the Interests tab does,
- * so there is one writer and one sync queue.
- *
- * Only the interests that keep something are listed — the rest are a count. Every interest under
- * every source is five copies of one list, and the useful reading of a zero is not per source
- * anyway: an interest matching nothing *anywhere* is a dead interest, which is the Interests tab's
- * question, and the link goes there.
- */
-function Filtering({
-  filtering,
-  lang,
-  editing,
-  onEdit,
-  onSave,
-}: {
-  filtering: SourceFiltering;
-  lang: Lang;
-  editing: string | null;
-  onEdit: (id: string | null) => void;
-  onSave: (id: string, draft: InterestDraft) => void;
-}) {
-  const t = translations[lang];
-  return (
-    <section className="ev-source-block">
-      <h4 className="ev-block-head">{t.filtersHeading}</h4>
-      <p className="ev-hint">
-        {fill(t.filtersKept, { kept: filtering.kept, rows: filtering.rows })}
-      </p>
-
-      {filtering.filters.length === 0 ? (
-        <p className="ev-hint">{t.filtersNone}</p>
-      ) : (
-        <ul className="ev-filters">
-          {filtering.filters.map(({ interest, kept }) => (
-            <li className="ev-filter" key={interest.id}>
-              <div className="ev-interest-head">
-                <h5 className="ev-interest-name">{interest.label}</h5>
-                <span className="ev-chip">{fill(t.filterKeeps, { count: kept })}</span>
-                <div className="ev-actions">
-                  <button
-                    type="button"
-                    className="ev-link"
-                    aria-expanded={editing === interest.id}
-                    onClick={() => onEdit(editing === interest.id ? null : interest.id)}
-                  >
-                    {editing === interest.id ? t.cancel : t.editInterest}
-                  </button>
-                </div>
-              </div>
-
-              {editing === interest.id ? (
-                <InterestForm
-                  lang={lang}
-                  existing={interest}
-                  onSubmit={(draft) => onSave(interest.id, draft)}
-                  onCancel={() => onEdit(null)}
-                />
-              ) : (
-                <InterestRules interest={interest} lang={lang} />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {filtering.silent > 0 ? (
-        <p className="ev-hint">
-          {fill(t.filtersSilent, { count: filtering.silent })}{' '}
-          <a className="ev-link" href={localizePath(INTERESTS_PATH, lang)}>
-            {t.filtersAll}
-          </a>
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 function kindLabel(kind: SourceKind, t: Translation): string {
   if (kind === 'scrape') return t.kindScrape;
   if (kind === 'ical') return t.kindIcal;
@@ -465,10 +347,11 @@ function fieldLabel(field: keyof EventRecord | string, t: Translation): string {
 /**
  * What a page stamps on everything it yields, plus whether its absence is normal.
  *
- * Shown because a keyword-less interest has no second filter — a tag applied feed-wide *is* the
- * whole of what reaches it, which is the mistake this app has made from three different directions.
- * Being able to read a source's blanket tags off the page it comes from is what makes the next one
- * catchable before it ships.
+ * Shown because a tag a page stamps feed-wide is a claim about every row behind it, and the three
+ * worst bugs this app has had were all a blanket tag being wider than the thing it described. The
+ * interests that used to be handed the whole of such a tag are gone; the tag is still what the
+ * classifier's prompt and anything reading `EventRecord.tags` sees, and reading it off the page it
+ * comes from is what makes the next one catchable.
  */
 function pageMeta(page: SourcePage, t: Translation): string {
   const parts: string[] = [];

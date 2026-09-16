@@ -41,9 +41,9 @@ interface TmEvent {
 /**
  * Their classification tree as our tags.
  *
- * Lowercased and folded to the same vocabulary the other sources use, so an interest asking for
- * `opera` matches a Ticketmaster listing and a Teatr Wielki one alike. The raw genre is kept too —
- * it costs nothing and lets a keyword reach something the fixed vocabulary missed.
+ * Lowercased and folded to the same vocabulary the other sources use, so `opera` means the same
+ * thing on a Ticketmaster listing and on a Teatr Wielki one. The raw genre is kept too — it costs
+ * nothing, and it is what the classifier's prompt reads when the fixed vocabulary says too little.
  */
 export function tagsOf(event: TmEvent): string[] {
   const tags = new Set<string>(['ticketed']);
@@ -56,12 +56,13 @@ export function tagsOf(event: TmEvent): string[] {
     if (segment.includes('arts') || segment.includes('theatre')) tags.add('theatre');
     if (segment.includes('sports')) tags.add('sports');
     /*
-     * `opera` only where they really say opera. Mapping `classical` onto it as well was wrong twice
-     * over: a Chopin recital by candlelight is not opera, and the Opera Narodowa interest is
-     * keyword-less by design (`tags: ['opera']`, no constraint), so every classical listing in the
-     * country landed in it — 202 matches where 7 were the opera house. Their Polish catalogue has
-     * no `opera` genre at all as of Aug 2026, so this mapping never bought anything either.
-     * `classical` still reaches the feed: the raw genre slug is added below.
+     * `opera` only where they really say opera. Mapping `classical` onto it as well was wrong: a
+     * Chopin recital by candlelight is not opera, and the interest that asked for the tag alone —
+     * `tags: ['opera']`, no keywords — took every classical listing in the country, 202 matches
+     * where 7 were the opera house. That interest is gone and the rule it taught is not: **widen a
+     * tag only as far as the narrowest reader of it can bear**, and let the raw genre slug carry
+     * the rest, which is what it is there for. Their Polish catalogue has no `opera` genre at all
+     * as of Aug 2026, so this mapping never bought anything either.
      */
     if (genre.includes('opera') || sub.includes('opera')) tags.add('opera');
     if (genre.includes('rock')) tags.add('rock');

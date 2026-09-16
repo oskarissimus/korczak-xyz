@@ -3,8 +3,8 @@
  *
  * Its own module, and its own eviction rule, rather than more of the sleep log's `storage.ts`.
  * The two apps share one ~5 MB origin budget but must be able to fail independently: a full store
- * here must not surrender somebody's sleep history, and a full store there must not drop an
- * interest he typed.
+ * here must not surrender somebody's sleep history, and a full store there must not silence a
+ * source he switched off.
  *
  * It sits in `browser/` rather than beside the matcher, and that directory boundary is the whole
  * point: everything in `src/utils/events/` itself is compiled into the Cloud Functions bundle, so
@@ -14,7 +14,10 @@
  *
  * What is expendable and what is not:
  *
- *   - `events-interests` is the ONLY local copy of something he typed. Never evicted.
+ *   - `events-source-prefs` and `events-push-settings` are the only local copies of a decision he
+ *     made. Never evicted. Nothing in this app is *typed* any more — the interests were the one
+ *     thing that was — but a silenced source is still a choice that exists nowhere else until the
+ *     next sync lands.
  *   - `events-feed` is a cache of a server-owned corpus. First to go, and losing it costs one
  *     online refresh — it exists so an installed app shows something on a dead network.
  */
@@ -23,12 +26,16 @@ import { isQuotaError, storageBytes } from '../../../lib/localStorage';
 import { describeError, log } from '../../../lib/logger';
 import { PUSH_APPS } from '../pushApps';
 import { normalizeSourcePrefs, type SourcePrefs } from '../sourcePrefs';
-import type { EventRecord, Interest, PushApp, PushSettings } from '../types';
+import type { EventRecord, PushApp, PushSettings } from '../types';
 import { DEFAULT_PUSH_SETTINGS } from '../types';
 
+/*
+ * `events-interests` and `events-interests-unsynced` are gone (Sep 2026) and deliberately not
+ * migrated: a browser that holds them simply holds two strings nobody reads, which is what happened
+ * to `events-feed-city` and `events-feed-kinds` when the feed's filters went. Deleting somebody's
+ * data to tidy a key list is a worse idea than a key nobody opens.
+ */
 export const EVENT_KEYS = {
-  interests: 'events-interests',
-  unsynced: 'events-interests-unsynced',
   feed: 'events-feed',
   pushSubId: 'events-push-sub-id',
   pushApps: 'events-push-sub-apps',
@@ -44,12 +51,10 @@ const FEED_CACHE_LIMIT = 200;
  * Keys holding data that belongs to one signed-in account.
  *
  * Cleared when the account changes, so signing in as somebody else on one browser does not leave
- * the previous person's interests in memory to be pushed into the new account on the first write.
+ * the previous person's switches in memory to be pushed into the new account on the first write.
  * The sleep log learnt this the hard way; see `adoptOwner` there.
  */
 const CACHED_PER_OWNER = [
-  EVENT_KEYS.interests,
-  EVENT_KEYS.unsynced,
   EVENT_KEYS.feed,
   EVENT_KEYS.settings,
   /*
@@ -69,7 +74,8 @@ const failingKeys = new Set<string>();
  *
  * Never a bare `catch {}`. A silently failed write leaves the page working perfectly while the
  * stored copy stays frozen, and the next page load reads back something older than what was on
- * screen — which for a list of interests means edits that vanish with no error anywhere.
+ * screen — which for the source switches means a feed that un-silences itself with no error
+ * anywhere.
  *
  * Once per key because a full store fails again on the very next write, and an `error` entry makes
  * the log sink flush immediately — writing to the store that is already full.
@@ -79,8 +85,8 @@ export function writeEventsKey(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
   } catch (e) {
-    // Under pressure, surrender the feed cache — never the interests. The cache is a copy of
-    // something the server owns; the interests are not.
+    // Under pressure, surrender the feed cache — never a setting. The cache is a copy of something
+    // the server owns; a switch flipped a second ago is not, until the sync lands.
     if (isQuotaError(e) && key !== EVENT_KEYS.feed) {
       const dropped = evictFeedCache();
       if (dropped > 0) {
@@ -147,101 +153,6 @@ function readJSON<T>(key: string, fallback: T): T {
     // sane fallback. Reads are not what silently loses data — writes are.
     return fallback;
   }
-}
-
-// --- interests ------------------------------------------------------------------------------
-
-/**
- * Every stored interest, tombstones included — callers filter.
- *
- * Each row is validated, so one bad record written by an older build costs that row rather than
- * the whole list.
- */
-export function loadInterests(): Interest[] {
-  const raw = readJSON<unknown[]>(EVENT_KEYS.interests, []);
-  if (!Array.isArray(raw)) return [];
-  const out: Interest[] = [];
-  for (const item of raw) {
-    const interest = normalizeInterest(item);
-    if (interest) out.push(interest);
-  }
-  return out;
-}
-
-export function saveInterests(interests: Interest[]): boolean {
-  return writeEventsKey(EVENT_KEYS.interests, JSON.stringify(interests));
-}
-
-/**
- * Rebuilds an interest from an untrusted value, allow-list style.
- *
- * A field added to the interface and not added here is silently stripped on every read — which is
- * the trade the sleep log's `normalizeClimate` makes too, and the reason to grep for this function
- * when the shape changes.
- */
-export function normalizeInterest(raw: unknown): Interest | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Record<string, unknown>;
-  if (typeof r.id !== 'string' || !r.id) return null;
-  if (typeof r.rev !== 'number' || typeof r.updatedAt !== 'number') return null;
-  if (typeof r.writerId !== 'string') return null;
-
-  const strings = (value: unknown): string[] | undefined => {
-    if (!Array.isArray(value)) return undefined;
-    const list = value.filter((v): v is string => typeof v === 'string' && v.trim() !== '');
-    return list.length > 0 ? list : undefined;
-  };
-
-  return {
-    id: r.id,
-    rev: r.rev,
-    updatedAt: r.updatedAt,
-    writerId: r.writerId,
-    ...(r.deleted === true ? { deleted: true as const } : {}),
-    label: typeof r.label === 'string' ? r.label : '',
-    keywords: strings(r.keywords) ?? [],
-    excludeKeywords: strings(r.excludeKeywords),
-    tags: strings(r.tags),
-    cities: strings(r.cities),
-    fromDay: typeof r.fromDay === 'string' ? r.fromDay : undefined,
-    toDay: typeof r.toDay === 'string' ? r.toDay : undefined,
-    leadDays: typeof r.leadDays === 'number' ? r.leadDays : 14,
-    ...(r.muted === true ? { muted: true as const } : {}),
-    // An interest stored before createdAt existed is treated as ancient rather than as new, so a
-    // migration never re-announces its backlog.
-    createdAt: typeof r.createdAt === 'number' ? r.createdAt : 0,
-  };
-}
-
-// --- the push queues ------------------------------------------------------------------------
-
-/*
- * A queue of ids waiting to reach the cloud, keyed by the store it drains — `EVENT_KEYS.unsynced`
- * for the interests, which is the only collection in this app a client writes.
- *
- * The key stays a required argument rather than becoming a default. It carried two collections
- * until the ignores were removed (Sep 2026), and the reason it was parameterised is the reason to
- * leave it so: two collections hold ids from different id spaces, and one shared queue has each
- * sync loop look up the other's ids, find nothing, and drop them as already-done — a write that
- * never leaves the device, with a drained queue and a Synced badge saying it did.
- */
-
-export function loadUnsynced(key: string): string[] {
-  const raw = readJSON<unknown>(key, []);
-  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
-}
-
-export function saveUnsynced(key: string, ids: string[]): boolean {
-  return writeEventsKey(key, JSON.stringify([...new Set(ids)]));
-}
-
-export function markUnsynced(key: string, ids: string[]): boolean {
-  return saveUnsynced(key, [...loadUnsynced(key), ...ids]);
-}
-
-export function clearUnsynced(key: string, ids: string[]): boolean {
-  const done = new Set(ids);
-  return saveUnsynced(key, loadUnsynced(key).filter((id) => !done.has(id)));
 }
 
 // --- the feed cache -------------------------------------------------------------------------
@@ -329,9 +240,9 @@ export function savePushSettings(settings: PushSettings): boolean {
 /**
  * The Sources tab's switches, as this browser last knew them.
  *
- * Stored locally as well as in the cloud for the reason the interests are — the tab has to draw
- * the boxes on the first paint rather than after a round trip, and `buildFeed` has to know what is
- * off before it draws a feed. `normalizeSourcePrefs` rather than a cast: this is parsed from a
+ * Stored locally as well as in the cloud because the tab has to draw the boxes on the first paint
+ * rather than after a round trip, and `buildFeed` has to know what is off before it draws a feed —
+ * which matters more than it did, these being the only filter left. `normalizeSourcePrefs` rather than a cast: this is parsed from a
  * store an older build wrote, and a half-written switch that read as `enabled: undefined` would
  * silence a source with nothing on the screen saying why.
  */
@@ -351,8 +262,8 @@ let adoptedSwitched = false;
 /**
  * Records which account this browser's cache belongs to, clearing it on a change.
  *
- * Memoised for the page load because more than one caller asks — the interests hook and the
- * source-prefs hook both mount on the Feed — and the *clearing* must happen exactly once. But the
+ * Memoised for the page load because more than one caller asks — the source-prefs hook mounts on
+ * the Feed and on the Sources tab — and the *clearing* must happen exactly once. But the
  * **answer** is memoised too, not just the guard, and that distinction is the whole of the sleep
  * log's `adoptOwner` bug: whoever asks second reads `previous === uid`, having watched the first
  * caller write it, so a plain re-read tells them nothing happened. They then keep the previous
@@ -365,7 +276,7 @@ let adoptedSwitched = false;
  * store of their own.
  *
  * An absent value adopts the current account rather than clearing, so an install predating this
- * migrates instead of losing its interests.
+ * migrates instead of losing its cache.
  */
 export function adoptOwner(uid: string): boolean {
   if (typeof window === 'undefined') return false;

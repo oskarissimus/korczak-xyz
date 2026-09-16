@@ -109,7 +109,7 @@ export function announceFloor(prefs: SourcePrefs, id: string): number {
  * Per source rather than per document, and by the flip time rather than by a document revision:
  * the phone turning a noisy feed off and the laptop turning a different one off are not a conflict
  * at all, and a whole-document last-writer-wins would quietly undo one of them. This is the same
- * argument the interests make for being one document each, reached from the other side — these are
+ * argument the interests made for being one document each, reached from the other side — these are
  * five booleans, not five records, and a collection of five documents to hold them would be five
  * reads on every page load.
  *
@@ -134,7 +134,7 @@ export function mergeSourcePrefs(a: SourcePrefs, b: SourcePrefs): SourcePrefs {
 /**
  * Whatever localStorage or Firestore handed back, as switches.
  *
- * Every entry is checked rather than trusted, for the reason `normalizeInterest` is: this is
+ * Every entry is checked rather than trusted, the way every store this app reads back is: this is
  * parsed from a store a previous build wrote and a future one will, and a malformed switch that
  * reads as `enabled: undefined` would silence a source with nothing on the screen saying why.
  *

@@ -31,7 +31,6 @@ describe('toRecord', () => {
     const record = toRecord(raw(), 'teatr-wielki', 'Teatr Wielki', NOW);
     expect(record.id).toBe('teatr-wielki_abc');
     expect(record.day).toBe('2027-01-14');
-    expect(record.haystack).toContain('wesele figara');
     expect(record.fingerprint).toContain('weselefigara');
     expect(record.firstSeenAt).toBe(NOW);
   });
@@ -228,7 +227,7 @@ describe('mergeRecord and the newsroom reader', () => {
   it('re-derives no tag for a verdict whose date did not survive', () => {
     /*
      * `ticket-sale` means "there is a deadline on this row", not "a model thought this was about a
-     * sale" — it is the whole of a keyword-less seeded interest, which has no second filter.
+     * sale" — it is what `presale` counts down to, and a countdown needs a date.
      */
     const before = article({ newsroomTicketSale: true, newsroomHash: 'abc123' });
     const incoming = toRecord(

@@ -20,7 +20,9 @@
  * **The city is inside the title**, as `Miasto, "Nazwa"` — which is why this adapter splits it out
  * rather than stamping one on from the page the way the RSS feeds do. It is the same fact the
  * platform's own city dropdown filters on, and reading it per row is what lets the collector take
- * the national listing while `Interest.cities` and the feed's city picker decide what is Warsaw.
+ * the national listing, every row states its own town, and the card is what says which is which.
+ * It is also, by some way, the longest source in the feed — which is what the switch on its card
+ * is for.
  * Narrowing the *fetch* to `?city_id=12` was the other option and is the wrong one: it would bake
  * one reader's preference into a corpus every account shares, and the day the question became
  * "what about Kraków" there would be nothing stored to answer it with.

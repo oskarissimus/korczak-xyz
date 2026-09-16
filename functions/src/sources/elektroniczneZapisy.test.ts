@@ -9,8 +9,9 @@ import { RUNNING_LISTINGS } from '../../../korczak-xyz/src/utils/events/sources'
  * The platform is a Bootstrap 3 table that will eventually be rebuilt, and when it is this test is
  * what turns a silently empty running feed into a red build. The page it came from is the one the
  * catalogue names, so the fixture is parsed with that page's own tags and country rather than with
- * a stand-in — the row's `tags` are the seeded interest's entire filter, and a page that stopped
- * stamping them would empty the feed without any of these assertions noticing.
+ * a stand-in — `running` is what `distancesOf` is gated on and what the classifier's prompt reads,
+ * and a page that stopped stamping it would put `42.2 km` on a film night without any of these
+ * assertions noticing.
  */
 const html = readFileSync(
   new URL('./fixtures/elektroniczne-zapisy-bieg.html', import.meta.url),

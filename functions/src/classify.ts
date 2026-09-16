@@ -8,16 +8,17 @@
  *
  * Three properties hold it in place, and each is load-bearing:
  *
- *   1. **It runs only here.** The browser never calls a model, and neither does the matcher. What
- *      crosses into `src/utils/events/` is the *result*, as two ordinary fields on the record —
- *      so the feed and the collector still answer "does this match?" with the same pure code, and
+ *   1. **It runs only here.** The browser never calls a model. What crosses into
+ *      `src/utils/events/` is the *result*, as ordinary fields on the record — so the feed and the
+ *      collector still answer "does this reach the reader?" with the same pure code, and
  *      `portable.test.ts` has nothing new to police.
  *   2. **Once per event.** `classifyHash` is what the verdict was computed from; unchanged hash,
  *      no second call. That is what makes a run over 1,100 events cost nothing after the first.
  *   3. **A failure is never fatal and never silent.** Bad JSON, a short array, a model that is
- *      down: the event stays unclassified, `matchReason` lets an unclassified event through, and
- *      `eventSources/classifier` records that nothing came back. The failure mode is the noise
- *      coming back visibly, never a feed that quietly empties.
+ *      down: the event stays unclassified and `eventSources/classifier` records that nothing came
+ *      back. Nothing filters on a verdict since the interests went, so the cost of a stopped
+ *      classifier is cards that say `?` where they should say where the event is — visible, and
+ *      never a feed that quietly empties.
  *
  * One set of rows is deliberately **never asked**: the theatre's newsroom items, which have their
  * own model pass in `readNewsroom.ts` and arrive already placed. `needsClassifying` says why, and
@@ -440,10 +441,10 @@ export async function classifyEvents(
   /*
    * The verdicts, kept so the caller gets the same records the database now holds.
    *
-   * `notifyAccount` runs next and decides pushes with `matchReason`, which reads `country` and
-   * `reach`. Handing it the pre-classification copies would make every event look pending — which
-   * passes the places rule — and the first run after a deploy would push about exactly the
-   * national conferences this whole feature exists to stop pushing about.
+   * Nothing downstream filters on them today — `notifyAccount` reads only dates and the source
+   * switches — but handing the caller a copy the database has already moved past is the kind of
+   * thing that is correct until somebody reads one of these fields, and the cost of getting it
+   * right is a map.
    */
   const updates = new Map<string, Partial<EventRecord>>();
 

@@ -65,7 +65,7 @@ service cloud.firestore {
      * entirely — so `write: if false` costs the collector nothing and is a statement about the
      * client: nothing in a browser may touch this. Readable by any signed-in account, because it is
      * public listings data scraped from public pages and holds nothing belonging to a person. What
-     * IS personal — which of these matched an interest, and what was pushed — lives under
+     * IS personal — which sources somebody is still listening to, and what was pushed — lives under
      * users/{uid} and is covered by the catch-all below.
      *
      * These two are the only new blocks the events app needed. A top-level collection is outside

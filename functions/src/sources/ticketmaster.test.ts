@@ -60,9 +60,9 @@ describe('tagsOf', () => {
   });
 
   /*
-   * The Opera Narodowa interest is keyword-less by design, so `opera` on a listing is the whole of
-   * what puts it in front of me. Classical is not opera: mapping it across gave that interest 202
-   * matches, 195 of them candlelight Chopin recitals.
+   * Classical is not opera. The interest that asked for the tag alone is gone, but it is what
+   * measured the cost: mapping `classical` across gave it 202 matches, 195 of them candlelight
+   * Chopin recitals, where 7 were the opera house.
    */
   it('does not call classical music opera', () => {
     expect(tagsOf({ classifications: [{ genre: { name: 'Classical' }, subGenre: { name: 'Classical/Vocal' } }] }))

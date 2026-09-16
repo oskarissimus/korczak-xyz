@@ -5,7 +5,6 @@ import {
   eventIdFor,
   fingerprintOf,
   foldText,
-  haystackOf,
   noticeIdFor,
   parseNoticeId,
   slugKey,
@@ -129,34 +128,5 @@ describe('daysUntil', () => {
     const now = Date.parse('2026-08-23T10:00:00Z');
     expect(daysUntil(Date.parse('2026-08-23T20:00:00Z'), now)).toBe(0);
     expect(daysUntil(Date.parse('2026-08-21T20:00:00Z'), now)).toBe(-2);
-  });
-});
-
-describe('haystackOf', () => {
-  it('folds everything the matcher will read into one string', () => {
-    const hay = haystackOf({
-      title: 'Jarmark Średniowieczny',
-      venue: 'Zamek Chudów',
-      city: 'Gliwice',
-    });
-    expect(hay).toContain('jarmark sredniowieczny');
-    expect(hay).toContain('zamek chudow');
-  });
-
-  it('caps a source that pastes a whole press release', () => {
-    const hay = haystackOf({ title: 'X', description: 'word '.repeat(500) });
-    expect(hay.length).toBeLessThan(700);
-  });
-
-  it('does NOT read tags — they are matched structurally, not as keywords', () => {
-    /*
-     * Regression. Tags used to be folded in here, which made any tag a source applies feed-wide a
-     * blanket keyword hit for every row it produced: tagging the Jewish Culture Festival's feed
-     * `klezmer` made the Klezmer interest match all 67 of its articles, one of which was about
-     * Ted Kaczynski. Keywords ask what an event says; tags ask what it is.
-     */
-    const hay = haystackOf({ title: 'Ted Kaczynski, the Unabomber' });
-    expect(hay).not.toContain('klezmer');
-    expect(haystackOf({ title: 'X' })).toBe('x');
   });
 });

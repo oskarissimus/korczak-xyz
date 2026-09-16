@@ -52,5 +52,14 @@
 /pl/apps/events/pipeline      /pl/apps/events/sources       301
 /pl/apps/events/pipeline/*    /pl/apps/events/sources       301
 
+# And the Interests tab is gone too (Sep 2026). The feed is now what the enabled sources collected,
+# so the question "what am I watching for?" is answered per source — which is where the Sources tab
+# already answered "and how would I know if that were wrong". Same shape of rule as the Pipeline
+# one above, and for the same reason: this is a route an installed app precached.
+/apps/events/interests        /apps/events/sources          301
+/apps/events/interests/*      /apps/events/sources          301
+/pl/apps/events/interests     /pl/apps/events/sources       301
+/pl/apps/events/interests/*   /pl/apps/events/sources       301
+
 /games/*                      /apps/:splat               301
 /pl/games/*                   /pl/apps/:splat            301

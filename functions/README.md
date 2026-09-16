@@ -2,13 +2,17 @@
 
 The scheduled collector and the web-push sender for `/apps/events/`.
 
-## Why the matcher comes from the site
+## Why the shared modules come from the site
 
 `tsconfig.json` sets `rootDir: ".."` and includes `../korczak-xyz/src/utils/events/*.ts`, so the
-event types, the matcher and the notice planner are **compiled from the site's source** rather than
-copied here. The feed and the collector have to answer "does this event match this interest?"
-identically — if they drift, the feed shows things you were never told about and pushes arrive for
-things the feed does not list. A copy would be identical only until the first bug fix.
+event types, the source switches and the notice planner are **compiled from the site's source**
+rather than copied here. The feed and the collector have to answer "does this event reach the
+reader?" identically — if they drift, the feed shows things you were never told about and pushes
+arrive for things the feed does not list. A copy would be identical only until the first bug fix.
+
+Since the interests were removed (Sep 2026) that question is a short one — is it past, and is its
+source switched on — but it is asked in two runtimes and is still one function, `buildFeed` beside
+`noticesFor`, for the same reason.
 
 `tsc` emits into `lib/`, so the deploy bundle is self-contained: the Firebase CLI zips `functions/`
 and never learns the sources came from a sibling directory. Note the single `*` in the include —
@@ -190,8 +194,8 @@ keeping straight:
 Two guards are specific to it, and both are there because the article is **text scraped from
 someone else's CMS being handed to a model whose answer schedules a notification**:
 
-- A `kind` outside the closed set is dropped, so a model cannot invent a tag nobody can write an
-  interest against.
+- A `kind` outside the closed set is dropped, so a model cannot invent a label nothing in the app
+  knows how to draw.
 - A `saleOpensAt` is stored **only when it parses to a real calendar day, lands in the future, and
   lands inside two years**. A hallucinated or injected past date would otherwise count as tickets
   having gone on sale and mint an "On sale now" push about a shut box office.

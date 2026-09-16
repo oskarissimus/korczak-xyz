@@ -63,10 +63,10 @@ const NEWS_ROW = /<li>\s*<time class="date"([\s\S]*?)<\/li>/g;
  *     legitimately yield nothing for months, and the run where the wording changed and the parse
  *     silently died would look exactly the same. Ten articles a run is a health signal that stays
  *     honest.
- *   - **Nothing here reaches an interest by accident.** The page stamps `theatre` and
- *     `teatr-wielki`, which no seeded interest asks for, and `ticket-sale` — the tag the seeded
- *     "Ticket sales opening" interest is built on — is added per row and only where a date was
- *     actually read out of the prose. A parking notice carries no deadline and matches nothing.
+ *   - **Nothing here carries a deadline by accident.** The page stamps `theatre`, `teatr-wielki`
+ *     and `newsroom`, which are what these rows *are*, and `ticket-sale` is added per row and only
+ *     where a date was actually read out of the prose. A parking notice therefore has nothing for
+ *     `presale` to count down to, and is one more card to read past rather than a 7am buzz.
  *
  * `startsAt` is null on every row, sale or not. A news item is an article and an article has no
  * date of its own; the RSS adapter refuses to put a `pubDate` there for the same reason, and doing
@@ -127,22 +127,15 @@ export function parseNewsPage(html: string): RawEvent[] {
       country: 'PL',
       venue: 'Teatr Wielki – Opera Narodowa',
       /*
-       * `ticket-sale` per row, never page-wide. It is the one tag that says "this row carries a
-       * deadline", the keyword-less seeded interest matches on it alone, and a keyword-less
-       * interest has no second filter — so stamping it on the whole page would hand that interest
-       * the theatre's job adverts. Same mistake, fourth direction; see the rules file.
-       */
-      /*
        * `newsroom` is what every row on this page **is** — an article rather than an event —
        * which is the only sort of tag a page may stamp feed-wide. It is a marker for the
        * collector rather than a subject: it is the newsroom reader's entire queue, so
        * pointing that reader at another source's article feed is a line there and nothing here.
        *
        * `ticket-sale` is the opposite kind of tag and is added per row, only where the regex
-       * actually read a date out of the prose. It is the whole of the keyword-less "Ticket sales
-       * opening" seed, and a keyword-less interest has no second filter — page-wide it would hand
-       * that interest the theatre's job adverts. The reader may add it to a row this missed;
-       * `tagsWithTicketSale` is where that union is made, once.
+       * actually read a date out of the prose. It is what `presale` counts down to, so page-wide
+       * it would put a reminder on the calendar for the theatre's job adverts. The reader may add
+       * it to a row this missed; `tagsWithTicketSale` is where that union is made, once.
        */
       tags:
         onSaleAt !== null

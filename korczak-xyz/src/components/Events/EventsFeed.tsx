@@ -1,13 +1,15 @@
 /**
- * The Feed tab: what is coming up that matches an interest. Items, and nothing else.
+ * The Feed tab: what the sources collected and has not happened yet. Cards, and nothing else.
  *
  * **There are no filters on this tab, and that is the design rather than an omission.** The feed is
- * the *output* of the pipeline — scrape, derive, classify, filter — so everything that decides what
- * lands here is a fact about a source or about an interest, and both are read where they are set:
- * the Sources tab draws each source's model passes and the interests that reach it, counted over
- * that source's own rows. A second, per-device narrowing on top of that was three controls that
- * could hide a row with nothing on this screen saying who asked for it, months after the choice was
- * made, and two of the three duplicated an interest's own fields.
+ * the *output* of the pipeline — scrape, derive, classify — so everything deciding what lands here
+ * is a fact about a source, and it is read where it is set: the Sources tab draws each source's
+ * pages, its model passes, how much of the corpus is its, and the switch that silences it.
+ *
+ * Since the interests went (Sep 2026) there is no per-reader filter at all, which is the thing to
+ * understand before wondering where a row came from: if it is here, a source you have left on
+ * collected it and it has not happened yet. Narrowing is a change to an adapter or a tap on a
+ * switch.
  *
  * Also where the push subscription is re-verified. That is deliberate and not just convenience:
  * iOS drops subscriptions silently after a few weeks and has no `pushsubscriptionchange`, so the
@@ -17,7 +19,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useEventFeed } from '../../hooks/useEventFeed';
-import { useEventInterests } from '../../hooks/useEventInterests';
 import { useEventSourcePrefs } from '../../hooks/useEventSourcePrefs';
 import { useWebPush } from '../../hooks/useWebPush';
 import {
@@ -26,12 +27,11 @@ import {
   saleWhenLabel,
   whenLabel,
   type FeedGroup,
-  type FeedItem,
 } from '../../utils/events/feed';
 import { countryLabel } from '../../utils/events/countries';
 import { eventFocusOf, FEED_PATH, localizePath, SOURCES_PATH } from '../../utils/events/links';
 import { formatDistances } from '../../utils/events/distance';
-import type { EventKind, Reach } from '../../utils/events/types';
+import type { EventKind, EventRecord, Reach } from '../../utils/events/types';
 import EventsGate from './EventsGate';
 import {
   fill,
@@ -58,7 +58,6 @@ export default function EventsFeed({ lang }: Props) {
 function FeedPanel({ lang }: Props) {
   const auth = useAuth();
   const feed = useEventFeed(auth.user);
-  const { interests, ready } = useEventInterests(auth.user);
   const switches = useEventSourcePrefs(auth.user);
   const t = translations[lang];
   /*
@@ -70,7 +69,7 @@ function FeedPanel({ lang }: Props) {
    *
    * It no longer has to turn any filter off, which is the quiet dividend of this tab having none —
    * the note that used to explain three unexplained changes at once is now only ever about the row
-   * itself being gone.
+   * itself being gone, or about the source it came from having been switched off since.
    */
   const [focus] = useState<string | null>(focusFromUrl);
 
@@ -80,22 +79,22 @@ function FeedPanel({ lang }: Props) {
   const now = Date.now();
   const sources = switches.prefs;
   const sections = useMemo(
-    () => buildFeed(feed.events, interests, now, { sources }),
+    () => buildFeed(feed.events, now, { sources }),
     // `now` is deliberately not a dependency: re-grouping on every render would rebuild the list
     // for a clock tick nobody can see. It is recomputed when the data actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [feed.events, interests, sources],
+    [feed.events, sources],
   );
 
-  if (!feed.ready || !ready) return <div className="ev-loading" />;
+  if (!feed.ready) return <div className="ev-loading" />;
 
-  const items = sections.flatMap((section) => section.items);
+  const events = sections.flatMap((section) => section.events);
   /*
    * Whether the row a notification pointed at is on the screen — by fingerprint, which is what the
    * link carries and what survives the dedupe, so the card the reader sees answers to it however
    * the two copies of one night were resolved.
    */
-  const focusShown = focus !== null && items.some((item) => item.event.fingerprint === focus);
+  const focusShown = focus !== null && events.some((event) => event.fingerprint === focus);
   /*
    * Said only once the network has answered, or failed to. A feed restored from the localStorage
    * cache is a few hours old and routinely lacks the very row the push was about, so announcing it
@@ -109,7 +108,7 @@ function FeedPanel({ lang }: Props) {
       <section className="ev-section">
         <h2 className="ev-subhead">{t.feedHeading}</h2>
         <div className="ev-toolbar">
-          <span>{fill(t.showingCount, { shown: items.length, total: feed.events.length })}</span>
+          <span>{fill(t.showingCount, { shown: events.length, total: feed.events.length })}</span>
           {feed.error ? <span className="ev-sync ev-sync--bad">✕ {feed.error}</span> : null}
         </div>
 
@@ -132,10 +131,10 @@ function FeedPanel({ lang }: Props) {
           <p>{t.feedEmpty}</p>
           <p className="ev-hint">{t.feedEmptyHint}</p>
           {/*
-            * The one thing that can empty this list without an interest having decided anything,
-            * and its control is on another tab — so it gets a link out rather than a button. A
-            * source switched off on a phone weeks ago empties a laptop that has narrowed nothing,
-            * and without this line there would be nothing on the screen saying who asked for that.
+            * The one thing that can empty this list, and its control is on another tab — so it
+            * gets a link out rather than a button. A source switched off on a phone weeks ago
+            * empties a laptop, and without this line there would be nothing on the screen saying
+            * who asked for that.
             */}
           {switches.disabled.length > 0 ? (
             <a className="ev-link" href={localizePath(SOURCES_PATH, lang)}>
@@ -148,13 +147,13 @@ function FeedPanel({ lang }: Props) {
           <section className="ev-group" key={section.group}>
             <h3 className="ev-group-head">{groupLabel(section.group, t)}</h3>
             <ul className="ev-list">
-              {section.items.map((item) => (
+              {section.events.map((event) => (
                 <EventCard
-                  key={item.event.id}
-                  item={item}
+                  key={event.id}
+                  event={event}
                   lang={lang}
                   now={now}
-                  focused={item.event.fingerprint === focus}
+                  focused={event.fingerprint === focus}
                 />
               ))}
             </ul>
@@ -168,9 +167,8 @@ function FeedPanel({ lang }: Props) {
 /**
  * What the classifier decided, in words.
  *
- * Absent is its own case and says so rather than printing nothing: a blank where a label goes and
- * a label that has not arrived yet look identical, and only one of them is a reason for an event
- * to still be in the feed.
+ * Absent draws nothing, like `listing` — the place chip beside it already says `?` while the
+ * classifier has not reached the row, and saying it twice on one line of chips is noise.
  */
 function kindLabel(kind: EventKind | undefined, t: Translation): string | null {
   if (kind === 'announcement') return t.kindAnnouncement;
@@ -207,19 +205,18 @@ function groupLabel(group: FeedGroup, t: Translation): string {
 }
 
 function EventCard({
-  item,
+  event,
   lang,
   now,
   focused = false,
 }: {
-  item: FeedItem;
+  event: EventRecord;
   lang: Lang;
   now: number;
   /** The row a notification was about: outlined, and scrolled to once. */
   focused?: boolean;
 }) {
   const t = translations[lang];
-  const { event } = item;
   const saleWhen = saleWhenLabel(event, localeOf(lang));
   const saleChip = saleWhen ? fill(t.saleOpens, { when: saleWhen }) : null;
   const card = useRef<HTMLLIElement>(null);
@@ -266,21 +263,18 @@ function EventCard({
           * is about to arrive was counting down to.
           */}
         {saleChip ? <span className="ev-chip ev-chip--presale">{saleChip}</span> : null}
-        <span>
-          {t.matchedBy} {item.matched.map((i) => i.label).join(', ')}
-        </span>
         {/*
-          * Where it is and who it is for, on every card. Without it there is no telling whether
-          * something stayed because the filter judged it right or because it has not been judged at
-          * all — which is the difference between a working filter and one that has not started.
+          * Where it is and who it is for, on every card. Nothing filters on either any more, so
+          * this is the classifier's answer read rather than obeyed — and `?` is what says it has
+          * not reached this row, which is the only sign in the app that the pass has stopped.
           */}
         <span className="ev-chip ev-chip--place">
           {countryLabel(event.country)} · {reachLabel(event.reach, t)}
         </span>
         {/*
           * Only when the classifier says this row is not a listing, which is the only case the
-          * word adds anything to: an article kept by an interest that asked for articles and one
-          * nobody has judged yet are different rows, and this is what tells them apart.
+          * word adds anything to: an article among the listings says it is one, where a chip on
+          * every card reading "yes, this is an event" is a label nobody reads twice.
           */}
         {kindLabel(event.kind, t) ? (
           <span className="ev-chip ev-chip--kind">{kindLabel(event.kind, t)}</span>

@@ -31,10 +31,9 @@ describe('parseNewsPage', () => {
 
   it('tags exactly the rows that carry a deadline', () => {
     /*
-     * `ticket-sale` is what the keyword-less "Ticket sales opening" interest matches on, and a
-     * keyword-less interest has no second filter — so this tag reaching a row without a sale date
-     * hands that interest the theatre's press office. The four earlier versions of this mistake
-     * are written up in .claude/rules/events.md.
+     * `ticket-sale` is what `presale` counts down to, so this tag reaching a row without a sale
+     * date is a reminder scheduled about the theatre's press office. The four earlier versions of
+     * this mistake — a tag stamped wider than the thing it named — are in .claude/rules/events.md.
      */
     for (const item of news) {
       expect(item.tags).toContain('teatr-wielki');
@@ -47,7 +46,8 @@ describe('parseNewsPage', () => {
     /*
      * Page-wide, unlike `ticket-sale`, and legitimately so: every row here IS an article rather
      * than an event, which is the only sort of fact a page may stamp on everything it yields. It
-     * is a marker for the collector rather than a subject — no interest asks for it.
+     * is a marker for the collector rather than a subject — it is the newsroom reader's queue and
+     * the one thing `needsClassifying` looks at.
      */
     expect(news.every((e) => e.tags!.includes('newsroom'))).toBe(true);
   });

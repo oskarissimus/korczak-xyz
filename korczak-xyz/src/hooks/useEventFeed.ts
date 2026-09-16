@@ -2,8 +2,8 @@
  * The shared event corpus, as this browser sees it.
  *
  * Read-only: `events/` is written by the collector on the Admin SDK and nothing here can touch it.
- * That makes this much simpler than `useEventInterests` — no push queue, no reconciler, no
- * tombstones. The only real decisions are what to do offline and how to spend the pull.
+ * That makes this much simpler than the app's one writing hook, `useEventSourcePrefs` — no push,
+ * no merge. The only real decisions are what to do offline and how to spend the pull.
  *
  * The cache is what makes an installed app worth having: Firestore's client cache here is
  * memory-only, so without the localStorage copy an app opened on the underground shows nothing at
@@ -52,8 +52,8 @@ export function useEventFeed(user: AuthUser | null): EventFeedData {
        * `allSettled`, not `all`: these ask for two independent halves of the feed, and one of them
        * failing is not a reason to show neither. That is not hypothetical — the undated query needs
        * a composite index the dated one does not, and while it was missing `Promise.all` turned a
-       * half-answer into an empty screen reading "nothing matches your interests yet", which is a
-       * sentence about the interests and was a lie about the index.
+       * half-answer into an empty screen reading "nothing has been collected yet", which is a
+       * sentence about the collector and was a lie about the index.
        */
       const [dated, undated] = await Promise.allSettled([
         pullEvents(Date.now()),

@@ -1,16 +1,18 @@
 /*
  * The watched legs of the journey, and their cloud sync.
  *
- * Structurally `useEventInterests`, down to the reasoning: refs beside a `publish` that writes the
- * ref and calls `setState` together, a `commit` that is synchronous before any await, and a
- * single-flight `runSync` that **pulls before it pushes** — because a leg is a mutable document and
- * a blind `setDoc` from the phone would land on top of an edit made on the laptop.
+ * Structurally what Event Watch's `useEventInterests` was before that app dropped its interests,
+ * down to the reasoning: refs beside a `publish` that writes the ref and calls `setState` together,
+ * a `commit` that is synchronous before any await, and a single-flight `runSync` that **pulls
+ * before it pushes** — because a leg is a mutable document and a blind `setDoc` from the phone
+ * would land on top of an edit made on the laptop. It is the last hook in the repo of that shape
+ * outside the sleep log.
  *
  * The reconciler is the sleep log's, unchanged: `WatchedSegment` extends `Versioned` structurally,
  * so `mergeById` merges these without being told anything about them, and `applyLocal` is what
  * stops a re-added leg from meeting its own tombstone.
  *
- * One thing this hook has that the interests hook does not: `addSegment` and `updateSegment` can
+ * One thing this hook has that that one did not: `addSegment` and `updateSegment` can
  * **fail**, and return `false` when they do. A leg whose two stations are not both on one line is
  * not a journey, and `normalizeSegment` refuses it rather than storing a row that would match
  * nothing forever. The form needs to hear that, which is why these are not `void`.

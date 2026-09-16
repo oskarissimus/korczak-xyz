@@ -88,8 +88,9 @@ export const STATIONS: Record<MetroLine, readonly string[]> = {
  * abbreviate `Plac Wilsona` to `pl. Wilsona`. Folding handles case and diacritics; it cannot handle
  * a different word.
  *
- * **A wrong alias is worse than a missing one**, which is the rule `CITY_ALIASES` keeps in the
- * events app and it is sharper here: a missing alias costs one unrecognised station name, which
+ * **A wrong alias is worse than a missing one**, which was the rule the events app's `CITY_ALIASES`
+ * kept until it went with the interests, and it is sharper here: a missing alias costs one
+ * unrecognised station name, which
  * `impactOf` resolves upward into an alert you did get. An alias pointing at the wrong station puts
  * a closure on the wrong half of the line and produces confident silence.
  */

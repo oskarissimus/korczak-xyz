@@ -6,7 +6,7 @@ paths:
   - "**/components/Events/**"
   - "**/hooks/useEventFeed.ts"
   - "**/hooks/useEventCorpus.ts"
-  - "**/hooks/useEventInterests.ts"
+  - "**/hooks/useEventSourcePrefs.ts"
   - "**/hooks/useWebPush.ts"
   - "**/styles/events.css"
   - "**/utils/jsonView.ts"
@@ -24,24 +24,29 @@ paths:
 
 ## Event Watch
 
-At `/apps/events/` — four tabs (Feed, Interests, Alerts, Sources) over a shared corpus of
-scraped listings, with web push when something matching an interest is announced, goes on sale, or
-gets close. The Feed is the output of the pipeline and carries no controls at all; the Sources tab
-is where the pipeline is read, per source. There was a fifth tab, Pipeline, and *The Pipeline tab
-is gone* below is what replaced it and why. The first app here that watches the outside world rather than recording what I did,
-which is why it is **signed-in only**: the collecting happens on a server and the notifications have
-to know where to go.
+At `/apps/events/` — three tabs (Feed, Alerts, Sources) over a shared corpus of scraped listings,
+with web push when something is announced, goes on sale, or gets close. The Feed is the output of
+the pipeline and carries no controls at all; the Sources tab is where the pipeline is read, per
+source, and carries the app's one filter. There were two more tabs, Pipeline and Interests, and
+*The Pipeline tab is gone* and *The interests are gone* below are what replaced each and why. The
+first app here that watches the outside world rather than recording what I did, which is why it is
+**signed-in only**: the collecting happens on a server and the notifications have to know where to
+go.
 
 Two halves. `korczak-xyz/src/utils/events/` and `src/components/Events/` are the client;
 `functions/` is a scheduled Cloud Function that collects and sends.
 
-### One matcher, two runtimes
+### One rule, two runtimes
 
 `src/utils/events/` is compiled **twice** — by Astro for the browser, and by `tsc` into the Cloud
 Functions bundle, via `rootDir: ".."` and an `include` of `../korczak-xyz/src/utils/events/*.ts` in
-`functions/tsconfig.json`. The feed and the collector both ask "does this event match this
-interest?", and if they ever answer differently the feed shows things you were never told about and
-pushes arrive for things the feed does not list.
+`functions/tsconfig.json`. The feed and the collector both ask "does this event reach the reader?",
+and if they ever answer differently the feed shows things you were never told about and pushes
+arrive for things the feed does not list.
+
+Since the interests went that question is short — is it past, and is its source switched on — and
+the argument for compiling rather than copying is unchanged: `buildFeed` and `noticesFor` read the
+same `sourcePrefs.ts`, so a switch cannot mean one thing on the screen and another on the phone.
 
 This repo's usual idiom for one fact in two files is to read one as text and assert agreement
 (`tiers.test.ts`, `chordAlignment.test.ts`) — but that is for cases where an import is *impossible*.
@@ -52,95 +57,122 @@ subdirectory** holds the modules that cannot obey (localStorage, the Firestore c
 does not recurse and the tsconfig `include` uses a single `*`, so the two agree by construction
 rather than by a list.
 
-### Keywords ask what an event says; tags ask what it is
+### The interests are gone, and tags still have to mean what they say
 
-Keyword matching is on **word boundaries**, because `'floyd'` inside "Floydwear" is an interest you
-turn off, and `'opera'` inside "operacja" is worse. But whole-word alone is wrong for Polish, which
-inflects everything: `klezmer` never reaches "koncert klezmerski", `rycerski` never reaches "turniej
-rycerskiego". Loosening to a prefix match everywhere brings Floydwear straight back, so the choice is
-**explicit rather than guessed**: a keyword ending in `*` is a prefix, anything else is a whole word.
-The seeded Polish stems use it (`klezmer*`, `sredniowieczn*`, `rycersk*`); `floyd` and `opera`
-deliberately do not.
+There was a whole grammar here: `Interest` with keywords matched on word boundaries, a `*` suffix
+for a Polish prefix match, all-of tags, any-of cities, ISO-2 countries OR-ed with
+`internationalAnywhere`, `includeCoverage`, a date window, `leadDays`, a mute, a synced collection
+per account with tombstones, eight seeds, an editor, a tab, and `match.ts` compiled into both
+runtimes so the feed and the collector could not disagree about any of it. **All of it is gone
+(Sep 2026), at the owner's request**, and the reasoning is worth recording because the feature
+worked and the arguments for it were sound.
 
-**An empty keyword list means NO constraint, not "matches nothing".** The Opera Narodowa seed is
-`tags: ['opera']` with no keywords at all, because "tell me when new repertoire is announced" is not
-a keyword search. Since the season scrape was dropped nothing in the corpus carries `opera` except
-a Ticketmaster listing that really says so, so that seed is a live interest with nothing to match
-most weeks — which is a fact about the sources, not a bug in the rule below. Reading empty as unsatisfiable makes that interest silently dead — matching
-nothing forever, with nothing in the UI to say why. It is the first test in `match.test.ts`.
+What it was for: one durable list, written once, applied to every source. What it cost: the edge
+cases. Every source needs a different rule — a theatre wants its sale dates, an entry platform
+wants a place, a magazine's feed wants almost nothing — and expressing five different questions in
+one vocabulary meant each seed was a workaround for the vocabulary rather than a statement of what
+was wanted. The three shapes an interest could take (keyword, keyword-less-plus-tag, tag-plus-city)
+were three ways round the same problem. Per-source filtering is the answer instead: what a source
+collects is decided in its adapter and in the pages it reads, and whether this account hears it at
+all is one checkbox on its card.
 
-**A keyword names what an event is, never where it happens.** `Castles & medieval fairs` carried
-`zamek` and `zamku` alongside `sredniowieczn*`, `rycersk*` and `oblezeni*`, and it was the one
-keyword in that list naming a building rather than the thing inside it — so it kept the theatre's
-`Ogrody Muzyczne` announcement, the Royal Castle courtyard being one of Warsaw's summer concert
-stages. It bought nothing to pay for that: over the live corpus the two words kept three rows —
-that series and two articles about castles being closed and moved — while the one real fair among
-them, `turniej rycerski na zamku w Łęczycy`, is kept by `rycersk*` without help. They are gone
-(Sep 2026), and an exclusion was **not** the answer: `floyd rose` vetoes one fixed product name,
-where this would have been an open-ended list of venues growing for as long as castles host
-concerts. This is the blanket-tag lesson below arriving through the keyword field instead.
+So `match.ts`, `interests.ts`, `filtering.ts`, `cities.ts`, `useEventInterests`, `EventsInterests`,
+`InterestForm`, `InterestRules`, the Events `SyncBadge`, both `interests.astro` pages and about
+forty translation keys in two locales are deleted; `countries.ts` is down to `ONLINE` and
+`countryLabel`, its hundred-and-thirty-name table having existed for one caller. `_redirects` 301s
+both locales' `interests` paths to `/apps/events/sources/`, bare and slashed, because an installed
+app precached the route. `users/{uid}/eventInterests` documents are **not** deleted — the catch-all
+rule still covers them, nothing reads them, and a migration that deletes user data to tidy a schema
+is a worse idea than a collection nobody opens. Same call as `eventIgnores`, below.
 
-`haystackOf` deliberately does **not** read tags. It used to, and the result was that any tag a
-source applies feed-wide became a blanket keyword hit for every row: tagging the Jewish Culture
-Festival's feed `klezmer` made the Klezmer interest match all 67 of its articles, one of which was
-about Ted Kaczynski. Tags are matched all-of and structurally, by `interest.tags`. That live run also
-found `tagsFor` in the Teatr Wielki adapter falling through to `opera` for anything that was not
-ballet, which handed the keyword-less Opera interest the entire season, galas included. That
-function went with the season scrape (Sep 2026) and the lesson did not: it is the same one the
-three cases below are about.
+**`EventRecord.haystack` went with it**, which is the one change here that touches every stored
+document. It was folded title + subtitle + venue + city + the head of the description, computed on
+every upsert and read by exactly one thing: the keyword matcher. `batch.set` rewrites the whole
+document, so the field drops off the corpus over the run after this deploys, and the client's pull
+gets a couple of hundred bytes a row lighter. `haystackOf` is in the history if a search box ever
+wants it.
 
-`events-seed-new-season` is the counterweight to that, and the reason both exist: a
-`ticket-sale` tag only appears once a **date** has been read out of the prose, which is the last
-moment in the sequence rather than the first. The house teases the season five weeks earlier —
-*Wkrótce ogłoszenie nowego sezonu!* — in an article that states no date and therefore carries no
-tag. That seed is keyword-shaped (`nowego sezonu`, `nowy sezon`, `ogloszenie sezonu`) and narrowed
-by `tags: ['teatr-wielki']`, and the phrases are phrases rather than a `sezon*` stem on purpose:
-the stem also claims "przesłuchania … na sezon 2026/27" and the season page's own trailer, which
-are about a season without being the news that one is coming.
+What is left of the grammar, and what is not:
 
-**A keyword-less interest has no second filter, so a generous tag is the whole of what reaches it**
-— which is why that mistake keeps arriving from a new direction. The third time was Ticketmaster's
-`tagsOf` mapping `genre.includes('classical')` onto `opera`, on the reasonable-sounding grounds
-that an interest asking for opera should reach a ticketed listing and a Teatr Wielki one alike:
-switching the real API key on took Opera Narodowa from 7 matches to 202, the other 195 being
-candlelight Chopin recitals. It bought nothing either — their Polish catalogue has no `opera` genre
-or subGenre at all, so the branch only ever fired on classical. The rule to apply when mapping a
-source's vocabulary onto ours: **widen a tag only as far as the narrowest interest that uses it can
-bear**, and let the raw genre slug carry the rest, which is what it is there for.
+- **`Interest.leadDays` is `LEAD_DAYS`, one number, 14.** It could differ per interest — 45 days
+  for a season, 30 for a marathon, 14 for a ticket sale — and nothing replaces that. A race is now
+  warned about on the same schedule as a concert, which is a real loss and was taken deliberately.
+  If a per-source lead is ever wanted it belongs in the source catalogue beside that source's
+  pages, not in a second per-account collection: a theatre and an entry platform differ because of
+  what they publish.
+- **`Interest.includeCoverage` is nothing.** `coverage` rows reach the feed like any other. The
+  sponsor posts and pacer times that made `EventKind` worth having are four cards from a ten-item
+  WordPress feed, and the answer to a feed that is mostly those is the switch on its card.
+- **`Interest.cities` and `cityKey` are gone, and `CITY_ALIASES` with them.** The table that joined
+  `Warsaw` to `Warszawa` had one reader. Every row still states its own town and the card prints
+  it; nothing compares two spellings any more. Metro Watch keeps its own station alias table and
+  the rule that outlived this one — **a wrong alias is worse than a missing one**.
+- **`EventKind`, `Reach` and `country` are all still written, and none of them filters.** They are
+  read on the card: the place chip, and the kind chip on anything that is not a `listing`. A `?`
+  there is how "the classifier has not reached this row" is said, and it is now the only sign in
+  the app that the pass has stopped — which is why `extraction.ts` counts it per source.
 
-The `running` tag is the one place that rule is knowingly bent, and it is written down here so the
-next person does not "fix" it. `RUNNING_LISTINGS` is a running-only listing, so the tag is exactly
-what those pages are; the **Maraton Warszawski feed carries it too**, and that feed is a magazine —
-so the keyword-less `Running in Warszawa` seed reaches its sponsor posts along with the route
-announcements. Taken deliberately, for two reasons: a WordPress feed holds ten items, so this is a
-card or two rather than the sixty-seven that made the Klezmer case a disaster; and an announcement
-with no date yet — entries opening, next year's date fixed — is the earliest anything about a race
-is knowable, which is what the app is for.
+**The tag rule survives the interests and is worth keeping**, because what it is really about is a
+source claiming more than it knows. `haystackOf` used to fold tags into the text it searched, so
+any tag a source applied feed-wide became a blanket keyword hit for every row: tagging the Jewish
+Culture Festival's feed `klezmer` put all 67 of its articles — one about Ted Kaczynski — in front
+of somebody who asked about klezmer. `tagsFor` in the Teatr Wielki adapter fell through to `opera`
+for anything that was not ballet, handing a keyword-less interest an entire season, galas included.
+Ticketmaster's `tagsOf` mapped `genre.includes('classical')` onto `opera`, taking Opera Narodowa
+from 7 matches to 202, the other 195 being candlelight Chopin recitals. Three directions, one
+mistake. The rule to apply when mapping a source's vocabulary onto ours is unchanged: **widen a tag
+only as far as the narrowest reader of it can bear**, and let the raw genre slug carry the rest.
 
-The card or two turned out to be four in a row — three sponsor posts and a set of pacer times, above
-the race itself — and the answer was **not** to narrow the tag, because that would have cost the
-announcements too. It is `EventRecord.kind`, below: the same call that says where an event is now
-also says whether the row is one, and the tag goes on meaning what those pages are.
+Who the narrowest reader is has changed, and it is a shorter list than it was: `distancesOf` is
+gated on `running` and will put `42.2 km` on a film night if that tag widens (`maraton` is a live
+Polish word for a long sitting of anything); `presale` counts down to `ticket-sale` and will put a
+reminder on the calendar for a press office if that one does; `needsClassifying` and the newsroom
+reader's queue are `newsroom`; and the classifier's prompt reads `tags` wholesale. A page may
+stamp feed-wide only what every row on it **is** — `newsroom` on a news list, `running` on a
+running listing, `history` on a history magazine — and anything narrower goes on per row.
+
+`ticket-sale` is the sharpest case and the one the Teatr Wielki adapter is careful about: it is
+applied per row and only where a date was actually read out of the prose, because it means "there
+is a deadline on this row" and `presale` is what acts on it. Stamped page-wide it would schedule a
+reminder about a parking notice.
 
 ### What may wake me up
 
 `notices.ts` is pure, so the whole "should this push fire?" question is reachable from a unit test
-rather than from a phone at 7am. Three guards against the flood, and all three are needed:
+rather than from a phone at 7am.
+
+**Everything an enabled source collects is push-eligible**, which is the change the interests'
+removal made here and it is the one to understand before touching a cap. The interests used to
+stand between the corpus and the lock screen; the source switches are what stand there now, and
+they are per publication rather than per subject. So the caps are doing more work than they were.
 
 - **`armedAt`** — written when notifications are first armed. Nothing already in the corpus at that
   moment can ever be `announced`. Without it, arming replays the entire corpus into the lock screen.
-- **`interest.createdAt`** — a field of its own, *not* `Versioned.updatedAt`. Adding an interest
-  surfaces its backlog in the feed and pushes about nothing; if this were `updatedAt`, editing one
-  keyword would re-arm the whole backlog.
+- **`announceFloor`** — the same rule for a source switched back on, from the moment of the tap.
+  See *The switch on each source* below.
 - **`maxPerRun`** (3) — the overflow becomes one summary, and the suppressed notices are still
   latched so they never fire individually later. This is what saves you when a scrape's markup
-  shifts, every synthesised key changes, and an entire opera season looks new. `onsale` is exempt
-  (capped separately at 10, a budget it shares with `presale`): tickets going on sale is the thing
-  that was asked for, and it is not noise.
+  shifts, every synthesised key changes, and an entire opera season looks new.
+- **`maxOnSalePerRun`** (10) — `onsale` and `presale` share it, and it never becomes a summary:
+  tickets going on sale is the thing that was asked for, and it is not noise.
+- **`maxSoonPerRun`** (5) — **new, and only needed because the interests went.** A reminder used to
+  fire only for a row an interest had named, so the ceiling was the length of a hand-written list;
+  with the whole corpus eligible, a fortnight's lead over a national race listing is a morning of
+  buzzing about races in towns nobody chose.
 
-`soon` uses **`max`** of the matching interests' `leadDays`, not min — leadDays means "how much
-warning I want". One notice per kind per fingerprint, never one per interest: the interests are *why*
-it fired, not *what* fired.
+There used to be a third clock beside `armedAt` and `announceFloor`: **`interest.createdAt`**, a
+field of its own rather than `Versioned.updatedAt`, so that adding an interest surfaced its backlog
+in the feed and pushed about nothing while editing one keyword did not re-arm it. Nothing replaces
+it, and nothing can — there is no per-reader act left that widens what matches.
+
+**The overflow of `maxSoonPerRun` and `maxOnSalePerRun` is dropped, not latched**, which is the
+opposite of what `announced` does and the distinction is the interesting part. An announcement is a
+one-off: suppressing one without claiming its id only postpones the flood to the next run. A
+countdown is asked again every run, and the events dropped today rise to the top of the sort as
+they get nearer — latching them would silence exactly the ones about to become worth a reminder.
+
+One notice per kind per fingerprint. The key is the fingerprint rather than the event id so one
+concert listed by two sources notifies once.
 
 #### `presale`, and why `onsale` was never enough
 
@@ -150,14 +182,14 @@ at 11.00 on one morning and the house is half sold by lunchtime, so a notificati
 the next six-hourly run is a notification about seats somebody else has.
 
 The date, though, is **known weeks ahead**. `presale` counts down to `EventRecord.onSaleAt` exactly
-as `soon` counts down to `startsAt`, on the same `leadDays`. Four things about it:
+as `soon` counts down to `startsAt`, on the same `LEAD_DAYS`. Four things about it:
 
 - **`onSaleAt` must be in the future.** Nearly every Ticketmaster row carries the date its sale
   opened, usually months ago; without the guard the feature's first run is a hundred warnings about
   the past.
 - **It is deliberately not gated on `isFresh`**, unlike `announced`. A date-based reminder is not
-  an announcement. An interest added today has to be able to warn about a sale announced last week,
-  which is the only reason anyone would add it.
+  an announcement: a source armed today has to be able to warn about a sale announced last week,
+  which is the only reason anyone would switch it on.
 - **Notices are ranked by `noticeAt`, not by `startsAt`.** A sale announcement is an article and has
   no `startsAt`, so sorting on that field alone files every one of them behind every dated notice in
   the run — and then the ticket budget keeps whatever the tail happened to hold instead of the sale
@@ -175,10 +207,11 @@ the point: the first says a date exists, the second that it is close. No clock i
 the wording — "Tickets on sale from 1 Sep 2026, 11:00" is true of a sale that opens then and of one
 that opened then — so `payloadFor` stays a pure function of the notice.
 
-`Interest.leadDays` now means two things at once — how long before the curtain, and how long before
-the sale — and that is on purpose rather than an economy. Both answer "how much warning do I want
-about this kind of thing", and a second field would have to be filled in on every interest by
-somebody who has never wanted the two to differ.
+`LEAD_DAYS` means two things at once — how long before the curtain, and how long before the sale —
+and that is on purpose rather than an economy. Both answer "how much warning do I want about this
+kind of thing", and a second constant would be a second number to keep in step for a difference
+nobody has wanted. It was `Interest.leadDays` and could differ per interest; see *The interests are
+gone* above for what that cost.
 
 **The notice document is a lock taken before sending, not a receipt written after.** `create()` fails
 on an existing document, which is the atomic latch. Written after the send, a crash between sending
@@ -284,7 +317,8 @@ than `matched` with the stored city and label filters unapplied, because an inte
 the push was sent, a dismissal pressed afterwards or a city chosen weeks ago could each hide the one
 row the tap was about — and a highlighted card nobody can see is the same bug wearing a fix. There
 are no filters to turn off now, which is the quiet dividend of the feed having none: the only thing
-that can still hide the row is an interest that has changed since, and the note says so. When the
+that can still hide the row is the source it came from having been switched off since, and the note
+says so. When the
 row is genuinely gone — it happened, or its sale opened — the note says that instead, but only once
 the network has answered: the cached feed is hours old and routinely lacks the row the push was
 about, and announcing it missing on the first frame would be wrong about half the taps and then
@@ -344,8 +378,7 @@ prose says `10 km od centrum`, `przewyższenie 300 m` and `500 m od mety` — di
 and are not the race's. The one source that lists races carries no description at all, so this
 costs nothing today and holds the line the day an adapter starts supplying one.
 
-It is derived in `toRecord` beside the haystack and the fingerprint rather than in the running
-adapter, so a second source of races cannot get it subtly different — the Maraton Warszawski feed
+It is derived in `toRecord` beside the id and the fingerprint rather than in the running adapter, so a second source of races cannot get it subtly different — the Maraton Warszawski feed
 already tags itself `running`. And unlike the classifier's fields it is **not** carried forward by
 `mergeRecord`: it is recomputed from the title every run, costs nothing, and a stale one would
 outlive a title being corrected.
@@ -361,8 +394,8 @@ without a distance, capped per run and latched so it converges — and not in th
 Five adapter *types*, not five scrapers — `rss` and `ical` are driven by URL lists and
 `elektroniczne-zapisy` by a third, so watching one more festival blog is a line in `FEEDS`, and one
 more running discipline a line in `RUNNING_LISTINGS`, not code. An adapter returns `RawEvent[]` and
-**nothing derived**: the id, the haystack, the fingerprint and the day are computed by `upsert.ts`,
-so a new adapter cannot get normalisation subtly different.
+**nothing derived**: the id, the fingerprint, the day and the distances are computed by
+`upsert.ts`, so a new adapter cannot get normalisation subtly different.
 
 - **teatrwielki.pl** is the source the app was really asked for, and it is now **one page**:
   `/teatr/aktualnosci/`, the theatre's own news list. It is read for one fact — the morning the
@@ -408,8 +441,8 @@ so a new adapter cannot get normalisation subtly different.
     pages having been the other half of it.
   - **`ticket-sale` is applied per row and never stamped on the page**, and only where a date was
     actually parsed. That tag is the whole of the keyword-less `Ticket sales opening` seed, and a
-    keyword-less interest has no second filter — page-wide it would hand that interest the
-    theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
+    tag is what `presale` counts down to — page-wide it would put a reminder on the calendar for
+    the theatre's job adverts. Fourth direction, same mistake; see the tag rule above.
 
   **Three pages are read, not one** — `/teatr/aktualnosci/` and `p/2/`, `p/3/` behind it, per
   `TEATR_WIELKI_NEWS_PAGES`. The front page holds ten articles, which is about two months, and
@@ -439,8 +472,9 @@ so a new adapter cannot get normalisation subtly different.
   else in the feed moves, `onSaleAt` being set only where a source stated it in advance.
 
 - **python.org** is an iCal feed — 874 VEVENTs, mostly historical, so `collect.ts` drops anything
-  already past. Geography is deliberately *not* filtered there: PyCon US may still be worth knowing
-  about, and deciding that is the interest's job. RFC 5545 line unfolding is the one parsing bug
+  already past. Geography is deliberately *not* filtered there: what is collected is a fact about
+  the world, so PyCon US is in the corpus whether or not anybody would fly to it, and the card says
+  which country it is in. RFC 5545 line unfolding is the one parsing bug
   worth naming: miss it and every long `SUMMARY` truncates at 75 octets, which looks like the feed
   having short titles.
 - **RSS feeds** leave `startsAt` null on purpose. A feed item is an *article*: putting its `pubDate`
@@ -482,11 +516,15 @@ so a new adapter cannot get normalisation subtly different.
   months before entries open, and the button appearing is the event.
 
   The fetch is deliberately **not** narrowed to `?city_id=12`, which the platform offers and which
-  would have halved the rows. Geography is the interest's job, as it is for python.org: a Warsaw
-  baked into the *fetch* is one reader's preference written into a corpus every account shares, and
-  the day the question becomes Kraków there is nothing stored to answer it with. So the collector
-  takes the national listing, every row says its own town, and `Interest.cities` and the feed's city
-  picker decide what is Warsaw — through `cityKey`, so `Warsaw` and `Warszawa` are the same ask.
+  would have halved the rows. A Warsaw baked into the *fetch* is one reader's preference written
+  into a corpus every account shares, and the day the question becomes Kraków there is nothing
+  stored to answer it with. So the collector takes the national listing and every row says its own
+  town, which the card prints.
+
+  That is also what makes this **by some way the longest source in the feed** — a hundred-odd races
+  nationally against ten items from a WordPress feed — and since the interests went there is no
+  `cities: ['Warszawa']` to narrow it with. The switch on its card is the answer, and it is the
+  first one to reach for if the feed is too long to read.
 
 - **Ticketmaster** can never produce an `onsale` transition — its listing *is* its ticket page. That
   is correct, not a gap. No API key is a configuration state, not a failure, so it returns `[]`.
@@ -497,8 +535,10 @@ looking perfectly healthy while never announcing another opera — the most like
 the least likely way anyone notices.
 
 `functions/src/smoke.live.test.ts` runs every adapter against the real network under `LIVE=1`
-(skipped otherwise, so CI and an offline laptop are unaffected). It is what caught both the haystack
-bug and the opera over-tagging; run it after touching an adapter.
+(skipped otherwise, so CI and an offline laptop are unaffected). It is what caught both the
+haystack bug and the opera over-tagging, back when there was a keyword matcher for either to break;
+it now prints what each source collected and what the feed makes of it. Run it after touching an
+adapter.
 
 ### The Sources tab, and why the URLs had to move
 
@@ -535,15 +575,15 @@ names. Two tabs naming one source differently is worse than either name. A sourc
 `label` stays its *server-side identity* — the string a health row and a "this source has stopped
 working" push are written under — and is what an id nothing describes falls back to.
 
-Five facts per card, and they are five different questions:
+Four facts per card, and they are four different questions:
 
 - **The pages**, from the catalogue. Static: no network, no pull, no collector run, so the tab says
   something useful offline and on an account whose first collection has not happened. Each carries
   what that *page* stamps on everything it yields — its tags, its city, its country. That is on the
-  screen because a keyword-less interest has no second filter, so a blanket tag **is** the whole of
-  what reaches it, and this app has made that mistake from three directions (the Jewish Culture
-  Festival's feed, `tagsFor`'s fallthrough, Ticketmaster's `classical`). Being able to read a
-  source's blanket tags off the page they come from is what makes the fourth one catchable.
+  screen because a tag a page stamps feed-wide is a claim about every row behind it, and this app
+  has made that mistake from three directions (the Jewish Culture Festival's feed, `tagsFor`'s
+  fallthrough, Ticketmaster's `classical`). Being able to read a source's blanket tags off the page
+  they come from is what makes the fourth one catchable.
 - **Health**, from `eventSources`. Three states and not two: never run is not ran-and-found-nothing,
   and only one of them is a reason to go and look at the page.
 - **How much of the corpus is its.** A source can be green, be read, and be contributing nothing you
@@ -553,7 +593,15 @@ Five facts per card, and they are five different questions:
   orphans onto the second line at 320px, where it reads as a bullet.
 - **What a model was asked about its rows, and how much has come back** — `extraction.ts`, and the
   section below.
-- **Which interests reach it, and what they keep** — `filtering.ts`, the section after that.
+
+And **one control**: the switch, which is the only thing on this tab that writes anything and,
+since the interests went, the only filter left in the app. *The switch on each source* has it.
+
+There was a fifth fact — the interests reaching each source, each with what it kept of that
+source's rows, drawn read-only and editable in place. It went with the interests themselves, and so
+did the question it answered. The argument it was built on is what per-source filtering now does
+structurally: **a filter is written once and judged in one place, which is beside the rows it
+decides about.**
 
 A health row the catalogue does not describe gets its own short list under *Also reporting* rather
 than a special case for the id we happen to know about. `classifier` lands there correctly — it
@@ -606,45 +654,48 @@ against a document in the console or against `types.ts`. Not VT323 — that face
 `I` alike, which is the Pipeline tab's one surviving lesson about reading strings character by
 character.
 
-### The interests that reach a source, read where they are judged
+### The interests that reached a source, and what replaced the block
 
-`filtering.ts`, and the second block under each card. An interest is written once and applied
-everywhere — "klezmer concerts" is not a fact about a feed — but it is **read** in exactly one
-place, which is beside the rows it decides about. A list of interests on a tab of its own says what
-you asked for; it cannot say that the tag you narrowed on is stamped by no source you watch, or
-that the one interest reaching a magazine keeps sixty-seven of its sixty-eight articles. Both of
-those are failures this app has actually had, and both are invisible from either side alone.
+`filtering.ts` drew a second block under each card: how many of that source's rows reached the feed
+at all, then the interests that kept something, each with its own count, drawn read-only by the
+same `InterestRules` component the Interests tab used — and editable in place, through
+`useEventInterests`, so there was one writer and one sync queue. It is gone with the interests
+(Sep 2026) and the reasoning it was built on is worth keeping, because it is the reasoning *for*
+per-source filtering rather than against it.
 
-So each card says how many of the source's rows reach the feed at all, then lists the interests
-that keep something, each with its own count, drawn read-only by the same `InterestRules` component
-the Interests tab uses — two screens describing one filter differently is worse than either
-description. **Editing is in place**: the Edit button swaps the rules for the same `InterestForm`,
-saving through `useEventInterests`, so there is one writer and one sync queue. One form slot for the
-whole tab, because an interest is not a fact about the source it is drawn under: the same filter
-appears under every source it reaches, and two open copies would be two drafts of one document.
+The block existed because an interest was written once and applied everywhere — "klezmer concerts"
+is not a fact about a feed — but could only be **judged** in one place, beside the rows it decided
+about. A list of interests on a tab of its own says what you asked for; it cannot say that the tag
+you narrowed on is stamped by no source you watch, or that the one interest reaching a magazine
+keeps sixty-seven of its sixty-eight articles. Both of those were failures this app actually had,
+and both were invisible from either side alone. So a filter written globally had to be drawn
+locally, under every source it touched, with one open form slot for the whole tab because the same
+filter appeared under five cards and two open copies would have been two drafts of one document.
 
-Three decisions worth keeping:
+Filtering per source removes the join rather than displaying it. What decides whether a row exists
+is the adapter and the pages it reads; what decides whether this account hears about it is one
+checkbox on that source's card. Neither is written in one place and read in another, so there is
+nothing to reconcile on screen — which is why the card is down to `n collected` beside the switch.
 
-- **Only the interests that keep something are listed; the rest are a count.** Every interest under
-  every source is five copies of one list, and a zero is not read per source anyway — an interest
-  matching nothing *anywhere* is a dead interest, which is the Interests tab's question, and the
-  line links there.
-- **The counts come from `matchesInterest`**, the call the feed and the collector make. A second
-  "would this match?" written for a summary would agree with the real one until the first bug fix.
-- **Counted over the feed pull, not the whole corpus** — what is upcoming or undated. That is the
-  honest set for "what does this interest currently get me from here", and it is the set the
-  `n collected` chip above it counts, so the two numbers on one card cannot contradict each other.
-  It is also why this tab needs no second query: `pullAllEvents` went with the Pipeline tab.
+Two things it taught that outlived it:
 
-A muted interest is listed, because muting says "do not wake me" rather than "stop showing me" and
-it still filters the feed; a deleted one is not, tombstones included.
+- **Counted over the feed pull, not the whole corpus** — what is upcoming or undated. That was the
+  honest set for "what does this get me from here", and it is the set the `n collected` chip still
+  counts, which is why this tab needs no second query. `pullAllEvents` went with the Pipeline tab.
+- **A count that can contradict another count on the same card is worse than no count.** The two
+  numbers came from one pull for that reason, and `n collected` is still counted over the same
+  rows the extraction block counts over.
 
 ### The switch on each source, and the two things it does not do
 
-The three facts above answer "is this source worth its fixture?" and left you with nowhere to put
-the answer. A pipeline is tuned by running it, an adapter that turns out to be noisy is fixed in a
-fixture and a deploy, and in between the phone keeps ringing — so each card now carries a checkbox,
-and `src/utils/events/sourcePrefs.ts` is what it writes.
+The facts above answer "is this source worth its fixture?" and left you with nowhere to put the
+answer. A pipeline is tuned by running it, an adapter that turns out to be noisy is fixed in a
+fixture and a deploy, and in between the phone keeps ringing — so each card carries a checkbox, and
+`src/utils/events/sourcePrefs.ts` is what it writes.
+
+It was built as a blunt instrument beside a fine one. **It is now the only one**, which is a good
+deal more weight than it was designed to carry and is worth knowing before changing anything here:
+a source is in the feed and on the lock screen, or it is neither.
 
 **It is this account's preference, not an instruction to the collector.** `events/` is one shared
 corpus scraped from public pages and `eventSources/` is the health of the scrape; both are facts
@@ -671,33 +722,40 @@ Three rules keep it honest, and the third is the one that is invisible until it 
   under a `Source off` chip, on the grounds that a row absent from one view and present in another
   with nothing saying why reads as the matcher disagreeing with itself. That view is gone and the
   argument came with it: there is one list now, and what the switch is currently keeping out is
-  counted on the card that carries it — `n collected` against what the filters keep.
+  the `n collected` chip on the card that carries it.
 - **The empty feed says who emptied it.** The switch is on another tab, and a source silenced from
   a phone empties a laptop that has narrowed nothing — so the empty state links to Sources with a
   count. It is now the *only* line in that empty state, the other filters having gone.
 - **Switching a source back on does not replay its backlog.** A fortnight off is a fortnight of
-  rows newer than `armedAt` and newer than every interest, so both of `isFresh`'s existing clocks
-  would let the lot through at once — the exact flood the box was reached for. A switch records
-  *when it was flipped*, and `announceFloor` makes that a third clock: re-enabling arms that source
-  from the moment of the tap, exactly as arming push arms the account from the moment of the tap.
+  rows newer than `armedAt`, so the one other clock `isFresh` has would let the lot through at once
+  — the exact flood the box was reached for. A switch records *when it was flipped*, and
+  `announceFloor` makes that a second clock: re-enabling arms that source from the moment of the
+  tap, exactly as arming push arms the account from the moment of the tap. (There was a third,
+  `interest.createdAt`, which did the same job for adding an interest. It went with them.)
 
 `soon` and `presale` are deliberately not floored, only `announced` and `onsale` — the two that ask
-`isFresh`. A date-based reminder is not an announcement, which is the rule `presale` already states
-for interests: a race next week is next week whenever its row happened to be collected, and hearing
-about it is why anybody switches a source back on. While a source is off, nothing is produced for
+`isFresh`. A date-based reminder is not an announcement: a race next week is next week whenever its
+row happened to be collected, and hearing about it is why anybody switches a source back on. While a source is off, nothing is produced for
 it and **nothing is latched**, so no notice id is consumed and the reminders survive the silence.
 
 ### Where an event is, who it is for, and whether it is one
 
+Three fields a model writes, and **none of them filters anything any more.** They were built as
+filters and the rules that read them went with the interests (Sep 2026); what is left is what they
+say on the card, which was always half the point — see *The filter has to be falsifiable from the
+outside* below, which is about exactly that. The history is kept because these fields are still
+written on every run, still cost model calls, and the reasons for their shapes are the reasons not
+to simplify them.
+
 The feed's first real complaint was four PyCons — Cameroon, Africa, Greece, NL — none of them
 attendable, all of them matched by `python`/`pycon`. The app had **no axis for where** at all beyond
-`Interest.cities`, which is any-of over free text: saying "in Poland" would have meant listing every
-Polish city, against a `cityOf` that guesses at the second-from-last comma-separated field.
+`Interest.cities`, which was any-of over free text: saying "in Poland" would have meant listing
+every Polish city, against a `cityOf` that guesses at the second-from-last comma-separated field.
 
 A country whitelist alone does not answer it either, and that is the whole shape of this feature.
 The question is not *which country* but **does this pull people in from outside** — PyCon US and
-EuroPython are to be kept and PyCon NL dropped, and nothing in a listing distinguishes them. They can
-be in the same country in the same year. So two fields, and only one of them is scrapable:
+EuroPython are worth knowing about and PyCon NL is not, and nothing in a listing distinguishes them.
+They can be in the same country in the same year. So two fields, and only one of them is scrapable:
 
 - `EventRecord.country` — ISO-2, or `ONLINE`. Supplied by the adapter **where the source knows it
   for free** (`teatr-wielki` is in Warsaw, `ticketmaster` is queried `countryCode=PL`, each `FEEDS`
@@ -706,40 +764,35 @@ be in the same country in the same year. So two fields, and only one of them is 
 - `EventRecord.reach` — `local` / `national` / `international`. A judgement, and the one thing here a
   language model decides.
 
-`src/utils/events/countries.ts` normalises both sides to codes, and it is load-bearing rather than
-tidy: the matcher compares `Interest.countries` against `EventRecord.country`, so a stored `Polska`
-would be a filter that never fires with an empty feed as its only symptom. `newInterest` is the one
-choke point, the way `sanitizeSettings` is for the chord cards.
+`countries.ts` used to normalise both sides to codes, over a hand-written table of a hundred and
+thirty English and Polish names, because the matcher compared `Interest.countries` against
+`EventRecord.country` and a stored `Polska` would have been a filter that never fired with an empty
+feed as its only symptom. Nothing parses a country out of free text now — the classifier is asked
+for a code and `classify.ts` checks the shape itself — so that file is down to `ONLINE` and
+`countryLabel`, which is what prints `PL` or `?` on a chip.
 
-#### One rule with two ways to pass, not two constraints
+**The `places` rule they fed was one rule with two ways to pass**, and it is written down here
+because it is the shape to come back to if a filter ever returns: `Interest.countries` and
+`Interest.internationalAnywhere` were joined by **OR**, not AND. Country in the list passed, and an
+`international` reach passed wherever it was held. AND-ed the way `tags` and `cities` were, it read
+"in Poland *and* international", which keeps nothing — where "conferences in Poland, plus the ones
+worth flying to" is one thought, which is why the checkbox sat inside the countries field rather
+than beside it.
 
-`Interest.countries` and `Interest.internationalAnywhere` are read together, joined by **OR**:
-
-```
-countries empty                                    → no constraint
-country ∈ countries                                → passes
-internationalAnywhere && reach === 'international' → passes
-```
-
-AND-ed the way `tags` and `cities` are, it would read "in Poland *and* international", which keeps
-nothing. "Conferences in Poland, plus the ones worth flying to" is one thought, and the checkbox
-sits inside the countries field for that reason rather than beside it.
-
-**An unclassified event passes**, per axis. It follows the undated-event rule directly above it in
-`matchReason` — not excluded, simply no answer yet — and it decides which way this fails when the
-model is down: the noise comes back visibly rather than the feed quietly emptying, and a silently
-empty feed is the one outcome here indistinguishable from everything working. Per axis because a
-record can know where it is and not yet who it is for: every scraped Polish row is `PL` from the
-moment it lands, with `reach` arriving later.
+**An unclassified event passed**, per axis, and that rule outlived the filter in a different form:
+nothing is excluded for want of a verdict, so the classifier being down brings the noise back
+visibly rather than emptying the feed. A silently empty feed is the one outcome here that looks
+exactly like everything working. Per axis, because a record can know where it is and not yet who it
+is for: every scraped Polish row is `PL` from the moment it lands, with `reach` arriving later.
 
 #### And whether it is an event at all
 
 The second complaint had the same shape and a different axis. The running interest surfaced three
 sponsor posts and a set of pacer times about the 48th Warsaw Marathon — *"Marki DIP Hot i DIP Rilif
-Partnerem 48. Maratonu Warszawskiego!"* — four cards, above the one row that is the race. They are
+Partnerem 48. Maratonu Warszawskiego!"* — four cards, above the one row that is the race. They were
 not near misses: every one of them is genuinely about running, genuinely in Warszawa, and genuinely
 matched. They are simply **articles rather than events**, which is the trade the RSS adapter names
-in its own header and had until now paid in full.
+in its own header and had until then paid in full.
 
 So a third field, `EventRecord.kind`, from the same call:
 
@@ -761,15 +814,17 @@ whose items are articles by construction — is precisely the source whose items
 event. A blanket `coverage` on `SourcePage` would be a rule that is right four times in five and
 silently wrong about the fifth, which is what makes this a judgement rather than a field.
 
-`Interest.includeCoverage` is the opt-in, and it is off by default: this is the one filter here
-that runs without being asked for. Nobody sets up an event watcher wanting press releases, where
-"conferences in Poland" is a preference someone has to state. The interest that *does* want them —
-"everything the Maraton Warszawski blog says" — is the unusual one, and the checkbox is how it is
-said. `announcement` is never touched by it either way.
+**`Interest.includeCoverage` was the opt-in, and it is nothing now.** It was off by default and was
+the one filter here that ran without being asked for. With the interests gone the owner's call was
+to let coverage through rather than to hard-code the old default: a rule nobody can turn off is
+worse than the four cards it saves, and those four cards come from a ten-item WordPress feed whose
+switch is one tap away. `announcement` was never touched by it either way, which is why nothing
+about the theatre's news changed.
 
-The rule sits **before** `places` in `matchReason`, because a reason is the first thing wrong and
-"this is not an event" is the stronger statement. A sponsor post about a race in Cameroon fails
-both; filed under geography it would be noise in the list that exists to check the country filter.
+So the field is now read and not obeyed: the card draws a kind chip on anything that is not a
+`listing`, which is what tells an article among the listings apart from a row nobody has judged.
+There is deliberately no chip saying "yes, this is an event" — a label on every card in the corpus
+is a label nobody reads twice.
 
 #### The classifier runs in exactly one place
 
@@ -820,13 +875,16 @@ Four things about it are load-bearing:
   changes. There is deliberately no button: "the prompt changed" is a fact about a build, and a
   re-run nobody can date afterwards is worse than no re-run. It is at **2**, bumped when `kind`
   joined the prompt — so the whole corpus re-labels over the few runs after that deploy, at 400 an
-  hour, and until it has, every article in the feed is unclassified and therefore still showing.
+  hour. Nothing is filtered on the result, so a corpus mid-relabel costs chips on cards rather than
+  rows in the feed, which is a good deal less pressing than it was when the bump shipped.
 
 The order in `runCollection` is `fetch → upsert → read → classify → notify` (the `read` step is the
-newsroom reader, one section down), and it is the point rather
-than an implementation detail: `notifyAccount` decides pushes with the same `matchReason`, an
-unclassified event passes the places rule, so notifying first would push about exactly the national
-conferences this exists to stop pushing about. It also made `upsertEvents` return the **merged**
+newsroom reader, one section down). It used to be the point rather than an implementation detail:
+`notifyAccount` decided pushes with the same `matchReason`, an unclassified event passed the places
+rule, and notifying first would have pushed about exactly the national conferences the filter
+existed to stop pushing about. With the filter gone what the order buys is smaller and still worth
+keeping — the card behind a notification can say where the event is by the time the tap arrives,
+and the classifier is the expensive step either way. It also made `upsertEvents` return the **merged**
 records, which the notifier now receives instead of freshly built ones — so `firstSeenAt` is the
 real one (`announced` no longer fires every run for every match, held back only by the notice latch)
 and `onSaleSeenAt` is visible to the planner for the first time, which is what `onsale` always
@@ -856,8 +914,8 @@ which becomes `EventRecord.onSaleAt` for `presale` to count down to. That is the
 It answered a five-way `newsroomKind` as well (`ticket-sale` / `programme` / `practical` /
 `institutional` / `other`), plus a `newsroomEventAt` and an English `summary`, and all three are
 gone at `READER_VERSION` **3**. Four of the five kinds were only ever *read* — nothing counted
-down to them, no seeded interest asked for them, and their whole effect was a chip on a card and a
-row of filter buttons over one theatre's news list. A taxonomy is also a materially harder question
+down to them, nothing filtered on them, and their whole effect was a chip on a card and a row of
+filter buttons over one theatre's news list. A taxonomy is also a materially harder question
 than a boolean, which is the second reason: the point of this pass is the one fact on that page
 with a deadline, and everything else it was asked was competing for the same judgement.
 
@@ -945,11 +1003,11 @@ Five mechanics are load-bearing:
   source has not heard of a date the reader found; deriving the union in one place is what stops
   the reader racing the upsert and what makes a re-read idempotent.
 
-  **It is keyed on the date, not on the boolean.** `ticket-sale` is the whole of the keyword-less
-  `Ticket sales opening` seed, so it has to mean *there is a deadline on this row* — a `true` whose
-  date the guards refused is a card with nothing to count down to. Both writers stamp it: the
-  adapter's regex where it fired, the reader where it did not, and which pass established the
-  deadline is not something an interest should have to know.
+  **It is keyed on the date, not on the boolean.** `ticket-sale` is what `presale` counts down to,
+  so it has to mean *there is a deadline on this row* — a `true` whose date the guards refused is a
+  card with nothing to count down to. Both writers stamp it: the adapter's regex where it fired,
+  the reader where it did not, and which pass established the deadline is not something anything
+  downstream should have to know.
 
 **The regex is kept and wins where it fires.** It read the theatre's literal sentence with a tested
 regex, and a model is not asked to second-guess a stated fact — the same rule as `country`. It is
@@ -1006,86 +1064,85 @@ it scrolls off the theatre's news list — which is at most ten items, so it is 
 most of the work: the card says `Published 61 d ago` rather than `Announced 2 d ago`, and the
 undated group is ordered by something real.
 
-#### The filter has to be falsifiable from the outside
+#### A verdict has to be falsifiable from the outside
 
-A geography filter is otherwise unprovable: a thing that stopped appearing and a thing that was
-never announced look identical, which is the whole reason this half exists.
+A geography filter was otherwise unprovable: a thing that stopped appearing and a thing that was
+never announced look identical, which is the whole reason this half existed. **There is no filter
+now, and the argument survives it in a weaker but still real form** — a card that says where an
+event is can be argued with, where a card that says nothing leaves the classifier's whole output
+unexaminable from the app.
 
-**Where that proof lives moved in Sep 2026**, and it is worth knowing what it used to be. The Feed
-carried three view states — `Matched` / `Filtered out` / `Everything` — with the middle one listing
-events that satisfied everything an interest asked about their *content* and were turned away only
-on `kind` or `places`, a country tally under it and a `{classified} of {total} labelled` line beside
-that. It worked, and it put an inspection tool on the screen that is read every day: three buttons,
-two filter rows and a city picker above a list whose whole job is to be short. The same question is
-now answered on the Sources tab, per source and beside the source it is about — `n collected`,
-`{kept} of {rows} reach your feed`, and a model-coverage count per pass. That is strictly more
-information (the old coverage line was corpus-wide, so a scrape whose rows were the unlabelled ones
-looked like everything else) and it is on the tab somebody opens *because* something looks wrong.
+**Where that proof lives moved twice.** The Feed originally carried three view states — `Matched` /
+`Filtered out` / `Everything` — with the middle one listing events that satisfied everything an
+interest asked about their *content* and were turned away only on `kind` or `places`, a country
+tally under it and a `{classified} of {total} labelled` line beside that. It worked, and it put an
+inspection tool on the screen that is read every day: three buttons, two filter rows and a city
+picker above a list whose whole job is to be short. That moved to the Sources tab, per source; then
+the interests went and `{kept} of {rows} reach your feed` went with them, leaving `n collected`
+beside the switch and the model-coverage count per pass, which is the honest remainder — nothing
+between a source's rows and the feed except the switch, so there is nothing left to report as kept.
 
 What stayed on the card, because it is a fact about the row rather than an inspection:
 
-- **The country-and-reach chip, on every card.** Without it there is no telling whether something is
-  here because the filter judged it right or because it has not been judged at all — and `?` / *not
-  labelled yet* is its own state for exactly that.
-- **The kind chip, when the row is not a `listing`.** An article an interest kept because it asked
-  for articles and one nobody has judged yet are different rows. There is deliberately no chip
-  saying "yes, this is an event": a label on every card in the corpus that nobody reads twice.
+- **The country-and-reach chip, on every card.** It used to say whether something was here because
+  the filter judged it right or because it had not been judged at all. Nothing is judged now, so
+  what it says is simply where the event is — and `?` / *not labelled yet* is still its own state,
+  and is now the **only** place in the app where a stopped classifier is visible on a row. The
+  per-source count in `extraction.ts` is the other half of that, and the aggregate one.
+- **The kind chip, when the row is not a `listing`.** An article among the listings says it is one.
+  There is deliberately no chip saying "yes, this is an event": a label on every card in the corpus
+  that nobody reads twice.
 
-`matchReason` keeps returning the first failing rule and `interestsRejectingFor` is gone with the
-view it fed. A wrong *rejection* is still corrected with a second interest naming the event; a wrong
-*admission* with `excludeKeywords`. There is no per-event override — see the section below.
+A wrong verdict is now a wrong word on a card rather than a row that vanished, which is the quiet
+dividend of nothing filtering on it: `CLASSIFIER_VERSION` is the lever, and there is no per-event
+override — see the section below, which is about the last time somebody wanted one.
 
 ### Ignoring one event, and why there is no longer such a thing
 
 There was an `Ignore` button on every card, a `users/{uid}/eventIgnores` collection reconciled by
 `versioned.ts`, an `Ignored (n)` view to undo it from, and a read of that collection in
-`loadAccount` so the collector obeyed it too. All of it is gone (Sep 2026), at the owner's request,
+`loadAccount` so the collector obeyed it too. All of it went in Sep 2026, at the owner's request,
 and the reasoning is worth recording because the feature was carefully built and the arguments for
-it were sound.
+it were sound. It was the first of three removals in a fortnight — this, the Pipeline tab, then the
+interests — and they are the same decision three times: a per-reader control is worth less than it
+costs on a list this short.
 
-What it was for: the rules turn away a **kind** of event (`excludeKeywords`) or a **place**
-(`countries`), and neither can say *yes, this is exactly what I asked for, and I am not going to
+What it was for: the rules could turn away a **kind** of event (`excludeKeywords`) or a **place**
+(`countries`), and neither could say *yes, this is exactly what I asked for, and I am not going to
 that one*. What it cost: a second synced collection, a second push queue, a second hook mounted on
 the Feed, a fourth view on the feed to undo from, a chip on a card in a view that existed to explain
 it, and a required field on `PlanContext` that every future caller had to think about. For a feed
 whose whole list is a screen or two, the cheaper answer to a row you are not going to is to read
-past it.
+past it — which is the answer to a whole *source's* worth of rows you are not going to, too, except
+that there the switch is cheaper still.
 
-Three things it left behind, each deliberate:
+Three things it left behind, each deliberate, and each one a rule the later removals kept:
 
 - **`adoptOwner` still memoises its answer rather than its guard.** It was changed for the ignores —
   two hooks mounting on the Feed, whoever asks second reading `previous === uid` and keeping the
   previous account's rows over an emptied store — and the second caller is now `useEventSourcePrefs`,
-  so the case is live and the rule stands.
-- **The push queue keeps its `key` argument** although there is one collection left to drain. Two
-  collections holding ids from different spaces (a `uuid()` and a `slugKey(fingerprint)`) sharing one
-  queue is a write that never leaves the device under a Synced badge, and the parameter is what
-  stops that being re-invented.
-- **`users/{uid}/eventIgnores` documents are not deleted.** Nothing reads them, the catch-all rule
-  still covers them, and a migration that deletes user data to tidy a schema is a worse idea than a
-  collection nobody opens.
-
-The countries join the interest's rule summary (`@PL`, and `+international` for the OR clause) —
-left off, an interest quietly dropping four conferences a week would look exactly like one that
-constrains nothing, which is that feature's own failure mode reappearing one screen along.
-
-`SEED_INTERESTS` is untouched: `withMissingSeeds` is keyed by id and never edits an existing row, so
-an account's own `Python & dev` is set by hand in the editor, which is also the first real test of
-the toggle.
-
-`Running in Warszawa` is the seed that made a **third** interest shape worth naming, beside the
-keyword one and the keyword-less-plus-tag one: `tags: ['running']` narrowed by `cities:
-['Warszawa']`, where the place is the whole question. Keywords could not have done it — "Cross
-Forteczny" and "Zabierz PIESia do Międzylesia" are both races and share no word with each other or
-with `bieg` — and `countries` is the wrong axis for a listing that is national by design.
+  which mounts on the Feed and on the Sources tab. The case is live and the rule stands.
+- **Data a removed feature wrote is not deleted.** Nothing reads `users/{uid}/eventIgnores`, the
+  catch-all rule still covers it, and a migration that deletes user data to tidy a schema is a worse
+  idea than a collection nobody opens. `users/{uid}/eventInterests` is left the same way, and so are
+  the `events-interests` localStorage keys — a browser holding those simply holds two strings nobody
+  reads, exactly as it does for `events-feed-city` and `events-feed-kinds`.
+- **The push queue's `key` argument** was the one thing here that did *not* survive. It existed
+  because two collections holding ids from different spaces (a `uuid()` and a
+  `slugKey(fingerprint)`) sharing one queue is a write that never leaves the device under a Synced
+  badge. The interests were the last collection a client wrote; the queue went with them, and
+  `useEventSourcePrefs` writes one document with a merge rather than draining a queue at all. If a
+  second client-written collection ever returns, that parameter is the lesson to re-read.
 
 ### The feed has no filters
 
 The Feed toolbar held a city picker (`events-feed-city`), a row of `kind` toggles
 (`events-feed-kinds`), the three view states above and an `Ignored` view. It holds a count and
-nothing else now, and `buildFeed` returns matched rows and nothing else: one `FeedOptions` field
-(`sources`), no `FeedMode`, no `rejectedBy`, no `offSource`, no `narrowSections`, no `cityOptions`,
-no `kindOptions`.
+nothing else, and `buildFeed` returns upcoming rows from enabled sources and nothing else: one
+`FeedOptions` field (`sources`), no `FeedMode`, no `rejectedBy`, no `offSource`, no
+`narrowSections`, no `cityOptions`, no `kindOptions`, and since the interests went no `FeedItem`
+either — a section is an `EventRecord[]`, because there is no longer a "why is this here" to carry
+beside each row.
 
 **The reasoning is the one those controls were built on, followed one step further.** Each was
 documented as "a view preference on one device, never a `FeedOptions` field, never anything
@@ -1097,29 +1154,32 @@ keep that honest. And both durable forms already existed and already reached the
 `Interest.cities` for the city, `Interest.includeCoverage` for the kinds. The controls were a second
 spelling of two interest fields, on the one screen that is read every day.
 
-So the pipeline's output goes to two places — the feed and the lock screen — and both are decided by
-the same interests, read where they are written and judged where their rows are. What is lost is
-real and was weighed: three tours of one show in three cities are three cards, and narrowing to
-Warszawa is now an edit to an interest rather than a tap. That edit is one tap away on the Sources
-tab, under the source producing the cards.
+That last sentence is the one the interests' removal changed, and it should be said plainly rather
+than explained away: **the durable forms those controls duplicated are gone too.** Narrowing to
+Warszawa was a tap, then an edit to an interest, and is now neither — the whole national race
+listing is in the feed or the source is off. Three tours of one show in three cities are three
+cards. That is the trade the owner asked for, and the switch on the Sources tab is what it is
+answered with.
 
-`cityKey` and `CITY_ALIASES` stay, and are not tidy-up bait. `matchReason`'s `cities` rule is their
-caller now: folding makes `Kraków`, `KRAKOW` and `Krakow` one string, and only the alias table joins
-`Warsaw` to `Warszawa` — Ticketmaster's English and Polish catalogues list the same hall under both,
-so an interest limited to one spelling would silently miss half its nights. The table is short and
-hand-written on purpose (this file compiles into the Cloud Function, so a gazetteer here is a
-dependency in the collector) and **a wrong merge is worse than a missing one**. `isEndonym` went with
-the picker that printed labels; `cities.test.ts` keeps the two properties the table rests on.
+`cityKey` and `CITY_ALIASES` went with it. They existed because the matcher's `cities` rule
+compared two spellings — folding made `Kraków`, `KRAKOW` and `Krakow` one string, and only the
+alias table joined `Warsaw` to `Warszawa`, Ticketmaster's English and Polish catalogues listing the
+same hall under both. Nothing compares two city spellings now: each row states its town and the card
+prints it. The rule the table was built on outlived it next door — **a wrong alias is worse than a
+missing one** is what `lines.ts` keeps for Metro Watch's stations, where it is sharper still.
 
-`events-feed-city` and `events-feed-kinds` are gone from `EVENT_KEYS` and from `CACHED_PER_OWNER`;
-nothing migrates them, and a browser holding the old keys simply has two strings nobody reads.
+`events-feed-city`, `events-feed-kinds`, `events-interests` and `events-interests-unsynced` are all
+gone from `EVENT_KEYS` and from `CACHED_PER_OWNER`; nothing migrates them, and a browser holding the
+old keys simply has some strings nobody reads.
 
 ### The Pipeline tab is gone, and where its job went
 
 `/apps/events/pipeline/` listed the **whole corpus** — interests ignored, past rows included — with
 eight comboboxes over it and a row that opened into its own JSON, grouped by the pass that wrote
 each field. It was removed in Sep 2026 at the owner's request ("not useful"), and what it was
-genuinely for moved onto the Sources tab, per source. `_redirects` 301s both locales' paths to
+genuinely for moved onto the Sources tab, per source. The interests followed a fortnight later; see
+*The interests are gone* above, and note that the feed listing the whole corpus is now the feed's
+ordinary state rather than a separate tab. `_redirects` 301s both locales' paths to
 `/apps/events/sources/`, bare and slashed, because an installed app precached the route.
 
 What went with it: `EventsPipeline.tsx`, `utils/events/pipeline.ts` (`FIELD_STAGES`, `stageBlocks`,
@@ -1133,20 +1193,24 @@ translation keys in two locales.
   over everything, so a single scrape whose rows were the unlabelled ones looked exactly like a
   healthy corpus.
 - *"What is my filter doing to them?"* — nothing did this, actually; the tab showed the corpus and
-  the feed showed the survivors, and the join was done in the reader's head. `filtering.ts` does it
-  per source now.
+  the feed showed the survivors, and the join was done in the reader's head. `filtering.ts` did it
+  per source for a fortnight, and then there was no filter to report on: the feed and the corpus
+  are the same list, minus what is past and minus a switched-off source.
 - *"What exactly is stored on this row, and which pass wrote it?"* — **this is the loss**, and it is
-  a real one. There is no longer any way to read a fingerprint, a haystack, a `classifyHash` or a
+  a real one. There is no longer any way to read a fingerprint, a `classifyHash` or a
   `newsroomHash` from the app; that is the Firestore console again, which is what the tab was built
-  to avoid. It is the price of the trade and it should be stated rather than explained away. If it
+  to avoid. (`haystack` is not on that list any more: it went with the matcher that read it.) It is
+  the price of the trade and it should be stated rather than explained away. If it
   comes back, it belongs behind a disclosure on a source's card — one row's JSON, reached from the
   source it came from — rather than as a fifth tab over a corpus.
 
 Two things it taught that are still true elsewhere, and are written up where they now apply:
 
-- **A multi-select's counts are the report**, each axis counted over what the *other* axes leave, an
-  empty selection meaning no constraint. The rule outlived the control; `match.ts` states it for a
-  keyword-less interest, which is where it came from.
+- **An empty selection means no constraint, never "matches nothing".** It came from the facets,
+  where each axis was counted over what the *other* axes left; `match.ts` then stated it for a
+  keyword-less interest, and that was the first test in `match.test.ts`. Both are gone and the rule
+  is the one to re-read before writing any filter here again — reading empty as unsatisfiable makes
+  a control silently dead, with nothing in the UI to say why.
 - **Somebody else's text must reach the DOM as text.** `jsonView.ts` returned `{kind, text}` tokens
   rather than an HTML string for `dangerouslySetInnerHTML`, because every string in that panel was a
   scraped title or a sentence a model wrote about an article it was handed. Nothing in the app

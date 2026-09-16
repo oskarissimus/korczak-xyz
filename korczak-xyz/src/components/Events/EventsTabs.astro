@@ -1,6 +1,9 @@
 ---
 /**
- * Navigation between the feed, the interests, the notification settings and the sources.
+ * Navigation between the feed, the notification settings and the sources.
+ *
+ * Three tabs since the Interests one went (Sep 2026), which is the same count it had before the
+ * Pipeline tab was added and removed.
  *
  * Server-rendered rather than part of the islands, for the reason the sleep log's is: all three
  * islands are client:only, so anything inside one is missing until React hydrates — and the nav is
@@ -8,7 +11,7 @@
  */
 import { translations, type Lang } from './translations';
 
-type View = 'feed' | 'interests' | 'alerts' | 'sources';
+type View = 'feed' | 'alerts' | 'sources';
 
 interface Props {
   lang: Lang;
@@ -22,7 +25,6 @@ const base = lang === 'pl' ? '/pl/apps/events' : '/apps/events';
 
 const TABS: { view: View; href: string; label: string }[] = [
   { view: 'feed', href: `${base}/`, label: t.navFeed },
-  { view: 'interests', href: `${base}/interests/`, label: t.navInterests },
   { view: 'alerts', href: `${base}/alerts/`, label: t.navAlerts },
   { view: 'sources', href: `${base}/sources/`, label: t.navSources },
 ];

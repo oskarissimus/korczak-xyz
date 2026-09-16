@@ -7,7 +7,9 @@
  * The feed is worldwide and mostly historical: at the time of writing it carries 874 VEVENTs, plenty
  * of them from 2016. Dropping the past happens in `collect.ts`, which does it for every source;
  * geography deliberately does NOT happen here, because "PyCon US" may still be worth knowing about
- * and deciding that is the interest's job, not the collector's.
+ * and what is collected is a fact about the world rather than about one reader. Every row says
+ * which country it is in — the classifier fills that where the feed does not — and a card that is
+ * never going to be worth a flight is a card to read past.
  */
 
 import type { EventSource, RawEvent, SourceContext } from './types';
@@ -36,7 +38,7 @@ export function toRawEvents(ics: string): RawEvent[] {
  *
  * These read like "Kraków, Poland" or "Convention Center, Pittsburgh, PA, USA" — so the city is the
  * first field for a short one and the second-from-last otherwise. Wrong often enough that it must
- * only ever *narrow* an interest that asked for a city, never be shown as fact.
+ * only ever be read as a hint on the card, never printed as fact.
  */
 export function cityOf(location: string | undefined): string | undefined {
   if (!location) return undefined;

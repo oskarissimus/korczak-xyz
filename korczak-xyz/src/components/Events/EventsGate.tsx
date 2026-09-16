@@ -2,8 +2,8 @@
  * The signed-in gate every tab of this app sits behind.
  *
  * Unlike the typing trainer or the flashcards, this app has nothing to offer a signed-out visitor:
- * the watching happens on a server, against interests stored on an account, and the notifications
- * have to know where to go. So it hard-gates, in the order `BabySleepShare` established — and the
+ * the watching happens on a server, the sources somebody is listening to are stored on an account,
+ * and the notifications have to know where to go. So it hard-gates, in the order `BabySleepShare` established — and the
  * loading branch renders an empty reserved block rather than a disabled form, because a form you
  * cannot use is worse than no form at all.
  */

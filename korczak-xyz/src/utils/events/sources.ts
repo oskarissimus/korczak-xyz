@@ -146,7 +146,8 @@ export const ELEKTRONICZNE_ZAPISY_HOST = 'https://elektronicznezapisy.pl';
  * **No `city`, unlike every other page in this file.** These listings are national and each row
  * says its own place, so the fact belongs to the row rather than to the page — see `splitPlace` in
  * the adapter. Fetching `?city_id=12` instead would have put one reader's Warsaw into a corpus
- * every account shares; `Interest.cities` and the feed's city picker are where that question lives.
+ * every account shares, and the day the question became Kraków there would be nothing stored to
+ * answer it with. Every row states its own town and the card is what says which is which.
  *
  * `running` is what these pages *are*, which is the only kind of tag a page may stamp feed-wide:
  * every row on them is a race. It is deliberately the whole tag list — a discipline tag per page
@@ -182,9 +183,9 @@ export const FEEDS: SourcePage[] = [
     /*
      * Their reenactment and tournament calendars are the best single source for castles and fairs —
      * but the feed is a general history magazine, so most items are articles about something else
-     * entirely. `history` describes what the feed is; it is the interest's keywords that pick the
-     * tournaments out, and only one item in seventy-seven matched on the last live run, which is
-     * the ratio working as intended. Tagging it `festival` would have claimed every article was one.
+     * entirely. `history` describes what the feed is, and that is all a page-wide tag may ever
+     * claim. Tagging it `festival` would have said every article was one, which is the mistake
+     * this file's other comments are about.
      */
     tags: ['history'],
     country: 'PL',
@@ -193,10 +194,11 @@ export const FEEDS: SourcePage[] = [
     url: 'https://www.jewishfestival.pl/feed/',
     label: 'Festiwal Kultury Żydowskiej',
     /*
-     * No `klezmer` tag, deliberately. Tags are matched all-of and structurally, but they used to be
-     * folded into the keyword haystack too — and a feed-wide `klezmer` made the Klezmer interest
-     * match all 67 articles this feed carried, Ted Kaczynski included. The haystack no longer reads
-     * tags (see haystackOf), and the tag stays off anyway: what this feed IS is a festival's blog.
+     * No `klezmer` tag, deliberately. A feed-wide `klezmer` once put all 67 articles this feed
+     * carried, Ted Kaczynski included, in front of a reader who had asked about klezmer — because
+     * the keyword matcher of the day folded tags into the text it searched. That matcher is gone
+     * and the tag stays off anyway, for the reason it should always have been off: what this feed
+     * IS is a festival's blog.
      */
     tags: ['music', 'festival'],
     city: 'Kraków',
@@ -214,12 +216,13 @@ export const FEEDS: SourcePage[] = [
      * first, months before any of it is a row anywhere.
      *
      * `running` is honest as a feed-wide tag: this is a running organiser's own publication, the
-     * way historia.org.pl is a history magazine. The cost is the one that tag always carries — a
-     * keyword-less interest asking for `running` gets the sponsor posts too, and the seeded
-     * `Running in Warszawa` is exactly such an interest. Ten items is what a WordPress feed holds,
-     * so that is a card or two, not the sixty-seven the Jewish Culture Festival's feed once handed
-     * the Klezmer interest; and it is the trade this feed is here to make, since an announcement
-     * with no date yet is the thing worth knowing earliest.
+     * way historia.org.pl is a history magazine. It also gates `distancesOf`, which is the one
+     * thing in the app that still reads it — and that gate is the whole safety of the distance
+     * rules, since `maraton` is a live Polish word for a long sitting of anything.
+     *
+     * Ten items is what a WordPress feed holds, so the sponsor posts and pacer times this feed
+     * carries alongside its announcements are a card or two, and that is the trade it is here to
+     * make: an announcement with no date yet is the thing worth knowing earliest.
      */
     tags: ['running'],
     city: 'Warszawa',
@@ -275,8 +278,8 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
          * produce. A page may only stamp feed-wide what every row on it *is*, and most of these
          * rows are a job advert or a parking notice; the tag is applied per row, by the adapter,
          * and only where a sale date was actually read out of the prose. Stamping it here would
-         * hand the keyword-less "Ticket sales opening" interest the theatre's entire press
-         * office — which is the mistake this app has now made from three directions.
+         * put a `presale` countdown on the theatre's entire press office — the same mistake this
+         * app has now made from three directions, arriving by a fourth.
          */
         tags: ['theatre', 'teatr-wielki', 'newsroom'],
         city: 'Warszawa',

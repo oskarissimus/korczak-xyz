@@ -1,28 +1,22 @@
 /*
- * Arranging matched events for reading.
+ * Arranging collected events for reading.
  *
  * Pure, and in the portable set — the collector does not use it today, but nothing here needs a
- * browser and keeping it beside the matcher is what stops "what the feed shows" and "what the
- * collector notifies about" drifting into two different ideas of the same list.
+ * browser and keeping it beside `notices.ts` is what stops "what the feed shows" and "what the
+ * collector notifies about" drifting into two different ideas of the same list. They now agree by
+ * being the same short rule: an upcoming or undated row, from a source this account has left on.
  */
 
-import type { EventRecord, Interest } from './types';
+import type { EventRecord } from './types';
 import { ALL_SOURCES_ON, sourceEnabled, type SourcePrefs } from './sourcePrefs';
-import { matchingInterests, scoreMatch } from './match';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
-
-export interface FeedItem {
-  event: EventRecord;
-  /** Why it is here. Never empty: the feed is the matched rows and nothing else. */
-  matched: Interest[];
-}
 
 export type FeedGroup = 'week' | 'month' | 'later' | 'undated';
 
 export interface FeedSection {
   group: FeedGroup;
-  items: FeedItem[];
+  events: EventRecord[];
 }
 
 /**
@@ -62,52 +56,47 @@ export interface FeedOptions {
 }
 
 /**
- * The feed: matched events, deduped, grouped by how soon they are.
+ * The feed: what the enabled sources collected, deduped, grouped by how soon it is.
  *
- * **The whole of what this returns is what the filters kept**, and that is the tab's contract since
- * Sep 2026: the feed is the output of the pipeline, not a place to inspect it. What a filter turned
- * away, how much of a source reaches you and which interest is doing it are questions about the
- * *extraction*, and they are answered on the Sources tab beside the source they are about — see
- * `filtering.ts`. A feed that could also show the rows it had removed needed a view switcher, and a
- * view switcher on the one screen that is read every day is a filter somebody leaves set.
+ * **The whole of what this returns is what the sources produced**, which since the interests went
+ * (Sep 2026) is nearly the whole corpus: past rows are dropped, a switched-off source is dropped,
+ * and nothing else is. That is the tab's contract — the feed is the output of the pipeline, not a
+ * place to inspect it, and narrowing it belongs where the narrowing is a fact about the world: in
+ * an adapter, in the pages a source reads, or on the switch that turns one off.
  *
- * `forPush: false` — a muted interest still puts things here. Muting says "do not wake me", not
- * "hide it from me", and conflating the two is how a muted interest becomes indistinguishable from
- * a deleted one.
+ * What was given up with the interests is real: the feed carries every race in Poland where it used
+ * to carry the ones in Warszawa, and every ticketed night where it used to carry the opera. The
+ * `n collected` chip on each source card is what that costs, per source, and the switch beside it
+ * is the answer.
  */
 export function buildFeed(
   events: EventRecord[],
-  interests: Interest[],
   now: number,
   opts: FeedOptions = {},
 ): FeedSection[] {
   const sources = opts.sources ?? ALL_SOURCES_ON;
 
-  const items: FeedItem[] = [];
+  const kept: EventRecord[] = [];
   for (const event of dedupeByFingerprint(events)) {
-    // Something that finished yesterday is not "coming up", whatever matched it. A sale
-    // announcement expires the same way, on the day the sale it announced opens.
+    // Something that finished yesterday is not "coming up". A sale announcement expires the same
+    // way, on the day the sale it announced opens.
     const at = actionableAt(event);
     if (at !== null && daysUntil(at, now) < 0) continue;
 
-    // A source this account has switched off on the Sources tab. Applied here rather than in the
-    // matcher because it is not a fact about whether the event matches — it matched, and the reader
-    // has stopped listening to where it came from.
+    // A source this account has switched off on the Sources tab.
     if (!sourceEnabled(sources, event.source)) continue;
 
-    const matched = matchingInterests(event, interests, { forPush: false });
-    if (matched.length === 0) continue;
-    items.push({ event, matched });
+    kept.push(event);
   }
 
-  items.sort(compareItems);
+  kept.sort(compareEvents);
 
-  const sections: Record<FeedGroup, FeedItem[]> = { week: [], month: [], later: [], undated: [] };
-  for (const item of items) sections[groupOf(item.event, now)].push(item);
+  const sections: Record<FeedGroup, EventRecord[]> = { week: [], month: [], later: [], undated: [] };
+  for (const event of kept) sections[groupOf(event, now)].push(event);
 
   return (['week', 'month', 'later', 'undated'] as FeedGroup[])
-    .map((group) => ({ group, items: sections[group] }))
-    .filter((section) => section.items.length > 0);
+    .map((group) => ({ group, events: sections[group] }))
+    .filter((section) => section.events.length > 0);
 }
 
 /**
@@ -148,19 +137,23 @@ export function groupOf(event: EventRecord, now: number): FeedGroup {
 /**
  * Chronological, because the question the feed answers is "what is coming up".
  *
- * The match score is only a tiebreak within one day — it exists so that on a night when a broad
- * interest and a specific keyword both matched, the specific one is read first. Undated events
- * fall to the end and order by when they were announced — by `announcedAt`, which is the source's
- * publication date where there is one and not the day the collector happened to meet the row.
+ * There is no relevance tiebreak within a day any more — `scoreMatch` ranked a narrow interest's
+ * hit above a broad one's on the same night, and with no interests there is nothing to be narrow
+ * about. The id is the tiebreak instead, which is arbitrary and, more to the point, stable: two
+ * renders of one day must not reshuffle.
+ *
+ * Undated events fall to the end and order by when they were announced — by `announcedAt`, which
+ * is the source's publication date where there is one and not the day the collector happened to
+ * meet the row.
  */
-function compareItems(a: FeedItem, b: FeedItem): number {
-  const at = actionableAt(a.event);
-  const bt = actionableAt(b.event);
-  if (at === null && bt === null) return announcedAt(b.event) - announcedAt(a.event);
+function compareEvents(a: EventRecord, b: EventRecord): number {
+  const at = actionableAt(a);
+  const bt = actionableAt(b);
+  if (at === null && bt === null) return announcedAt(b) - announcedAt(a);
   if (at === null) return 1;
   if (bt === null) return -1;
   if (at !== bt) return at - bt;
-  return bestScore(b) - bestScore(a) || a.event.id.localeCompare(b.event.id);
+  return a.id.localeCompare(b.id);
 }
 
 /**
@@ -180,12 +173,21 @@ export function announcedAt(event: Pick<EventRecord, 'publishedAt' | 'firstSeenA
   return event.publishedAt ?? event.firstSeenAt;
 }
 
-function bestScore(item: FeedItem): number {
-  let best = 0;
-  for (const interest of item.matched) {
-    best = Math.max(best, scoreMatch(item.event, interest));
+/**
+ * The corpus split by the adapter that produced each row — the first half of every event id, and
+ * what `eventSources` health and the source catalogue are both keyed on.
+ *
+ * One pass rather than a filter per source: the Sources tab draws five cards over two thousand
+ * rows and asks each card two different questions about its own slice.
+ */
+export function bySource(events: EventRecord[]): Map<string, EventRecord[]> {
+  const grouped = new Map<string, EventRecord[]>();
+  for (const event of events) {
+    const held = grouped.get(event.source);
+    if (held) held.push(event);
+    else grouped.set(event.source, [event]);
   }
-  return best;
+  return grouped;
 }
 
 /**

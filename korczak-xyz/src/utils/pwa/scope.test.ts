@@ -27,7 +27,7 @@ describe('appForPath', () => {
     expect(appForPath('/apps/baby-sleep/share')).toBe('baby-sleep');
     expect(appForPath('/pl/apps/baby-sleep')).toBe('baby-sleep');
     expect(appForPath('/apps/events')).toBe('events');
-    expect(appForPath('/apps/events/interests')).toBe('events');
+    expect(appForPath('/apps/events/sources')).toBe('events');
     expect(appForPath('/pl/apps/events/alerts')).toBe('events');
   });
 

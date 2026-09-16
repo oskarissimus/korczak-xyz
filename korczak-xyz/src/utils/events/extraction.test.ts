@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasValue, modelPasses } from './extraction';
-import { fingerprintOf, haystackOf } from './normalize';
+import { fingerprintOf } from './normalize';
 import type { EventRecord } from './types';
 
 const NOW = Date.parse('2026-09-14T12:00:00Z');
@@ -13,7 +13,6 @@ function ev(p: Partial<EventRecord> & { title: string }): EventRecord {
     source: 'teatr-wielki',
     sourceKey: p.title,
     sourceName: 'test',
-    haystack: haystackOf({ title: p.title }),
     url: 'https://example.test/e',
     startsAt: 'startsAt' in p ? p.startsAt! : Date.parse(`${day}T18:00:00Z`),
     day,

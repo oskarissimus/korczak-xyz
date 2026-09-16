@@ -186,12 +186,12 @@ export async function runCollection(
   await recordReaderHealth(db, now, newsroom);
 
   /*
-   * Classify before notifying, and this order is the point rather than an implementation detail.
+   * Classify before notifying.
    *
-   * `notifyAccount` decides pushes with the same `matchReason` the feed filters with, and that
-   * reads `country` and `reach`. An unclassified event passes the places rule — deliberately, so a
-   * dead classifier cannot empty the feed — so notifying first would push about exactly the
-   * national conferences this exists to stop pushing about, once each, before the labels arrived.
+   * Nothing filters on a verdict since the interests went, so this no longer decides which pushes
+   * fire — what it decides is whether the card behind a notification can say where the event is by
+   * the time the tap arrives. Worth keeping in this order for that alone, and it costs nothing:
+   * the classifier is the expensive step either way.
    *
    * It works from the *merged* records for the same reason it must: a freshly built `toRecord`
    * carries no `classifyHash`, so every event would look unclassified and the corpus would be

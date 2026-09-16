@@ -9,7 +9,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import type {
   EventRecord,
-  Interest,
   Notice,
   PushSettings,
   PushSub,
@@ -40,26 +39,25 @@ async function loadAccount(
   db: Firestore,
   uid: string,
 ): Promise<{
-  interests: Interest[];
   settings: PushSettings;
   subs: PushSub[];
   seen: Set<string>;
   sources: SourcePrefs;
 }> {
   const user = db.collection('users').doc(uid);
-  const [interestsSnap, settingsSnap, sourcesSnap, subsSnap, noticesSnap] =
+  const [settingsSnap, sourcesSnap, subsSnap, noticesSnap] =
     await Promise.all([
-      user.collection('eventInterests').get(),
       user.collection('eventSettings').doc('push').get(),
       /*
-       * The Sources tab's switches.
+       * The Sources tab's switches — and since the interests went, the only per-account rule left
+       * between the corpus and a lock screen.
        *
-       * Read here rather than treated as a client-side nicety, and it is the one preference in
-       * this app that must reach the collector. A source switched off in the app and still read
-       * here is a feed that has gone quiet on the screen and still rings the phone about everything
-       * it publishes, which is the exact complaint the switch was built for. `normalizeSourcePrefs` rather than a cast: this
-       * document is written by a browser, and a malformed switch must not read as `enabled:
-       * undefined` and silence a source nobody asked to silence.
+       * Read here rather than treated as a client-side nicety. A source switched off in the app
+       * and still read here is a feed that has gone quiet on the screen and still rings the phone
+       * about everything it publishes, which is the exact complaint the switch was built for.
+       * `normalizeSourcePrefs` rather than a cast: this document is written by a browser, and a
+       * malformed switch must not read as `enabled: undefined` and silence a source nobody asked
+       * to silence.
        */
       user.collection('eventSettings').doc('sources').get(),
       user.collection('pushSubs').get(),
@@ -72,7 +70,6 @@ async function loadAccount(
     ]);
 
   return {
-    interests: interestsSnap.docs.map((d) => ({ ...(d.data() as Interest), id: d.id })),
     settings: settingsSnap.exists
       ? { ...DEFAULT_PUSH_SETTINGS, ...(settingsSnap.data() as PushSettings) }
       : DEFAULT_PUSH_SETTINGS,
@@ -182,13 +179,14 @@ export async function notifyAccount(
   events: EventRecord[],
   now: number,
 ): Promise<NotifyResult> {
-  const { interests, settings, subs, seen, sources } = await loadAccount(db, uid);
+  const { settings, subs, seen, sources } = await loadAccount(db, uid);
 
-  const plan = planRun(events, interests, seen, {
+  const plan = planRun(events, seen, {
     now,
     armedAt: settings.armedAt,
     maxPerRun: settings.maxPerRun,
     maxOnSalePerRun: settings.maxOnSalePerRun,
+    maxSoonPerRun: settings.maxSoonPerRun,
     sources,
   });
 
@@ -203,7 +201,6 @@ export async function notifyAccount(
       kind: notice.kind,
       fingerprint: notice.fingerprint,
       eventId: notice.eventId,
-      interestIds: notice.interestIds,
       claimedAt: now,
       sentAt: null,
       title: notice.title,
@@ -243,7 +240,7 @@ export async function notifyAccount(
 
   if (plan.summary && subs.length > 0) {
     const outcome = await sendToAll(db, uid, subs, {
-      title: `${plan.summary.count} new events match your interests`,
+      title: `${plan.summary.count} new events`,
       body: 'Open Event Watch to see them.',
       url: plan.summary.url,
       tag: `summary-${new Date(now).toISOString().slice(0, 13)}`,

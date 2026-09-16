@@ -2,8 +2,8 @@
  * What a model was asked about a source's rows, and how much of it has come back.
  *
  * The Sources tab answers "where does this come from, and how would I know if that were wrong".
- * Two of the three facts it draws are about the *fetch* — the pages, and whether the last run got
- * anything. This file is the third: of the rows a source produced, which fields no page ever
+ * Two of the facts it draws are about the *fetch* — the pages, and whether the last run got
+ * anything. This file is the other: of the rows a source produced, which fields no page ever
  * stated, and how many of them a model has actually filled in.
  *
  * It is here rather than hard-coded per source because **which pass reads a row is a fact about the
@@ -82,8 +82,10 @@ export function hasValue(event: EventRecord, field: keyof EventRecord): boolean 
  * **A pass with no rows is left out, and a pass with rows and no answers is not.** They are the two
  * states this is drawn for: a source the reader never touches is not a fault and does not belong on
  * the screen, where a source whose rows it should have read and has not is the classifier having
- * stopped — which is the single most likely way this app fails quietly, since an unclassified row
- * *passes* every rule the classifier feeds and the feed goes on looking perfectly healthy.
+ * stopped — which is the single most likely way the model half of this app fails quietly. Nothing
+ * filters on a verdict any more, so a stopped classifier no longer empties or floods anything; what
+ * it does is leave every card saying `?` where it should say where the event is, and a count stuck
+ * at zero against a full scrape is what that looks like before anybody notices the chips.
  */
 export function modelPasses(events: EventRecord[]): PassCoverage[] {
   const newsroom = events.filter(isNewsroomItem);

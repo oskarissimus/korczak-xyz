@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionableAt,
   announcedAt,
   buildFeed,
+  bySource,
   dedupeByFingerprint,
   groupOf,
   placeLabel,
@@ -10,8 +10,8 @@ import {
   whenLabel,
 } from './feed';
 import { setSourceEnabled } from './sourcePrefs';
-import { fingerprintOf, haystackOf } from './normalize';
-import type { EventRecord, Interest } from './types';
+import { fingerprintOf } from './normalize';
+import type { EventRecord } from './types';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-08-23T12:00:00Z');
@@ -24,7 +24,6 @@ function ev(p: Partial<EventRecord> & { title: string }): EventRecord {
     source: 'feed',
     sourceKey: p.title,
     sourceName: 'test',
-    haystack: p.haystack ?? haystackOf({ title: p.title }),
     url: 'https://example.test/e',
     startsAt: 'startsAt' in p ? p.startsAt! : Date.parse(`${day}T18:00:00Z`),
     day,
@@ -35,11 +34,6 @@ function ev(p: Partial<EventRecord> & { title: string }): EventRecord {
     ...p,
   } as EventRecord;
 }
-
-const ALL: Interest = {
-  id: 'i1', rev: 0, updatedAt: NOW, writerId: 'w', createdAt: 0,
-  label: 'Everything', keywords: [], leadDays: 14,
-};
 
 describe('dedupeByFingerprint', () => {
   it('keeps the copy that has a ticket link', () => {
@@ -80,49 +74,39 @@ describe('groupOf', () => {
 describe('buildFeed', () => {
   it('drops what has already happened', () => {
     const past = ev({ title: 'Gone', startsAt: NOW - 5 * DAY });
-    expect(buildFeed([past], [ALL], NOW)).toEqual([]);
+    expect(buildFeed([past], NOW)).toEqual([]);
   });
 
-  it('shows a muted interest’s matches', () => {
-    // Muting says "do not wake me", not "hide it from me". Conflating the two makes a muted
-    // interest indistinguishable from a deleted one.
-    const muted: Interest = { ...ALL, muted: true };
-    const sections = buildFeed([ev({ title: 'X' })], [muted], NOW);
-    expect(sections[0].items).toHaveLength(1);
+  it('keeps everything an enabled source collected', () => {
+    /*
+     * The contract since the interests went: the feed is the corpus minus what is past and minus
+     * what a switch is keeping out. A row nobody would have written a keyword for is still a row
+     * the source produced, and deciding it is not worth reading is that source's business.
+     */
+    const sections = buildFeed([ev({ title: 'Techno' }), ev({ title: 'Koncert klezmerski' })], NOW);
+    expect(sections.flatMap((s) => s.events)).toHaveLength(2);
   });
 
-  it('hides everything when no interest matches', () => {
-    const narrow: Interest = { ...ALL, keywords: ['klezmer'] };
-    expect(buildFeed([ev({ title: 'Techno' })], [narrow], NOW)).toEqual([]);
+  it('keeps a coverage row, the kind rule having gone with the interests', () => {
+    // `Interest.includeCoverage` was the opt-in; there is no opt-in and no opt-out now. A sponsor
+    // post about a marathon is a row the running blog published, and it is switched off by feed.
+    const sponsor = ev({ title: 'Marki DIP Hot Partnerem 48. Maratonu', kind: 'coverage' });
+    expect(buildFeed([sponsor], NOW)[0].events).toHaveLength(1);
   });
 
   /*
-   * A source switched off on the Sources tab. There is no view that shows it anyway: the feed is
-   * the output of the filters and nothing else, and what a switch is currently keeping out is
-   * counted on the Sources tab, beside the switch.
+   * A source switched off on the Sources tab — which is now the only thing standing between the
+   * corpus and this list. What it is currently keeping out is counted on that tab, beside it.
    */
   it('hides the events of a source that has been switched off', () => {
     const off = setSourceEnabled({}, 'feed', false, NOW);
-    expect(buildFeed([ev({ title: 'X' })], [ALL], NOW, { sources: off })).toEqual([]);
+    expect(buildFeed([ev({ title: 'X' })], NOW, { sources: off })).toEqual([]);
   });
 
   it('leaves the other sources alone', () => {
     const off = setSourceEnabled({}, 'feed', false, NOW);
     const race = ev({ title: 'X', source: 'elektroniczne-zapisy' });
-    expect(buildFeed([race], [ALL], NOW, { sources: off })[0].items).toHaveLength(1);
-  });
-
-  it('never returns a row no interest matched', () => {
-    // The feed's whole contract since the views went: every item on it is something a filter kept,
-    // so a card can always say what put it there.
-    const narrow: Interest = { ...ALL, keywords: ['klezmer*'] };
-    const items = buildFeed(
-      [ev({ title: 'Koncert klezmerski' }), ev({ title: 'Techno' })],
-      [narrow],
-      NOW,
-    ).flatMap((s) => s.items);
-    expect(items.map((i) => i.event.title)).toEqual(['Koncert klezmerski']);
-    expect(items.every((i) => i.matched.length > 0)).toBe(true);
+    expect(buildFeed([race], NOW, { sources: off })[0].events).toHaveLength(1);
   });
 
   it('orders chronologically and groups in reading order', () => {
@@ -133,22 +117,35 @@ describe('buildFeed', () => {
         ev({ title: 'Soon', startsAt: NOW + 2 * DAY }),
         ev({ title: 'Mid', startsAt: NOW + 20 * DAY }),
       ],
-      [ALL],
       NOW,
     );
     expect(sections.map((s) => s.group)).toEqual(['week', 'month', 'later', 'undated']);
-    expect(sections[0].items[0].event.title).toBe('Soon');
+    expect(sections[0].events[0].title).toBe('Soon');
+  });
+
+  it('orders two events on one day by id, so a re-render does not reshuffle', () => {
+    const at = NOW + 2 * DAY;
+    const b = ev({ id: 'zz', title: 'B', startsAt: at });
+    const a = ev({ id: 'aa', title: 'A', startsAt: at });
+    expect(buildFeed([b, a], NOW)[0].events.map((e) => e.id)).toEqual(['aa', 'zz']);
   });
 
   it('omits an empty group rather than rendering a bare heading', () => {
-    const sections = buildFeed([ev({ title: 'Soon', startsAt: NOW + 2 * DAY })], [ALL], NOW);
+    const sections = buildFeed([ev({ title: 'Soon', startsAt: NOW + 2 * DAY })], NOW);
     expect(sections.map((s) => s.group)).toEqual(['week']);
   });
+});
 
-  it('records which interests matched, so a row can say why it is there', () => {
-    const klezmer: Interest = { ...ALL, id: 'k', label: 'Klezmer', keywords: ['klezmer*'] };
-    const sections = buildFeed([ev({ title: 'Koncert klezmerski' })], [ALL, klezmer], NOW);
-    expect(sections[0].items[0].matched.map((i) => i.label)).toEqual(['Everything', 'Klezmer']);
+describe('bySource', () => {
+  it('splits the corpus by the adapter that produced each row', () => {
+    const grouped = bySource([
+      ev({ title: 'A', source: 'feed' }),
+      ev({ title: 'B', source: 'elektroniczne-zapisy' }),
+      ev({ title: 'C', source: 'feed' }),
+    ]);
+    expect(grouped.get('feed')).toHaveLength(2);
+    expect(grouped.get('elektroniczne-zapisy')).toHaveLength(1);
+    expect(grouped.get('ticketmaster')).toBeUndefined();
   });
 });
 
@@ -234,9 +231,9 @@ describe('announcedAt', () => {
       firstSeenAt: seen,
       publishedAt: NOW - DAY,
     });
-    const [section] = buildFeed([old, fresh], [ALL], NOW);
+    const [section] = buildFeed([old, fresh], NOW);
     expect(section.group).toBe('undated');
-    expect(section.items.map((i) => i.event.title)).toEqual(['From yesterday', 'From July']);
+    expect(section.events.map((e) => e.title)).toEqual(['From yesterday', 'From July']);
   });
 });
 
@@ -264,8 +261,8 @@ describe('a dateless event with a known sale date', () => {
 
   it('sorts among the dated events by that same moment', () => {
     const later = ev({ title: 'Concert', day: '2026-09-10' });
-    const sections = buildFeed([later, announcement()], [ALL], NOW);
-    expect(sections.flatMap((s) => s.items).map((i) => i.event.title)[0]).toBe(
+    const sections = buildFeed([later, announcement()], NOW);
+    expect(sections.flatMap((s) => s.events).map((e) => e.title)[0]).toBe(
       'Sprzedaż biletów na sezon 2027/28',
     );
   });
@@ -277,7 +274,7 @@ describe('a dateless event with a known sale date', () => {
       day: null,
       onSaleAt: NOW - 3 * DAY,
     } as Partial<EventRecord> & { title: string });
-    expect(buildFeed([past], [ALL], NOW)).toEqual([]);
+    expect(buildFeed([past], NOW)).toEqual([]);
   });
 
   it('leaves an ordinary undated announcement exactly where it was', () => {
@@ -291,7 +288,7 @@ describe('a dateless event with a known sale date', () => {
       day: null,
     } as Partial<EventRecord> & { title: string });
     expect(groupOf(article, NOW)).toBe('undated');
-    expect(buildFeed([article], [ALL], NOW)).toHaveLength(1);
+    expect(buildFeed([article], NOW)).toHaveLength(1);
   });
 });
 

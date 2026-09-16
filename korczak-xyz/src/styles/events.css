@@ -312,7 +312,15 @@
   font-style: italic;
 }
 
-/* --- interests ----------------------------------------------------------------------------- */
+/* --- the interest furniture, which is Metro Watch's now ------------------------------------- */
+
+/*
+ * Event Watch's Interests tab is gone (Sep 2026) and these rules stayed, because `transit.css`
+ * imports this file and draws its watched routes in them — a route is the same shape of thing an
+ * interest was: a named rule with a summary under it and a mute. The names are the history rather
+ * than a description; renaming them is a change to two components and worth doing only if this
+ * file is being reorganised anyway.
+ */
 
 .ev-interest {
   display: flex;
@@ -369,8 +377,7 @@
   color: var(--retro-black);
 }
 
-.ev-input,
-.ev-textarea {
+.ev-input {
   font-family: 'VT323', monospace;
   font-size: 1.15rem;
   padding: 6px 8px;
@@ -380,15 +387,6 @@
   /* Without this a long keyword list pushes the panel wider than the window on a phone. */
   max-width: 100%;
   box-sizing: border-box;
-}
-
-.ev-textarea {
-  min-height: 68px;
-  resize: vertical;
-}
-
-.ev-number {
-  width: 7ch;
 }
 
 /* --- alerts -------------------------------------------------------------------------------- */
@@ -675,43 +673,6 @@
   margin-left: auto;
 }
 
-.ev-filters {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.ev-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 0 0;
-  border-top: 1px solid var(--retro-dark-gray);
-}
-
-.ev-filter:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-/*
- * The name and its count read as one thing, and the way in is on the right.
- *
- * `.ev-interest-head`'s own `space-between` is for a row of two — a name and a group of buttons —
- * and with a chip between them it parks the count in the middle of the line, where it reads as
- * belonging to neither. Pushed left together, then the button pushed away by `margin-left: auto`.
- */
-.ev-filter .ev-interest-head {
-  justify-content: flex-start;
-}
-
-.ev-filter .ev-actions {
-  margin-left: auto;
-}
-
 /* --- sync badge ---------------------------------------------------------------------------- */
 
 .ev-sync {
@@ -753,7 +714,7 @@
 }
 
 /*
- * The checkbox under the countries field.
+ * A checkbox with its label beside it — the switch on a source card, and Metro Watch's own boxes.
  *
  * A row rather than a block, so the label sits beside the box and the whole thing is one tap
  * target — on a phone a checkbox on its own line reads as a separate control from the words next

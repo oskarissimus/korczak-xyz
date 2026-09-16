@@ -146,7 +146,7 @@ export interface TransitItem {
  * Rondo ONZ — squarely in the middle of the trip — reads as somebody else's problem.
  *
  * Extends `Versioned` structurally (id / rev / updatedAt / writerId / deleted) so the sleep log's
- * reconciler merges these without being told anything about them, exactly as `Interest` does.
+ * reconciler merges these without being told anything about them.
  */
 export interface WatchedSegment {
   id: string;

@@ -17,9 +17,9 @@
  *
  * The reader once answered a five-way taxonomy — `ticket-sale`, `programme`, `practical`,
  * `institutional`, `other` — plus the date the article was about and an English summary of it.
- * Four of those five verdicts were only ever *read*: nothing counted down to them, no seeded
- * interest asked for them, and their whole effect was a chip on a card and a row of filter buttons
- * over one theatre's news list. The taxonomy was answering a question nobody was asking.
+ * Four of those five verdicts were only ever *read*: nothing counted down to them, nothing
+ * filtered on them, and their whole effect was a chip on a card and a row of filter buttons over
+ * one theatre's news list. The taxonomy was answering a question nobody was asking.
  *
  * What is left is the question that costs money to get wrong: **do tickets go on sale on a stated
  * date, and when.** A season's sale opens on one morning at one hour and the house is half sold by
@@ -31,11 +31,11 @@
  */
 
 /**
- * The tag a sale announcement carries, and the whole of the seeded "Ticket sales opening" interest.
+ * The tag a sale announcement carries — the mark that says this row has a deadline on it.
  *
  * Bare rather than prefixed, because it joins one namespace with `opera`, `running` and `theatre`:
- * an interest asks for tags, and a second spelling convention inside that field would be a fact
- * only this file knows. It is the same string `teatrWielki.ts` stamps where its own regex read a
+ * a tag is a tag, and a second spelling convention inside that field would be a fact only this
+ * file knows. It is the same string `teatrWielki.ts` stamps where its own regex read a
  * sale sentence off the news list — one tag, two writers, deliberately.
  */
 export const TICKET_SALE_TAG = 'ticket-sale';
@@ -45,8 +45,9 @@ export const TICKET_SALE_TAG = 'ticket-sale';
  *
  * This is the reader's whole queue, and it is a fact about the *page*: every row of
  * `/teatr/aktualnosci/` is an article, which is exactly the kind of thing a page is allowed to
- * stamp feed-wide. No seeded interest asks for it — it is a marker for the collector, not a
- * subject — so widening it to another source's article feed costs nothing but the model calls.
+ * stamp feed-wide. It is a marker for the collector rather than a subject — `needsClassifying`
+ * and the reader's queue are its only readers — so widening it to another source's article feed
+ * costs nothing but the model calls.
  */
 export const NEWSROOM_TAG = 'newsroom';
 
@@ -64,9 +65,8 @@ export function isNewsroomItem(event: { tags?: string[] }): boolean {
  * to race the upsert, and re-running it can never accumulate a second copy of the same tag.
  *
  * **The tag follows the date, not the boolean.** A model that says "yes, a sale" and gives no
- * usable date has told us nothing anybody can act on, and the tag is the entire content of a
- * keyword-less seeded interest — so stamping it there would put a card with no deadline in front
- * of a reader who asked to be told about deadlines. `readingUpdate` passes what survived its
+ * usable date has told us nothing anybody can act on, and the tag is what `presale` counts down
+ * to — so stamping it there would promise a warning about a morning nobody knows. `readingUpdate` passes what survived its
  * guards, which is the same rule the adapter's own regex path already follows.
  */
 export function tagsWithTicketSale(tags: string[], hasSaleDate: boolean): string[] {
