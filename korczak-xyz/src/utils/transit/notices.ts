@@ -13,9 +13,10 @@
  *
  * - **`armedAt`** — nothing already in the corpus when alerts were switched on may fire. Without
  *   it, arming replays a fortnight of metro history into the lock screen.
- * - **The claim latch** — `alertIdFor` includes the content hash, so an unchanged communiqué can
- *   never fire twice and an edited one fires once more. The document is written by `create()`
- *   before sending, never after: see `notify.ts`.
+ * - **The claim latch** — `alertIdFor` includes the revision, so an unchanged communiqué can never
+ *   fire twice while an edited one, or one WTP has published a second time under the same post,
+ *   fires once more. The document is written by `create()` before sending, never after: see
+ *   `notify.ts`.
  * - **`maxPerRun`** — the overflow becomes one summary, and the suppressed alerts are still
  *   claimed, so they cannot arrive individually on the next run instead.
  *
@@ -25,7 +26,7 @@
  * more urgent for being seventh.
  */
 
-import { alertIdFor } from './normalize';
+import { alertIdFor, revisionOf } from './normalize';
 import { audibleAtRoute, impactOf } from './impact';
 import type {
   AlertKind,
@@ -114,7 +115,7 @@ export function planAlerts(
     const decided = alertKindFor(item, segments, settings);
     if (!decided) continue;
 
-    const alertId = alertIdFor(item.guid, decided.kind, item.contentHash);
+    const alertId = alertIdFor(item.guid, decided.kind, revisionOf(item));
     if (seen.has(alertId)) continue;
 
     candidates.push({ alertId, kind: decided.kind, item, verdict: decided.verdict });

@@ -58,9 +58,11 @@
  *
  * `needsArticle` asks for a page once per revision of the RSS row, and `mergeItem` is what makes
  * that the right unit: WTP rewriting the feed text drops the stored article, so the next run
- * fetches the page again. The one exception is a fetch that *failed*, retried while the notice is
- * still recent — see `RETRY_FAILURE_MS`, and note that it is a property of the WAF rather than of
- * the page that makes it worth asking twice.
+ * fetches the page again. **A revision is the row's text *and* its publication date** — see
+ * `articleStampOf`, which learnt the second half the evening a fresh M1 closure arrived under the
+ * previous one's post id and was served the previous one's prose. The one exception is a fetch that
+ * *failed*, retried while the notice is still recent — see `RETRY_FAILURE_MS`, and note that it is
+ * a property of the WAF rather than of the page that makes it worth asking twice.
  *
  * What is given up is an edit *confined to the article body* while the RSS row stays identical, and
  * that is a deliberate gap rather than an oversight. The alternative is re-fetching every live item
@@ -74,7 +76,12 @@
 import { articleText } from '../sources/html';
 import { wafChallenge } from './wtp';
 import { EMPTY_INDEX, fetchAlerts, postIdOf, type AlertIndex } from './alerts';
-import { contentHashOf, feedHashOf, hasProse } from '../../../korczak-xyz/src/utils/transit/normalize';
+import {
+  contentHashOf,
+  feedHashOf,
+  hasProse,
+  republishedAt,
+} from '../../../korczak-xyz/src/utils/transit/normalize';
 import type { TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 import { isExtractable } from './extract';
 
@@ -348,9 +355,27 @@ export function articleFailure(item: TransitItem, error: string): Partial<Transi
   return { articleFetchedFor: articleStampOf(item), articleError: error.slice(0, 300) };
 }
 
-/** What a fetch records having been made against: this build, and the feed revision it saw. */
-export function articleStampOf(item: Pick<TransitItem, 'title' | 'body'>): string {
-  return `${ARTICLE_VERSION}:${feedHashOf(item)}`;
+/**
+ * What a fetch records having been made against: this build, the feed revision it saw, and — where
+ * WTP has published the post a second time — which publication that was.
+ *
+ * The date is here for the same reason it is in `revisionOf`, one step earlier in the chain. WTP's
+ * metro rows are a template: the headline is always `Utrudnienia w komunikacji: M1` over one
+ * sentence restating it, so `feedHashOf` is **the same string for every M1 incident there has ever
+ * been**. A stored article therefore looked current under a row announcing a different disruption,
+ * `mergeItem` carried it forward, and the app went on describing the night before — which on
+ * 17 Sep 2026 it did, down to the stop list, while the closure it was actually about was somewhere
+ * else on the line. An edited row drops the article; a re-published one has to as well.
+ *
+ * `republishedAt` is undefined for all but a couple of rows in a corpus, so every stamp already
+ * stored stays valid and this costs one fetch for the item it is about rather than a re-fetch of
+ * the corpus.
+ */
+export function articleStampOf(
+  item: Pick<TransitItem, 'title' | 'body' | 'publishedAt' | 'firstSeenAt'>,
+): string {
+  const again = republishedAt(item);
+  return `${ARTICLE_VERSION}:${feedHashOf(item)}${again === undefined ? '' : `:${again}`}`;
 }
 
 /**

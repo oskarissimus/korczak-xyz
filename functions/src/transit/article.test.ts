@@ -313,6 +313,33 @@ describe('what a fetch writes', () => {
     expect(needsArticle(stale, NOW + 30 * 86400000)).toBe(true);
   });
 
+  /*
+   * The property that makes the date in this string affordable. Both the stamp and the alert id are
+   * compared against a value already stored, so a component added unconditionally would invalidate
+   * every row at once — dropping the corpus's articles and re-announcing a fortnight of metro
+   * history on the deploy. An ordinary row is published before we meet it, so it keeps exactly the
+   * stamp it has: the build and the feed digest, and nothing after them.
+   */
+  it('leaves the stamp of a row published before we met it exactly as it was', () => {
+    expect(articleStampOf(item()).split(':')).toHaveLength(2);
+    expect(articleStampOf(item()).endsWith(`:${feedHashOf(item())}`)).toBe(true);
+  });
+
+  /*
+   * And the case it is for. WTP's metro headline is a template — `Utrudnienia w komunikacji: M1`
+   * over one sentence restating it — so `feedHashOf` is the same string for every M1 incident there
+   * has ever been, and a stored article looked current under a row about a different closure.
+   */
+  it('asks for the page again when WTP has published the post a second time', () => {
+    const latched = item();
+    const again = item({ publishedAt: NOW + 86400000 });
+    expect(articleStampOf(again)).not.toBe(articleStampOf(latched));
+    expect(feedHashOf(again)).toBe(feedHashOf(latched));
+
+    const stale = { ...again, articleFetchedFor: articleStampOf(latched) };
+    expect(needsArticle(stale, NOW + 86400000)).toBe(true);
+  });
+
   it('clears a previous failure rather than leaving it beside a page that read fine', () => {
     expect(articleUpdate(item(), PROSE).articleError).toBe('');
   });

@@ -96,6 +96,41 @@ describe('the latch', () => {
     const first = item(1, { body: 'Zamknięta stacja Centrum.' });
     expect(contentHashOf({ ...first, body: '  Zamknięta   stacja Centrum. ' })).toBe(contentHashOf(first));
   });
+
+  /** Yesterday evening: published, met by the collector a moment later, alerted on. */
+  const LAST_NIGHT = NOW - 23 * 3600000;
+  const yesterdays = item(1, { publishedAt: LAST_NIGHT - 30000, firstSeenAt: LAST_NIGHT });
+  /** Tonight: the same post, the same text, a new `pubDate`. Nothing else moved. */
+  const tonight = { ...yesterdays, publishedAt: NOW - 60000 };
+
+  /*
+   * 17 Sep 2026, and the reason the alert id carries the publication date as well.
+   *
+   * WTP files a second incident under the first one's post rather than opening a new one: the guid
+   * is `?post_type=impediment&p=177253` both nights, the headline is the template every M1 row
+   * carries, the body is that headline restated, and the article is the same two-loop paragraph. So
+   * every digest this app takes is identical, the alert id was the one claimed 24 hours earlier,
+   * and `create()` failed on it — the closure was on the screen, read down to the station, and the
+   * phone stayed silent while a competing app rang.
+   *
+   * Note what this defeats: nothing was stale and no reading was wrong. The guard was right and
+   * what it was comparing could not see the day change.
+   */
+  it('fires again when WTP publishes the same communiqué a second time', () => {
+    const seen = new Set([alertIdFor(yesterdays.guid, 'route', yesterdays.contentHash)]);
+    expect(planAlerts([yesterdays], SEGMENTS, ctx({ seen })).send).toEqual([]);
+
+    const plan = planAlerts([tonight], SEGMENTS, ctx({ seen }));
+    expect(plan.send).toHaveLength(1);
+    expect(plan.send[0].item.contentHash).toBe(yesterdays.contentHash);
+  });
+
+  /** And the second publication latches in its turn, or the next run repeats it ten minutes later. */
+  it('does not fire a third time for that same re-publication', () => {
+    const claimed = planAlerts([tonight], SEGMENTS, ctx()).send[0]!;
+    const seen = new Set([claimed.alertId]);
+    expect(planAlerts([tonight], SEGMENTS, ctx({ seen })).send).toEqual([]);
+  });
 });
 
 describe('the two kinds', () => {

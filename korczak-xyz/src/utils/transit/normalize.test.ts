@@ -6,6 +6,9 @@ import {
   hasProse,
   parseAlertId,
   proseOf,
+  REPUBLISH_MARGIN_MS,
+  republishedAt,
+  revisionOf,
   transitIdFor,
 } from './normalize';
 
@@ -33,13 +36,72 @@ describe('ids', () => {
     expect(parseAlertId(id)).toEqual({
       guid: 'https-example-test-a',
       kind: 'route',
-      contentHash: 'deadbeefdeadbeef',
+      revision: 'deadbeefdeadbeef',
     });
   });
 
   it('refuses an id that is not one', () => {
     expect(parseAlertId('nope')).toBeNull();
     expect(parseAlertId('a|route|')).toBeNull();
+  });
+});
+
+describe('which publication of a communiqué this is', () => {
+  const SEEN = Date.parse('2026-09-16T18:47:00Z');
+  const row = { contentHash: 'deadbeefdeadbeef', firstSeenAt: SEEN, publishedAt: SEEN - 30_000 };
+
+  /*
+   * The ordinary case, and the one that has to stay untouched: a communiqué reaches us minutes
+   * after it is published. Both callers compare their string against one already stored, so a
+   * revision that changed shape here would invalidate the whole corpus on the deploy.
+   */
+  it('is the content hash alone for an item published before we met it', () => {
+    expect(republishedAt(row)).toBeUndefined();
+    expect(revisionOf(row)).toBe(row.contentHash);
+  });
+
+  it('tolerates a feed clock running slightly ahead of ours', () => {
+    const skewed = { ...row, publishedAt: SEEN + REPUBLISH_MARGIN_MS - 1000 };
+    expect(republishedAt(skewed)).toBeUndefined();
+    expect(revisionOf(skewed)).toBe(row.contentHash);
+  });
+
+  /*
+   * 17 Sep 2026. A fresh M1 closure was published under the previous evening's post id — same
+   * guid, same headline, same one-sentence body, and the article text of the night before, so
+   * every digest this app takes came back identical and the alert was latched away by the one sent
+   * 24 hours earlier. The publication date is the only field that moved.
+   */
+  it('carries the publication date once WTP has published the post again', () => {
+    const again = { ...row, publishedAt: SEEN + 86_400_000 };
+    expect(republishedAt(again)).toBe(again.publishedAt);
+    expect(revisionOf(again)).not.toBe(revisionOf(row));
+    expect(alertIdFor('g', 'route', revisionOf(again))).not.toBe(
+      alertIdFor('g', 'route', revisionOf(row)),
+    );
+  });
+
+  /** Two re-publications of one post are two incidents, and the second is not the first. */
+  it('tells one re-publication from the next', () => {
+    const tuesday = { ...row, publishedAt: SEEN + 86_400_000 };
+    const wednesday = { ...row, publishedAt: SEEN + 2 * 86_400_000 };
+    expect(revisionOf(wednesday)).not.toBe(revisionOf(tuesday));
+  });
+
+  /** Decided from stored fields that never move again, so a re-run reaches the same id. */
+  it('is stable across runs', () => {
+    const again = { ...row, publishedAt: SEEN + 86_400_000 };
+    expect(revisionOf(again)).toBe(revisionOf({ ...again }));
+  });
+
+  /** `parseAlertId` still cuts cleanly: the date is inside the third part, not a fourth. */
+  it('leaves an alert id in three parts', () => {
+    const again = { ...row, publishedAt: SEEN + 86_400_000 };
+    expect(parseAlertId(alertIdFor('https://example.test/a/', 'route', revisionOf(again)))).toEqual({
+      guid: 'https-example-test-a',
+      kind: 'route',
+      revision: revisionOf(again),
+    });
   });
 });
 

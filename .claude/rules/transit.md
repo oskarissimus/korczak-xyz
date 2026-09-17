@@ -209,7 +209,10 @@ its teaser never mentioned. Four things about it:
 - **`feedHashOf` is a second digest over the feed's text alone**, and it exists for `mergeItem`. The
   stored article survives only while the RSS row it was fetched against is unchanged; the
   `ZAKOŃCZONO:` prefix *is* such a change, so it drops the article and the latch together and the
-  page is fetched again on the same run. Carried forward unconditionally it would be a description
+  page is fetched again on the same run. **The text is not the whole of that revision** — WTP's
+  metro headlines are a template, so this digest is the same string for every M1 incident there has
+  ever been, and `articleStampOf` carries `publishedAt` beside it for the reason *A revision is what
+  it says and when it was published* sets out below. Carried forward unconditionally it would be a description
   of a live closure sitting under a headline saying it is over, with `contentHash` covering it and
   calling it current. `mergeItem` is also the only place that knows both halves, which is why the
   hash is recomputed there rather than taken from `parseWtpFeed`.
@@ -269,12 +272,12 @@ exactly the question this app exists to answer without guessing.
 Seeded rather than assumed: `withMissingSeeds` is keyed by id and never edits an existing row, so a
 deleted seed stays deleted and a rewritten one keeps the reader's version.
 
-### The content hash is in the alert id, and that is a feature
+### The revision is in the alert id, and that is a feature
 
-`alertIdFor` is `${slugKey(guid)}|${kind}|${contentHash}` — three parts where Event Watch's notice
-id has two. WTP **edits a live communiqué** as a closure develops, and *"the closure now reaches
-Imielin too"* is news about an article you were already told about. Keyed on the guid alone that
-update is latched away by the alert already claimed for the original text.
+`alertIdFor` is `${slugKey(guid)}|${kind}|${revisionOf(item)}` — three parts where Event Watch's
+notice id has two. WTP **edits a live communiqué** as a closure develops, and *"the closure now
+reaches Imielin too"* is news about an article you were already told about. Keyed on the guid alone
+that update is latched away by the alert already claimed for the original text.
 
 The hash is over the **source prose**, never over the extractor's output (`contentHashOf`, folded,
 so a whitespace edit in the CMS costs nothing). A model that phrased its summary differently on a
@@ -282,6 +285,62 @@ re-read must not be able to ring the phone.
 
 The same hash is `needsExtracting`: unchanged text, no second model call. That is what keeps this
 app's bill near nothing.
+
+#### A revision is what it says *and* when it was published
+
+The half added on 17 Sep 2026, and the failure that bought it is the sharpest this app has had,
+because nothing anywhere was stale, wrong or broken.
+
+At 21:14 a fresh M1 closure was published under `?post_type=impediment&p=177253` — **the post id of
+the previous evening's incident**. WTP does not always open a new post; it takes the existing one,
+moves its date and its permalink (`/2026/09/17/…-m1-23/`) and publishes it again. The RSS row was
+what an M1 row always is:
+
+```
+<title>Utrudnienia w komunikacji: M1</title>
+<description>Utrudnienia w kursowaniu pociągów metra linii M1</description>
+<pubDate>Thu, 17 Sep 2026 19:14:51 +0000</pubDate>
+```
+
+Same guid, so the same document and `created: 0`. Same title and body, so `feedHashOf` matched and
+`mergeItem` kept the article fetched the night before. The same article, so `contentHashOf` came
+back `a1da30c3d79c7ed1` — the digest the alert sent at 20:47 the previous evening was claimed
+against. `create()` raised ALREADY_EXISTS, `claim` returned, `delivered: 0`. The card was on screen,
+read to the station, and the phone never rang; a competing app, which deduplicates on nothing,
+pushed five minutes later.
+
+**Every guard was correct and every input it compared was identical.** The one field that moved was
+`pubDate`, and neither digest reads it — `contentHashOf` deliberately not, so a re-read cannot ring
+the phone; `feedHashOf` deliberately not, so an article can be told from the row it was fetched
+against. Both are right about their own question. Neither was asked this one.
+
+So `revisionOf` is `contentHash`, plus the publication date **where `republishedAt` says there was a
+second publication** — `publishedAt` more than `REPUBLISH_MARGIN_MS` after our own `firstSeenAt`. A
+communiqué normally reaches us minutes after it is published, so that is undefined for all but a
+couple of rows in a corpus, and `articleStampOf` appends the same thing for the same reason: a
+re-published row drops its stored article exactly as an edited one does, so the prose on the card is
+about the notice the card is about.
+
+Three things about that shape are load-bearing:
+
+- **It is appended conditionally, and that is not tidiness.** Both strings are compared against one
+  already stored. A component added unconditionally would invalidate every `articleFetchedFor` and
+  every alert id at once — the deploy would drop the corpus's articles, re-fetch them into a WAF,
+  and re-announce a fortnight of metro history as uncertain route alerts. Measured before it was
+  written: **2 of 184 rows in the live corpus have a `publishedAt` more than an hour after their
+  `firstSeenAt`**, one of them this M1 row. The fix therefore fires exactly one alert on deploy, and
+  it is tonight's closure.
+- **`mergeItem` stamps against the *stored* `firstSeenAt`.** `parseWtpFeed` writes `firstSeenAt:
+  now` on everything it parses, having no way to know when this app first met a row — so
+  `articleStampOf(incoming)` on its own can only ever answer "published before we saw it" and the
+  date would silently never reach the latch. Every later caller is handed the merged record and has
+  the real one.
+- **The margin is for two clocks, not for two publications.** WTP's server stamps `pubDate` and this
+  collector stamps `firstSeenAt`; a few minutes of skew is ordinary, a re-publication is hours or
+  days. Five minutes costs nothing and stops a fast clock reading as news.
+
+What it does not do: a genuine edit **confined to the article body**, with the RSS row and its date
+both unchanged, is still invisible — that gap is `needsArticle`'s and is written up there.
 
 `contentHashOf` is FNV-1a rather than a crypto digest, deliberately: `createHash` is a Node builtin
 and would push the module out of the browser bundle, taking the Raw tab's "this reading is out of

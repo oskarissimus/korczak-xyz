@@ -83,6 +83,37 @@ describe('an article outlives its row only as long as the row', () => {
     expect(stripUndefined(record)).not.toHaveProperty('article');
   });
 
+  /*
+   * The other kind of edited row, and it does not look like one. WTP files a second incident under
+   * the first one's post: same guid, same headline, same one-sentence body, new `pubDate`. Every
+   * word this comparison can read is identical, so the previous night's article was carried forward
+   * and hashed as current — the app describing yesterday's closure under tonight's notice, stop
+   * list and all.
+   */
+  it('drops the article when WTP publishes the same row a second time', () => {
+    // As `parseWtpFeed` produces it: the feed's new `pubDate`, and `firstSeenAt` stamped `now`
+    // because a parser cannot know when this app first met the row. The stored date is the real one.
+    const tonight = fromFeed(STUB, { publishedAt: NOW - 60_000, firstSeenAt: NOW });
+    const { record } = mergeItem(tonight, withArticle(STUB), NOW);
+    expect(record.article).toBeUndefined();
+    expect(record.articleFetchedFor).toBeUndefined();
+    expect(hasProse(record)).toBe(false);
+    // And the merged row carries the stored date, so the re-fetch stamps the right revision.
+    expect(record.firstSeenAt).toBe(EARLIER);
+  });
+
+  /*
+   * And the deploy-safety half: a row published before we met it — which is every row in the corpus
+   * bar a couple — keeps the article and the stamp it already has. Otherwise this change would drop
+   * every stored article at once and re-announce a fortnight of metro history.
+   */
+  it('keeps the article of a row that was never re-published', () => {
+    const stored = withArticle(STUB);
+    const { record } = mergeItem(fromFeed(STUB), stored, NOW);
+    expect(record.article).toBe(PROSE);
+    expect(record.articleFetchedFor).toBe(articleStampOf(stored));
+  });
+
   /* A row nothing has fetched yet is written exactly as the feed stated it. */
   it('leaves a brand new row alone', () => {
     const { record, created } = mergeItem(fromFeed(STUB), null, NOW);

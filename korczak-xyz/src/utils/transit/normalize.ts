@@ -23,28 +23,87 @@ export function transitIdFor(feed: FeedKind, guid: string): string {
 }
 
 /**
- * `${slugKey(guid)}|${kind}|${contentHash}`.
+ * How much later than our own first sight of an item its `pubDate` may be and still be the same
+ * publication.
  *
- * Three parts rather than the events app's two, and the third is the interesting one. An alert is
- * claimed against a **revision** of a communiqué, not against the communiqué — because WTP genuinely
- * does edit them, and "the closure now reaches Imielin too" is news even though the article is the
- * one you were already told about. Keyed on the guid alone, that update would be latched away by
- * the alert already claimed for the original text.
- *
- * The hash is over the source prose (see `contentHashOf`), never over the extractor's output. A
- * model that phrased its summary differently on a re-read must not be able to ring the phone.
+ * WTP's clock and this collector's are not the same clock, and the feed is read within ten minutes
+ * of anything appearing on it, so a few minutes of skew either way is ordinary. A genuine
+ * re-publication is hours or days later — the one in the corpus when this was written is a day —
+ * so the margin costs nothing and stops a server running fast from reading as news.
  */
-export function alertIdFor(guid: string, kind: string, contentHash: string): string {
-  return `${slugKey(guid)}|${kind}|${contentHash}`;
+export const REPUBLISH_MARGIN_MS = 5 * 60_000;
+
+/**
+ * When WTP re-published this post, or undefined for the ordinary case.
+ *
+ * A communiqué normally reaches us minutes *after* it is published, so `publishedAt` sits before
+ * `firstSeenAt` and this is undefined. `publishedAt` well after `firstSeenAt` means the opposite:
+ * WTP took a post we already have and published it again.
+ *
+ * **Undefined for almost everything, which is the point.** Both callers fold this into a string
+ * they compare against one already stored — the article latch and the alert id — so anything that
+ * changed their shape unconditionally would invalidate every stored value at once, and the deploy
+ * would re-fetch the corpus and re-announce a fortnight of metro history. Appended only where it is
+ * true, every row that was never re-published keeps the exact strings it has.
+ */
+export function republishedAt(
+  item: Pick<TransitItem, 'publishedAt' | 'firstSeenAt'>,
+): number | undefined {
+  return item.publishedAt - item.firstSeenAt > REPUBLISH_MARGIN_MS ? item.publishedAt : undefined;
+}
+
+/**
+ * The revision of a communiqué an alert is claimed against.
+ *
+ * `contentHash` was this on its own, and for an *edit* it is exactly right: WTP rewrites a live
+ * communiqué as a closure grows, and "the closure now reaches Imielin too" is news about an article
+ * you were already told about. What it cannot see is the other way WTP files a second incident
+ * under the first one's post.
+ *
+ * **17 Sep 2026 is what this is for.** A new M1 disruption was published at 21:14 under
+ * `?post_type=impediment&p=177253` — the post id of the previous evening's incident, permalink
+ * moved to the new day, the RSS row the same headline it always is (`Utrudnienia w komunikacji: M1`
+ * over one sentence restating it), and the article text word for word the template of the night
+ * before. Same guid, same title, same body, same article, therefore the same `contentHash`, the
+ * same alert id and a `create()` that failed on the alert sent 24 hours earlier. The app had the
+ * closure on screen, read to the station, and said nothing — while a competing app, which
+ * deduplicates on nothing, rang.
+ *
+ * So the revision is what it says **and when it was published**. The date is the one field that
+ * actually moved, and neither digest reads it: `contentHashOf` is deliberately over the prose alone
+ * so a re-read cannot ring the phone, and `feedHashOf` over the feed's text alone so an article can
+ * be told from the row it was fetched against. Neither is wrong; both are answering a different
+ * question from this one.
+ */
+export function revisionOf(
+  item: Pick<TransitItem, 'contentHash' | 'publishedAt' | 'firstSeenAt'>,
+): string {
+  const again = republishedAt(item);
+  return again === undefined ? item.contentHash : `${item.contentHash}@${again}`;
+}
+
+/**
+ * `${slugKey(guid)}|${kind}|${revision}`.
+ *
+ * Three parts rather than the events app's two, and the third is the interesting one: an alert is
+ * claimed against a **revision** of a communiqué rather than against the communiqué. See
+ * `revisionOf` for what a revision is and for the evening that added the second half of it.
+ *
+ * The revision is built from the source prose (see `contentHashOf`) and the feed's own publication
+ * date, never from the extractor's output. A model that phrased its summary differently on a
+ * re-read must not be able to ring the phone.
+ */
+export function alertIdFor(guid: string, kind: string, revision: string): string {
+  return `${slugKey(guid)}|${kind}|${revision}`;
 }
 
 /** Splits an alert id back apart. `slugKey` never emits `|`, so the two cuts are unambiguous. */
 export function parseAlertId(
   id: string,
-): { guid: string; kind: string; contentHash: string } | null {
+): { guid: string; kind: string; revision: string } | null {
   const parts = id.split('|');
   if (parts.length !== 3 || parts.some((p) => p === '')) return null;
-  return { guid: parts[0], kind: parts[1], contentHash: parts[2] };
+  return { guid: parts[0], kind: parts[1], revision: parts[2] };
 }
 
 /** What the extractor is shown: the article page's prose where there is one, the feed's otherwise. */

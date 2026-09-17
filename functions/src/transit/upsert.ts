@@ -55,6 +55,13 @@ export function stripUndefined<T extends object>(value: T): DocumentData {
  * forward unconditionally it would be a fortnight-old description of a closure sitting under a
  * headline saying the closure is over, and `contentHash` would cover it and call it current.
  *
+ * **A re-published row is the other kind of edited row, and it does not look like one.** WTP files
+ * a second incident under the first one's post: same guid, same headline, same one-sentence body,
+ * new `pubDate`. The text this comparison reads is identical, so for a year it kept the previous
+ * night's article and hashed it as current. `articleStampOf` carries the publication date for that
+ * reason, and it is why the date is in there rather than in `feedHashOf` — the question here is
+ * whether the page we hold is about the row that arrived, and two incidents can share every word.
+ *
  * Which is why the hash is recomputed here rather than taken from `incoming`. `parseWtpFeed` has no
  * article to hash, so its digest is the feed's alone; this is the only place that knows both halves.
  */
@@ -65,8 +72,17 @@ export function mergeItem(
 ): { record: TransitItem; created: boolean } {
   if (!stored) return { record: { ...incoming, firstSeenAt: now, updatedAt: now }, created: true };
 
+  /*
+   * Stamped against the row as it will be *stored*, which is the incoming feed fields under the
+   * stored `firstSeenAt`. `parseWtpFeed` has no way to know when this app first met an item, so it
+   * writes `firstSeenAt: now` on everything it parses — and `republishedAt` compares those two, so
+   * asking `incoming` on its own can only ever answer "published before we saw it" and the date
+   * would silently never reach the stamp. Every later caller is handed the merged record and has
+   * the real one.
+   */
   const keepsArticle =
-    stored.articleFetchedFor !== undefined && stored.articleFetchedFor === articleStampOf(incoming);
+    stored.articleFetchedFor !== undefined &&
+    stored.articleFetchedFor === articleStampOf({ ...incoming, firstSeenAt: stored.firstSeenAt });
 
   return {
     record: {

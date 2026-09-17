@@ -81,6 +81,9 @@ export interface TransitItem {
    * text drops the article, and a dropped article is re-fetched. Present means "already attempted
    * at this revision", which is what stops a page that will not load being asked for again every
    * ten minutes.
+   *
+   * The feed's revision is its text **and** its `pubDate` — WTP's metro headlines are a template,
+   * so the text alone made every M1 incident look like the same row. See `articleStampOf`.
    */
   articleFetchedFor?: string;
   /** Why the last article fetch produced nothing. The Raw tab's answer to a card that says little. */
@@ -206,13 +209,18 @@ export type AlertKind = Impact;
  * rather than repeating it.
  */
 export interface TransitAlert {
-  /** `${slugKey(guid)}|${kind}|${contentHash}` — see `alertIdFor`. */
+  /** `${slugKey(guid)}|${kind}|${revision}` — see `alertIdFor` and `revisionOf`. */
   id: string;
   kind: AlertKind;
   itemId: string;
   guid: string;
   feed: FeedKind;
-  /** The content revision this alert was raised for, so an edited communiqué can raise a second. */
+  /**
+   * The digest of the prose this alert was raised for, so an edited communiqué can raise a second.
+   *
+   * Not the whole revision the id is keyed on: a re-publication of the same text raises a second
+   * alert carrying this same hash, and `publishedAt` below is what tells the two apart.
+   */
   contentHash: string;
   segmentIds: string[];
   lines: MetroLine[];
