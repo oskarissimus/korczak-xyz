@@ -107,8 +107,31 @@ describe('the prompt', () => {
    * least as often as they list stations, and a stretch this app cannot expand is a closure it
    * cannot place on a route.
    */
-  it('asks for ranges to be expanded station by station', () => {
-    expect(buildPrompt([item()])).toContain('Expand ranges');
+  it('asks for a closed stretch to be expanded station by station, endpoints included', () => {
+    const prompt = buildPrompt([item()]);
+    expect(prompt).toContain('nie kursują na odcinku Centrum – Wilanowska');
+    expect(prompt).toContain('BOTH endpoints INCLUDED');
+  });
+
+  /*
+   * The other phrasing, and the one that cost a wrong answer on 16 Sep 2026. An incident at Centrum
+   * split M1 into `Kabaty – Politechnika` and `Młociny – Dw. Gdański`, and the reading came back
+   * with Dworzec Gdański among the closed stations — the terminus of a loop that was still running.
+   * Named stations mean the opposite thing in the two phrasings, so the prompt has to say so
+   * outright rather than leave the model to invert the closed-stretch rule.
+   */
+  it('says that a stretch still running means its endpoints are open', () => {
+    const prompt = buildPrompt([item()]);
+    expect(prompt).toContain('pociągi kursują w dwóch pętlach');
+    expect(prompt).toContain('Every station in a running stretch is OPEN');
+    // The worked answer, so the boundary is stated rather than implied.
+    expect(prompt).toContain('Centrum, Świętokrzyska, Ratusz');
+    expect(prompt).toContain('listing Politechnika or Dworzec Gdański would be wrong');
+  });
+
+  /* A prompt change is a re-read of the corpus, and the stored hash is what makes that happen. */
+  it('invalidates every stored reading when the prompt changes', () => {
+    expect(extractHashOf({ contentHash: 'abcd1234abcd1234' })).toBe('2:abcd1234abcd1234');
   });
 
   it('gives each notice its own publication date, since the prose gives times without dates', () => {

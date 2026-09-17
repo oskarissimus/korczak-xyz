@@ -52,8 +52,19 @@ const LOCATION = 'global';
  * The only lever for it, and it belongs in the code: "the prompt changed" is a fact about a build,
  * and a re-run nobody can date afterwards is worse than no re-run. It feeds the stored hash, so
  * bumping invalidates every reading at once and the backlog drains over the next few runs.
+ *
+ * **2 is the running-stretch rule.** On 16 Sep 2026 an incident at Centrum split M1 into two loops
+ * and the reading came back `Centrum, Świętokrzyska, Ratusz Arsenał, Dworzec Gdański` — three
+ * right and one wrong, Dworzec Gdański being the terminus of a loop that was still running. The
+ * prompt had one range rule and it was the closed-stretch one; this notice named the *open*
+ * stretches instead, so the model had to invert it and got one endpoint of two right. See rule 2.
+ *
+ * Re-reading cannot re-alert: `alertIdFor` keys on `contentHash`, which is the prose, and a second
+ * reading of unchanged prose leaves it alone. A *corrected* reading that moves an item between
+ * route and line level does mint one new alert id — which is right, since what it says about the
+ * commute has genuinely changed.
  */
-const EXTRACTOR_VERSION = 1;
+const EXTRACTOR_VERSION = 2;
 
 /**
  * The lines whose prose is read at all.
@@ -169,9 +180,13 @@ export function isExtractable(item: TransitItem): boolean {
  * as one string, or *"stacje na Ursynowie"* — and `canonicalStation` places none of that. With it,
  * the instruction is an expansion task over a fixed vocabulary, which is a much easier thing to ask.
  *
- * **Segments must be expanded.** Polish communiqués state closures as a stretch (*"na odcinku
- * Centrum – Wilanowska"*) at least as often as they list stations, and a stretch this app cannot
- * expand is a closure it cannot place on a route.
+ * **Stretches must be expanded, and there are two kinds of them.** Polish communiqués state a
+ * closure as a stretch (*"na odcinku Centrum – Wilanowska"*) at least as often as they list
+ * stations, and a stretch this app cannot expand is a closure it cannot place on a route. The trap
+ * is that WTP states it the *other* way round just as readily — naming the loops still running and
+ * leaving the closure as the gap — and then the named stations are the ones that are **open**. Both
+ * phrasings are spelt out in rule 2 with the case that got one endpoint wrong; see
+ * `EXTRACTOR_VERSION`.
  *
  * The answers stay in **Polish**. Every station name is Polish, the reason is a phrase lifted from
  * the source, and a lock screen reading `Centrum – Wilanowska · awaria taboru` is the same string
@@ -201,11 +216,25 @@ export function buildPrompt(items: TransitItem[]): string {
     '1. `lines` — which of M1, M2 the notice actually concerns. Empty if it concerns neither.',
     '',
     '2. `closedStops` — every station where trains do NOT stop for passengers, as a result of this',
-    '   notice. Expand ranges: "nie kursują na odcinku Centrum – Wilanowska" means every station',
-    '   from Centrum to Wilanowska inclusive, listed one by one. A station the notice says is',
-    '   closed, skipped, or passed without stopping belongs here. Return an empty list if the',
-    '   notice closes no station — reduced frequency, a broken lift, a delay, or a notice about',
-    '   replacement buses only. Never list a station the notice does not concern.',
+    '   notice. A station the notice says is closed, skipped, or passed without stopping belongs',
+    '   here. Return an empty list if the notice closes no station — reduced frequency, a broken',
+    '   lift, a delay, or a notice about replacement buses only. Never list a station the notice',
+    '   does not concern.',
+    '',
+    '   WTP states this two ways round, and the named stations mean OPPOSITE things in each. Work',
+    '   out which way the notice is phrased before listing anything.',
+    '',
+    '   (a) It names the CLOSED stretch — "pociągi nie kursują na odcinku Centrum – Wilanowska".',
+    '       Every station from Centrum to Wilanowska is closed, BOTH endpoints INCLUDED. Expand it',
+    '       and list them one by one.',
+    '',
+    '   (b) It names the stretches still RUNNING — "pociągi kursują w dwóch pętlach: Kabaty –',
+    '       Politechnika, Młociny – Dw. Gdański". Every station in a running stretch is OPEN, both',
+    '       endpoints INCLUDED: a terminus is a station trains reach and passengers get off at. The',
+    '       closed stations are the ones lying BETWEEN the running stretches, and the endpoints are',
+    '       NOT among them. For that example the answer is exactly Centrum, Świętokrzyska, Ratusz',
+    '       Arsenał — and listing Politechnika or Dworzec Gdański would be wrong, because trains',
+    '       are still calling there.',
     '',
     '3. `wholeLine` — true only if the entire line is suspended end to end.',
     '',

@@ -324,8 +324,28 @@ Four things about the prompt are load-bearing:
 - **The station list is in it, per line.** Without it the model returns whatever the prose called a
   place — `odcinek Centrum – Wilanowska` as one string, `stacje na Ursynowie` — and nothing places
   any of that. With it, the instruction is an expansion over a fixed vocabulary.
-- **Ranges must be expanded.** Polish notices state a closure as a stretch at least as often as they
-  list stations, and a stretch this app cannot expand is a closure it cannot put on a route.
+- **Stretches must be expanded, and WTP states them both ways round.** Polish notices give a closure
+  as a stretch at least as often as they list stations, and a stretch this app cannot expand is a
+  closure it cannot put on a route. The trap is that the *named* stations mean opposite things in
+  the two phrasings, so the prompt spells out both rather than leaving one to be inferred:
+
+  - *"nie kursują na odcinku Centrum – Wilanowska"* names the **closed** stretch — both endpoints
+    closed, expanded station by station.
+  - *"pociągi kursują w dwóch pętlach: Kabaty – Politechnika, Młociny – Dw. Gdański"* names the
+    stretches still **running** — both endpoints *open*, and the closure is the gap between them.
+
+  The second one cost a wrong answer on 16 Sep 2026, which is why it is now written out with its
+  worked result. An incident at Centrum split M1 into those two loops and the reading came back
+  `Centrum, Świętokrzyska, Ratusz Arsenał, Dworzec Gdański` — three right, and Dworzec Gdański
+  wrong, it being the terminus of a loop that was still carrying passengers. The prompt had only
+  the closed-stretch rule, so the model had to invert it unaided and got one endpoint of the two
+  right. Note the direction of the error: over-reporting a closure is the safe way to be wrong
+  here, and it is still a card naming a station you could have used, which is what teaches a reader
+  to discount the loud kind. `EXTRACTOR_VERSION` is at **2** for the fix.
+
+  Re-reading on a version bump cannot re-alert — `alertIdFor` keys on `contentHash`, the prose,
+  which a second reading does not touch. A *corrected* reading that moves an item between route and
+  line level does mint one new alert id, which is right: what it says about the commute changed.
 - **`closedStops` is free strings, not a schema enum**, though all 38 names would fit in one. An
   enum forces every answer onto a name this build knows — turning *"a station I have never heard
   of"* into *"the nearest one I was offered"*, silently. The unknown name is what tells `impactOf`
