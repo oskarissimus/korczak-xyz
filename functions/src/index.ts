@@ -6,7 +6,7 @@
  */
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import {
   db,
   PROJECT_ID,
@@ -20,6 +20,7 @@ import {
 import { runCollection } from './collect';
 import { runTransitCollection } from './transit/collect';
 import { configureWebPush, sendTo } from './push';
+import { handleAssembleVideo } from './sloper/handler';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
 const SECRETS = [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, TICKETMASTER_API_KEY];
@@ -166,4 +167,37 @@ export const collectTransit = onSchedule(
     });
     console.log('collectTransit', JSON.stringify(summary));
   },
+);
+
+/**
+ * The slop video assembler.
+ *
+ * `/apps/sloper/` does everything else itself — the script, the images, the narration all come
+ * straight from the browser to OpenAI, Google and ElevenLabs. This is the one step a page cannot
+ * do: FFmpeg, turning N stills and N narrations into an MP4.
+ *
+ * `onRequest` rather than `onCall`, and 2 GiB rather than 512 MiB, for reasons that are in
+ * sloper/handler.ts and sloper/ffmpeg.ts respectively. The timeout is nine minutes because a
+ * dozen 1024x1536 scenes is a few minutes of libx264 on a shared core and a request that dies at
+ * five has thrown away every API call that paid for it.
+ *
+ * It holds no secrets: the caller's Firebase ID token is the only credential involved, and it is
+ * verified inside the handler. The public invoker binding it needs is in terraform/functions.tf,
+ * beside `sendTestPush`'s and for the same reason.
+ */
+export const assembleVideo = onRequest(
+  {
+    region: REGION,
+    memory: '2GiB',
+    timeoutSeconds: 540,
+    // One request per instance: ffmpeg will take every core it is given, so a second concurrent
+    // assembly on the same instance makes both slower and doubles peak memory and /tmp.
+    concurrency: 1,
+    // Bounded so an idle evening costs nothing and a burst cannot quietly scale into a bill.
+    maxInstances: 3,
+    // CORS is answered by the handler, which has the allowlist. Letting the platform do it too
+    // would mean two places deciding, and the platform's cannot vary the header by origin.
+    cors: false,
+  },
+  handleAssembleVideo,
 );

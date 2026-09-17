@@ -2,6 +2,15 @@
 
 The scheduled collector and the web-push sender for `/apps/events/`.
 
+Since Sep 2026 there is a third, unrelated thing in here: **`assembleVideo`**, the FFmpeg endpoint
+for `/apps/sloper/`. It shares nothing with the collectors but the deploy — it holds no secrets,
+reads no Firestore, and runs on request rather than on a schedule — and it is here rather than in
+a container of its own precisely because this pipeline already reaches this directory. Everything
+about it is in `src/sloper/` and in `.claude/rules/sloper.md`; the one thing worth knowing from
+out here is that its public invoker binding lives in `terraform/functions.tf`, and that a new HTTP
+function is a two-pass landing (function first, binding second) for the reason set out in
+`terraform/README.md`.
+
 ## Why the shared modules come from the site
 
 `tsconfig.json` sets `rootDir: ".."` and includes `../korczak-xyz/src/utils/events/*.ts`, so the

@@ -1,0 +1,763 @@
+/* Sloper — retro theme.
+ *
+ * The app is a five-step wizard, and a wizard is the one shape Windows 95 had a strong opinion
+ * about: a tab strip of steps across the top, a grey property-sheet face under it, groove-bordered
+ * group boxes with legends cut into them, and a sunken status strip at the bottom. Everything here
+ * is that, drawn out of the same tokens as the rest of the site, plus three borrowed idioms —
+ * the blocky progress bar, the sunken well an image sits in, and the two-tone bevel on every
+ * control.
+ *
+ * Only two rules of thumb are worth knowing before editing:
+ *
+ *  1. **Outset means raised, inset means pressed, groove means a boundary.** The site's own
+ *     `.retro-btn` already does the first two; anything new here that draws a border picks one of
+ *     the three on purpose rather than by eye.
+ *  2. **The screen scrolls a long way.** Twelve scene cards, each with two textareas, is several
+ *     thousand pixels, so nothing here is fixed-position and every heading is a real heading —
+ *     the step strip is the only navigation, and on a phone it wraps rather than scrolling
+ *     sideways, because a step you cannot see is a step you cannot tell you have not reached. */
+
+/* Same reasoning as the trainers and the shopping list: this is a property sheet, not a page in a
+   teal window, so the content area is the panel face and the ink is reset with the surface. */
+.sloper-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 16px;
+}
+
+.slp-app {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+  font-size: 1.15rem;
+}
+
+/* Reserves roughly what the island occupies, so the window does not collapse and rebound while
+   localStorage is read. */
+.slp-loading {
+  min-height: 520px;
+}
+
+/* --- the step strip ------------------------------------------------------------------- */
+
+.slp-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-bottom: 2px solid var(--retro-dark-gray);
+}
+
+.slp-step button,
+.slp-step span {
+  display: block;
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  padding: 5px 12px;
+  background: #b0b0b0;
+  color: var(--retro-dark-gray);
+  border: 2px outset var(--retro-white);
+  border-bottom: none;
+  cursor: default;
+  text-decoration: none;
+}
+
+.slp-step button {
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.slp-step button:hover {
+  background: #c8c8c8;
+}
+
+/* The current step is the tab in front: same face colour as the sheet below it, and one pixel
+   taller so it reads as continuous with the panel rather than as a button on it. */
+.slp-step-here span,
+.slp-step-here button {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  font-weight: bold;
+  padding-bottom: 7px;
+  margin-bottom: -2px;
+}
+
+.slp-step-done button::before {
+  /* A finished step says so without needing a colour, which is the same rule the charts follow. */
+  content: '✓ ';
+}
+
+/* --- the status strip ----------------------------------------------------------------- */
+
+.slp-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-gray);
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.slp-sync::before {
+  content: '● ';
+}
+
+.slp-sync-synced {
+  color: #006000;
+}
+
+.slp-sync-syncing {
+  color: var(--retro-dark-gray);
+}
+
+/* Not a failure of the app: the settings are still in this browser and everything works. Amber
+   rather than red, and the sentence under it says so. */
+.slp-sync-error {
+  color: #8a4b00;
+}
+
+.slp-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+/* --- panels --------------------------------------------------------------------------- */
+
+.slp-signin,
+.slp-banner,
+.slp-total,
+.slp-tokens,
+.slp-progress,
+.slp-wait {
+  border: 2px groove var(--retro-white);
+  background: var(--retro-gray);
+  padding: 12px;
+}
+
+.slp-signin p,
+.slp-banner p {
+  margin: 6px 0;
+}
+
+.slp-signin .retro-btn {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  padding: 6px 14px;
+}
+
+.slp-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-color: var(--retro-red);
+  border-style: solid;
+  border-width: 2px;
+}
+
+.slp-banner-close {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.slp-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.slp-group {
+  border: 2px groove var(--retro-white);
+  padding: 10px 12px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.slp-legend {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 9px;
+  padding: 0 6px;
+  color: var(--retro-black);
+}
+
+.slp-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  margin: 0 0 6px;
+  color: var(--retro-black);
+}
+
+/* --- rows and controls ---------------------------------------------------------------- */
+
+.slp-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slp-label {
+  font-size: 1.1rem;
+  color: var(--retro-black);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* A label whose own row carries something beside it — the set/not-set chip on a key. Without
+   this it inherits the column direction above and the chip becomes a full-width band of its own. */
+.slp-label-inline {
+  flex-direction: row;
+  align-items: baseline;
+}
+
+.slp-hint,
+.slp-note {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.slp-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
+.slp-error {
+  font-size: 1rem;
+  color: #a00000;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.slp-error-block {
+  border-left: 3px solid var(--retro-red);
+  padding-left: 8px;
+}
+
+.slp-input,
+.slp-select,
+.slp-textarea {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  width: 100%;
+  padding: 5px 7px;
+  background: var(--retro-white);
+  color: var(--retro-black);
+  border: 2px inset var(--retro-white);
+}
+
+.slp-textarea {
+  min-height: 74px;
+  resize: vertical;
+  line-height: 1.35;
+}
+
+.slp-prompt {
+  min-height: 110px;
+}
+
+.slp-input-number {
+  max-width: 9ch;
+}
+
+.slp-select:disabled,
+.slp-input:disabled,
+.slp-textarea:disabled {
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.slp-key {
+  display: flex;
+  gap: 6px;
+}
+
+.slp-key-toggle {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 10px;
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.slp-key-toggle:active {
+  border-style: inset;
+}
+
+.slp-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+}
+
+.slp-check input {
+  width: auto;
+}
+
+.slp-slider {
+  width: 100%;
+}
+
+.slp-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+}
+
+/* Two settings side by side where they are read together — scenes and length, model and voice.
+   Collapses below 480px, where two number boxes on one line leave neither room for its label. */
+.slp-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .slp-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A chip that states a fact rather than raising an alarm: `set` / `not set` beside a key,
+   `edited` beside a scene. */
+.slp-chip {
+  display: inline-block;
+  font-size: 0.9rem;
+  padding: 0 6px;
+  margin-left: 6px;
+  border: 1px solid var(--retro-dark-gray);
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.slp-chip-on {
+  border-color: #006000;
+  color: #006000;
+}
+
+/* --- costs ---------------------------------------------------------------------------- */
+
+.slp-cost {
+  border-top: 1px solid var(--retro-dark-gray);
+  padding-top: 8px;
+}
+
+.slp-cost-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.slp-cost-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.slp-total .slp-cost-line {
+  font-size: 1.3rem;
+}
+
+/* --- actions -------------------------------------------------------------------------- */
+
+.slp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.slp-actions .retro-btn {
+  font-size: 1.1rem;
+  padding: 8px 16px;
+}
+
+/* The one button on each screen that spends money or moves the wizard on. Navy on grey, the way
+   a default button in a 95 dialog carried a heavier border than its neighbours. */
+.slp-primary {
+  font-weight: bold;
+  box-shadow: inset 0 0 0 1px var(--retro-navy);
+}
+
+.slp-primary:disabled,
+.retro-btn:disabled {
+  color: var(--retro-dark-gray);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.slp-small {
+  font-size: 0.95rem;
+  padding: 3px 10px;
+}
+
+.slp-backbar {
+  display: flex;
+}
+
+.slp-back {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.slp-back:disabled {
+  color: var(--retro-dark-gray);
+  cursor: not-allowed;
+}
+
+/* --- scenes --------------------------------------------------------------------------- */
+
+.slp-empty {
+  border: 2px inset var(--retro-white);
+  background: #d8d8d8;
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.slp-scenes,
+.slp-assets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.slp-scene,
+.slp-asset {
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+.slp-scene-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  /* The same gradient as a window's title bar, because that is what this is — a collapsible
+     panel with a caption. */
+  background: linear-gradient(90deg, var(--retro-navy), #1084d0);
+}
+
+.slp-scene-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: var(--retro-white);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slp-scene-arrow {
+  font-size: 0.8rem;
+}
+
+.slp-scene-toggle .slp-chip {
+  background: transparent;
+  border-color: var(--retro-cyan);
+  color: var(--retro-cyan);
+}
+
+.slp-scene-delete {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 1px 8px;
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.slp-scene-delete:active {
+  border-style: inset;
+}
+
+.slp-scene-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slp-scene-peek {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 1.05rem;
+  color: var(--retro-dark-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slp-add-scene {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 2px dashed var(--retro-dark-gray);
+  color: var(--retro-dark-gray);
+  cursor: pointer;
+}
+
+.slp-add-scene:hover {
+  background: #c8c8c8;
+  color: var(--retro-black);
+}
+
+.slp-token-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+
+.slp-token-grid dt {
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+}
+
+.slp-token-grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .slp-token-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- assets --------------------------------------------------------------------------- */
+
+.slp-progress-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* A 1995 progress bar: a sunken well with a solid navy fill. No animation, no gradient — the
+   number beside it is the precise answer and the bar is the glanceable one. */
+.slp-bar {
+  height: 18px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.slp-bar-fill {
+  height: 100%;
+  background: var(--retro-navy);
+  transition: width 0.3s ease-out;
+}
+
+.slp-asset {
+  padding: 10px;
+}
+
+.slp-asset .slp-subhead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.slp-halves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .slp-halves {
+    grid-template-columns: 1fr;
+  }
+}
+
+.slp-half-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.slp-half-title {
+  font-size: 1.05rem;
+}
+
+/* Every status also carries its own word — nothing here is read by colour alone, which is the
+   rule the charts are built on and applies just as much to four coloured badges. */
+.slp-status {
+  font-size: 0.9rem;
+  padding: 0 6px;
+  border: 1px solid var(--retro-dark-gray);
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.slp-status-generating {
+  border-color: var(--retro-navy);
+  color: var(--retro-navy);
+}
+
+.slp-status-complete {
+  border-color: #006000;
+  color: #006000;
+}
+
+.slp-status-failed {
+  border-color: var(--retro-red);
+  color: #a00000;
+}
+
+/* The sunken well an image sits in. Fixed height so a grid of twelve does not reflow as each
+   picture lands at whatever size its model chose. */
+.slp-half-body {
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border: 2px inset var(--retro-white);
+  background: #d8d8d8;
+}
+
+.slp-thumb {
+  max-height: 120px;
+  max-width: 100%;
+  object-fit: contain;
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.slp-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.slp-audio audio {
+  width: 100%;
+  max-width: 260px;
+}
+
+.slp-fail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+/* --- assembly and output -------------------------------------------------------------- */
+
+.slp-wait {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.slp-wait-line {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.slp-player {
+  border: 2px inset var(--retro-white);
+  background: var(--retro-black);
+  padding: 4px;
+}
+
+.slp-player video {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+}
+
+/* A spinner drawn out of a border, so it costs no image and no SVG filter. */
+.slp-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  border: 3px solid var(--retro-dark-gray);
+  border-top-color: var(--retro-navy);
+  border-radius: 50%;
+  animation: slp-spin 0.8s linear infinite;
+}
+
+@keyframes slp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Somebody who has asked for less motion gets a pulse instead of a rotation — it still says
+   "working", which is the whole job. */
+@media (prefers-reduced-motion: reduce) {
+  .slp-spinner {
+    animation: slp-pulse 1.4s ease-in-out infinite;
+  }
+
+  .slp-bar-fill {
+    transition: none;
+  }
+}
+
+@keyframes slp-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "scrapedAt": "2026-02-16T12:30:00Z",
+  "llm": {
+    "gpt-5.2": { "input": 1.75, "cachedInput": 0.175, "output": 14.00 },
+    "gpt-5.1": { "input": 1.25, "cachedInput": 0.125, "output": 10.00 },
+    "gpt-5": { "input": 1.25, "cachedInput": 0.125, "output": 10.00 },
+    "gpt-5-mini": { "input": 0.25, "cachedInput": 0.025, "output": 2.00 },
+    "gpt-5-nano": { "input": 0.05, "cachedInput": 0.005, "output": 0.40 },
+    "gpt-5.2-pro": { "input": 21.00, "cachedInput": null, "output": 168.00 },
+    "gpt-5-pro": { "input": 15.00, "cachedInput": null, "output": 120.00 },
+    "gpt-4.1": { "input": 2.00, "cachedInput": 0.50, "output": 8.00 },
+    "gpt-4.1-mini": { "input": 0.40, "cachedInput": 0.10, "output": 1.60 },
+    "gpt-4.1-nano": { "input": 0.10, "cachedInput": 0.025, "output": 0.40 },
+    "gpt-4o": { "input": 2.50, "cachedInput": 1.25, "output": 10.00 },
+    "gpt-4o-mini": { "input": 0.15, "cachedInput": 0.075, "output": 0.60 },
+    "o3": { "input": 2.00, "cachedInput": 0.50, "output": 8.00 },
+    "o3-pro": { "input": 20.00, "cachedInput": null, "output": 80.00 },
+    "o3-mini": { "input": 1.10, "cachedInput": 0.55, "output": 4.40 },
+    "o4-mini": { "input": 1.10, "cachedInput": 0.275, "output": 4.40 },
+    "o1": { "input": 15.00, "cachedInput": 7.50, "output": 60.00 },
+    "o1-mini": { "input": 1.10, "cachedInput": 0.55, "output": 4.40 },
+    "gpt-4-turbo": { "input": 10.00, "cachedInput": null, "output": 30.00 },
+    "gpt-3.5-turbo": { "input": 0.50, "cachedInput": null, "output": 1.50 },
+    "deepseek-chat": { "input": 0.28, "cachedInput": 0.028, "output": 0.42 },
+    "deepseek-reasoner": { "input": 0.28, "cachedInput": 0.028, "output": 0.42 }
+  },
+  "image": {
+    "gpt-image-1": {
+      "low":    { "1024x1024": 0.011, "1024x1536": 0.016, "1536x1024": 0.016 },
+      "medium": { "1024x1024": 0.042, "1024x1536": 0.063, "1536x1024": 0.063 },
+      "high":   { "1024x1024": 0.167, "1024x1536": 0.250, "1536x1024": 0.250 }
+    },
+    "gpt-image-1-mini": {
+      "low":    { "1024x1024": 0.005, "1024x1536": 0.006, "1536x1024": 0.006 },
+      "medium": { "1024x1024": 0.011, "1024x1536": 0.015, "1536x1024": 0.015 },
+      "high":   { "1024x1024": 0.036, "1024x1536": 0.052, "1536x1024": 0.052 }
+    },
+    "gpt-image-1.5": {
+      "low":    { "1024x1024": 0.009, "1024x1536": 0.013, "1536x1024": 0.013 },
+      "medium": { "1024x1024": 0.034, "1024x1536": 0.050, "1536x1024": 0.050 },
+      "high":   { "1024x1024": 0.133, "1024x1536": 0.200, "1536x1024": 0.200 }
+    },
+    "dall-e-3": {
+      "standard": { "1024x1024": 0.040, "1024x1792": 0.080, "1792x1024": 0.080 },
+      "hd":       { "1024x1024": 0.080, "1024x1792": 0.120, "1792x1024": 0.120 }
+    },
+    "dall-e-2": {
+      "standard": { "256x256": 0.016, "512x512": 0.018, "1024x1024": 0.020 }
+    }
+  },
+  "geminiImage": {
+    "gemini-2.0-flash-image-generation-001": 0.039,
+    "gemini-2.0-flash-image": 0.039,
+    "gemini-2.5-flash-preview-image-generation": 0.039,
+    "gemini-2.5-flash-image": 0.039,
+    "gemini-3-pro-image-preview": 0.039,
+    "imagen-3.0-generate-002": 0.04,
+    "imagen-3.0-fast-generate-001": 0.02,
+    "imagen-4.0-generate-preview-05-20": 0.04,
+    "imagen-4.0-fast-generate": 0.02,
+    "imagen-4.0-generate": 0.04,
+    "imagen-4.0-ultra-generate": 0.06
+  },
+  "tts": {
+    "flash_turbo": {
+      "free": null,
+      "starter": 0.08,
+      "creator": 0.11,
+      "pro": 0.10,
+      "scale": 0.08,
+      "business": 0.06
+    },
+    "multilingual_v2_v3": {
+      "free": null,
+      "starter": 0.17,
+      "creator": 0.22,
+      "pro": 0.20,
+      "scale": 0.17,
+      "business": 0.12
+    }
+  }
+}

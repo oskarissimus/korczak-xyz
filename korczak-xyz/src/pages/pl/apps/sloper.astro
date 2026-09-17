@@ -1,0 +1,28 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Sloper from '../../../components/Sloper/Sloper';
+import SloperSkeleton from '../../../components/Sloper/SloperSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/sloper.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Sloper')} | korczak.xyz`} description={t('sloper.desc')} lang={lang}>
+  <div class="window sloper-window">
+    <div class="title-bar">
+      <span>{t('Sloper')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content sloper-content">
+      <Sloper client:only="react" lang={lang}>
+        <SloperSkeleton slot="fallback" lang={lang} />
+      </Sloper>
+    </div>
+  </div>
+</Layout>

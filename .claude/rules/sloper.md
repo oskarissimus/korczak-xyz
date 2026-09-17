@@ -1,0 +1,229 @@
+---
+name: sloper
+description: The slop video generator at /apps/sloper/ - the five-stage wizard as one island, the four API keys and where they are kept, the streaming scene parser, the canvas pass every picture goes through, and the one Cloud Function that runs FFmpeg.
+paths:
+  - "**/utils/sloper/**"
+  - "**/components/Sloper/**"
+  - "**/hooks/useSloperConfig.ts"
+  - "**/hooks/useSloperRun.ts"
+  - "**/styles/sloper.css"
+  - "**/pages/**/apps/sloper.astro"
+  - "functions/src/sloper/**"
+---
+
+## Slop Video Generator
+
+At `/apps/sloper/` — a topic goes in, a narrated MP4 comes out, paid for with the reader's own
+API keys. Migrated from `oskarissimus/sloper` (a Vite SPA on GitHub Pages plus a FastAPI/FFmpeg
+container on Cloud Run) in Sep 2026; `sloper-migration-log.md` at the repo root is the record of
+what moved where and what did not move at all.
+
+Two halves, same as Event Watch: `korczak-xyz/src/utils/sloper/` and `src/components/Sloper/` are
+the client, `functions/src/sloper/` is the one thing a browser cannot do.
+
+### Why it is one page and one island
+
+sloper was a `HashRouter` over five routes. Here the five stages are five values of one `stage`
+in `useSloperRun`, and that is **forced rather than preferred**: every asset is a `Blob` held in
+memory and nothing persists them, so a genuine navigation between stages throws away a video that
+cost real money to make. The step strip is the whole of the navigation; a step you have not
+reached is a `<span>`, not a link.
+
+The same fact rules out three things somebody will reasonably want:
+
+- **No localStorage for a sitting.** Twelve 1024×1536 images and twelve narrations is tens of
+  megabytes against an origin budget of ~5 MB shared with the typing trainer's `typedHistory`.
+  One sitting would evict a book. `storage.ts` holds one small key and nothing else.
+- **No PWA tier and no manifest.** It is not in `PWA_APPS` or in `APP_TIERS` (`generate-sw.mjs`),
+  and that is deliberate: what qualifies as an installable app here is a thing you reach for away
+  from a desk, and an app whose whole state dies with the tab is the opposite of that.
+- **No resume.** Reloading mid-run starts again. The `beforeunload` warning in `Sloper.tsx` is the
+  entire mitigation, and it is armed only while `run.busy` — a prompt on every navigation is one
+  people learn to dismiss without reading.
+
+### The keys, and the trade being made
+
+Four of them — OpenAI, DeepSeek, Google, ElevenLabs — in `localStorage` under `sloper-config`,
+and, for a signed-in account, in `users/{uid}/sloper/config` under the existing
+`users/{uid}/{document=**}` rule. **No rules change was needed and none should be added**: that
+catch-all already makes the document private to its owner.
+
+Storing keys at all was the ask this migration was for, and the reasoning should not be quietly
+reversed by somebody tidying:
+
+- They are **already in the clear in the page's memory** every time it calls OpenAI. Encrypting
+  them at rest buys nothing — anything the page can decrypt with, script on this origin can too.
+- The only design that keeps them out of the browser is one where **a server of ours holds them
+  and makes the calls**, which is a strictly larger thing to own and puts this site on the hook
+  for somebody else's OpenAI bill.
+- They are metered, per-provider and revocable, which is what makes the first two acceptable.
+
+**The sync is last-write-wins, wholesale, on one `updatedAt`.** There is no reconciler and no
+per-field revision like the sleep log's, and a field-by-field merge is not an improvement waiting
+to happen — it is the specific bug to avoid. Merging by field means a key **cleared** on the
+laptop is resurrected by the phone's copy on its next load, for ever. That is the one outcome
+that must not happen to a key somebody deliberately revoked, so clearing is an ordinary edit with
+a newer timestamp and it propagates.
+
+`pulledRef` in `useSloperConfig` gates the push, not `user`: pushing before the pull has answered
+races the account's own copy against whatever this browser had, and the edit that loses is the one
+somebody just typed. A pull that finds **no document** is not "the account has no config" — it is
+a first sitting, and this browser's copy is the only one there is, so it is pushed up.
+
+### Typing a key is how a key is checked
+
+There is no "validate" button for three of the four, because listing a provider's models *is* the
+validation call: a key that fills the dropdown is a key that works. It is debounced 500 ms in
+`ConfigStage`, because a key typed rather than pasted arrives one character at a time and forty
+401s is a rate limit.
+
+ElevenLabs is the exception — it has no model list worth showing, so it is the one key checked
+explicitly, and only when Start is pressed (`validateElevenLabsKey`).
+
+The auto-pick reads the current model through a **ref**, not a dependency. In the dependency array
+it re-runs the fetch every time the dropdown changes, which is what the fetch itself does when it
+picks one, and the two take turns for ever.
+
+A provider's own error text is shown **verbatim and untranslated**. It is the string you would
+paste into their support page; the sentence around it is translated, the quote is not.
+
+### The scenes arrive before the model has finished writing
+
+`parseSceneBuffer` in `llm.ts` is the only hand-written parser here and the streaming screen
+stands on it. The model is asked for a JSON array of `{script, image_description}`; waiting for
+the closing `]` is thirty seconds of blank screen, so the buffer is scanned for **complete
+objects** and each becomes a card the moment it is whole.
+
+It cannot use `JSON.parse` — the buffer is invalid until the last character — so it walks braces
+itself, tracking strings and escapes. That is not defensive coding: an `image_description` is
+prose written by a model, and `{`, `}` and escaped quotes turn up in prose. Counted naively, the
+first brace inside a string closes the object one character early and nothing parses again.
+
+It is called on **every chunk over the whole buffer** and re-parses what it has already parsed;
+callers keep their own count and slice past it. That is quadratic in the scene count and does not
+matter — the ceiling is 100 scenes of a few hundred characters.
+
+`sceneSystemPrompt` and the parser are one thing. A prompt that stopped naming those two keys
+would produce a stream nothing reads, with no error anywhere; `llm.test.ts` asserts the prompt
+names them.
+
+### Every picture goes through a canvas, and each step fixes a real failure
+
+`processImage` in `images.ts`, in this order, and the order matters:
+
+| step | what it prevents |
+|---|---|
+| flatten transparency onto white | a PNG with alpha becomes **black** under yuv420p, so a logo arrives as a black rectangle |
+| lift below mean luminance 50 | slop image models love a near-black frame; the scene after it will not be, and the cut reads as a fault |
+| re-encode as JPEG | the one that decides whether the video can be made at all — twelve 1024×1536 PNGs do not fit in 32 MiB |
+
+Flattening comes first so the brightness reading is of pixels the video will actually show; the
+JPEG pass comes last so its saving is not thrown away by a re-encode after it.
+
+**The requested size is almost never what a model serves.** DALL-E 3 offers three sizes and none
+of them is the 1024×1536 the video settings default to, and Gemini takes a ratio rather than
+pixels — so `normalizeImageSize` picks the nearest supported one and FFmpeg letterboxes the
+difference (`force_original_aspect_ratio=decrease` plus `pad`). `estimateImageCost` mirrors that
+normalization deliberately: a price quoted for 1024×1024 against a request that will be sent as
+1024×1792 is worse than no price.
+
+### How long each picture is held
+
+The narration's own length, never a setting. ElevenLabs' `/with-timestamps` returns a
+character-level alignment, `wordsFromAlignment` folds it into words, and **the last word's end
+time becomes the scene's `imageDuration`**. A walk that closes words on spaces alone drops the
+final word, and the scene is then held for however long the second-to-last word ended — which
+cuts the narration off mid-sentence. `tts.test.ts` guards exactly that.
+
+`previous_text` / `next_text` are not optional niceties. Each scene is a separate request, so
+without them the model reads every scene as a standalone sentence and the cuts sound like six
+people reading six cards. Neither is billed.
+
+### The queue, and why a rejection must free its slot
+
+`ConcurrencyLimiter` is split out of the image module so it can be tested without a canvas (there
+is no jsdom in this project). Twelve scenes fired at once earns a 429 from both providers. The
+ElevenLabs width is a **setting** because their ceiling is per plan; the image width is a constant
+because DALL-E's is per key and twelve has never been what hit it.
+
+Two properties are load-bearing and both are tested: a rejected job frees its slot (otherwise the
+first 429 stops the other eleven, which looks exactly like a generation still in progress), and a
+task that throws **synchronously** rejects the promise `add` returned rather than escaping the
+pump (an escape leaves that promise pending for ever — a card stuck on "Working" with nothing to
+retry).
+
+`startAssets` uses `allSettled` and catches per asset, never `all`: one refused image must not
+abandon eleven paid-for narrations, and each rejection is recorded against its own asset, which
+is what the Retry button reads.
+
+### The one thing that is not in the browser
+
+`assembleVideo`, a gen-2 HTTPS function in `functions/`, deployed by the same pipeline as the two
+collectors. A Cloud Run container was the other option and was rejected: the existing path (WIF →
+terraform → `firebase deploy`) already reaches `functions/`, and a container would have meant a
+new registry, a new build and a new workflow for one endpoint.
+
+- **`onRequest`, not `onCall`**, because the payload is tens of megabytes of binary and `onCall` is
+  JSON — base64 would put a third on top of a body already at the platform's ceiling. `onCall`'s
+  free `request.auth` goes with it, so the bearer token is verified by hand in `handler.ts`.
+- **Busboy over `req.rawBody`.** Cloud Functions reads the whole body before the handler runs;
+  anything streaming the request is too late.
+- **32 MiB, both ways.** It bounds the upload *and* the MP4 coming back — a response over it is
+  truncated by the platform, which reaches the browser as a corrupt file rather than an error. So
+  the finished video is measured before it is sent. `assemble.ts` keeps the same limit on the way
+  in, so most of this is never reached.
+- **`ffmpeg-static`, and therefore no `ffprobe`.** The Python backend probed the finished file for
+  a duration; the duration reported here is the sum of the scene durations the client sent, which
+  is what the video was built to, to within the rounding `-shortest` trims.
+- **`concurrency: 1`, `maxInstances: 3`, 2 GiB, 540 s.** libx264 takes every core it is given, so
+  a second concurrent assembly on one instance makes both slower and doubles peak memory and
+  `/tmp`; the instance cap is what stops a burst becoming a bill.
+- **`metadata.ts` is Pydantic's replacement.** FastAPI validated the request body for free and a
+  Cloud Function does not, and these numbers become `ffmpeg` arguments: a width of `1e9` is an
+  out-of-memory kill, a `NaN` duration reaches `-t` as the literal string. Dimensions are forced
+  even because yuv420p subsamples chroma 2×2 and libx264 refuses an odd one.
+
+**`handler.test.ts` is the cross-runtime test and is the reason to keep `parseMultipart`
+exported.** The part names and the file ordering are a contract written down twice in two
+languages with no shared type; that test builds a body with the platform's own `FormData` — the
+same serializer `fetch` uses — and reads it with the real parser. A parser that returned the files
+in another order would produce a video whose narration drifts one scene further out of step with
+every cut: correct-looking output that is wrong, which is worse than a crash.
+
+### Deploying it
+
+Nothing new in the pipeline — `functions/**` is already in `firebase-deploy.yml`'s path filter.
+Two things are worth knowing:
+
+- **`terraform/functions.tf` carries the public invoker binding**, beside `sendTestPush`'s and for
+  the same reason: a gen-2 function is a Cloud Run service underneath, so it must be
+  `google_cloud_run_service_iam_member`, and the service name is the function name **lowercased**
+  (`assemblevideo`). "Public" means reachable, not unguarded — the handler returns 401 without a
+  Firebase ID token.
+- **It is a two-pass landing on a project where the function does not exist yet.** The terraform
+  job runs *before* the deploy job, so a binding on a service that has never been created fails
+  the apply and blocks the very deploy that would create it. Land the function first, let it
+  deploy, then land the binding. This is the same two-pass `terraform/README.md` describes for the
+  bootstrap, and it is a one-off: once `assemblevideo` exists the ordering is right for ever.
+
+`PUBLIC_SLOPER_ASSEMBLE_URL` exists only for the emulator. In production the URL is derived from
+`PUBLIC_FIREBASE_PROJECT_ID`, because a gen-2 function answers on the same `cloudfunctions.net`
+host as a gen-1 one and one fewer variable is one fewer thing to get wrong.
+
+`PUBLIC_GOOGLE_DRIVE_CLIENT_ID` is unset, so the "Send to Google Drive" button does not render.
+That is the correct state until an OAuth client exists: a client id naming an origin Google has
+not been told about produces a consent popup that closes with an error, which is worse than no
+button. Downloading is unaffected either way.
+
+### What was left behind
+
+- **The FastAPI backend, the Dockerfile, `cloudbuild.yaml` and the Cloud Run deploy.** Replaced by
+  the function above; the FFmpeg pipeline itself is a faithful port, same four steps and same
+  flags.
+- **Playwright's `video-generation.spec.ts`.** It drove the SPA against fixture providers through
+  `VITE_*` env vars that do not exist here. What it covered is covered instead by the unit tests
+  named above plus a mocked walkthrough — every provider intercepted at the network layer — which
+  is recorded in the migration log rather than committed, there being no browser-test harness in
+  this repo to commit it to.
+- **`react-router-dom` and the four React contexts.** See the first section.
+- **Tailwind.** `styles/sloper.css` is the whole look, on the site's own retro tokens.

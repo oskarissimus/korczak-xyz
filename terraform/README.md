@@ -21,10 +21,10 @@ Both are project state. Project state that is not written down is state that get
 
 | Terraform owns | The Firebase CLI owns |
 |---|---|
-| enabled APIs | `collectEvents`, `sendTestPush` |
+| enabled APIs | `collectEvents`, `sendTestPush`, `collectTransit`, `assembleVideo` |
 | IAM role grants | `firestore.rules` |
 | secret **containers** | `firestore.indexes.json` |
-| `run.invoker` on `sendTestPush` | the code, the schedule |
+| `run.invoker` on `sendTestPush` and `assembleVideo` | the code, the schedule |
 | the `gcf-artifacts` cleanup policy | |
 | the Firestore backup **schedules** | the Firestore **database** itself |
 | the export bucket, its schedule and its two accounts | the **key** for the reader account |
@@ -46,6 +46,20 @@ touch nothing else. Declaring `google_firestore_database` to reach the one field
 (point-in-time recovery) would put every other tool's read-write target under Terraform's
 management for a feature with a seven-day window and a continuous bill. See the header of
 `firestore.tf`.
+
+### A binding on a function that does not exist yet
+
+`functions.tf` attaches `run.invoker` to two Cloud Run services that Terraform does not create —
+the Firebase CLI does, as gen-2 functions. The ordering in `firebase-deploy.yml` puts the
+`terraform` job **before** the `deploy` job, which is right in the steady state and exactly wrong
+the first time a new HTTP function lands: the binding fails the apply, the failed apply blocks the
+deploy, and the deploy is the thing that would have created the service.
+
+So a new public function is a **two-pass landing**, the same shape as the bootstrap below: push
+the function, let it deploy, then push its binding. `assembleVideo` (the sloper video assembler,
+Sep 2026) landed that way. It is a one-off per function — once the service exists the ordering is
+right for ever — and the alternative, reversing the two jobs, would give up the guarantee the
+ordering was put there for.
 
 ## The accepted trade
 
