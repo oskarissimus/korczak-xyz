@@ -118,18 +118,38 @@ produce a video whose narration drifts one scene further out of step with every 
 `npm run build` in `korczak-xyz/` and `npm run build` in `functions/` both clean;
 `npx tsc --noEmit` reports nothing in any sloper file.
 
+**And then, against the deployed function**, once both pushes had landed:
+
+```
+POST, no token        401 {"error":"UNAUTHENTICATED","message":"Sign in first."}
+POST, bad token       401 {"error":"UNAUTHENTICATED","message":"That sign-in is not valid…"}
+OPTIONS, korczak.xyz  204 + access-control-allow-origin: https://korczak.xyz, vary: Origin
+OPTIONS, evil.test    204 + no access-control-allow-origin at all
+```
+
+So the endpoint is reachable from a page, refuses an anonymous one, quotes nothing back to a
+caller it did not recognise, and the allowlist really is an allowlist.
+
 ## What still needs a human
 
 - [ ] **End-to-end with real keys.** Nothing here has ever called OpenAI, Google or ElevenLabs
       for real. The request shapes are ports of code that worked, but that is not the same thing.
-- [ ] **The two-pass landing of the terraform binding.** The `terraform` job runs before the
-      `deploy` job, so a `run.invoker` binding on a service that does not exist yet fails the
-      apply and blocks the deploy that would create it. The function is pushed first; the binding
-      follows once `assemblevideo` exists. One-off per function — see `terraform/README.md`.
+- [x] ~~The two-pass landing of the terraform binding.~~ Done: `1003734` shipped the function,
+      `e30094b` the binding, both green. Worth recording what the first pass showed — the
+      freshly deployed function answered a preflight with **403**, which is the state
+      `sendTestPush` was in before its own binding, so the binding was not paperwork. One-off per
+      function; the ordering is right for ever now. See `terraform/README.md`.
 - [ ] **First real assembly.** Worth watching `maxInstances: 3` and the 540 s timeout against a
       twelve-scene run; both are guesses from the Python version's 300 s.
 - [ ] **`PUBLIC_GOOGLE_DRIVE_CLIENT_ID`**, if the Drive button is wanted. Unset, it does not
       render, which is the right state until an OAuth client naming `korczak.xyz` exists.
+
+## Landed
+
+| commit | what |
+|---|---|
+| `1003734` | the app, the function, the tests, the docs |
+| `e30094b` | `terraform/functions.tf` — the public invoker binding, second pass |
 
 ## Not migrated, deliberately
 
