@@ -1,0 +1,13 @@
+# Everything here is meant to be read, so nothing is disallowed. The pages that should stay out
+# of the index say so themselves, with <meta name="robots" content="noindex"> — a Disallow would
+# be the wrong tool for them twice over: it blocks the crawl rather than the indexing, so a URL
+# that is linked from anywhere can still be listed, and it stops Google ever seeing the noindex
+# it would have obeyed. See src/utils/seo.ts for which pages those are and why.
+#
+# Cloudflare injects its Content Signals block into this file at the edge (Settings -> AI Crawl
+# Control), so what the site serves is longer than what is in the repo. That block is comments
+# and a content-signal header; it adds no crawl directives and overrides nothing below.
+User-agent: *
+Allow: /
+
+Sitemap: https://korczak.xyz/sitemap-index.xml

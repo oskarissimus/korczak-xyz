@@ -70,6 +70,7 @@ there; they exist because most of what is in them was learnt by breaking somethi
 | `.claude/rules/pwa.md` | The installable apps: manifests, the service worker and its tiers, the safe area, fonts |
 | `.claude/rules/charts.md` | Every chart: why no series is read by colour alone, the shared marks, the pointer readout |
 | `.claude/rules/songbook.md` | The songbook: chord lines aligned in characters, and the synthetic-bold trap |
+| `.claude/rules/seo.md` | What the site tells crawlers: canonical URLs, hreflang, noindex, the sitemap, the trailing slash |
 
 If you are working somewhere these globs do not reach and something here seems to have a reason
 behind it, read the matching file before assuming there is not one.

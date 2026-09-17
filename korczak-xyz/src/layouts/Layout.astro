@@ -7,6 +7,7 @@ import islandRecovery from '../scripts/island-recovery.js?raw';
 import registerSw from '../scripts/register-sw.js?raw';
 import PwaHead from '../components/PwaHead.astro';
 import type { PwaApp } from '../utils/pwa/apps';
+import { getPageSeo } from '../utils/seo';
 import '../styles/global.css';
 import '../styles/auth.css';
 
@@ -32,6 +33,11 @@ const {
 
 const currentPath = Astro.url.pathname;
 
+// Canonical URL, hreflang pairs and the noindex decision all come out of src/utils/seo.ts, which
+// holds the reasoning. Doing it here rather than per page means a new route is covered the moment
+// it renders, instead of the day somebody remembers to add the tag.
+const seo = getPageSeo(currentPath, lang);
+
 const t = useTranslations(lang);
 const recoveryStrings = {
   title: t('hydrationError.title'),
@@ -51,6 +57,11 @@ const recoveryStrings = {
          turning phone-number- or email-shaped text into links of their own accord. -->
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
     <meta name="description" content={description} />
+    <link rel="canonical" href={seo.canonical} />
+    {seo.alternates.map((alt) => (
+      <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />
+    ))}
+    {seo.noindex && <meta name="robots" content="noindex, follow" />}
     <meta name="image" content="https://korczak.xyz/logo.png" />
     <link rel="icon" href="/favicon-32x32.png" type="image/png" />
     <PwaHead app={pwa} lang={lang} />
