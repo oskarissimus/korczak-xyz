@@ -70,3 +70,23 @@ resource "google_artifact_registry_repository" "gcf_artifacts" {
     ignore_changes = [labels, description]
   }
 }
+
+/*
+ * `assembleVideo` is called from the browser and must be reachable without a Google identity.
+ *
+ * Same shape and same argument as `sendTestPush` above — a gen-2 function IS a Cloud Run service
+ * underneath, so this has to be `google_cloud_run_service_iam_member`, and "public" means
+ * reachable rather than unguarded: the handler verifies a Firebase ID token and returns 401
+ * without one (functions/src/sloper/handler.ts).
+ *
+ * The service name is the function name LOWERCASED, which is the one thing to get right here —
+ * Cloud Run has no `assembleVideo`, and a binding on a service that does not exist fails the
+ * apply rather than being ignored.
+ */
+resource "google_cloud_run_service_iam_member" "assemble_video_public" {
+  project  = local.project_id
+  location = local.region
+  service  = "assemblevideo"
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
