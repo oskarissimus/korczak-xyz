@@ -62,7 +62,14 @@ import type {
 } from '../utils/sloper/types';
 import type { SloperProjectApi } from './useSloperProject';
 
-export type AssemblyPhase = 'idle' | 'preparing' | 'uploading' | 'done' | 'error';
+/**
+ * `uploading` is the bytes going up; `encoding` is the function's first heartbeat having arrived,
+ * which is the only moment the page can know ffmpeg has the files. Before the answer was streamed
+ * there was no such moment, so the screen said "sending 3.3 MB" for the whole minute the encode
+ * took — a stalled upload and a working one looked identical, and the one that was working was
+ * the one that looked broken.
+ */
+export type AssemblyPhase = 'idle' | 'preparing' | 'uploading' | 'encoding' | 'done' | 'error';
 
 export interface SloperRun {
   stage: Stage;
@@ -692,6 +699,7 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
           images,
           audioFiles,
           signal,
+          () => setAssembly('encoding'),
         );
 
         setVideo(result.video);
@@ -744,7 +752,14 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
     goTo('config');
   }, [goTo, project]);
 
-  const busy = streaming || generatingAssets || assembly === 'preparing' || assembly === 'uploading';
+  // `encoding` belongs here with the other two: it is the longest stretch of the wait and the one
+  // where a navigation costs the most — the request in the air is the one already being paid for.
+  const busy =
+    streaming ||
+    generatingAssets ||
+    assembly === 'preparing' ||
+    assembly === 'uploading' ||
+    assembly === 'encoding';
 
   /*
    * The rows the autosave effect writes. Derived on every render rather than kept in state, so

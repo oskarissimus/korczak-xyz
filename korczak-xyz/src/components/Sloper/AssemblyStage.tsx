@@ -26,6 +26,17 @@ function Elapsed({ t }: { t: Translation }) {
   return <p className="slp-hint">{fill(t.assemblyElapsed, { time: `${mm}:${ss}` })}</p>;
 }
 
+/**
+ * Which of the three waits this is. `encoding` is knowable only because the function heartbeats —
+ * see `AssemblyPhase` — and it is the longest of the three by a wide margin, so it is the one the
+ * line is worth being honest about.
+ */
+function waitLine(phase: AssemblyPhase, uploadMB: string | null, t: Translation): string {
+  if (phase === 'encoding') return t.assemblyEncoding;
+  if (phase === 'uploading' && uploadMB) return fill(t.assemblyUploading, { mb: uploadMB });
+  return t.assemblyPreparing;
+}
+
 interface AssemblyStageProps {
   phase: AssemblyPhase;
   uploadMB: string | null;
@@ -67,10 +78,7 @@ export default function AssemblyStage({
         ) : (
           <>
             <p className="slp-wait-line">
-              <Spinner />{' '}
-              {phase === 'uploading' && uploadMB
-                ? fill(t.assemblyUploading, { mb: uploadMB })
-                : t.assemblyPreparing}
+              <Spinner /> {waitLine(phase, uploadMB, t)}
             </p>
             <Elapsed t={t} />
             <p className="slp-note">{t.assemblyWait}</p>

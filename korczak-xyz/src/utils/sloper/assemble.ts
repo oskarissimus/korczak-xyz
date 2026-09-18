@@ -14,6 +14,26 @@
  * open to the internet: it wants a Firebase ID token and rejects anything without one. That is
  * also why the wizard checks for a signed-in account before it starts, rather than at the last
  * step where the work is already spent.
+ *
+ * WHY THE ANSWER IS READ AS A STREAM. Encoding runs at roughly real time — ten scenes, 54 s of
+ * video, 63.8 s on the instance — and WebKit abandons a request that has gone 60 s without a
+ * byte arriving. It reports that abandonment as `TypeError: Load failed` and nothing else, which
+ * is the same four words a cross-origin refusal produces, so the first reading of it was that the
+ * bucket's CORS had broken again. It had not: the function answered 200 with the finished video
+ * at 65.1 s, to a phone that had already given up at 60 and shown "The video could not be
+ * assembled. Load failed." Every test this was built with was one scene and four seconds, which
+ * is why it shipped.
+ *
+ * So the function now sends its head immediately and a heartbeat every 10 s while ffmpeg runs,
+ * and `readAssemblyStream` below reads the frames. A byte arriving is what resets WebKit's clock,
+ * so the ceiling is the function's own 540 s rather than the browser's minute.
+ *
+ * The `stream` field is the handshake and it is deliberately a form field, not a header: a header
+ * would need naming in the deployed function's `Access-Control-Allow-Headers`, and the page and
+ * the function do not deploy at the same instant. An old function ignores the field and answers
+ * with a plain MP4, which is what the content-type check below falls back to; a new function
+ * sends frames only to a client that asked for them. Both branches can go once a deploy of the
+ * two halves has settled.
  */
 
 import { getIdToken } from 'firebase/auth';
@@ -56,6 +76,9 @@ export function assembleUrl(): string {
   return `https://europe-central2-${project}.cloudfunctions.net/assembleVideo`;
 }
 
+/** The framed answer's content type. The protocol itself is documented in `functions/src/sloper/handler.ts`. */
+export const STREAM_CONTENT_TYPE = 'application/vnd.sloper.assembly+octet-stream';
+
 export function totalBytes(blobs: Blob[]): number {
   return blobs.reduce((sum, blob) => sum + blob.size, 0);
 }
@@ -65,6 +88,8 @@ export async function assembleVideo(
   images: Blob[],
   audioFiles: Blob[],
   signal?: AbortSignal,
+  /** Called once the upload has landed and ffmpeg has started, so the screen can stop saying "sending". */
+  onEncoding?: () => void,
 ): Promise<AssemblyResult> {
   const bytes = totalBytes([...images, ...audioFiles]);
   if (bytes > MAX_UPLOAD_BYTES) {
@@ -81,6 +106,8 @@ export async function assembleVideo(
 
   const form = new FormData();
   form.append('metadata', JSON.stringify(metadata));
+  // "I can read the framed answer." See the note at the top of this file for why it is a field.
+  form.append('stream', '1');
   // Order is the contract: the function pairs images[i] with audio[i] with scenes[i].
   images.forEach((img, i) => form.append('images', img, `image_${i}.jpg`));
   audioFiles.forEach((audio, i) => form.append('audio', audio, `audio_${i}.mp3`));
@@ -96,10 +123,140 @@ export async function assembleVideo(
     throw new Error(await readError(response));
   }
 
+  if ((response.headers.get('Content-Type') || '').startsWith(STREAM_CONTENT_TYPE)) {
+    return readAssemblyStream(response, onEncoding);
+  }
+
+  // An older function, or anything in between that rewrote the body: a plain MP4, as it was.
   return {
     video: await response.blob(),
     duration: Number.parseFloat(response.headers.get('X-Video-Duration') || '0'),
   };
+}
+
+interface DoneFrame {
+  status: 'done';
+  duration: number;
+  bytes: number;
+}
+
+/**
+ * Read the framed answer: JSON lines, then the MP4.
+ *
+ * The frames are `{"status":"working"}` while ffmpeg runs, and then either `{"status":"error"}`
+ * and nothing, or `{"status":"done", bytes, duration}` followed by exactly `bytes` of MP4. The
+ * byte count is checked rather than trusted: a connection cut at nine tenths of the way through
+ * otherwise becomes a video that plays until it stops, saved to the account as if it were whole,
+ * which is worse than the failure it came from.
+ */
+export async function readAssemblyStream(
+  response: Response,
+  onEncoding?: () => void,
+): Promise<AssemblyResult> {
+  const body = response.body;
+  if (!body) throw new Error('The assembler answered with nothing to read.');
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+
+  /** Bytes read but not yet resolved into a whole line. Only ever holds frames, never video. */
+  let pending = new Uint8Array(0);
+  let header: DoneFrame | null = null;
+  const videoChunks: Uint8Array[] = [];
+  let videoBytes = 0;
+  let announced = false;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+
+    if (value && value.length > 0) {
+      if (header) {
+        videoChunks.push(value);
+        videoBytes += value.length;
+      } else {
+        pending = concat(pending, value);
+
+        // Whole lines only: a frame split across two chunks is not a frame yet, and decoding half
+        // of one would also cut a multi-byte character in half.
+        for (;;) {
+          const newline = pending.indexOf(10);
+          if (newline === -1) break;
+
+          const line = decoder.decode(pending.subarray(0, newline)).trim();
+          pending = pending.subarray(newline + 1);
+          if (!line) continue;
+
+          const frame = parseFrame(line);
+          if (frame.status === 'error') {
+            throw new Error(frame.message || 'Video assembly failed.');
+          }
+          if (frame.status === 'done') {
+            header = frame;
+            // Whatever came in behind the frame on the same chunk is already video.
+            if (pending.length > 0) {
+              videoChunks.push(pending);
+              videoBytes += pending.length;
+              pending = new Uint8Array(0);
+            }
+            break;
+          }
+          if (!announced) {
+            // The first heartbeat is the upload having landed: ffmpeg has the files.
+            announced = true;
+            onEncoding?.();
+          }
+        }
+      }
+    }
+
+    if (done) break;
+  }
+
+  if (!header) {
+    throw new Error('The assembler stopped answering before the video was ready.');
+  }
+  if (videoBytes !== header.bytes) {
+    throw new Error(
+      `The video arrived incomplete — ${videoBytes} bytes of the ${header.bytes} it should have been.`,
+    );
+  }
+
+  return {
+    video: new Blob(videoChunks as BlobPart[], { type: 'video/mp4' }),
+    duration: header.duration,
+  };
+}
+
+type Frame =
+  | { status: 'working' }
+  | { status: 'error'; message?: string }
+  | DoneFrame;
+
+function parseFrame(line: string): Frame {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    throw new Error('The assembler answered with something this page cannot read.');
+  }
+
+  const frame = parsed as Partial<DoneFrame> & { status?: string; message?: string };
+  if (frame.status === 'error') return { status: 'error', message: frame.message };
+  if (frame.status === 'done') {
+    if (typeof frame.bytes !== 'number' || typeof frame.duration !== 'number') {
+      throw new Error('The assembler said the video was ready without saying how big it is.');
+    }
+    return { status: 'done', bytes: frame.bytes, duration: frame.duration };
+  }
+  return { status: 'working' };
+}
+
+function concat(left: Uint8Array, right: Uint8Array): Uint8Array {
+  if (left.length === 0) return right;
+  const joined = new Uint8Array(left.length + right.length);
+  joined.set(left, 0);
+  joined.set(right, left.length);
+  return joined;
 }
 
 async function readError(response: Response): Promise<string> {

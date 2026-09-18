@@ -16,6 +16,26 @@
  * rather than an error. So the finished video is measured before it is sent, and an oversized one
  * is refused with a sentence that says what to change. The frontend keeps the same limit on the
  * way in (src/utils/sloper/assemble.ts) so that most of this is never reached.
+ *
+ * THE ANSWER IS STREAMED, AND THAT IS NOT AN OPTIMISATION — IT IS THE ONLY REASON A REAL PROJECT
+ * FINISHES. Encoding is roughly real time: ten scenes measured at 63.8 s on the deployed
+ * instance, for 54 s of video. WebKit gives up on a request that has gone 60 s without a single
+ * byte arriving, and it reports that as `TypeError: Load failed` — the same four words a
+ * cross-origin refusal produces, which is what made this look like the bucket's CORS all over
+ * again. It is not. The function had already finished: a 200 with the finished MP4 went out at
+ * 65.1 s, to a phone that had hung up at 60 and thrown the video away. Anything under a minute —
+ * every one-scene test this was built with — never saw it.
+ *
+ * So `AssemblyStream` sends the response head the moment the upload has been read and validated,
+ * and a heartbeat line every 10 s while ffmpeg runs. A byte arriving is what resets WebKit's
+ * clock, so the wait can now be as long as the platform's own 540 s and no longer than that.
+ * The frames are documented on `AssemblyStream` and read by `readAssemblyStream` in
+ * `src/utils/sloper/assemble.ts` — one protocol written twice, like `parseMultipart` above it.
+ *
+ * ONCE THE HEAD IS OUT THERE IS NO STATUS CODE LEFT TO SEND. Everything that can be refused with
+ * one — a bad token, a malformed metadata field, an upload over the cap — is checked *before*
+ * the stream opens, and keeps its 401 or its 400. Only ffmpeg itself can fail after that, and it
+ * fails as an `error` frame inside a 200.
  */
 
 import { promises as fs } from 'node:fs';
@@ -39,6 +59,16 @@ interface UploadedFile {
 
 export interface ParsedForm {
   metadata?: string;
+  /**
+   * `"1"` from a client that can read the streamed answer.
+   *
+   * It is a form field rather than a request header because a header would have to be named in
+   * `Access-Control-Allow-Headers`, and the function that is already deployed does not name it —
+   * so a new page would fail its preflight against the old function for the minutes the two
+   * deploys are out of step. An unknown field is ignored by the old parser, in both directions.
+   * Once a deploy of both halves has settled this can go, and the stream become the only answer.
+   */
+  stream?: string;
   files: UploadedFile[];
 }
 
@@ -66,6 +96,7 @@ export function parseMultipart(req: Request): Promise<ParsedForm> {
 
     busboy.on('field', (name, value) => {
       if (name === 'metadata') form.metadata = value;
+      if (name === 'stream') form.stream = value;
     });
 
     busboy.on('file', (name, stream) => {
@@ -129,6 +160,116 @@ function applyCors(req: Request, res: Response): void {
   res.set('Access-Control-Max-Age', '3600');
 }
 
+/**
+ * `application/vnd.sloper.assembly+octet-stream` — the streamed answer, and the whole protocol.
+ *
+ * One JSON object per line, UTF-8, each closed by `\n`:
+ *
+ *   {"status":"working","elapsedMs":10000}   zero or more, one every 10 s while ffmpeg runs
+ *   {"status":"error","message":"…"}         the stream ends here, nothing follows
+ *   {"status":"done","duration":54.1,"bytes":2548123,"filename":"…"}
+ *
+ * A `done` frame is followed immediately by exactly `bytes` bytes of MP4 and nothing else, which
+ * is why the length is in the frame: the reader has no other way to know it got all of it, and a
+ * connection dropped at 90% would otherwise become a video file that plays until it does not.
+ *
+ * The content type is the whole handshake. A reader that does not recognise it treats the body as
+ * a plain MP4, which is what the previous version of this function sent and what a proxy that
+ * rewrites bodies would leave behind — so an unframed answer is never parsed as a framed one.
+ */
+export const STREAM_CONTENT_TYPE = 'application/vnd.sloper.assembly+octet-stream';
+
+/**
+ * Well inside WebKit's 60 s and generous about a slow link — the heartbeat's only job is to be a
+ * byte, so sending it more often than this buys nothing and writes a line per beat to no reader.
+ */
+const HEARTBEAT_MS = 10_000;
+
+/** Exported for `handler.test.ts`, which reads the frames back the way the browser does. */
+export class AssemblyStream {
+  private timer: NodeJS.Timeout | undefined;
+  private opened = false;
+
+  constructor(
+    private readonly res: Response,
+    private readonly started: number,
+  ) {}
+
+  get isOpen(): boolean {
+    return this.opened;
+  }
+
+  /** Sends the head and the first heartbeat, and starts the clock that sends the rest. */
+  begin(): void {
+    this.res.status(200);
+    this.res.set('Content-Type', STREAM_CONTENT_TYPE);
+    // Nothing in front of this may hold a chunk back waiting for more: holding it back is exactly
+    // the 60 s of silence the frames exist to break.
+    this.res.set('Cache-Control', 'no-store');
+    this.res.set('X-Accel-Buffering', 'no');
+    this.res.flushHeaders();
+    this.opened = true;
+
+    // A phone that walked out of coverage mid-encode leaves ffmpeg running and this socket dead.
+    // Writing a heartbeat to it throws from inside a timer, where there is no caller to catch it
+    // and an uncaught throw takes the instance down with every other request on it.
+    this.res.on('close', () => this.stop());
+    // EPIPE arrives as an event rather than a throw, and an unhandled one on a stream is fatal to
+    // the process — which is the same instance every other assembly in flight is running on.
+    this.res.on('error', () => this.stop());
+
+    this.beat();
+    this.timer = setInterval(() => this.beat(), HEARTBEAT_MS);
+  }
+
+  done(video: Buffer, duration: number, filename: string): void {
+    this.stop();
+    this.frame({ status: 'done', duration, bytes: video.length, filename });
+    this.end(video);
+  }
+
+  failed(message: string): void {
+    this.stop();
+    this.frame({ status: 'error', message });
+    this.end();
+  }
+
+  private end(body?: Buffer): void {
+    if (this.res.writableEnded || this.res.destroyed) return;
+    try {
+      if (body) this.res.end(body);
+      else this.res.end();
+    } catch {
+      // Same as `frame`: the reader hung up, and the request is over either way.
+    }
+  }
+
+  private beat(): void {
+    this.frame({ status: 'working', elapsedMs: Date.now() - this.started });
+  }
+
+  private frame(value: Record<string, unknown>): void {
+    if (this.res.writableEnded || this.res.destroyed) return;
+    try {
+      this.res.write(`${JSON.stringify(value)}\n`);
+    } catch {
+      // The reader is gone. The encode it was waiting for finishes anyway and is thrown away;
+      // there is nobody left to tell, and the alternative is killing the instance to say so.
+      this.stop();
+    }
+  }
+
+  private stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = undefined;
+  }
+}
+
+/** The name the browser saves it under, and the only thing in the answer that reads a clock. */
+function videoFilename(): string {
+  return `slop-video-${new Date().toISOString().slice(0, 10)}.mp4`;
+}
+
 export async function handleAssembleVideo(req: Request, res: Response): Promise<void> {
   applyCors(req, res);
 
@@ -143,6 +284,7 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
 
   const started = Date.now();
   let workDir: string | undefined;
+  let stream: AssemblyStream | undefined;
 
   try {
     const uid = await verifyCaller(req);
@@ -159,6 +301,16 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
       throw new BadRequestError(
         `The upload is ${(uploadBytes / 1024 / 1024).toFixed(1)} MB, over the ${MAX_BYTES / 1024 / 1024} MB limit.`,
       );
+    }
+
+    /*
+     * Last point at which a status code is still possible, so it is where the stream opens.
+     * Everything above this line can be refused with a 401 or a 400; everything below it is
+     * ffmpeg, which takes a minute and would otherwise take it in silence.
+     */
+    if (form.stream === '1') {
+      stream = new AssemblyStream(res, started);
+      stream.begin();
     }
 
     workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sloper-'));
@@ -208,14 +360,23 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
       }),
     );
 
-    const filename = `slop-video-${new Date().toISOString().slice(0, 10)}.mp4`;
-    res.set('Content-Type', 'video/mp4');
-    res.set('Content-Length', String(video.length));
-    res.set('X-Video-Duration', String(duration));
-    res.set('Content-Disposition', `attachment; filename="${filename}"`);
-    res.status(200).send(video);
+    const filename = videoFilename();
+
+    if (stream) {
+      stream.done(video, duration, filename);
+    } else {
+      res.set('Content-Type', 'video/mp4');
+      res.set('Content-Length', String(video.length));
+      res.set('X-Video-Duration', String(duration));
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+      res.status(200).send(video);
+    }
   } catch (error) {
-    respondWithError(res, error, Date.now() - started);
+    if (stream?.isOpen) {
+      streamTheError(stream, error, Date.now() - started);
+    } else {
+      respondWithError(res, error, Date.now() - started);
+    }
   } finally {
     // The instance is reused between requests, so a temp directory left behind is a leak that
     // eventually fills /tmp — which on Cloud Run is memory.
@@ -223,6 +384,19 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
       await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
+}
+
+/**
+ * The same refusal, once the head has gone out and a status code is no longer on the table.
+ *
+ * Only ffmpeg and the finished file's own size can get this far — auth and the metadata are
+ * settled before the stream opens — so this is a 500's worth of message inside a 200, and it is
+ * logged as one.
+ */
+function streamTheError(stream: AssemblyStream, error: unknown, elapsedMs: number): void {
+  const message = error instanceof Error ? error.message : 'Video assembly failed';
+  console.error('assembleVideo.failed', JSON.stringify({ message, elapsedMs, streamed: true }));
+  stream.failed(message);
 }
 
 function respondWithError(res: Response, error: unknown, elapsedMs: number): void {

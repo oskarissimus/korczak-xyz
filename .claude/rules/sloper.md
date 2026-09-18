@@ -421,6 +421,29 @@ new registry, a new build and a new workflow for one endpoint.
   truncated by the platform, which reaches the browser as a corrupt file rather than an error. So
   the finished video is measured before it is sent. `assemble.ts` keeps the same limit on the way
   in, so most of this is never reached.
+- **The answer is streamed, and that is the difference between working and not.** Encoding runs at
+  roughly real time — ten scenes measured at 63.8 s on the instance, for 54 s of video — and
+  WebKit abandons a request that has gone 60 s without a byte arriving. So the function sends its
+  head as soon as the upload is read and validated, then a `{"status":"working"}` line every 10 s
+  while ffmpeg runs, and ends with `{"status":"done", bytes, duration}` followed by exactly those
+  bytes of MP4. `AssemblyStream` in `handler.ts` writes the frames, `readAssemblyStream` in
+  `utils/sloper/assemble.ts` reads them, and both files carry the format.
+
+  **The byte count in that frame is checked, not trusted.** A connection cut at nine tenths
+  otherwise yields a file that plays until it does not — and the page would then save it to the
+  account as the finished article, which is the same class of fault as `parseMultipart` returning
+  files out of order.
+
+  **Once the head is out there is no status code left.** Everything refusable with one — a bad
+  token, malformed metadata, an upload over the cap — is checked *before* the stream opens and
+  keeps its 401 or 400. Only ffmpeg can fail after that, and it fails as an `error` frame inside a
+  200.
+
+  **The opt-in is a form field (`stream=1`), deliberately not a header.** A new header would have
+  to be named in the *deployed* function's `Access-Control-Allow-Headers`, so a page that shipped
+  minutes before the function would fail its preflight; an unknown form field is ignored by both
+  old parsers instead. Both fallback branches can go once a deploy of the two halves has settled.
+
 - **`ffmpeg-static`, and therefore no `ffprobe`.** The Python backend probed the finished file for
   a duration; the duration reported here is the sum of the scene durations the client sent, which
   is what the video was built to, to within the rounding `-shortest` trims.
