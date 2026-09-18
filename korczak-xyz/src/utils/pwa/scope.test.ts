@@ -31,6 +31,12 @@ describe('appForPath', () => {
     expect(appForPath('/pl/apps/events/alerts')).toBe('events');
   });
 
+  it('recognises the video generation wizard, which is one page per locale', () => {
+    expect(appForPath('/apps/sloper')).toBe('sloper');
+    expect(appForPath('/apps/sloper/')).toBe('sloper');
+    expect(appForPath('/pl/apps/sloper')).toBe('sloper');
+  });
+
   it('treats everything else as the site', () => {
     expect(appForPath('/')).toBe('site');
     expect(appForPath('/apps')).toBe('site');

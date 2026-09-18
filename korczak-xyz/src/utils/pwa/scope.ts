@@ -12,7 +12,8 @@ export type PwaApp =
   | 'baby-sleep'
   | 'shopping'
   | 'events'
-  | 'transit';
+  | 'transit'
+  | 'sloper';
 
 /**
  * The scoped subtrees, in both locales. `site` is everything else, so it is not listed - it is
@@ -31,6 +32,7 @@ const SCOPED: ReadonlyArray<{ app: PwaApp; pattern: RegExp }> = [
   { app: 'shopping', pattern: /^(\/pl)?\/apps\/shopping(\/|$)/ },
   { app: 'events', pattern: /^(\/pl)?\/apps\/events(\/|$)/ },
   { app: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
+  { app: 'sloper', pattern: /^(\/pl)?\/apps\/sloper(\/|$)/ },
 ];
 
 function normalize(pathname: string): string {

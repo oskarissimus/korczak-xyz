@@ -72,6 +72,7 @@ const sources = {
   shopping: { file: join(iconsDir, 'shopping.svg'), maskable: 'bleed' },
   events: { file: join(iconsDir, 'events.svg'), maskable: 'bleed' },
   transit: { file: join(iconsDir, 'transit.svg'), maskable: 'bleed' },
+  sloper: { file: join(iconsDir, 'sloper.svg'), maskable: 'bleed' },
 };
 
 /**

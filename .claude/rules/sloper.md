@@ -8,6 +8,7 @@ paths:
   - "**/hooks/useSloperRun.ts"
   - "**/styles/sloper.css"
   - "**/pages/**/apps/sloper.astro"
+  - "**/assets/icons/sloper.svg"
   - "functions/src/sloper/**"
 ---
 
@@ -57,17 +58,53 @@ Three things about it are load-bearing rather than decorative:
   band says it at length because it is the only heading that screen has. They are not duplicates
   to be collapsed.
 
-The same fact rules out three things somebody will reasonably want:
+The same fact rules out two things somebody will reasonably want:
 
 - **No localStorage for a sitting.** Twelve 1024×1536 images and twelve narrations is tens of
   megabytes against an origin budget of ~5 MB shared with the typing trainer's `typedHistory`.
-  One sitting would evict a book. `storage.ts` holds one small key and nothing else.
-- **No PWA tier and no manifest.** It is not in `PWA_APPS` or in `APP_TIERS` (`generate-sw.mjs`),
-  and that is deliberate: what qualifies as an installable app here is a thing you reach for away
-  from a desk, and an app whose whole state dies with the tab is the opposite of that.
+  One sitting would evict a book. `storage.ts` holds one small key and nothing else. Installing
+  the app does not change this: an installed app shares the origin's budget, it does not get
+  its own.
 - **No resume.** Reloading mid-run starts again. The `beforeunload` warning in `Sloper.tsx` is the
   entire mitigation, and it is armed only while `run.busy` — a prompt on every navigation is one
   people learn to dismiss without reading.
+
+### It is installable, and the reason is not offline
+
+This used to read "no PWA tier and no manifest", on the grounds that an installable app here is a
+thing you reach for away from a desk and this one's whole state dies with the tab. **That was
+answering the wrong question** — it weighed installing only as a way to work offline, which this
+app will never do, and ignored everything else an install is. It is in `PWA_APPS`, in `SCOPED`, in
+both `APP_TIERS` lists and on both pages' `pwa` prop as of Sep 2026. Nothing the old paragraph
+asserted has become false — the state still dies with the tab, there is still no resume, a run
+still needs a network. Only the conclusion drawn from them changed.
+
+What the install actually buys, none of which needs a network:
+
+- **Its own window.** No tab strip, no address bar, no URL to lose. The wizard is five stages and
+  several thousand pixels of scroll on a phone, and the rail down the left is the only navigation
+  there is; every row of browser chrome comes out of the sheet beside it.
+- **Its own scope.** `/apps/sloper` and nothing else, so a stray link leaves the app rather than
+  navigating away from a run in progress — which, since nothing persists, is the expensive
+  mistake this app has.
+- **Its own icon and identity.** Four API keys live in this app's `localStorage`; reaching them
+  through thirty tabs is how a sitting gets abandoned.
+
+It is a full app in the registry with **one deliberate exception**: it is not in `PUSH_APPS`, and
+it has nothing to notify about — a run finishes while you are watching it or not at all.
+
+**The tier is two documents and ~55 kB gz, the smallest on the origin, and it is not there for
+offline video.** Nothing in a run survives a dead network. It is there because the stage the app
+opens at is the key-and-model form, which is backed by `localStorage` and works with no network at
+all: without the tier the home screen icon opens `/offline`, and there is no reaching the settings
+of an app that will not open. The model dropdowns stay empty until there is a network; that is the
+honest state and the provider's own error says so.
+
+`beforeunload` is unchanged and still the whole of the mitigation. It fires in a standalone window
+the same as in a tab, and installing neither strengthens nor weakens it. **Do not reach for a
+resume because the app now has an icon** — the objection was never where the app was launched
+from, it is the ~5 MB origin budget in the bullet above, and an installed app shares that budget
+rather than getting one of its own.
 
 ### The keys, and the trade being made
 

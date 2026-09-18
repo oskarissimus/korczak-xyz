@@ -1,6 +1,6 @@
 ---
 name: pwa
-description: The seven installable web apps - manifests per app per locale, the single service worker and its precache tiers, the safe area, and self-hosted fonts.
+description: The installable web apps - manifests per app per locale, the single service worker and its precache tiers, the safe area, and self-hosted fonts.
 paths:
   - "**/utils/pwa/**"
   - "**/components/PwaHead.astro"
@@ -20,22 +20,32 @@ paths:
 
 ## Installable web apps (PWA)
 
-The site ships **seven** installable apps from one origin: the whole site, the guitar tuner
-(`/apps/tuner`), the songbook (`/songs`), the flashcards (`/apps/flashcards`), the baby sleep log
-(`/apps/baby-sleep`), the shopping list (`/apps/shopping`) and Event Watch (`/apps/events`). What
-qualifies is a thing you reach for away from a desk;
-the games that are only fun on a keyboard stay part of `site`. Each has its own scope, so
-opening a link outside it leaves the app — which is the point, since most of the site is not
-built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default `'site'`) that picks
-which manifest the page links; iOS reads the manifest of the page you install *from*, so that
-prop is what decides which app "Add to Home Screen" produces. **Every page of a scoped app has
-to set it** — the flashcards and sleep log are several documents each (their tabs), and a tab
-that forgets installs the whole site under the app's own name.
+The site ships installable apps from one origin, and **`PWA_APPS` is the list** — this paragraph
+used to open with a count, and it went stale exactly the way the icon paragraph's count did. At
+the time of writing: the whole site, the guitar tuner (`/apps/tuner`), the songbook (`/songs`),
+the flashcards (`/apps/flashcards`), the baby sleep log (`/apps/baby-sleep`), the shopping list
+(`/apps/shopping`), Event Watch (`/apps/events`), Metro Watch (`/apps/transit`) and the video
+generation wizard (`/apps/sloper`). What qualifies is a thing you reach for away from a desk; the
+games that are only fun on a keyboard stay part of `site`.
 
-It shipped six until the fretboard and transposition trainers became one, and the retiring cost is
-worth knowing before doing it again: an installed app's `start_url` now 301s out of its own scope, so
-iOS opens the target in Safari rather than the app. Deleting the old icon and installing the new one
-is the only fix, and there is no way to hand an existing install a new identity.
+The wizard is the one that fails that test and is here anyway, so the test is not the whole rule:
+it needs a desk and a network, and its state dies with the tab either way. It is installable for
+the half of an install that is not offline — its own window, its own scope and its own icon, for
+an app that holds four API keys and scrolls for a thousand pixels. `.claude/rules/sloper.md` has
+the full argument, including why its tier is worth having when a run offline is impossible.
+
+Each has its own scope, so opening a link outside it leaves the app — which is the point, since
+most of the site is not built for a phone. `Layout.astro` takes a `pwa` prop (a `PwaApp`, default
+`'site'`) that picks which manifest the page links; iOS reads the manifest of the page you install
+*from*, so that prop is what decides which app "Add to Home Screen" produces. **Every page of a
+scoped app has to set it** — the flashcards and sleep log are several documents each (their tabs),
+and a tab that forgets installs the whole site under the app's own name.
+
+Retiring one is the move to think twice about — the fretboard and transposition trainers became
+one app, and the cost of that is worth knowing before doing it again: an installed app's
+`start_url` now 301s out of its own scope, so iOS opens the target in Safari rather than the app.
+Deleting the old icon and installing the new one is the only fix, and there is no way to hand an
+existing install a new identity.
 
 Adding an app is: an entry in `PWA_APPS`, a pattern in `SCOPED`, two short names in the i18n
 table, artwork, the `pwa` prop on its pages, and a precache tier. Everything else — both
@@ -65,8 +75,9 @@ All of them are the same Win95 device — navy body, raised bezel, sunken black 
 what is *on* the glass telling them apart, because they sit side by side on one home screen:
 the tuner's dial, the songbook's yellow chords over green lyrics, the flashcards' stack of cards, the
 sleep log's crescent and Zs, the shopping list's green trolley carrying a yellow tick, Metro Watch's
-M over the two line colours, Event Watch's yellow ticket over a green calendar bar. Green and yellow
-throughout, the site's own phosphor. (This paragraph used to count them, and the count was a
+M over the two line colours, Event Watch's yellow ticket over a green calendar bar, the wizard's
+green play triangle between two yellow-perforated sprocket rails. Green and yellow throughout,
+the site's own phosphor. (This paragraph used to count them, and the count was a
 release behind more often than not, so it no longer does.)
 The flashcards icon draws **two** frets where the app draws five, on a card front rather than filling
 the glass: an icon is read at 40px two rows down a home screen, where a finer grid stops being a neck
@@ -180,10 +191,14 @@ takes at most two: the shell, and the one named after the app it belongs to.
   worker cannot tell those apart — iOS gives them the same registration — so `register-sw.js`
   checks `display-mode: standalone` and names the tiers it wants.
 - **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `flashcards` (~110 kB gz),
-  `baby-sleep` (~92 kB gz), `shopping`, `events`. Each covers its app's whole subtree, because a tab
-  is a separate document and an uncached tab is a dead link on a dead network. The shopping list is
-  the tier that most has to be there: it is used in a basement on a dead network, and a list you
-  cannot open is not a list.
+  `baby-sleep` (~92 kB gz), `shopping`, `events`, `transit`, `sloper` (~55 kB gz, two documents).
+  Each covers its app's whole subtree, because a tab is a separate document and an uncached tab
+  is a dead link on a dead network. The shopping list is the tier that most has to be there: it
+  is used in a basement on a dead network, and a list you cannot open is not a list. `sloper` is
+  the opposite end of the same argument and still earns its tier: a run of it offline is
+  impossible, but the stage it opens at is the key-and-model form, which is `localStorage` and
+  needs nothing — and without a tier the icon opens `/offline`, so there is no reaching the
+  settings of an app that will not open.
 
 The per-app split is what stops the shell growing with the app count. Folding the newest apps into the
 shell instead cost every installed app — including the songbook, which wants none of it — an extra

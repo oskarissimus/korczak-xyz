@@ -39,6 +39,7 @@
     { tier: 'shopping', pattern: /^(\/pl)?\/apps\/shopping(\/|$)/ },
     { tier: 'events', pattern: /^(\/pl)?\/apps\/events(\/|$)/ },
     { tier: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
+    { tier: 'sloper', pattern: /^(\/pl)?\/apps\/sloper(\/|$)/ },
   ];
 
   /**

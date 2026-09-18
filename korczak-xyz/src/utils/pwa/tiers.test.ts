@@ -71,6 +71,8 @@ describe('precache tiers', () => {
       '/apps/baby-sleep', '/apps/baby-sleep/share', '/pl/apps/baby-sleep/stats',
       '/apps/shopping', '/apps/shopping/share', '/pl/apps/shopping/share',
       '/apps/events', '/apps/events/sources', '/pl/apps/events/alerts',
+      '/apps/transit', '/apps/transit/alerts', '/pl/apps/transit/raw',
+      '/apps/sloper', '/pl/apps/sloper',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);
@@ -93,5 +95,10 @@ describe('precache tiers', () => {
     expect(byTier.get('shopping')!.test('/pl/apps/shopping/share')).toBe(true);
     expect(byTier.get('events')!.test('/apps/events')).toBe(true);
     expect(byTier.get('events')!.test('/pl/apps/events/alerts')).toBe(true);
+    expect(byTier.get('transit')!.test('/apps/transit')).toBe(true);
+    expect(byTier.get('transit')!.test('/pl/apps/transit/alerts')).toBe(true);
+    // The wizard is a single page in each locale, so its whole tier is those two documents.
+    expect(byTier.get('sloper')!.test('/apps/sloper')).toBe(true);
+    expect(byTier.get('sloper')!.test('/pl/apps/sloper')).toBe(true);
   });
 });

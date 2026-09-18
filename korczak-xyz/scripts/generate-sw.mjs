@@ -41,6 +41,11 @@ const SHELL_ROUTES = ['/', '/pl', '/apps/tuner', '/pl/apps/tuner', '/songs', '/p
  * app whose stats tab was never precached has a dead link on a dead network. `songs` is the
  * exception that proves it: its index is already in the shell, so its tier is the 82 song
  * pages alone.
+ *
+ * `sloper` is one page and cannot do anything at all without a network, so its tier looks like
+ * a waste. It is not: the stage it opens at is the key and model form, which is backed by
+ * localStorage and is the one part of that app that works offline. Without the tier the icon
+ * opens /offline instead, and there is no reaching the settings of an app you cannot open.
  */
 const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
@@ -49,6 +54,7 @@ const APP_TIERS = {
   shopping: /^(\/pl)?\/apps\/shopping(\/|$)/,
   events: /^(\/pl)?\/apps\/events(\/|$)/,
   transit: /^(\/pl)?\/apps\/transit(\/|$)/,
+  sloper: /^(\/pl)?\/apps\/sloper(\/|$)/,
 };
 
 /**

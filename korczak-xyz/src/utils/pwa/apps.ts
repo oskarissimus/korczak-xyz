@@ -11,6 +11,11 @@ import type { PwaApp } from './scope';
  * drilling the neck between takes, logging a nap at 3am. The games that are only fun on a
  * keyboard stay part of `site`.
  *
+ * `sloper` is the one that does not fit that sentence - a run of it needs a desk and a network,
+ * and its assets die with the tab either way. It is here for the other half of what installing
+ * buys: its own icon, its own window and its own scope, so a wizard that holds four API keys and
+ * scrolls for a thousand pixels is not a tab among thirty. See .claude/rules/sloper.md.
+ *
  * The path patterns that decide which app a URL belongs to live in scope.ts, which ships to
  * the browser; this module does not, because it pulls in the whole translation table.
  */
@@ -76,6 +81,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     nameKey: 'Shopping',
     shortNameKey: 'pwa.shopping.short',
     descriptionKey: 'shopping.desc',
+  },
+  sloper: {
+    path: '/apps/sloper',
+    nameKey: 'Sloper',
+    shortNameKey: 'pwa.sloper.short',
+    descriptionKey: 'sloper.desc',
   },
 };
 
