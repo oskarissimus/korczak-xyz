@@ -73,9 +73,10 @@ interface StepRailProps {
 function StepRail({ stage, reachable, onGo, t }: StepRailProps) {
   const current = STAGES.indexOf(stage);
 
+  /* No visible caption: the rail is a plain sunken list, and `aria-label` is where the word
+     "Steps" lives now that the navy title bar has gone. */
   return (
     <nav className="slp-rail" aria-label={t.steps}>
-      <p className="slp-rail-title">{t.steps}</p>
       <ol>
         {STAGES.map((step, i) => {
           const label = t[STAGE_LABELS[step]];

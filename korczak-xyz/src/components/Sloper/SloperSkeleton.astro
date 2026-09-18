@@ -25,7 +25,6 @@ const steps = [t.stepConfig, t.stepScenes, t.stepAssets, t.stepAssembly, t.stepO
 
 <div class="slp-app" aria-hidden="true">
   <nav class="slp-rail">
-    <p class="slp-rail-title">{t.steps}</p>
     <ol>
       {steps.map((label, i) => (
         <li class={i === 0 ? 'slp-step slp-step-here' : 'slp-step'}>

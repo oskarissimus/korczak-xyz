@@ -58,37 +58,28 @@
 
 /* --- the step rail ------------------------------------------------------------------- */
 
-/* The installer's left panel: a captioned box that stays put while the sheet beside it scrolls.
+/* The installer's left panel: one white sunken well that stays put while the sheet beside it
+   scrolls. It used to be a raised, navy-captioned box with a second sunken box inside it — a
+   window drawn inside a window, on a page that is already inside one. The steps are a list, not
+   an application, so they get the same idiom as a text field: white face, one inset bevel,
+   nothing else. The `aria-label` on the nav carries what the caption used to say.
    `top` clears nothing in particular — the site's header is not fixed — it is just breathing room
    so the rail does not touch the viewport edge. */
 .slp-rail {
   position: sticky;
   top: 8px;
-  border: 2px outset var(--retro-white);
-  background: var(--retro-gray);
-  padding: 2px;
-}
-
-.slp-rail-title {
-  margin: 0 0 2px;
-  padding: 4px 8px;
-  font-family: 'Press Start 2P', cursive;
-  font-size: 8px;
-  color: var(--retro-white);
-  /* The same gradient as a window's title bar and a scene card's head, because this is the same
-     thing again: a panel with a caption. */
-  background: linear-gradient(90deg, var(--retro-navy), #1084d0);
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  padding: 4px;
 }
 
 .slp-rail ol {
   list-style: none;
   margin: 0;
-  padding: 4px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 2px inset var(--retro-white);
-  background: #d8d8d8;
 }
 
 .slp-step {
