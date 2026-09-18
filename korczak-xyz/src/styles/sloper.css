@@ -1,21 +1,26 @@
 /* Sloper — retro theme.
  *
  * The app is a five-step wizard, and a wizard is the one shape Windows 95 had a strong opinion
- * about: a tab strip of steps across the top, a grey property-sheet face under it, groove-bordered
- * group boxes with legends cut into them, and a sunken status strip at the bottom. Everything here
- * is that, drawn out of the same tokens as the rest of the site, plus three borrowed idioms —
- * the blocky progress bar, the sunken well an image sits in, and the two-tone bevel on every
- * control.
+ * about: a rail of numbered steps down the left, a titled band over a grey property-sheet face
+ * beside it, groove-bordered group boxes with legends cut into them, and a sunken status strip at
+ * the bottom. Everything here is that, drawn out of the same tokens as the rest of the site, plus
+ * three borrowed idioms — the blocky progress bar, the sunken well an image sits in, and the
+ * two-tone bevel on every control.
  *
- * Only two rules of thumb are worth knowing before editing:
+ * Only three rules of thumb are worth knowing before editing:
  *
  *  1. **Outset means raised, inset means pressed, groove means a boundary.** The site's own
  *     `.retro-btn` already does the first two; anything new here that draws a border picks one of
  *     the three on purpose rather than by eye.
  *  2. **The screen scrolls a long way.** Twelve scene cards, each with two textareas, is several
- *     thousand pixels, so nothing here is fixed-position and every heading is a real heading —
- *     the step strip is the only navigation, and on a phone it wraps rather than scrolling
- *     sideways, because a step you cannot see is a step you cannot tell you have not reached. */
+ *     thousand pixels. That is why the rail is `sticky` rather than scrolled away: it is the only
+ *     navigation there is, and a step you cannot see is a step you cannot tell you have not
+ *     reached. Sticky, not fixed — it keeps its column and its place in the flow, so on a phone,
+ *     where there is no column to spare, it simply stops sticking and the steps wrap into a row
+ *     above the sheet.
+ *  3. **Nothing here is read by colour alone**, which is the charts' rule and applies just as much
+ *     to five steps: the marker cell carries a tick, an arrow or a number, and the navy bar behind
+ *     the current step is confirmation rather than the message. */
 
 /* Same reasoning as the trainers and the shopping list: this is a property sheet, not a page in a
    teal window, so the content area is the panel face and the ink is reset with the surface. */
@@ -26,12 +31,23 @@
 }
 
 .slp-app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* `minmax(0, 1fr)` and not `1fr`: a grid track's default minimum is its content, so one long
+     unbroken provider error — and they are long — would push the sheet wider than the window
+     instead of wrapping inside it. */
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
   gap: 14px;
   font-family: 'VT323', monospace;
   color: var(--retro-black);
   font-size: 1.15rem;
+}
+
+.slp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
 
 /* Reserves roughly what the island occupies, so the window does not collapse and rebound while
@@ -40,55 +56,136 @@
   min-height: 520px;
 }
 
-/* --- the step strip ------------------------------------------------------------------- */
+/* --- the step rail ------------------------------------------------------------------- */
 
-.slp-steps ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+/* The installer's left panel: a captioned box that stays put while the sheet beside it scrolls.
+   `top` clears nothing in particular — the site's header is not fixed — it is just breathing room
+   so the rail does not touch the viewport edge. */
+.slp-rail {
+  position: sticky;
+  top: 8px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  padding: 2px;
+}
+
+.slp-rail-title {
+  margin: 0 0 2px;
+  padding: 4px 8px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  color: var(--retro-white);
+  /* The same gradient as a window's title bar and a scene card's head, because this is the same
+     thing again: a panel with a caption. */
+  background: linear-gradient(90deg, var(--retro-navy), #1084d0);
+}
+
+.slp-rail ol {
   list-style: none;
   margin: 0;
-  padding: 0;
-  border-bottom: 2px solid var(--retro-dark-gray);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 2px inset var(--retro-white);
+  background: #d8d8d8;
+}
+
+.slp-step {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 6px;
+  color: var(--retro-dark-gray);
+}
+
+/* One width for every marker, so five labels start on the same column whatever their glyph. */
+.slp-step-mark {
+  flex: none;
+  width: 1.4ch;
+  text-align: center;
+  font-size: 1rem;
 }
 
 .slp-step button,
-.slp-step span {
-  display: block;
+.slp-step-label {
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
-  padding: 5px 12px;
-  background: #b0b0b0;
-  color: var(--retro-dark-gray);
-  border: 2px outset var(--retro-white);
-  border-bottom: none;
-  cursor: default;
-  text-decoration: none;
+  line-height: 1.2;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
 }
 
+/* A step you have reached is a button back to it; one you have not is a `<span>`, and the two
+   look different because only one of them does anything. */
 .slp-step button {
   cursor: pointer;
   color: var(--retro-black);
+  text-decoration: underline;
 }
 
 .slp-step button:hover {
-  background: #c8c8c8;
+  color: var(--retro-navy);
 }
 
-/* The current step is the tab in front: same face colour as the sheet below it, and one pixel
-   taller so it reads as continuous with the panel rather than as a button on it. */
-.slp-step-here span,
-.slp-step-here button {
-  background: var(--retro-gray);
+.slp-step-done {
   color: var(--retro-black);
-  font-weight: bold;
-  padding-bottom: 7px;
-  margin-bottom: -2px;
 }
 
-.slp-step-done button::before {
-  /* A finished step says so without needing a colour, which is the same rule the charts follow. */
-  content: '✓ ';
+/* Where you are: the one bar of solid navy on the screen. */
+.slp-step-here {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+  font-weight: bold;
+}
+
+/* --- the band over the sheet ---------------------------------------------------------- */
+
+.slp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: 2px groove var(--retro-white);
+  background: var(--retro-gray);
+  padding: 9px 12px;
+}
+
+.slp-head-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  color: var(--retro-black);
+}
+
+.slp-head-count {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A phone has no column to give the rail, so it stops sticking and the steps wrap into a row
+   above the sheet — the same list, laid out the other way, rather than a different navigation. */
+@media (max-width: 700px) {
+  .slp-app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .slp-rail {
+    position: static;
+  }
+
+  .slp-rail ol {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 2px 4px;
+  }
 }
 
 /* --- the status strip ----------------------------------------------------------------- */

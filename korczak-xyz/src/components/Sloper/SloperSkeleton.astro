@@ -1,14 +1,17 @@
 ---
 /**
- * Server-rendered stand-in for <Sloper client:only="react" />: the step strip and the shape of the
- * settings sheet under it. Astro swaps it for the real island the moment React hydrates.
+ * Server-rendered stand-in for <Sloper client:only="react" />: the step rail, the band naming the
+ * step, and the shape of the settings sheet beside them. Astro swaps it for the real island the
+ * moment React hydrates.
  *
  * It commits to no *values*, and it cannot: every one of them is in localStorage or in Firestore,
  * and this runs at build time. Nothing here may import `storage.ts` for that reason. The point is
- * only that the window is the right height and the strip does not jump — a page that renders
- * empty and then grows by 600px is the thing this avoids.
+ * only that the window is the right height and the rail does not jump — a page that renders
+ * empty and then grows by 600px is the thing this avoids. It draws step one as the current step
+ * because that is where a first visit lands; a session resumed further along corrects it on the
+ * same tick as hydration, and nobody sees the first frame.
  */
-import { translations, type Lang } from './translations';
+import { fill, translations, type Lang } from './translations';
 
 interface Props {
   lang: Lang;
@@ -21,24 +24,33 @@ const steps = [t.stepConfig, t.stepScenes, t.stepAssets, t.stepAssembly, t.stepO
 ---
 
 <div class="slp-app" aria-hidden="true">
-  <nav class="slp-steps">
+  <nav class="slp-rail">
+    <p class="slp-rail-title">{t.steps}</p>
     <ol>
       {steps.map((label, i) => (
         <li class={i === 0 ? 'slp-step slp-step-here' : 'slp-step'}>
-          <span>{label}</span>
+          <span class="slp-step-mark">{i === 0 ? '▶' : i + 1}</span>
+          <span class="slp-step-label">{label}</span>
         </li>
       ))}
     </ol>
   </nav>
 
-  <div class="slp-statusbar">
-    <span class="slp-sync slp-sync-syncing">{t.syncSyncing}</span>
+  <div class="slp-main">
+    <header class="slp-head">
+      <h2 class="slp-head-title">{t.configTitle}</h2>
+      <p class="slp-head-count">{fill(t.stepCounter, { n: 1, total: steps.length })}</p>
+    </header>
+
+    <fieldset class="slp-group">
+      <legend class="slp-legend">{t.keysTitle}</legend>
+      <p class="slp-hint">{t.keysBlurb}</p>
+    </fieldset>
+
+    <div class="slp-loading"></div>
+
+    <div class="slp-statusbar">
+      <span class="slp-sync slp-sync-syncing">{t.syncSyncing}</span>
+    </div>
   </div>
-
-  <fieldset class="slp-group">
-    <legend class="slp-legend">{t.keysTitle}</legend>
-    <p class="slp-hint">{t.keysBlurb}</p>
-  </fieldset>
-
-  <div class="slp-loading"></div>
 </div>

@@ -1,6 +1,6 @@
 ---
 name: sloper
-description: The slop video generator at /apps/sloper/ - the five-stage wizard as one island, the four API keys and where they are kept, the streaming scene parser, the canvas pass every picture goes through, and the one Cloud Function that runs FFmpeg.
+description: The video generation wizard at /apps/sloper/ - the five-stage wizard as one island, the four API keys and where they are kept, the streaming scene parser, the canvas pass every picture goes through, and the one Cloud Function that runs FFmpeg.
 paths:
   - "**/utils/sloper/**"
   - "**/components/Sloper/**"
@@ -11,12 +11,21 @@ paths:
   - "functions/src/sloper/**"
 ---
 
-## Slop Video Generator
+## Video Generation Wizard
 
 At `/apps/sloper/` — a topic goes in, a narrated MP4 comes out, paid for with the reader's own
 API keys. Migrated from `oskarissimus/sloper` (a Vite SPA on GitHub Pages plus a FastAPI/FFmpeg
 container on Cloud Run) in Sep 2026; `sloper-migration-log.md` at the repo root is the record of
 what moved where and what did not move at all.
+
+**The name it shows and the name it is spelt with are two different things.** It was called the
+Slop Video Generator until Sep 2026; what changed is the `Sloper` / `sloper.desc` pair in
+`src/i18n/index.ts` and nothing else. The route is still `/apps/sloper/`, the files are still
+`utils/sloper/` and `components/Sloper/`, the Firestore document is still
+`users/{uid}/sloper/config` and the localStorage key is still `sloper-config` — renaming any of
+those trades somebody's saved keys, or a working bookmark, for a tidier spelling. The rule the
+`/games/` → `/apps/` move wrote down applies here in full: a display name is free to change, a
+path or a storage key is not.
 
 Two halves, same as Event Watch: `korczak-xyz/src/utils/sloper/` and `src/components/Sloper/` are
 the client, `functions/src/sloper/` is the one thing a browser cannot do.
@@ -26,8 +35,27 @@ the client, `functions/src/sloper/` is the one thing a browser cannot do.
 sloper was a `HashRouter` over five routes. Here the five stages are five values of one `stage`
 in `useSloperRun`, and that is **forced rather than preferred**: every asset is a `Blob` held in
 memory and nothing persists them, so a genuine navigation between stages throws away a video that
-cost real money to make. The step strip is the whole of the navigation; a step you have not
-reached is a `<span>`, not a link.
+cost real money to make. The step rail is the whole of the navigation; a step you have not
+reached is a `<span>`, not a link, and nothing in the rail ever points forwards — a step is
+unlocked by finishing the one before it, and `output` only while there is a video to show.
+
+The rail sits down the left with the sheet beside it and a band naming the step over it, which is
+a setup wizard's shape on purpose: this app really is five steps in a row, and that is the one
+layout that answers where you are, what is behind you and how much is left without being read.
+Three things about it are load-bearing rather than decorative:
+
+- **The rail is `sticky`, not fixed.** Twelve scene cards is several thousand pixels of scroll,
+  and the only navigation there is must not be at the top of it. Sticky keeps it in its grid
+  column, so on a phone — where there is no column to spare — it simply stops sticking and the
+  five steps wrap into a row above the sheet.
+- **The marker cell carries the state, not the colour.** A tick, an arrow or the step's number,
+  in a cell one character wide; the navy bar behind the current step confirms it. Same rule as
+  the charts, and it is what makes the rail legible to somebody who cannot tell the bar from the
+  panel.
+- **The rail's labels and the band's title are two registers of one step**, `stepScenes` against
+  `scenesTitle`. The rail is short because five of them are read as a column at a glance; the
+  band says it at length because it is the only heading that screen has. They are not duplicates
+  to be collapsed.
 
 The same fact rules out three things somebody will reasonably want:
 

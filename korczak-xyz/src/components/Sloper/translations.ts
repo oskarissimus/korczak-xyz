@@ -1,5 +1,5 @@
 /*
- * Strings for the slop video generator, kept beside the app the way the shopping list and the
+ * Strings for the video generation wizard, kept beside the app the way the shopping list and the
  * sleep log keep theirs — there are far too many of them, and they are far too specific, to
  * belong in the site-wide table. The app's name and one-line description do live there, because
  * the apps index shows them.
@@ -19,14 +19,18 @@ export type Lang = 'en' | 'pl';
 
 export const translations = {
   en: {
-    // The step strip
-    steps: 'Stages',
+    // The step rail, and the band over the sheet beside it. The rail is short labels because it
+    // is a list read at a glance; the band is the fuller name of the same step, which is the
+    // division an installer's own left panel and title band make.
+    steps: 'Steps',
     stepConfig: 'Settings',
     stepScenes: 'Script',
     stepAssets: 'Pictures & voice',
     stepAssembly: 'Assembling',
     stepOutput: 'Video',
     stepLocked: 'Not reached yet',
+    stepCounter: 'Step {n} of {total}',
+    configTitle: 'Keys and settings',
 
     // Sign-in gate
     signedOutTitle: 'Sign in to keep your keys',
@@ -199,13 +203,15 @@ export const translations = {
   },
 
   pl: {
-    steps: 'Etapy',
+    steps: 'Kroki',
     stepConfig: 'Ustawienia',
     stepScenes: 'Scenariusz',
     stepAssets: 'Obrazy i głos',
     stepAssembly: 'Składanie',
     stepOutput: 'Wideo',
     stepLocked: 'Jeszcze nie tutaj',
+    stepCounter: 'Krok {n} z {total}',
+    configTitle: 'Klucze i ustawienia',
 
     signedOutTitle: 'Zaloguj się, żeby zachować klucze',
     signedOutBody:
