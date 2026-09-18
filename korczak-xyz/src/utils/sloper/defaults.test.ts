@@ -20,7 +20,7 @@ describe('normalizeConfig', () => {
   it('keeps what a well-formed document says', () => {
     const config = normalizeConfig({
       apiKeys: { openai: 'sk-abc', elevenLabs: 'el-xyz' },
-      llm: { provider: 'deepseek', model: 'deepseek-chat' },
+      llm: { provider: 'deepseek', model: 'deepseek-flash' },
       video: { resolution: { width: 1920, height: 1080 }, frameRate: 30, numScenes: 6, targetDuration: 45 },
       image: { provider: 'google', model: 'imagen-4', quality: 'high', aspectRatio: '16:9' },
       tts: { model: 'eleven_turbo_v2', voiceId: 'abc', speed: 1.4, concurrency: 8, plan: 'pro' },
@@ -28,7 +28,7 @@ describe('normalizeConfig', () => {
     });
 
     expect(config.apiKeys.openai).toBe('sk-abc');
-    expect(config.llm).toEqual({ provider: 'deepseek', model: 'deepseek-chat' });
+    expect(config.llm).toEqual({ provider: 'deepseek', model: 'deepseek-flash' });
     expect(config.video.resolution).toEqual({ width: 1920, height: 1080 });
     expect(config.image.aspectRatio).toBe('16:9');
     expect(config.tts.plan).toBe('pro');

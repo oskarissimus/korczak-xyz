@@ -1,6 +1,16 @@
 {
-  "scrapedAt": "2026-02-16T12:30:00Z",
+  "scrapedAt": "2026-09-18T00:00:00Z",
   "llm": {
+    "gpt-6-astra": { "input": 10.00, "cachedInput": 1.00, "output": 50.00 },
+    "gpt-5.6-sol": { "input": 4.00, "cachedInput": 0.40, "output": 20.00 },
+    "gpt-5.6-terra": { "input": 2.00, "cachedInput": 0.20, "output": 12.00 },
+    "gpt-5.6-luna": { "input": 0.20, "cachedInput": 0.02, "output": 1.20 },
+    "gpt-5.5": { "input": 5.00, "cachedInput": 0.50, "output": 30.00 },
+    "gpt-5.5-pro": { "input": 30.00, "cachedInput": null, "output": 180.00 },
+    "gpt-5.4": { "input": 2.50, "cachedInput": 0.25, "output": 15.00 },
+    "gpt-5.4-mini": { "input": 0.75, "cachedInput": 0.075, "output": 4.50 },
+    "gpt-5.4-nano": { "input": 0.20, "cachedInput": 0.02, "output": 1.25 },
+    "gpt-5.4-pro": { "input": 30.00, "cachedInput": null, "output": 180.00 },
     "gpt-5.2": { "input": 1.75, "cachedInput": 0.175, "output": 14.00 },
     "gpt-5.1": { "input": 1.25, "cachedInput": 0.125, "output": 10.00 },
     "gpt-5": { "input": 1.25, "cachedInput": 0.125, "output": 10.00 },
@@ -18,11 +28,13 @@
     "o3-mini": { "input": 1.10, "cachedInput": 0.55, "output": 4.40 },
     "o4-mini": { "input": 1.10, "cachedInput": 0.275, "output": 4.40 },
     "o1": { "input": 15.00, "cachedInput": 7.50, "output": 60.00 },
+    "o1-pro": { "input": 150.00, "cachedInput": null, "output": 600.00 },
     "o1-mini": { "input": 1.10, "cachedInput": 0.55, "output": 4.40 },
     "gpt-4-turbo": { "input": 10.00, "cachedInput": null, "output": 30.00 },
     "gpt-3.5-turbo": { "input": 0.50, "cachedInput": null, "output": 1.50 },
-    "deepseek-chat": { "input": 0.28, "cachedInput": 0.028, "output": 0.42 },
-    "deepseek-reasoner": { "input": 0.28, "cachedInput": 0.028, "output": 0.42 }
+    "deepseek-flash": { "input": 0.30, "cachedInput": 0.006, "output": 1.20 },
+    "deepseek-v4-flash": { "input": 0.30, "cachedInput": 0.006, "output": 1.20 },
+    "deepseek-v4-pro": { "input": 1.32, "cachedInput": 0.044, "output": 3.96 }
   },
   "image": {
     "gpt-image-1": {
@@ -49,11 +61,14 @@
     }
   },
   "geminiImage": {
+    "gemini-3.1-flash-image": 0.067,
+    "gemini-3.1-flash-lite-image": 0.0336,
+    "gemini-3-pro-image": 0.134,
+    "gemini-3-pro-image-preview": 0.134,
+    "gemini-2.5-flash-image": 0.039,
+    "gemini-2.5-flash-preview-image-generation": 0.039,
     "gemini-2.0-flash-image-generation-001": 0.039,
     "gemini-2.0-flash-image": 0.039,
-    "gemini-2.5-flash-preview-image-generation": 0.039,
-    "gemini-2.5-flash-image": 0.039,
-    "gemini-3-pro-image-preview": 0.039,
     "imagen-3.0-generate-002": 0.04,
     "imagen-3.0-fast-generate-001": 0.02,
     "imagen-4.0-generate-preview-05-20": 0.04,
@@ -64,19 +79,19 @@
   "tts": {
     "flash_turbo": {
       "free": null,
-      "starter": 0.08,
-      "creator": 0.11,
-      "pro": 0.10,
-      "scale": 0.08,
-      "business": 0.06
+      "starter": 0.05,
+      "creator": 0.05,
+      "pro": 0.05,
+      "scale": 0.05,
+      "business": 0.05
     },
     "multilingual_v2_v3": {
       "free": null,
-      "starter": 0.17,
-      "creator": 0.22,
-      "pro": 0.20,
-      "scale": 0.17,
-      "business": 0.12
+      "starter": 0.10,
+      "creator": 0.10,
+      "pro": 0.10,
+      "scale": 0.10,
+      "business": 0.10
     }
   }
 }

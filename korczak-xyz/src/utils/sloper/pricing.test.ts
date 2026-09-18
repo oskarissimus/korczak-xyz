@@ -64,6 +64,20 @@ describe('estimateImageCost', () => {
     expect(unknown.total).toBeNull();
   });
 
+  /*
+   * `gemini-3.1-flash-lite-image` and `gemini-3.1-flash-image` are two models at two prices, and
+   * neither id is a prefix of the other — but a shorter key that *is* one would silently quote
+   * the wrong model. This is the assertion that the longest-prefix rule is what decides.
+   */
+  it('does not price a Gemini model at a cheaper sibling\'s rate', () => {
+    const size = { width: 1024, height: 1024 };
+    const flash = estimateImageCost('google', 'gemini-3.1-flash-image', '1:1' as never, size, 1);
+    const lite = estimateImageCost('google', 'gemini-3.1-flash-lite-image-preview', '1:1' as never, size, 1);
+    expect(flash.perImage).not.toBeNull();
+    expect(lite.perImage).not.toBeNull();
+    expect(lite.perImage).toBeLessThan(flash.perImage ?? 0);
+  });
+
   /* Gemini ids carry a date suffix, so an exact miss falls back to the longest matching prefix. */
   it('matches a dated Gemini model id by prefix', () => {
     const exact = estimateImageCost('google', 'gemini-2.5-flash-image', '1:1' as never, { width: 1024, height: 1024 }, 1);

@@ -303,6 +303,39 @@ picks one, and the two take turns for ever.
 A provider's own error text is shown **verbatim and untranslated**. It is the string you would
 paste into their support page; the sentence around it is translated, the quote is not.
 
+### The price list is a scrape with a date on it
+
+`pricing.json` is hand-copied from four vendors' pricing pages and `scrapedAt` is stamped beside
+every figure it produces, because that date is the whole warranty: the estimate is shown before
+anything is spent and is never a bill. Refreshing it means re-reading the pages, not editing the
+numbers that look stale.
+
+Four things in it are judgement rather than transcription, and each survives a refresh only if it
+is made again:
+
+- **The models are the ones the dropdowns will offer, and those come from the provider.** Three of
+  the four lists are fetched with the key, so a model that ships is in the dropdown the same day
+  and a table that has not been refreshed prices it as `gpt-4o` with a caveat on screen. That
+  fallback is the safety net, not the plan.
+- **DeepSeek is stored at its peak rate.** It bills peak and off-peak, off-peak being half, and
+  the run happens when it happens — so the table carries the number that cannot be beaten by the
+  clock. `deepseek-chat` and `deepseek-reasoner` were retired in Jul 2026 and are gone from the
+  table; `deepseek-v4-flash` is still accepted as a name and is listed at the Flash price it is
+  actually billed at.
+- **ElevenLabs no longer varies by plan.** It is $0.05 per 1k characters for Flash/Turbo and $0.10
+  for the multilingual models whoever you are, so the six plan columns carry one number five
+  times. The plan field stays anyway: saved documents have it, and `free` is still not a price —
+  it is null, which is what puts `costFreePlan` on screen instead of a dollar figure.
+- **Gemini images are priced per output resolution.** The table takes the 1k rate, which is what
+  `images.ts` asks for. Their ids nest (`gemini-3.1-flash-lite-image` beside
+  `gemini-3.1-flash-image`), and the lookup's longest-prefix rule is the only thing stopping a
+  dated id being quoted at a sibling's price — `pricing.test.ts` holds that down.
+
+OpenAI's image models moved to token billing, and the per-image table still matches it exactly: an
+image is 272/1056/4160 output tokens at low/medium/high square and 408/1584/6240 portrait, so
+gpt-image-1 at $40 per 1M is the $0.011/$0.042/$0.167 that is written down. A future image model
+gets a row here only once those token counts are known for it — an invented row reads as a price.
+
 ### The scenes arrive before the model has finished writing
 
 `parseSceneBuffer` in `llm.ts` is the only hand-written parser here and the streaming screen
