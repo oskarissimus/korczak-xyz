@@ -177,6 +177,15 @@ touching it.
   — the exact failure the feature was built to stop. If the bill ever matters, the answer is a
   Delete button in the Open window, not a timer.
 
+**`firebase.json` names the bucket, and it is the only entry in that file that names anything
+project-specific.** The `storage` key takes an object or an array; given a bare object the CLI
+resolves the project's *default* bucket and fails the whole deploy with *"Firebase Storage has not
+been set up on project …"*. There is no default bucket here and there cannot be one — that is a
+`.firebasestorage.app` name only the console's "Get Started" button mints, which is a click nobody
+can put in git. The array form names the bucket Terraform made and the lookup never happens. This
+cost one red deploy on the way in; the bucket was created and registered correctly and the CLI
+refused to look at it.
+
 `storage.rules` mirrors `firestore.rules`: owner-only under `users/{uid}`, denied everywhere else,
 with a 64 MiB cap (twice what the assembler accepts either way, so it cannot refuse anything the
 app can legitimately make). It deliberately has **no household share** — the sleep log and the
