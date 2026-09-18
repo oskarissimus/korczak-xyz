@@ -402,11 +402,15 @@ things are worth knowing:
   deploy, then land the binding. This is the same two-pass `terraform/README.md` describes for the
   bootstrap, and it is a one-off: once `assemblevideo` exists the ordering is right for ever.
 
-- **`storage:rules` deploys in the same step as `firestore:rules`, and its bucket is Terraform's.**
-  That is why the existing job order is already right rather than needing a second pass: the
-  `terraform` job creates the bucket and registers it with Firebase, and only then does the deploy
-  job have somewhere to put the rules. The first landing of this feature is therefore one pass,
-  unlike `assembleVideo`'s.
+- **`storage` deploys in the same step as `firestore:rules`, and its bucket is Terraform's.** That
+  is why the existing job order is already right rather than needing a second pass: the `terraform`
+  job creates the bucket and registers it with Firebase, and only then does the deploy job have
+  somewhere to put the rules.
+- **It is `storage`, never `storage:rules`.** The colon means two different things on either side
+  of that list: after `firestore` it names a sub-resource, after `storage` it names a *deploy
+  target* of the `.firebaserc` kind. There are none here, so `storage:rules` fails with "Could not
+  find rules for the following storage targets: rules". This cost the second red deploy on the way
+  in, immediately after the `bucket` one above.
 
 `PUBLIC_SLOPER_ASSEMBLE_URL` exists only for the emulator. In production the URL is derived from
 `PUBLIC_FIREBASE_PROJECT_ID`, because a gen-2 function answers on the same `cloudfunctions.net`

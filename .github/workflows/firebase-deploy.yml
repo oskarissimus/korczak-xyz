@@ -175,8 +175,14 @@ jobs:
         # throws `Cannot read properties of undefined (reading 'stdin')` after the script has
         # already succeeded, failing a perfectly good deploy.
         #
-        # `storage:rules` rides with them, and its bucket is Terraform's (terraform/storage.tf) —
-        # so the job ordering that already exists is what makes this work on a project where the
-        # bucket is new: the apply registers it with Firebase, and only then does the CLI have
-        # somewhere to put the rules.
-        run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,storage:rules,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
+        # `storage` rides with them, and its bucket is Terraform's (terraform/storage.tf) — so the
+        # job ordering that already exists is what makes this work on a project where the bucket is
+        # new: the apply registers it with Firebase, and only then does the CLI have somewhere to
+        # put the rules.
+        #
+        # It is `storage` and NOT `storage:rules`, which is the trap: after a colon the CLI reads a
+        # deploy TARGET name (the `.firebaserc` kind), not a sub-resource the way `firestore:rules`
+        # does. There are no storage targets here, so `storage:rules` fails with "Could not find
+        # rules for the following storage targets: rules". Bare `storage` deploys every entry in
+        # firebase.json's `storage` array, which is the one bucket.
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,storage,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
