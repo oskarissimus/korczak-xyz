@@ -1,0 +1,50 @@
+---
+/**
+ * Server-rendered stand-in for <Backseat client:only="react" />: the heading, the shape of the
+ * setup sheet and the status strip. Astro swaps it for the real island the moment React hydrates.
+ *
+ * It commits to no *values*, and it cannot: every one of them is in localStorage or in Firestore,
+ * and this runs at build time. Nothing here may import `storage.ts` for that reason. The point is
+ * only that the window is the right height and nothing jumps — a page that renders empty and then
+ * grows by 500px is the thing this avoids.
+ *
+ * It draws the setup screen rather than the ride screen because a ride cannot survive a reload:
+ * the camera is acquired by a button press, so a first frame is always the setup sheet.
+ */
+import { translations, type Lang } from './translations';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+
+const groups = [t.keysTitle, t.visionTitle, t.personaTitle, t.voiceTitle, t.cameraTitle];
+---
+
+<div class="bks-app" aria-hidden="true">
+  <header class="bks-head">
+    <h2 class="bks-head-title">{t.setupTitle}</h2>
+  </header>
+
+  <div class="bks-sheet">
+    <p class="bks-pitch">{t.pitch}</p>
+
+    <aside class="bks-warning">
+      <h3 class="bks-warning-title">{t.disclaimerTitle}</h3>
+      <p>{t.disclaimerBody}</p>
+    </aside>
+
+    {groups.map((legend) => (
+      <fieldset class="bks-group">
+        <legend class="bks-legend">{legend}</legend>
+        <div class="bks-loading"></div>
+      </fieldset>
+    ))}
+  </div>
+
+  <div class="bks-statusbar">
+    <span class="bks-sync bks-sync-syncing">{t.syncSyncing}</span>
+  </div>
+</div>

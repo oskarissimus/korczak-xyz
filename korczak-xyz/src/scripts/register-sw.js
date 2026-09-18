@@ -40,6 +40,7 @@
     { tier: 'events', pattern: /^(\/pl)?\/apps\/events(\/|$)/ },
     { tier: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
     { tier: 'sloper', pattern: /^(\/pl)?\/apps\/sloper(\/|$)/ },
+    { tier: 'backseat', pattern: /^(\/pl)?\/apps\/backseat(\/|$)/ },
   ];
 
   /**

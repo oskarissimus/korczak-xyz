@@ -73,6 +73,7 @@ describe('precache tiers', () => {
       '/apps/events', '/apps/events/sources', '/pl/apps/events/alerts',
       '/apps/transit', '/apps/transit/alerts', '/pl/apps/transit/raw',
       '/apps/sloper', '/pl/apps/sloper',
+      '/apps/backseat', '/pl/apps/backseat',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);
@@ -100,5 +101,9 @@ describe('precache tiers', () => {
     // The wizard is a single page in each locale, so its whole tier is those two documents.
     expect(byTier.get('sloper')!.test('/apps/sloper')).toBe(true);
     expect(byTier.get('sloper')!.test('/pl/apps/sloper')).toBe(true);
+    // Same for the annoying passenger, whose tier exists so the icon opens the setup sheet in a
+    // tunnel rather than /offline.
+    expect(byTier.get('backseat')!.test('/apps/backseat')).toBe(true);
+    expect(byTier.get('backseat')!.test('/pl/apps/backseat')).toBe(true);
   });
 });

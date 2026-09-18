@@ -16,6 +16,11 @@ import type { PwaApp } from './scope';
  * buys: its own icon, its own window and its own scope, so a wizard that holds four API keys and
  * scrolls for a thousand pixels is not a tab among thirty. See .claude/rules/sloper.md.
  *
+ * `backseat` is the opposite - it fits that sentence better than anything else here. It is used in
+ * a phone cradle in a moving car, where every row of browser chrome is taken off a screen read at
+ * arm's length, and where a stray link leaving the app kills a live camera stream. See
+ * .claude/rules/backseat.md.
+ *
  * The path patterns that decide which app a URL belongs to live in scope.ts, which ships to
  * the browser; this module does not, because it pulls in the whole translation table.
  */
@@ -87,6 +92,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     nameKey: 'Sloper',
     shortNameKey: 'pwa.sloper.short',
     descriptionKey: 'sloper.desc',
+  },
+  backseat: {
+    path: '/apps/backseat',
+    nameKey: 'Backseat',
+    shortNameKey: 'pwa.backseat.short',
+    descriptionKey: 'backseat.desc',
   },
 };
 

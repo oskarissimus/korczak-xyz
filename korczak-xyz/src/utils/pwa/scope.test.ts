@@ -37,6 +37,12 @@ describe('appForPath', () => {
     expect(appForPath('/pl/apps/sloper')).toBe('sloper');
   });
 
+  it('recognises the annoying passenger, which is one page per locale', () => {
+    expect(appForPath('/apps/backseat')).toBe('backseat');
+    expect(appForPath('/apps/backseat/')).toBe('backseat');
+    expect(appForPath('/pl/apps/backseat')).toBe('backseat');
+  });
+
   it('treats everything else as the site', () => {
     expect(appForPath('/')).toBe('site');
     expect(appForPath('/apps')).toBe('site');

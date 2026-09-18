@@ -46,6 +46,11 @@ const SHELL_ROUTES = ['/', '/pl', '/apps/tuner', '/pl/apps/tuner', '/songs', '/p
  * a waste. It is not: the stage it opens at is the key and model form, which is backed by
  * localStorage and is the one part of that app that works offline. Without the tier the icon
  * opens /offline instead, and there is no reaching the settings of an app you cannot open.
+ *
+ * `backseat` is the same argument with a sharper edge. A ride needs a network — every remark is a
+ * vision call — but the app is opened in a car, which is where a network is least reliable, and
+ * what opens first is the setup sheet backed by localStorage. Without the tier the home screen
+ * icon leads to /offline in exactly the tunnel where somebody wants to check which key is set.
  */
 const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
@@ -55,6 +60,7 @@ const APP_TIERS = {
   events: /^(\/pl)?\/apps\/events(\/|$)/,
   transit: /^(\/pl)?\/apps\/transit(\/|$)/,
   sloper: /^(\/pl)?\/apps\/sloper(\/|$)/,
+  backseat: /^(\/pl)?\/apps\/backseat(\/|$)/,
 };
 
 /**

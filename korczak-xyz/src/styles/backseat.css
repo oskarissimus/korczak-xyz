@@ -1,0 +1,541 @@
+/* Backseat Driver — retro theme.
+ *
+ * Two screens with opposite jobs, and the split is the only thing worth knowing before editing
+ * this file.
+ *
+ *  - **The setup sheet** is an ordinary Win95 property sheet, built out of the same idioms as
+ *    sloper's: groove-bordered group boxes with legends cut into them, white sunken inputs, a
+ *    sunken status strip at the foot. It is read sitting still, before the journey, and it can
+ *    afford to be dense.
+ *  - **The ride screen** is not a form at all. It is read at arm's length, in a cradle, in
+ *    daylight, by somebody who must not look at it for long — so the type is several times larger,
+ *    the two buttons are thumb-sized with room around them, and the camera preview is a strip
+ *    rather than a viewfinder. The obvious layout (full-screen video with a caption over it) is
+ *    wrong twice: the driver can see the road far better through the windscreen, and text over
+ *    moving video is the least legible arrangement there is.
+ *
+ * Three rules carried over from the rest of the site:
+ *
+ *  1. **Outset means raised, inset means pressed, groove means a boundary.**
+ *  2. **Nothing is read by colour alone** — the charts' rule. The speaking state is a word with a
+ *     marker beside it, never a green dot on its own; the sync badge is a word with a dot after it.
+ *  3. **`prefers-reduced-motion` stops the one animation here.** The speaking marker pulses, and a
+ *     pulsing element in a car is exactly the thing somebody may have turned off for good reason.
+ */
+
+/* Same reasoning as the trainers and the shopping list: this is a property sheet, not a page in a
+   teal window, so the content area is the panel face and the ink is reset with the surface. */
+.backseat-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 0;
+}
+
+.bks-app {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+  font-size: 1.15rem;
+  /* A grid track's default minimum is its content, so one long unbroken provider error — and they
+     are long — would push the panel wider than the window instead of wrapping inside it. */
+  min-width: 0;
+}
+
+/* Reserves roughly what the island occupies, so the window does not collapse and rebound while
+   localStorage is read. */
+.bks-loading {
+  min-height: 90px;
+}
+
+/* --- the band over the sheet ----------------------------------------------------------- */
+
+.bks-head {
+  border: 2px groove var(--retro-white);
+  background: var(--retro-gray);
+  padding: 9px 12px;
+}
+
+.bks-head-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  color: var(--retro-black);
+}
+
+.bks-subhead {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  margin: 0 0 6px;
+  color: var(--retro-black);
+}
+
+/* --- the setup sheet -------------------------------------------------------------------- */
+
+.bks-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bks-pitch {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+/*
+ * The disclaimer. Yellow-on-navy rather than the red of an error, because it is not a failure —
+ * it is the single most important sentence in the app and it is true before anything has gone
+ * wrong. The site's own phosphor colours, so it reads as a notice from the machine rather than as
+ * a browser warning.
+ */
+.bks-warning {
+  border: 3px outset var(--retro-white);
+  background: var(--retro-navy);
+  color: var(--retro-yellow);
+  padding: 12px;
+}
+
+.bks-warning-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  line-height: 1.7;
+  margin: 0 0 8px;
+  color: var(--retro-yellow);
+}
+
+.bks-warning p {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
+.bks-group {
+  border: 2px groove var(--retro-white);
+  padding: 10px 12px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bks-legend {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 9px;
+  padding: 0 6px;
+  color: var(--retro-black);
+}
+
+.bks-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bks-label {
+  font-size: 1.1rem;
+  color: var(--retro-black);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* A label whose own row carries something beside it — the set/not-set chip on a key. Without this
+   it inherits the column direction above and the chip becomes a full-width band of its own. */
+.bks-label-inline {
+  flex-direction: row;
+  align-items: baseline;
+}
+
+.bks-hint,
+.bks-note {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.bks-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
+.bks-error {
+  font-size: 1rem;
+  color: #a00000;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.bks-input,
+.bks-select {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  width: 100%;
+  padding: 5px 7px;
+  background: var(--retro-white);
+  color: var(--retro-black);
+  border: 2px inset var(--retro-white);
+}
+
+.bks-select:disabled,
+.bks-input:disabled {
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.bks-key {
+  display: flex;
+  gap: 6px;
+}
+
+.bks-key-toggle {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 10px;
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.bks-key-toggle:active {
+  border-style: inset;
+}
+
+.bks-slider {
+  width: 100%;
+}
+
+.bks-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--retro-dark-gray);
+}
+
+/* A chip that states a fact rather than raising an alarm: `set` / `not set` beside a key. */
+.bks-chip {
+  display: inline-block;
+  font-size: 0.9rem;
+  padding: 0 6px;
+  margin-left: 6px;
+  border: 1px solid var(--retro-dark-gray);
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.bks-chip-on {
+  border-color: #006000;
+  color: #006000;
+}
+
+.bks-test {
+  align-self: flex-start;
+}
+
+.bks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* The one button on the setup screen that matters, sized to say so. */
+.bks-start {
+  font-size: 1.2rem;
+  padding: 10px 22px;
+}
+
+.bks-start:disabled {
+  color: var(--retro-dark-gray);
+  cursor: not-allowed;
+}
+
+/* --- panels ----------------------------------------------------------------------------- */
+
+.bks-signin,
+.bks-banner {
+  border: 2px groove var(--retro-white);
+  background: var(--retro-gray);
+  padding: 12px;
+}
+
+.bks-signin p,
+.bks-banner p {
+  margin: 6px 0;
+}
+
+.bks-signin .retro-btn {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  padding: 6px 14px;
+}
+
+.bks-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-color: var(--retro-red);
+  border-style: solid;
+  border-width: 2px;
+}
+
+.bks-banner-close {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+/* --- the ride screen -------------------------------------------------------------------- */
+
+.bks-ride {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/*
+ * The preview, deliberately a strip. It is here to confirm the phone is pointed at the road, and
+ * for nothing else — the driver has a windscreen. `aspect-ratio` rather than a fixed height so it
+ * keeps its shape across phone widths, and the black well is the same sunken black glass the
+ * icons are drawn with.
+ */
+.bks-viewport {
+  position: relative;
+  border: 2px inset var(--retro-white);
+  background: #040404;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+}
+
+.bks-video {
+  width: 100%;
+  height: 100%;
+  /* `cover`, so the strip is filled whatever the camera's own aspect ratio is. What it crops is
+     the top and bottom of a view nobody is reading detail from. */
+  object-fit: cover;
+  display: block;
+}
+
+.bks-viewport-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--retro-green);
+  font-size: 1.1rem;
+}
+
+/*
+ * The remark. This is the whole screen, and the size is the point: it has to be readable from a
+ * cradle at arm's length with one glance. `min-height` holds the layout still between remarks, so
+ * the buttons under it do not move under a thumb that is already on the way down.
+ */
+.bks-current {
+  border: 2px inset var(--retro-white);
+  background: var(--retro-black);
+  color: var(--retro-green);
+  padding: 16px;
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.bks-current-text {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.25;
+}
+
+.bks-current-waiting {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--retro-dark-gray);
+}
+
+/* A word, plus a marker. Never the marker alone — the charts' rule, and a driver glancing at a
+   phone in sunlight is the worst case that rule exists for. */
+.bks-speaking {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  color: var(--retro-yellow);
+}
+
+.bks-speaking-mark {
+  width: 12px;
+  height: 12px;
+  background: var(--retro-yellow);
+  animation: bks-pulse 1s ease-in-out infinite;
+}
+
+@keyframes bks-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Somebody who has turned animation off has done so for a reason, and a blinking square in a
+   moving car is precisely the reason. The word beside it carries the whole message anyway. */
+@media (prefers-reduced-motion: reduce) {
+  .bks-speaking-mark {
+    animation: none;
+  }
+}
+
+/* Two buttons, both thumb-sized. A control that needs aiming is a control that is used at the
+   wrong moment. */
+.bks-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.bks-big {
+  font-size: 1.25rem;
+  padding: 16px 12px;
+  min-height: 60px;
+}
+
+.bks-big:disabled {
+  color: var(--retro-dark-gray);
+  cursor: not-allowed;
+}
+
+/* The short form of the warning, on the screen where the voice is actually talking. */
+.bks-disclaimer {
+  margin: 0;
+  border-left: 3px solid var(--retro-navy);
+  padding-left: 8px;
+  font-size: 1.05rem;
+  color: var(--retro-black);
+}
+
+/* --- what has already been said ---------------------------------------------------------- */
+
+.bks-log {
+  border: 2px groove var(--retro-white);
+  padding: 10px 12px 12px;
+}
+
+.bks-log-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 9px;
+  margin: 0 0 8px;
+  color: var(--retro-black);
+}
+
+.bks-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Long enough to scroll back over the last few minutes, short enough that the controls above
+     it stay on the first screen. */
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.bks-log-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 1.05rem;
+  border-bottom: 1px solid #a8a8a8;
+  padding-bottom: 5px;
+}
+
+.bks-log-time {
+  flex: none;
+  color: var(--retro-dark-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+.bks-log-text {
+  overflow-wrap: anywhere;
+}
+
+/* Said in words, because "it is grey" is not a message. */
+.bks-log-failed {
+  flex: none;
+  font-size: 0.9rem;
+  color: #8a4b00;
+}
+
+/* --- the status strip --------------------------------------------------------------------- */
+
+.bks-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-gray);
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.bks-sync::before {
+  content: '● ';
+}
+
+.bks-sync-synced {
+  color: #006000;
+}
+
+.bks-sync-syncing,
+.bks-sync-local {
+  color: var(--retro-dark-gray);
+}
+
+/* Not a failure of the app: the settings are still in this browser and everything works. Amber
+   rather than red, and the sentence under it says so. */
+.bks-sync-error {
+  color: #8a4b00;
+}
+
+.bks-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+/* --- small screens ------------------------------------------------------------------------ */
+
+/* The screen this app is actually used on. The sheet loses its outer padding to the window edge,
+   and the remark grows rather than shrinks: at this width it is the only thing being read. */
+@media (max-width: 700px) {
+  .bks-app {
+    padding: 12px;
+  }
+
+  .bks-current-text {
+    font-size: 1.8rem;
+  }
+
+  .bks-viewport {
+    aspect-ratio: 16 / 9;
+  }
+}
