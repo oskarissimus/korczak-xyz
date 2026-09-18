@@ -23,6 +23,7 @@
 import { isQuotaError } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { normalizeConfig } from './defaults';
+import { borrowFromBrowser } from './importKeys';
 import type { BackseatConfig } from './types';
 
 export const CONFIG_KEY = 'backseat-config';
@@ -31,25 +32,48 @@ export interface StampedConfig {
   config: BackseatConfig;
   /** When this copy was last edited, by whichever device edited it. 0 means "never". */
   updatedAt: number;
+  /**
+   * True when the keys in it were borrowed from the video generation wizard rather than typed
+   * here. The setup sheet says so under the key; nothing else behaves differently.
+   */
+  borrowed: boolean;
 }
 
+/**
+ * What this browser holds — or, when it holds nothing, what the wizard next door does.
+ *
+ * THE BORROWED COPY IS STAMPED 0, WHICH IS THE WHOLE OF ITS CONFLICT RESOLUTION. `updatedAt: 0`
+ * means "never edited", so it loses to any copy the account has: a device that borrowed sloper's
+ * keys this morning cannot overwrite the ones somebody typed here last week. It still pushes up
+ * when the account has no copy at all, which is the case the borrow exists for.
+ *
+ * It happens only when there is no `backseat-config` at all, and that absence is the only marker
+ * the import has — see `importKeys.ts` for why that is enough, and why a key cleared here is
+ * therefore never resurrected from sloper's.
+ */
 export function loadConfig(): StampedConfig {
-  if (typeof window === 'undefined') return { config: normalizeConfig(null), updatedAt: 0 };
+  if (typeof window === 'undefined') {
+    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false };
+  }
 
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return { config: normalizeConfig(null), updatedAt: 0 };
+    if (!raw) {
+      const { config, borrowed } = borrowFromBrowser();
+      return { config, updatedAt: 0, borrowed };
+    }
 
     const parsed = JSON.parse(raw);
     return {
       config: normalizeConfig(parsed),
       updatedAt: typeof parsed?.updatedAt === 'number' ? parsed.updatedAt : 0,
+      borrowed: false,
     };
   } catch (e) {
     // A corrupt value is worth one line: it is the difference between "my key vanished" and "my
     // key vanished and nobody can say why".
     log.warn('backseat.config.load.failed', describeError(e));
-    return { config: normalizeConfig(null), updatedAt: 0 };
+    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false };
   }
 }
 

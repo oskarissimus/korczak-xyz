@@ -64,11 +64,21 @@ interface SetupScreenProps {
   update: (patch: Partial<BackseatConfig>) => void;
   reset: () => void;
   onStart: () => void;
+  /** The keys on screen came from the video generation wizard rather than from this app. */
+  borrowed: boolean;
   t: Translation;
   lang: 'en' | 'pl';
 }
 
-export default function SetupScreen({ config, update, reset, onStart, t, lang }: SetupScreenProps) {
+export default function SetupScreen({
+  config,
+  update,
+  reset,
+  onStart,
+  borrowed,
+  t,
+  lang,
+}: SetupScreenProps) {
   /*
    * The auto-pick reads the current settings through refs rather than through the dependency
    * array. In the array it re-runs the fetch every time the dropdown changes — which is what the
@@ -196,6 +206,11 @@ export default function SetupScreen({ config, update, reset, onStart, t, lang }:
       </aside>
 
       <Fieldset legend={t.keysTitle} hint={t.keysBlurb}>
+        {/* A key appearing in an app you never typed it into is startling, and a key you believe
+            you have revoked in one place while a copy of it works in another is worse. Both are
+            said here, where the key is, rather than in a paragraph at the top. */}
+        {borrowed && <p className="bks-note">{t.keysBorrowed}</p>}
+
         {provider === 'openai' ? (
           <KeyField
             label={t.keyOpenai}

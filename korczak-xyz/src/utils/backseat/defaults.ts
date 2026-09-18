@@ -41,6 +41,16 @@ export const INTENSITIES: readonly Intensity[] = ['mild', 'normal', 'relentless'
 export const MIN_INTERVAL = 6;
 export const MAX_INTERVAL = 120;
 
+/**
+ * Where a Google setup starts.
+ *
+ * Named rather than inlined because `importKeys.ts` needs it: borrowing a Google-only set of keys
+ * has to move the provider as well, and leaving the OpenAI default model behind would be a config
+ * that names one provider and one of the other's models. If the guess is wrong for the account,
+ * the model list replaces it as soon as it comes back.
+ */
+export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
+
 export const DEFAULT_CONFIG: BackseatConfig = {
   apiKeys: { openai: null, google: null, elevenLabs: null },
   vision: { provider: 'openai', model: 'gpt-4o-mini' },

@@ -160,6 +160,46 @@ The ElevenLabs key field is **only shown when an ElevenLabs voice is selected**,
 only asks for it then. A key field for a service the current settings never call is a question
 nobody should have to answer.
 
+### The keys are borrowed from sloper on a first visit
+
+Both apps are paid for with the same three keys off the same three accounts, so `importKeys.ts`
+seeds this one from the wizard's config rather than asking for the same OpenAI key twice. Two
+halves, because a first visit comes in two shapes: `storage.ts` reads `sloper-config` out of
+localStorage (same browser, works signed out), and `useBackseatConfig` reads
+`users/{uid}/sloper/config` when the pull finds no Backseat document (a phone signing in for the
+first time, which has nothing local to copy from). DeepSeek is dropped on the way through — no
+model of theirs can look at a photograph.
+
+**It is a copy, not a shared store, and that is the part to be honest about.** Afterwards there are
+two documents holding the same OpenAI key: editing one does not change the other, and revoking
+means clearing it twice. The setup sheet says exactly that in a line under the key, because a key
+you believe you have revoked while a copy of it still works is worse than one you have to paste
+twice. The better shape is one store both apps read — `users/{uid}/keys/…` — and it was not done
+here because it is a migration of a working app's live keys rather than a new file; if this is ever
+revisited, that is the direction, and sloper's own "one home per account" argument is the reason.
+
+**The borrow happens once and there is no flag, because there is already a fact that means the
+same thing:** whether this browser has ever written `backseat-config`. Nothing is borrowed over a
+config that exists, and every edit creates one — including clearing a key, and including Clear
+everything, which writes the defaults straight back. So **a key deliberately cleared here is never
+resurrected from sloper's copy on the next load**, which is the same rule the account sync is built
+on and the one bug worth going out of the way to avoid. `importKeys.test.ts` pins both directions.
+
+Two smaller things that are load-bearing:
+
+- **The browser-side borrow is stamped `updatedAt: 0`.** It means "never edited", so it loses to
+  any copy the account has: a device borrowing sloper's keys this morning cannot overwrite the ones
+  somebody typed here last week. It still pushes up when the account has no copy at all, which is
+  the case it exists for. The account-side borrow is stamped `Date.now()` instead, because at that
+  point it *is* the account's only copy.
+- **A Google-only borrow moves the provider too.** The default provider is OpenAI, so filling in a
+  Google key alone would leave Start dead with the key it needs sitting right there unasked for.
+  `DEFAULT_GOOGLE_MODEL` goes with it, and the model list corrects it if that guess is wrong.
+
+`pullSloperKeys` **never fails the caller**: a missing document, a rules refusal or a dead client
+all come back as three nulls. An app that would not open because it could not read a different
+app's document is a poor trade for a convenience.
+
 ### Nothing about a ride is saved
 
 Not in localStorage and not in Firestore. The localStorage half is the budget argument the other

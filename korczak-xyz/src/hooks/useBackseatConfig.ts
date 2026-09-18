@@ -22,8 +22,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
-import { pullConfig, pushConfig } from '../utils/backseat/cloud';
+import { pullConfig, pullSloperKeys, pushConfig } from '../utils/backseat/cloud';
 import { DEFAULT_CONFIG } from '../utils/backseat/defaults';
+import { anyKey, configWithBorrowedKeys, hasNoKeys } from '../utils/backseat/importKeys';
 import { clearConfig, loadConfig, saveConfig } from '../utils/backseat/storage';
 import type { BackseatConfig } from '../utils/backseat/types';
 import type { AuthUser } from './useAuth';
@@ -35,6 +36,12 @@ export interface BackseatConfigApi {
   /** False until localStorage has been read; nothing should render settings before it. */
   ready: boolean;
   sync: SyncState;
+  /**
+   * True while the keys on screen are the video generation wizard's rather than ones typed here.
+   * The setup sheet says so under the key, and the first edit clears it — from then on they are
+   * this app's own copies. See `utils/backseat/importKeys.ts` for what that does and does not mean.
+   */
+  borrowed: boolean;
   update: (patch: Partial<BackseatConfig>) => void;
   reset: () => void;
 }
@@ -43,6 +50,7 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
   const [config, setConfig] = useState<BackseatConfig>(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
   const [sync, setSync] = useState<SyncState>('local');
+  const [borrowed, setBorrowed] = useState(false);
 
   // The current value, readable from a callback that must not depend on the render it was made
   // in — `update` is handed to every control on the sheet and re-creating it on each keystroke
@@ -58,12 +66,13 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
     saveConfig(next, updatedAt);
   }, []);
 
-  // What this browser holds, before anything asks the network.
+  // What this browser holds — or, when it has never held anything, what sloper left beside it.
   useEffect(() => {
     const stored = loadConfig();
     configRef.current = stored.config;
     updatedAtRef.current = stored.updatedAt;
     setConfig(stored.config);
+    setBorrowed(stored.borrowed);
     setReady(true);
   }, []);
 
@@ -84,10 +93,29 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
         if (cancelled) return;
 
         if (!remote) {
-          // First ride on this account: this browser's copy is the only one there is.
+          /*
+           * First ride on this account. This browser's copy is the only one there is — but if it
+           * has no keys in it either, the account may still have sloper's, which is the case a
+           * phone signing in for the first time is in: nothing in its localStorage to borrow from
+           * and a wizard config sitting in the account.
+           *
+           * Stamped `Date.now()` rather than 0 on the way up, unlike the browser-side borrow,
+           * because at this point it IS the account's only copy and a 0 would lose to the next
+           * device to write anything at all.
+           */
+          if (hasNoKeys(configRef.current)) {
+            const keys = await pullSloperKeys(uid);
+            if (cancelled) return;
+            if (anyKey(keys)) {
+              publish(configWithBorrowedKeys(configRef.current, keys), Date.now());
+              setBorrowed(true);
+            }
+          }
           await pushConfig(uid, configRef.current, updatedAtRef.current || Date.now());
         } else if (remote.updatedAt > updatedAtRef.current) {
+          // The account's own copy, which is never borrowed — somebody typed it somewhere.
           publish(remote.config, remote.updatedAt);
+          setBorrowed(false);
         } else if (remote.updatedAt < updatedAtRef.current) {
           // This browser is ahead — typed while signed out, most likely. Send it up.
           await pushConfig(uid, configRef.current, updatedAtRef.current);
@@ -115,6 +143,10 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
       const next = { ...configRef.current, ...patch };
       const now = Date.now();
       publish(next, now);
+      // The first edit makes them this app's own copies, whatever they were a moment ago — and
+      // `publish` has just written them, so the next load has a config to find and borrows
+      // nothing.
+      setBorrowed(false);
 
       const uid = user?.uid;
       if (!uid || !pulledRef.current) return;
@@ -137,6 +169,13 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
     clearConfig();
     const now = Date.now();
     publish(DEFAULT_CONFIG, now);
+    /*
+     * `publish` writes the defaults straight back, so there IS a `backseat-config` afterwards and
+     * the next load borrows nothing. That is deliberate: Clear everything has to mean it, and an
+     * app that refilled itself from the wizard on the very next reload would be unable to be
+     * cleared at all.
+     */
+    setBorrowed(false);
 
     const uid = user?.uid;
     if (!uid || !pulledRef.current) return;
@@ -149,5 +188,5 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
       });
   }, [publish, user]);
 
-  return { config, ready, sync, update, reset };
+  return { config, ready, sync, borrowed, update, reset };
 }

@@ -56,6 +56,9 @@ export const translations = {
     keyNotSet: 'not set',
     keySet: 'set',
     keyElevenLabsHint: 'Only needed if you pick an ElevenLabs voice below.',
+    keysBorrowed:
+      'Filled in from the Video Generation Wizard, so you do not have to paste them twice. ' +
+      'They are copies: changing one here does not change it there.',
 
     // The eyes
     visionTitle: 'The eyes',
@@ -175,6 +178,9 @@ export const translations = {
     keyNotSet: 'brak',
     keySet: 'jest',
     keyElevenLabsHint: 'Potrzebny tylko wtedy, gdy wybierzesz niżej głos z ElevenLabs.',
+    keysBorrowed:
+      'Wzięte z Kreatora generowania wideo, żeby nie wklejać ich drugi raz. To kopie: zmiana ' +
+      'tutaj nie zmienia ich tam.',
 
     visionTitle: 'Oczy',
     visionProvider: 'Patrzy przez',
