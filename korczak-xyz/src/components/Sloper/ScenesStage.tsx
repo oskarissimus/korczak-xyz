@@ -85,6 +85,15 @@ function SceneCard({ scene, onUpdate, onDelete, t, lang }: SceneCardProps) {
 
 interface ScenesStageProps {
   config: SloperConfig;
+  /*
+   * The topic lives in `useSloperRun` rather than here, and that is not gratuitous lifting: it is
+   * the one thing on this screen that is worth saving and cannot be rebuilt from anything else.
+   * Held in local state it would be lost on a reload and, worse, would come back empty on a
+   * project reopened from the account — leaving a stack of scenes with no record of what they
+   * were asked for.
+   */
+  prompt: string;
+  onPromptChange: (value: string) => void;
   scenes: Scene[];
   streaming: boolean;
   tokenUsage: TokenUsage | null;
@@ -103,6 +112,8 @@ interface ScenesStageProps {
 
 export default function ScenesStage({
   config,
+  prompt,
+  onPromptChange,
   scenes,
   streaming,
   tokenUsage,
@@ -118,8 +129,6 @@ export default function ScenesStage({
   t,
   lang,
 }: ScenesStageProps) {
-  const [prompt, setPrompt] = useState('');
-
   // A scene missing either field cannot become a pair of assets, so it is counted out here
   // rather than generated half-way and refused by the assembler later.
   const usable = scenes.filter((s) => s.script.trim() && s.imageDescription.trim());
@@ -143,7 +152,7 @@ export default function ScenesStage({
         value={prompt}
         placeholder={t.promptPlaceholder}
         disabled={streaming}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => onPromptChange(e.target.value)}
       />
       <p className="slp-hint">
         {fill(t.promptHint, {

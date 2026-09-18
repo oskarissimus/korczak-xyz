@@ -1,4 +1,5 @@
-# Deploys the Firestore rules and the two collectors — Event Watch and the metro watcher.
+# Deploys the Firestore and Storage rules and the two collectors — Event Watch and the metro
+# watcher.
 #
 # Separate from node.js.yml because it is path-filtered: the site deploys on every push from that
 # workflow, but redeploying Cloud Functions on a commit that only touched a song chart would take
@@ -24,6 +25,7 @@ on:
       - "functions/**"
       - "firestore.rules"
       - "firestore.indexes.json"
+      - "storage.rules"
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
       - "korczak-xyz/src/utils/transit/**"
@@ -172,4 +174,9 @@ jobs:
         # `npm run build` — the firebase CLI ships its own bundled node 20 / npm 8, and that npm
         # throws `Cannot read properties of undefined (reading 'stdin')` after the script has
         # already succeeded, failing a perfectly good deploy.
-        run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
+        #
+        # `storage:rules` rides with them, and its bucket is Terraform's (terraform/storage.tf) —
+        # so the job ordering that already exists is what makes this work on a project where the
+        # bucket is new: the apply registers it with Firebase, and only then does the CLI have
+        # somewhere to put the rules.
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,storage:rules,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force

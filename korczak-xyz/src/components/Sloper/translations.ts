@@ -118,6 +118,37 @@ export const translations = {
     costFreePlan: 'Inside the free allowance.',
     costEstimateOnly: 'An estimate over the target length, not a bill.',
 
+    // The project menu, and the window it opens. `menuOpen` keeps its ellipsis: a menu item that
+    // opens a dialog rather than doing the thing is spelt with one, and this app is 95 all the
+    // way down.
+    menuProject: 'Project',
+    menuOpen: 'Open…',
+    openTitle: 'Open a project',
+    openLoading: 'Fetching your projects…',
+    openEmpty: 'Nothing saved yet. Start a video and it will be here when you come back.',
+    openSignedOut: 'Projects are saved to your account. Sign in and they follow you between devices.',
+    openFailed: 'Your projects could not be fetched.',
+    openRetry: 'Try again',
+    openButton: 'Open',
+    openClose: 'Close',
+    openCurrent: 'open',
+    openScenes: '{count} scenes',
+    openHasVideo: 'video ready',
+    openUnknownDate: 'no date',
+
+    // Autosave, in the status strip beside the settings badge.
+    saveOff: 'Project not saved',
+    saveIdle: 'Nothing to save yet',
+    saveLoading: 'Opening…',
+    saveSaving: 'Saving…',
+    saveSaved: 'Project saved',
+    saveError: 'Project not saved',
+    saveErrorHint:
+      'The sitting is still on screen and nothing has been lost. The next change tries again.',
+    projectMissing: 'That link does not name a project on this account. Starting a fresh one.',
+    assetNotSaved: 'This one never reached your account, so it has to be made again.',
+    restoringVideo: 'Fetching the video back from your account…',
+
     // Starting
     startButton: 'Write the script',
     startChecking: 'Checking the ElevenLabs key…',
@@ -195,11 +226,20 @@ export const translations = {
     driveFailed: 'Sending failed — retry',
     driveDismiss: 'Dismiss',
     startOver: 'Start a new video',
+    /* Two of them, because Start Over means two different things now. Signed in, the project
+       stays in the account and this button only stops looking at it; signed out there is nowhere
+       for it to stay, which is the sentence this app has always shown. */
     startOverConfirm: 'Start again? This throws away the script, the pictures and the video.',
+    startOverConfirmSaved:
+      'Start another video? This one stays in your account — the Project menu opens it again.',
 
     // Errors
     errorDismiss: 'Dismiss',
     leaveWarning: 'The pictures and the voice are only in this page. Leaving loses them.',
+    /* Signed in, everything finished is already in the bucket. What leaving still costs is the
+       requests in the air — which is exactly what `run.busy` means, so the warning is armed on
+       the same condition and only its wording changes. */
+    leaveWarningSaved: 'Pictures and narrations are still being made. Leaving loses the ones in flight.',
   },
 
   pl: {
@@ -364,9 +404,39 @@ export const translations = {
     driveDismiss: 'Zamknij',
     startOver: 'Nowe wideo',
     startOverConfirm: 'Zacząć od nowa? Scenariusz, obrazy i wideo przepadną.',
+    startOverConfirmSaved:
+      'Zacząć kolejne wideo? To zostaje na koncie — menu Projekt otworzy je ponownie.',
+
+    menuProject: 'Projekt',
+    menuOpen: 'Otwórz…',
+    openTitle: 'Otwórz projekt',
+    openLoading: 'Pobieram twoje projekty…',
+    openEmpty: 'Nic jeszcze nie zapisano. Zacznij wideo, a będzie tu, gdy wrócisz.',
+    openSignedOut: 'Projekty zapisują się na koncie. Zaloguj się, a będą na każdym urządzeniu.',
+    openFailed: 'Nie udało się pobrać projektów.',
+    openRetry: 'Spróbuj ponownie',
+    openButton: 'Otwórz',
+    openClose: 'Zamknij',
+    openCurrent: 'otwarty',
+    openScenes: 'scen: {count}',
+    openHasVideo: 'wideo gotowe',
+    openUnknownDate: 'bez daty',
+
+    saveOff: 'Projekt niezapisany',
+    saveIdle: 'Nie ma jeszcze czego zapisać',
+    saveLoading: 'Otwieram…',
+    saveSaving: 'Zapisuję…',
+    saveSaved: 'Projekt zapisany',
+    saveError: 'Projekt niezapisany',
+    saveErrorHint:
+      'Wszystko jest nadal na ekranie i nic nie przepadło. Następna zmiana spróbuje ponownie.',
+    projectMissing: 'Ten link nie wskazuje projektu na tym koncie. Zaczynam nowy.',
+    assetNotSaved: 'To nie trafiło na konto, więc trzeba wygenerować to ponownie.',
+    restoringVideo: 'Pobieram wideo z konta…',
 
     errorDismiss: 'Zamknij',
     leaveWarning: 'Obrazy i głos są tylko na tej stronie. Wyjście je traci.',
+    leaveWarningSaved: 'Obrazy i narracje wciąż powstają. Wyjście traci te w trakcie.',
   },
 } as const;
 

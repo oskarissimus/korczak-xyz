@@ -28,6 +28,7 @@ Both are project state. Project state that is not written down is state that get
 | the `gcf-artifacts` cleanup policy | |
 | the Firestore backup **schedules** | the Firestore **database** itself |
 | the export bucket, its schedule and its two accounts | the **key** for the reader account |
+| the sloper bucket, and registering it with Firebase | `storage.rules` |
 
 Nothing may be in both columns. Two owners of one resource is permanent drift: every
 `terraform apply` reverts what the last `firebase deploy` did, and back again, with neither tool
@@ -46,6 +47,21 @@ touch nothing else. Declaring `google_firestore_database` to reach the one field
 (point-in-time recovery) would put every other tool's read-write target under Terraform's
 management for a feature with a seven-day window and a continuous bill. See the header of
 `firestore.tf`.
+
+### The one beta resource
+
+`google_firebase_storage_bucket` in `storage.tf` is the only thing in this directory using the
+`google-beta` provider, and it is there because it has no GA counterpart. It is what tells Firebase
+that `korczak-xyz-501720-sloper` is one of its buckets — without it the SDK gets a 404 from a bucket
+that plainly exists, and `firebase deploy --only storage` has nothing to put rules on.
+
+The beta provider is pinned to the same exact version as the GA one, for the same reason. The cost
+of each beta resource is a future upgrade to read carefully, since a beta schema may change under a
+pinned version's successor, so **keep the count at one** unless there is no alternative.
+
+Note this is *not* another two-pass landing like the one below: nothing here waits on the Firebase
+CLI to create a service first, so the ordering that already exists is the right one — the apply
+registers the bucket, and the deploy job after it puts the rules on.
 
 ### A binding on a function that does not exist yet
 

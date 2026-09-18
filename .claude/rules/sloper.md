@@ -1,11 +1,14 @@
 ---
 name: sloper
-description: The video generation wizard at /apps/sloper/ - the five-stage wizard as one island, the four API keys and where they are kept, the streaming scene parser, the canvas pass every picture goes through, and the one Cloud Function that runs FFmpeg.
+description: The video generation wizard at /apps/sloper/ - the five-stage wizard as one island, saved projects and the bucket behind them, the four API keys and where they are kept, the streaming scene parser, the canvas pass every picture goes through, and the one Cloud Function that runs FFmpeg.
 paths:
   - "**/utils/sloper/**"
   - "**/components/Sloper/**"
   - "**/hooks/useSloperConfig.ts"
+  - "**/hooks/useSloperProject.ts"
   - "**/hooks/useSloperRun.ts"
+  - "storage.rules"
+  - "terraform/storage.tf"
   - "**/styles/sloper.css"
   - "**/pages/**/apps/sloper.astro"
   - "**/assets/icons/sloper.svg"
@@ -34,11 +37,12 @@ the client, `functions/src/sloper/` is the one thing a browser cannot do.
 ### Why it is one page and one island
 
 sloper was a `HashRouter` over five routes. Here the five stages are five values of one `stage`
-in `useSloperRun`, and that is **forced rather than preferred**: every asset is a `Blob` held in
-memory and nothing persists them, so a genuine navigation between stages throws away a video that
-cost real money to make. The step rail is the whole of the navigation; a step you have not
-reached is a `<span>`, not a link, and nothing in the rail ever points forwards — a step is
-unlocked by finishing the one before it, and `output` only while there is a video to show.
+in `useSloperRun`, and that is **still forced rather than preferred** even now that sittings are
+saved: a genuine navigation tears the island down mid-generation, which cancels requests that have
+already been paid for, and no amount of Firestore brings a half-drawn picture back. The step rail
+is the whole of the navigation; a step you have not reached is a `<span>`, not a link, and nothing
+in the rail ever points forwards — a step is unlocked by finishing the one before it, and `output`
+only while there is a video to show.
 
 The rail sits down the left with the sheet beside it and a band naming the step over it, which is
 a setup wizard's shape on purpose: this app really is five steps in a row, and that is the one
@@ -58,16 +62,126 @@ Three things about it are load-bearing rather than decorative:
   band says it at length because it is the only heading that screen has. They are not duplicates
   to be collapsed.
 
-The same fact rules out two things somebody will reasonably want:
+One thing that fact still rules out, and it is the one people reach for first:
 
-- **No localStorage for a sitting.** Twelve 1024×1536 images and twelve narrations is tens of
-  megabytes against an origin budget of ~5 MB shared with the typing trainer's `typedHistory`.
-  One sitting would evict a book. `storage.ts` holds one small key and nothing else. Installing
-  the app does not change this: an installed app shares the origin's budget, it does not get
-  its own.
-- **No resume.** Reloading mid-run starts again. The `beforeunload` warning in `Sloper.tsx` is the
-  entire mitigation, and it is armed only while `run.busy` — a prompt on every navigation is one
-  people learn to dismiss without reading.
+- **Still no localStorage for a sitting.** Twelve 1024×1536 images and twelve narrations is tens
+  of megabytes against an origin budget of ~5 MB shared with the typing trainer's `typedHistory`.
+  One sitting would evict a book. `storage.ts` holds one small key and nothing else, and that is
+  as true after projects as before them — none of the saving below goes near localStorage.
+  Installing the app does not change it either: an installed app shares the origin's budget, it
+  does not get its own.
+
+### A sitting is a project now, and it is saved
+
+There used to be a second bullet above this one reading **"No resume. Reloading mid-run starts
+again."** It was true for six weeks and the reason given for it was the localStorage budget in the
+bullet that survives — which was the right reason for rejecting *that* store and not a reason to
+have no store at all. Firestore and Cloud Storage are not that budget, so the objection is answered
+rather than overruled, and nothing the old bullet protected has been given up: the other apps on
+this origin still have their ~5 MB to themselves.
+
+Signed in, everything a run produces is written down as it is produced. Signed out, nothing is —
+the wizard behaves exactly as it did, one sitting, in memory, lost on reload — because there is
+nowhere to put a project that belongs to nobody. That is the honest state, not a degraded one.
+
+**The split is the design, and it is not a detail to tidy.**
+
+| | holds | why there |
+|---|---|---|
+| `users/{uid}/sloperProjects/{id}` | name, date, stage, prompt, scenes, one row per asset, a keyless settings snapshot | kilobytes; it is listed and queried |
+| `gs://korczak-xyz-501720-sloper` | the processed JPEGs, the MP3s, the finished MP4 | megabytes; it is fetched by URL |
+
+A Firestore document is capped at 1 MiB. A twelve-scene script is perhaps 8 kB; one processed
+picture is a few hundred kB and base64 adds a third to it. So the document holds a **path** per
+asset and the bucket holds the bytes — which is also what makes the Open window cheap, since
+listing projects reads documents and not one byte of image.
+
+Six things about it are load-bearing:
+
+- **The id is eleven characters of base64URL, in `?p=`.** `projectId.ts` says why at length: a URL
+  is pasted into messages and read off second screens, a v4 UUID is 36 characters of which thirty
+  are ceremony, and eleven symbols of a 64-symbol alphabet is 2^66 values. `crypto.getRandomValues`
+  and `byte & 63`, never `Math.random()` — the cost of a collision is not a leak, it is one sitting
+  silently overwriting another's scenes.
+- **It is `replaceState`, never `pushState`.** Minting a project is not a navigation, and a Back
+  button that stepped between stages of one wizard is precisely what the single-island design is
+  for.
+- **A project is minted on leaving the settings step, not on load.** Minting on load would put a
+  row in the list for every idle visit, and the list is meant to be the videos you made rather than
+  the times you opened the page.
+- **The document is written whole, with `setDoc` and no merge.** One browser holds one sitting, so
+  there is nothing to merge with; a partial write would leave a scene list and an asset list
+  disagreeing about how many scenes exist, which is the one inconsistency the assembler cannot
+  survive. This is *not* the config document's last-write-wins — that one is contested between
+  devices and this one is not.
+- **The cheap half is debounced, the expensive half is not.** Scenes, stage and prompt go on a
+  1.2-second quiet timer (a write per keystroke is a bill and a rate limit) and `pagehide` flushes
+  it. A picture, a narration and the video are uploaded the moment they exist, so a crash costs at
+  most a second of typing and never anything that was paid for.
+- **A failed upload costs the saved copy and nothing else.** The asset is already in memory and
+  already paid for, so `putBlob` returning null does not fail the run. What it does cost is stated
+  honestly on the way back: `hydrateAssets` demotes a stored "complete" with no path to "failed",
+  so reopening offers Retry rather than drawing an `<img>` at nothing.
+
+**Reopening does not fetch the bytes**, with one exception. A download URL is all an `<img>` or an
+`<audio>` needs, so pictures and narrations come back as URLs with `data: null`; the blobs are
+fetched one at a time by `blobForAsset`, and only when the assembler asks — which is what lets a
+sitting paid for on a laptop be finished on a phone. The exception is the **video**, fetched
+eagerly on open, because it is the finished article and the reason to reopen at all.
+
+**Reopening never lands on the assembly stage.** A project saved while the video was uploading has
+no video, and landing there would re-run a thirty-megabyte upload before anybody asked. It lands on
+the assets screen, where the button to assemble is the next thing on the page.
+
+**Start Over stopped being destructive**, which is the other thing this changed. It used to be the
+only button on the site that threw away an hour of paid-for work; it now drops the id out of the
+address bar and leaves the project in the account, and the confirm text says so (signed out it asks
+the old question, because signed out the old answer is still true).
+
+**The menu has one item and that is not a placeholder.** Project ▸ Open… , and a modal listing
+name, date, stage, scene count and the topic. Rename, Delete and Duplicate are decisions nobody has
+made; the two-word name is generated at mint time rather than taken from the topic, because the
+project is minted *before* a topic is typed and a name that changes under somebody after they have
+learnt it is worse than one that never meant anything.
+
+**No API key ever goes in a project document.** `settings` is a `SloperConfig` with `apiKeys`
+stripped by `projectSettings`, and that is the same rule the section below is built on: the keys
+have one home per account, and a second copy per project is a second place to miss when somebody
+revokes one.
+
+**That snapshot is put back when a project is opened**, and it is not decoration. A project
+reopened after the video size was changed would otherwise assemble at the new size, FFmpeg
+letterboxing twelve pictures drawn for the old one — so the settings a video was made with come
+back with it. Being keyless is what makes that safe: `update` shallow-merges, so restoring how a
+video was made has no opinion at all about which keys are current. The cost, taken knowingly, is
+that opening an old project moves the live settings (and therefore the account's config document)
+back to what that project used.
+
+### The bucket, and the two resources behind it
+
+`korczak-xyz-501720-sloper`, in `terraform/storage.tf`. Three things are worth knowing before
+touching it.
+
+- **It is not `korczak-xyz-501720.firebasestorage.app`.** That is the name the console's SDK
+  snippet prints for a default bucket, and `PUBLIC_FIREBASE_STORAGE_BUCKET` sat pointing at it for
+  weeks — for a bucket nobody had ever pressed the button to create. A `.app` name is a
+  domain-named bucket and cannot be declared outside the console; a plain project-prefixed one can,
+  and the SDK does not care which it is handed.
+- **Two Terraform resources, not one.** `google_storage_bucket` makes it exist;
+  `google_firebase_storage_bucket` (the only reason `google-beta` is in this project at all) is
+  what lets the Firebase SDK address it and `storage.rules` apply to it. Without the second, an
+  upload gets a 404 from a bucket that plainly exists.
+- **No lifecycle rule, deliberately, unlike the export bucket next door.** A nightly export is a
+  copy of something that still exists; these objects are the only copy of a picture somebody paid
+  for. An `age = 90` here would quietly empty a project somebody came back to after a busy quarter
+  — the exact failure the feature was built to stop. If the bill ever matters, the answer is a
+  Delete button in the Open window, not a timer.
+
+`storage.rules` mirrors `firestore.rules`: owner-only under `users/{uid}`, denied everywhere else,
+with a 64 MiB cap (twice what the assembler accepts either way, so it cannot refuse anything the
+app can legitimately make). It deliberately has **no household share** — the sleep log and the
+shopping list are shared because a household is one household, and a grant made for a shopping list
+must not reach into somebody's drafts.
 
 ### It is installable, and the reason is not offline
 
@@ -75,9 +189,10 @@ This used to read "no PWA tier and no manifest", on the grounds that an installa
 thing you reach for away from a desk and this one's whole state dies with the tab. **That was
 answering the wrong question** — it weighed installing only as a way to work offline, which this
 app will never do, and ignored everything else an install is. It is in `PWA_APPS`, in `SCOPED`, in
-both `APP_TIERS` lists and on both pages' `pwa` prop as of Sep 2026. Nothing the old paragraph
-asserted has become false — the state still dies with the tab, there is still no resume, a run
-still needs a network. Only the conclusion drawn from them changed.
+both `APP_TIERS` lists and on both pages' `pwa` prop as of Sep 2026. One of the old paragraph's
+three facts has since become false — there *is* a resume now, see the section above — and the
+other two hold: a run still needs a network, and a sitting still dies with the tab for anybody
+signed out. The conclusion was already right before either changed.
 
 What the install actually buys, none of which needs a network:
 
@@ -85,8 +200,9 @@ What the install actually buys, none of which needs a network:
   several thousand pixels of scroll on a phone, and the rail down the left is the only navigation
   there is; every row of browser chrome comes out of the sheet beside it.
 - **Its own scope.** `/apps/sloper` and nothing else, so a stray link leaves the app rather than
-  navigating away from a run in progress — which, since nothing persists, is the expensive
-  mistake this app has.
+  navigating away from a run in progress. That is less expensive than it was — a signed-in run is
+  saved as it goes — and still expensive, because what a navigation kills is the requests in
+  flight, and those are the ones already being billed for.
 - **Its own icon and identity.** Four API keys live in this app's `localStorage`; reaching them
   through thirty tabs is how a sitting gets abandoned.
 
@@ -100,11 +216,16 @@ all: without the tier the home screen icon opens `/offline`, and there is no rea
 of an app that will not open. The model dropdowns stay empty until there is a network; that is the
 honest state and the provider's own error says so.
 
-`beforeunload` is unchanged and still the whole of the mitigation. It fires in a standalone window
-the same as in a tab, and installing neither strengthens nor weakens it. **Do not reach for a
-resume because the app now has an icon** — the objection was never where the app was launched
-from, it is the ~5 MB origin budget in the bullet above, and an installed app shares that budget
-rather than getting one of its own.
+`beforeunload` is still armed on exactly the same condition, `run.busy`, and installing neither
+strengthens nor weakens it. What changed is only the sentence it shows: signed out it says the
+pictures and the voice are in this page alone, and signed in it says the finished ones are already
+in the account and what leaving costs is the requests in the air. Both are true of `busy` and
+neither is true of anything else, which is why there is one condition and two strings.
+
+The old paragraph here ended **"do not reach for a resume because the app now has an icon"**, and
+that was right about the reasoning and has been overtaken by the store. The part of it that still
+holds is the part about localStorage: an installed app shares the origin's ~5 MB rather than
+getting its own, so the answer was never to put a sitting in it. The answer was a bucket.
 
 ### The keys, and the trade being made
 
@@ -257,8 +378,9 @@ every cut: correct-looking output that is wrong, which is worse than a crash.
 
 ### Deploying it
 
-Nothing new in the pipeline — `functions/**` is already in `firebase-deploy.yml`'s path filter.
-Two things are worth knowing:
+Nothing new in the pipeline — `functions/**` is already in `firebase-deploy.yml`'s path filter, and
+`storage.rules` was added beside `firestore.rules` in both the filter and the `--only` list. Three
+things are worth knowing:
 
 - **`terraform/functions.tf` carries the public invoker binding**, beside `sendTestPush`'s and for
   the same reason: a gen-2 function is a Cloud Run service underneath, so it must be
@@ -270,6 +392,12 @@ Two things are worth knowing:
   the apply and blocks the very deploy that would create it. Land the function first, let it
   deploy, then land the binding. This is the same two-pass `terraform/README.md` describes for the
   bootstrap, and it is a one-off: once `assemblevideo` exists the ordering is right for ever.
+
+- **`storage:rules` deploys in the same step as `firestore:rules`, and its bucket is Terraform's.**
+  That is why the existing job order is already right rather than needing a second pass: the
+  `terraform` job creates the bucket and registers it with Firebase, and only then does the deploy
+  job have somewhere to put the rules. The first landing of this feature is therefore one pass,
+  unlike `assembleVideo`'s.
 
 `PUBLIC_SLOPER_ASSEMBLE_URL` exists only for the emulator. In production the URL is derived from
 `PUBLIC_FIREBASE_PROJECT_ID`, because a gen-2 function answers on the same `cloudfunctions.net`

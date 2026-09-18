@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// What may be put in `korczak-xyz-501720-sloper`, which is the only bucket this site's clients
+// ever touch. It holds one thing: the pictures, narrations and finished MP4s of `/apps/sloper/`,
+// under `users/{uid}/sloper/{projectId}/`.
+//
+// The shape deliberately mirrors `firestore.rules`: a per-account subtree, owner-only, with the
+// path itself carrying the authorization. What it does NOT mirror is the household share — there
+// is no `hasShare()` here and there should not be one. The sleep log and the shopping list are
+// shared because a household is one household; a video somebody is paying OpenAI to make is not,
+// and a share granted for a shopping list must not quietly reach into somebody's drafts.
+//
+// There is no catch-all beneath this block, so anything outside `users/{uid}/` is denied by
+// default. That is the intended state: no part of this site writes anywhere else, and a new app
+// that needs to should have to say so here.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // WHY THERE IS A SIZE CAP AT ALL. Nothing else bounds an upload: the client decides what to
+      // send, and a bug — or a browser tab left open on a page that retries — can write the same
+      // object over and over. 64 MiB is twice the 32 MiB the assembler will accept in either
+      // direction, so it cannot refuse anything the app can legitimately produce, while still
+      // being a number rather than no number.
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 64 * 1024 * 1024;
+
+      // Spelt out beside `write`, which in Storage rules already covers it. It has to be: on a
+      // delete there is no `request.resource`, so the size clause above evaluates to an error and
+      // denies — and rules are a permissive union, so this second block is what grants it back.
+      // Nothing in the app deletes yet; the alternative is a bucket that can only ever grow.
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

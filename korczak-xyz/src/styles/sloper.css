@@ -211,6 +211,24 @@
   color: #8a4b00;
 }
 
+/* The save badge, which reads the same way as the sync badge beside it and for the same reason:
+   the dot is confirmation and the word is the message. Amber, not red, where a save failed — the
+   sitting is still on screen and nothing has gone. */
+.slp-save-saved {
+  color: #006000;
+}
+
+.slp-save-saving,
+.slp-save-loading,
+.slp-save-idle,
+.slp-save-off {
+  color: var(--retro-dark-gray);
+}
+
+.slp-save-error {
+  color: #8a4b00;
+}
+
 .slp-who {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -848,4 +866,173 @@
   50% {
     opacity: 0.3;
   }
+}
+
+
+/* --- the menu bar, and the window it opens --------------------------------------------- */
+
+/* A 95 menu bar: a raised strip across the top of the sheet, flush with it, with the open
+   project's name pushed to the right-hand end. It is above the title band rather than below,
+   because a menu bar is chrome and the band is the page — the same order a property sheet in an
+   installer uses. */
+.slp-menubar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+}
+
+.slp-menu {
+  position: relative;
+}
+
+.slp-menu-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  background: none;
+  border: none;
+  color: var(--retro-black);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.slp-menu-title:hover,
+.slp-menu-title-open {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+/* The dropdown is absolutely positioned so that opening it does not reflow the sheet under it —
+   a menu that pushes the page down is the one thing a menu must never do. */
+.slp-menu-pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  border: 2px outset var(--retro-white);
+  background: var(--retro-gray);
+  padding: 2px;
+}
+
+.slp-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  background: none;
+  border: none;
+  color: var(--retro-black);
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.slp-menu-item:hover {
+  background: var(--retro-navy);
+  color: var(--retro-white);
+}
+
+.slp-menubar-name {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+  padding-right: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+
+/* The same three elements as the typing trainer's conflict dialog — backdrop, bevelled box, navy
+   title bar — because they are the site's modal and there is no reason for this one to look like
+   a different application. */
+.slp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* above .taskbar (9999) and any maximized .window (9998) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 32, 0.7);
+  overflow-y: auto;
+}
+
+.slp-modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  color: var(--retro-black);
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+}
+
+.slp-modal:focus {
+  outline: none;
+}
+
+.slp-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+/* A white sunken well, the same idiom as the step rail: this is a list to pick from, so it gets
+   a text field's bevel rather than a panel's. Bounded in height because fifty projects is a
+   scroll, and a modal taller than the viewport cannot reach its own Close button. */
+.slp-projects {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+}
+
+.slp-project {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border-bottom: 1px solid #d0d0d0;
+}
+
+.slp-project:last-child {
+  border-bottom: none;
+}
+
+/* The one already open. The chip in the row says so too — the tint is confirmation, not the
+   message, which is the rule the rail and the charts are built on. */
+.slp-project-here {
+  background: #eef0ff;
+}
+
+.slp-project-text {
+  min-width: 0;
+}
+
+.slp-project-name {
+  margin: 0;
+  font-weight: bold;
+}
+
+.slp-project-text .slp-hint {
+  margin: 0;
+}
+
+/* The topic, clipped to one line: it is what actually identifies a project, and a list meant to
+   be scanned down the names cannot have one row three lines tall. */
+.slp-project-topic {
+  margin: 4px 0 0;
+  color: var(--retro-dark-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

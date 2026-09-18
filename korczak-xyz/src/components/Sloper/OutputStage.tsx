@@ -115,10 +115,12 @@ function DriveButton({ video, t }: { video: Blob; t: Translation }) {
 interface OutputStageProps {
   video: Blob;
   onStartOver: () => void;
+  /** Whether this video is in the account. It decides which sentence Start Over asks. */
+  saved: boolean;
   t: Translation;
 }
 
-export default function OutputStage({ video, onStartOver, t }: OutputStageProps) {
+export default function OutputStage({ video, saved, onStartOver, t }: OutputStageProps) {
   const url = useMemo(() => URL.createObjectURL(video), [video]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
@@ -152,7 +154,9 @@ export default function OutputStage({ video, onStartOver, t }: OutputStageProps)
           type="button"
           className="retro-btn"
           onClick={() => {
-            if (window.confirm(t.startOverConfirm)) onStartOver();
+            // Signed in this destroys nothing — the project stays in the account and the
+            // Project menu opens it again — so the question asked is a different one.
+            if (window.confirm(saved ? t.startOverConfirmSaved : t.startOverConfirm)) onStartOver();
           }}
         >
           {t.startOver}

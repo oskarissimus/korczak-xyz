@@ -4,6 +4,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, terminate, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 const config = {
   apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY as string | undefined,
@@ -19,6 +20,7 @@ export const firebaseEnabled = Boolean(config.apiKey && config.projectId && conf
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
+let storageInstance: FirebaseStorage | null = null;
 
 if (firebaseEnabled) {
   app = initializeApp({
@@ -31,6 +33,18 @@ if (firebaseEnabled) {
   });
   authInstance = getAuth(app);
   dbInstance = getFirestore(app);
+  /*
+   * Cloud Storage, for the one app that produces files rather than rows: /apps/sloper/ writes its
+   * pictures, narrations and finished MP4 to `korczak-xyz-501720-sloper`. It is built here and not
+   * lazily, because `getStorage` is a synchronous lookup on an app that already exists — the
+   * bundle cost is the `firebase/storage` import, and that is paid by importing the module at all.
+   *
+   * There is deliberately no `recycleStorage` beside `recycleDb`. The failure this file exists to
+   * work around is Firestore's AsyncQueue poisoning itself, which leaves every waiting promise
+   * unsettled for ever. Storage has no such queue: an upload is one HTTPS request, and a request
+   * that fails rejects like any other. Nothing to revive.
+   */
+  storageInstance = config.storageBucket ? getStorage(app) : null;
 }
 
 export const auth = authInstance;
@@ -70,4 +84,15 @@ export function recycleDb(): boolean {
   }
   dbInstance = getFirestore(app);
   return true;
+}
+
+/**
+ * Cloud Storage, or null when Firebase is off or no bucket is configured.
+ *
+ * A getter for symmetry with `getDb()`, not because the instance can die — see the note where it
+ * is created. Callers must handle null: `PUBLIC_FIREBASE_STORAGE_BUCKET` is absent from a fresh
+ * clone's `.env`, and an app that throws there is an app that will not start in development.
+ */
+export function getStorageClient(): FirebaseStorage | null {
+  return storageInstance;
 }

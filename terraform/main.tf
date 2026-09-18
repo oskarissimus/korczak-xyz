@@ -41,6 +41,18 @@ terraform {
        */
       version = "8.0.0"
     }
+
+    /*
+     * The beta provider, pinned to the same exact version and used by exactly one resource:
+     * `google_firebase_storage_bucket` in storage.tf, which registers the sloper bucket with
+     * Firebase and has no GA counterpart. Nothing else in this directory may reach for it —
+     * a beta resource is one whose schema can change under a pinned version's successor, so
+     * the cost of each one is a future upgrade to read carefully.
+     */
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "8.0.0"
+    }
   }
 
   /*

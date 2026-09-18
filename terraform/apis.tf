@@ -27,6 +27,13 @@ locals {
     # Secrets, and the data the app stores.
     "secretmanager.googleapis.com",
     "firestore.googleapis.com",
+    "storage.googleapis.com",
+
+    # Cloud Storage as Firebase sees it. Distinct from `storage.googleapis.com` above: that one
+    # makes buckets exist, this one is what lets a bucket be registered with Firebase and given
+    # `storage.rules`. Without it the apply fails on `google_firebase_storage_bucket`, not on the
+    # bucket itself — which reads as "the bucket is fine, the app still gets a 404".
+    "firebasestorage.googleapis.com",
 
     # Workload Identity Federation, which is how CI authenticates without a key.
     "iamcredentials.googleapis.com",
