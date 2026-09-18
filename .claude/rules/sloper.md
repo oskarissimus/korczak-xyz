@@ -166,8 +166,22 @@ back to what that project used.
 
 ### The bucket, and the two resources behind it
 
-`korczak-xyz-501720-sloper`, in `terraform/storage.tf`. Three things are worth knowing before
+`korczak-xyz-501720-sloper`, in `terraform/storage.tf`. Four things are worth knowing before
 touching it.
+
+- **The `cors` block is what makes reopening work at all, and its absence is invisible from three
+  of the four ways you would check.** A media element needs no CORS, so `<img>` and `<audio>` drew
+  every saved asset correctly; the API answers errors and preflights with
+  `Access-Control-Allow-Origin: *` whatever the bucket says, so curling a bad path or an `OPTIONS`
+  comes back permissive. Only the successful `?alt=media` response carries the bucket's own config
+  — and with no block there it carried no ACAO header at all. The two `fetch` calls in the app are
+  exactly the two reads that matter: the eager video fetch on open, and `blobForAsset` gathering
+  assets for the assembler. So a project made in one sitting worked (nothing is fetched — the
+  blobs are still in memory), and the same project reopened would not show its video and could not
+  be assembled, reporting only Safari's `TypeError: Load failed`. **A sitting reopened is the
+  whole feature**, so this is the one setting on the bucket that the saving is worthless without.
+  Its origins are `corsOrigin`'s in `functions/src/sloper/metadata.ts`, one allowlist in two
+  languages, and `metadata.test.ts` reads the HCL and fails on drift.
 
 - **It is not `korczak-xyz-501720.firebasestorage.app`.** That is the name the console's SDK
   snippet prints for a default bucket, and `PUBLIC_FIREBASE_STORAGE_BUCKET` sat pointing at it for

@@ -301,7 +301,31 @@ export async function blobForAsset(asset: Asset): Promise<Blob | null> {
   if (asset.data) return asset.data;
   if (!asset.dataUrl) return null;
 
-  const response = await fetch(asset.dataUrl);
+  /*
+   * A refusal and a failure are different answers and the caller wants them told apart.
+   *
+   * `!response.ok` is the bucket saying no to a request it heard — a deleted object, an expired
+   * token — and null is right, because `startAssembly` skips that scene and carries on. A `fetch`
+   * that *throws* never reached anybody: no network, or the browser refusing to let the page read
+   * a response it did download. Returning null for that reports every scene as missing its
+   * assets, and the assembly step then says there is nothing to assemble — which is a sentence
+   * about the project rather than about the network, and sends the reader to look at the wrong
+   * thing entirely.
+   *
+   * So it is rethrown, and it is rethrown wearing a sentence that says which of this app's two
+   * halves failed. The bare message is worth keeping in front of: a cross-origin read the bucket
+   * has not allowed reaches Safari as `TypeError: Load failed` and nothing else, which is how the
+   * missing `cors` block in terraform/storage.tf (see the comment there) came to present as a
+   * video that would not assemble with no clue anywhere as to why.
+   */
+  let response: Response;
+  try {
+    response = await fetch(asset.dataUrl);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not read a saved ${asset.type} back out of your account (${reason}).`);
+  }
+
   if (!response.ok) return null;
   return response.blob();
 }

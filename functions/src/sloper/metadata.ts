@@ -123,15 +123,26 @@ export function checkCounts(meta: AssemblyMetadata, imageCount: number, audioCou
   }
 }
 
-/** The origins allowed to call this from a browser. */
+/**
+ * The origins allowed to call this from a browser.
+ *
+ * THE SAME LIST IS IN `terraform/storage.tf`, as the sloper bucket's `cors` block, and the two
+ * have to agree. They answer one question in two places: this one decides who may POST a sitting
+ * to the assembler, that one decides who may read the pictures and narrations back out of the
+ * bucket in order to have something to POST. An origin added here and not there can start an
+ * assembly it cannot gather the assets for — which is the shape of the bug that put the CORS
+ * block in that file in the first place, and which reaches the screen as nothing more useful than
+ * Safari's `TypeError: Load failed`. `metadata.test.ts` reads the HCL and fails on drift.
+ */
+export const ALLOWED_ORIGINS = [
+  'https://korczak.xyz',
+  'https://www.korczak.xyz',
+  // `astro dev` and `astro preview`.
+  'http://localhost:4321',
+  'http://localhost:4322',
+];
+
 export function corsOrigin(origin: string | undefined): string | null {
   if (!origin) return null;
-  const allowed = [
-    'https://korczak.xyz',
-    'https://www.korczak.xyz',
-    // `astro dev` and `astro preview`.
-    'http://localhost:4321',
-    'http://localhost:4322',
-  ];
-  return allowed.includes(origin) ? origin : null;
+  return ALLOWED_ORIGINS.includes(origin) ? origin : null;
 }

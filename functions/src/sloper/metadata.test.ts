@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { BadRequestError, checkCounts, corsOrigin, parseMetadata } from './metadata';
+import {
+  ALLOWED_ORIGINS,
+  BadRequestError,
+  checkCounts,
+  corsOrigin,
+  parseMetadata,
+} from './metadata';
 
 const valid = {
   scenes: [
@@ -89,5 +98,36 @@ describe('corsOrigin', () => {
     expect(corsOrigin('http://localhost:4321')).toBe('http://localhost:4321');
     expect(corsOrigin('https://korczak.xyz.evil.test')).toBeNull();
     expect(corsOrigin(undefined)).toBeNull();
+  });
+});
+
+/*
+ * The other copy of that allowlist, in `terraform/storage.tf`.
+ *
+ * This is the repo's usual idiom for one fact in two files — read the other one as text and assert
+ * agreement — and it is here because the two halves fail in opposite directions and neither is
+ * visible from the other. An origin in the bucket's `cors` block and not in `ALLOWED_ORIGINS` can
+ * read every asset it owns and then be refused by the assembler. An origin here and not there can
+ * reach the assembler and arrive with nothing to send, because gathering the assets is itself a
+ * cross-origin `fetch` the bucket has not been told to allow.
+ *
+ * That second one is not hypothetical: it is the bug this block was written for. It cost a
+ * reopened project its video and failed every assembly from one, while a sitting done in a single
+ * visit — where nothing is ever fetched back — went on working, and the only thing on screen was
+ * Safari's `TypeError: Load failed`.
+ */
+describe('the bucket and the assembler agree about origins', () => {
+  it('lists the same origins in terraform/storage.tf', () => {
+    const hcl = readFileSync(
+      join(new URL('.', import.meta.url).pathname, '../../../terraform/storage.tf'),
+      'utf8',
+    );
+
+    const block = /\bcors\s*\{[\s\S]*?\borigin\s*=\s*\[([\s\S]*?)\]/.exec(hcl);
+    expect(block, 'no cors { origin = [...] } block in terraform/storage.tf').not.toBeNull();
+
+    const declared = [...block![1].matchAll(/"([^"]+)"/g)].map(([, origin]) => origin);
+
+    expect([...declared].sort()).toEqual([...ALLOWED_ORIGINS].sort());
   });
 });

@@ -55,6 +55,57 @@ resource "google_storage_bucket" "sloper" {
   public_access_prevention = "enforced"
 
   /*
+   * CORS, AND THE ONE REQUEST SHAPE THAT NEEDS IT.
+   *
+   * `getDownloadURL()` hands back a `firebasestorage.googleapis.com` URL and the app uses it two
+   * ways. An `<img src>` or an `<audio src>` needs nothing from this block — pointing a media
+   * element at a URL is not a cross-origin *read* — which is why the assets screen has always
+   * drawn correctly and why this looked for all the world like a bucket that was working.
+   * `fetch()` is the other way, and it is the one that was broken: reopening a project fetches
+   * the finished MP4 eagerly, and `blobForAsset` fetches a picture or a narration back out of the
+   * bucket when the assembler asks for it. Those are the only two reads there are, and they are
+   * the whole reason a sitting paid for on a laptop can be finished on a phone.
+   *
+   * WHY IT IS SO EASY TO PROVE THE WRONG THING HERE. The Firebase Storage API answers an *error*
+   * — a 403 for an object that is not there, an OPTIONS preflight — with
+   * `Access-Control-Allow-Origin: *` whatever this block says. Only a successful `?alt=media`
+   * response is served with the bucket's own CORS config applied. So curling a bad path comes
+   * back permissive and proves nothing at all: the header is on the response that carries no
+   * bytes. With no config here, the 200 carrying the bytes came back with no ACAO header at all,
+   * the browser refused to let the page read a response it had already downloaded, and Safari
+   * reported the whole thing as `TypeError: Load failed`.
+   *
+   * What that looked like from the app, which is the part worth recognising again: a project
+   * assembled in one sitting worked perfectly, because every blob was still in memory and
+   * `blobForAsset` never fetched anything. Reopen that same project and the video would not load
+   * — it was in the bucket the whole time, saved exactly as intended — and pressing Assemble
+   * failed with "The video could not be assembled. Load failed." The one thing this bucket exists
+   * for was the only thing that could not work.
+   *
+   * THE ORIGINS ARE `corsOrigin`'s, in functions/src/sloper/metadata.ts. That is one allowlist
+   * written twice in two languages with nothing but a test to keep them honest — both answer
+   * "which page may read this account's own bytes", and `metadata.test.ts` reads this file as
+   * text and fails if the two lists drift apart.
+   *
+   * GET AND HEAD ONLY. An upload goes to the API's upload endpoint rather than to the object, and
+   * that endpoint sets `ACAO: *` itself — which is exactly why saving a project worked all along
+   * while reading one back did not. Adding PUT or POST here would widen the bucket for a request
+   * the browser never makes.
+   */
+  cors {
+    origin = [
+      "https://korczak.xyz",
+      "https://www.korczak.xyz",
+      # `astro dev` and `astro preview`.
+      "http://localhost:4321",
+      "http://localhost:4322",
+    ]
+    method          = ["GET", "HEAD"]
+    response_header = ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
+    max_age_seconds = 3600
+  }
+
+  /*
    * NO LIFECYCLE RULE, UNLIKE THE EXPORT BUCKET, AND DELIBERATELY SO. A nightly full export is a
    * copy of something that still exists, so deleting old ones loses nothing. These objects are the
    * only copy there is of a picture somebody paid a provider to draw — an `age = 90` here would
