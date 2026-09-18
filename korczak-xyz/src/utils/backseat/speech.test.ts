@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchElevenLabsVoices, pickVoice, speechTimeoutMs, type DeviceVoice } from './speech';
+import {
+  ELEVENLABS_MAX_SPEED,
+  ELEVENLABS_MIN_SPEED,
+  fetchElevenLabsVoices,
+  pickVoice,
+  speechTimeoutMs,
+  splitSpeed,
+  type DeviceVoice,
+} from './speech';
 
 const voices: DeviceVoice[] = [
   { uri: 'urn:moz-tts:osx:com.apple.speech.synthesis.voice.daniel', name: 'Daniel', lang: 'en-GB' },
@@ -57,6 +65,42 @@ describe('speechTimeoutMs', () => {
   it('stays within bounds a ride can live with', () => {
     expect(speechTimeoutMs('', 1)).toBeGreaterThanOrEqual(4000);
     expect(speechTimeoutMs('x'.repeat(10000), 0.5)).toBeLessThanOrEqual(30000);
+  });
+});
+
+/*
+ * The app's rate slider runs 0.5–2, because that is what a speech synthesiser takes. ElevenLabs
+ * answers 422 to anything outside 0.7–1.2 — and it does so BEFORE generating any audio, so an
+ * out-of-range rate lost the whole remark rather than merely speaking it at the wrong speed. That
+ * is half of why the ElevenLabs voice was silent while the device voice was fine.
+ */
+describe('splitSpeed', () => {
+  it('leaves the audio untouched for a rate they accept', () => {
+    expect(splitSpeed(1)).toEqual({ speed: 1, playbackRate: 1 });
+
+    const slow = splitSpeed(0.8);
+    expect(slow.speed).toBeCloseTo(0.8);
+    expect(slow.playbackRate).toBeCloseTo(1);
+  });
+
+  it('never asks them for a speed outside their range', () => {
+    for (const rate of [0.5, 0.6, 0.7, 1, 1.2, 1.5, 2]) {
+      const { speed } = splitSpeed(rate);
+      expect(speed).toBeGreaterThanOrEqual(ELEVENLABS_MIN_SPEED);
+      expect(speed).toBeLessThanOrEqual(ELEVENLABS_MAX_SPEED);
+    }
+  });
+
+  it('makes up the difference with playbackRate, so the net rate is what was asked for', () => {
+    for (const rate of [0.5, 0.6, 1.5, 2]) {
+      const { speed, playbackRate } = splitSpeed(rate);
+      expect(speed * playbackRate).toBeCloseTo(rate);
+    }
+  });
+
+  it('falls back to 1 for a rate that is not a number', () => {
+    expect(splitSpeed(Number.NaN)).toEqual({ speed: 1, playbackRate: 1 });
+    expect(splitSpeed(undefined as unknown as number)).toEqual({ speed: 1, playbackRate: 1 });
   });
 });
 

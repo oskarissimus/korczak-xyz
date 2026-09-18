@@ -41,7 +41,7 @@ import {
   type CameraFailure,
 } from '../utils/backseat/frame';
 import { isRepeat, recentTexts, sanitizeRemark, systemPrompt, USER_PROMPT } from '../utils/backseat/remarks';
-import { cancelSpeech, primeSpeech, speak } from '../utils/backseat/speech';
+import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
 import type { BackseatConfig, Remark, RideStatus } from '../utils/backseat/types';
 import { askForRemark, VisionError } from '../utils/backseat/vision';
 import { createWakeLock } from '../utils/wakeLock';
@@ -268,13 +268,19 @@ export function useBackseatRide(config: BackseatConfig, lang: string): RideApi {
           signal: speechController.signal,
         });
       } catch (e) {
-        // The remark exists and is on the screen; only the voice failed. Worth marking on the
-        // line itself rather than in a banner, because the next one may well speak fine.
+        /*
+         * The remark exists and is on the screen; only the voice failed. It is marked on the line
+         * AND raised in the banner, which is a deliberate change of mind: the first version marked
+         * only the line, on the grounds that the next remark may well speak fine — and the result
+         * was an app that went quiet with the explanation in a chip at the bottom of a log nobody
+         * reads while driving. A passenger that has stopped talking is exactly when somebody needs
+         * to be told why.
+         */
+        const message = e instanceof Error ? e.message : 'Speech failed';
         log.warn('backseat.speak.failed', describeError(e));
+        setError(message);
         historyRef.current = historyRef.current.map((r) =>
-          r.id === remark.id
-            ? { ...r, error: e instanceof Error ? e.message : 'Speech failed' }
-            : r,
+          r.id === remark.id ? { ...r, error: message } : r,
         );
         setRemarks([...historyRef.current].reverse());
       } finally {
@@ -330,11 +336,13 @@ export function useBackseatRide(config: BackseatConfig, lang: string): RideApi {
     }
 
     /*
-     * The unlocking utterance, spoken here and nowhere else: this function is called straight from
-     * the Start button's click handler, which is the only place iOS accepts one. Move it into the
-     * async body below and the ride goes silent on every iPhone, with nothing in any log.
+     * Both engines woken here and nowhere else: this function is called straight from the Start
+     * button's click handler, which is the only place iOS accepts either. Move it into the async
+     * body below — or behind any `await` at all — and the ride goes silent on every iPhone with
+     * nothing in any log. The clip half of it is why an ElevenLabs voice plays at all; see the
+     * note at the top of `speech.ts`.
      */
-    primeSpeech();
+    primeVoices();
 
     setStatus('starting');
     const startId = startIdRef.current + 1;

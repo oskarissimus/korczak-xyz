@@ -140,7 +140,7 @@ export default function Backseat({ lang }: BackseatProps) {
             /* Handed the hook's own callback, with nothing awaited in between: the speech engine
                is unlocked by an utterance spoken inside a real user gesture, and one `await`
                before that point loses the gesture on iOS — the app is then silent for the whole
-               ride with nothing in any log. See `primeSpeech`. */
+               ride with nothing in any log. See `primeVoices`. */
             onStart={ride.start}
             t={t}
             lang={lang}

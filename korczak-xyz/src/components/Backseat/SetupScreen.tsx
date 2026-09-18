@@ -24,7 +24,14 @@ import {
   canStart,
   missingKeys,
 } from '../../utils/backseat/defaults';
-import { fetchElevenLabsVoices, speak, watchVoices, type DeviceVoice, type ElevenLabsVoice } from '../../utils/backseat/speech';
+import {
+  fetchElevenLabsVoices,
+  primeVoices,
+  speak,
+  watchVoices,
+  type DeviceVoice,
+  type ElevenLabsVoice,
+} from '../../utils/backseat/speech';
 import type {
   BackseatConfig,
   CameraFacing,
@@ -180,6 +187,9 @@ export default function SetupScreen({
   const [testError, setTestError] = useState<string | null>(null);
   const testVoice = () => {
     setTestError(null);
+    // Before anything is awaited, for the reason in `speech.ts`: this click is a gesture and the
+    // clip element has to be woken inside it or iOS refuses every clip that follows.
+    primeVoices();
     void speak(configRef.current, {
       text: t.voiceTestLine,
       lang: lang === 'pl' ? 'pl-PL' : 'en-GB',

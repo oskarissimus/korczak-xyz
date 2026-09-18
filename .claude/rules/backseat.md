@@ -123,16 +123,41 @@ Four things about `speechSynthesis` are not optional and all four are iOS:
   `voiceschanged` — but Chrome has it ready on a second load and never fires the event at all, so
   `watchVoices` both reads and subscribes. Either half alone is an empty dropdown on some browser.
 - **It has to be unlocked by a gesture.** The first utterance must be spoken inside a real user
-  event or iOS silently ignores it and every one after it. `primeSpeech` is called from `start`,
+  event or iOS silently ignores it and every one after it. `primeVoices` is called from `start`,
   which is handed **straight** to the button — one `await` before that point loses the gesture and
   the app is silent for the whole ride with nothing in any log. The Test button on the setup sheet
-  does the same job incidentally.
+  does the same job.
 - **`onend` does not always fire.** A cancelled or interrupted utterance can leave the promise
   pending for ever, and a ride whose speaker never reports finishing stops speaking. Every
   utterance is raced against `speechTimeoutMs`.
 - **A saved `voiceURI` outlives the voice it names.** Voices come and go with OS updates and
   language packs; unresolved, the synthesiser picks something in the wrong language and reads Polish
   in English phonetics. `pickVoice` falls back by language.
+
+**ElevenLabs has two of its own, and between them they shipped as one symptom: the device voice
+worked and the ElevenLabs voice was silent.**
+
+- **The unlock is per element, and the element has to exist when the gesture happens.** iOS blesses
+  the element a gesture touched, not the page — so `new Audio(url)` built after `await fetch(...)`,
+  several seconds and a network round trip after the click, is a brand-new element nobody has
+  tapped and every clip is refused. There is now exactly one `clipPlayer` for the life of the tab;
+  `primeVoices` starts a 15ms silent WAV on it inside the Start handler, and every clip after that
+  is the same element with a new `src`. It has to be a real decodable clip and it must not be
+  muted: iOS counts a muted play as a muted play and grants nothing for audible playback after it.
+  The consequence of one shared element is that its handlers must be cleared after every clip, and
+  that the clip needs its own `speechTimeoutMs` race — anything replacing the `src` mid-clip drops
+  it without firing `ended` or `error`, and a round awaiting that promise never schedules the next.
+- **Their speed range is narrower than ours.** The slider is 0.5–2 because that is what a
+  synthesiser takes; ElevenLabs accepts 0.7–1.2 and answers **422 before generating any audio**, so
+  an out-of-range rate lost the whole remark rather than merely speaking it at the wrong speed.
+  `splitSpeed` clamps their half and puts the remainder in `playbackRate`, which multiplies back to
+  the rate that was asked for.
+
+**A remark that was written but not spoken is raised in the banner, not just chipped on its log
+line.** That is a deliberate reversal: the first version marked only the line, reasoning that the
+next remark might speak fine — and the result was an app that went quiet with its explanation in a
+chip at the bottom of a list nobody reads while driving. A passenger that has stopped talking is
+exactly when somebody needs to be told why.
 
 The screen is held awake for the whole ride (`createWakeLock`), which is what makes the suspended
 stream above rarer rather than constant.
