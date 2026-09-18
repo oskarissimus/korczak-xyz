@@ -270,137 +270,141 @@ export default function Sloper({ lang }: SloperProps) {
     : t.saveOff;
 
   return (
-    <div className="slp-app">
-      <StepRail stage={run.stage} reachable={reachable} onGo={run.goTo} t={t} />
+    // The menu bar spans the window, above the rail and the sheet both, because it belongs to the
+    // page's title bar rather than to either column — see the note at the top of `ProjectMenu`.
+    <div className="slp-shell">
+      <ProjectMenu
+        enabled={project.enabled}
+        openId={project.id}
+        openName={project.name}
+        list={project.list}
+        onOpen={project.open}
+        t={t}
+        lang={lang}
+      />
 
-      <div className="slp-main">
-        <ProjectMenu
-          enabled={project.enabled}
-          openId={project.id}
-          openName={project.name}
-          list={project.list}
-          onOpen={project.open}
-          t={t}
-          lang={lang}
-        />
+      <div className="slp-app">
+        <StepRail stage={run.stage} reachable={reachable} onGo={run.goTo} t={t} />
 
-        <header className="slp-head">
-          <h2 className="slp-head-title">{t[STAGE_TITLES[run.stage]]}</h2>
-          <p className="slp-head-count">
-            {fill(t.stepCounter, {
-              n: STAGES.indexOf(run.stage) + 1,
-              total: STAGES.length,
-            })}
-          </p>
-        </header>
+        <div className="slp-main">
+          <header className="slp-head">
+            <h2 className="slp-head-title">{t[STAGE_TITLES[run.stage]]}</h2>
+            <p className="slp-head-count">
+              {fill(t.stepCounter, {
+                n: STAGES.indexOf(run.stage) + 1,
+                total: STAGES.length,
+              })}
+            </p>
+          </header>
 
-        {!auth.user && auth.enabled && (
-          <aside className="slp-signin">
-            <h2 className="slp-subhead">{t.signedOutTitle}</h2>
-            <p>{t.signedOutBody}</p>
-            <a className="retro-btn" href={loginPath(lang)}>
-              {t.signedOutLink}
-            </a>
-          </aside>
-        )}
+          {!auth.user && auth.enabled && (
+            <aside className="slp-signin">
+              <h2 className="slp-subhead">{t.signedOutTitle}</h2>
+              <p>{t.signedOutBody}</p>
+              <a className="retro-btn" href={loginPath(lang)}>
+                {t.signedOutLink}
+              </a>
+            </aside>
+          )}
 
-        {/* A `?p=` that names nothing this account can see. Worth a sentence rather than a silent
-            redirect: the usual cause is a link opened while signed into the wrong account, and
-            "starting a fresh one" is the difference between that and "your project is gone". */}
-        {project.missing && <p className="slp-note">{t.projectMissing}</p>}
+          {/* A `?p=` that names nothing this account can see. Worth a sentence rather than a silent
+              redirect: the usual cause is a link opened while signed into the wrong account, and
+              "starting a fresh one" is the difference between that and "your project is gone". */}
+          {project.missing && <p className="slp-note">{t.projectMissing}</p>}
 
-        {run.restoring && <p className="slp-note">{t.restoringVideo}</p>}
+          {run.restoring && <p className="slp-note">{t.restoringVideo}</p>}
 
-        {/* One place for everything that went wrong, so no stage has to grow its own banner. The
-            assembly stage draws its own failure instead, because there the error IS the screen. */}
-        {run.error && run.stage !== 'assembly' && (
-          <div className="slp-banner">
-            <p className="slp-error">{run.error}</p>
-            <button type="button" className="slp-banner-close" onClick={run.dismissError}>
-              {t.errorDismiss}
-            </button>
+          {/* One place for everything that went wrong, so no stage has to grow its own banner. The
+              assembly stage draws its own failure instead, because there the error IS the screen. */}
+          {run.error && run.stage !== 'assembly' && (
+            <div className="slp-banner">
+              <p className="slp-error">{run.error}</p>
+              <button type="button" className="slp-banner-close" onClick={run.dismissError}>
+                {t.errorDismiss}
+              </button>
+            </div>
+          )}
+
+          {run.stage === 'config' && (
+            <ConfigStage
+              config={config}
+              update={update}
+              reset={resetConfig}
+              onStart={() => {
+                // Where a project is minted. Not on load — the list is meant to be the videos you
+                // made, not the times you opened the page.
+                project.begin();
+                run.goTo('scenes');
+              }}
+              t={t}
+              lang={lang}
+            />
+          )}
+
+          {run.stage === 'scenes' && (
+            <ScenesStage
+              config={config}
+              prompt={run.prompt}
+              onPromptChange={run.setPrompt}
+              scenes={run.scenes}
+              streaming={run.streaming}
+              tokenUsage={run.tokenUsage}
+              estimatedCost={run.estimatedCost}
+              onGenerate={(prompt) => void run.generateScenes(config, prompt)}
+              onStop={run.stopStreaming}
+              onAdd={run.addScene}
+              onUpdate={run.updateScene}
+              onRemove={run.removeScene}
+              onClear={run.clearScenes}
+              onBack={() => run.goTo('config')}
+              onNext={() => {
+                run.startAssets(config);
+                run.goTo('assets');
+              }}
+              t={t}
+              lang={lang}
+            />
+          )}
+
+          {run.stage === 'assets' && (
+            <AssetsStage
+              scenes={run.scenes}
+              assets={run.assets}
+              assetsFor={run.assetsFor}
+              generating={run.generatingAssets}
+              onRetry={(assetId) => void run.retryAsset(config, assetId)}
+              onBack={() => run.goTo('scenes')}
+              onNext={() => run.goTo('assembly')}
+              t={t}
+            />
+          )}
+
+          {run.stage === 'assembly' && (
+            <AssemblyStage
+              phase={run.assembly}
+              uploadMB={run.uploadMB}
+              error={run.error}
+              onRetry={() => void run.startAssembly(config)}
+              onBack={() => run.goTo('assets')}
+              t={t}
+            />
+          )}
+
+          {run.stage === 'output' && run.video && (
+            <OutputStage video={run.video} saved={project.enabled} onStartOver={run.reset} t={t} />
+          )}
+
+          {/* The status strip sits at the foot of the sheet, where a property sheet's own does, and
+              the sentence that explains an amber badge sits with the badge rather than a screen
+              away from it. */}
+          {sync === 'error' && <p className="slp-note">{t.syncErrorHint}</p>}
+          {project.state === 'error' && <p className="slp-note">{t.saveErrorHint}</p>}
+
+          <div className="slp-statusbar">
+            <span className={`slp-sync slp-sync-${sync}`}>{syncLabel}</span>
+            <span className={`slp-sync slp-save-${project.state}`}>{saveLabel}</span>
+            {auth.user?.email && <span className="slp-who">{auth.user.email}</span>}
           </div>
-        )}
-
-        {run.stage === 'config' && (
-          <ConfigStage
-            config={config}
-            update={update}
-            reset={resetConfig}
-            onStart={() => {
-              // Where a project is minted. Not on load — the list is meant to be the videos you
-              // made, not the times you opened the page.
-              project.begin();
-              run.goTo('scenes');
-            }}
-            t={t}
-            lang={lang}
-          />
-        )}
-
-        {run.stage === 'scenes' && (
-          <ScenesStage
-            config={config}
-            prompt={run.prompt}
-            onPromptChange={run.setPrompt}
-            scenes={run.scenes}
-            streaming={run.streaming}
-            tokenUsage={run.tokenUsage}
-            estimatedCost={run.estimatedCost}
-            onGenerate={(prompt) => void run.generateScenes(config, prompt)}
-            onStop={run.stopStreaming}
-            onAdd={run.addScene}
-            onUpdate={run.updateScene}
-            onRemove={run.removeScene}
-            onClear={run.clearScenes}
-            onBack={() => run.goTo('config')}
-            onNext={() => {
-              run.startAssets(config);
-              run.goTo('assets');
-            }}
-            t={t}
-            lang={lang}
-          />
-        )}
-
-        {run.stage === 'assets' && (
-          <AssetsStage
-            scenes={run.scenes}
-            assets={run.assets}
-            assetsFor={run.assetsFor}
-            generating={run.generatingAssets}
-            onRetry={(assetId) => void run.retryAsset(config, assetId)}
-            onBack={() => run.goTo('scenes')}
-            onNext={() => run.goTo('assembly')}
-            t={t}
-          />
-        )}
-
-        {run.stage === 'assembly' && (
-          <AssemblyStage
-            phase={run.assembly}
-            uploadMB={run.uploadMB}
-            error={run.error}
-            onRetry={() => void run.startAssembly(config)}
-            onBack={() => run.goTo('assets')}
-            t={t}
-          />
-        )}
-
-        {run.stage === 'output' && run.video && (
-          <OutputStage video={run.video} saved={project.enabled} onStartOver={run.reset} t={t} />
-        )}
-
-        {/* The status strip sits at the foot of the sheet, where a property sheet's own does, and
-            the sentence that explains an amber badge sits with the badge rather than a screen
-            away from it. */}
-        {sync === 'error' && <p className="slp-note">{t.syncErrorHint}</p>}
-        {project.state === 'error' && <p className="slp-note">{t.saveErrorHint}</p>}
-
-        <div className="slp-statusbar">
-          <span className={`slp-sync slp-sync-${sync}`}>{syncLabel}</span>
-          <span className={`slp-sync slp-save-${project.state}`}>{saveLabel}</span>
-          {auth.user?.email && <span className="slp-who">{auth.user.email}</span>}
         </div>
       </div>
     </div>

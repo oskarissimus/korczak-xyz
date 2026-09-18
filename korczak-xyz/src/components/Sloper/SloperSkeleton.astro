@@ -23,33 +23,41 @@ const t = translations[lang];
 const steps = [t.stepConfig, t.stepScenes, t.stepAssets, t.stepAssembly, t.stepOutput];
 ---
 
-<div class="slp-app" aria-hidden="true">
-  <nav class="slp-rail">
-    <ol>
-      {steps.map((label, i) => (
-        <li class={i === 0 ? 'slp-step slp-step-here' : 'slp-step'}>
-          <span class="slp-step-mark">{i === 0 ? '▶' : i + 1}</span>
-          <span class="slp-step-label">{label}</span>
-        </li>
-      ))}
-    </ol>
-  </nav>
+<div class="slp-shell" aria-hidden="true">
+  {/* The menu bar is drawn here too, dead: it is the first thing under the window's title bar and
+      it is ~26px of its height, so leaving it out would drop everything below it on hydration. */}
+  <div class="slp-menubar">
+    <div class="slp-menu"><span class="slp-menu-title">{t.menuFile}</span></div>
+  </div>
 
-  <div class="slp-main">
-    <header class="slp-head">
-      <h2 class="slp-head-title">{t.configTitle}</h2>
-      <p class="slp-head-count">{fill(t.stepCounter, { n: 1, total: steps.length })}</p>
-    </header>
+  <div class="slp-app">
+    <nav class="slp-rail">
+      <ol>
+        {steps.map((label, i) => (
+          <li class={i === 0 ? 'slp-step slp-step-here' : 'slp-step'}>
+            <span class="slp-step-mark">{i === 0 ? '▶' : i + 1}</span>
+            <span class="slp-step-label">{label}</span>
+          </li>
+        ))}
+      </ol>
+    </nav>
 
-    <fieldset class="slp-group">
-      <legend class="slp-legend">{t.keysTitle}</legend>
-      <p class="slp-hint">{t.keysBlurb}</p>
-    </fieldset>
+    <div class="slp-main">
+      <header class="slp-head">
+        <h2 class="slp-head-title">{t.configTitle}</h2>
+        <p class="slp-head-count">{fill(t.stepCounter, { n: 1, total: steps.length })}</p>
+      </header>
 
-    <div class="slp-loading"></div>
+      <fieldset class="slp-group">
+        <legend class="slp-legend">{t.keysTitle}</legend>
+        <p class="slp-hint">{t.keysBlurb}</p>
+      </fieldset>
 
-    <div class="slp-statusbar">
-      <span class="slp-sync slp-sync-syncing">{t.syncSyncing}</span>
+      <div class="slp-loading"></div>
+
+      <div class="slp-statusbar">
+        <span class="slp-sync slp-sync-syncing">{t.syncSyncing}</span>
+      </div>
     </div>
   </div>
 </div>

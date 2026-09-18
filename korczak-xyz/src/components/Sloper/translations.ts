@@ -118,11 +118,13 @@ export const translations = {
     costFreePlan: 'Inside the free allowance.',
     costEstimateOnly: 'An estimate over the target length, not a bill.',
 
-    // The project menu, and the window it opens. `menuOpen` keeps its ellipsis: a menu item that
-    // opens a dialog rather than doing the thing is spelt with one, and this app is 95 all the
-    // way down.
-    menuProject: 'Project',
-    menuOpen: 'Open…',
+    // The menu bar, and the window it opens. The menu is File rather than Project because a 95
+    // menu bar's first item is File wherever there is one, and a reader looking for Open looks
+    // there before reading the bar; the item says which noun it opens, since a bar with one menu
+    // cannot leave that to the menu's own name. It keeps its ellipsis: a menu item that opens a
+    // dialog rather than doing the thing is spelt with one, and this app is 95 all the way down.
+    menuFile: 'File',
+    menuOpen: 'Open project…',
     openTitle: 'Open a project',
     openLoading: 'Fetching your projects…',
     openEmpty: 'Nothing saved yet. Start a video and it will be here when you come back.',
@@ -231,7 +233,7 @@ export const translations = {
        for it to stay, which is the sentence this app has always shown. */
     startOverConfirm: 'Start again? This throws away the script, the pictures and the video.',
     startOverConfirmSaved:
-      'Start another video? This one stays in your account — the Project menu opens it again.',
+      'Start another video? This one stays in your account — the File menu opens it again.',
 
     // Errors
     errorDismiss: 'Dismiss',
@@ -405,10 +407,10 @@ export const translations = {
     startOver: 'Nowe wideo',
     startOverConfirm: 'Zacząć od nowa? Scenariusz, obrazy i wideo przepadną.',
     startOverConfirmSaved:
-      'Zacząć kolejne wideo? To zostaje na koncie — menu Projekt otworzy je ponownie.',
+      'Zacząć kolejne wideo? To zostaje na koncie — menu Plik otworzy je ponownie.',
 
-    menuProject: 'Projekt',
-    menuOpen: 'Otwórz…',
+    menuFile: 'Plik',
+    menuOpen: 'Otwórz projekt…',
     openTitle: 'Otwórz projekt',
     openLoading: 'Pobieram twoje projekty…',
     openEmpty: 'Nic jeszcze nie zapisano. Zacznij wideo, a będzie tu, gdy wrócisz.',

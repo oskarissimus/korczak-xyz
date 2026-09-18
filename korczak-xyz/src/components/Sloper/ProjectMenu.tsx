@@ -3,10 +3,18 @@
  *
  * A menu is the right shape here for the same reason the rail is: this app is a 95-era property
  * sheet, and the thing a property sheet keeps above its tabs is a menu bar. It has exactly one
- * item — Project ▸ Open… — and that is not a placeholder to be apologised for. Everything else a
- * project menu usually carries either exists already under a better name (Start Over is New) or
- * is a decision nobody has made yet (Rename, Delete, Duplicate). One item that works beats four
- * that half do.
+ * item — File ▸ Open project… — and that is not a placeholder to be apologised for. Everything
+ * else a File menu usually carries either exists already under a better name (Start Over is New)
+ * or is a decision nobody has made yet (Rename, Delete, Duplicate). One item that works beats
+ * four that half do.
+ *
+ * WHERE IT SITS. Flush under the page's own title bar, edge to edge across the client area, which
+ * is the only place a menu bar has ever been: `Sloper` renders it above `.slp-app` rather than
+ * inside `.slp-main`, so it spans the rail as well as the sheet. It used to sit inside that
+ * column, starting where the sheet started — which read as a control belonging to the sheet
+ * rather than as the window's own menu, and left the strip between the title bar and it empty.
+ * The window's padding therefore lives on `.slp-app`, not on `.sloper-content`: a menu bar with
+ * a gutter around it is a toolbar.
  *
  * WHY A WINDOW AND NOT A PANEL ON THE PAGE. The list is a different sitting from the one on
  * screen, and opening one throws away nothing but does replace everything. A modal is what says
@@ -86,7 +94,7 @@ export default function ProjectMenu({
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          {t.menuProject}
+          {t.menuFile}
         </button>
 
         {menuOpen && (

@@ -27,10 +27,21 @@
 .sloper-content {
   background: var(--retro-gray);
   color: var(--retro-black);
-  padding: 16px;
+  /* No padding here, deliberately: the menu bar is the first thing inside the window and a menu
+     bar runs into the frame on all three sides — one with a gutter around it is a toolbar. The
+     16px moved down to `.slp-app`, which is everything under the bar. */
+  padding: 0;
+}
+
+/* Menu bar, then the wizard. The shell exists only to stack those two; the grid below it is the
+   rail and the sheet, and the bar is above both because it belongs to the window. */
+.slp-shell {
+  display: flex;
+  flex-direction: column;
 }
 
 .slp-app {
+  padding: 16px;
   display: grid;
   /* `minmax(0, 1fr)` and not `1fr`: a grid track's default minimum is its content, so one long
      unbroken provider error — and they are long — would push the sheet wider than the window
@@ -166,6 +177,7 @@
 @media (max-width: 700px) {
   .slp-app {
     grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
   }
 
   .slp-rail {
@@ -875,14 +887,24 @@
    project's name pushed to the right-hand end. It is above the title band rather than below,
    because a menu bar is chrome and the band is the page — the same order a property sheet in an
    installer uses. */
+/* Flush under the page's own title bar and edge to edge across it, which is where every menu bar
+   in this idiom has ever been. It used to be a raised box floating in the sheet's column, two
+   bevels deep inside a window that already has one; a menu bar is not a box, it is a strip of the
+   frame, so what is left of the chrome is the one carved line along the bottom — a dark pixel
+   with a white one under it, the same groove the status strip is drawn with, and the thing that
+   separates the bar from the client area below it. */
 .slp-menubar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 2px 4px;
-  border: 2px outset var(--retro-white);
   background: var(--retro-gray);
+  border-bottom: 1px solid var(--retro-dark-gray);
+  box-shadow: 0 1px 0 var(--retro-white);
+  /* Above the sheet, so the white half of that groove is not painted over by what follows it. */
+  position: relative;
+  z-index: 1;
 }
 
 .slp-menu {

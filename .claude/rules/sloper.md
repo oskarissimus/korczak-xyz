@@ -138,11 +138,18 @@ only button on the site that threw away an hour of paid-for work; it now drops t
 address bar and leaves the project in the account, and the confirm text says so (signed out it asks
 the old question, because signed out the old answer is still true).
 
-**The menu has one item and that is not a placeholder.** Project ▸ Open… , and a modal listing
+**The menu has one item and that is not a placeholder.** File ▸ Open project… , and a modal listing
 name, date, stage, scene count and the topic. Rename, Delete and Duplicate are decisions nobody has
 made; the two-word name is generated at mint time rather than taken from the topic, because the
 project is minted *before* a topic is typed and a name that changes under somebody after they have
 learnt it is worse than one that never meant anything.
+
+**The bar is the window's, not the sheet's.** It runs flush under the page's own title bar, across the
+rail as well as the sheet, which is why `Sloper` renders it above `.slp-app` and why the 16px of window
+padding lives on `.slp-app` rather than on `.sloper-content` — a menu bar with a gutter around it is a
+toolbar. The menu is **File**, not Project: a 95 menu bar's first menu is File wherever there is one, and
+the item carries the noun instead (`Open project…`) because a bar with a single menu cannot leave it to the
+menu's own name. `SloperSkeleton` draws the strip dead, so hydration does not drop the page by its height.
 
 **No API key ever goes in a project document.** `settings` is a `SloperConfig` with `apiKeys`
 stripped by `projectSettings`, and that is the same rule the section below is built on: the keys
