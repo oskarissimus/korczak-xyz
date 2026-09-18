@@ -14,12 +14,22 @@
  * `users/{uid}/keys/…` — is the better shape and is a migration of a working app's live data; see
  * `.claude/rules/backseat.md` for where that stands.
  *
- * WHAT MAKES IT SAFE TO DO ONCE. There is no flag and no marker, because there is already a fact
- * that means the same thing: whether this browser has ever written `backseat-config`. Nothing is
- * borrowed over a config that exists, and every edit — including clearing a key, and including
- * Clear everything, which writes the defaults back — creates one. So a key deliberately cleared
- * here is never resurrected from sloper's copy on the next load, which is the same rule the
- * account sync is built on and the one bug worth going out of the way to avoid.
+ * WHAT MAKES IT SAFE TO DO ONCE. `settled` — one boolean, stored beside `updatedAt` in both
+ * localStorage and the account document, meaning **somebody has decided what the keys here are**.
+ * Every edit sets it, including clearing a key and including Clear everything. Nothing is ever
+ * borrowed into a settled config, so a key deliberately cleared here is never resurrected from
+ * sloper's copy on the next load — the same rule the account sync is built on, and the one bug
+ * worth going out of the way to avoid.
+ *
+ * It was originally the absence of a `backseat-config` in localStorage, on the grounds that the
+ * absence meant the same thing and cost nothing to store. **That was wrong for the account half
+ * and shipped broken.** `useBackseatConfig` pushes a config up the first time somebody opens the
+ * app signed in, keys or no keys, so within minutes of the app going live there were accounts
+ * holding an empty document with a recent `updatedAt` — which then beat the borrow for ever,
+ * because the borrow only ran when there was no document at all. A fact that exists as a
+ * side-effect of a sync cannot carry a meaning the sync does not know about; the flag has to be
+ * written on purpose. Configs predating the flag have no `settled`, which reads as false, so they
+ * borrow once and are then settled — which is exactly the repair those accounts need.
  *
  * DEEPSEEK IS DROPPED ON THE WAY THROUGH. sloper keeps four keys; this app has no use for the
  * fourth, DeepSeek having no model that can look at a photograph.
@@ -69,6 +79,18 @@ export function anyKey(keys: ApiKeys): boolean {
 /** Whether this config is still holding none of its own. Nothing is ever borrowed over a key. */
 export function hasNoKeys(config: BackseatConfig): boolean {
   return !anyKey(config.apiKeys);
+}
+
+/**
+ * The whole decision, in one place so that both halves of the borrow ask the same question and so
+ * that it can be tested without a browser or a React renderer.
+ *
+ * Two conditions and they are not the same one: keys already here mean there is nothing to borrow
+ * into, and `settled` means there is nothing to borrow into *on purpose*. The second is the only
+ * thing standing between a deliberately cleared key and its own resurrection.
+ */
+export function shouldBorrow(config: BackseatConfig, settled: boolean): boolean {
+  return !settled && hasNoKeys(config);
 }
 
 /**

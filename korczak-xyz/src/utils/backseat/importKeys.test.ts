@@ -7,6 +7,7 @@ import {
   configWithBorrowedKeys,
   hasNoKeys,
   keysFromSloper,
+  shouldBorrow,
   sloperKeysInBrowser,
 } from './importKeys';
 import { loadConfig } from './storage';
@@ -149,31 +150,94 @@ describe('sloperKeysInBrowser', () => {
 });
 
 /*
- * The borrow has no flag and no marker. The absence of a `backseat-config` IS the marker, and
- * every edit — including clearing a key, and including Clear everything, which writes the defaults
- * back — creates one. These two tests are the whole safety argument.
+ * `settled` is the whole safety argument: it means somebody has DECIDED what the keys here are,
+ * and nothing is ever borrowed into a settled config.
+ *
+ * It replaced "does a `backseat-config` exist", which was the same idea inferred from a
+ * side-effect — and which shipped broken, because the sync writes a config up the first time
+ * anybody opens the app signed in. An empty document with a recent timestamp then beat the borrow
+ * for ever. A fact that exists as a side-effect of a sync cannot carry a meaning the sync does not
+ * know about.
  */
-describe('loadConfig and the one-shot borrow', () => {
+describe('shouldBorrow', () => {
+  const keyless = DEFAULT_CONFIG;
+  const keyed = { ...DEFAULT_CONFIG, apiKeys: { ...DEFAULT_CONFIG.apiKeys, openai: 'sk' } };
+
+  it('borrows into a config nobody has decided and that holds no keys', () => {
+    expect(shouldBorrow(keyless, false)).toBe(true);
+  });
+
+  /* The key was cleared on purpose. Borrowing here is the resurrection bug. */
+  it('never borrows into a settled config, however empty', () => {
+    expect(shouldBorrow(keyless, true)).toBe(false);
+  });
+
+  it('never borrows over a key that is already there', () => {
+    expect(shouldBorrow(keyed, false)).toBe(false);
+    expect(shouldBorrow(keyed, true)).toBe(false);
+  });
+});
+
+describe('loadConfig and the borrow', () => {
   it('borrows when this browser has never saved a config, stamped 0 so the account wins', () => {
     withBrowser({ 'sloper-config': JSON.stringify({ apiKeys: { openai: 'sk-a' } }) });
 
     const loaded = loadConfig();
     expect(loaded.config.apiKeys.openai).toBe('sk-a');
     expect(loaded.borrowed).toBe(true);
+    expect(loaded.settled).toBe(false);
     // `updatedAt: 0` is what stops a borrow this morning overwriting a key typed here last week.
     expect(loaded.updatedAt).toBe(0);
   });
 
-  it('never borrows over a config this app has saved, however empty it is', () => {
+  /*
+   * The regression. This is the exact shape a browser is left in by pulling down the empty
+   * document the sync created on a first signed-in visit: a saved config, a real timestamp, no
+   * keys and nobody having decided anything. It has to still be a first visit to the borrow.
+   */
+  it('borrows into a saved config that nobody has decided, such as a pulled empty one', () => {
+    withBrowser({
+      'backseat-config': JSON.stringify({
+        apiKeys: { openai: null },
+        updatedAt: 1789757457694,
+      }),
+      'sloper-config': JSON.stringify({ apiKeys: { openai: 'sk-a' } }),
+    });
+
+    const loaded = loadConfig();
+    expect(loaded.config.apiKeys.openai).toBe('sk-a');
+    expect(loaded.borrowed).toBe(true);
+    expect(loaded.updatedAt).toBe(0);
+  });
+
+  it('never borrows into a settled config, however empty', () => {
     // The shape left behind by clearing a key deliberately. Borrowing here would resurrect it.
     withBrowser({
-      'backseat-config': JSON.stringify({ apiKeys: { openai: null }, updatedAt: 1730000000000 }),
+      'backseat-config': JSON.stringify({
+        apiKeys: { openai: null },
+        updatedAt: 1730000000000,
+        settled: true,
+      }),
       'sloper-config': JSON.stringify({ apiKeys: { openai: 'sk-a' } }),
     });
 
     const loaded = loadConfig();
     expect(loaded.config.apiKeys.openai).toBeNull();
     expect(loaded.borrowed).toBe(false);
+    expect(loaded.settled).toBe(true);
     expect(loaded.updatedAt).toBe(1730000000000);
+  });
+
+  it('leaves a settled config with keys exactly as it found it', () => {
+    withBrowser({
+      'backseat-config': JSON.stringify({
+        apiKeys: { openai: 'sk-mine' },
+        updatedAt: 1730000000000,
+        settled: true,
+      }),
+      'sloper-config': JSON.stringify({ apiKeys: { openai: 'sk-theirs' } }),
+    });
+
+    expect(loadConfig().config.apiKeys.openai).toBe('sk-mine');
   });
 });

@@ -23,7 +23,13 @@
 import { isQuotaError } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { normalizeConfig } from './defaults';
-import { borrowFromBrowser } from './importKeys';
+import {
+  anyKey,
+  borrowFromBrowser,
+  configWithBorrowedKeys,
+  shouldBorrow,
+  sloperKeysInBrowser,
+} from './importKeys';
 import type { BackseatConfig } from './types';
 
 export const CONFIG_KEY = 'backseat-config';
@@ -37,6 +43,12 @@ export interface StampedConfig {
    * here. The setup sheet says so under the key; nothing else behaves differently.
    */
   borrowed: boolean;
+  /**
+   * Somebody has decided what the keys here are — by typing one, by clearing one, or by pressing
+   * Clear everything. It is what stops a cleared key being borrowed straight back, and it is
+   * written on purpose rather than inferred from a document existing. See `importKeys.ts`.
+   */
+  settled: boolean;
 }
 
 /**
@@ -47,41 +59,59 @@ export interface StampedConfig {
  * keys this morning cannot overwrite the ones somebody typed here last week. It still pushes up
  * when the account has no copy at all, which is the case the borrow exists for.
  *
- * It happens only when there is no `backseat-config` at all, and that absence is the only marker
- * the import has — see `importKeys.ts` for why that is enough, and why a key cleared here is
- * therefore never resurrected from sloper's.
+ * It happens only while nothing here is `settled` — see `importKeys.ts` for what that means and
+ * why a key cleared here is therefore never borrowed straight back.
  */
 export function loadConfig(): StampedConfig {
   if (typeof window === 'undefined') {
-    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false };
+    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false, settled: false };
   }
 
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) {
       const { config, borrowed } = borrowFromBrowser();
-      return { config, updatedAt: 0, borrowed };
+      return { config, updatedAt: 0, borrowed, settled: false };
     }
 
     const parsed = JSON.parse(raw);
+    const config = normalizeConfig(parsed);
+    const settled = parsed?.settled === true;
+
+    // A config this browser holds but nobody has decided — the shape left behind by pulling an
+    // empty account document. It is still a first visit as far as the borrow is concerned.
+    if (shouldBorrow(config, settled)) {
+      const keys = sloperKeysInBrowser();
+      if (anyKey(keys)) {
+        return {
+          config: configWithBorrowedKeys(config, keys),
+          // Stamped 0 like any other borrow, so the account still wins. See above.
+          updatedAt: 0,
+          borrowed: true,
+          settled: false,
+        };
+      }
+    }
+
     return {
-      config: normalizeConfig(parsed),
+      config,
       updatedAt: typeof parsed?.updatedAt === 'number' ? parsed.updatedAt : 0,
       borrowed: false,
+      settled,
     };
   } catch (e) {
     // A corrupt value is worth one line: it is the difference between "my key vanished" and "my
     // key vanished and nobody can say why".
     log.warn('backseat.config.load.failed', describeError(e));
-    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false };
+    return { config: normalizeConfig(null), updatedAt: 0, borrowed: false, settled: false };
   }
 }
 
-export function saveConfig(config: BackseatConfig, updatedAt: number): void {
+export function saveConfig(config: BackseatConfig, updatedAt: number, settled: boolean): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...config, updatedAt }));
+    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...config, updatedAt, settled }));
   } catch (e) {
     // Nothing to evict — this app owns one key and it is already the smallest it can be. The
     // report is the point: a silent failure here is what makes a key "not stick" after a reload.

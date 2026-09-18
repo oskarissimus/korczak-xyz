@@ -56,8 +56,14 @@ export async function pullConfig(uid: string): Promise<StampedConfig | null> {
   return {
     config: normalizeConfig(data),
     updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
-    // Never borrowed: whatever is in the account, somebody typed it into this app somewhere.
+    // Never borrowed: a borrow is something this browser did, not something the account records.
     borrowed: false,
+    /*
+     * Absent on every document written before the flag existed — which includes the empty ones the
+     * sync itself created on somebody's first signed-in visit. Those read as unsettled and are
+     * therefore borrowed into once, which is precisely the repair they need.
+     */
+    settled: data.settled === true,
   };
 }
 
@@ -65,9 +71,12 @@ export async function pushConfig(
   uid: string,
   config: BackseatConfig,
   updatedAt: number,
+  settled: boolean,
 ): Promise<void> {
   if (!getDb()) return;
-  await runCloud('backseat.config.push', () => setDoc(configDoc(uid), { ...config, updatedAt }));
+  await runCloud('backseat.config.push', () =>
+    setDoc(configDoc(uid), { ...config, updatedAt, settled }),
+  );
 }
 
 /**

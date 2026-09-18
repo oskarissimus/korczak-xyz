@@ -178,20 +178,37 @@ twice. The better shape is one store both apps read — `users/{uid}/keys/…` �
 here because it is a migration of a working app's live keys rather than a new file; if this is ever
 revisited, that is the direction, and sloper's own "one home per account" argument is the reason.
 
-**The borrow happens once and there is no flag, because there is already a fact that means the
-same thing:** whether this browser has ever written `backseat-config`. Nothing is borrowed over a
-config that exists, and every edit creates one — including clearing a key, and including Clear
-everything, which writes the defaults straight back. So **a key deliberately cleared here is never
-resurrected from sloper's copy on the next load**, which is the same rule the account sync is built
-on and the one bug worth going out of the way to avoid. `importKeys.test.ts` pins both directions.
+**What makes it safe to do once is `settled`** — one boolean, stored beside `updatedAt` in both
+localStorage and the account document, meaning *somebody has decided what the keys here are*. Every
+edit sets it, including clearing a key and including Clear everything. Nothing is ever borrowed
+into a settled config, so **a key deliberately cleared here is never resurrected from sloper's copy
+on the next load** — the same rule the account sync is built on, and the one bug worth going out of
+the way to avoid. `shouldBorrow` is the whole decision in one function so that both halves ask the
+same question; `importKeys.test.ts` pins every direction of it.
 
-Two smaller things that are load-bearing:
+**That flag replaced a cleverer rule that shipped broken, and the lesson is worth more than the
+flag.** The marker used to be the *absence* of a `backseat-config` — no storage, same meaning, one
+less field. Except that `useBackseatConfig` pushes a config up the first time anybody opens the app
+signed in, keys or no keys, so within five minutes of the app going live there were accounts
+holding an empty document with a recent `updatedAt`. That document then beat the borrow for ever,
+because the borrow ran only in the `!remote` branch — the state was "document exists", so nothing
+was ever borrowed, and the app looked exactly as it had before the import was written. **A fact
+that exists as a side-effect of a sync cannot carry a meaning the sync does not know about.**
+
+Two things fell out of that repair and both are load-bearing:
+
+- **The account-side borrow runs after the three sync branches, not inside one.** It asks what the
+  state is — keyless and unsettled? — rather than which branch the control flow happened to take.
+  That is what makes it cover both a fresh phone (nothing local, wizard keys in the account) and
+  the empty documents already out there.
+- **Configs written before the flag have no `settled`, which reads as false.** So they borrow once
+  and are then settled, which is exactly the repair those accounts need and requires no migration.
 
 - **The browser-side borrow is stamped `updatedAt: 0`.** It means "never edited", so it loses to
   any copy the account has: a device borrowing sloper's keys this morning cannot overwrite the ones
   somebody typed here last week. It still pushes up when the account has no copy at all, which is
-  the case it exists for. The account-side borrow is stamped `Date.now()` instead, because at that
-  point it *is* the account's only copy.
+  the case it exists for. The account-side borrow is stamped `Date.now()` instead, because it has
+  been through the account and is the copy of record from there on.
 - **A Google-only borrow moves the provider too.** The default provider is OpenAI, so filling in a
   Google key alone would leave Start dead with the key it needs sitting right there unasked for.
   `DEFAULT_GOOGLE_MODEL` goes with it, and the model list corrects it if that guess is wrong.
