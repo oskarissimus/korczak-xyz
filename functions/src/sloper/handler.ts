@@ -1,6 +1,14 @@
 /*
  * The HTTPS half of `assembleVideo`: auth, CORS, multipart, temp files, cleanup.
  *
+ * TWO REQUEST SHAPES, ONE ENDPOINT. A multipart body is the original conversation — the browser
+ * sends the pictures and the narrations, waits through the encode on a streamed heartbeat, and
+ * catches the MP4 on the way back. A JSON body naming a project is the background mode: the
+ * assets are already in the account, the job is already written down there, and this call is the
+ * poke that gets it done (`job.ts`). The second is what the page uses whenever there is an account
+ * to save to, because it is the one that survives the tab being closed; the first is what is left
+ * when there is nowhere to have saved the assets in the first place.
+ *
  * ONE TOKEN CHECK, DONE BY HAND. This is `onRequest`, not `onCall`, because the payload is tens
  * of megabytes of binary and `onCall` is JSON — base64 would put a third on top of a body that is
  * already at the platform's ceiling. `onCall`'s free `request.auth` goes with it, so the bearer
@@ -47,10 +55,22 @@ import type { Response } from 'express';
 import type { Request } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 
+import { AssemblyJobError } from '../../../korczak-xyz/src/utils/sloper/job';
 import { assemble } from './ffmpeg';
+import { runAssemblyJob } from './job';
 import { BadRequestError, checkCounts, corsOrigin, parseMetadata } from './metadata';
 
 export const MAX_BYTES = 32 * 1024 * 1024;
+
+/**
+ * What a project id may look like, as a doc id and as a path segment.
+ *
+ * `projectId.ts` in the browser mints eleven characters of base64URL and this could insist on
+ * exactly that — it deliberately does not, because the only thing the shape has to buy here is
+ * that the string cannot climb out of a Firestore collection or a bucket folder. Anything that
+ * survives this is still checked against the account's own folder before a byte is read.
+ */
+const PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 interface UploadedFile {
   field: 'images' | 'audio';
@@ -289,6 +309,35 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
   try {
     const uid = await verifyCaller(req);
 
+    /*
+     * THE BACKGROUND MODE, AND WHY IT IS A SECOND SHAPE ON THE SAME ENDPOINT.
+     *
+     * A JSON body naming a project means "the job is already written down in the account; go and
+     * do it". Nothing else is sent, nothing is expected back, and the caller may hang up the
+     * instant after asking — which is the whole point, and is what lets somebody press Assemble
+     * and close the browser.
+     *
+     * It is this function rather than a new one for a reason worth knowing before splitting it:
+     * `assemblevideo` already carries the public invoker binding in terraform/functions.tf, and a
+     * new function would be a new binding on a service that does not exist yet — the two-pass
+     * landing that file describes. A second request shape needs neither. The preflight is already
+     * answered and `Content-Type` is already in `Access-Control-Allow-Headers`, so nothing about
+     * CORS moves either.
+     *
+     * It is checked before the multipart parse because busboy would otherwise be handed a JSON
+     * body and fail with a sentence about a form.
+     */
+    if ((req.headers['content-type'] || '').includes('application/json')) {
+      const projectId = String((req.body as { projectId?: unknown })?.projectId ?? '');
+      if (!PROJECT_ID.test(projectId)) {
+        throw new BadRequestError('No project was named for the assembler to work on.');
+      }
+
+      const outcome = await runAssemblyJob(uid, projectId, started);
+      res.status(200).json({ ok: true, ...outcome });
+      return;
+    }
+
     const form = await parseMultipart(req);
     const meta = parseMetadata(form.metadata);
 
@@ -404,7 +453,9 @@ function respondWithError(res: Response, error: unknown, elapsedMs: number): voi
     res.status(401).json({ error: 'UNAUTHENTICATED', message: error.message });
     return;
   }
-  if (error instanceof BadRequestError) {
+  // `AssemblyJobError` is the job document refusing to be read — a malformed scene list, a
+  // duration that is not a number. It is the same class of answer as a bad metadata field.
+  if (error instanceof BadRequestError || error instanceof AssemblyJobError) {
     res.status(400).json({ error: 'INVALID_REQUEST', message: error.message });
     return;
   }

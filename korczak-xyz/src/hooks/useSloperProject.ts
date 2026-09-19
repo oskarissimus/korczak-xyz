@@ -34,14 +34,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
 import { getStorageClient } from '../lib/firebase';
+import { startAssemblyJob } from '../utils/sloper/assemble';
+import {
+  assetObjectPath,
+  buildAssemblyJob,
+  videoObjectPath,
+  type AssemblyJob,
+  type AssemblyJobScene,
+} from '../utils/sloper/job';
 import { newProjectId, newProjectName, PROJECT_PARAM, isProjectId } from '../utils/sloper/projectId';
 import {
-  assetPath,
+  deleteJob,
   listProjects,
+  loadJob,
   loadProject,
   putBlob,
+  saveJob,
   saveProject,
-  videoPath,
 } from '../utils/sloper/projects';
 import type {
   AssetType,
@@ -94,6 +103,24 @@ export interface SloperProjectApi {
   putAsset: (assetId: string, type: AssetType, blob: Blob) => Promise<{ path: string; url: string } | null>;
   putVideo: (blob: Blob, duration: number) => Promise<StoredVideo | null>;
   list: () => Promise<ProjectSummary[]>;
+
+  /*
+   * The assembly, once it stopped being something this page has to sit through.
+   *
+   * `queueAssembly` writes the job down and pokes the assembler; `readAssembly` is how the wizard
+   * finds out how it is going, on a timer while the page is open and once more whenever a project
+   * is opened; `nudgeAssembly` is the poke on its own, for a job found queued or abandoned on a
+   * reopening. `dropAssembly` is the undo — it is what the fallback to the in-page assembler uses
+   * so that a job nobody is going to run cannot be picked up tomorrow and encode a second copy.
+   */
+  queueAssembly: (
+    scenes: AssemblyJobScene[],
+    resolution: { width: number; height: number },
+    frameRate: number,
+  ) => Promise<AssemblyJob>;
+  readAssembly: () => Promise<AssemblyJob | null>;
+  nudgeAssembly: () => void;
+  dropAssembly: () => Promise<void>;
 }
 
 /** The id in the address bar right now, if it is one of ours. */
@@ -321,7 +348,7 @@ export function useSloperProject(user: AuthUser | null): SloperProjectApi {
     if (!owner || !projectId) return null;
 
     try {
-      return await putBlob(assetPath(owner, projectId, assetId, type), blob);
+      return await putBlob(assetObjectPath(owner, projectId, assetId, type), blob);
     } catch (e) {
       log.warn('sloper.asset.upload.failed', { ...describeError(e), type });
       return null;
@@ -334,7 +361,7 @@ export function useSloperProject(user: AuthUser | null): SloperProjectApi {
     if (!owner || !projectId) return null;
 
     try {
-      const saved = await putBlob(videoPath(owner, projectId), blob);
+      const saved = await putBlob(videoObjectPath(owner, projectId), blob);
       if (!saved) return null;
       return { ...saved, bytes: blob.size, duration };
     } catch (e) {
@@ -347,6 +374,70 @@ export function useSloperProject(user: AuthUser | null): SloperProjectApi {
     const owner = uidRef.current;
     if (!owner) return [];
     return listProjects(owner);
+  }, []);
+
+  /* --- the assembly ----------------------------------------------------------------------- */
+
+  /**
+   * Poke the assembler about the open project.
+   *
+   * Deliberately not awaited and deliberately not surfaced. The request settles when the encode
+   * finishes — minutes — so awaiting it here would be exactly the wait this whole feature exists
+   * to remove; and a rejection means the poke did not land, which the job document says better,
+   * from anywhere, at any later time. Whether the assembly actually started is read off that
+   * document and nothing else.
+   */
+  const poke = useCallback((projectId: string) => {
+    void startAssemblyJob(projectId).catch((e) => {
+      log.warn('sloper.job.poke.failed', describeError(e));
+    });
+  }, []);
+
+  const queueAssembly = useCallback(
+    async (
+      scenes: AssemblyJobScene[],
+      resolution: { width: number; height: number },
+      frameRate: number,
+    ) => {
+      const owner = uidRef.current;
+      const projectId = idRef.current;
+      if (!owner || !projectId) throw new Error('There is no open project to assemble.');
+
+      /*
+       * The pending write goes first, and it is not tidiness. The assembler is about to put a
+       * video beside this document, and everything else on the sitting — the scene list the video
+       * was built from, where the wizard had got to — is sitting in a 1.2-second debounce. A page
+       * closed a moment after pressing Assemble would otherwise come back to a finished video
+       * beside a project one edit out of date.
+       */
+      if (timerRef.current) clearTimeout(timerRef.current);
+      await flush();
+
+      const job = buildAssemblyJob({ projectId, scenes, resolution, frameRate, now: Date.now() });
+      await saveJob(owner, job);
+      poke(projectId);
+      return job;
+    },
+    [flush, poke],
+  );
+
+  const readAssembly = useCallback(async () => {
+    const owner = uidRef.current;
+    const projectId = idRef.current;
+    if (!owner || !projectId) return null;
+    return loadJob(owner, projectId);
+  }, []);
+
+  const nudgeAssembly = useCallback(() => {
+    const projectId = idRef.current;
+    if (projectId) poke(projectId);
+  }, [poke]);
+
+  const dropAssembly = useCallback(async () => {
+    const owner = uidRef.current;
+    const projectId = idRef.current;
+    if (!owner || !projectId) return;
+    await deleteJob(owner, projectId);
   }, []);
 
   return {
@@ -365,5 +456,9 @@ export function useSloperProject(user: AuthUser | null): SloperProjectApi {
     putAsset,
     putVideo,
     list,
+    queueAssembly,
+    readAssembly,
+    nudgeAssembly,
+    dropAssembly,
   };
 }

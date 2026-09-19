@@ -210,8 +210,12 @@ export const translations = {
     assemblyTitle: 'Assembling',
     assemblyPreparing: 'Getting the files together…',
     assemblyUploading: 'Sending {mb} MB to the assembler…',
+    assemblyQueued: 'Handed to the assembler. Waiting for it to start…',
     assemblyEncoding: 'The assembler has the files and is encoding…',
-    assemblyWait: 'FFmpeg is encoding. A dozen scenes takes a few minutes.',
+    assemblyWait: 'FFmpeg is encoding. A dozen scenes takes a few minutes. Keep this page open.',
+    // The whole point of the background route, said where somebody is about to sit and watch it.
+    assemblyLeaveOk:
+      'This is happening on the server, not in this page. You can close it — the video will be waiting in this project when you come back.',
     assemblyElapsed: 'Elapsed: {time}',
     assemblyFailed: 'The video could not be assembled.',
     assemblyRetry: 'Try again',
@@ -389,8 +393,11 @@ export const translations = {
     assemblyTitle: 'Składanie',
     assemblyPreparing: 'Zbieram pliki…',
     assemblyUploading: 'Wysyłam {mb} MB do składarki…',
+    assemblyQueued: 'Zlecone składarce. Czekam, aż zacznie…',
     assemblyEncoding: 'Składarka ma pliki i koduje…',
-    assemblyWait: 'FFmpeg koduje. Kilkanaście scen to kilka minut.',
+    assemblyWait: 'FFmpeg koduje. Kilkanaście scen to kilka minut. Nie zamykaj tej strony.',
+    assemblyLeaveOk:
+      'To dzieje się na serwerze, nie na tej stronie. Możesz ją zamknąć — wideo będzie czekać w tym projekcie.',
     assemblyElapsed: 'Upłynęło: {time}',
     assemblyFailed: 'Nie udało się złożyć wideo.',
     assemblyRetry: 'Spróbuj ponownie',

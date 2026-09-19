@@ -6,9 +6,9 @@
 # Separate from node.js.yml because it is path-filtered: the site deploys on every push from that
 # workflow, but redeploying Cloud Functions on a commit that only touched a song chart would take
 # three minutes and change nothing. The paths below are exactly what can affect the backend —
-# note that `korczak-xyz/src/utils/{events,transit}/**` are in the list, because
-# functions/tsconfig.json compiles both directories into the deploy bundle rather than keeping a
-# copy of either.
+# note that `korczak-xyz/src/utils/{events,transit}/**` and `utils/sloper/job.ts` are in the
+# list, because functions/tsconfig.json compiles those into the deploy bundle rather than keeping
+# a copy of any of them.
 #
 # Auth is Workload Identity Federation, so there is no long-lived service account key in GitHub.
 # The security boundary is the provider's attribute-condition, which pins it to this repository —
@@ -31,6 +31,11 @@ on:
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
       - "korczak-xyz/src/utils/transit/**"
+      # One file rather than the directory, because only one file of `utils/sloper/` compiles into
+      # the functions bundle: `job.ts`, the assembly job that the browser writes and the assembler
+      # reads. The rest of that directory talks to the DOM and to providers and could not compile
+      # there at all — see the note at the top of it.
+      - "korczak-xyz/src/utils/sloper/job.ts"
       - "terraform/**"
       - ".github/workflows/firebase-deploy.yml"
   # So rules can be pushed out without waiting for a code change to ride along.
@@ -150,7 +155,8 @@ jobs:
 
       # Deliberately before the deploy, not in a separate workflow: nothing should be able to
       # reach the collector that has not typechecked and passed its tests. The build also
-      # typechecks the site's src/utils/events and src/utils/transit, which this bundle compiles in.
+      # typechecks the site's src/utils/{events,transit} and its sloper/job.ts, which this bundle
+      # compiles in.
       - name: Build
         run: npm run build
         working-directory: functions

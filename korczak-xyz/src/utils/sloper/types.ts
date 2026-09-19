@@ -14,6 +14,8 @@
  *    difference — see `projects.ts` for where the bytes actually live.
  */
 
+import type { JobVideo } from './job';
+
 export type LlmProvider = 'openai' | 'deepseek';
 export type ImageProvider = 'openai' | 'google';
 export type ImageQuality = 'low' | 'medium' | 'high';
@@ -130,12 +132,14 @@ export interface StoredAsset {
   error: string | null;
 }
 
-export interface StoredVideo {
-  path: string;
-  url: string;
-  bytes: number;
-  duration: number;
-}
+/**
+ * Where the finished MP4 ended up.
+ *
+ * It is `JobVideo` and not a second declaration of the same four fields, because the assembler
+ * writes this shape too now — a background assembly puts the video in the bucket itself and names
+ * it in the job document, and `job.ts` is the one file both runtimes compile.
+ */
+export type StoredVideo = JobVideo;
 
 export interface SloperProject {
   id: string;

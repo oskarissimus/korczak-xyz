@@ -3,13 +3,20 @@
 The scheduled collector and the web-push sender for `/apps/events/`.
 
 Since Sep 2026 there is a third, unrelated thing in here: **`assembleVideo`**, the FFmpeg endpoint
-for `/apps/sloper/`. It shares nothing with the collectors but the deploy — it holds no secrets,
-reads no Firestore, and runs on request rather than on a schedule — and it is here rather than in
-a container of its own precisely because this pipeline already reaches this directory. Everything
-about it is in `src/sloper/` and in `.claude/rules/sloper.md`; the one thing worth knowing from
-out here is that its public invoker binding lives in `terraform/functions.tf`, and that a new HTTP
-function is a two-pass landing (function first, binding second) for the reason set out in
-`terraform/README.md`.
+for `/apps/sloper/`. It shares nothing with the collectors but the deploy — it holds no secrets and
+runs on request rather than on a schedule — and it is here rather than in a container of its own
+precisely because this pipeline already reaches this directory. Everything about it is in
+`src/sloper/` and in `.claude/rules/sloper.md`; the one thing worth knowing from out here is that
+its public invoker binding lives in `terraform/functions.tf`, and that a new HTTP function is a
+two-pass landing (function first, binding second) for the reason set out in `terraform/README.md`.
+
+It does reach Firestore and Cloud Storage, which it did not when it was written. A request may now
+be a JSON body naming a project instead of a multipart upload, and what that means is *the job is
+written down in the account; go and do it* — the function reads the pictures and narrations out of
+`korczak-xyz-501720-sloper` itself, writes the finished MP4 back into it, and records the outcome
+on `users/{uid}/sloperJobs/{projectId}`. That is what lets somebody press Assemble and close the
+browser. It needs no new permission: these functions run as the default compute account, which
+already carries `roles/editor`.
 
 ## Why the shared modules come from the site
 

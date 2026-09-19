@@ -83,6 +83,38 @@ export function totalBytes(blobs: Blob[]): number {
   return blobs.reduce((sum, blob) => sum + blob.size, 0);
 }
 
+/**
+ * Ask the assembler to make a video that is already written down in the account.
+ *
+ * THIS IS THE CALL THAT LETS THE BROWSER LEAVE. Nothing is uploaded — the pictures and the
+ * narrations went into the bucket as they were made, and the job document says which of them to
+ * use and for how long — so all that goes up is a project id, and the answer is written back into
+ * the account rather than into this response. A page that closes a second after this is sent still
+ * gets its video: Cloud Run does not abandon a request because the client hung up, and everything
+ * the function needs it reads for itself.
+ *
+ * THE PROMISE IS NOT THE POINT, AND MUST NOT BE AWAITED BEFORE CARRYING ON. It settles when the
+ * encode finishes, which is minutes — the same wait as the multipart path, just with nobody
+ * obliged to sit through it. The caller fires it, ignores it, and watches the job document, which
+ * is the only place either half of this can agree on what happened. What a rejection is still
+ * worth is a fast one: a 401 or a 400 arrives in a second and says the assembler never started,
+ * which is what the wizard falls back on.
+ */
+export async function startAssemblyJob(projectId: string, signal?: AbortSignal): Promise<void> {
+  const user = auth?.currentUser;
+  if (!user) throw new Error('Sign in before assembling — the assembler is not open to the internet.');
+  const token = await getIdToken(user);
+
+  const response = await fetch(assembleUrl(), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({ projectId }),
+  });
+
+  if (!response.ok) throw new Error(await readError(response));
+}
+
 export async function assembleVideo(
   metadata: AssemblyMetadata,
   images: Blob[],

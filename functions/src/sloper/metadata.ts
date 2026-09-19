@@ -11,17 +11,27 @@
  * part of this function testable at all without ffmpeg on the box.
  */
 
+import {
+  MAX_DIMENSION,
+  MAX_SCENE_SECONDS,
+  MAX_SCENES,
+} from '../../../korczak-xyz/src/utils/sloper/job';
+
 export interface AssemblyMetadata {
   scenes: { index: number; imageDuration: number }[];
   resolution: { width: number; height: number };
   frameRate: number;
 }
 
-/** Matches the frontend's own ceiling; beyond this an instance runs out of memory, not time. */
-export const MAX_SCENES = 100;
-export const MAX_DIMENSION = 4096;
-/** A still held for longer than this is a mistake, and it is ten minutes of encoding. */
-export const MAX_SCENE_SECONDS = 600;
+/*
+ * The bounds are `job.ts`'s, not this file's, and they are re-exported rather than restated.
+ *
+ * Both request shapes this function accepts end in the same `ffmpeg` arguments — the multipart
+ * upload validated here, and the job document validated there — so two copies of "how many scenes
+ * is too many" is one copy too many. `job.ts` is the file both runtimes compile, which makes it
+ * the honest home for a number the browser is also expected to respect.
+ */
+export { MAX_DIMENSION, MAX_SCENE_SECONDS, MAX_SCENES };
 
 export class BadRequestError extends Error {
   constructor(message: string) {

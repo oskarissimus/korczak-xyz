@@ -1,10 +1,15 @@
 /*
  * The wait.
  *
- * Nothing on this screen is decorative. A dozen scenes is a 20 MB upload and a few minutes of
- * libx264 on a shared core, and the two facts that make that bearable are which of those two it
- * is doing and how long it has been at it — so the phase and a running clock are the whole
- * screen. Without the clock, three minutes of silence and a hung request look the same.
+ * Nothing on this screen is decorative. A dozen scenes is a few minutes of libx264 on a shared
+ * core, and the two facts that make that bearable are what it is doing and how long it has been
+ * at it — so the phase and a running clock are the whole screen. Without the clock, three minutes
+ * of silence and a hung request look the same.
+ *
+ * SINCE THE ASSEMBLY MOVED INTO THE ACCOUNT this screen is usually not a wait at all, it is a
+ * progress report on work happening elsewhere, and the note at the bottom says which of the two
+ * it is. That is the one sentence on the page somebody acts on: it is the difference between
+ * sitting here for three minutes and closing the laptop.
  */
 
 import { useEffect, useState } from 'react';
@@ -27,18 +32,21 @@ function Elapsed({ t }: { t: Translation }) {
 }
 
 /**
- * Which of the three waits this is. `encoding` is knowable only because the function heartbeats —
- * see `AssemblyPhase` — and it is the longest of the three by a wide margin, so it is the one the
- * line is worth being honest about.
+ * Which of the waits this is. `encoding` is knowable because the assembler says so — a heartbeat
+ * down the response on the in-page route, a heartbeat into the job document on the other — and it
+ * is the longest of them by a wide margin, so it is the one the line is worth being honest about.
  */
 function waitLine(phase: AssemblyPhase, uploadMB: string | null, t: Translation): string {
   if (phase === 'encoding') return t.assemblyEncoding;
+  if (phase === 'queued') return t.assemblyQueued;
   if (phase === 'uploading' && uploadMB) return fill(t.assemblyUploading, { mb: uploadMB });
   return t.assemblyPreparing;
 }
 
 interface AssemblyStageProps {
   phase: AssemblyPhase;
+  /** Whether the encode is the account's rather than this page's. Changes what the note says. */
+  background: boolean;
   uploadMB: string | null;
   error: string | null;
   onRetry: () => void;
@@ -48,6 +56,7 @@ interface AssemblyStageProps {
 
 export default function AssemblyStage({
   phase,
+  background,
   uploadMB,
   error,
   onRetry,
@@ -81,7 +90,9 @@ export default function AssemblyStage({
               <Spinner /> {waitLine(phase, uploadMB, t)}
             </p>
             <Elapsed t={t} />
-            <p className="slp-note">{t.assemblyWait}</p>
+            {/* The two sentences are opposites and only one of them can be true: either this page
+                is the only thing holding the encode up, or it is a spectator that may leave. */}
+            <p className="slp-note">{background ? t.assemblyLeaveOk : t.assemblyWait}</p>
           </>
         )}
       </div>

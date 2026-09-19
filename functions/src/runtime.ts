@@ -40,6 +40,17 @@ export const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'korczak-xyz-50172
 export const VERTEX_LOCATION = 'global';
 
 /**
+ * The bucket `/apps/sloper/` keeps its pictures, narrations and finished videos in.
+ *
+ * Derived from the project id because that is how `terraform/storage.tf` names it
+ * (`"${local.project_id}-sloper"`), and one fewer configured string is one fewer thing to get
+ * wrong. It is emphatically NOT `korczak-xyz-501720.firebasestorage.app`: there is no default
+ * bucket on this project and there cannot be one — see the header of that Terraform file — so
+ * `getStorage().bucket()` with no argument resolves nothing and has to be handed this.
+ */
+export const SLOPER_BUCKET = `${PROJECT_ID}-sloper`;
+
+/**
  * Who the push service should contact about a misbehaving sender.
  *
  * Apple rejects a VAPID `sub` that is not a `mailto:` or `https:` URL, with a 400 that says

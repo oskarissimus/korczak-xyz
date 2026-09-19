@@ -144,7 +144,12 @@ export default function Sloper({ lang }: SloperProps) {
    * everything on this page is in memory and a reload during a generation loses assets that were
    * paid for. Signed in it survives for a narrower reason — the finished ones are already in the
    * bucket, and what leaving still costs is the requests in the air. Same condition either way,
-   * because `run.busy` is exactly "something is in flight"; only the sentence differs.
+   * because `run.busy` is exactly "something this page is holding up"; only the sentence differs.
+   *
+   * WHAT IS NO LONGER IN IT is the assembly, for a signed-in sitting. The encode happens in the
+   * account now and closing the tab does not touch it, so `busy` deliberately excludes it — a
+   * prompt that is not true is worse than no prompt, because it is the one that teaches people to
+   * dismiss the next one unread. See `busy` in `useSloperRun`.
    *
    * Armed only while something is genuinely in flight — a prompt that warns on every navigation
    * is one people learn to dismiss without reading.
@@ -231,6 +236,11 @@ export default function Sloper({ lang }: SloperProps) {
    * the effect therefore runs on every render, and a phase updated by `setState` is still the old
    * value on the render that scheduled it. Without the ref that is two uploads of 20 MB. `reset`
    * and the Retry button clear it by moving off the stage and calling `startAssembly` directly.
+   *
+   * A project reopened onto an assembly that is already running lands on this stage with a phase
+   * of its own, which is what the `idle` test keeps out: the wait screen is then a report on work
+   * happening elsewhere, and starting a second assembly of it is the one thing that must not
+   * happen here.
    */
   const assemblyStartedRef = useRef(false);
   useEffect(() => {
@@ -382,6 +392,7 @@ export default function Sloper({ lang }: SloperProps) {
           {run.stage === 'assembly' && (
             <AssemblyStage
               phase={run.assembly}
+              background={run.assemblyBackground}
               uploadMB={run.uploadMB}
               error={run.error}
               onRetry={() => void run.startAssembly(config)}

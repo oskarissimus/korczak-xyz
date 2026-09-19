@@ -40,6 +40,7 @@
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -52,12 +53,13 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
 import { getDb, getStorageClient } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
+import { describeError, log } from '../../lib/logger';
 import { normalizeConfig } from './defaults';
+import { ASSEMBLY_JOBS, assemblyJobId, readAssemblyJob, type AssemblyJob } from './job';
 import { isProjectId } from './projectId';
 import type {
   Asset,
   AssetStatus,
-  AssetType,
   ProjectSettings,
   ProjectSummary,
   Scene,
@@ -82,21 +84,15 @@ function projectDoc(uid: string, id: string) {
   return doc(getDb()!, 'users', uid, 'sloperProjects', id);
 }
 
-/**
- * Where an asset's bytes go.
+/*
+ * WHERE THE BYTES GO IS IN `job.ts` NOW, as `assetObjectPath` and `videoObjectPath`.
  *
  * `users/{uid}/…` is the first segment for the same reason it is in Firestore: `storage.rules`
- * matches on it, so the path is the authorization. The extension is real rather than decorative —
- * Storage serves the object with a content type derived from the upload, and a browser asked to
- * play an `<audio>` from a URL ending in `.mp3` behaves better than one guessing.
+ * matches on it, so the path is the authorization. What moved it out of this file is that the
+ * assembler writes the finished video to a path of its own construction and reads the pictures
+ * back off paths this browser wrote — two runtimes spelling one folder, which is exactly the kind
+ * of agreement `job.ts` exists to hold.
  */
-export function assetPath(uid: string, projectId: string, assetId: string, type: AssetType): string {
-  return `users/${uid}/sloper/${projectId}/${assetId}.${type === 'image' ? 'jpg' : 'mp3'}`;
-}
-
-export function videoPath(uid: string, projectId: string): string {
-  return `users/${uid}/sloper/${projectId}/video.mp4`;
-}
 
 /* --- writing ------------------------------------------------------------------------------ */
 
@@ -135,6 +131,67 @@ export function projectSettings(config: SloperConfig): ProjectSettings {
 export async function saveProject(uid: string, project: SloperProject): Promise<void> {
   if (!getDb()) return;
   await runCloud('sloper.project.save', () => setDoc(projectDoc(uid, project.id), project));
+}
+
+/* --- the assembly job ----------------------------------------------------------------------- */
+
+/**
+ * The one document in this app that two writers share, and the rules that keep that honest.
+ *
+ * The browser creates it — one per project, id and all, see `assemblyJobId` — and after that it
+ * is the assembler's: `status`, `attempts`, the heartbeat and the finished video are all written
+ * by the Cloud Function. The page only ever reads it back. That is the opposite of the project
+ * document next door, which is the browser's alone and is written whole; the two are kept apart
+ * deliberately, so neither side has to merge anything.
+ */
+function jobDoc(uid: string, projectId: string) {
+  return doc(getDb()!, 'users', uid, ASSEMBLY_JOBS, assemblyJobId(projectId));
+}
+
+/**
+ * Write a job down, which is what asking for a video now means.
+ *
+ * A whole-document `setDoc`, because a second assembly of the same project replaces the first
+ * rather than amending it: a half-overwritten job is a scene list and a status that disagree,
+ * and the assembler acts on both.
+ */
+export async function saveJob(uid: string, job: AssemblyJob): Promise<void> {
+  if (!getDb()) return;
+  await runCloud('sloper.job.save', () => setDoc(jobDoc(uid, job.projectId), job));
+}
+
+/**
+ * How the assembly is going, or how it went.
+ *
+ * A malformed document reads as no job at all rather than as an error: this is polled on a timer
+ * and on every reopening, and there is nothing a reader could do about a document a console edit
+ * has broken except be told about it every four seconds.
+ */
+export async function loadJob(uid: string, projectId: string): Promise<AssemblyJob | null> {
+  if (!getDb()) return null;
+
+  const snap = await runCloud('sloper.job.load', () => getDoc(jobDoc(uid, projectId)));
+  if (!snap.exists()) return null;
+
+  try {
+    return readAssemblyJob(snap.data());
+  } catch (e) {
+    log.warn('sloper.job.unreadable', describeError(e));
+    return null;
+  }
+}
+
+/**
+ * Throw the job away.
+ *
+ * The one caller is the wizard giving up on the background assembler and doing the encode in the
+ * page instead. Leaving a `queued` job behind would be a promise nobody is keeping: the next time
+ * this project is opened the page would offer to poke it, and the assembler would make a second
+ * copy of a video that is already finished.
+ */
+export async function deleteJob(uid: string, projectId: string): Promise<void> {
+  if (!getDb()) return;
+  await runCloud('sloper.job.delete', () => deleteDoc(jobDoc(uid, projectId)));
 }
 
 /* --- reading ------------------------------------------------------------------------------ */

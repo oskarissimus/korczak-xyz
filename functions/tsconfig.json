@@ -16,7 +16,8 @@
   "include": [
     "src/**/*.ts",
     "../korczak-xyz/src/utils/events/*.ts",
-    "../korczak-xyz/src/utils/transit/*.ts"
+    "../korczak-xyz/src/utils/transit/*.ts",
+    "../korczak-xyz/src/utils/sloper/job.ts"
   ],
   "exclude": [
     "../korczak-xyz/src/utils/events/*.test.ts",

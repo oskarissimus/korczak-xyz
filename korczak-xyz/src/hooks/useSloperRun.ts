@@ -45,6 +45,13 @@ import {
   streamLLM,
   targetWords,
 } from '../utils/sloper/llm';
+import {
+  jobIsLive,
+  jobIsStale,
+  jobNeedsStarting,
+  type AssemblyJob,
+  type AssemblyJobScene,
+} from '../utils/sloper/job';
 import { blobForAsset, hydrateAssets } from '../utils/sloper/projects';
 import { createTtsLimiter, generateTtsAudio } from '../utils/sloper/tts';
 import type {
@@ -63,13 +70,37 @@ import type {
 import type { SloperProjectApi } from './useSloperProject';
 
 /**
- * `uploading` is the bytes going up; `encoding` is the function's first heartbeat having arrived,
- * which is the only moment the page can know ffmpeg has the files. Before the answer was streamed
- * there was no such moment, so the screen said "sending 3.3 MB" for the whole minute the encode
- * took — a stalled upload and a working one looked identical, and the one that was working was
- * the one that looked broken.
+ * `uploading` is the bytes going up; `encoding` is ffmpeg having the files. Before the answer was
+ * streamed there was no way to tell those apart, so the screen said "sending 3.3 MB" for the whole
+ * minute the encode took — a stalled upload and a working one looked identical, and the one that
+ * was working was the one that looked broken.
+ *
+ * `queued` belongs to the background route and to nothing else: the job is written down in the
+ * account and the assembler has not picked it up yet. It is a real state rather than a flicker,
+ * because a cold instance is several seconds and because it is the state a project reopened after
+ * a failed poke comes back in.
  */
-export type AssemblyPhase = 'idle' | 'preparing' | 'uploading' | 'encoding' | 'done' | 'error';
+export type AssemblyPhase =
+  | 'idle'
+  | 'preparing'
+  | 'uploading'
+  | 'queued'
+  | 'encoding'
+  | 'done'
+  | 'error';
+
+/** How often the wait screen asks the account how the assembly is going. */
+const JOB_POLL_MS = 4000;
+
+/**
+ * How long a job may sit unclaimed before the page stops believing in it.
+ *
+ * Generous, because it is a cold start of a 2 GiB instance with ffmpeg in it and the cost of being
+ * wrong is encoding the same video twice. What happens at the end of it is the fallback to the
+ * in-page assembler, which is also what a page that shipped minutes before the function does —
+ * an older `assembleVideo` has never heard of a job and answers the poke with a 400.
+ */
+const JOB_START_DEADLINE_MS = 30_000;
 
 export interface SloperRun {
   stage: Stage;
@@ -98,6 +129,16 @@ export interface SloperRun {
   retryAsset: (config: SloperConfig, assetId: string) => Promise<void>;
 
   assembly: AssemblyPhase;
+  /**
+   * Whether the wait on screen is one the page may walk away from.
+   *
+   * True while the assembler is working from the job document in the account — the ordinary case
+   * for a signed-in sitting. False when the encode is this page's own request, which is what a
+   * sitting with nowhere to save its assets falls back to. The wait screen says a different thing
+   * in each case, and so does the unload warning, because leaving costs nothing in one and an
+   * encode in the other.
+   */
+  assemblyBackground: boolean;
   uploadMB: string | null;
   video: Blob | null;
   videoMeta: StoredVideo | null;
@@ -151,6 +192,7 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
   const [generatingAssets, setGeneratingAssets] = useState(false);
 
   const [assembly, setAssembly] = useState<AssemblyPhase>('idle');
+  const [assemblyBackground, setAssemblyBackground] = useState(false);
   const [uploadMB, setUploadMB] = useState<string | null>(null);
   const [video, setVideo] = useState<Blob | null>(null);
   const [videoMeta, setVideoMeta] = useState<StoredVideo | null>(null);
@@ -161,6 +203,34 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
   const abortRef = useRef<AbortController | null>(null);
   const scenesRef = useRef<Scene[]>([]);
   const assetsRef = useRef<Map<string, Asset>>(new Map());
+
+  /** True while the job document is being polled. The effect below is the whole of the watching. */
+  const [watchingJob, setWatchingJob] = useState(false);
+  /*
+   * The same flag, readable synchronously.
+   *
+   * A tick already in flight when the watching stops is the one hazard in the poll: the fallback
+   * deletes the job and starts an encode in this page, and a tick landing a moment later would
+   * find no job at all and send the wizard back to the assets screen on top of it. State is not
+   * visible until the next render; a ref is, so the ref is what a tick checks itself against.
+   */
+  const watchingRef = useRef(false);
+  /** When to stop believing in a job nobody has claimed. See `JOB_START_DEADLINE_MS`. */
+  const startDeadlineRef = useRef(0);
+  /*
+   * The settings the current assembly was asked for with.
+   *
+   * The poll runs on a timer rather than out of a callback, so when it decides to fall back to the
+   * in-page assembler there is no `config` in scope — and taking the live one would assemble at
+   * whatever the settings have since been changed to, which is the same fault opening an old
+   * project used to have.
+   */
+  const assemblyConfigRef = useRef<SloperConfig | null>(null);
+
+  const watchJob = useCallback((on: boolean) => {
+    watchingRef.current = on;
+    setWatchingJob(on);
+  }, []);
 
   useEffect(() => {
     scenesRef.current = scenes;
@@ -197,6 +267,55 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
     });
   }, []);
 
+  /*
+   * The project hook's own callbacks, taken once.
+   *
+   * Every one of these is a `useCallback` with no dependencies over there, so they are stable for
+   * the life of the island where `project` itself is a fresh object on every render. Reaching
+   * through the object would make each of the callbacks below churn with it — which costs nothing
+   * for a click handler and a great deal for the two things here that live in effects: the poll
+   * would restart on every keystroke, and the hydrate effect would re-run on every render.
+   */
+  const {
+    dropAssembly,
+    nudgeAssembly,
+    putAsset,
+    putVideo,
+    queueAssembly,
+    readAssembly,
+  } = project;
+
+  /** A finished video, fetched back out of the account and put on the output stage. */
+  const showSavedVideo = useCallback(
+    async (meta: StoredVideo) => {
+      setVideoMeta(meta);
+      setAssembly('done');
+      setError(null);
+      goTo('output');
+
+      setRestoring(true);
+      try {
+        const response = await fetch(meta.url);
+        if (response.ok) {
+          setVideo(await response.blob());
+          return;
+        }
+        // The row says there is a video and the bucket will not give it back. The output stage
+        // renders nothing without a blob, so staying there would be a blank screen with no way
+        // off it — the assets are all still there, and assembling again is the way out.
+        log.warn('sloper.video.fetch.refused', { status: response.status });
+      } catch (e) {
+        log.warn('sloper.video.fetch.failed', describeError(e));
+      } finally {
+        setRestoring(false);
+      }
+
+      setAssembly('idle');
+      goTo('assets');
+    },
+    [goTo],
+  );
+
   /* --- coming back to one ------------------------------------------------------------------ */
 
   /**
@@ -204,10 +323,16 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
    *
    * Two things are deliberately not restored as written.
    *
-   * The **assembly stage is not resumed into**. A project saved while the video was uploading has
-   * no video, and landing on that stage would re-run the upload — tens of megabytes — before
-   * anybody had asked for it. It lands on the assets screen instead, where the button to assemble
-   * is the next thing on the page.
+   * The **assembly stage is not resumed into by the stored stage**, which used to be the whole
+   * rule and is now half of it. A project saved while the video was going up has no video, and
+   * landing there off the document alone would re-run the upload — tens of megabytes — before
+   * anybody had asked. It lands on the assets screen instead, where the button to assemble is the
+   * next thing on the page.
+   *
+   * What DOES land there is a project whose **job is still running**, and that is the opposite
+   * case rather than an exception to this one: nothing is re-sent, nothing is paid for twice, and
+   * the screen is a progress report on work that has been going on without this page. The stage
+   * is reached from the job document, never from the stored stage — see below.
    *
    * The **video is fetched eagerly**, and only here. It is the finished article and the reason to
    * reopen a project at all; the pictures and narrations are not fetched, because a download URL
@@ -239,36 +364,65 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
       setError(null);
       setVideo(null);
       setVideoMeta(saved.video);
+      watchJob(false);
+      setAssemblyBackground(false);
       setAssembly(saved.video ? 'done' : 'idle');
 
       const landing: Stage =
         saved.video ? 'output' : saved.stage === 'assembly' || saved.stage === 'output' ? 'assets' : saved.stage;
       goTo(landing);
 
-      if (!saved.video) return;
+      if (saved.video) {
+        await showSavedVideo(saved.video);
+        return;
+      }
 
-      setRestoring(true);
-      try {
-        const response = await fetch(saved.video.url);
-        if (response.ok) {
-          setVideo(await response.blob());
-        } else {
-          // The row says there is a video and the bucket will not give it back. The output stage
-          // renders nothing without a blob, so staying there would be a blank screen with no way
-          // off it — the assets are all still there, and assembling again is the way out.
-          log.warn('sloper.video.fetch.refused', { status: response.status });
-          setAssembly('idle');
-          goTo('assets');
-        }
-      } catch (e) {
-        log.warn('sloper.video.fetch.failed', describeError(e));
-        setAssembly('idle');
-        goTo('assets');
-      } finally {
-        setRestoring(false);
+      /*
+       * NO VIDEO IN THE DOCUMENT IS NOT THE SAME AS NO VIDEO. An assembly started before this page
+       * existed may have finished since, may still be running, or may have died holding the claim
+       * — and all three are things this account knows and this document does not. So the job is
+       * read once on the way in, and it is the answer for all of them.
+       *
+       * A finished job whose video never reached the project document is the ordinary case rather
+       * than a repair: the assembler writes the video into both, and a browser autosave that was
+       * in flight at that moment overwrites the project's copy with the null it was holding. The
+       * job's copy is the one that cannot be raced, so it is the one read here — and adopting it
+       * makes this page's next save put it back where the Open window looks for it.
+       */
+      const job = await readAssembly().catch((e) => {
+        log.warn('sloper.job.load.failed', describeError(e));
+        return null;
+      });
+      if (!job) return;
+
+      const now = Date.now();
+
+      if (job.status === 'done' && job.video) {
+        await showSavedVideo(job.video);
+        return;
+      }
+
+      if (jobIsLive(job, now)) {
+        setAssemblyBackground(true);
+        setAssembly(job.status === 'running' ? 'encoding' : 'queued');
+        startDeadlineRef.current = now + JOB_START_DEADLINE_MS;
+        // A job still sitting at `queued` means the poke never landed — the page that asked for
+        // it was closed before the request went out, or the assembler was busy refusing it. This
+        // is the recovery, and it is the only one there is: no queue, no sweeper, just the page
+        // that has come back to look asking again.
+        if (jobNeedsStarting(job, now)) nudgeAssembly();
+        watchJob(true);
+        goTo('assembly');
+        return;
+      }
+
+      if (job.status === 'error' || jobIsStale(job, now)) {
+        // Said on the assets screen rather than on the wait screen: what is wanted here is the
+        // Assemble button with a sentence above it, not a spinner for an encode that is over.
+        setError(job.error || 'The assembler did not finish this video. Try again.');
       }
     },
-    [goTo, notSavedMessage],
+    [goTo, notSavedMessage, nudgeAssembly, readAssembly, showSavedVideo, watchJob],
   );
 
   // `useSloperProject` fetches, this consumes — once, which is what `takeOpened` marks.
@@ -439,10 +593,10 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
    */
   const keep = useCallback(
     async (assetId: string, type: AssetType, blob: Blob) => {
-      const saved = await project.putAsset(assetId, type, blob);
+      const saved = await putAsset(assetId, type, blob);
       if (saved) patchAsset(assetId, { path: saved.path, remoteUrl: saved.url });
     },
-    [patchAsset, project],
+    [patchAsset, putAsset],
   );
 
   /** One image request for one scene, including the canvas pass its result has to survive. */
@@ -643,82 +797,321 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
 
   /* --- the video --------------------------------------------------------------------------- */
 
-  const startAssembly = useCallback(
+  /**
+   * How long this scene's still is held.
+   *
+   * The narration's own length, never a setting. The timing from ElevenLabs is the better number
+   * where there is one; ten seconds is the last resort, and it is only ever reached when a decode
+   * failed too.
+   */
+  const holdFor = useCallback(
+    (audio: Asset) => timings.get(audio.id)?.totalDuration || audio.duration || 10,
+    [timings],
+  );
+
+  /** The scenes with both halves finished, in the order the assembler pairs them by. */
+  const readyScenes = useCallback((): { image: Asset; audio: Asset }[] => {
+    const ready: { image: Asset; audio: Asset }[] = [];
+    // Scene order is the contract with the assembler; the Map's iteration order is not.
+    for (const scene of scenesRef.current) {
+      const found = assetsFor(scene.id);
+      if (found.image?.status !== 'complete' || found.audio?.status !== 'complete') continue;
+      ready.push({ image: found.image, audio: found.audio });
+    }
+    return ready;
+  }, [assetsFor]);
+
+  /**
+   * Make sure an asset's bytes are in the bucket, and say where.
+   *
+   * Usually a no-op: everything is uploaded the moment it exists. What this is for is the asset
+   * whose upload failed at the time — the run carried on with it in memory, which was the right
+   * call then and is exactly what stops a background assembly now, because the assembler reads
+   * the bucket and nothing else. So it is offered one more chance here, where there is a reason
+   * to insist.
+   */
+  const ensureSaved = useCallback(
+    async (asset: Asset): Promise<string | null> => {
+      if (asset.path) return asset.path;
+      if (!asset.data) return null;
+
+      const saved = await putAsset(asset.id, asset.type, asset.data);
+      if (!saved) return null;
+      patchAsset(asset.id, { path: saved.path, remoteUrl: saved.url });
+      return saved.path;
+    },
+    [patchAsset, putAsset],
+  );
+
+  /**
+   * The old way, and still the right one when there is nowhere to have saved the assets.
+   *
+   * Everything goes up in one request and the MP4 comes back down in the answer, which means the
+   * page has to be here for the whole of it. That is the trade signed out, and it is also the
+   * fallback when the background route cannot be taken — a picture that never reached the bucket,
+   * or an assembler that has not been deployed yet.
+   */
+  const assembleHere = useCallback(
     async (config: SloperConfig) => {
       const signal = abortRef.current?.signal;
+      setAssemblyBackground(false);
+      setAssembly('preparing');
+      setUploadMB(null);
+
+      const images: Blob[] = [];
+      const audioFiles: Blob[] = [];
+      const sceneMeta: { index: number; imageDuration: number }[] = [];
+
+      for (const { image, audio } of readyScenes()) {
+        // In a live run this is the blob already in hand. On a project reopened from the account
+        // it is a fetch out of the bucket — which is precisely what lets a sitting be finished on
+        // a different machine from the one that paid for it.
+        const [imageBlob, audioBlob] = await Promise.all([
+          blobForAsset(image),
+          blobForAsset(audio),
+        ]);
+        if (!imageBlob || !audioBlob) continue;
+
+        images.push(imageBlob);
+        audioFiles.push(audioBlob);
+        sceneMeta.push({ index: sceneMeta.length, imageDuration: holdFor(audio) });
+      }
+
+      if (sceneMeta.length === 0) {
+        throw new Error('No scene has both an image and a narration, so there is nothing to assemble.');
+      }
+
+      const bytes = [...images, ...audioFiles].reduce((sum, b) => sum + b.size, 0);
+      setUploadMB((bytes / 1024 / 1024).toFixed(1));
+      setAssembly('uploading');
+
+      const result = await assembleVideo(
+        {
+          scenes: sceneMeta,
+          resolution: config.video.resolution,
+          frameRate: config.video.frameRate,
+        },
+        images,
+        audioFiles,
+        signal,
+        () => setAssembly('encoding'),
+      );
+
+      setVideo(result.video);
+      setAssembly('done');
+      goTo('output');
+
+      // After the stage has moved, never before: the video is on screen and playable while this
+      // is still going up, and a bucket that refuses it costs the saved copy rather than the
+      // thing somebody just waited two minutes for.
+      const saved = await putVideo(result.video, result.duration);
+      if (saved) setVideoMeta(saved);
+    },
+    [goTo, holdFor, putVideo, readyScenes],
+  );
+
+  /**
+   * Give up on the assembler and do it here after all.
+   *
+   * The job is deleted first and that ordering is the whole of the safety: a `queued` job left
+   * behind is a promise somebody else might keep, and the next opening of this project would poke
+   * it into encoding a second copy of a video that is already finished.
+   */
+  const fallBackToPage = useCallback(
+    async (config: SloperConfig) => {
+      watchJob(false);
+      log.warn('sloper.job.fallback', { reason: 'unclaimed' });
+      await dropAssembly().catch(() => undefined);
+      await assembleHere(config);
+    },
+    [assembleHere, dropAssembly, watchJob],
+  );
+
+  /**
+   * Hand the whole thing to the assembler and stop being needed.
+   *
+   * Nothing is uploaded here — the pictures and the narrations have been in the bucket since the
+   * moment each was paid for — so what goes up is a list of paths and a poke. From this point the
+   * page is a spectator: it polls the job document while it happens to be open, and if it is
+   * closed the video is finished, saved and waiting the next time anybody looks.
+   */
+  const assembleInAccount = useCallback(
+    async (config: SloperConfig): Promise<boolean> => {
+      if (!project.enabled || !project.id) return false;
+
+      const rows: AssemblyJobScene[] = [];
+      for (const { image, audio } of readyScenes()) {
+        const [imagePath, audioPath] = await Promise.all([ensureSaved(image), ensureSaved(audio)]);
+        // One asset the account never received is enough to disqualify the route: the assembler
+        // would assemble the scenes around it and hand back a video with a gap in it, where the
+        // in-page path still has those bytes in memory and can make the whole thing.
+        if (!imagePath || !audioPath) return false;
+
+        rows.push({ imagePath, audioPath, imageDuration: holdFor(audio) });
+      }
+
+      if (rows.length === 0) {
+        throw new Error('No scene has both an image and a narration, so there is nothing to assemble.');
+      }
+
+      await queueAssembly(rows, config.video.resolution, config.video.frameRate);
+
+      setAssemblyBackground(true);
+      setUploadMB(null);
+      setAssembly('queued');
+      startDeadlineRef.current = Date.now() + JOB_START_DEADLINE_MS;
+      watchJob(true);
+      return true;
+    },
+    [ensureSaved, holdFor, project.enabled, project.id, queueAssembly, readyScenes, watchJob],
+  );
+
+  const startAssembly = useCallback(
+    async (config: SloperConfig) => {
       setAssembly('preparing');
       setError(null);
       setUploadMB(null);
+      assemblyConfigRef.current = config;
 
       try {
-        const images: Blob[] = [];
-        const audioFiles: Blob[] = [];
-        const sceneMeta: { index: number; imageDuration: number }[] = [];
-
-        // Scene order is the contract with the assembler; the Map's iteration order is not.
-        for (const scene of scenesRef.current) {
-          const found = assetsFor(scene.id);
-          if (found.image?.status !== 'complete' || found.audio?.status !== 'complete') continue;
-
-          // In a live run this is the blob already in hand. On a project reopened from the account
-          // it is a fetch out of the bucket — which is precisely what lets a sitting be finished on
-          // a different machine from the one that paid for it.
-          const [imageBlob, audioBlob] = await Promise.all([
-            blobForAsset(found.image),
-            blobForAsset(found.audio),
-          ]);
-          if (!imageBlob || !audioBlob) continue;
-
-          images.push(imageBlob);
-          audioFiles.push(audioBlob);
-
-          // The narration's own length decides how long its still is held. The timing from
-          // ElevenLabs is the better number where there is one; ten seconds is the last resort,
-          // and it is only ever reached when a decode failed too.
-          const timing = timings.get(found.audio.id);
-          sceneMeta.push({
-            index: sceneMeta.length,
-            imageDuration: timing?.totalDuration || found.audio.duration || 10,
-          });
-        }
-
-        if (sceneMeta.length === 0) {
-          throw new Error('No scene has both an image and a narration, so there is nothing to assemble.');
-        }
-
-        const bytes = [...images, ...audioFiles].reduce((sum, b) => sum + b.size, 0);
-        setUploadMB((bytes / 1024 / 1024).toFixed(1));
-        setAssembly('uploading');
-
-        const result = await assembleVideo(
-          {
-            scenes: sceneMeta,
-            resolution: config.video.resolution,
-            frameRate: config.video.frameRate,
-          },
-          images,
-          audioFiles,
-          signal,
-          () => setAssembly('encoding'),
-        );
-
-        setVideo(result.video);
-        setAssembly('done');
-        goTo('output');
-
-        // After the stage has moved, never before: the video is on screen and playable while this
-        // is still going up, and a bucket that refuses it costs the saved copy rather than the
-        // thing somebody just waited two minutes for.
-        const saved = await project.putVideo(result.video, result.duration);
-        if (saved) setVideoMeta(saved);
+        if (await assembleInAccount(config)) return;
+        await assembleHere(config);
       } catch (e) {
         log.warn('sloper.assemble.failed', describeError(e));
+        watchJob(false);
         setAssembly('error');
         setError(e instanceof Error ? e.message : 'Assembling the video failed.');
       }
     },
-    [assetsFor, goTo, project, timings],
+    [assembleHere, assembleInAccount, watchJob],
   );
+
+  /* --- watching one that is not this page's ---------------------------------------------- */
+
+  /**
+   * What the job document says, turned into what the screen shows.
+   *
+   * Split out of the effect below so that it is also what a reopened project runs once, on the
+   * job it finds waiting for it. Both cases ask the same question — is there a video, is one
+   * coming, or did it fail — and neither should answer it differently.
+   */
+  const applyJob = useCallback(
+    async (job: AssemblyJob | null): Promise<void> => {
+      // A tick that was already in the air when the watching stopped has nothing to say about a
+      // screen somebody else has moved on. See `watchingRef`.
+      if (!watchingRef.current) return;
+
+      const config = assemblyConfigRef.current;
+      const now = Date.now();
+
+      if (!job) {
+        // Nothing there at all. The document is written before the poke and deleted only by the
+        // fallback, so this is a console delete or another tab starting over — either way there
+        // is no assembly to wait for and the assets screen is where the buttons are.
+        watchJob(false);
+        setAssembly('idle');
+        goTo('assets');
+        return;
+      }
+
+      if (job.status === 'done' && job.video) {
+        watchJob(false);
+        await showSavedVideo(job.video);
+        return;
+      }
+
+      if (job.status === 'error' || (job.status === 'done' && !job.video)) {
+        watchJob(false);
+        setAssembly('error');
+        setError(job.error || 'Assembling the video failed.');
+        return;
+      }
+
+      if (jobIsStale(job, now)) {
+        // The claim is older than any encode can be, so whatever held it is gone. One more poke
+        // if it has attempts left, and otherwise say so rather than spin on a dead job.
+        if (jobNeedsStarting(job, now)) {
+          nudgeAssembly();
+          startDeadlineRef.current = now + JOB_START_DEADLINE_MS;
+          setAssembly('queued');
+          return;
+        }
+        watchJob(false);
+        setAssembly('error');
+        setError(job.error || 'The assembler did not finish this video. Try again.');
+        return;
+      }
+
+      if (job.status === 'running') {
+        setAssembly('encoding');
+        return;
+      }
+
+      // Still queued. Either the poke has not landed yet, or it never will.
+      setAssembly('queued');
+      if (now <= startDeadlineRef.current) return;
+
+      if (config) {
+        await fallBackToPage(config);
+        return;
+      }
+
+      /*
+       * The deadline has passed on a job this page did not start — it was found waiting by a
+       * reopening, and was poked again on the way in. There is nothing to fall back to, because
+       * falling back means encoding here and the settings that video was asked for with belong to
+       * the run that asked. So it says so and offers the button, which re-queues it with the
+       * settings the project has just restored.
+       */
+      watchJob(false);
+      setAssembly('error');
+      setError('The assembler has not picked this video up. Try again.');
+    },
+    [fallBackToPage, goTo, nudgeAssembly, showSavedVideo, watchJob],
+  );
+
+  /*
+   * The poll.
+   *
+   * A timer and a `getDoc` rather than an `onSnapshot`, which is the same call every other app on
+   * this site makes: the Firestore client here is replaced wholesale when it dies (see
+   * `firestoreHealth.ts`), and a listener registered against the dead one is a screen that stops
+   * updating with nothing to say why. A read every four seconds against a document of a few
+   * hundred bytes is cheap enough not to need the cleverer thing.
+   *
+   * IT DEPENDS ON THE FLAG AND NOTHING ELSE, which is why `applyJob` is reached through a ref.
+   * That function closes over the sitting, so its identity changes on every render of the island;
+   * in the dependency array it would tear the interval down and send a fresh read on each one —
+   * several a second while somebody types. The ref is always the current one by the time a tick
+   * runs, which is the only property this needs.
+   */
+  const applyJobRef = useRef(applyJob);
+  useEffect(() => {
+    applyJobRef.current = applyJob;
+  });
+
+  useEffect(() => {
+    if (!watchingJob) return;
+
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const job = await readAssembly();
+        if (!cancelled) await applyJobRef.current(job);
+      } catch (e) {
+        // A failed read is a network blip, not an answer. The next tick asks again; nothing about
+        // the assembly depends on this page being able to see it.
+        log.debug('sloper.job.poll.failed', describeError(e));
+      }
+    };
+
+    void tick();
+    const timer = setInterval(() => void tick(), JOB_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [readAssembly, watchingJob]);
 
   /* --- starting over ----------------------------------------------------------------------- */
 
@@ -743,6 +1136,8 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
     setEstimatedCost(null);
     setStreaming(false);
     setGeneratingAssets(false);
+    watchJob(false);
+    setAssemblyBackground(false);
     setAssembly('idle');
     setUploadMB(null);
     setVideo(null);
@@ -750,16 +1145,23 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
     setError(null);
     project.close();
     goTo('config');
-  }, [goTo, project]);
+  }, [goTo, project, watchJob]);
 
-  // `encoding` belongs here with the other two: it is the longest stretch of the wait and the one
-  // where a navigation costs the most — the request in the air is the one already being paid for.
+  /*
+   * What leaving would actually cost.
+   *
+   * `uploading` and `encoding` are here for the reason they always were — the request in the air
+   * is the one already being paid for — but only while the encode is THIS PAGE's. An assembly the
+   * account is doing survives the tab by construction, so warning about it would be a prompt that
+   * is simply untrue, and a prompt people learn to dismiss without reading is worth less than the
+   * one case it is right about. `preparing` stays busy either way: whichever route is taken, that
+   * is the moment an asset that never reached the bucket is being pushed up.
+   */
   const busy =
     streaming ||
     generatingAssets ||
     assembly === 'preparing' ||
-    assembly === 'uploading' ||
-    assembly === 'encoding';
+    (!assemblyBackground && (assembly === 'uploading' || assembly === 'encoding'));
 
   /*
    * The rows the autosave effect writes. Derived on every render rather than kept in state, so
@@ -803,6 +1205,7 @@ export function useSloperRun(project: SloperProjectApi, notSavedMessage: string)
     startAssets,
     retryAsset,
     assembly,
+    assemblyBackground,
     uploadMB,
     video,
     videoMeta,
