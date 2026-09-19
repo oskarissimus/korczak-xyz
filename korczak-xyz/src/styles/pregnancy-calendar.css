@@ -150,7 +150,7 @@
   width: 100%;
   padding: 8px 10px;
   background: transparent;
-  border: none;
+  border: 0;
   cursor: pointer;
   font-family: 'VT323', monospace;
   text-align: left;

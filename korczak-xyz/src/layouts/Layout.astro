@@ -652,6 +652,13 @@ const recoveryStrings = {
     }
   }
 
+  /* Pressed flips the bevel rather than moving the label, so the button never changes size
+     while it is held. That only holds if a button that opts out of the frame zeroes the border
+     *width*: `border: none` leaves the width at `medium`, which is 3px waiting to be used, and
+     this rule — more specific than the class that set it — hands it a style to be used with. The
+     button then grows 3px on every side for exactly as long as the finger is down, which on a
+     phone is a flash of the page below it jumping. So every borderless button here is written
+     `border: 0`; it reads the same and cannot come back. */
   button:active {
     border-style: inset;
   }

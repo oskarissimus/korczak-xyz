@@ -158,7 +158,7 @@
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
   background: none;
-  border: none;
+  border: 0;
   padding: 0;
   color: var(--retro-navy);
   text-decoration: underline;
@@ -358,7 +358,7 @@
   font: inherit;
   color: inherit;
   background: none;
-  border: none;
+  border: 0;
   cursor: pointer;
 }
 

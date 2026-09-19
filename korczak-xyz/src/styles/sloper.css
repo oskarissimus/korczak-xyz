@@ -116,7 +116,7 @@
   line-height: 1.2;
   text-align: left;
   background: none;
-  border: none;
+  border: 0;
   padding: 0;
   color: inherit;
 }
@@ -538,7 +538,7 @@
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
   background: none;
-  border: none;
+  border: 0;
   padding: 0;
   color: var(--retro-navy);
   text-decoration: underline;
@@ -594,7 +594,7 @@
   gap: 8px;
   flex: 1;
   background: none;
-  border: none;
+  border: 0;
   padding: 0;
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
@@ -915,7 +915,7 @@
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
   background: none;
-  border: none;
+  border: 0;
   color: var(--retro-black);
   padding: 2px 10px;
   cursor: pointer;
@@ -947,7 +947,7 @@
   font-family: 'VT323', monospace;
   font-size: 1.1rem;
   background: none;
-  border: none;
+  border: 0;
   color: var(--retro-black);
   padding: 3px 12px;
   cursor: pointer;

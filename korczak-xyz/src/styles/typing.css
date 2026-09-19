@@ -859,7 +859,7 @@
   font-size: 1.1rem;
   color: var(--retro-white);
   background: transparent;
-  border: none;
+  border: 0;
   border-bottom: 1px solid var(--retro-dark-gray);
   text-align: left;
   cursor: pointer;
