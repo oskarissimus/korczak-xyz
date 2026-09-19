@@ -31,11 +31,17 @@ on:
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
       - "korczak-xyz/src/utils/transit/**"
-      # One file rather than the directory, because only one file of `utils/sloper/` compiles into
+      # Two files rather than the directory, because only one file of `utils/sloper/` compiles into
       # the functions bundle: `job.ts`, the assembly job that the browser writes and the assembler
       # reads. The rest of that directory talks to the DOM and to providers and could not compile
       # there at all — see the note at the top of it.
+      #
+      # The tsconfig beside it is in the list for a reason that is easy to miss and cost a run:
+      # it is what stops Vite's tsconfig walk reaching the site's `astro/tsconfigs/strict`, which
+      # this runner has no node_modules for. A commit that only touches it is a commit that decides
+      # whether these tests can run at all, so it has to be able to run them.
       - "korczak-xyz/src/utils/sloper/job.ts"
+      - "korczak-xyz/src/utils/sloper/tsconfig.json"
       - "terraform/**"
       - ".github/workflows/firebase-deploy.yml"
   # So rules can be pushed out without waiting for a code change to ride along.
