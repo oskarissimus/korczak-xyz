@@ -1,0 +1,66 @@
+/* The list of apps at /apps/, and the one card that is not in the markup.
+ *
+ * It was a scoped `<style>` block in `pages/apps/index.astro` and an identical copy of it in
+ * `pages/pl/apps/index.astro` — two files that had to be edited together and, being a copy,
+ * silently did not have to. It is global now for a second reason as well: the admissions panel's
+ * card is rendered by React (only an admin has one), and Astro's scoping attaches to elements in
+ * the template, so a scoped rule reaches nothing an island paints.
+ */
+
+.apps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-link {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  text-decoration: none;
+  color: var(--retro-black);
+  font-family: 'VT323', monospace;
+  transition: none;
+}
+
+.app-link:hover {
+  background: #a0a0a0;
+}
+
+.app-link:active {
+  border-style: inset;
+}
+
+.app-icon {
+  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--retro-teal);
+  border: 2px inset var(--retro-dark-gray);
+  color: var(--retro-white);
+}
+
+.app-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.app-title {
+  font-size: 1.4rem;
+  color: var(--retro-black);
+}
+
+.app-desc {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}

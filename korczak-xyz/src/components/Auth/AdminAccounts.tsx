@@ -5,10 +5,10 @@
  * know what `approved` means — it would be a hand-edited document in a list of collections, at
  * two in the morning, on a phone. This is that edit with the reasoning written next to it.
  *
- * WHAT IT IS NOT: a security boundary. Anyone can open /admin/ and anyone can call these functions
- * from a console; what stops them is `firestore.rules`, where every write here is refused to
- * anybody without a row in `admins/`. The `isAdmin` check below decides what to *draw* — showing a
- * queue of other people's addresses to a stranger would be a leak in itself — and nothing else.
+ * WHAT IT IS NOT: a security boundary. Anyone can open /apps/admin/ and anyone can call these
+ * functions from a console; what stops them is `firestore.rules`, where every write here is refused
+ * to anybody without a row in `admins/`. The `isAdmin` check below decides what to *draw* — showing
+ * a queue of other people's addresses to a stranger would be a leak in itself — and nothing else.
  *
  * Two decisions per account, and they are not the same decision:
  *

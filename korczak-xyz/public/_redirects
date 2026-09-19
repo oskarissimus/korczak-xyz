@@ -61,5 +61,11 @@
 /pl/apps/events/interests     /pl/apps/events/sources       301
 /pl/apps/events/interests/*   /pl/apps/events/sources       301
 
+# The admissions panel was /admin/ for one morning, before it became an app — which is the only
+# place anything here is actually found. The old path is in one deploy's worth of bookmarks and
+# in the link the login page shipped with, so it keeps working.
+/admin                        /apps/admin                301
+/pl/admin                     /pl/apps/admin             301
+
 /games/*                      /apps/:splat               301
 /pl/games/*                   /pl/apps/:splat            301

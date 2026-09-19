@@ -9,7 +9,8 @@ paths:
   - "**/lib/authCache.ts"
   - "**/hooks/useAuth.ts"
   - "**/components/Auth/**"
-  - "**/pages/**/admin.astro"
+  - "**/pages/**/apps/admin.astro"
+  - "**/pages/**/apps/index.astro"
   - "**/pages/**/login.astro"
   - "terraform/iam.tf"
 ---
@@ -118,13 +119,36 @@ household out of its own shopping list on the deploy that shipped this. **For an
 through the site, leave it off** — their verification mail is better evidence than a memory of who
 asked.
 
+### Where the panel is
+
+`/apps/admin/`, and it is in the list at `/apps/` like everything else — as a card `AdminAppCard`
+draws only for an admin. It shipped at `/admin/`, reachable from one link on the login page, which
+is a page nobody opens once they are signed in; in practice that meant reachable by typing its
+address. `_redirects` 301s the old path, both locales.
+
+Hiding the card protects nothing — the page and the rules behind it refuse everybody else anyway.
+It keeps a card that fourteen out of fifteen visitors cannot use off a list whose whole job is to
+be a list of things you can open.
+
+One mechanical note, which will look arbitrary in six months: **`styles/appsList.css` is
+global.** Astro's scoping attaches to elements in the template, so a scoped rule reaches nothing an
+island paints — and the block was two identical copies, in the English and Polish index pages,
+which had to be edited together and silently did not. The island itself sits inside the `<ul>` as
+an ordinary item: Astro gives `<astro-island>` `display: contents`, so the `<li>` is the flex item
+and a card that renders nothing for everybody else occupies nothing.
+
+It is deliberately **not installable**: no manifest, no icon, no precache tier. `apps.ts` says what
+qualifies — "a thing you reach for away from a desk" — and approving an account once a fortnight is
+not it. Making it one is an SVG, `npm run icons`, a `PWA_APPS` entry, a scope pattern and two tier
+lists, and nothing about the panel needs to work in a tunnel.
+
 ### Admins
 
 `admins/{uid}`, `write: if false`. Appointing an admin is a console or Admin SDK job on purpose:
 an admin who can appoint admins turns one stolen session into a second permanent owner. There is
 one row in it.
 
-`/admin/` checks `isAdmin` to decide **what to draw** — a queue of other people's addresses is not
+`/apps/admin/` checks `isAdmin` to decide **what to draw** — a queue of other people's addresses is not
 something to show a stranger — and the rules decide what it may do. The panel offers no button to
 revoke or forget your own row: undoing that from a site that has just started refusing you is too
 subtle a rescue to rely on at the moment you would need it.

@@ -129,7 +129,7 @@ export default function LoginForm({ lang }: LoginFormProps) {
   const t = translations[lang];
   const homePath = lang === 'en' ? '/' : '/pl/';
   const typingPath = lang === 'en' ? '/apps/typing/' : '/pl/apps/typing/';
-  const adminPath = lang === 'en' ? '/admin/' : '/pl/admin/';
+  const adminPath = lang === 'en' ? '/apps/admin/' : '/pl/apps/admin/';
 
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [email, setEmail] = useState('');

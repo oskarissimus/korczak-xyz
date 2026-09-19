@@ -20,7 +20,7 @@ rules_version = '2';
 // anybody holding a token was somebody he had personally let in. Self-service sign-up ends that,
 // and `approved()` below is what replaces it — every rule in this file except the sign-up
 // handshake itself goes through it, so a stranger who registers holds a token that opens nothing
-// at all until `accounts/{uid}.approved` is flipped from the panel at /admin/.
+// at all until `accounts/{uid}.approved` is flipped from the panel at /apps/admin/.
 //
 // Three things follow from that, and each is easy to get wrong later:
 //

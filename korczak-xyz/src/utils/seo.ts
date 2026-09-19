@@ -34,7 +34,7 @@ const NO_ALTERNATES = new Set(['/404/', '/offline/']);
  */
 const NOINDEX = new Set([
   '/login/',
-  '/admin/',
+  '/apps/admin/',
   '/offline/',
   '/404/',
   '/apps/anesthesia/admin/',
