@@ -21,7 +21,12 @@ import { runCollection } from './collect';
 import { runTransitCollection } from './transit/collect';
 import { configureWebPush, sendTo } from './push';
 import { handleAssembleVideo } from './sloper/handler';
+import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
+
+// At module load, so it is running before any handler body does — including the cold-start path,
+// which is where the configuration failures worth catching actually happen.
+initSentry();
 
 const SECRETS = [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, TICKETMASTER_API_KEY];
 
@@ -76,17 +81,18 @@ export const collectEvents = onSchedule(
      */
     retryCount: 0,
   },
-  async () => {
-    configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
-    const summary = await runCollection(db, {
-      now: Date.now(),
-      fetch: globalThis.fetch,
-      secret: secretReader(),
-      project: PROJECT_ID,
-      location: VERTEX_LOCATION,
-    });
-    console.log('collectEvents', JSON.stringify(summary));
-  },
+  async () =>
+    withSentry('collectEvents', async () => {
+      configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
+      const summary = await runCollection(db, {
+        now: Date.now(),
+        fetch: globalThis.fetch,
+        secret: secretReader(),
+        project: PROJECT_ID,
+        location: VERTEX_LOCATION,
+      });
+      console.log('collectEvents', JSON.stringify(summary));
+    }),
 );
 
 /**
@@ -100,32 +106,60 @@ export const collectEvents = onSchedule(
 export const sendTestPush = onCall(
   { region: REGION, secrets: [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY] },
   async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-    const uid = request.auth.uid;
-    const subId = String((request.data as { subId?: unknown })?.subId ?? '');
-    if (!subId) throw new HttpsError('invalid-argument', 'No device given.');
+    /*
+     * Not wrapped in `withSentry`, because most of what this throws is not a failure.
+     * `unauthenticated`, `invalid-argument` and `not-found` are this function answering the
+     * caller correctly — reporting them would fill the project with events describing a button
+     * pressed while signed out. Only the two genuine failures below are reported: the push
+     * service rejecting a send, and anything unexpected.
+     */
+    try {
+      if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+      const uid = request.auth.uid;
+      const subId = String((request.data as { subId?: unknown })?.subId ?? '');
+      if (!subId) throw new HttpsError('invalid-argument', 'No device given.');
 
-    const snap = await db.collection('users').doc(uid).collection('pushSubs').doc(subId).get();
-    if (!snap.exists) throw new HttpsError('not-found', 'That device is not registered.');
+      const snap = await db.collection('users').doc(uid).collection('pushSubs').doc(subId).get();
+      if (!snap.exists) throw new HttpsError('not-found', 'That device is not registered.');
 
-    configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
-    const outcome = await sendTo(db, uid, { ...(snap.data() as PushSub), id: subId }, {
-      title: 'Event Watch',
-      body: 'Notifications are working.',
-      url: '/apps/events/alerts',
-      tag: 'test',
-      kind: 'test',
-    });
+      configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
+      const outcome = await sendTo(db, uid, { ...(snap.data() as PushSub), id: subId }, {
+        title: 'Event Watch',
+        body: 'Notifications are working.',
+        url: '/apps/events/alerts',
+        tag: 'test',
+        kind: 'test',
+      });
 
-    if (!outcome.ok) {
-      // The status code is the whole value: "Apple returned 403" is debuggable in a way that
-      // "something went wrong" is not.
-      throw new HttpsError(
-        'internal',
-        `Push service returned ${outcome.statusCode ?? '?'}${outcome.pruned ? ' (device removed)' : ''}`,
-      );
+      if (!outcome.ok) {
+        /*
+         * This one is worth an event. The whole point of the test button is to prove the chain
+         * from VAPID keys to Apple's servers is intact, so a failure here is the answer somebody
+         * pressed it to get — and the status code is what makes it actionable.
+         */
+        reportError('sendTestPush', new Error(`push service returned ${outcome.statusCode ?? '?'}`), {
+          statusCode: outcome.statusCode ?? null,
+          pruned: outcome.pruned ?? false,
+        });
+        await flushSentry();
+        // The status code is the whole value: "Apple returned 403" is debuggable in a way that
+        // "something went wrong" is not.
+        throw new HttpsError(
+          'internal',
+          `Push service returned ${outcome.statusCode ?? '?'}${outcome.pruned ? ' (device removed)' : ''}`,
+        );
+      }
+      await flushSentry();
+      return { ok: true, statusCode: outcome.statusCode };
+    } catch (error) {
+      // An HttpsError has already been decided about above; anything else got here by surprise
+      // (a Firestore outage, a secret that will not read) and is exactly what this is for.
+      if (!(error instanceof HttpsError)) {
+        reportError('sendTestPush', error);
+        await flushSentry();
+      }
+      throw error;
     }
-    return { ok: true, statusCode: outcome.statusCode };
   },
 );
 
@@ -157,16 +191,17 @@ export const collectTransit = onSchedule(
     timeoutSeconds: 300,
     retryCount: 0,
   },
-  async () => {
-    configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
-    const summary = await runTransitCollection(db, {
-      now: Date.now(),
-      fetch: globalThis.fetch,
-      project: PROJECT_ID,
-      location: VERTEX_LOCATION,
-    });
-    console.log('collectTransit', JSON.stringify(summary));
-  },
+  async () =>
+    withSentry('collectTransit', async () => {
+      configureWebPush(VAPID_SUBJECT, VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
+      const summary = await runTransitCollection(db, {
+        now: Date.now(),
+        fetch: globalThis.fetch,
+        project: PROJECT_ID,
+        location: VERTEX_LOCATION,
+      });
+      console.log('collectTransit', JSON.stringify(summary));
+    }),
 );
 
 /**

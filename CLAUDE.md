@@ -9,7 +9,8 @@ subproject.
 
 ## Where it runs
 
-Two vendors, one each side. **Cloudflare** serves the site: `korczak-xyz/wrangler.jsonc` declares a
+Two vendors in the serving path, one each side (Sentry is a third vendor but sits outside it —
+see *Error reporting* below). **Cloudflare** serves the site: `korczak-xyz/wrangler.jsonc` declares a
 Worker that is nothing but its own static assets, and the build is a plain `astro build` with no
 adapter — no SSR, no API routes, nothing running per request. **GCP** (`korczak-xyz-501720`) is the
 backend: Firestore, two gen-2 Cloud Functions in `europe-central2`, Cloud Scheduler, Secret
@@ -46,6 +47,43 @@ domain has no origin server, so Cloudflare points the record at an address that 
 and routes the request to the Worker before that matters. The same is true of `www` — the CNAME
 target is irrelevant because the Single Redirect returns before any origin is consulted. **Neither
 record is a thing to "fix" if it looks wrong.**
+
+## Error reporting
+
+**Sentry**, org `oskar-korczak`, EU region (`de.sentry.io`) — a third vendor alongside Cloudflare
+and GCP, added Sep 2026. Two projects, because the two halves have nothing to say about each
+other: no page load waits on a collector, and a 3am scheduled failure has no business in the
+project you open to ask whether the typing trainer is broken.
+
+| Project | Covers | Configured in |
+|---|---|---|
+| `korczak-xyz` | every page, and the service worker | `korczak-xyz/src/lib/sentry.ts`, `src/sw/sentry.js` |
+| `korczak-xyz-functions` | the four Cloud Functions | `functions/src/sentry.ts` |
+
+**Errors only, deliberately.** No performance tracing and no Session Replay, on either side. The
+reasoning is at the top of `src/lib/sentry.ts` and is worth reading before switching either on —
+the short version is that every span this site could produce would be a client-only span, and
+Replay records the DOM of apps that hold somebody's actual life (the sleep log, the shopping
+list). The bundle is 27KB gzipped as configured; Replay would roughly triple it.
+
+The site's own structured logging feeds this rather than sitting beside it. `log.*` in
+`src/lib/logger.ts` is unchanged and so are its 165 call sites, but `debug`/`info`/`warn` are now
+Sentry breadcrumbs and `error` is a Sentry event. The localStorage ring buffer and the
+`users/{uid}/logs` Firestore batches it used to write are gone, along with `src/lib/logSink.ts`.
+Old batches are still in Firestore; nothing adds to them.
+
+The service worker reports by POSTing an envelope by hand (`src/sw/sentry.js`), not through the
+SDK. That is not a shortcut — `dist/sw.js` is a classic script assembled by concatenation, which
+is the safest thing to hand iOS, and importing an npm package would make it a module and put a
+bundler in the middle of `generate-sw.mjs`.
+
+**Releases are the commit hash** — the same `git rev-parse --short HEAD` the navbar's status bar
+prints, so an issue and the hash on the page name the same deploy.
+
+**Source maps need `SENTRY_AUTH_TOKEN` as a GitHub Actions secret.** Without it the build is
+exactly what it was, minus readable stack traces: `astro.config.mjs` only adds the upload plugin
+when the token is present. It is the one Sentry credential that can do damage, so unlike the DSNs
+— which are public by design and live in the source — it never reaches the bundle.
 
 ## Solitaire Game
 

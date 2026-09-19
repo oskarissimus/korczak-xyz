@@ -20,7 +20,6 @@ import {
 import { clearCachedUser, readCachedUser, writeCachedUser } from '../lib/authCache';
 import { installFirestoreWatchdog } from '../lib/firestoreHealth';
 import { installLogDebug } from '../lib/logDebug';
-import { onAuthResolved } from '../lib/logSink';
 import { describeError, log, setLogUid } from '../lib/logger';
 
 // Minimal user shape we pass around (subset of the Firebase User).
@@ -200,7 +199,6 @@ export function useAuth(): AuthApi {
   useEffect(() => {
     if (status === 'approved' && identity) {
       writeCachedUser({ uid: identity.uid, email: identity.email });
-      onAuthResolved(); // ship anything buffered while signed out
     } else if (status === 'pending' || status === 'signed-out') {
       // A pending account must not leave an address behind for the navbar's pre-paint script to
       // put on screen: it would show a session that Firestore refuses everything for.

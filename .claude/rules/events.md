@@ -224,7 +224,7 @@ sources notifies once.
 
 ### The service worker, and why a name collision there is expensive
 
-`generate-sw.mjs` now inlines **two** pure modules (`routing.js`, `push.js`) rather than one. They
+`generate-sw.mjs` now inlines **three** pure modules (`sentry.js`, `routing.js`, `push.js`). They
 share a single top-level scope after concatenation, and there is exactly one service worker for every
 installed app on this origin — so a name declared in both is a SyntaxError that takes the songbook,
 the tuner and the sleep log offline along with this app, until the next deploy. `swBundle.test.js`
@@ -237,6 +237,13 @@ future build all yield a showable title and body — and the handler has exactly
 early return. The sender emits a Declarative Web Push envelope (`web_push: 8030`) with the flat
 fields alongside: on Safari 18.4+ the OS renders it even if our JS throws, and still dispatches the
 push event, so the same tag collapses the two into one banner.
+
+**A rejected `showNotification` is reported to Sentry** as `sw.push.show.fail`, and it is the one
+failure on this worker worth waking somebody for. There is nothing the handler can do about it —
+the rethrow is deliberate, so the platform still sees the push as unhandled and behaves as it
+would have — but the symptom is the *absence* of notifications, which is exactly the failure
+nobody discovers for a month. Reporting it does not change the shape above: `showNotification` is
+still called on every path and there is still no early return.
 
 There is deliberately **no `pushsubscriptionchange` handler**. iOS never fires it, and on platforms
 that do the worker could not act on it — no auth, no SDK, possibly no client to postMessage. It would

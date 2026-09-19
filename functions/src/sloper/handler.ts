@@ -59,6 +59,7 @@ import { AssemblyJobError } from '../../../korczak-xyz/src/utils/sloper/job';
 import { assemble } from './ffmpeg';
 import { runAssemblyJob } from './job';
 import { BadRequestError, checkCounts, corsOrigin, parseMetadata } from './metadata';
+import { flushSentry, reportError } from '../sentry';
 
 export const MAX_BYTES = 32 * 1024 * 1024;
 
@@ -432,6 +433,9 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
     if (workDir) {
       await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
     }
+    // Anything reported above has to leave before the platform freezes the instance. Bounded and
+    // non-throwing, so it cannot turn a delivered video into a failed request.
+    await flushSentry();
   }
 }
 
@@ -445,6 +449,10 @@ export async function handleAssembleVideo(req: Request, res: Response): Promise<
 function streamTheError(stream: AssemblyStream, error: unknown, elapsedMs: number): void {
   const message = error instanceof Error ? error.message : 'Video assembly failed';
   console.error('assembleVideo.failed', JSON.stringify({ message, elapsedMs, streamed: true }));
+  // Reported for the same reason it is logged: by this point the caller has paid for every image
+  // and every second of narration in the video, and a 200 carrying a failure is the easiest kind
+  // of error to lose track of.
+  reportError('assembleVideo', error, { elapsedMs, streamed: true });
   stream.failed(message);
 }
 
@@ -462,5 +470,8 @@ function respondWithError(res: Response, error: unknown, elapsedMs: number): voi
 
   const message = error instanceof Error ? error.message : 'Video assembly failed';
   console.error('assembleVideo.failed', JSON.stringify({ message, elapsedMs }));
+  // Only this branch. The 401 and 400 above are the handler answering a bad request correctly,
+  // and reporting those would turn an expired token into a Sentry issue.
+  reportError('assembleVideo', error, { elapsedMs, streamed: false });
   res.status(500).json({ error: 'ASSEMBLY_FAILED', message });
 }

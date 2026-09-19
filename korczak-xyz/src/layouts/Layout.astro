@@ -75,6 +75,22 @@ const recoveryStrings = {
     </script>
     <script is:inline set:html={islandRecovery}></script>
     <script is:inline set:html={registerSw}></script>
+    <script>
+      /*
+       * Error reporting. First module script in the head, so `window.onerror` and the unhandled
+       * rejection handler are installed before any island hydrates - which is where nearly every
+       * error this is meant to catch comes from.
+       *
+       * It cannot be an `is:inline` script like the two above: those are raw source strings and
+       * the SDK is a bundled dependency. That costs a little ordering - a module script is
+       * deferred, so a synchronous throw from `island-recovery.js` itself would still be missed -
+       * and that is the right trade: island-recovery is 40 lines that have never thrown, while
+       * inlining the SDK would put it in the HTML of all 370 pages, uncached.
+       */
+      import { initSentry } from '../lib/sentry';
+
+      initSentry('page');
+    </script>
     <!-- Client-side routing. The point is the navbar: without it every click tears the
          document down, and the auth islands - the only part of the menu that is not
          server-rendered - have to resolve Firebase's session again from scratch, which is

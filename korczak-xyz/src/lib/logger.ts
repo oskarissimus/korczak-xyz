@@ -2,15 +2,20 @@
  * Structured frontend logging.
  *
  * The typing trainer's cloud sync has failed silently in the past - every error path was a
- * bare `catch {}`, so a lost write left no trace anywhere. This module is the record: calls
- * are cheap, buffered locally, and shipped to Firestore by `logSink`.
+ * bare `catch {}`, so a lost write left no trace anywhere. This module is the record.
+ *
+ * Where the record goes changed in Sep 2026. It used to be a localStorage ring buffer batched
+ * into `users/{uid}/logs` in Firestore by `logSink.ts`; it is now Sentry (`sentry.ts`), which
+ * also catches the uncaught exceptions this module never saw. The call sites did not change:
+ * `log.warn('sync.push.fail', …)` means the same thing it always did. What changed is that
+ * `debug`/`info`/`warn` are breadcrumbs on whatever fails next, and `error` is an event.
  *
  * Nothing here may ever throw into the caller. A logger that can break the page it is
  * watching is worse than no logger, so every entry point swallows its own failures.
  */
 
 import { getClientId, getPageId } from './clientId';
-import { enqueue } from './logSink';
+import { recordLog, setSentryUser } from './sentry';
 
 export { getClientId, getPageId };
 
@@ -30,6 +35,18 @@ export interface LogEntry {
 
 const DEBUG_KEY = 'typing-debug';
 
+/*
+ * A short in-memory tail, for `window.typingLogs` alone.
+ *
+ * This is not the old buffer and does not do its job: nothing here is persisted, uploaded, or
+ * survives a reload - Sentry is the durable record now. It exists because reading what just
+ * happened on the machine in front of you is worth a console command rather than a round trip
+ * through a dashboard, and because the entries that never become Sentry events (the `info` and
+ * `warn` breadcrumbs) are exactly the ones worth reading while reproducing something.
+ */
+const TAIL_MAX = 200;
+const tail: LogEntry[] = [];
+
 // localStorage throws rather than degrades in a few real situations (Safari private mode,
 // storage disabled by policy) - same defensive shape as authCache.ts.
 function store<T>(fn: (s: Storage) => T): T | null {
@@ -45,6 +62,7 @@ function store<T>(fn: (s: Storage) => T): T | null {
 let currentUid: string | null = null;
 export function setLogUid(uid: string | null): void {
   currentUid = uid;
+  setSentryUser(uid, getClientId());
 }
 export function getLogUid(): string | null {
   return currentUid;
@@ -72,7 +90,9 @@ function emit(level: LogLevel, event: string, fields?: Record<string, unknown>):
       const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
       fn(`[${event}]`, fields ?? '');
     }
-    enqueue(entry);
+    tail.push(entry);
+    if (tail.length > TAIL_MAX) tail.splice(0, tail.length - TAIL_MAX);
+    recordLog(level, event, fields);
   } catch {
     // A logger must never take the page down with it.
   }
@@ -85,8 +105,19 @@ export const log = {
   error: (event: string, fields?: Record<string, unknown>) => emit('error', event, fields),
 };
 
-// Firestore rejects `undefined` and chokes on cyclic values, and an error object serializes
-// to `{}` through JSON. Normalize anything unknown before it becomes a log field.
+/** Read side, for the debug console only. */
+export function snapshot(): LogEntry[] {
+  return [...tail];
+}
+
+export function clearTail(): void {
+  tail.length = 0;
+}
+
+// An error object serializes to `{}` through JSON and loses its stack, so normalize anything
+// unknown before it becomes a log field. `stack` is load-bearing downstream: `recordLog` turns
+// an entry that carries one into a Sentry exception rather than a bare message, which is what
+// gets it a stack trace and source maps in the issue.
 export function describeError(e: unknown): Record<string, unknown> {
   if (e instanceof Error) {
     return {

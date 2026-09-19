@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Each account's data is private to it, with one deliberate exception: the household apps — the
 // baby sleep log and the shopping list — can be shared with a second account, so both parents work
-// against one history. Everything else — typing progress, fretboard sittings, diagnostic logs —
+// against one history. Everything else — typing progress, fretboard sittings, sleep targets —
 // remains owner-only.
 //
 // There is **one grant per person, not one per app**: a single `shares/{email}` document is what
@@ -264,19 +264,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Covers progress, sessions, and the frontend diagnostic log batches written to
-    // users/{uid}/logs.
+    // Covers progress, sessions, and everything else an account keeps under its own uid.
     //
-    // Note that the logs are writable, not append-only. Making them append-only would mean
-    // replacing this recursive wildcard with one rule per collection, because rules are a
+    // It used to cover `users/{uid}/logs` as well — the frontend diagnostic batches written by
+    // the site's own log sink. That sink was replaced by Sentry in Sep 2026 and nothing writes
+    // there any more. The rule is unchanged because it never named the collection: this is a
+    // recursive wildcard, and `logs` was only ever one of the things it swept up. Whatever
+    // batches an account already accumulated are still readable by that account and are dead
+    // weight; there is no code left that will add to them.
+    //
+    // Note that everything here is writable, not append-only. Making any of it append-only would
+    // mean replacing this recursive wildcard with one rule per collection, because rules are a
     // permissive union: a narrower `allow update, delete: if false` alongside this match
     // grants nothing and denies nothing, it is simply ignored. Not worth trading the
     // catch-all's "any future collection just works" for, on a single-account database.
     //
-    // "Any future collection just works" now means "for an approved account". An unapproved one
-    // cannot even write its own diagnostic logs, which is a real cost — the first sign-in of a
-    // person who is about to be turned away is exactly the session you would want a log of — and
-    // the right trade anyway: a writable subtree is a writable subtree.
+    // "Any future collection just works" means "for an approved account". An unapproved one can
+    // write nothing at all under its own uid — which used to cost us the diagnostic log of the
+    // first sign-in of a person about to be turned away. Sentry does not go through these rules,
+    // so that session is now reported like any other, and the cost is gone.
     match /users/{uid}/{document=**} {
       allow read, write: if approved() && request.auth.uid == uid;
     }

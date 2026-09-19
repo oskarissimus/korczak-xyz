@@ -78,13 +78,36 @@ async function precacheTier(name) {
   const cache = await caches.open(cacheName(name, BUILD_ID));
   const already = await cache.keys();
   if (already.length >= urls.length) return;
-  await precache(cache, urls);
+  const failed = await precache(cache, urls);
+
+  /*
+   * A partial tier is the failure this worker is least able to notice and most damaged by: the
+   * app installs, activates, looks healthy, and then renders nothing on a dead network because
+   * one chunk never arrived. `precache` deliberately tolerates it (an atomic addAll would be
+   * worse), so tolerating it silently is the part worth fixing.
+   *
+   * Reported only when a tier is meaningfully incomplete. One 404 on a stale URL is noise; a
+   * tenth of the tier missing means the build and the precache list disagree.
+   */
+  if (failed > 0 && failed >= Math.max(2, Math.ceil(urls.length * 0.1))) {
+    sentryReport('sw.precache.incomplete', new Error(`${failed}/${urls.length} failed`), {
+      tier: name,
+      failed,
+      total: urls.length,
+    });
+  }
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      await precacheTier('essential');
+      try {
+        await precacheTier('essential');
+      } catch (error) {
+        // skipWaiting still has to run: a worker that never activates leaves the previous one
+        // serving a build whose chunks no longer exist.
+        sentryReport('sw.install.fail', error, { tier: 'essential' });
+      }
       await self.skipWaiting();
     })(),
   );
@@ -93,8 +116,14 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const names = await caches.keys();
-      await Promise.all(cachesToDelete(names, BUILD_ID).map((name) => caches.delete(name)));
+      try {
+        const names = await caches.keys();
+        await Promise.all(cachesToDelete(names, BUILD_ID).map((name) => caches.delete(name)));
+      } catch (error) {
+        // Sweeping is housekeeping; claiming clients is the part that matters, so this must not
+        // stop it. Left unswept, the old caches cost storage and nothing else.
+        sentryReport('sw.activate.sweep.fail', error);
+      }
       await self.clients.claim();
     })(),
   );
@@ -111,7 +140,14 @@ self.addEventListener('message', (event) => {
     (async () => {
       // Sequential, not parallel, and register-sw.js lists the shell first: the songs tier is
       // 82 requests and must not race the shell the app needs to render at all.
-      for (const tier of data.tiers) await precacheTier(tier);
+      for (const tier of data.tiers) {
+        try {
+          await precacheTier(tier);
+        } catch (error) {
+          // One tier failing must not abandon the tiers after it in the list.
+          sentryReport('sw.precache.tier.fail', error, { tier });
+        }
+      }
     })(),
   );
 });
@@ -248,7 +284,16 @@ self.addEventListener('push', (event) => {
   }
   const payload = parsePushPayload(text);
   event.waitUntil(
-    self.registration.showNotification(payload.title, notificationOptions(payload)),
+    /*
+     * The one failure on this worker worth waking somebody for. If showNotification rejects, iOS
+     * treats the push as unhandled and silently unsubscribes the app - and because the symptom
+     * is the *absence* of notifications, nobody finds out for weeks. There is nothing to do
+     * about it here, which is exactly why it has to be reported.
+     */
+    self.registration.showNotification(payload.title, notificationOptions(payload)).catch((error) => {
+      sentryReport('sw.push.show.fail', error, { hadText: Boolean(text) });
+      throw error;
+    }),
   );
 });
 

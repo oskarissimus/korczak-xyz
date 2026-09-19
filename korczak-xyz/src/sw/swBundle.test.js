@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
- * dist/sw.js is three files concatenated into one classic script (see scripts/generate-sw.mjs).
+ * dist/sw.js is several files concatenated into one classic script (see scripts/generate-sw.mjs).
  * They share one top-level scope, so a name declared in two of them is a SyntaxError — and there
  * is exactly one service worker for every installed app on this origin, so that failure takes the
  * songbook, the tuner and the sleep log offline along with the events app, until the next deploy.
@@ -13,12 +13,29 @@ import { describe, expect, it } from 'vitest';
 const DIR = new URL('.', import.meta.url).pathname;
 const read = (name) => readFileSync(`${DIR}${name}`, 'utf8');
 
-/** What the generator does: strip a leading `export `, join in order. */
-const PURE = ['routing.js', 'push.js'];
+/**
+ * The inlined files, read out of the generator rather than repeated here.
+ *
+ * This list used to be a second copy of the generator's, which meant a file added to one and not
+ * the other was exactly the case this suite exists to catch and the one case it could not see:
+ * an uncovered file still reaches dist/sw.js, and its name collisions arrive in a browser.
+ */
+const GENERATOR = readFileSync(`${DIR}../../scripts/generate-sw.mjs`, 'utf8');
+const PURE = JSON.parse(
+  GENERATOR.match(/^const PURE = (\[[^\]]*\]);$/m)[1].replace(/'/g, '"'),
+);
+
 const stripped = PURE.map((name) => read(name).replace(/^export /gm, ''));
 const bundle = `${stripped.join('\n')}\n${read('sw.template.js')}`;
 
 describe('the generated service worker', () => {
+  it('inlines the files the generator says it does', () => {
+    // Guards the regex above: if the generator's declaration is reformatted, every other test
+    // here would silently start checking a shorter list rather than failing.
+    expect(PURE.length).toBeGreaterThanOrEqual(3);
+    expect(PURE).toContain('sentry.js');
+  });
+
   it('parses as one classic script', () => {
     // `new Function` parses without executing, so this never touches self, caches or clients.
     expect(() => new Function(bundle)).not.toThrow();
@@ -48,6 +65,14 @@ describe('the generated service worker', () => {
         seen.set(name, PURE[i]);
       }
     }
+  });
+
+  it('gives the template the reporter it calls', () => {
+    // Same argument as the push helpers below: the template calls sentryReport by bare name, and
+    // every call site is an error path, so a rename would break exactly the code that only runs
+    // when something has already gone wrong.
+    expect(read('sentry.js')).toMatch(/function sentryReport\b/);
+    expect(read('sw.template.js')).toContain('sentryReport(');
   });
 
   it('uses the push helpers the template calls', () => {

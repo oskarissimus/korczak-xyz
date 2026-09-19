@@ -158,8 +158,26 @@ worse than one that waits, and `StatsSkeleton.astro` prints the same two tiles w
 
 ### Frontend logging
 
-Structured logs buffer in localStorage and upload in batches to `users/{uid}/logs`, reachable at
-`window.typingLogs` — see the `typing-logs` skill.
+Structured logs go to **Sentry** (project `korczak-xyz`, org `oskar-korczak`, EU region). The
+`log.*` API in `src/lib/logger.ts` is unchanged and so are its 165 call sites; only the backend
+moved. `src/lib/sentry.ts` is where the SDK is configured and where the reasoning lives.
+
+Until Sep 2026 this was a localStorage ring buffer batched into `users/{uid}/logs` by a
+`logSink.ts` that no longer exists. Two things about the change are worth knowing before reading
+an old comment that still assumes the buffer:
+
+- **`debug`/`info`/`warn` are breadcrumbs, not records.** They are attached to whatever fails
+  next and are invisible if nothing does. Only `log.error` produces an event on its own. That is
+  the right shape — the warn level is chatty by design on a flaky network — but it does mean
+  "I logged it and Sentry has nothing" is expected rather than a bug.
+- **The signed-out window is covered now, and used to be the gap.** The old sink could not write
+  to Firestore without a uid, so it buffered and hoped; the rules also denied an unapproved
+  account its own logs entirely. Sentry does not go through Firestore rules, so the first
+  sign-in of a person about to be turned away now reports like any other session.
+
+`window.typingLogs` still exists and still reads a tail of entries, but that tail is in memory
+only — 200 entries, gone on reload. It is for watching events go by while reproducing something,
+not a record. See the `typing-logs` skill.
 
 Two `error`-level assertions watch progress for going backwards, and they cover different
 windows — the first one alone missed the loss it was written to catch:

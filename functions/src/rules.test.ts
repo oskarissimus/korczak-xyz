@@ -141,10 +141,12 @@ maybe('firestore.rules', () => {
   });
 
   describe('an account nobody has approved', () => {
-    it('opens nothing at all — not even its own subtree or its own logs', async () => {
+    it('opens nothing at all — not even its own subtree', async () => {
       await assertFails(getDoc(doc(stranger(), 'users/stranger/progress/p1')));
       await assertFails(setDoc(doc(stranger(), 'users/stranger/progress/p1'), { done: 1 }));
-      await assertFails(setDoc(doc(stranger(), 'users/stranger/logs/l1'), { x: 1 }));
+      // An arbitrary collection under its own uid, to pin the recursive wildcard rather than the
+      // one collection named above. This used to be `logs`, which the site no longer writes.
+      await assertFails(setDoc(doc(stranger(), 'users/stranger/anything/x1'), { x: 1 }));
       await assertFails(getDoc(doc(stranger(), 'events/e1')));
       await assertFails(getDoc(doc(stranger(), 'transitItems/t1')));
     });
