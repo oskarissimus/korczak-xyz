@@ -1,0 +1,38 @@
+{
+  // Why this file exists — the third copy of the same lesson, after `src/utils/events/` and
+  // `src/utils/transit/`, and the first one that was not learnt the expensive way.
+  //
+  // One file in this directory, `job.ts`, is compiled by two projects: Astro for the browser, and
+  // `tsc` into the Cloud Functions bundle (functions/tsconfig.json names it by path rather than
+  // keeping a copy, so the page that writes an assembly job and the assembler that reads one
+  // cannot disagree about its shape).
+  //
+  // Vite resolves a tsconfig by walking UP from the file it is transforming. Without this file that
+  // walk reaches korczak-xyz/tsconfig.json, which `extends: "astro/tsconfigs/strict"` — resolvable
+  // only where the site's node_modules are installed. The CI runner that deploys the functions
+  // installs only the functions' dependencies, so `functions/src/sloper/*.test.ts` died with
+  // `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, naming a file that has
+  // nothing wrong with it. It has cost a deploy once already, over `transit/`.
+  //
+  // WHAT IS DIFFERENT HERE, and it is worth stating because the other two say the opposite: this
+  // directory is NOT portable as a whole. `images.ts` wants a canvas, `assemble.ts` reads
+  // `import.meta.env`, `projects.ts` imports `firebase/*`. Only `job.ts` crosses into the
+  // function, and it imports nothing at all — that is what makes it safe to compile there, and it
+  // is a property to check before adding a second file to the functions' `include`.
+  //
+  // The walk stops here for every `.ts` in the directory all the same, because it is per-file and
+  // has no way to stop for one of them. That costs nothing: these are plain modules, and none of
+  // them needs an Astro or a React compiler setting. The React components are in
+  // `src/components/Sloper/` and are untouched by this.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"]
+}
