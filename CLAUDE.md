@@ -61,6 +61,7 @@ there; they exist because most of what is in them was learnt by breaking somethi
 
 | File | Covers |
 |---|---|
+| `.claude/rules/accounts.md` | Who may use the site: sign-up, the approval every account waits for, the panel at `/admin/`, the two rules files that enforce it |
 | `.claude/rules/typing.md` | The typing trainer: progress sync by lineage, Firestore client health, the localStorage budget, frontend logging |
 | `.claude/rules/flashcards.md` | The guitar flashcards: both decks, the shared SM-2 scheduler, the mixed sitting, the neck cards and the chord cards |
 | `.claude/rules/baby-sleep.md` | The baby sleep log: entries, routines, stats, the climate tab, targets, sharing |

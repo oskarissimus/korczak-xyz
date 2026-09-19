@@ -1,5 +1,7 @@
 # Deploys the Firestore and Storage rules and the two collectors — Event Watch and the metro
-# watcher.
+# watcher. The rules go out only after they have been run against the emulator (see "The rules
+# contract" below), because since sign-up was opened up they are the only thing standing between a
+# stranger with an account and everything in the database.
 #
 # Separate from node.js.yml because it is path-filtered: the site deploys on every push from that
 # workflow, but redeploying Cloud Functions on a commit that only touched a song chart would take
@@ -158,6 +160,20 @@ jobs:
         # a deploy must not depend on somebody else's website being up.
         run: npm test
         working-directory: functions
+
+      # The rules are the whole admissions policy now that anybody can sign up, and the way they
+      # fail is silent: a ruleset that quietly grants everything looks, from every screen in the
+      # app, exactly like one that works. So they are executed against the real rules engine before
+      # they are allowed out — `emulators:exec` starts the Firestore emulator, points
+      # FIRESTORE_EMULATOR_HOST at it, and that env var is what un-skips the test.
+      #
+      # It runs from the repository root because that is where firebase.json and firestore.rules
+      # are; the vitest run itself is in `functions/`, which is the package holding the emulator's
+      # one devDependency. The runner already has a JVM.
+      - name: The rules contract
+        run: |
+          npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-rules \
+            "npm test --prefix functions -- src/rules.test.ts"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3

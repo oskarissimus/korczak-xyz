@@ -11,6 +11,29 @@ rules_version = '2';
 // household, and two lists of the same two people that can silently fall out of step is a worse
 // thing to own than one grant that is honest about its reach — and both share tabs say so on the
 // screen. Splitting it later means a second collection and a second `hasShare()`, not a flag here.
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// SIGNING IN IS NOT THE SAME THING AS BEING LET IN.
+//
+// Sign-up used to be disabled at the Identity Platform level, and that one switch was the whole
+// admissions policy: an account existed because the owner had made it by hand in the console, so
+// anybody holding a token was somebody he had personally let in. Self-service sign-up ends that,
+// and `approved()` below is what replaces it — every rule in this file except the sign-up
+// handshake itself goes through it, so a stranger who registers holds a token that opens nothing
+// at all until `accounts/{uid}.approved` is flipped from the panel at /admin/.
+//
+// Three things follow from that, and each is easy to get wrong later:
+//
+//   1. **A new collection must state the gate.** Adding a `match` block without `approved()` in it
+//      re-opens that data to anyone who can fill in a sign-up form. There is no catch-all that
+//      grants — the catch-all at `users/{uid}` requires approval like everything else.
+//   2. **The gate costs one document read per evaluated rule.** `get()` in rules is a billed read,
+//      cached within a request. On a two-person database that is noise; on a thousand-person one
+//      it would not be, and that is the point at which custom claims stop being premature.
+//   3. **The client is not the gate.** `useAuth` hides an unapproved session from every app, but
+//      only so the person sees "waiting for approval" instead of a wall of permission errors.
+//      What actually stops them is this file.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -32,30 +55,158 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/shares/$(callerEmail()));
     }
 
+    function callerAccount() {
+      return get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data;
+    }
+
+    /*
+     * The admissions gate: has the owner let this account in?
+     *
+     * A missing account document denies rather than opens. `get()` on a document that is not there
+     * returns null, reading `.data` off null is an evaluation error, and an evaluation error is a
+     * denial — so an account nobody has ever seen, including one created straight in the Identity
+     * Platform console, which writes nothing here, starts able to open nothing. The client's
+     * `ensureAccount()` is what puts such an account in front of the owner; it is not what admits
+     * it.
+     *
+     * Deliberately NOT a custom claim. A claim would be free to check, but it is minted into the
+     * ID token: revoking one leaves the revoked person working normally for up to an hour, and
+     * setting one needs the Admin SDK — a Cloud Function in the approval path, for a database with
+     * two people in it. A document is read at the moment of the request, so approval and
+     * revocation both bite on the next query, and the panel is one `updateDoc` from the browser.
+     */
+    function approved() {
+      return signedIn() && callerAccount().approved == true;
+    }
+
+    /*
+     * Whether this account's address may be taken to be its own.
+     *
+     * It matters in exactly one place — the household share, which is keyed by *address* rather
+     * than by uid — and the comment this replaces said why: "IF SIGN-UP IS EVER ENABLED, THIS RULE
+     * MUST REQUIRE request.auth.token.email_verified FIRST, or a stranger can register an invited
+     * address and walk in." Sign-up is now enabled. Here it is.
+     *
+     * The `emailTrusted` half is the escape hatch for the accounts that predate all of this. Both
+     * were made by hand in the console, where nothing sends a verification mail, so both are
+     * unverified through no fault of their own and a bare `email_verified` check would have locked
+     * the household out of its own shopping list on the deploy that shipped it. Only an admin can
+     * set the flag, the panel says in one line what it means, and no account can ever grant it to
+     * itself — which is the property the warning was protecting.
+     */
+    function trustedEmail() {
+      return request.auth.token.email_verified == true || callerAccount().emailTrusted == true;
+    }
+
+    // Who may work the admissions panel. One document per uid, its id the uid and its contents
+    // beside the point — `exists()` is the whole question.
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // The two clauses every self-write to an account row shares: the row describes the caller, and
+    // it describes them truthfully. `email_verified` is compared against `== true` rather than
+    // used raw, so a provider that omits the claim reads as false instead of failing the write.
+    function selfDescribed() {
+      return request.resource.data.email == callerEmail()
+        && request.resource.data.emailVerified == (request.auth.token.email_verified == true);
+    }
+
+    /*
+     * One document per account — and the only thing in this file that somebody the owner has never
+     * heard of is allowed to write.
+     *
+     * The client creates it on first sign-in (`ensureAccount()` in `src/lib/account.ts`) because
+     * somebody has to, and only the browser is present for every way an account can come into
+     * existence: the sign-up form, the Identity Platform console, a provider link. Letting the
+     * subject write their own row is safe exactly as long as the row cannot say anything the
+     * subject is not entitled to say, which is what the clauses below enforce field by field:
+     *
+     *   email          must equal the address in the caller's own token, lowercased
+     *   emailVerified  must equal the caller's own `email_verified` claim — a mirror, not an
+     *                  assertion. It is what lets the panel show "unverified" against somebody
+     *                  else's account, which the admin's own token cannot tell them
+     *   approved       false on create, and unchanged by any write the subject makes
+     *   emailTrusted   the same
+     *
+     * So the most a determined stranger gets out of this block is one small document saying "this
+     * is my address and I am not approved" — which is precisely what the panel needs in order to
+     * put a decision in front of the owner.
+     */
+    match /accounts/{uid} {
+      // The subject reads their own row — the waiting screen watches it, so an approval lands on
+      // their device without a reload. The admin reads all of them, which is the panel's list.
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['email', 'emailVerified', 'approved', 'emailTrusted', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.keys().hasAll(
+             ['email', 'emailVerified', 'approved', 'emailTrusted', 'createdAt'])
+        && request.resource.data.approved == false
+        && request.resource.data.emailTrusted == false
+        && selfDescribed();
+
+      // The subject refreshing their own mirror: the address and the verification flag on each
+      // sign-in, and the timestamp that tells the panel who is still turning up. Never a verdict.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['email', 'emailVerified', 'approved', 'emailTrusted', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.approved == resource.data.approved
+        && request.resource.data.emailTrusted == resource.data.emailTrusted
+        && request.resource.data.createdAt == resource.data.createdAt
+        && selfDescribed();
+
+      // The admin writing the verdicts, and only the verdicts. Stated the other way round — what
+      // must not move — so that a field added to this document later is denied to the panel until
+      // somebody has decided whether the panel should be writing it.
+      allow update: if isAdmin()
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.emailVerified == resource.data.emailVerified
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      // Turning somebody away for good. The Identity Platform account outlives it — deleting that
+      // is a console job — but without this row they are back to opening nothing, and the panel
+      // stops offering a decision that has already been made.
+      allow delete: if isAdmin();
+    }
+
+    /*
+     * Who may work the panel. Writable by nobody: appointing an admin is a console or Admin SDK
+     * job on purpose, because an admin who can appoint admins turns one stolen session into a
+     * second permanent owner. The list has one entry in it and should stay that way.
+     */
+    match /admins/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
     // Who may read and write somebody else's sleep log. One document per invited address, at the
     // top level rather than under the owner's subtree, because this rule has to resolve it from the
     // caller's token before it knows whose data is being asked for.
     //
-    // Note there is deliberately no `email_verified` check here or below. Nothing in the invite
-    // flow verifies an address — the owner creates the invitee's account by hand in the Firebase
-    // console — so requiring verification would lock out the very account the share is for. That is
-    // safe only because sign-up is disabled at the Identity Platform level, which is what stops
-    // anyone from claiming an address they do not own. IF SIGN-UP IS EVER ENABLED, THIS RULE MUST
-    // REQUIRE request.auth.token.email_verified FIRST, or a stranger can register an invited
-    // address and walk in.
+    // `trustedEmail()` is the other half of the gate here and only here, because this is the one
+    // collection keyed by an address rather than by a uid: approval says the owner has let this
+    // *person* in, and verification says the address they are claiming is actually theirs. An
+    // invited address that somebody else registers now fails the second test even if it passes the
+    // first.
     match /shares/{email} {
       // The invitee reads their own share to learn whose log to open; the owner lists the shares
       // they granted. The owner's list query filters on ownerUid, which is what makes every
       // document it can return satisfy the second clause.
-      allow read: if signedIn()
-        && (callerEmail() == email || request.auth.uid == resource.data.ownerUid);
+      allow read: if approved()
+        && ((callerEmail() == email && trustedEmail()) || request.auth.uid == resource.data.ownerUid);
 
       // Only ever created by the owner, for their own uid, with the id and the field agreeing.
-      allow create: if signedIn()
+      allow create: if approved()
         && request.auth.uid == request.resource.data.ownerUid
         && request.resource.data.email == email;
 
-      allow update, delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+      allow update, delete: if approved() && request.auth.uid == resource.data.ownerUid;
     }
 
     /*
@@ -63,22 +214,23 @@ service cloud.firestore {
      *
      * Written only by the scheduled Cloud Function, which runs on the Admin SDK and bypasses rules
      * entirely — so `write: if false` costs the collector nothing and is a statement about the
-     * client: nothing in a browser may touch this. Readable by any signed-in account, because it is
+     * client: nothing in a browser may touch this. Readable by any approved account, because it is
      * public listings data scraped from public pages and holds nothing belonging to a person. What
      * IS personal — which sources somebody is still listening to, and what was pushed — lives under
      * users/{uid} and is covered by the catch-all below.
      *
-     * These two are the only new blocks the events app needed. A top-level collection is outside
-     * the `users/{uid}/{document=**}` wildcard, so until this is deployed the feed reads nothing —
-     * which looks exactly like a collector that has not run yet.
+     * It is `approved()` and not `signedIn()` even so. Nothing here is a secret, but "a stranger
+     * with an account can still read something" is a sentence that has to stay false for the gate
+     * to be simple enough to reason about — and a reader is a reader: this collection is a few
+     * thousand documents somebody could pull in a loop.
      */
     match /events/{eventId} {
-      allow read: if signedIn();
+      allow read: if approved();
       allow write: if false;
     }
 
     match /eventSources/{sourceId} {
-      allow read: if signedIn();
+      allow read: if approved();
       allow write: if false;
     }
 
@@ -88,7 +240,7 @@ service cloud.firestore {
      *
      * Same shape and same argument as `events/` above — written only by the scheduled Cloud
      * Function on the Admin SDK, which bypasses rules entirely, so `write: if false` costs the
-     * collector nothing and is a statement about the client. Readable by any signed-in account,
+     * collector nothing and is a statement about the client. Readable by any approved account,
      * because it is public operator announcements scraped from public pages and holds nothing
      * belonging to a person. What IS personal — which stretch of which line somebody rides, and
      * what was pushed to them — lives under users/{uid} and is covered by the catch-all below.
@@ -98,17 +250,17 @@ service cloud.firestore {
      * open is not a source you can check.
      */
     match /transitItems/{itemId} {
-      allow read: if signedIn();
+      allow read: if approved();
       allow write: if false;
     }
 
     match /transitRaw/{itemId} {
-      allow read: if signedIn();
+      allow read: if approved();
       allow write: if false;
     }
 
     match /transitFeeds/{feedId} {
-      allow read: if signedIn();
+      allow read: if approved();
       allow write: if false;
     }
 
@@ -120,8 +272,13 @@ service cloud.firestore {
     // permissive union: a narrower `allow update, delete: if false` alongside this match
     // grants nothing and denies nothing, it is simply ignored. Not worth trading the
     // catch-all's "any future collection just works" for, on a single-account database.
+    //
+    // "Any future collection just works" now means "for an approved account". An unapproved one
+    // cannot even write its own diagnostic logs, which is a real cost — the first sign-in of a
+    // person who is about to be turned away is exactly the session you would want a log of — and
+    // the right trade anyway: a writable subtree is a writable subtree.
     match /users/{uid}/{document=**} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read, write: if approved() && request.auth.uid == uid;
     }
 
     // The shared baby sleep log. This sits *beside* the catch-all above rather than replacing it,
@@ -129,7 +286,7 @@ service cloud.firestore {
     // work: the owner keeps their access through the rule above, and this one adds the invitee's.
     // Only this collection is shared — a share grants nothing anywhere else under users/{uid}.
     match /users/{uid}/babySleep/{entryId} {
-      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+      allow read, write: if approved() && trustedEmail() && hasShare() && callerShare().ownerUid == uid;
     }
 
     // The night climate records — forecast low, window, and how the morning went — which are part
@@ -137,7 +294,7 @@ service cloud.firestore {
     // rather than more of the one above, so it needs its own copy of the rule: rules are a
     // permissive union, and the block above says nothing at all about this path.
     match /users/{uid}/babySleepClimate/{recordId} {
-      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+      allow read, write: if approved() && trustedEmail() && hasShare() && callerShare().ownerUid == uid;
     }
 
     // The bedtime routine records — when the routine started and when he went into the crib — which
@@ -145,7 +302,7 @@ service cloud.firestore {
     // separate collection, so another copy of the rule, for the reason above: rules are a permissive
     // union, and neither block above says anything at all about this path.
     match /users/{uid}/babySleepRoutines/{recordId} {
-      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+      allow read, write: if approved() && trustedEmail() && hasShare() && callerShare().ownerUid == uid;
     }
 
     // The targets — one document, holding the crib time bedtime is aiming at. Part of the same
@@ -154,7 +311,7 @@ service cloud.firestore {
     // copy of the rule, for the reason above: rules are a permissive union, and no block above says
     // anything at all about this path.
     match /users/{uid}/babySleepTargets/{recordId} {
-      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+      allow read, write: if approved() && trustedEmail() && hasShare() && callerShare().ownerUid == uid;
     }
 
     // The shopping list — one document per line, ticked off by whoever is in the shop. A different
@@ -167,7 +324,7 @@ service cloud.firestore {
     // whatever this block says — which is exactly what would make a forgotten one invisible to the
     // person most likely to notice, and leave the *shared* half silently dead.
     match /users/{uid}/shopping/{itemId} {
-      allow read, write: if signedIn() && hasShare() && callerShare().ownerUid == uid;
+      allow read, write: if approved() && trustedEmail() && hasShare() && callerShare().ownerUid == uid;
     }
   }
 }

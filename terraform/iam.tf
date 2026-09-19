@@ -30,3 +30,25 @@ resource "google_project_iam_member" "functions_vertex_ai" {
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${local.functions_runtime_sa}"
 }
+
+/*
+ * What lets `storage.rules` read `accounts/{uid}` out of Firestore.
+ *
+ * The bucket's rules gate every upload on the same approval document the site's Firestore rules
+ * do, which is a cross-service rule: the lookup is made by the Cloud Storage for Firebase service
+ * agent, not by the caller, and that agent can only make it while it holds this role. Without the
+ * grant every write to the sloper bucket is denied — the safe direction, and an entirely silent
+ * one from the browser, which sees a plain 403 on a picture it just made.
+ *
+ * The service agent is addressed by project NUMBER, read from `data.google_project.this` for the
+ * reason given where that data source is declared: an email built from a number nobody can check
+ * by eye is how a grant comes to name an account that does not exist.
+ *
+ * This is also the ordering the deploy workflow's `terraform` → `deploy` dependency exists for.
+ * The apply lands the role, and only then does the CLI push rules that need it.
+ */
+resource "google_project_iam_member" "firebasestorage_reads_firestore" {
+  project = local.project_id
+  role    = "roles/firebaserules.firestoreServiceAgent"
+  member  = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-firebasestorage.iam.gserviceaccount.com"
+}

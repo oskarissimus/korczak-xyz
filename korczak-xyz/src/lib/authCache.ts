@@ -1,5 +1,5 @@
 /*
- * Last-known signed-in user, mirrored to localStorage.
+ * Last-known **approved** signed-in user, mirrored to localStorage.
  *
  * Firebase persists the session in IndexedDB, which is async: `onAuthStateChanged` does not
  * fire until a round-trip completes, so anything that waits for it renders blank first. That
@@ -11,6 +11,13 @@
  * that remains is a session revoked *elsewhere*: the old address shows until Firebase says
  * otherwise, a moment later. That is an acceptable trade for a label showing the user their
  * own address, and nothing is authorised on the strength of it.
+ *
+ * **Only an approved account is ever written here**, which is why the word is in the first line.
+ * `useAuth` seeds its state from this cache and every app treats that state as "signed in", so
+ * caching an account still waiting on the owner's decision would paint a session that Firestore
+ * is about to refuse everything for. An account whose approval has not been seen yet simply has
+ * no cache entry: the first paint shows it signed out, and a beat later the account row arrives
+ * and says which of the two it is.
  */
 
 export interface CachedUser {

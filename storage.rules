@@ -24,15 +24,41 @@ rules_version = '2';
 // re-breaks the deploy.
 service firebase.storage {
   match /b/{bucket}/o {
+    /*
+     * The same admissions gate `firestore.rules` is built on, reached across the service boundary.
+     *
+     * Signing in stopped being the same thing as being let in when self-service sign-up was turned
+     * on: `accounts/{uid}.approved` is the verdict, and it lives in Firestore because that is where
+     * the panel that writes it and every other rule that reads it are. Storage rules can read it —
+     * `firestore.get()` against the DEFAULT database only — and the alternative was to leave this
+     * bucket open to anybody who can complete a sign-up form, on the reasoning that the app would
+     * not let them. The app is not the gate.
+     *
+     * TWO THINGS THIS DEPENDS ON, neither of them visible from here:
+     *
+     *   - An IAM grant. The lookup runs as the Cloud Storage for Firebase service agent, which
+     *     needs `roles/firebaserules.firestoreServiceAgent` to make it. That grant is
+     *     `firebasestorage_reads_firestore` in `terraform/iam.tf`, and the deploy workflow runs
+     *     Terraform before the rules for exactly this class of ordering. Without it every upload
+     *     fails closed, which at least fails in the safe direction.
+     *   - A missing account document denies. `firestore.get()` on a document that is not there
+     *     returns null and reading `.data` off null is an evaluation error, which is a denial —
+     *     the same reasoning as the Firestore side, where the same sentence appears.
+     */
+    function approved() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/accounts/$(request.auth.uid)).data.approved == true;
+    }
+
     match /users/{uid}/{allPaths=**} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if approved() && request.auth.uid == uid;
 
       // WHY THERE IS A SIZE CAP AT ALL. Nothing else bounds an upload: the client decides what to
       // send, and a bug — or a browser tab left open on a page that retries — can write the same
       // object over and over. 64 MiB is twice the 32 MiB the assembler will accept in either
       // direction, so it cannot refuse anything the app can legitimately produce, while still
       // being a number rather than no number.
-      allow write: if request.auth != null
+      allow write: if approved()
         && request.auth.uid == uid
         && request.resource.size < 64 * 1024 * 1024;
 
@@ -40,7 +66,7 @@ service firebase.storage {
       // delete there is no `request.resource`, so the size clause above evaluates to an error and
       // denies — and rules are a permissive union, so this second block is what grants it back.
       // Nothing in the app deletes yet; the alternative is a bucket that can only ever grow.
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if approved() && request.auth.uid == uid;
     }
   }
 }

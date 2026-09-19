@@ -26,7 +26,7 @@ export const SITE = 'https://korczak.xyz';
 const NO_ALTERNATES = new Set(['/404/', '/offline/']);
 
 /**
- * Pages that should not be in the index at all: a sign-in form, an admin panel, the two
+ * Pages that should not be in the index at all: a sign-in form, two admin panels, the two
  * invite-link landing pages, and the service worker's offline fallback. None of them mean anything
  * to someone arriving cold from a search result, and the share pages are only reachable with a
  * token in the first place. `follow` rather than `none` — the links out of them are still worth
@@ -34,6 +34,7 @@ const NO_ALTERNATES = new Set(['/404/', '/offline/']);
  */
 const NOINDEX = new Set([
   '/login/',
+  '/admin/',
   '/offline/',
   '/404/',
   '/apps/anesthesia/admin/',

@@ -98,6 +98,7 @@ export const ui = {
     // Auth
     'Login': 'Login',
     'Logout': 'Logout',
+    'auth.accounts': 'Accounts',
 
     // Apps
     'Apps': 'Apps',
@@ -422,6 +423,7 @@ export const ui = {
     // Auth
     'Login': 'Logowanie',
     'Logout': 'Wyloguj',
+    'auth.accounts': 'Konta',
 
     // Apps
     'Apps': 'Aplikacje',

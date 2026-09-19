@@ -21,3 +21,8 @@ snapshot-crawler/node_modules/
 *.tfstate.*
 tfplan
 tfplan.json
+
+# The Firestore emulator's log, written into whatever directory `emulators:exec` is run from —
+# which for the rules contract test (functions/src/rules.test.ts) is the repository root.
+firestore-debug.log
+ui-debug.log

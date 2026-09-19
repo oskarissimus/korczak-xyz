@@ -143,7 +143,7 @@ function StatusBarEmail({ email }: { email: string }) {
 }
 
 export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
-  const { enabled, user, loading, signOut } = useAuth();
+  const { enabled, user, identity, loading, signOut } = useAuth();
   const t = translations[lang];
   const loginPath = lang === 'en' ? '/login/' : '/pl/login/';
 
@@ -151,13 +151,20 @@ export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
   if (!enabled || loading) return null;
 
   // Identity variant: just the email (for the status bar); nothing when logged out.
+  //
+  // `user` rather than `identity`, deliberately: an account still waiting on the owner's approval
+  // is signed in and can do nothing, and the status bar is the site's way of saying "you are
+  // logged in and your work is being saved". It would be saying something false.
   if (variant === 'identity') {
     if (!user) return null;
     return <StatusBarEmail email={user.email ?? ''} />;
   }
 
   // Control variant: Login link or Logout button in the nav row.
-  if (user) {
+  //
+  // `identity` here, for the opposite reason: somebody waiting on approval *is* signed in, and a
+  // navbar offering them "Login" is a navbar with no way out of a session they are stuck in.
+  if (identity) {
     const handleLogout = async () => {
       await signOut();
       window.location.reload();
