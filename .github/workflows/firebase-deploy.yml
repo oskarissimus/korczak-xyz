@@ -161,6 +161,16 @@ jobs:
         run: npm test
         working-directory: functions
 
+      # The Firestore emulator is a jar, and firebase-tools 15 refuses to run it on anything below
+      # JDK 21 — the runner image's default is 17, which fails the step below with a message about
+      # Java rather than about rules. Temurin 21 is what a local run has; this is what makes CI the
+      # same machine.
+      - name: Java, for the emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
       # The rules are the whole admissions policy now that anybody can sign up, and the way they
       # fail is silent: a ruleset that quietly grants everything looks, from every screen in the
       # app, exactly like one that works. So they are executed against the real rules engine before
@@ -169,7 +179,7 @@ jobs:
       #
       # It runs from the repository root because that is where firebase.json and firestore.rules
       # are; the vitest run itself is in `functions/`, which is the package holding the emulator's
-      # one devDependency. The runner already has a JVM.
+      # one devDependency.
       - name: The rules contract
         run: |
           npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-rules \
