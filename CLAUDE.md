@@ -70,7 +70,9 @@ The site's own structured logging feeds this rather than sitting beside it. `log
 `src/lib/logger.ts` is unchanged and so are its 165 call sites, but `debug`/`info`/`warn` are now
 Sentry breadcrumbs and `error` is a Sentry event. The localStorage ring buffer and the
 `users/{uid}/logs` Firestore batches it used to write are gone, along with `src/lib/logSink.ts`.
-Old batches are still in Firestore; nothing adds to them.
+The batches two accounts had already accumulated — 5,415 documents, ~22 MB — were bulk-deleted on
+20 Sep 2026 (`gcloud firestore bulk-delete --collection-ids=logs`), once Sentry had been live for a
+day. The collection no longer exists under either account.
 
 The service worker reports by POSTing an envelope by hand (`src/sw/sentry.js`), not through the
 SDK. That is not a shortcut — `dist/sw.js` is a classic script assembled by concatenation, which

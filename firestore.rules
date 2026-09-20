@@ -267,11 +267,10 @@ service cloud.firestore {
     // Covers progress, sessions, and everything else an account keeps under its own uid.
     //
     // It used to cover `users/{uid}/logs` as well — the frontend diagnostic batches written by
-    // the site's own log sink. That sink was replaced by Sentry in Sep 2026 and nothing writes
-    // there any more. The rule is unchanged because it never named the collection: this is a
-    // recursive wildcard, and `logs` was only ever one of the things it swept up. Whatever
-    // batches an account already accumulated are still readable by that account and are dead
-    // weight; there is no code left that will add to them.
+    // the site's own log sink. That sink was replaced by Sentry in Sep 2026, and the 5,415
+    // documents the two accounts had accumulated were bulk-deleted on 20 Sep. The rule is
+    // unchanged because it never named the collection: this is a recursive wildcard, and `logs`
+    // was only ever one of the things it swept up.
     //
     // Note that everything here is writable, not append-only. Making any of it append-only would
     // mean replacing this recursive wildcard with one rule per collection, because rules are a
