@@ -37,7 +37,16 @@ const sentryPlugins = sentryAuthToken
       sentryVitePlugin({
         org: 'oskar-korczak',
         project: 'korczak-xyz',
-        url: 'https://de.sentry.io',
+        /*
+         * No `url`. This org is on Sentry's EU region, so `https://de.sentry.io` looks like the
+         * right thing to set and is in fact ignored: an org auth token carries its own region,
+         * sentry-cli prefers that over anything configured here, and it said so on every build —
+         * "Using https://sentry.io (embedded in token) rather than manually-configured URL".
+         * The upload lands in the EU org either way (verified: org oskar-korczak, project
+         * korczak-xyz, release = the commit hash). A line that cannot change the outcome and
+         * prints a warning is worse than no line, and if the token is ever replaced with one for
+         * another region, the token is what decides — not this file.
+         */
         authToken: sentryAuthToken,
         release: { name: commitHash },
         sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
