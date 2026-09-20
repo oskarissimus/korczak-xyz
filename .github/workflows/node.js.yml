@@ -35,6 +35,13 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: korczak-xyz
+        env:
+          # Source maps. astro.config.mjs adds the Sentry upload plugin only when this is set, so
+          # a fork or a local build is unaffected and a missing secret costs readable stack traces
+          # rather than the build. It has to be named here: a repository secret is not an
+          # environment variable until a step asks for it, and without this line the token exists,
+          # the build succeeds, and every Sentry frame is still a line in a minified chunk.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
       # This job used to build the site and throw it away, while Netlify ran its own build and
       # deployed that one. Deploying the artifact we just tested closes that gap: a red test now

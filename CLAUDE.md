@@ -82,10 +82,19 @@ bundler in the middle of `generate-sw.mjs`.
 **Releases are the commit hash** — the same `git rev-parse --short HEAD` the navbar's status bar
 prints, so an issue and the hash on the page name the same deploy.
 
-**Source maps need `SENTRY_AUTH_TOKEN` as a GitHub Actions secret.** Without it the build is
-exactly what it was, minus readable stack traces: `astro.config.mjs` only adds the upload plugin
-when the token is present. It is the one Sentry credential that can do damage, so unlike the DSNs
-— which are public by design and live in the source — it never reaches the bundle.
+**Source maps need `SENTRY_AUTH_TOKEN`, and it takes two things, not one.** The repository secret
+(set 20 Sep 2026 — an org token named *GitHub Actions - korczak-xyz source maps*, scope `org:ci`,
+which is source-map upload, release creation and code mappings and nothing else), **and** the
+`env:` block on the site's Build step in `node.js.yml` that hands it to the build. A secret is not
+an environment variable until a step asks for it, so with the secret alone the token exists, the
+build goes green, and every Sentry frame is still a line in a minified chunk — which is exactly
+what happened for a day between the two.
+
+Without it the build is exactly what it was, minus readable stack traces: `astro.config.mjs` only
+adds the upload plugin when the token is present, so a fork and a local build are unaffected. It
+is the one Sentry credential that can do damage, so unlike the DSNs — which are public by design
+and live in the source — it never reaches the bundle. Rotating it is a new token in Sentry plus
+`gh secret set SENTRY_AUTH_TOKEN`; nothing in the repo names its value.
 
 ## Solitaire Game
 
