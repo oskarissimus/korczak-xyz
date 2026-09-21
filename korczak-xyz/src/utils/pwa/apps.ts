@@ -16,6 +16,10 @@ import type { PwaApp } from './scope';
  * buys: its own icon, its own window and its own scope, so a wizard that holds four API keys and
  * scrolls for a thousand pixels is not a tab among thirty. See .claude/rules/sloper.md.
  *
+ * `audio-guide` fits that sentence exactly: it is a map of the square you are standing in, and
+ * the thing it is for is walking around with it. Installed it gets the whole screen, which on a
+ * map is the difference between two streets and six.
+ *
  * `backseat` is the opposite - it fits that sentence better than anything else here. It is used in
  * a phone cradle in a moving car, where every row of browser chrome is taken off a screen read at
  * arm's length, and where a stray link leaving the app kills a live camera stream. See
@@ -98,6 +102,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     nameKey: 'Backseat',
     shortNameKey: 'pwa.backseat.short',
     descriptionKey: 'backseat.desc',
+  },
+  'audio-guide': {
+    path: '/apps/audio-guide',
+    nameKey: 'AudioGuide',
+    shortNameKey: 'pwa.audioGuide.short',
+    descriptionKey: 'audioGuide.desc',
   },
 };
 

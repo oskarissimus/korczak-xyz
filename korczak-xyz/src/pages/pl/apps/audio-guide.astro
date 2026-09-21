@@ -1,0 +1,34 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import AudioGuide from '../../../components/AudioGuide/AudioGuide';
+import AudioGuideSkeleton from '../../../components/AudioGuide/AudioGuideSkeleton.astro';
+import { useTranslations } from '../../../i18n';
+import 'leaflet/dist/leaflet.css';
+import '../../../styles/audioGuide.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout
+  title={`${t('AudioGuide')} | korczak.xyz`}
+  description={t('audioGuide.desc')}
+  lang={lang}
+  pwa="audio-guide"
+>
+  <div class="window audio-guide-window">
+    <div class="title-bar">
+      <span>{t('AudioGuide')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content audio-guide-content">
+      <AudioGuide client:only="react" lang={lang}>
+        <AudioGuideSkeleton slot="fallback" lang={lang} />
+      </AudioGuide>
+    </div>
+  </div>
+</Layout>

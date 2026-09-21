@@ -138,6 +138,15 @@ const t = useTranslations(lang);
           </span>
         </a>
       </li>
+      <li>
+        <a href="/pl/apps/audio-guide/" class="app-link">
+          <span class="app-icon">{'\u{1F5FA}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('AudioGuide')}</span>
+            <span class="app-desc">{t('audioGuide.desc')}</span>
+          </span>
+        </a>
+      </li>
       <AdminAppCard client:only="react" lang={lang} />
     </ul>
   </PageContent>

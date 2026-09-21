@@ -1,0 +1,497 @@
+/* Audio guide — retro theme over a map.
+ *
+ * The problem this file solves is that a Leaflet map is a rectangle of somebody else's design
+ * dropped into a Win95 window, and the two have to be made to look like one thing. The answer
+ * throughout is that the map is the *glass*: it sits in a sunken bezel, exactly as the screens on
+ * the home screen icons do, and every control the app adds is a raised panel floating over it.
+ * Nothing recolours the tiles — a map you cannot read is not a map.
+ *
+ * Three rules carried over from the rest of the site:
+ *
+ *  1. Outset means raised, inset means pressed, groove means a boundary.
+ *  2. Nothing is read by colour alone. The pin that is generating pulses AND is the only one with
+ *     a dashed border; the player's state is a word beside the icon, never the icon alone.
+ *  3. `prefers-reduced-motion` stops the one animation here.
+ *
+ * The layout is a column: a bar, the map, a footnote. The map takes whatever is left, which is
+ * why `.ag-stage` is the flex child that grows and `.ag-map` is absolutely positioned inside it —
+ * Leaflet sizes itself from its container, and a container sized by its content is zero pixels
+ * tall forever.
+ */
+
+.audio-guide-content {
+  background: var(--retro-gray);
+  color: var(--retro-black);
+  padding: 0;
+}
+
+.ag-app {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  font-family: 'VT323', monospace;
+  color: var(--retro-black);
+  font-size: 1.1rem;
+  /* The window is the viewport minus everything above it — the navbar window, this window's own
+     title bar, the footnote and the page's bottom padding. That subtraction is a measured
+     constant rather than anything computed, because CSS cannot ask how tall the navbar came out
+     and a map sized by its content is zero pixels tall forever.
+     dvh rather than vh: on iOS the address bar comes and goes, and vh is sized for it being gone.
+     The floor matters more than the ceiling — a map shorter than about three streets is not worth
+     panning — so on a very short window the page scrolls rather than the map collapsing. */
+  height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 330px);
+  min-height: 360px;
+  max-height: 820px;
+}
+
+/* --- the bar over the map --------------------------------------------------------------- */
+
+.ag-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border: 2px groove var(--retro-white);
+  padding: 7px 10px;
+  flex: none;
+}
+
+.ag-language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ag-language-label {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.ag-select,
+.ag-input {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  background: var(--retro-white);
+  color: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 3px 6px;
+}
+
+.ag-input {
+  /* Wide enough for a language name and no wider: this shares a row with the select on a phone. */
+  width: 11ch;
+}
+
+.ag-compass {
+  padding: 5px 12px;
+  font-size: 1rem;
+  margin-left: auto;
+}
+
+.ag-compass-off {
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: #404040;
+}
+
+/* --- the map, as sunken glass ------------------------------------------------------------ */
+
+.ag-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 3px inset var(--retro-white);
+  background: #0a0a0a;
+  overflow: hidden;
+}
+
+.ag-map {
+  position: absolute;
+  inset: 0;
+  /* Leaflet's own default; stated here because the tiles are the one thing on this page that is
+     not Win95 and the background behind them while they load should not be teal. */
+  background: #1b1b1b;
+}
+
+/* Before hydration there is no map, only the hole it will fill. */
+.ag-map-placeholder {
+  background: repeating-linear-gradient(45deg, #161616, #161616 12px, #1d1d1d 12px, #1d1d1d 24px);
+}
+
+/* Leaflet's attribution is a licence notice and has to stay legible; it is restyled to the
+   site's type rather than hidden, which the tile usage policy does not allow.
+   It is also MOVED, from the bottom right to the top right, because the bottom right is where the
+   player and the progress panel live — and the panels have to sit above the map, which on a
+   phone left the one notice we are obliged to show underneath them. Nothing else is in the top
+   right: the chips are aligned left. */
+.ag-stage .leaflet-bottom.leaflet-right {
+  top: 0;
+  bottom: auto;
+}
+
+.ag-stage .leaflet-control-attribution {
+  font-family: 'VT323', monospace;
+  font-size: 0.85rem;
+  background: rgba(192, 192, 192, 0.85);
+  color: var(--retro-black);
+}
+
+.ag-stage .leaflet-control-attribution a {
+  color: #000080;
+}
+
+/* --- the pins ---------------------------------------------------------------------------- */
+
+/* Leaflet gives every DivIcon a background and a border of its own; the marker is drawn here
+   instead, so those are cleared rather than fought with. */
+.ag-marker {
+  background: none;
+  border: none;
+}
+
+.ag-marker-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 6px 2px 3px;
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  color: var(--retro-black);
+  white-space: nowrap;
+  /* A pin is a button. Without this the tap lands on the map and pans it a pixel instead. */
+  cursor: pointer;
+}
+
+.ag-marker-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.ag-marker-selected .ag-marker-body {
+  background: var(--retro-navy);
+  color: var(--retro-yellow);
+  border-color: var(--retro-white);
+}
+
+/* The one being generated: a dashed edge as well as the pulse, so the state survives both
+   reduced motion and colour blindness. */
+.ag-marker-generating .ag-marker-body {
+  border-style: dashed;
+  animation: ag-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes ag-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-marker-generating .ag-marker-body {
+    animation: none;
+  }
+}
+
+/* --- the arrow --------------------------------------------------------------------------- */
+
+.ag-user {
+  background: none;
+  border: none;
+}
+
+.ag-user-arrow {
+  display: block;
+  width: 26px;
+  height: 26px;
+  transform-origin: 50% 50%;
+}
+
+.ag-user-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 6px;
+  border-radius: 50%;
+  background: #0040ff;
+  border: 2px solid #fff;
+}
+
+/* --- what floats over the map ------------------------------------------------------------ */
+
+.ag-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Leaflet's panes sit at 400-700 and its control corners at 1000, which is the number that
+     matters: at 800 these rendered *under* the attribution. */
+  z-index: 1050;
+  pointer-events: none;
+}
+
+.ag-chip {
+  margin: 0;
+  align-self: flex-start;
+  max-width: 100%;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 4px 9px;
+  font-size: 1rem;
+  /* The chips carry a Retry button, which needs to be tappable even though the strip is not. */
+  pointer-events: auto;
+}
+
+.ag-chip-error {
+  background: var(--retro-yellow);
+}
+
+.ag-link {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #000080;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ag-dock {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- the progress panel ------------------------------------------------------------------ */
+
+.ag-generating,
+.ag-player,
+.ag-error {
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 10px 12px;
+}
+
+.ag-generating-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.ag-generating-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.ag-generating-name {
+  font-size: 1.1rem;
+  /* A long OSM name would otherwise push the panel past the map it sits on. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-progress {
+  height: 18px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+  overflow: hidden;
+}
+
+/* The blocks of a Win95 progress bar rather than a smooth fill, drawn as a repeating gradient so
+   there is no markup per block. */
+.ag-progress-fill {
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--retro-navy),
+    var(--retro-navy) 10px,
+    var(--retro-gray) 10px,
+    var(--retro-gray) 13px
+  );
+  transition: width 240ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-progress-fill {
+    transition: none;
+  }
+}
+
+.ag-generating-stage {
+  margin: 6px 0 0;
+  font-size: 1.05rem;
+}
+
+.ag-note {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  color: #404040;
+}
+
+.ag-cancel {
+  margin-top: 8px;
+  padding: 6px 16px;
+  font-size: 1rem;
+}
+
+/* --- the player -------------------------------------------------------------------------- */
+
+.ag-player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Thumb-sized, because this is pressed while walking. */
+.ag-play {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ag-play:active {
+  border-style: inset;
+}
+
+.ag-play-glyph {
+  font-size: 1.3rem;
+  color: var(--retro-black);
+  line-height: 1;
+}
+
+.ag-player-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ag-player-name {
+  font-size: 1.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-player-state {
+  font-size: 0.95rem;
+  color: #303030;
+}
+
+.ag-player-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ag-player-close:active {
+  border-style: inset;
+}
+
+/* Yellow on navy, the site's own phosphor: this is a notice about how good the narration is, not
+   a failure, so it must not wear the red of one. */
+.ag-warning {
+  margin: 8px 0 0;
+  background: var(--retro-navy);
+  color: var(--retro-yellow);
+  border: 2px outset var(--retro-white);
+  padding: 7px 9px;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+/* --- when it fails ----------------------------------------------------------------------- */
+
+.ag-error-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 9px;
+  line-height: 1.6;
+  margin: 0 0 6px;
+  color: #a00000;
+}
+
+.ag-error-body {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+/* The provider's own words: quoted, in a monospace that says so, and deliberately quieter than
+   the sentence above it. */
+.ag-error-detail {
+  margin: 6px 0 0;
+  padding: 5px 7px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-dark-gray);
+  font-size: 0.95rem;
+  word-break: break-word;
+  color: #303030;
+}
+
+.ag-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.ag-error-actions .retro-btn {
+  padding: 6px 14px;
+  font-size: 1rem;
+}
+
+/* --- the footnote ------------------------------------------------------------------------ */
+
+.ag-foot {
+  flex: none;
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: #303030;
+}
+
+.ag-credits {
+  display: block;
+}
+
+/* On a phone the window goes full bleed and the bar's two controls need the whole width; the
+   footnote loses its second line, which is a licence notice Leaflet also prints on the map. */
+@media (max-width: 600px) {
+  .ag-app {
+    /* Less to subtract: the body goes full bleed, so the gutters and most of the page padding
+       are gone, and the navbar collapses to its menu button. */
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 250px);
+    padding: 8px;
+  }
+
+  .ag-credits {
+    display: none;
+  }
+}

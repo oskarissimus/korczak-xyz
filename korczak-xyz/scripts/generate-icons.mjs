@@ -74,6 +74,7 @@ const sources = {
   transit: { file: join(iconsDir, 'transit.svg'), maskable: 'bleed' },
   sloper: { file: join(iconsDir, 'sloper.svg'), maskable: 'bleed' },
   backseat: { file: join(iconsDir, 'backseat.svg'), maskable: 'bleed' },
+  'audio-guide': { file: join(iconsDir, 'audio-guide.svg'), maskable: 'bleed' },
 };
 
 /**

@@ -48,6 +48,12 @@ const SHELL_ROUTES = ['/', '/pl', '/apps/tuner', '/pl/apps/tuner', '/songs', '/p
  * localStorage and is the one part of that app that works offline. Without the tier the icon
  * opens /offline instead, and there is no reaching the settings of an app you cannot open.
  *
+ * `audio-guide` is the same shape again, and its tier buys the least of any of them: the map
+ * tiles are cross-origin and the worker never intercepts those, so offline the app opens onto
+ * grey. It is still worth the two routes it costs, because the alternative is that a home screen
+ * icon leads to /offline in the one place somebody is most likely to have no signal - abroad,
+ * standing in front of the thing they wanted a guide to.
+ *
  * `backseat` is the same argument with a sharper edge. A ride needs a network — every remark is a
  * vision call — but the app is opened in a car, which is where a network is least reliable, and
  * what opens first is the setup sheet backed by localStorage. Without the tier the home screen
@@ -62,6 +68,7 @@ const APP_TIERS = {
   transit: /^(\/pl)?\/apps\/transit(\/|$)/,
   sloper: /^(\/pl)?\/apps\/sloper(\/|$)/,
   backseat: /^(\/pl)?\/apps\/backseat(\/|$)/,
+  'audio-guide': /^(\/pl)?\/apps\/audio-guide(\/|$)/,
 };
 
 /**
