@@ -7,13 +7,14 @@
  * Cloud Function, because all three steps need API keys and a key in a static page is a key
  * anybody can spend.
  *
- * THIS BACKEND IS NOT IN THIS REPOSITORY, and it is the only thing on korczak.xyz that is not.
- * It is `function/function.go` in `oskarissimus/audio-guide-v2`, deployed by that repository's
- * own workflow to GCP project `prompt-compressor-1` - not to `korczak-xyz-501720`, where the rest
- * of the site's backend lives. The port moved the app and left the service where it already ran:
- * it is live, it answers `*` for CORS, and moving it would have meant putting somebody's OpenAI
- * and ElevenLabs keys into a second project's Secret Manager to change nothing a reader can see.
- * `.claude/rules/audio-guide.md` has the argument and what it would take to bring it home.
+ * The backend is `audio-guide-function/` at the root of this repository - Go, deployed with gcloud
+ * to `korczak-xyz-501720` beside the site's other functions. It came from
+ * `oskarissimus/audio-guide-v2` (project `prompt-compressor-1`) in Sep 2026.
+ *
+ * BACKEND_URL still names the OLD deployment until the new one holds both provider keys and has
+ * answered a real request; flipping it to
+ * `https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio` is the cutover.
+ * `.claude/rules/audio-guide.md` has the sequence.
  */
 
 import type { Attraction } from './types';

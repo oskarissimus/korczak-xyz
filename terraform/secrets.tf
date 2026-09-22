@@ -19,7 +19,14 @@ locals {
     "VAPID_PUBLIC_KEY",
     "VAPID_PRIVATE_KEY",
     "TICKETMASTER_API_KEY",
+
+    # The audio guide's two providers. Read by the Go function in audio-guide-function/, which
+    # gcloud deploys rather than the Firebase CLI - see the grant at the bottom of this file.
+    "OPENAI_API_KEY",
+    "ELEVENLABS_API_KEY",
   ]
+
+  audio_guide_secrets = ["OPENAI_API_KEY", "ELEVENLABS_API_KEY"]
 }
 
 resource "google_secret_manager_secret" "app" {
@@ -44,4 +51,25 @@ resource "google_secret_manager_secret" "app" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+/*
+ * The audio guide's runtime may read its two keys.
+ *
+ * The Firebase CLI grants this itself for every secret a Node function names, which is why the
+ * three secrets above need no line here. `gcloud functions deploy --set-secrets` does not: it
+ * mounts the secret and leaves the grant to you, and without it the new revision fails to start
+ * with a permission error on the secret rather than on anything that says IAM. The runtime is the
+ * default compute account, whose `roles/editor` does not include `secretAccessor`.
+ *
+ * Per secret, not project-wide, so the audio guide's identity grant reads exactly the two keys it
+ * uses. `_member`, so it is additive like everything else in this directory.
+ */
+resource "google_secret_manager_secret_iam_member" "audio_guide_reads_keys" {
+  for_each = toset(local.audio_guide_secrets)
+
+  project   = local.project_id
+  secret_id = google_secret_manager_secret.app[each.value].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${local.functions_runtime_sa}"
 }

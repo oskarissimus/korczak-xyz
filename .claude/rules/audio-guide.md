@@ -1,7 +1,8 @@
 ---
 name: audio-guide
-description: The audio guide at /apps/audio-guide/ - the map and its pins, the one backend that is not in this repository, what a tap costs, the iOS audio unlock, and the narration language.
+description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend and its cutover, what a tap costs, the iOS audio unlock, and the narration language.
 paths:
+  - "audio-guide-function/**"
   - "**/utils/audioGuide/**"
   - "**/components/AudioGuide/**"
   - "**/hooks/useAudioGuide.ts"
@@ -19,42 +20,73 @@ thinks is worth looking at. Tap one and a model writes a minute about it, a voic
 plays. Ported from `oskarissimus/audio-guide-v2` (a Vite app of hand-written DOM, deployed to
 GitHub Pages) in Sep 2026.
 
-What moved is the front half. What did not move is the backend, and that is the first thing to
-know about this app.
+The front half moved first; the backend followed a few days later, and it is still Go.
 
-### The one thing not in this repository
+### The backend is `audio-guide-function/`, and the only Go in the repository
 
-`utils/audioGuide/narration.ts` posts to
-`https://us-central1-prompt-compressor-1.cloudfunctions.net/generate-audio`. That function is
-`function/function.go` in `oskarissimus/audio-guide-v2`, deployed by **that** repository's
-workflow, to **GCP project `prompt-compressor-1`** — not to `korczak-xyz-501720`, where the rest
-of this site's backend lives. It is the only piece of the serving path for any app here that is
-neither in git nor in the project CLAUDE.md names.
+`audio-guide-function/function.go` is the function that used to be `function/function.go` in
+`oskarissimus/audio-guide-v2`, deployed to GCP project `prompt-compressor-1` in `us-central1`. It
+now deploys to **`korczak-xyz-501720`, `europe-central2`, as `generate-audio`** — beside the Node
+functions, but not among them:
 
-It stayed because moving it would have changed nothing a reader can see and would have cost the
-one thing that is genuinely hard to move: two API keys. The function holds an OpenAI key and an
-ElevenLabs key, it is live, it answers `Access-Control-Allow-Origin: *`, and bringing it home
-means creating both secrets in a second project's Secret Manager, porting 438 lines of Go to
-TypeScript, and then having two deployments of the same service to keep in step until the old one
-is deleted. That is worth doing the day something else needs it — a rate limit, a sign-in check on the server,
-an account of what it spends — and is not worth doing to tidy a URL.
+- **The Firebase CLI cannot deploy it.** It does Node and Python. So it has its own job,
+  `audio-guide` in `firebase-deploy.yml`, which runs `gofmt`, `go vet` and `go test` and then
+  `gcloud functions deploy`. It needs `terraform` like `deploy` does, and runs beside it.
+- **The CLI will not delete it either.** `firebase deploy --only functions --force` prunes only
+  functions carrying its own `deployment-tool` label, and a gcloud deploy carries none. Nothing
+  about the Node codebase can reach this function, and nothing in this job can reach that one.
+- **The keys are Secret Manager secrets**, `OPENAI_API_KEY` and `ELEVENLABS_API_KEY`, mounted with
+  `--set-secrets` — where the old workflow put them into plain env vars from GitHub secrets.
+  Terraform owns the containers and, in `secrets.tf`, the per-secret `secretAccessor` grant for
+  the runtime account: the Firebase CLI makes that grant itself for Node functions, gcloud does
+  not, and the default compute account's `roles/editor` does not include it.
+- **`--max-instances=5`** is a spending ceiling, not tuning.
+- **Not in Sentry.** The four Node functions report to `korczak-xyz-functions`; this one logs each
+  provider failure with `log.Printf` to Cloud Logging and nothing else. Adding `sentry-go` is the
+  obvious next step if its failures ever need to be seen rather than looked up.
 
-What it does, in order, so the port can be read without the Go: reverse-geocodes the coordinates
-with Nominatim; asks `gpt-4o-mini` for facts about the named place at that address; asks it again
-for a 80–150 word script written for a speech synthesiser (numbers as words, abbreviations
-expanded — the prompt is emphatic about it, because "1889" read aloud is "one thousand eight
-hundred and eighty-nine"); has ElevenLabs' `eleven_multilingual_v2` read it; and answers with the
-MP3. If Nominatim failed it sets `X-Location-Warning`, which is why the player sometimes carries a
-notice about accuracy.
+What it does, in order: reverse-geocodes the coordinates with Nominatim; asks `gpt-4o-mini` for
+facts about the named place at that address; asks it again for a 80–150 word script written for a
+speech synthesiser (numbers as words, abbreviations expanded — the prompt is emphatic about it,
+because "1889" read aloud is "one thousand eight hundred and eighty-nine"); has ElevenLabs'
+`eleven_multilingual_v2` read it; and answers with the MP3. If Nominatim failed it sets
+`X-Location-Warning`, which is why the player sometimes carries a notice about accuracy.
 
-**If the guide starts failing everywhere and nothing here changed, look there.** The failure
-arrives as a 502 with the provider's own sentence in it, which the app shows verbatim under a
-translated one — that quote is the diagnosis.
+The prompts, the model, the voice, the validation limits and the CORS headers are the original's,
+unchanged. **One behaviour did change in the move**: a provider failure used to be a bare
+`Failed to generate audio`, with the provider's reason thrown away — so the `quota` branch of
+`classifyNarrationFailure` could never fire. The 502 now carries the provider's own sentence
+(`Failed to generate facts: OpenAI 429: You exceeded your current quota…`), pulled out of
+OpenAI's `error.message` or ElevenLabs' `detail.message`, which the app shows verbatim under a
+translated one. **If the guide starts failing everywhere and nothing here changed, that quote is
+the diagnosis.** A network error or timeout says only that, never our own plumbing.
+
+### The cutover, and where it stands
+
+The values of the two keys are not in this repository, not in Terraform state, and could not be
+copied across: nothing here can read `prompt-compressor-1`. So the move is three steps, and
+**until the third, the app still posts to the old deployment** — `BACKEND_URL` in
+`utils/audioGuide/narration.ts` is the one line that decides which backend a tap spends.
+
+1. The keys go in by hand, once, from wherever they are kept:
+   ```sh
+   printf %s "$OPENAI_KEY"     | gcloud secrets versions add OPENAI_API_KEY     --data-file=- --project=korczak-xyz-501720
+   printf %s "$ELEVENLABS_KEY" | gcloud secrets versions add ELEVENLABS_API_KEY --data-file=- --project=korczak-xyz-501720
+   ```
+   Until both have a version, the `audio-guide` job warns *Audio guide not deployed* and skips
+   — `--set-secrets` against an empty container fails the deploy outright, and a red job would
+   hold nothing back that a warning does not. `none`, the repo's placeholder value, is read as
+   unset, so a placeholder answers 500 (`config` in the app) rather than posting "none" as a key.
+2. Re-run *Deploy Firebase* (`workflow_dispatch`), and post one real request to
+   `https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio`.
+3. Flip `BACKEND_URL` to that address. Then — and only then — delete `generate-audio` in
+   `prompt-compressor-1` and the `OPENAI_API_KEY`/`ELEVENLABS_API_KEY` secrets in
+   `audio-guide-v2`, whose workflow would otherwise redeploy it on its next push.
 
 ### Every tap spends money, so the app is behind the account gate
 
-A tap is two model calls and a minute of synthesised speech, billed to whoever's keys are in
-`prompt-compressor-1` — and this is a public page on a site with real traffic, where the old app
+A tap is two model calls and a minute of synthesised speech, billed to whoever's keys the backend
+holds — and this is a public page on a site with real traffic, where the old app
 was a toy on GitHub Pages. So since Sep 2026 the whole island sits behind `AudioGuideGate`: it
 opens for **approved** accounts only (`auth.user`, see `.claude/rules/accounts.md`), says "waiting
 for approval" to a pending one, and offers sign-in, with a `redirect` back here, to everybody else.
@@ -67,11 +99,11 @@ page is the same height on both sides of it.
 
 **The gate is not security, and the function is still open.** It removes the only page that
 spends it; the URL is in the bundle and answers `*` to anyone who posts. Closing it for real means
-the function verifying a Firebase ID token — which is the day it moves home to
-`korczak-xyz-501720`, per the section above, because that is where the accounts are. Sending the
-token from here before then would break the preflight: the function answers
-`Access-Control-Allow-Headers: Content-Type` and nothing else (checked Sep 2026), so an
-`Authorization` header fails every tap.
+the function verifying a Firebase ID token, which the move to `korczak-xyz-501720` is what makes
+possible — that is where the accounts are. It is not done yet. Sending the token from the app
+first would break the preflight: the function answers `Access-Control-Allow-Headers:
+Content-Type` and nothing else, so an `Authorization` header fails every tap. The server side
+(allow the header, verify the token, check approval) has to ship first.
 
 What keeps an approved session survivable is still that nothing fires on its own: no guide is
 generated by panning, by loading the page, or by any crawler, because the only path to that
