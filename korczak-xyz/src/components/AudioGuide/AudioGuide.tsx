@@ -17,14 +17,17 @@
  * written; the player once there is one; a notice when something failed. Nothing scrolls, because
  * this is read standing in a square with one hand.
  *
- * NOTHING IS SIGNED IN AND NOTHING IS SAVED. There is no account here and no Firestore: the one
- * piece of state worth keeping between visits is the narration language, and that is a single
- * localStorage key. A guide itself is megabytes of MP3 that a walk leaves behind.
+ * SIGNED IN, BUT NOTHING IS SAVED. The app opens for approved accounts only (`AudioGuideGate`),
+ * because every tap spends somebody's money. The account is the admission and nothing more: no
+ * Firestore, and the one piece of state worth keeping between visits is the narration language,
+ * a single localStorage key. A guide itself is megabytes of MP3 that a walk leaves behind.
  */
 
 import { useAudioGuide } from '../../hooks/useAudioGuide';
+import { useAuth } from '../../hooks/useAuth';
 import { useNearbyAttractions } from '../../hooks/useNearbyAttractions';
 import { useUserPosition } from '../../hooks/useUserPosition';
+import AudioGuideGate from './AudioGuideGate';
 import GenerationBar from './GenerationBar';
 import LanguagePicker from './LanguagePicker';
 import MapPane from './MapPane';
@@ -63,6 +66,19 @@ function guideMessage(error: ReturnType<typeof useAudioGuide>['error'], t: Trans
 }
 
 export default function AudioGuide({ lang }: AudioGuideProps) {
+  const auth = useAuth();
+  return (
+    <AudioGuideGate auth={auth} lang={lang}>
+      <AudioGuideApp lang={lang} />
+    </AudioGuideGate>
+  );
+}
+
+/*
+ * Behind the gate, so that none of its hooks run for a visitor who cannot use it: no location
+ * prompt, no Overpass request, no silent WAV.
+ */
+function AudioGuideApp({ lang }: AudioGuideProps) {
   const t: Translation = translations[lang];
   const places = useNearbyAttractions();
   const position = useUserPosition();

@@ -19,6 +19,17 @@ export type Lang = 'en' | 'pl';
 
 export const translations = {
   en: {
+    // The account gate
+    gateSignedOutTitle: 'Sign in for a guide',
+    gateSignedOutBody:
+      'Every guide is written and recorded fresh, and that costs real money, so the audio guide ' +
+      'is for signed-in accounts.',
+    gateSignIn: 'Sign in',
+    gatePendingTitle: 'Waiting for approval',
+    gatePendingBody:
+      'Your account is signed in but has not been let in yet. The audio guide opens once it has.',
+    gateUnavailable: 'Accounts are not available on this copy of the site, so neither is the guide.',
+
     // The band over the map
     title: 'Audio guide',
     pitch: 'Tap a pin and hear what happened there.',
@@ -81,6 +92,17 @@ export const translations = {
     costNote: 'Every tap writes and records a new guide, so give it twenty seconds or so.',
   },
   pl: {
+    gateSignedOutTitle: 'Zaloguj się po przewodnik',
+    gateSignedOutBody:
+      'Każdy przewodnik jest pisany i nagrywany od nowa, a to kosztuje prawdziwe pieniądze, więc ' +
+      'audioprzewodnik jest dla zalogowanych kont.',
+    gateSignIn: 'Zaloguj się',
+    gatePendingTitle: 'Czeka na zatwierdzenie',
+    gatePendingBody:
+      'Twoje konto jest zalogowane, ale jeszcze nie zostało wpuszczone. Audioprzewodnik otworzy ' +
+      'się, gdy to nastąpi.',
+    gateUnavailable: 'Ta kopia strony nie obsługuje kont, więc przewodnik też nie działa.',
+
     title: 'Audioprzewodnik',
     pitch: 'Dotknij pinezki i posłuchaj, co się tam wydarzyło.',
 
