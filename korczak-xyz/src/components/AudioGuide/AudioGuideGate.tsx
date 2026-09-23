@@ -1,8 +1,8 @@
 /**
  * The account gate in front of the whole audio guide.
  *
- * Every tap on a pin is two model calls and a minute of synthesised speech, billed to real keys,
- * and this is a public page on a site with real traffic. So the app opens for **approved accounts
+ * Every tap on a pin is two model calls and a minute of synthesised speech, billed to the
+ * reader's own keys, which are kept in their account. So the app opens for **approved accounts
  * only**, the same admission every other account-backed app on the site waits for.
  *
  * It gates the whole island rather than the tap, on purpose: behind it are a geolocation prompt
@@ -10,9 +10,8 @@
  * they cannot have a guide. The frame stays the app's own shape — bar, stage, footnote — so the
  * page is exactly as tall behind the gate as in front of it, and nothing jumps when it opens.
  *
- * THIS IS NOT SECURITY. The narration function lives in another project and still answers anyone
- * who posts to it (`utils/audioGuide/narration.ts`). What the gate removes is the only *page* that
- * spends it; `.claude/rules/audio-guide.md` has what closing the function itself would take.
+ * THIS IS NOT SECURITY, and nothing needs it to be. The narration function answers anybody who
+ * posts to it, but spends only the keys it is sent (`audio-guide-function/function.go`).
  */
 import type { ReactNode } from 'react';
 import type { AuthApi } from '../../hooks/useAuth';

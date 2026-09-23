@@ -2,9 +2,8 @@
  * The whole of `/apps/audio-guide/`, as one island.
  *
  * Ported from `oskarissimus/audio-guide-v2` (a Vite app of hand-written DOM on GitHub Pages) in
- * Sep 2026. What moved is the front half: the map, the pins, the player and the state between
- * them. What did not move is the Cloud Function that writes and records the narration — see
- * `utils/audioGuide/narration.ts` for why it stayed where it was.
+ * Sep 2026, and its Go backend followed into `audio-guide-function/` — see
+ * `utils/audioGuide/narration.ts`.
  *
  * ONE ISLAND, NO ROUTES, for the same reason as sloper and the backseat driver: there is a live
  * thing here that a navigation would tear down mid-flight. Two of them, in fact — a geolocation
@@ -13,22 +12,27 @@
  * is the worst kind.
  *
  * THE LAYOUT IS THE MAP. Everything else is a strip over it that appears when it has something to
- * say: the language picker, which is the only setting; a progress bar while a guide is being
- * written; the player once there is one; a notice when something failed. Nothing scrolls, because
- * this is read standing in a square with one hand.
+ * say: the language picker and the keys, which are the only settings; a progress bar while a
+ * guide is being written; the player once there is one; a notice when something failed. Nothing
+ * scrolls, because this is read standing in a square with one hand.
  *
- * SIGNED IN, BUT NOTHING IS SAVED. The app opens for approved accounts only (`AudioGuideGate`),
- * because every tap spends somebody's money. The account is the admission and nothing more: no
- * Firestore, and the one piece of state worth keeping between visits is the narration language,
- * a single localStorage key. A guide itself is megabytes of MP3 that a walk leaves behind.
+ * SIGNED IN, AND ALMOST NOTHING IS SAVED. The app opens for approved accounts only
+ * (`AudioGuideGate`). What is kept between visits is the reader's two API keys — in localStorage
+ * and `users/{uid}/audioGuide/config`, like sloper's and the backseat driver's — and the narration
+ * language, one localStorage key. A guide itself is megabytes of MP3 that a walk leaves behind.
  */
 
+import { useEffect, useRef, useState } from 'react';
+
 import { useAudioGuide } from '../../hooks/useAudioGuide';
-import { useAuth } from '../../hooks/useAuth';
+import { useAudioGuideKeys } from '../../hooks/useAudioGuideKeys';
+import { useAuth, type AuthUser } from '../../hooks/useAuth';
+import { missingKeys } from '../../utils/audioGuide/keys';
 import { useNearbyAttractions } from '../../hooks/useNearbyAttractions';
 import { useUserPosition } from '../../hooks/useUserPosition';
 import AudioGuideGate from './AudioGuideGate';
 import GenerationBar from './GenerationBar';
+import KeysSheet from './KeysSheet';
 import LanguagePicker from './LanguagePicker';
 import MapPane from './MapPane';
 import PlayerBar from './PlayerBar';
@@ -58,8 +62,8 @@ function guideMessage(error: ReturnType<typeof useAudioGuide>['error'], t: Trans
       return t.errorRateLimited;
     case 'quota':
       return t.errorQuota;
-    case 'config':
-      return t.errorConfig;
+    case 'keys':
+      return t.errorKeys;
     default:
       return t.errorFailed;
   }
@@ -69,7 +73,7 @@ export default function AudioGuide({ lang }: AudioGuideProps) {
   const auth = useAuth();
   return (
     <AudioGuideGate auth={auth} lang={lang}>
-      <AudioGuideApp lang={lang} />
+      {auth.user && <AudioGuideApp lang={lang} user={auth.user} />}
     </AudioGuideGate>
   );
 }
@@ -78,11 +82,26 @@ export default function AudioGuide({ lang }: AudioGuideProps) {
  * Behind the gate, so that none of its hooks run for a visitor who cannot use it: no location
  * prompt, no Overpass request, no silent WAV.
  */
-function AudioGuideApp({ lang }: AudioGuideProps) {
+function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
   const t: Translation = translations[lang];
   const places = useNearbyAttractions();
   const position = useUserPosition();
-  const guide = useAudioGuide(lang);
+  const keys = useAudioGuideKeys(user);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const guide = useAudioGuide(lang, keys.keys, () => setKeysOpen(true));
+  const keysMissing = missingKeys(keys.keys).length > 0;
+
+  /*
+   * Open the sheet once, by itself, when the app finds a key missing — but only after the account
+   * has answered, or a phone whose keys are in the account (or borrowable from the other two apps)
+   * would be asked for them for the half-second before they arrive.
+   */
+  const askedOnce = useRef(false);
+  useEffect(() => {
+    if (askedOnce.current || !keys.ready || keys.sync === 'syncing') return;
+    askedOnce.current = true;
+    if (keysMissing) setKeysOpen(true);
+  }, [keys.ready, keys.sync, keysMissing]);
 
   const generating = guide.status === 'generating';
 
@@ -90,6 +109,15 @@ function AudioGuideApp({ lang }: AudioGuideProps) {
     <div className="ag-app">
       <div className="ag-bar">
         <LanguagePicker value={guide.language} onChange={guide.setLanguage} t={t} />
+
+        <button
+          type="button"
+          className={keysMissing ? 'retro-btn ag-keys-btn ag-keys-btn-missing' : 'retro-btn ag-keys-btn'}
+          aria-expanded={keysOpen}
+          onClick={() => setKeysOpen(!keysOpen)}
+        >
+          {keysMissing ? t.keysButtonMissing : t.keysButton}
+        </button>
 
         {/* Only where the platform requires a gesture to ask — that is, on iOS. Elsewhere the
             compass is already reporting and a button would do nothing but confuse. */}
@@ -141,6 +169,8 @@ function AudioGuideApp({ lang }: AudioGuideProps) {
         </div>
 
         <div className="ag-dock">
+          {keysOpen && <KeysSheet api={keys} onClose={() => setKeysOpen(false)} t={t} />}
+
           {generating && guide.startedAt !== null && (
             <GenerationBar
               startedAt={guide.startedAt}

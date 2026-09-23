@@ -5,10 +5,15 @@ const fail = (status: number, message = 'something') =>
   classifyNarrationFailure(new NarrationError(message, status));
 
 describe('classifyNarrationFailure', () => {
-  it('knows the function’s own missing-keys answer from a provider failure', () => {
-    // 500 is the Cloud Function's "Service configuration error" — its keys are unset, and no
-    // amount of tapping again will help.
-    expect(fail(500, 'Service configuration error')).toBe('config');
+  it('reads a 401 as the reader’s keys, missing or refused', () => {
+    // The one failure the reader can fix on the spot; the app opens the keys sheet for it.
+    expect(fail(401, 'No OpenAI key was sent')).toBe('keys');
+    expect(fail(401, 'Failed to generate audio: ElevenLabs 401: Invalid API key')).toBe('keys');
+  });
+
+  it('does not send somebody to re-paste a key that is merely out of credit', () => {
+    // ElevenLabs reports an exhausted quota as a 401, which the function passes on as one.
+    expect(fail(401, 'Failed to generate audio: ElevenLabs 401: This request exceeds your quota')).toBe('quota');
   });
 
   it('reads a rate limit off the status', () => {
@@ -16,17 +21,18 @@ describe('classifyNarrationFailure', () => {
   });
 
   it('digs an exhausted account out of the 502 everything else arrives as', () => {
-    expect(fail(502, 'ElevenLabs error 401: quota_exceeded')).toBe('quota');
-    expect(fail(502, 'OpenAI error 429: insufficient_quota')).toBe('quota');
+    expect(fail(502, 'Failed to generate audio: ElevenLabs 402: This request exceeds your quota.')).toBe('quota');
+    expect(fail(502, 'Failed to generate facts: OpenAI 429: You exceeded your current quota')).toBe('quota');
     expect(fail(502, 'billing hard limit reached')).toBe('quota');
   });
 
   it('finds a provider’s rate limit inside the same 502', () => {
-    expect(fail(502, 'OpenAI error 429: Rate limit reached')).toBe('rate-limited');
+    expect(fail(502, 'Failed to generate script: OpenAI 429: Rate limit reached')).toBe('rate-limited');
   });
 
   it('falls back rather than guessing, which is what the verbatim quote is for', () => {
-    expect(fail(502, 'Failed to generate audio')).toBe('failed');
+    expect(fail(502, 'Failed to generate audio: upstream request failed')).toBe('failed');
+    expect(fail(500, 'anything')).toBe('failed');
     expect(fail(418, 'teapot')).toBe('failed');
   });
 

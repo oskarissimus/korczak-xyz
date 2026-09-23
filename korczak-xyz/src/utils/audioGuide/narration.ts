@@ -1,25 +1,23 @@
 /*
  * The one request that costs money.
  *
- * A name, a category and a pair of coordinates go out; an MP3 comes back. Everything between -
- * reverse geocoding the coordinates with Nominatim, asking a model for facts, turning those into
- * a script written for a speech synthesiser, and paying ElevenLabs to read it - happens inside a
- * Cloud Function, because all three steps need API keys and a key in a static page is a key
- * anybody can spend.
+ * A name, a category and a pair of coordinates go out, with the reader's two keys; an MP3 comes
+ * back. Everything between - reverse geocoding with Nominatim, asking a model for facts, turning
+ * those into a script written for a speech synthesiser, and paying ElevenLabs to read it - happens
+ * in `audio-guide-function/` at the root of this repository: Go, deployed with gcloud to
+ * `korczak-xyz-501720` beside the site's other functions. It came from `oskarissimus/audio-guide-v2`
+ * (project `prompt-compressor-1`) in Sep 2026.
  *
- * The backend is `audio-guide-function/` at the root of this repository - Go, deployed with gcloud
- * to `korczak-xyz-501720` beside the site's other functions. It came from
- * `oskarissimus/audio-guide-v2` (project `prompt-compressor-1`) in Sep 2026.
- *
- * BACKEND_URL still names the OLD deployment until the new one holds both provider keys and has
- * answered a real request; flipping it to
- * `https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio` is the cutover.
- * `.claude/rules/audio-guide.md` has the sequence.
+ * The keys are the reader's, typed into the keys sheet or borrowed from sloper or the backseat
+ * driver (`keys.ts`), and travel in two headers on every request. The function uses them for that
+ * one guide and keeps nothing - which is also why it can answer anybody: a stranger posting here
+ * pays for their own guide.
  */
 
+import type { ApiKeys } from './keys';
 import type { Attraction } from './types';
 
-const BACKEND_URL = 'https://us-central1-prompt-compressor-1.cloudfunctions.net/generate-audio';
+const BACKEND_URL = 'https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio';
 
 /**
  * The header the function sets when Nominatim could not tell it where the coordinates are.
@@ -67,11 +65,18 @@ export class NarrationError extends Error {
 export async function requestNarration(
   attraction: Attraction,
   language: string,
+  keys: ApiKeys,
   signal: AbortSignal,
 ): Promise<Narration> {
   const response = await fetch(BACKEND_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      // Named in the function's Access-Control-Allow-Headers; a header it does not list fails the
+      // preflight and the tap with it.
+      'X-OpenAI-Key': keys.openai ?? '',
+      'X-ElevenLabs-Key': keys.elevenLabs ?? '',
+    },
     body: JSON.stringify({
       name: attraction.name,
       category: attraction.category,
@@ -100,19 +105,21 @@ export async function requestNarration(
 /**
  * What went wrong, as something the UI can put a sentence to.
  *
- * The function collapses OpenAI's and ElevenLabs' failures into one 502 carrying a short reason,
- * so the status alone cannot tell a rate limit from an exhausted account — hence the match on the
- * reason text. It is deliberately loose: the wording is the providers' to change, and `failed` is
- * a perfectly good answer when they do. A 500 is the function's own "Service configuration error",
- * which means its keys are missing and no amount of retrying will help.
+ * 401 is the function saying a key is missing or a provider refused one, which is the one failure
+ * the reader can fix on the spot — the app opens the keys sheet for it. Everything else from a
+ * provider arrives as a 502 carrying the provider's own sentence, so the status alone cannot tell a
+ * rate limit from an exhausted account — hence the match on the text. It is deliberately loose: the
+ * wording is the providers' to change, and `failed` is a perfectly good answer when they do.
  */
-export type GuideFailure = 'rate-limited' | 'quota' | 'config' | 'failed';
+export type GuideFailure = 'keys' | 'rate-limited' | 'quota' | 'failed';
 
 export function classifyNarrationFailure(e: unknown): GuideFailure {
   if (!(e instanceof NarrationError)) return 'failed';
-  if (e.status === 429) return 'rate-limited';
-  if (e.status === 500) return 'config';
+  // Before the 401: ElevenLabs answers an exhausted quota with a 401 of its own, and sending the
+  // reader to re-paste a key that is fine would be the wrong advice.
   if (/quota|billing|credit|insufficient/i.test(e.message)) return 'quota';
+  if (e.status === 401) return 'keys';
+  if (e.status === 429) return 'rate-limited';
   if (/rate.?limit|too many requests|\b429\b/i.test(e.message)) return 'rate-limited';
   return 'failed';
 }

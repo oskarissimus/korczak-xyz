@@ -22,8 +22,8 @@ export const translations = {
     // The account gate
     gateSignedOutTitle: 'Sign in for a guide',
     gateSignedOutBody:
-      'Every guide is written and recorded fresh, and that costs real money, so the audio guide ' +
-      'is for signed-in accounts.',
+      'Every guide is written and recorded fresh on your own API keys, and those are kept in your ' +
+      'account, so the audio guide is for signed-in accounts.',
     gateSignIn: 'Sign in',
     gatePendingTitle: 'Waiting for approval',
     gatePendingBody:
@@ -33,6 +33,31 @@ export const translations = {
     // The band over the map
     title: 'Audio guide',
     pitch: 'Tap a pin and hear what happened there.',
+
+    // The keys
+    keysButton: 'Keys',
+    keysButtonMissing: 'Add keys',
+    keysTitle: 'API keys',
+    keysBlurb:
+      'Yours, billed to you. OpenAI writes each guide and ElevenLabs reads it. The keys go to ' +
+      'this site’s narration function with every tap, are used for that one guide, and are not ' +
+      'kept there.',
+    keyOpenai: 'OpenAI key',
+    keyElevenLabs: 'ElevenLabs key',
+    keyShow: 'Show',
+    keyHide: 'Hide',
+    keyNotSet: 'not set',
+    keySet: 'set',
+    keysBorrowed:
+      'Filled in from the Video Generation Wizard or the Annoying Passenger Simulator, so you do ' +
+      'not have to paste them twice. They are copies: changing one here does not change it there.',
+    keysNeeded: 'Both keys are needed before a pin can be read to you.',
+    syncLocal: 'This browser only',
+    syncSyncing: 'Checking the account…',
+    syncSynced: 'Saved to your account',
+    syncError: 'Not saved to the account — still in this browser. The next edit tries again.',
+    keysDone: 'Done',
+    keysClear: 'Clear keys',
 
     // The narration language
     languageLabel: 'Narration in',
@@ -79,8 +104,8 @@ export const translations = {
     // What can go wrong
     errorTitle: 'No guide this time',
     errorRateLimited: 'Too many guides at once. Wait a moment and tap again.',
-    errorQuota: 'The account behind the narration is out of credit.',
-    errorConfig: 'The narration service is not configured right now.',
+    errorKeys: 'A key is missing or was refused. Check them in the keys sheet.',
+    errorQuota: 'One of your provider accounts is out of credit.',
     errorFailed: 'The narration service could not answer.',
     locationWarning:
       'This one could not be placed on a map, so the story is written from its name alone and ' +
@@ -89,13 +114,14 @@ export const translations = {
 
     // The footnote under the map
     credits: 'Map and places from OpenStreetMap. Narration written and read by machine.',
-    costNote: 'Every tap writes and records a new guide, so give it twenty seconds or so.',
+    costNote:
+      'Every tap writes and records a new guide on your keys, so give it twenty seconds or so.',
   },
   pl: {
     gateSignedOutTitle: 'Zaloguj się po przewodnik',
     gateSignedOutBody:
-      'Każdy przewodnik jest pisany i nagrywany od nowa, a to kosztuje prawdziwe pieniądze, więc ' +
-      'audioprzewodnik jest dla zalogowanych kont.',
+      'Każdy przewodnik jest pisany i nagrywany od nowa na twoich kluczach API, a te są trzymane ' +
+      'na koncie, więc audioprzewodnik jest dla zalogowanych kont.',
     gateSignIn: 'Zaloguj się',
     gatePendingTitle: 'Czeka na zatwierdzenie',
     gatePendingBody:
@@ -105,6 +131,30 @@ export const translations = {
 
     title: 'Audioprzewodnik',
     pitch: 'Dotknij pinezki i posłuchaj, co się tam wydarzyło.',
+
+    keysButton: 'Klucze',
+    keysButtonMissing: 'Dodaj klucze',
+    keysTitle: 'Klucze API',
+    keysBlurb:
+      'Twoje, na twój rachunek. OpenAI pisze każdy przewodnik, a ElevenLabs go czyta. Klucze ' +
+      'trafiają z każdym dotknięciem do funkcji narracji tej strony, służą do tego jednego ' +
+      'przewodnika i nie są tam przechowywane.',
+    keyOpenai: 'Klucz OpenAI',
+    keyElevenLabs: 'Klucz ElevenLabs',
+    keyShow: 'Pokaż',
+    keyHide: 'Ukryj',
+    keyNotSet: 'brak',
+    keySet: 'jest',
+    keysBorrowed:
+      'Wzięte z Kreatora generowania wideo albo z Symulatora upierdliwego pasażera, żeby nie ' +
+      'wklejać ich drugi raz. To kopie: zmiana tutaj nie zmienia ich tam.',
+    keysNeeded: 'Potrzebne są oba klucze, zanim pinezka zostanie ci przeczytana.',
+    syncLocal: 'Tylko ta przeglądarka',
+    syncSyncing: 'Sprawdzam konto…',
+    syncSynced: 'Zapisane na koncie',
+    syncError: 'Niezapisane na koncie — zostają w tej przeglądarce. Następna zmiana spróbuje ponownie.',
+    keysDone: 'Gotowe',
+    keysClear: 'Wyczyść klucze',
 
     languageLabel: 'Narracja w języku',
     languageOther: 'Inny…',
@@ -147,8 +197,8 @@ export const translations = {
 
     errorTitle: 'Tym razem bez przewodnika',
     errorRateLimited: 'Za dużo przewodników naraz. Poczekaj chwilę i dotknij ponownie.',
-    errorQuota: 'Konto, z którego powstaje narracja, nie ma już środków.',
-    errorConfig: 'Serwis narracji nie jest teraz skonfigurowany.',
+    errorKeys: 'Brakuje klucza albo został odrzucony. Sprawdź je w kluczach.',
+    errorQuota: 'Na którymś z twoich kont u dostawców skończyły się środki.',
     errorFailed: 'Serwis narracji nie odpowiedział.',
     locationWarning:
       'Tego miejsca nie udało się umiejscowić na mapie, więc opowieść powstała z samej nazwy i ' +
@@ -156,7 +206,9 @@ export const translations = {
     dismiss: 'Zamknij',
 
     credits: 'Mapa i miejsca z OpenStreetMap. Narrację pisze i czyta maszyna.',
-    costNote: 'Każde dotknięcie pisze i nagrywa nowy przewodnik, więc daj mu ze dwadzieścia sekund.',
+    costNote:
+      'Każde dotknięcie pisze i nagrywa nowy przewodnik na twoich kluczach, więc daj mu ze ' +
+      'dwadzieścia sekund.',
   },
 } as const;
 

@@ -1,8 +1,9 @@
 ---
 name: audio-guide
-description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend and its cutover, what a tap costs, the iOS audio unlock, and the narration language.
+description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend, the keys and where they live, what a tap costs, the iOS audio unlock, and the narration language.
 paths:
   - "audio-guide-function/**"
+  - "**/hooks/useAudioGuideKeys.ts"
   - "**/utils/audioGuide/**"
   - "**/components/AudioGuide/**"
   - "**/hooks/useAudioGuide.ts"
@@ -35,12 +36,12 @@ functions, but not among them:
 - **The CLI will not delete it either.** `firebase deploy --only functions --force` prunes only
   functions carrying its own `deployment-tool` label, and a gcloud deploy carries none. Nothing
   about the Node codebase can reach this function, and nothing in this job can reach that one.
-- **The keys are Secret Manager secrets**, `OPENAI_API_KEY` and `ELEVENLABS_API_KEY`, mounted with
-  `--set-secrets` — where the old workflow put them into plain env vars from GitHub secrets.
-  Terraform owns the containers and, in `secrets.tf`, the per-secret `secretAccessor` grant for
-  the runtime account: the Firebase CLI makes that grant itself for Node functions, gcloud does
-  not, and the default compute account's `roles/editor` does not include it.
-- **`--max-instances=5`** is a spending ceiling, not tuning.
+- **It holds no keys.** They are the reader's, and arrive in `X-OpenAI-Key` and
+  `X-ElevenLabs-Key` on every request — see the next section. No Secret Manager, no env vars, no
+  fallback key of its own. A missing key, or one a provider refuses, is a **401**; everything else
+  a provider says no to is a 502.
+- **`--max-instances=5`** is a ceiling on what a stranger can use it for — the providers are
+  paid with the caller's keys, but the instance time is ours.
 - **Not in Sentry.** The four Node functions report to `korczak-xyz-functions`; this one logs each
   provider failure with `log.Printf` to Cloud Logging and nothing else. Adding `sentry-go` is the
   obvious next step if its failures ever need to be seen rather than looked up.
@@ -52,8 +53,8 @@ because "1889" read aloud is "one thousand eight hundred and eighty-nine"); has 
 `eleven_multilingual_v2` read it; and answers with the MP3. If Nominatim failed it sets
 `X-Location-Warning`, which is why the player sometimes carries a notice about accuracy.
 
-The prompts, the model, the voice, the validation limits and the CORS headers are the original's,
-unchanged. **One behaviour did change in the move**: a provider failure used to be a bare
+The prompts, the model, the voice and the validation limits are the original's, unchanged. Two
+behaviours changed in the move: where the keys come from (next section), and this: a provider failure used to be a bare
 `Failed to generate audio`, with the provider's reason thrown away — so the `quota` branch of
 `classifyNarrationFailure` could never fire. The 502 now carries the provider's own sentence
 (`Failed to generate facts: OpenAI 429: You exceeded your current quota…`), pulled out of
@@ -61,32 +62,46 @@ OpenAI's `error.message` or ElevenLabs' `detail.message`, which the app shows ve
 translated one. **If the guide starts failing everywhere and nothing here changed, that quote is
 the diagnosis.** A network error or timeout says only that, never our own plumbing.
 
-### The cutover, and where it stands
+### The keys are the reader's, typed in the app like sloper's
 
-The values of the two keys are not in this repository, not in Terraform state, and could not be
-copied across: nothing here can read `prompt-compressor-1`. So the move is three steps, and
-**until the third, the app still posts to the old deployment** — `BACKEND_URL` in
-`utils/audioGuide/narration.ts` is the one line that decides which backend a tap spends.
+OpenAI and ElevenLabs, in localStorage under `audio-guide-config` and in
+`users/{uid}/audioGuide/config` — the same arrangement as sloper's and the backseat driver's, down
+to the shape: `keys.ts` (pure), `keyStorage.ts`, `keyCloud.ts`, `useAudioGuideKeys`. Everything
+`.claude/rules/backseat.md` says under *The keys* applies here unchanged and is the reason for each
+piece: last write wins wholesale on one `updatedAt`, `pulledRef` gates the push, `settled` is
+written on purpose, and the account-side borrow runs **after** the three sync branches. Read it
+before simplifying any of them.
 
-1. The keys go in by hand, once, from wherever they are kept:
-   ```sh
-   printf %s "$OPENAI_KEY"     | gcloud secrets versions add OPENAI_API_KEY     --data-file=- --project=korczak-xyz-501720
-   printf %s "$ELEVENLABS_KEY" | gcloud secrets versions add ELEVENLABS_API_KEY --data-file=- --project=korczak-xyz-501720
-   ```
-   Until both have a version, the `audio-guide` job warns *Audio guide not deployed* and skips
-   — `--set-secrets` against an empty container fails the deploy outright, and a red job would
-   hold nothing back that a warning does not. `none`, the repo's placeholder value, is read as
-   unset, so a placeholder answers 500 (`config` in the app) rather than posting "none" as a key.
-2. Re-run *Deploy Firebase* (`workflow_dispatch`), and post one real request to
-   `https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio`.
-3. Flip `BACKEND_URL` to that address. Then — and only then — delete `generate-audio` in
-   `prompt-compressor-1` and the `OPENAI_API_KEY`/`ELEVENLABS_API_KEY` secrets in
-   `audio-guide-v2`, whose workflow would otherwise redeploy it on its next push.
+**The one difference is where the keys go.** The other two apps call providers from the page. A
+guide is four steps and a minute of MP3, so here the page hands both keys to the Go function in
+two headers on each tap, and the function uses them for that request and keeps nothing. That is
+also why the function may answer anybody: a stranger posting to it pays for their own guide.
+`Access-Control-Allow-Headers` must name both headers or every tap fails its preflight;
+`Access-Control-Max-Age: 600` spares the second tap a preflight.
 
-### Every tap spends money, so the app is behind the account gate
+**A first visit borrows**, per key, first from sloper and then from the backseat driver — in the
+browser (`sloper-config`, `sloper-api-config`, `backseat-config`) and, for a device with nothing
+local, from `users/{uid}/sloper/config` and `users/{uid}/backseat/config`. Per key rather than per
+config because the backseat driver only asks for ElevenLabs when one of its voices is picked. They
+are **copies**, and the sheet says so under the fields: revoking a key means clearing it in each app.
 
-A tap is two model calls and a minute of synthesised speech, billed to whoever's keys the backend
-holds — and this is a public page on a site with real traffic, where the old app
+The sheet (`KeysSheet.tsx`) sits over the map. It opens by itself once, when the account has
+answered and a key is still missing — not before, or a phone whose keys are on their way would be
+asked for them for half a second — and whenever a tap is made without both keys (no request is
+sent: it would only come back 401 after the progress bar) or a provider refuses one.
+Its fields commit on blur, not per keystroke, since each commit is a Firestore write.
+
+`classifyNarrationFailure` checks for quota wording **before** the 401: ElevenLabs reports an
+exhausted quota as a 401, and telling somebody to re-paste a key that is merely out of credit is the
+wrong advice.
+
+The old deployment in `prompt-compressor-1` is no longer called by anything here. It still holds
+that project's own keys and will be redeployed by `audio-guide-v2`'s workflow on its next push;
+deleting it there is the last step of the move, and nothing in this repository can do it.
+
+### Every tap spends money, and the app is behind the account gate
+
+A tap is two model calls and a minute of synthesised speech, billed to the reader's own keys — and this is a public page on a site with real traffic, where the old app
 was a toy on GitHub Pages. So since Sep 2026 the whole island sits behind `AudioGuideGate`: it
 opens for **approved** accounts only (`auth.user`, see `.claude/rules/accounts.md`), says "waiting
 for approval" to a pending one, and offers sign-in, with a `redirect` back here, to everybody else.
@@ -97,13 +112,10 @@ who is then told they cannot have a guide. `AudioGuideApp` — everything with a
 mounted until the gate opens. The gate draws the app's own frame (empty stage, footnote) so the
 page is the same height on both sides of it.
 
-**The gate is not security, and the function is still open.** It removes the only page that
-spends it; the URL is in the bundle and answers `*` to anyone who posts. Closing it for real means
-the function verifying a Firebase ID token, which the move to `korczak-xyz-501720` is what makes
-possible — that is where the accounts are. It is not done yet. Sending the token from the app
-first would break the preflight: the function answers `Access-Control-Allow-Headers:
-Content-Type` and nothing else, so an `Authorization` header fails every tap. The server side
-(allow the header, verify the token, check approval) has to ship first.
+**The gate is not security, and since the keys moved into the app it does not need to be.** The
+function answers anybody who posts, but it spends only the keys it is sent. What the gate now
+buys is the account the keys are kept in, and not showing a geolocation prompt to somebody who
+has no keys and no account to put them in.
 
 What keeps an approved session survivable is still that nothing fires on its own: no guide is
 generated by panning, by loading the page, or by any crawler, because the only path to that

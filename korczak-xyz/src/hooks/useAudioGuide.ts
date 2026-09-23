@@ -12,6 +12,11 @@
  *  2. Nothing else. The fetch is started after, and it is deliberately not awaited by `select`'s
  *     caller - the marker handler returns immediately so the map stays responsive.
  *
+ * NO KEYS, NO REQUEST. A tap with either key missing opens the keys sheet (`onNeedKeys`) and sends
+ * nothing: the function would only answer 401, and a twenty-second progress bar ending in "check
+ * your keys" is worse than being asked straight away. A 401 that comes back anyway - a key a
+ * provider refused - opens the sheet the same way, beside the error.
+ *
  * WHAT IS NOT KEPT: nothing. No narration is cached, in memory or anywhere else. Re-tapping the
  * pin you are already listening to does not re-fetch (that is the `key` check), but coming back
  * to it later does, and pays for it again. A cache is tempting and is the wrong shape here - the
@@ -22,6 +27,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
+import { missingKeys, type ApiKeys } from '../utils/audioGuide/keys';
 import { loadLanguage, saveLanguage } from '../utils/audioGuide/language';
 import {
   classifyNarrationFailure,
@@ -54,7 +60,11 @@ export interface AudioGuideState {
   dismissError: () => void;
 }
 
-export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
+export function useAudioGuide(
+  lang: 'en' | 'pl',
+  keys: ApiKeys,
+  onNeedKeys: () => void,
+): AudioGuideState {
   const [status, setStatus] = useState<GuideStatus>('idle');
   const [selected, setSelected] = useState<Attraction | null>(null);
   const [guide, setGuide] = useState<AudioGuide | null>(null);
@@ -72,6 +82,12 @@ export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
   const audio = useRef<HTMLAudioElement | null>(null);
   const language_ = useRef(language);
   language_.current = language;
+  // Read at request time rather than captured, so a key pasted while a pin is selected is the one
+  // the retry uses.
+  const keys_ = useRef(keys);
+  keys_.current = keys;
+  const needKeys = useRef(onNeedKeys);
+  needKeys.current = onNeedKeys;
 
   const discard = useCallback(() => {
     inFlight.current?.abort();
@@ -101,7 +117,12 @@ export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
       });
 
       try {
-        const narration = await requestNarration(attraction, language_.current, controller.signal);
+        const narration = await requestNarration(
+          attraction,
+          language_.current,
+          keys_.current,
+          controller.signal,
+        );
         if (controller.signal.aborted) {
           // Nobody is waiting for this any more, and the URL would otherwise never be revoked.
           URL.revokeObjectURL(narration.audioUrl);
@@ -136,7 +157,9 @@ export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
         if (controller.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) {
           return;
         }
-        setError(classifyNarrationFailure(e));
+        const failure = classifyNarrationFailure(e);
+        setError(failure);
+        if (failure === 'keys') needKeys.current();
         setErrorDetail(e instanceof NarrationError ? e.message : null);
         setStatus('error');
         setStartedAt(null);
@@ -150,6 +173,11 @@ export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
     (attraction: Attraction) => {
       // First, and synchronously: this is the only moment that counts as a user gesture.
       void unlock();
+
+      if (missingKeys(keys_.current).length > 0) {
+        needKeys.current();
+        return;
+      }
 
       // A second tap on what is already loaded is a request to hear it again, not to buy it
       // twice. Anything else starts over.
@@ -185,6 +213,10 @@ export function useAudioGuide(lang: 'en' | 'pl'): AudioGuideState {
 
   const retry = useCallback(() => {
     if (!selected) return;
+    if (missingKeys(keys_.current).length > 0) {
+      needKeys.current();
+      return;
+    }
     discard();
     setError(null);
     setErrorDetail(null);

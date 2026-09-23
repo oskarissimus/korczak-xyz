@@ -523,3 +523,104 @@
     display: none;
   }
 }
+
+/* --- the keys ----------------------------------------------------------------------------- */
+
+.ag-keys-btn {
+  padding: 5px 12px;
+  font-size: 1rem;
+}
+
+/* Missing keys are the one state in which a tap does nothing, so the button says so in the colour
+   the error chips use. */
+.ag-keys-btn-missing {
+  background: var(--retro-yellow);
+}
+
+.ag-keys {
+  background: var(--retro-gray);
+  border: 3px outset var(--retro-white);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Over a phone-sized map, with the keyboard up, the sheet must scroll rather than push its own
+     Done button off the stage. */
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
+.ag-keys .ag-gate-title {
+  margin: 0;
+}
+
+.ag-keys-blurb,
+.ag-keys-note,
+.ag-keys-sync {
+  margin: 0;
+  font-size: 1rem;
+  color: #303030;
+}
+
+.ag-keys-note {
+  border-left: 3px solid var(--retro-dark-gray);
+  padding-left: 8px;
+}
+
+.ag-keys-sync-error {
+  color: #a00000;
+}
+
+.ag-key {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ag-key-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+
+.ag-key-chip {
+  font-size: 0.9rem;
+  padding: 0 6px;
+  border: 1px solid var(--retro-dark-gray);
+  background: #d8d8d8;
+  color: var(--retro-dark-gray);
+}
+
+.ag-key-chip-on {
+  border-color: #006000;
+  color: #006000;
+}
+
+.ag-key-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* Wider than the language box it shares `.ag-input` with: a key is read back to check a paste
+   landed whole. */
+.ag-input.ag-key-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.ag-key-toggle {
+  flex: none;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 2px 10px;
+  cursor: pointer;
+  color: var(--retro-black);
+}
+
+.ag-key-toggle:active {
+  border-style: inset;
+}
