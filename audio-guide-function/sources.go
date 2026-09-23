@@ -439,11 +439,14 @@ func geosearchArticle(ctx context.Context, lang string, a *Attraction) *article 
 		} `json:"query"`
 	}
 	params := url.Values{
-		"action":        {"query"},
-		"list":          {"geosearch"},
-		"gscoord":       {fmt.Sprintf("%f|%f", a.Latitude, a.Longitude)},
-		"gsradius":      {fmt.Sprint(geosearchRadius)},
-		"gslimit":       {"20"},
+		"action":   {"query"},
+		"list":     {"geosearch"},
+		"gscoord":  {fmt.Sprintf("%f|%f", a.Latitude, a.Longitude)},
+		"gsradius": {fmt.Sprint(geosearchRadius)},
+		// Titles only, so a hundred costs nothing - and in a city centre twenty is not enough: the
+		// Pałac Staszica shares its exact point with five institutions housed in it, each with an
+		// article, and there are thirty more within a hundred metres.
+		"gslimit":       {"100"},
 		"format":        {"json"},
 		"formatversion": {"2"},
 	}
