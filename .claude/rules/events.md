@@ -36,6 +36,25 @@ go.
 Two halves. `korczak-xyz/src/utils/events/` and `src/components/Events/` are the client;
 `functions/` is a scheduled Cloud Function that collects and sends.
 
+### Filters are per source, and opt-in — the owner's standing rule
+
+**Every filter belongs to one source, is switched on for that source by name, and is never
+inferred.** Stated by the owner (Sep 2026) while the app is being tuned: the point is to
+understand and control exactly what each source does, one at a time, until each is where it
+should be. A filter that appears on a source because its data happens to fit — the town picker
+turning up on python.org's conference calendar because its rows named two cities — is the
+thing this rule forbids, even when it is harmless.
+
+In practice:
+
+- A new filter is a flag on that source's `SOURCE_CATALOGUE` entry (`townPicker`, `unclassified`)
+  and is set only on the source it was asked for. Offering it to another source is a separate
+  request, not a generalisation to make on the way.
+- Its setting lives on that source's switch in `sourcePrefs.ts` and is drawn on that source's
+  card, so what reaches the feed and the lock screen is readable one card at a time.
+- No cross-source or global filter — nothing like the interests, which applied one rule
+  everywhere and were removed for exactly that (see *The interests are gone* below).
+
 ### One rule, two runtimes
 
 `src/utils/events/` is compiled **twice** — by Astro for the browser, and by `tsc` into the Cloud
