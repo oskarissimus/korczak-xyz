@@ -3,7 +3,8 @@
  *
  * An attraction is an OpenStreetMap element that survived `transformAttractions` - it has a name
  * and a position, which are the two things the rest of the app cannot do without. Everything else
- * OSM knows about it is kept in `tags` and used only to name a category for the prompt.
+ * OSM knows about it that could help tell its story is kept in `tags` (see `STORY_TAGS` in
+ * `overpass.ts`) and sent with the tap, so the narration can be grounded in it.
  */
 
 /** The map's current rectangle, in the order Overpass writes one. */
@@ -30,6 +31,12 @@ export interface Attraction {
   lon: number;
   /** An OSM tag value (`museum`, `historic:castle`), handed to the model as-is. */
   category: string;
+  /**
+   * The tags the backend grounds the narration in: the Wikipedia and Wikidata links, dates,
+   * architects, inscriptions, other names. Only those - see `STORY_TAGS` - because every pin in
+   * the tile cache carries them.
+   */
+  tags: Record<string, string>;
 }
 
 /**
@@ -48,8 +55,10 @@ export interface AudioGuide {
   /** Object URL for the MP3. Revoked when the guide is replaced - see `useAudioGuide`. */
   audioUrl: string;
   /**
-   * Set when the backend could not reverse-geocode the coordinates, in which case the narration
-   * was written from the name and category alone and is more likely to be generic or wrong.
+   * Set when the backend could not reverse-geocode the coordinates. The facts are still checked
+   * against their sources, but the local Wikipedia may not have been the one read.
    */
   locationWarning: string | null;
+  /** Links to the sources the narration's facts were taken from, in the order they were used. */
+  sources: string[];
 }

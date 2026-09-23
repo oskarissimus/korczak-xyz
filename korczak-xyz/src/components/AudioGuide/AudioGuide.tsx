@@ -64,6 +64,8 @@ function guideMessage(error: ReturnType<typeof useAudioGuide>['error'], t: Trans
       return t.errorQuota;
     case 'keys':
       return t.errorKeys;
+    case 'no-sources':
+      return t.errorNoSources;
     default:
       return t.errorFailed;
   }
@@ -189,9 +191,12 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
                   you would paste into a provider's support page. */}
               {guide.errorDetail && <p className="ag-error-detail">{guide.errorDetail}</p>}
               <div className="ag-error-actions">
-                <button type="button" className="retro-btn" onClick={guide.retry}>
-                  {t.retry}
-                </button>
+                {/* Asking again finds the same nothing, and pays for the looking. */}
+                {guide.error !== 'no-sources' && (
+                  <button type="button" className="retro-btn" onClick={guide.retry}>
+                    {t.retry}
+                  </button>
+                )}
                 <button type="button" className="retro-btn" onClick={guide.dismissError}>
                   {t.dismiss}
                 </button>
@@ -205,6 +210,7 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
               playing={guide.playing}
               ended={guide.ended}
               locationWarning={guide.guide.locationWarning !== null}
+              sources={guide.guide.sources}
               onToggle={guide.togglePlay}
               onClose={guide.cancel}
               t={t}

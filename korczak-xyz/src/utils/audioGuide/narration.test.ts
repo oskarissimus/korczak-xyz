@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { classifyNarrationFailure, NarrationError } from './narration';
+import {
+  classifyNarrationFailure,
+  NarrationError,
+  parseSources,
+  sourceLabel,
+} from './narration';
 
 const fail = (status: number, message = 'something') =>
   classifyNarrationFailure(new NarrationError(message, status));
@@ -39,5 +44,33 @@ describe('classifyNarrationFailure', () => {
   it('treats anything that is not one of ours as a plain failure', () => {
     expect(classifyNarrationFailure(new Error('network'))).toBe('failed');
     expect(classifyNarrationFailure('nope')).toBe('failed');
+  });
+});
+
+describe('a place nothing is known about', () => {
+  it('is told apart by its code, not by its wording', () => {
+    expect(
+      classifyNarrationFailure(new NarrationError('No sources found about this place', 422, 'no_sources')),
+    ).toBe('no-sources');
+    // A 422 without the code is somebody else's 422.
+    expect(classifyNarrationFailure(new NarrationError('whatever', 422))).toBe('failed');
+  });
+});
+
+describe('the sources header', () => {
+  it('reads space-separated links and drops anything that is not one', () => {
+    expect(
+      parseSources(
+        'https://pl.wikipedia.org/wiki/Pa%C5%82ac_Staszica  https://www.wikidata.org/wiki/Q1 javascript:alert(1) nonsense',
+      ),
+    ).toEqual(['https://pl.wikipedia.org/wiki/Pa%C5%82ac_Staszica', 'https://www.wikidata.org/wiki/Q1']);
+    expect(parseSources(null)).toEqual([]);
+    expect(parseSources('')).toEqual([]);
+  });
+
+  it('names each source by what it is', () => {
+    expect(sourceLabel('https://pl.wikipedia.org/wiki/X')).toBe('Wikipedia (pl)');
+    expect(sourceLabel('https://www.wikidata.org/wiki/Q1')).toBe('Wikidata');
+    expect(sourceLabel('https://www.openstreetmap.org/way/1')).toBe('OpenStreetMap');
   });
 });

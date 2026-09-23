@@ -108,13 +108,19 @@ export const translations = {
     errorKeys: 'A key is missing or was refused. Check them in the keys sheet.',
     errorQuota: 'One of your provider accounts is out of credit.',
     errorFailed: 'The narration service could not answer.',
+    errorNoSources:
+      'Nothing reliable is written about this place — no article and no checkable details on the ' +
+      'map — so there is no guide rather than a made-up one.',
+    sourcesLabel: 'Sources:',
     locationWarning:
-      'This one could not be placed on a map, so the story is written from its name alone and ' +
-      'may be about somewhere else of the same name.',
+      'The address could not be looked up, so the local encyclopedia may not have been read. ' +
+      'Everything you hear is still taken from the sources below.',
     dismiss: 'Dismiss',
 
     // The footnote under the map
-    credits: 'Map and places from OpenStreetMap. Narration written and read by machine.',
+    credits:
+      'Map and places from OpenStreetMap. Facts from Wikipedia, Wikidata and OpenStreetMap; ' +
+      'narration written and read by machine.',
     costNote:
       'Every tap writes and records a new guide on your keys, so give it twenty seconds or so.',
   },
@@ -202,12 +208,18 @@ export const translations = {
     errorKeys: 'Brakuje klucza albo został odrzucony. Sprawdź je w kluczach.',
     errorQuota: 'Na którymś z twoich kont u dostawców skończyły się środki.',
     errorFailed: 'Serwis narracji nie odpowiedział.',
+    errorNoSources:
+      'O tym miejscu nie ma nic wiarygodnego — ani artykułu, ani sprawdzalnych danych na mapie — ' +
+      'więc zamiast zmyślonego przewodnika nie ma żadnego.',
+    sourcesLabel: 'Źródła:',
     locationWarning:
-      'Tego miejsca nie udało się umiejscowić na mapie, więc opowieść powstała z samej nazwy i ' +
-      'może dotyczyć innego miejsca o tej samej nazwie.',
+      'Nie udało się ustalić adresu, więc lokalna encyklopedia mogła nie zostać przeczytana. ' +
+      'Wszystko, co słyszysz, i tak pochodzi ze źródeł poniżej.',
     dismiss: 'Zamknij',
 
-    credits: 'Mapa i miejsca z OpenStreetMap. Narrację pisze i czyta maszyna.',
+    credits:
+      'Mapa i miejsca z OpenStreetMap. Fakty z Wikipedii, Wikidanych i OpenStreetMap; narrację ' +
+      'pisze i czyta maszyna.',
     costNote:
       'Każde dotknięcie pisze i nagrywa nowy przewodnik na twoich kluczach, więc daj mu ze ' +
       'dwadzieścia sekund.',

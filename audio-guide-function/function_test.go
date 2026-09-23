@@ -2,54 +2,146 @@ package function
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
-// fakeProviders stands up Nominatim, OpenAI and ElevenLabs on one httptest server and points the
-// package at it. Each handler can be replaced per test.
+// fakeProviders stands up Nominatim, Wikidata, Wikipedia, OpenAI and ElevenLabs on one httptest
+// server and points the package at it. Each piece can be replaced per test.
 type fakeProviders struct {
+	mu sync.Mutex
+
 	nominatim  http.HandlerFunc
-	openAI     http.HandlerFunc
 	elevenLabs http.HandlerFunc
-	chatCalls  int
+	// What the facts call answers with (the JSON the model would write), and what the script
+	// call answers with. A replacement for the whole OpenAI handler goes in openAI.
+	factsJSON string
+	openAI    http.HandlerFunc
+
+	// Wikidata entities by id, as wbgetentities returns them.
+	entities map[string]any
+	// Wikipedia article text by "lang:title".
+	articles map[string]string
+	// Geosearch titles by language.
+	geosearch map[string][]string
+
+	chatCalls    int
+	ttsCalls     int
+	scriptPrompt string
+	factsPrompt  string
+	wikiRequests []string
 }
+
+const staszicText = "Pałac Staszica – klasycystyczny pałac w Warszawie przy ulicy Nowy Świat 72. " +
+	"Został wzniesiony w latach 1820–1823 według projektu Antonia Corazziego. " +
+	"Budowę sfinansował Stanisław Staszic z przeznaczeniem na siedzibę Towarzystwa Przyjaciół Nauk. " +
+	"W 1893 roku Rosjanie przebudowali go w stylu bizantyjsko-ruskim. " +
+	"Po odzyskaniu niepodległości przywrócono mu klasycystyczny wygląd."
 
 func newFakeProviders(t *testing.T) *fakeProviders {
 	t.Helper()
 	f := &fakeProviders{
 		nominatim: func(w http.ResponseWriter, r *http.Request) {
-			io.WriteString(w, `{"address":{"road":"Krakowskie Przedmieście","city":"Warszawa","country":"Polska"}}`)
-		},
-		openAI: func(w http.ResponseWriter, r *http.Request) {
-			io.WriteString(w, `{"choices":[{"message":{"content":"Some facts."}}]}`)
+			io.WriteString(w, `{"address":{"road":"Nowy Świat","city":"Warszawa","country":"Polska","country_code":"pl"}}`)
 		},
 		elevenLabs: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "audio/mpeg")
 			io.WriteString(w, "ID3-fake-mp3")
 		},
+		factsJSON: `{"facts":[
+			{"fact":"Zbudowany w latach 1820–1823.","source":"S1","evidence":"Został wzniesiony w latach 1820–1823 według projektu Antonia Corazziego."},
+			{"fact":"Zaprojektował go Antonio Corazzi.","source":"S1","evidence":"według projektu Antonia Corazziego"},
+			{"fact":"W 1893 roku przebudowany w stylu bizantyjsko-ruskim.","source":"S1","evidence":"W 1893 roku Rosjanie przebudowali go w stylu bizantyjsko-ruskim."}
+		]}`,
+		entities:  map[string]any{},
+		articles:  map[string]string{"pl:Pałac Staszica": staszicText},
+		geosearch: map[string][]string{},
 	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/reverse", func(w http.ResponseWriter, r *http.Request) { f.nominatim(w, r) })
 	mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
 		f.chatCalls++
-		f.openAI(w, r)
+		f.mu.Unlock()
+		if f.openAI != nil {
+			f.openAI(w, r)
+			return
+		}
+		var req chatRequest
+		json.NewDecoder(r.Body).Decode(&req)
+		if r.Header.Get("Authorization") != "Bearer sk-test" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		content := "Witamy przy pałacu."
+		if req.ResponseFormat != nil {
+			f.factsPrompt = req.Messages[1].Content
+			content = f.factsJSON
+		} else {
+			f.scriptPrompt = req.Messages[1].Content
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]string{"content": content}}},
+		})
 	})
-	mux.HandleFunc("/tts/", func(w http.ResponseWriter, r *http.Request) { f.elevenLabs(w, r) })
+	mux.HandleFunc("/tts/", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		f.ttsCalls++
+		f.mu.Unlock()
+		f.elevenLabs(w, r)
+	})
+	mux.HandleFunc("/wikidata", func(w http.ResponseWriter, r *http.Request) {
+		out := map[string]any{}
+		for _, id := range strings.Split(r.URL.Query().Get("ids"), "|") {
+			if e, ok := f.entities[id]; ok {
+				out[id] = e
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]any{"entities": out})
+	})
+	mux.HandleFunc("/wiki/{lang}", func(w http.ResponseWriter, r *http.Request) {
+		lang, q := r.PathValue("lang"), r.URL.Query()
+		f.mu.Lock()
+		f.wikiRequests = append(f.wikiRequests, lang+" "+q.Get("list")+q.Get("titles"))
+		f.mu.Unlock()
+		if q.Get("list") == "geosearch" {
+			var hits []any
+			for _, title := range f.geosearch[lang] {
+				hits = append(hits, map[string]any{"title": title, "dist": 40.0})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"query": map[string]any{"geosearch": hits}})
+			return
+		}
+		title := q.Get("titles")
+		text, ok := f.articles[lang+":"+title]
+		page := map[string]any{"title": title, "extract": text}
+		if !ok {
+			page = map[string]any{"title": title, "missing": true}
+		}
+		json.NewEncoder(w).Encode(map[string]any{"query": map[string]any{"pages": []any{page}}})
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	prev := [3]string{nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint}
+	prev := [5]string{nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint, wikidataEndpoint, wikipediaEndpoint}
 	nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint = srv.URL+"/reverse", srv.URL+"/chat", srv.URL+"/tts"
-	t.Cleanup(func() { nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint = prev[0], prev[1], prev[2] })
+	wikidataEndpoint, wikipediaEndpoint = srv.URL+"/wikidata", srv.URL+"/wiki/%s"
+	t.Cleanup(func() {
+		nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint = prev[0], prev[1], prev[2]
+		wikidataEndpoint, wikipediaEndpoint = prev[3], prev[4]
+	})
 
 	return f
 }
 
-const validBody = `{"name":"Pałac Staszica","category":"historic","latitude":52.24,"longitude":21.02,"language":"Polski"}`
+const validBody = `{"name":"Pałac Staszica","category":"historic","latitude":52.24,"longitude":21.02,` +
+	`"language":"Polski","osm":"way/123","tags":{"wikipedia":"pl:Pałac Staszica","historic":"building"}}`
 
 func postWithKeys(body, openAIKey, elevenLabsKey string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
@@ -69,15 +161,22 @@ func post(body string) *httptest.ResponseRecorder {
 	return postWithKeys(body, "sk-test", "el-test")
 }
 
-func errorOf(t *testing.T, rec *httptest.ResponseRecorder) string {
+func errorBody(t *testing.T, rec *httptest.ResponseRecorder) (message, code string) {
 	t.Helper()
 	var body struct {
 		Error string `json:"error"`
+		Code  string `json:"code"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("error body is not JSON: %v", err)
 	}
-	return body.Error
+	return body.Error, body.Code
+}
+
+func errorOf(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	msg, _ := errorBody(t, rec)
+	return msg
 }
 
 func TestPreflightAllowsTheKeyHeaders(t *testing.T) {
@@ -95,20 +194,17 @@ func TestPreflightAllowsTheKeyHeaders(t *testing.T) {
 			t.Errorf("allow-headers %q lacks %s: every tap would fail its preflight", allowed, h)
 		}
 	}
-	if got := rec.Header().Get("Access-Control-Expose-Headers"); got != "X-Location-Warning" {
-		t.Errorf("expose-headers %q: the client reads the location warning through this", got)
+	// The client reads both through this; a header not exposed reads as null.
+	exposed := rec.Header().Get("Access-Control-Expose-Headers")
+	for _, h := range []string{"X-Location-Warning", "X-Guide-Sources"} {
+		if !strings.Contains(exposed, h) {
+			t.Errorf("expose-headers %q lacks %s", exposed, h)
+		}
 	}
 }
 
-func TestHappyPathReturnsMP3(t *testing.T) {
+func TestHappyPathReturnsMP3WithItsSources(t *testing.T) {
 	f := newFakeProviders(t)
-	f.openAI = func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer sk-test" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		io.WriteString(w, `{"choices":[{"message":{"content":"Some facts."}}]}`)
-	}
 	f.elevenLabs = func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("xi-api-key") != "el-test" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -132,6 +228,148 @@ func TestHappyPathReturnsMP3(t *testing.T) {
 	}
 	if f.chatCalls != 2 {
 		t.Errorf("%d chat calls, want facts then script", f.chatCalls)
+	}
+	if got := rec.Header().Get("X-Guide-Sources"); got != "https://pl.wikipedia.org/wiki/Pa%C5%82ac_Staszica" {
+		t.Errorf("sources %q", got)
+	}
+	if !strings.Contains(f.factsPrompt, "Antonia Corazziego") {
+		t.Error("the article never reached the facts prompt")
+	}
+	if !strings.Contains(f.scriptPrompt, "Zaprojektował go Antonio Corazzi.") {
+		t.Errorf("verified facts missing from the script prompt:\n%s", f.scriptPrompt)
+	}
+	if !strings.Contains(f.scriptPrompt, "between 80 and 150 words") {
+		t.Error("three verified facts should make a full-length script")
+	}
+}
+
+func TestAPlaceWithNoSourcesIsToldSoAndCostsNothing(t *testing.T) {
+	f := newFakeProviders(t)
+	rec := post(`{"name":"Kapliczka","category":"historic:wayside_shrine","latitude":52.1,"longitude":21.0,"tags":{"historic":"wayside_shrine"}}`)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if _, code := errorBody(t, rec); code != "no_sources" {
+		t.Errorf("code %q", code)
+	}
+	if f.chatCalls != 0 || f.ttsCalls != 0 {
+		t.Errorf("%d chat and %d TTS calls for a place nothing is known about", f.chatCalls, f.ttsCalls)
+	}
+}
+
+func TestInventedFactsAreDroppedAndNothingIsLeftToSay(t *testing.T) {
+	f := newFakeProviders(t)
+	f.factsJSON = `{"facts":[
+		{"fact":"Napoleon slept here.","source":"S1","evidence":"Napoleon spędził tu noc."},
+		{"fact":"Built in 1799.","source":"S1","evidence":"Został wzniesiony w latach 1820–1823 według projektu Antonia Corazziego."},
+		{"fact":"Designed by Corazzi.","source":"S9","evidence":"według projektu Antonia Corazziego"}
+	]}`
+	rec := post(validBody)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if f.ttsCalls != 0 || f.chatCalls != 1 {
+		t.Errorf("%d chat calls and %d TTS calls, want the facts call alone", f.chatCalls, f.ttsCalls)
+	}
+}
+
+func TestOneOrTwoFactsMakeAShortScript(t *testing.T) {
+	f := newFakeProviders(t)
+	f.factsJSON = `{"facts":[{"fact":"Zaprojektował go Antonio Corazzi.","source":"S1","evidence":"według projektu Antonia Corazziego"}]}`
+	if rec := post(validBody); rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(f.scriptPrompt, "between 35 and 70 words") {
+		t.Errorf("script prompt:\n%s", f.scriptPrompt)
+	}
+}
+
+func TestOSMTagsAloneAreASource(t *testing.T) {
+	f := newFakeProviders(t)
+	f.factsJSON = `{"facts":[{"fact":"Postawiona w 1905 roku.","source":"S1","evidence":"start_date: 1905"}]}`
+	rec := post(`{"name":"Kapliczka","category":"historic:wayside_shrine","latitude":52.1,"longitude":21.0,` +
+		`"osm":"node/42","tags":{"historic":"wayside_shrine","start_date":"1905"}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if got := rec.Header().Get("X-Guide-Sources"); got != "https://www.openstreetmap.org/node/42" {
+		t.Errorf("sources %q", got)
+	}
+}
+
+func TestWikidataPrefersTheLocalWikipediaAndReadsItsStatements(t *testing.T) {
+	f := newFakeProviders(t)
+	f.entities["Q1"] = map[string]any{
+		"labels":       map[string]any{"en": map[string]string{"value": "Staszic Palace"}},
+		"descriptions": map[string]any{"en": map[string]string{"value": "palace in Warsaw"}},
+		"sitelinks": map[string]any{
+			"enwiki":      map[string]string{"title": "Staszic Palace"},
+			"plwiki":      map[string]string{"title": "Pałac Staszica"},
+			"commonswiki": map[string]string{"title": "Category:Staszic Palace"},
+		},
+		"claims": map[string]any{
+			"P571": []any{map[string]any{"rank": "normal", "mainsnak": map[string]any{"datavalue": map[string]any{
+				"type": "time", "value": map[string]any{"time": "+1820-00-00T00:00:00Z", "precision": 9},
+			}}}},
+			"P84": []any{map[string]any{"rank": "normal", "mainsnak": map[string]any{"datavalue": map[string]any{
+				"type": "wikibase-entityid", "value": map[string]any{"id": "Q2"},
+			}}}},
+		},
+	}
+	f.entities["Q2"] = map[string]any{"labels": map[string]any{"en": map[string]string{"value": "Antonio Corazzi"}}}
+	f.articles["en:Staszic Palace"] = strings.Repeat("The Staszic Palace is in Warsaw. ", 5)
+	// S1 is the Wikidata item now; the Polish article is S2.
+	f.factsJSON = `{"facts":[{"fact":"Designed by Corazzi.","source":"S2","evidence":"według projektu Antonia Corazziego"}]}`
+
+	rec := post(`{"name":"Pałac Staszica","category":"historic","latitude":52.24,"longitude":21.02,` +
+		`"language":"English","tags":{"wikidata":"Q1"}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	for _, want := range []string{"inception: 1820", "architect: Antonio Corazzi", `Wikipedia (pl) article "Pałac Staszica"`, `Wikipedia (en) article "Staszic Palace"`} {
+		if !strings.Contains(f.factsPrompt, want) {
+			t.Errorf("facts prompt lacks %q", want)
+		}
+	}
+	// The Polish article comes before the English one: the country is Poland.
+	if strings.Index(f.factsPrompt, "(pl) article") > strings.Index(f.factsPrompt, "(en) article") {
+		t.Error("the local article should be read first")
+	}
+}
+
+func TestGeosearchTakesOnlyAnArticleWithThePlacesName(t *testing.T) {
+	f := newFakeProviders(t)
+	f.geosearch["pl"] = []string{"Kabaty", "Ulica Rybałtów w Warszawie", "Kościół św. Ojca Pio w Warszawie"}
+	f.articles["pl:Kościół św. Ojca Pio w Warszawie"] = strings.Repeat("Kościół parafialny na Kabatach. ", 5)
+	f.factsJSON = `{"facts":[{"fact":"Kościół parafialny.","source":"S1","evidence":"Kościół parafialny na Kabatach"}]}`
+
+	rec := post(`{"name":"Kościół Świętego Ojca Pio","category":"place_of_worship","latitude":52.12,"longitude":21.05}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(f.factsPrompt, `"Kościół św. Ojca Pio w Warszawie"`) || strings.Contains(f.factsPrompt, "Rybałtów w Warszawie\"") {
+		t.Errorf("wrong article chosen:\n%s", f.factsPrompt)
+	}
+
+	// And with nothing of that name nearby, nothing is borrowed from the neighbours.
+	f2 := newFakeProviders(t)
+	f2.geosearch["pl"] = []string{"Kabaty", "Ulica Rybałtów w Warszawie"}
+	if rec := post(`{"name":"Kościół Świętego Ojca Pio","category":"place_of_worship","latitude":52.12,"longitude":21.05}`); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status %d", rec.Code)
+	}
+}
+
+func TestAMemorialsSubjectIsLabelledAsTheSubject(t *testing.T) {
+	f := newFakeProviders(t)
+	f.articles["pl:Mikołaj Kopernik"] = strings.Repeat("Mikołaj Kopernik był astronomem. ", 5)
+	f.factsJSON = `{"facts":[{"fact":"Upamiętnia astronoma.","source":"S1","evidence":"Mikołaj Kopernik był astronomem"}]}`
+	rec := post(`{"name":"Pomnik Mikołaja Kopernika","category":"historic:memorial","latitude":52.24,"longitude":21.02,` +
+		`"tags":{"subject:wikipedia":"pl:Mikołaj Kopernik"}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(f.factsPrompt, "NOT about the place itself") {
+		t.Error("the subject's article is not marked as being about the subject")
 	}
 }
 
@@ -197,10 +435,17 @@ func TestMissingKeyIsA401AndSpendsNothing(t *testing.T) {
 
 func TestValidation(t *testing.T) {
 	newFakeProviders(t)
+	manyTags := map[string]string{}
+	for i := 0; i <= maxTags; i++ {
+		manyTags[fmt.Sprint("k", i)] = "v"
+	}
+	tooMany, _ := json.Marshal(map[string]any{"name": "a", "category": "x", "latitude": 1, "longitude": 1, "tags": manyTags})
 	cases := map[string]string{
 		"no name":       `{"category":"x","latitude":1,"longitude":1}`,
 		"bad latitude":  `{"name":"a","category":"x","latitude":91,"longitude":1}`,
 		"long language": `{"name":"a","category":"x","latitude":1,"longitude":1,"language":"` + strings.Repeat("x", 51) + `"}`,
+		"bad osm ref":   `{"name":"a","category":"x","latitude":1,"longitude":1,"osm":"../../etc"}`,
+		"too many tags": string(tooMany),
 		"not json":      `{`,
 	}
 	for name, body := range cases {

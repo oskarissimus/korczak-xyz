@@ -8,8 +8,12 @@
  *
  * The state is a word as well as an icon. A triangle and two bars are only distinguishable if you
  * can see them, and this is read outdoors in daylight.
+ *
+ * Under it, where the facts came from. The narration is made only of facts checked against these,
+ * and a listener who doubts one can read the source rather than take a machine's word for it.
  */
 
+import { sourceLabel } from '../../utils/audioGuide/narration';
 import type { Translation } from './translations';
 
 interface PlayerBarProps {
@@ -17,6 +21,7 @@ interface PlayerBarProps {
   playing: boolean;
   ended: boolean;
   locationWarning: boolean;
+  sources: string[];
   onToggle: () => void;
   onClose: () => void;
   t: Translation;
@@ -27,6 +32,7 @@ export default function PlayerBar({
   playing,
   ended,
   locationWarning,
+  sources,
   onToggle,
   onClose,
   t,
@@ -57,6 +63,20 @@ export default function PlayerBar({
           ×
         </button>
       </div>
+
+      {sources.length > 0 && (
+        <p className="ag-sources">
+          {t.sourcesLabel}{' '}
+          {sources.map((link, i) => (
+            <span key={link}>
+              {i > 0 && ' · '}
+              <a href={link} target="_blank" rel="noopener noreferrer">
+                {sourceLabel(link)}
+              </a>
+            </span>
+          ))}
+        </p>
+      )}
 
       {locationWarning && <p className="ag-warning">{t.locationWarning}</p>}
     </div>

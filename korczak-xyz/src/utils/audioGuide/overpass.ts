@@ -64,6 +64,46 @@ export function overpassQuery(bounds: Bounds): string {
 out center qt;`;
 }
 
+/**
+ * The tags the narration is grounded in, and the only ones kept.
+ *
+ * The backend reads the place's story out of these rather than out of a model's memory: the
+ * `wikipedia` and `wikidata` links lead to articles, `subject:*` to whoever a memorial is for,
+ * the dates, architects and inscriptions are facts in their own right, and the other names let
+ * a Wikipedia article found near the pin be matched to the place by name. The category tags go
+ * too, so the backend can say what kind of thing the facts are about.
+ *
+ * A list rather than all of them: every pin in the tile cache carries these, and OSM's other tags
+ * (opening hours, wheelchair access, `fixme`) say nothing a guide would read out.
+ */
+const STORY_TAGS = new Set([
+  'wikipedia', 'wikidata', 'subject:wikipedia', 'subject:wikidata',
+  'start_date', 'construction_date', 'opening_date', 'end_date',
+  'architect', 'builder', 'designer', 'artist_name', 'artist', 'sculptor',
+  'building:architecture', 'architecture', 'inscription', 'description', 'subject',
+  'memorial:subject', 'official_name', 'old_name', 'alt_name', 'short_name',
+  'historic', 'tourism', 'amenity', 'memorial', 'memorial:type', 'castle_type', 'building',
+  'denomination', 'religion', 'material', 'height',
+]);
+
+/**
+ * Other languages' names, for matching an article to the place - a handful, not `name:*`: a
+ * cathedral carries a hundred of them, and the function refuses more than sixty tags.
+ */
+const NAME_TAGS = ['en', 'pl', 'de', 'fr', 'es', 'it', 'cs', 'uk'].map((l) => `name:${l}`);
+
+export function storyTags(tags: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tags)) {
+    if (!STORY_TAGS.has(key) && !NAME_TAGS.includes(key)) continue;
+    const v = value.trim();
+    // The function refuses a value over a thousand characters; an inscription that long is
+    // better cut than a tap that fails.
+    if (v) out[key] = v.slice(0, 1000);
+  }
+  return out;
+}
+
 /** The OSM tag that best names what a thing is, for the model's benefit rather than the map's. */
 function categoryOf(tags: Record<string, string>): string {
   if (tags.tourism) return tags.tourism;
@@ -113,6 +153,7 @@ export function transformAttractions(response: unknown): Attraction[] {
       lat,
       lon,
       category: categoryOf(el.tags ?? {}),
+      tags: storyTags(el.tags ?? {}),
     });
   }
   return out;

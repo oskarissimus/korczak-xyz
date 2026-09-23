@@ -65,6 +65,38 @@ describe("transformAttractions", () => {
     });
   });
 
+  it("keeps the tags a story can be grounded in, and only those", () => {
+    const [attraction] = transformAttractions({
+      elements: [
+        {
+          id: 3,
+          type: "node",
+          lat: 1,
+          lon: 2,
+          tags: {
+            name: "Pałac",
+            historic: "building",
+            wikipedia: "pl:Pałac Staszica",
+            wikidata: "Q1",
+            start_date: "1823",
+            "name:en": "Staszic Palace",
+            "name:zu": "Something",
+            opening_hours: "Mo-Fr 09:00-17:00",
+            fixme: "check",
+            inscription: "  ",
+          },
+        },
+      ],
+    });
+    expect(attraction.tags).toEqual({
+      historic: "building",
+      wikipedia: "pl:Pałac Staszica",
+      wikidata: "Q1",
+      start_date: "1823",
+      "name:en": "Staszic Palace",
+    });
+  });
+
   it("drops an element with neither a point nor a centre", () => {
     expect(
       transformAttractions({

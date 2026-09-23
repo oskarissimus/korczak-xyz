@@ -1,9 +1,11 @@
 /*
  * The one request that costs money.
  *
- * A name, a category and a pair of coordinates go out, with the reader's two keys; an MP3 comes
- * back. Everything between - reverse geocoding with Nominatim, asking a model for facts, turning
- * those into a script written for a speech synthesiser, and paying ElevenLabs to read it - happens
+ * A name, a category, a pair of coordinates and the place's story tags go out, with the reader's
+ * two keys; an MP3 comes back, with the links its facts were taken from. Everything between -
+ * reading the place up on Wikipedia and Wikidata, having a model pick facts out of that with a
+ * quote for each, checking every quote, turning what survives into a script written for a speech
+ * synthesiser, and paying ElevenLabs to read it - happens
  * in `audio-guide-function/` at the root of this repository: Go, deployed with gcloud to
  * `korczak-xyz-501720` beside the site's other functions. It came from `oskarissimus/audio-guide-v2`
  * (project `prompt-compressor-1`) in Sep 2026.
@@ -28,9 +30,17 @@ const BACKEND_URL = 'https://europe-central2-korczak-xyz-501720.cloudfunctions.n
  */
 const LOCATION_WARNING_HEADER = 'X-Location-Warning';
 
+/**
+ * Space-separated, percent-encoded URLs of the sources the facts in this narration came from:
+ * Wikipedia articles, a Wikidata item, the OpenStreetMap object. Only the ones a checked fact was
+ * actually taken from.
+ */
+const SOURCES_HEADER = 'X-Guide-Sources';
+
 export interface Narration {
   audioUrl: string;
   locationWarning: string | null;
+  sources: string[];
 }
 
 /**
@@ -44,6 +54,8 @@ export class NarrationError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** `no_sources` when nothing checkable is known about the place; otherwise absent. */
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = 'NarrationError';
@@ -83,13 +95,22 @@ export async function requestNarration(
       latitude: attraction.lat,
       longitude: attraction.lon,
       language,
+      osm: attraction.key,
+      tags: attraction.tags,
     }),
     signal,
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new NarrationError(body?.error ?? `HTTP ${response.status}`, response.status);
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+      code?: string;
+    } | null;
+    throw new NarrationError(
+      body?.error ?? `HTTP ${response.status}`,
+      response.status,
+      body?.code ?? null,
+    );
   }
 
   const blob = await response.blob();
@@ -99,7 +120,32 @@ export async function requestNarration(
   return {
     audioUrl: URL.createObjectURL(blob),
     locationWarning: warning ? warning : null,
+    sources: parseSources(response.headers.get(SOURCES_HEADER)),
   };
+}
+
+/** The sources header, as links. Anything that is not an https URL is dropped, not linked. */
+export function parseSources(header: string | null): string[] {
+  if (!header) return [];
+  return header
+    .split(/\s+/)
+    .filter((u) => {
+      try {
+        return new URL(u).protocol === 'https:';
+      } catch {
+        return false;
+      }
+    });
+}
+
+/** What a source link is called in the player: "Wikipedia (pl)", "Wikidata", "OpenStreetMap". */
+export function sourceLabel(link: string): string {
+  const host = new URL(link).hostname;
+  const wiki = /^([a-z-]+)\.wikipedia\.org$/.exec(host);
+  if (wiki) return `Wikipedia (${wiki[1]})`;
+  if (host.endsWith('wikidata.org')) return 'Wikidata';
+  if (host.endsWith('openstreetmap.org')) return 'OpenStreetMap';
+  return host;
 }
 
 /**
@@ -110,11 +156,17 @@ export async function requestNarration(
  * provider arrives as a 502 carrying the provider's own sentence, so the status alone cannot tell a
  * rate limit from an exhausted account — hence the match on the text. It is deliberately loose: the
  * wording is the providers' to change, and `failed` is a perfectly good answer when they do.
+ *
+ * `no-sources` is not a failure of anything. The function found no source about the place, or
+ * none of the facts the model picked out survived the check against their quotes, and said so
+ * rather than narrating a guess - the one answer it gives by `code` rather than by wording.
  */
-export type GuideFailure = 'keys' | 'rate-limited' | 'quota' | 'failed';
+export type GuideFailure = 'keys' | 'rate-limited' | 'quota' | 'no-sources' | 'failed';
 
 export function classifyNarrationFailure(e: unknown): GuideFailure {
   if (!(e instanceof NarrationError)) return 'failed';
+  // Nothing failed: nothing checkable is known about the place, so no guide was made up for it.
+  if (e.code === 'no_sources') return 'no-sources';
   // Before the 401: ElevenLabs answers an exhausted quota with a 401 of its own, and sending the
   // reader to re-paste a key that is fine would be the wrong advice.
   if (/quota|billing|credit|insufficient/i.test(e.message)) return 'quota';

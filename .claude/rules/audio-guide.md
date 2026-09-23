@@ -1,6 +1,6 @@
 ---
 name: audio-guide
-description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend, the keys and where they live, what a tap costs, the iOS audio unlock, and the narration language.
+description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend, the sources every narration is grounded in and the checks on them, the keys and where they live, what a tap costs, the iOS audio unlock, and the narration language.
 paths:
   - "audio-guide-function/**"
   - "**/hooks/useAudioGuideKeys.ts"
@@ -17,8 +17,8 @@ paths:
 ## Audio Guide
 
 At `/apps/audio-guide/` — a map of where you are standing, with a pin on everything OpenStreetMap
-thinks is worth looking at. Tap one and a model writes a minute about it, a voice reads it, and it
-plays. Ported from `oskarissimus/audio-guide-v2` (a Vite app of hand-written DOM, deployed to
+thinks is worth looking at. Tap one and a model writes up to a minute from what Wikipedia,
+Wikidata and OSM say about it, a voice reads it, and it plays. Ported from `oskarissimus/audio-guide-v2` (a Vite app of hand-written DOM, deployed to
 GitHub Pages) in Sep 2026.
 
 The front half moved first; the backend followed a few days later, and it is still Go.
@@ -46,22 +46,74 @@ functions, but not among them:
   provider failure with `log.Printf` to Cloud Logging and nothing else. Adding `sentry-go` is the
   obvious next step if its failures ever need to be seen rather than looked up.
 
-What it does, in order: reverse-geocodes the coordinates with Nominatim; asks `gpt-4o-mini` for
-facts about the named place at that address; asks it again for a 80–150 word script written for a
-speech synthesiser (numbers as words, abbreviations expanded — the prompt is emphatic about it,
+What it does, in order: gathers sources (`sources.go`) - Nominatim's address beside the place's
+Wikidata item, then up to two Wikipedia articles and one about whoever a memorial commemorates;
+asks `gpt-4o-mini` to pick facts out of those, each with a verbatim quote (`grounding.go`);
+checks the quotes; asks it again for a script written for a speech synthesiser from the facts
+that survived (numbers as words, abbreviations expanded - the prompt is emphatic about it,
 because "1889" read aloud is "one thousand eight hundred and eighty-nine"); has ElevenLabs'
-`eleven_multilingual_v2` read it; and answers with the MP3. If Nominatim failed it sets
-`X-Location-Warning`, which is why the player sometimes carries a notice about accuracy.
+`eleven_multilingual_v2` read it; and answers with the MP3 and the links its facts came from. If
+Nominatim failed it sets `X-Location-Warning`, which is why the player sometimes carries a notice.
+
+### The guide says only what its sources say
+
+Until late Sep 2026 the model was given a name and a category and asked for "truly fascinating,
+little-known facts" that would make a visitor say "I didn't know that!", at temperature 0.7, and
+then for a "warm, engaging" script at 0.8. For anything smaller than a cathedral it knew nothing,
+and the prompt asked for exactly what it could not know - so it invented it, fluently, in the
+voice of a tour guide. Every piece below exists to close one route by which that happened.
+
+- **The sources.** The page keeps the place's *story tags* from Overpass (`STORY_TAGS` in
+  `overpass.ts`: `wikipedia`, `wikidata`, `subject:*`, dates, architect, inscription, other names,
+  a handful of `name:xx`) and sends them with the tap, with the element's `osm` key. The function
+  turns them into sources: the OSM tags themselves (only when there is a real fact among them -
+  `historic=memorial` and a name is not a story), the Wikidata item's statements (inception,
+  architect, style, heritage designation... with entities named in one more request), and
+  Wikipedia articles. Articles are read **local language first** - the country comes from
+  Nominatim's `country_code` - because the Polish article on a Warsaw church is usually several
+  times the English one; the model translates. A memorial's `subject:*` article is labelled as
+  being about the subject, **not** the place, and the prompt says what that allows.
+- **Geosearch, strictly.** When OSM links no article, Wikipedia's `geosearch` within 250 m of the
+  pin is read, and a hit is taken **only on a name match** (`namesMatch`: equal once folded, or
+  every word of the shorter name - at least two words - in the longer, abbreviations like "św"
+  allowed). The nearest article to a wayside shrine is usually the parish, the street or the
+  district, and any of them would be read out as if it were the shrine. **Do not loosen this into
+  "nearest article" or a fuzzy score** - a near miss is how the guide ended up about another town.
+- **The quotes are checked in Go, not by the model.** The facts call returns JSON
+  (`response_format: json_object`, temperature 0.1): each fact, the id of the source it came from,
+  and a verbatim quote. `verifyFacts` keeps a fact only if its quote - normalised for case,
+  whitespace, quotation marks and dashes, at least ten characters - is in the text of **the source
+  it cites**, and only if every number in the fact is in the quote (a century in Roman numerals,
+  "XVII wieku", counts for 17). A year is what a model most likes to invent and what a listener
+  most likes to repeat. A dropped true fact costs a sentence; a kept false one is the whole bug.
+- **The script sees only the surviving facts**, at temperature 0.3, and is told that any name,
+  date, number or claim it adds is an error. The old "share the most interesting facts" prompt is
+  where founding legends used to grow.
+- **The length follows what is known.** Three or more verified facts: 80-150 words. One or two:
+  35-70 (`tierFor`). None - no sources at all, or none of the facts survived - is a **422 with
+  `code: "no_sources"`**, and the app says in its own words that nothing reliable is written
+  about the place. No sources means no OpenAI call either; no surviving facts means no script and
+  no voice. The app shows no Retry for it: asking again finds the same nothing and pays for it.
+- **The reader sees the sources.** `X-Guide-Sources` carries the URLs of the sources a kept fact
+  came from (percent-encoded, space-separated, exposed through CORS), and the player links them
+  under the title: "Źródła: Wikipedia (pl) · Wikidata".
+
+Every Wikimedia request carries the app's User-Agent, because anonymous-looking clients are
+refused outright ("You are making too many requests"), and a refusal is **logged**
+(`generate-audio: wikimedia ...: status 429`): from the outside, a Wikimedia that has stopped
+answering this function looks exactly like every place in the world having nothing written about
+it. **If the guide starts answering "nothing reliable" everywhere, read those log lines first.**
 
 **The address goes to the model labelled, with the coordinates always beside it**
 (`describeLocation`). The original sent `Rybałtów, Ursynów, Warszawa, Polska` bare, and the model
 read the street as a village: a tap on the church of St Padre Pio in Kabaty, on ulica Rybałtów,
 got a guide to "a church in Rybałtów". Nominatim's `quarter` (Kabaty) is kept too — the suburb is
 often only the borough. The facts prompt also says to stay on this exact place and say less rather
-than borrow from a namesake. Do not go back to a comma-joined address.
+than borrow from a namesake. Do not go back to a comma-joined address. (Since the sources arrived
+the address matters less - it no longer has to stand in for knowledge - but it is still how the
+model tells a source about this church from one about its namesake.)
 
-The model, the voice, the rest of the prompts and the validation limits are the original's. Two
-behaviours changed in the move: where the keys come from (next section), and this: a provider failure used to be a bare
+The model and the voice are the original's. Two behaviours changed in the move itself: where the keys come from (next section), and this: a provider failure used to be a bare
 `Failed to generate audio`, with the provider's reason thrown away — so the `quota` branch of
 `classifyNarrationFailure` could never fire. The 502 now carries the provider's own sentence
 (`Failed to generate facts: OpenAI 429: You exceeded your current quota…`), pulled out of

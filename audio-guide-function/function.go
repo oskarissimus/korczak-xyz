@@ -1,10 +1,13 @@
 // Package function is the audio guide's backend: the one request on /apps/audio-guide/ that costs
 // money.
 //
-// A name, a category and a pair of coordinates come in; an MP3 goes out. In between it
-// reverse-geocodes the coordinates with Nominatim, asks gpt-4o-mini for facts about the place,
-// asks it again for a script written for a speech synthesiser, and has ElevenLabs read that
-// script aloud.
+// A name, a category, a pair of coordinates and the place's OpenStreetMap tags come in; an MP3
+// goes out. In between it gathers what is actually known about the place - the tags, its Wikidata
+// item, its Wikipedia articles (sources.go) - has gpt-4o-mini pick facts out of those with a
+// verbatim quote for each, checks every quote against its source (grounding.go), asks again for a
+// script written for a speech synthesiser from the facts that survived, and has ElevenLabs read
+// it aloud. A place with no sources, or none the checks let through, is answered with a 422
+// rather than a guess.
 //
 // THE KEYS ARE THE CALLER'S, not ours. They arrive with every request in two headers, typed into
 // the app's keys sheet the way sloper's and the backseat driver's are, and are used for that one
@@ -27,6 +30,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -40,6 +44,15 @@ const (
 	// The caller's keys. Named in Access-Control-Allow-Headers below, or every preflight fails.
 	openAIKeyHeader     = "X-OpenAI-Key"
 	elevenLabsKeyHeader = "X-ElevenLabs-Key"
+
+	// Space-separated URLs of the sources the narration's facts came from. Percent-encoded, so
+	// the header stays ASCII whatever the article title.
+	sourcesHeader = "X-Guide-Sources"
+	// The error code of a place nothing reliable is known about. The app shows its own sentence
+	// for it rather than the "service failed" one: nothing failed.
+	noSourcesCode = "no_sources"
+
+	maxTags = 60
 )
 
 // Variables rather than constants so the tests can point them at an httptest server. Nothing in
@@ -61,6 +74,11 @@ type Attraction struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 	Language  string  `json:"language"`
+	// "way/123". Optional: only used to link the reader to the object the facts came from.
+	OSM string `json:"osm"`
+	// The element's tags as Overpass gave them, filtered by the app to the ones that describe it
+	// (overpass.ts). Optional; a request without them is still grounded, through geosearch.
+	Tags map[string]string `json:"tags"`
 }
 
 // Location represents reverse geocoded location data
@@ -70,7 +88,8 @@ type Location struct {
 	Street       string
 	Neighborhood string
 	Quarter      string
-	Valid        bool // false if geocoding failed
+	CountryCode  string // "pl"; picks which Wikipedia is read first
+	Valid        bool   // false if geocoding failed
 }
 
 // nominatimResponse represents the Nominatim API response
@@ -85,6 +104,7 @@ type nominatimResponse struct {
 		Neighbourhood string `json:"neighbourhood"`
 		Quarter       string `json:"quarter"`
 		Country       string `json:"country"`
+		CountryCode   string `json:"country_code"`
 	} `json:"address"`
 }
 
@@ -122,8 +142,22 @@ func (a *Attraction) Validate() error {
 		return errors.New("language must be at most 50 characters")
 	}
 
+	if a.OSM != "" && !osmRefRE.MatchString(a.OSM) {
+		return errors.New("osm must look like way/123")
+	}
+	if len(a.Tags) > maxTags {
+		return fmt.Errorf("at most %d tags", maxTags)
+	}
+	for k, v := range a.Tags {
+		if len(k) > 64 || len(v) > 1000 {
+			return errors.New("tag too long")
+		}
+	}
+
 	return nil
 }
+
+var osmRefRE = regexp.MustCompile(`^(node|way|relation)/[1-9][0-9]{0,15}$`)
 
 // reverseGeocode converts coordinates to human-readable location using Nominatim API
 func reverseGeocode(ctx context.Context, lat, lon float64) Location {
@@ -154,8 +188,9 @@ func reverseGeocode(ctx context.Context, lat, lon float64) Location {
 	}
 
 	loc := Location{
-		Country: nomResp.Address.Country,
-		Valid:   true,
+		Country:     nomResp.Address.Country,
+		CountryCode: strings.ToLower(nomResp.Address.CountryCode),
+		Valid:       true,
 	}
 
 	// Get city (could be city, town, or village)
@@ -194,7 +229,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+openAIKeyHeader+", "+elevenLabsKeyHeader)
-	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning")
+	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning, "+sourcesHeader)
 	// The key headers make every tap a preflighted request; this spares the second tap one. Safari
 	// caps it at ten minutes whatever is asked for.
 	w.Header().Set("Access-Control-Max-Age", "600")
@@ -234,24 +269,35 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reverse geocode to get location context
-	location := reverseGeocode(ctx, attraction.Latitude, attraction.Longitude)
+	location, sources := gatherSources(ctx, &attraction)
 
 	// Set warning header if geocoding failed
 	if !location.Valid {
 		w.Header().Set("X-Location-Warning", "Location details unavailable - information may be less accurate")
 	}
 
-	// Generate facts
-	facts, err := generateFacts(ctx, openAIKey, &attraction, &location)
+	// Nothing to ground a narration on: say so, and spend nothing on either provider.
+	if len(sources) == 0 {
+		log.Printf("generate-audio: no sources for %q (%s)", attraction.Name, attraction.OSM)
+		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "No sources found about this place")
+		return
+	}
+
+	facts, err := extractFacts(ctx, openAIKey, &attraction, &location, sources)
 	if err != nil {
 		log.Printf("generate-audio: facts: %v", err)
 		writeError(w, failureStatus(err), "Failed to generate facts: "+providerMessage(err))
 		return
 	}
+	if len(facts) == 0 {
+		log.Printf("generate-audio: no verified facts for %q from %d sources", attraction.Name, len(sources))
+		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "The sources found say nothing checkable about this place")
+		return
+	}
 
-	// Generate script
-	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language)
+	t := tierFor(facts)
+	log.Printf("generate-audio: %q: %d sources, %d verified facts, %s script", attraction.Name, len(sources), len(facts), t.name)
+	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language, t)
 	if err != nil {
 		log.Printf("generate-audio: script: %v", err)
 		writeError(w, failureStatus(err), "Failed to generate script: "+providerMessage(err))
@@ -266,6 +312,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set(sourcesHeader, strings.Join(citedURLs(facts, sources), " "))
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.WriteHeader(http.StatusOK)
 	w.Write(audio)
@@ -345,9 +392,19 @@ func failureStatus(err error) int {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
+	writeErrorCode(w, status, "", message)
+}
+
+// writeErrorCode adds a machine-readable `code` beside the sentence, for the one failure the app
+// has to tell apart without matching on English.
+func writeErrorCode(w http.ResponseWriter, status int, code, message string) {
+	body := map[string]string{"error": message}
+	if code != "" {
+		body["code"] = code
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	json.NewEncoder(w).Encode(body)
 }
 
 // OpenAI types
@@ -357,10 +414,15 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Model       string        `json:"model"`
-	Messages    []chatMessage `json:"messages"`
-	MaxTokens   int           `json:"max_tokens"`
-	Temperature float64       `json:"temperature"`
+	Model          string          `json:"model"`
+	Messages       []chatMessage   `json:"messages"`
+	MaxTokens      int             `json:"max_tokens"`
+	Temperature    float64         `json:"temperature"`
+	ResponseFormat *responseFormat `json:"response_format,omitempty"`
+}
+
+type responseFormat struct {
+	Type string `json:"type"`
 }
 
 type chatResponse struct {
@@ -369,36 +431,6 @@ type chatResponse struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
-}
-
-func generateFacts(ctx context.Context, apiKey string, attraction *Attraction, location *Location) (string, error) {
-	systemPrompt := fmt.Sprintf("You are a knowledgeable tour guide with expertise in history, architecture, and culture. Provide accurate, engaging facts suitable for tourists. Write your response entirely in %s.", attraction.Language)
-
-	locationInfo := describeLocation(attraction, location)
-
-	userPrompt := fmt.Sprintf(`Provide 3-5 truly fascinating facts about "%s" (%s).
-
-It is this exact place:
-%s
-Only give facts about the place at this address. Other places may share its name, and a street
-may share its name with a town elsewhere — do not borrow facts from any of them. If you know
-little about this particular place, say less rather than guess.
-
-Focus on:
-- Surprising or little-known facts that most visitors wouldn't know
-- Unique historical events or stories connected to this place
-- Interesting architectural or design details with specific context
-- Cultural significance and local traditions
-- Notable people or events associated with this location
-
-Avoid:
-- Generic information easily found in any guidebook
-- Obvious facts about the category (e.g., "this museum has art")
-- Vague statements without specific details
-
-Each fact should make the visitor say "I didn't know that!" Be concise but engaging. Each fact should be 1-2 sentences. Write entirely in %s.`, attraction.Name, attraction.Category, locationInfo, attraction.Language)
-
-	return chatCompletion(ctx, apiKey, systemPrompt, userPrompt, 500, 0.7)
 }
 
 // describeLocation labels each part of the address, because unlabelled it is ambiguous: "Rybałtów,
@@ -430,8 +462,13 @@ func describeLocation(attraction *Attraction, location *Location) string {
 	return b.String()
 }
 
-func generateScript(ctx context.Context, apiKey, attractionName, facts, language string) (string, error) {
+// generateScript turns the verified facts into something to be read aloud. It sees the facts and
+// nothing else, and is told that everything it adds is an error: this is the step where a
+// "warm, engaging" script used to grow a founding legend of its own.
+func generateScript(ctx context.Context, apiKey, attractionName string, facts []fact, language string, t tier) (string, error) {
 	systemPrompt := fmt.Sprintf(`You are a professional audio guide scriptwriter. Write natural, conversational scripts for text-to-speech narration. Avoid visual references like "as you can see". Write entirely in %s.
+
+YOU USE ONLY THE FACTS YOU ARE GIVEN. Do not add any name, date, number, person, event, legend, record or claim that is not in them - not even one you believe is true, and not as colour or as a "some say". No superlatives the facts do not state. Connecting sentences are fine; new information is not. A short script that is true beats a long one that is not.
 
 CRITICAL TEXT-TO-SPEECH REQUIREMENTS:
 - Write ALL numbers as words (e.g., "eighteen eighty-nine" not "1889", "three hundred" not "300")
@@ -442,32 +479,35 @@ CRITICAL TEXT-TO-SPEECH REQUIREMENTS:
 - Avoid special characters and symbols
 - Use phonetic-friendly phrasing for foreign or difficult words`, language)
 
-	userPrompt := fmt.Sprintf(`Write a 30-60 second audio guide script for "%s" based on these facts:
+	var list strings.Builder
+	for _, f := range facts {
+		fmt.Fprintf(&list, "- %s\n", strings.TrimSpace(f.Fact))
+	}
+
+	userPrompt := fmt.Sprintf(`Write an audio guide script for "%s" from these facts, and only these:
 
 %s
-
 Requirements:
-- Start with a warm welcome mentioning the attraction name
-- Share 2-3 of the most interesting facts naturally
+- Start with a short welcome mentioning the attraction name
+- Use the facts in the order that tells the best story; you may leave a weak one out
 - Use conversational, engaging language
-- End with an invitation to explore or take photos
-- Keep it between 80-150 words for optimal audio length
+- End with a short invitation to look around
+- Keep it between %d and %d words
 - Write the entire script in %s
-- IMPORTANT: All numbers, dates, and abbreviations must be written as full words for text-to-speech`, attractionName, facts, language)
+- IMPORTANT: All numbers, dates, and abbreviations must be written as full words for text-to-speech`, attractionName, list.String(), t.minWords, t.maxWords, language)
 
-	return chatCompletion(ctx, apiKey, systemPrompt, userPrompt, 300, 0.8)
-}
-
-func chatCompletion(ctx context.Context, apiKey, systemPrompt, userPrompt string, maxTokens int, temperature float64) (string, error) {
-	reqBody := chatRequest{
-		Model: "gpt-4o-mini",
+	return chatCompletion(ctx, apiKey, chatRequest{
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		MaxTokens:   maxTokens,
-		Temperature: temperature,
-	}
+		MaxTokens:   400,
+		Temperature: 0.3,
+	})
+}
+
+func chatCompletion(ctx context.Context, apiKey string, reqBody chatRequest) (string, error) {
+	reqBody.Model = "gpt-4o-mini"
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {

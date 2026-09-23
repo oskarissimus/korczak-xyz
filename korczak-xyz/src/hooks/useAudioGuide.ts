@@ -138,6 +138,7 @@ export function useAudioGuide(
           attractionName: attraction.name,
           audioUrl: narration.audioUrl,
           locationWarning: narration.locationWarning,
+          sources: narration.sources,
         });
         setStatus('ready');
         setStartedAt(null);

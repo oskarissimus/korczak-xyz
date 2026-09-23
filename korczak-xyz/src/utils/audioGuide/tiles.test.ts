@@ -17,6 +17,7 @@ const place = (id: number, lat: number, lon: number): Attraction => ({
   lat,
   lon,
   category: "museum",
+  tags: {},
 });
 
 // Warsaw's old town, the map's opening view, about one phone screen across.

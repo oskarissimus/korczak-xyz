@@ -417,6 +417,19 @@
   border-style: inset;
 }
 
+/* Where the facts came from. Small, but links a thumb can hit: the gap is the separator's. */
+.ag-sources {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #303030;
+}
+
+.ag-sources a {
+  color: #000080;
+  text-decoration: underline;
+}
+
 /* Yellow on navy, the site's own phosphor: this is a notice about how good the narration is, not
    a failure, so it must not wear the red of one. */
 .ag-warning {
