@@ -78,8 +78,8 @@ export const translations = {
     // Loading the pins
     attractionsLoading: 'Looking for places…',
     attractionsEmpty: 'Nothing tagged around here. Zoom out, or move the map.',
-    attractionsRateLimited: 'The map data service is busy. Wait a moment and move the map again.',
-    attractionsTimeout: 'That area was too big to answer. Zoom in and try again.',
+    attractionsBusy: 'The map data service is busy. Wait a moment and move the map again.',
+    attractionsTooBig: 'That area was too big to answer. Zoom in and try again.',
     attractionsFailed: 'Could not load places for this area.',
     retry: 'Retry',
 
@@ -173,9 +173,9 @@ export const translations = {
 
     attractionsLoading: 'Szukam miejsc…',
     attractionsEmpty: 'Nic tu nie jest oznaczone. Oddal mapę albo przesuń ją gdzie indziej.',
-    attractionsRateLimited:
+    attractionsBusy:
       'Serwis z danymi mapy jest zajęty. Poczekaj chwilę i przesuń mapę jeszcze raz.',
-    attractionsTimeout: 'Ten obszar był za duży. Przybliż mapę i spróbuj ponownie.',
+    attractionsTooBig: 'Ten obszar był za duży. Przybliż mapę i spróbuj ponownie.',
     attractionsFailed: 'Nie udało się pobrać miejsc dla tego obszaru.',
     retry: 'Ponów',
 

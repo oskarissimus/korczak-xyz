@@ -23,7 +23,7 @@ import type { Attraction, Bounds } from '../utils/audioGuide/types';
 
 const DEBOUNCE_MS = 500;
 
-export type AttractionsError = 'rate-limited' | 'timeout' | 'failed';
+export type AttractionsError = 'busy' | 'too-big' | 'failed';
 
 export interface NearbyAttractions {
   attractions: Attraction[];

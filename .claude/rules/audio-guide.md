@@ -166,8 +166,11 @@ Three things about the pins that look like details and are not:
 
 Overpass is a free, shared, IP-rate-limited endpoint. `useNearbyAttractions` debounces the
 viewport by 500ms, aborts the in-flight request when the map moves again, and retries **only** a
-429 — a 504 means the box was too big to answer and will be too big again, so the reader is told
-to zoom in instead.
+busy server — 429 or 504. **A 504 is not "the box was too big".** It was read that way at first,
+and a reader looking at one city block was told to zoom in: the public instance answers 504 when
+its queue is full, whatever was asked. A query that genuinely outgrows `[timeout:25]` or its memory
+comes back as a **200** with a `remark` (`runtime error: Query timed out…`), and that — checked by
+`ranOutOfRoom` — is the only thing that says zoom in. It is not retried; it would be too big again.
 
 The tile layer is cross-origin, and the service worker never intercepts cross-origin requests. So
 **the app has an offline tier and is still useless offline**: the precache exists so the home

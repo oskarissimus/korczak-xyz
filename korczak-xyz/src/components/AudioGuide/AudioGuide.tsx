@@ -47,10 +47,10 @@ function attractionsMessage(
   t: Translation,
 ): string {
   switch (error) {
-    case 'rate-limited':
-      return t.attractionsRateLimited;
-    case 'timeout':
-      return t.attractionsTimeout;
+    case 'busy':
+      return t.attractionsBusy;
+    case 'too-big':
+      return t.attractionsTooBig;
     default:
       return t.attractionsFailed;
   }

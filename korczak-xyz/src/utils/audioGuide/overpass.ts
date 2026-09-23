@@ -18,11 +18,17 @@ const MAX_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
 
 /**
- * Raised when Overpass says it is busy. Worth its own name because it is the one failure the
+ * Raised when Overpass declines to answer. Worth its own name because it is the one failure the
  * reader can do something about - wait, or zoom in - and the one the retry loop treats specially.
+ *
+ * `busy` is the server's state and `too-big` is the question's, and they are told apart by how
+ * Overpass says them rather than by guessing: a 429 (this IP is asking too often) and a 504 (the
+ * server is too loaded to start the query at all) are both `busy`, while a query that ran out of
+ * time or memory comes back **200** with a `remark` saying so - that is the only `too-big`.
+ * Reading 504 as "too big" told somebody looking at one city block to zoom in.
  */
 export class OverpassBusyError extends Error {
-  constructor(readonly kind: 'rate-limited' | 'timeout') {
+  constructor(readonly kind: 'busy' | 'too-big') {
     super(kind);
     this.name = 'OverpassBusyError';
   }
@@ -121,14 +127,26 @@ async function requestAttractions(bounds: Bounds, signal: AbortSignal): Promise<
   });
 
   if (!response.ok) {
-    // 429 is "you are asking too often", 504 is "this box was too big to answer in time". They
-    // read the same to a reader and mean opposite things about what to do next.
-    if (response.status === 429) throw new OverpassBusyError('rate-limited');
-    if (response.status === 504) throw new OverpassBusyError('timeout');
+    // 429 is "you are asking too often" and 504 is "the server is too loaded to start" - the
+    // public instance's dispatcher answers 504 when its queue is full, whatever the box. Neither
+    // says anything about the size of the question, and both are worth waiting out.
+    if (response.status === 429 || response.status === 504) throw new OverpassBusyError('busy');
     throw new Error(`Overpass ${response.status}`);
   }
 
-  return response.json();
+  const body: unknown = await response.json();
+  if (ranOutOfRoom(body)) throw new OverpassBusyError('too-big');
+  return body;
+}
+
+/**
+ * Whether a 200 is Overpass saying the query outgrew its `[timeout:25]` or its memory. That arrives
+ * as a successful response with a `remark` beside whatever elements it got through, so without this
+ * check a box too big to answer would draw a partial set of pins and say nothing.
+ */
+export function ranOutOfRoom(response: unknown): boolean {
+  const remark = (response as { remark?: unknown })?.remark;
+  return typeof remark === 'string' && /timed out|out of memory/i.test(remark);
 }
 
 /** How long to wait before attempt `n`. Exported so the test does not have to wait for it. */
@@ -137,9 +155,9 @@ export function backoffMs(attempt: number): number {
 }
 
 /**
- * Overpass with a retry, for rate limiting only.
+ * Overpass with a retry, for a busy server only.
  *
- * A timeout is not retried: the box that was too big to answer will be too big to answer again,
+ * A box too big to answer is not retried: it will be too big to answer again,
  * and three more attempts only spend the shared endpoint's patience on a question it has already
  * refused. The reader is told to zoom in instead.
  */
@@ -152,7 +170,7 @@ export async function fetchAttractions(
     try {
       return transformAttractions(await requestAttractions(bounds, signal));
     } catch (e) {
-      const busy = e instanceof OverpassBusyError && e.kind === 'rate-limited';
+      const busy = e instanceof OverpassBusyError && e.kind === 'busy';
       if (!busy || attempt >= MAX_RETRIES) throw e;
       await sleep(backoffMs(attempt));
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
