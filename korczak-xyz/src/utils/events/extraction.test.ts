@@ -59,6 +59,11 @@ describe('modelPasses', () => {
     ]);
   });
 
+  it('leaves the classifier off a source whose catalogue entry opts out', () => {
+    const race = ev({ title: 'Maraton', source: 'elektroniczne-zapisy', tags: ['running'] });
+    expect(modelPasses([race, race])).toEqual([]);
+  });
+
   it('leaves out a pass with nothing to read, and keeps one with nothing answered', () => {
     // The two states this is drawn for. A source the reader never touches is not a fault; a source
     // the classifier should have reached and has not is the way this app fails quietly.

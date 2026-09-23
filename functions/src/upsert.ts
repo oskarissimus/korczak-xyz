@@ -20,6 +20,7 @@ import {
 } from '../../korczak-xyz/src/utils/events/normalize';
 import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
 import { tagsWithTicketSale } from '../../korczak-xyz/src/utils/events/newsroom';
+import { skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
 import type { RawEvent } from './sources/types';
 
 export interface UpsertResult {
@@ -137,12 +138,28 @@ export function mergeRecord(
        * wins, and the stored one (usually the classifier's) fills in when the source has none.
        */
       country: incoming.country ?? stored.country,
-      reach: stored.reach,
-      reachReason: stored.reachReason,
-      kind: stored.kind,
-      kindReason: stored.kindReason,
-      classifiedAt: stored.classifiedAt,
-      classifyHash: stored.classifyHash,
+      /*
+       * Except for a source the classifier no longer reads: its old verdicts are set undefined,
+       * which `stripUndefined` drops and `batch.set` then deletes — rather than kept as chips
+       * nothing will ever refresh. Undefined rather than omitted, since `...stored` is above.
+       */
+      ...(skipsClassifier(incoming)
+        ? {
+            reach: undefined,
+            reachReason: undefined,
+            kind: undefined,
+            kindReason: undefined,
+            classifiedAt: undefined,
+            classifyHash: undefined,
+          }
+        : {
+            reach: stored.reach,
+            reachReason: stored.reachReason,
+            kind: stored.kind,
+            kindReason: stored.kindReason,
+            classifiedAt: stored.classifiedAt,
+            classifyHash: stored.classifyHash,
+          }),
       /*
        * The newsroom reader's fields, carried forward for exactly the same reason — and one of
        * them, `onSaleAt`, is the reason this list is worth re-reading before adding a writer.

@@ -18,6 +18,7 @@
  */
 
 import { isNewsroomItem } from './newsroom';
+import { skipsClassifier } from './sources';
 import type { EventRecord } from './types';
 
 /** Which model pass wrote a field. Two, and they are kept apart for `events.md`'s three reasons. */
@@ -89,7 +90,7 @@ export function hasValue(event: EventRecord, field: keyof EventRecord): boolean 
  */
 export function modelPasses(events: EventRecord[]): PassCoverage[] {
   const newsroom = events.filter(isNewsroomItem);
-  const classified = events.filter((event) => !isNewsroomItem(event));
+  const classified = events.filter((event) => !isNewsroomItem(event) && !skipsClassifier(event));
 
   return [
     coverageOf('classifier', classified, CLASSIFIER_FIELDS, (event) => event.classifiedAt),

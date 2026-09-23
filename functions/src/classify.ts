@@ -20,9 +20,10 @@
  *      classifier is cards that say `?` where they should say where the event is — visible, and
  *      never a feed that quietly empties.
  *
- * One set of rows is deliberately **never asked**: the theatre's newsroom items, which have their
- * own model pass in `readNewsroom.ts` and arrive already placed. `needsClassifying` says why, and
- * it is the only exception — everything else in the corpus comes through here.
+ * Two sets of rows are deliberately **never asked**. One is the theatre's newsroom items, which have
+ * their own model pass in `readNewsroom.ts` and arrive already placed; `needsClassifying` says why.
+ * The other is a source whose catalogue entry says `unclassified` (the running listings, whose pages
+ * already state everything asked here). Everything else in the corpus comes through here.
  *
  * There is **no API key**. Vertex AI on Application Default Credentials, which inside a Cloud
  * Function is the function's own runtime service account — it is already inside the project the
@@ -38,6 +39,7 @@ import type { EventKind, EventRecord, Reach } from '../../korczak-xyz/src/utils/
 import { KINDS, REACHES } from '../../korczak-xyz/src/utils/events/types';
 import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
 import { isNewsroomItem } from '../../korczak-xyz/src/utils/events/newsroom';
+import { skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
 
 /**
  * Cheapest and fastest of the family, which is the right trade for a two-field judgement over a
@@ -180,6 +182,8 @@ export function classifyHashOf(event: {
  */
 export function needsClassifying(event: EventRecord): boolean {
   if (isNewsroomItem(event)) return false;
+  // A source whose catalogue entry opts out — the running listings. See `unclassified`.
+  if (skipsClassifier(event)) return false;
   return event.classifyHash !== classifyHashOf(event);
 }
 

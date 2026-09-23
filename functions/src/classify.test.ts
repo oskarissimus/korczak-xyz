@@ -91,6 +91,19 @@ describe('needsClassifying', () => {
     expect(needsClassifying(article)).toBe(false);
     expect(queueForClassification([article])).toEqual([]);
   });
+
+  it('never asks about a source whose catalogue entry opts out', () => {
+    // The running listings: every row a race, placed by its own town and a stamped `PL`.
+    const race = ev({
+      id: 'elektroniczne-zapisy_15822',
+      title: '48. Maraton Warszawski',
+      source: 'elektroniczne-zapisy',
+      city: 'Warszawa',
+      country: 'PL',
+    });
+    expect(needsClassifying(race)).toBe(false);
+    expect(queueForClassification([race])).toEqual([]);
+  });
 });
 
 describe('buildPrompt', () => {

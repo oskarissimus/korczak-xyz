@@ -128,6 +128,24 @@ describe('mergeRecord', () => {
     expect(merged.record.classifiedAt).toBe(1000);
   });
 
+  it('drops old verdicts for a source the classifier no longer reads', () => {
+    // Otherwise they would sit on the card for ever, with nothing left to refresh them.
+    const before = stored({
+      source: 'elektroniczne-zapisy',
+      reach: 'national',
+      kind: 'listing',
+      classifiedAt: 1000,
+      classifyHash: 'abc123',
+    });
+    const incoming = toRecord(raw({ country: 'PL' }), 'elektroniczne-zapisy', 'EZ', LATER);
+    const record = stripUndefined(mergeRecord(incoming, before, LATER).record);
+    expect(record).not.toHaveProperty('reach');
+    expect(record).not.toHaveProperty('kind');
+    expect(record).not.toHaveProperty('classifiedAt');
+    expect(record).not.toHaveProperty('classifyHash');
+    expect(record.country).toBe('PL');
+  });
+
   it('lets a source that knows the country overrule the stored one', () => {
     // Ticketmaster is queried countryCode=PL and Teatr Wielki is in Warsaw: those are facts, and
     // they outrank whatever the classifier guessed before the source started saying so.

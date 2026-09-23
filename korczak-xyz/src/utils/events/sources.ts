@@ -60,6 +60,16 @@ export interface SourceCatalogueEntry {
   /** The secret this source does nothing without. Absent means it needs none. */
   needsKey?: string;
   /**
+   * True where the classifier is never asked about this source's rows.
+   *
+   * For a source whose pages already answer the classifier's three questions: every row is a
+   * listing, its country is stamped by the page and its town by the row, so a model call per row
+   * buys a `reach` label on a local 10 km and nothing else. `needsClassifying` reads it through
+   * `skipsClassifier`, `mergeRecord` stops carrying old verdicts forward, and the Sources tab
+   * drops the pass from the card — one flag, three readers, no second list.
+   */
+  unclassified?: true;
+  /**
    * The pages this source reads, as of `now`.
    *
    * Every entry ignores the argument today — the theatre's season pages, which were a function of
@@ -298,6 +308,9 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'elektroniczne-zapisy',
     label: 'Elektroniczne Zapisy – biegi',
     kind: 'scrape',
+    // Every row is a race with its own town and a stamped `PL`; the longest source in the feed was
+    // also the classifier's biggest bill, for labels nobody read.
+    unclassified: true,
     pages: () => RUNNING_LISTINGS,
   },
   {
@@ -325,4 +338,9 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
 /** The catalogue row for a source id, or undefined for one nothing here describes. */
 export function catalogueEntry(id: string): SourceCatalogueEntry | undefined {
   return SOURCE_CATALOGUE.find((entry) => entry.id === id);
+}
+
+/** Whether this record's source is one the classifier is never asked about. */
+export function skipsClassifier(event: { source: string }): boolean {
+  return catalogueEntry(event.source)?.unclassified === true;
 }

@@ -849,6 +849,14 @@ rows carry no `kind` at all — the Sources tab counts them under the newsroom r
 classifier, which is what they are. Nothing is filtered out by it: unclassified passes both
 `passesKind` and `passesPlaces`, deliberately.
 
+**Nor about the running listings**, the second exception, and a per-source one: the catalogue entry
+for `elektroniczne-zapisy` says `unclassified: true`, and `skipsClassifier` is how all three readers
+see it — `needsClassifying` never queues those rows, `mergeRecord` stops carrying their old verdicts
+forward (set undefined, so the next upsert deletes them), and `modelPasses` leaves the classifier
+block off that source's card. Every row there is a race, its town is in the row and `PL` is stamped
+by the page, so the pass answered nothing but `reach` — for the longest source in the feed, at a
+model call per row. Another source opts out with the same one line.
+
 **There is no API key.** Vertex AI on Application Default Credentials, which in this runtime is the
 function's own service account — the code already runs inside the project the model is billed to, so
 a credential to prove that would be one to store, rotate and leak. It also keeps the classifier off
