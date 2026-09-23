@@ -232,7 +232,11 @@ function SourcesPanel({ lang }: Props) {
               </p>
 
               {feed.ready ? (
-                <Extraction passes={passesBySource.get(entry.id) ?? EMPTY_PASSES} t={t} />
+                <Extraction
+                  passes={passesBySource.get(entry.id) ?? EMPTY_PASSES}
+                  unclassified={entry.unclassified === true}
+                  t={t}
+                />
               ) : null}
             </li>
           );
@@ -270,12 +274,22 @@ function SourcesPanel({ lang }: Props) {
  * empty heading under each of them would be four sentences about nothing. A pass with rows and no
  * answers *is* drawn, at zero, because that is the state this block exists for.
  */
-function Extraction({ passes, t }: { passes: PassCoverage[]; t: Translation }) {
+function Extraction({
+  passes,
+  unclassified,
+  t,
+}: {
+  passes: PassCoverage[];
+  /** The catalogue opts this source out of the classifier, which is a setting, not an empty queue. */
+  unclassified: boolean;
+  t: Translation;
+}) {
   return (
     <section className="ev-source-block">
       <h4 className="ev-block-head">{t.extractionHeading}</h4>
+      {unclassified ? <p className="ev-hint">{t.extractionDisabled}</p> : null}
       {passes.length === 0 ? (
-        <p className="ev-hint">{t.extractionNone}</p>
+        unclassified ? null : <p className="ev-hint">{t.extractionNone}</p>
       ) : (
         passes.map((pass) => <Pass key={pass.pass} pass={pass} t={t} />)
       )}

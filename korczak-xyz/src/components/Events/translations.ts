@@ -128,6 +128,8 @@ export const translations = {
     extractionHeading: 'Read by a model',
     extractionNone:
       'Nothing from this source has been collected yet, so no model has been asked anything about it.',
+    extractionDisabled:
+      'Classification is switched off for this source: no model is asked about its rows. Each race states its own town and every page is in Poland, so there is nothing left for it to answer.',
     passClassifier: 'Classifier',
     passClassifierNote:
       'One call per row, over everything this source produces except its newsroom articles. Nothing is filtered on what it decides, so a count stuck well under the rows costs you the labels on the cards rather than the cards — which is why it is worth looking at here.',
@@ -256,6 +258,8 @@ export const translations = {
     extractionHeading: 'Czytane przez model',
     extractionNone:
       'Z tego źródła nie ma jeszcze żadnych wierszy, więc żaden model nie był o nie pytany.',
+    extractionDisabled:
+      'Klasyfikacja jest wyłączona dla tego źródła: żaden model nie jest pytany o jego wiersze. Każdy bieg podaje własną miejscowość, a każda strona dotyczy Polski, więc model nie miałby tu nic do ustalenia.',
     passClassifier: 'Klasyfikator',
     passClassifierNote:
       'Jedno zapytanie na wiersz, dla wszystkiego z tego źródła poza aktualnościami. Nic nie jest filtrowane na podstawie jego odpowiedzi, więc licznik stojący mocno poniżej liczby wierszy kosztuje opisy na kartach, a nie same karty — i dlatego warto na niego patrzeć tutaj.',
