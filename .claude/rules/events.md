@@ -753,8 +753,9 @@ by the same flip time, read through **`sourceAdmits`** by both `buildFeed` and `
 corpus is untouched; the fetch is still national, for the reason `?city_id=12` was turned down.
 
 - **Options are the towns the rows name** (`townsOf`, grouped by `foldCity`), and the picker only
-  appears where there are two or more — a feed that stamps one city on everything gets no control
-  that does nothing. It is offered on every source, so Ticketmaster gets one too.
+  appears on a source the catalogue marks **`townPicker`** — today only `elektroniczne-zapisy`.
+  It first shipped on any source whose rows named two towns, which put one on python.org's
+  worldwide conference calendar; being able to is not a reason to offer it.
 - **Matching is folded and takes a district**: `WARSZAWA`, `Warszawa, Bemowo` and `Warszawa-Wawer`
   are Warszawa; `Warszawianka` is not.
 - **A row with no town passes.** A title that lost its `Miasto, "Nazwa"` shape is stored with no

@@ -195,7 +195,7 @@ function SourcesPanel({ lang }: Props) {
                 <span>{on ? t.sourceOn : t.sourceOff}</span>
               </label>
 
-              {on ? (
+              {on && entry.townPicker ? (
                 <TownPicker
                   id={entry.id}
                   towns={townsBySource.get(entry.id) ?? []}
@@ -288,8 +288,8 @@ function SourcesPanel({ lang }: Props) {
 /**
  * Narrow one source to one town.
  *
- * Offered only where the rows name more than one town — a festival's blog stamps its one city on
- * every item, and a picker with a single choice is a control that does nothing. A town already
+ * Offered only on a source the catalogue marks `townPicker`, and only once its rows name more than
+ * one town — a picker with a single choice is a control that does nothing. A town already
  * chosen is always offered, even when no upcoming row names it any more, so the setting on the
  * screen is never one the select cannot show.
  *

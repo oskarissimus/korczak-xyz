@@ -70,6 +70,14 @@ export interface SourceCatalogueEntry {
    */
   unclassified?: true;
   /**
+   * True where the Sources tab offers a town picker on this source's card.
+   *
+   * Opt-in, not inferred from the rows: python.org's calendar names a city per conference too, and
+   * narrowing a worldwide conference list to one town is a control nobody asked for. Only the entry
+   * platform — a national listing whose reader wants the races near home — has one.
+   */
+  townPicker?: true;
+  /**
    * The pages this source reads, as of `now`.
    *
    * Every entry ignores the argument today — the theatre's season pages, which were a function of
@@ -311,6 +319,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     // Every row is a race with its own town and a stamped `PL`; the longest source in the feed was
     // also the classifier's biggest bill, for labels nobody read.
     unclassified: true,
+    townPicker: true,
     pages: () => RUNNING_LISTINGS,
   },
   {
