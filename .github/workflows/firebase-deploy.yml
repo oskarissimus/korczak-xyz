@@ -232,8 +232,9 @@ jobs:
   # deletes functions carrying its own `deployment-tool` label, so `--force` above cannot remove
   # this one, and this job cannot touch those.
   #
-  # After `terraform` for the same reason `deploy` is: the secret containers and the grant that
-  # lets the runtime read them are in terraform/secrets.tf.
+  # After `terraform` only so the two deploy jobs share its ordering; it needs nothing from it.
+  # No secrets either: the keys are the caller's and arrive with each request (see
+  # audio-guide-function/function.go).
   audio-guide:
     needs: terraform
     runs-on: ubuntu-latest
@@ -263,32 +264,10 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
-      # Terraform makes the two secret containers; their values go in by hand, once (see
-      # .claude/rules/audio-guide.md). `--set-secrets` on a container with no version fails the
-      # deploy outright, so until both have one this job says so and stops — the same "no-op
-      # loudly" the terraform job does before its bootstrap. Existence only: the values are never
-      # read here.
-      - name: Are the keys set?
-        id: keys
-        run: |
-          missing=""
-          for s in OPENAI_API_KEY ELEVENLABS_API_KEY; do
-            v=$(gcloud secrets versions list "$s" --project="${{ vars.FIREBASE_PROJECT_ID }}" \
-                  --filter="state:ENABLED" --limit=1 --format="value(name)" 2>/dev/null || true)
-            [ -n "$v" ] || missing="$missing $s"
-          done
-          if [ -n "$missing" ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Audio guide not deployed::No value in Secret Manager for:$missing. See .claude/rules/audio-guide.md."
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # `--max-instances` is a spending ceiling, not a performance setting: every request is two
-      # model calls and a minute of synthesised speech, and five at once is more than the one
-      # page that calls this will ever ask for honestly.
+      # `--max-instances` is a ceiling on what a stranger can use this for. The providers are paid
+      # with the caller's keys, but the instance time is ours, and five at once is more than the
+      # one page that calls this will ever ask for honestly.
       - name: Deploy generate-audio
-        if: steps.keys.outputs.ready == 'true'
         run: |
           gcloud functions deploy generate-audio \
             --project="${{ vars.FIREBASE_PROJECT_ID }}" \
@@ -302,5 +281,4 @@ jobs:
             --memory=256Mi \
             --timeout=120s \
             --max-instances=5 \
-            --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,ELEVENLABS_API_KEY=ELEVENLABS_API_KEY:latest \
             --quiet

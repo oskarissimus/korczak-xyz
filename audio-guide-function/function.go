@@ -4,7 +4,13 @@
 // A name, a category and a pair of coordinates come in; an MP3 goes out. In between it
 // reverse-geocodes the coordinates with Nominatim, asks gpt-4o-mini for facts about the place,
 // asks it again for a script written for a speech synthesiser, and has ElevenLabs read that
-// script aloud. All three steps need keys, and a key in a static page is a key anybody can spend.
+// script aloud.
+//
+// THE KEYS ARE THE CALLER'S, not ours. They arrive with every request in two headers, typed into
+// the app's keys sheet the way sloper's and the backseat driver's are, and are used for that one
+// request and forgotten: nothing here stores, logs or falls back to a key of its own. That is what
+// makes it safe for this function to answer anybody - a stranger who posts here pays for their
+// own guide - and why there is no Secret Manager and no sign-in check.
 //
 // Moved here from oskarissimus/audio-guide-v2 (GCP project prompt-compressor-1) in Sep 2026, and
 // kept in Go. It deploys with gcloud, not the Firebase CLI - the CLI deploys Node and Python only -
@@ -21,7 +27,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -31,6 +36,10 @@ import (
 const (
 	requestTimeout = 90 * time.Second
 	defaultVoiceID = "21m00Tcm4TlvDq8ikWAM"
+
+	// The caller's keys. Named in Access-Control-Allow-Headers below, or every preflight fails.
+	openAIKeyHeader     = "X-OpenAI-Key"
+	elevenLabsKeyHeader = "X-ElevenLabs-Key"
 )
 
 // Variables rather than constants so the tests can point them at an httptest server. Nothing in
@@ -178,8 +187,11 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	// CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+openAIKeyHeader+", "+elevenLabsKeyHeader)
 	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning")
+	// The key headers make every tap a preflighted request; this spares the second tap one. Safari
+	// caps it at ten minutes whatever is asked for.
+	w.Header().Set("Access-Control-Max-Age", "600")
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusNoContent)
@@ -205,11 +217,14 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
-	openAIKey := secretEnv("OPENAI_API_KEY")
-	elevenLabsKey := secretEnv("ELEVENLABS_API_KEY")
-
-	if openAIKey == "" || elevenLabsKey == "" {
-		writeError(w, http.StatusInternalServerError, "Service configuration error")
+	openAIKey := strings.TrimSpace(r.Header.Get(openAIKeyHeader))
+	elevenLabsKey := strings.TrimSpace(r.Header.Get(elevenLabsKeyHeader))
+	if openAIKey == "" {
+		writeError(w, http.StatusUnauthorized, "No OpenAI key was sent")
+		return
+	}
+	if elevenLabsKey == "" {
+		writeError(w, http.StatusUnauthorized, "No ElevenLabs key was sent")
 		return
 	}
 
@@ -225,7 +240,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	facts, err := generateFacts(ctx, openAIKey, &attraction, &location)
 	if err != nil {
 		log.Printf("generate-audio: facts: %v", err)
-		writeError(w, http.StatusBadGateway, "Failed to generate facts: "+providerMessage(err))
+		writeError(w, failureStatus(err), "Failed to generate facts: "+providerMessage(err))
 		return
 	}
 
@@ -233,7 +248,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language)
 	if err != nil {
 		log.Printf("generate-audio: script: %v", err)
-		writeError(w, http.StatusBadGateway, "Failed to generate script: "+providerMessage(err))
+		writeError(w, failureStatus(err), "Failed to generate script: "+providerMessage(err))
 		return
 	}
 
@@ -241,25 +256,13 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	audio, err := generateAudioTTS(ctx, elevenLabsKey, script)
 	if err != nil {
 		log.Printf("generate-audio: audio: %v", err)
-		writeError(w, http.StatusBadGateway, "Failed to generate audio: "+providerMessage(err))
+		writeError(w, failureStatus(err), "Failed to generate audio: "+providerMessage(err))
 		return
 	}
 
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.WriteHeader(http.StatusOK)
 	w.Write(audio)
-}
-
-// secretEnv reads a key mounted from Secret Manager. `none` is this repository's placeholder for
-// a secret whose container exists but which has no real value yet (see functions/README.md), and
-// it reads back as unset - so a placeholder answers 500 "Service configuration error" rather than
-// sending "none" to a provider as a key.
-func secretEnv(name string) string {
-	v := strings.TrimSpace(os.Getenv(name))
-	if v == "none" {
-		return ""
-	}
-	return v
 }
 
 // providerError is a provider's non-200 answer: the status and the provider's own sentence.
@@ -322,6 +325,17 @@ func providerMessage(err error) string {
 		return "timed out"
 	}
 	return "upstream request failed"
+}
+
+// failureStatus is 401 when a provider refused the caller's key and 502 for everything else. The
+// app reads 401 as "check your keys" and opens the sheet, which is the one failure the reader can
+// fix on the spot.
+func failureStatus(err error) int {
+	var pe *providerError
+	if errors.As(err, &pe) && (pe.status == http.StatusUnauthorized || pe.status == http.StatusForbidden) {
+		return http.StatusUnauthorized
+	}
+	return http.StatusBadGateway
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
