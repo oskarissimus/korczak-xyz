@@ -8,7 +8,7 @@
  */
 
 import type { EventRecord } from './types';
-import { ALL_SOURCES_ON, sourceEnabled, type SourcePrefs } from './sourcePrefs';
+import { ALL_SOURCES_ON, sourceAdmits, type SourcePrefs } from './sourcePrefs';
 import { foldText } from './normalize';
 import { daysUntil } from './normalize';
 
@@ -83,8 +83,8 @@ export function buildFeed(
     const at = actionableAt(event);
     if (at !== null && daysUntil(at, now) < 0) continue;
 
-    // A source this account has switched off on the Sources tab.
-    if (!sourceEnabled(sources, event.source)) continue;
+    // A source this account has switched off on the Sources tab, or narrowed to another town.
+    if (!sourceAdmits(sources, event)) continue;
 
     kept.push(event);
   }

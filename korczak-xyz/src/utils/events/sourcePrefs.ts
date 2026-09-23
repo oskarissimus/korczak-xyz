@@ -42,6 +42,15 @@ export interface SourceSwitch {
    * with no time on it cannot be compared with one that has.
    */
   at: number;
+  /**
+   * Only rows in this town, when set. See `sourceAdmits`.
+   *
+   * On the switch rather than beside it because it is the same kind of fact — this account's
+   * opinion of one source — and because it wants the same two things the switch has: the flip
+   * time that reconciles two devices, and the floor that stops a widened filter announcing the
+   * backlog it had been hiding.
+   */
+  city?: string;
 }
 
 /**
@@ -73,7 +82,85 @@ export function setSourceEnabled(
   enabled: boolean,
   now: number,
 ): SourcePrefs {
-  return { ...prefs, [id]: { enabled, at: now } };
+  const city = prefs[id]?.city;
+  return { ...prefs, [id]: city ? { enabled, at: now, city } : { enabled, at: now } };
+}
+
+/**
+ * Narrow one source to one town, or widen it again with `undefined`.
+ *
+ * Moves `at` like a flip does, and that is the point rather than a side effect: `announceFloor`
+ * reads `at` for an enabled source, so widening Warszawa back to the whole country arms the other
+ * towns from now instead of announcing the hundred races the filter had been keeping quiet.
+ */
+export function setSourceCity(
+  prefs: SourcePrefs,
+  id: SourceId,
+  city: string | undefined,
+  now: number,
+): SourcePrefs {
+  const enabled = prefs[id]?.enabled ?? true;
+  const kept = city?.trim();
+  return { ...prefs, [id]: kept ? { enabled, at: now, city: kept } : { enabled, at: now } };
+}
+
+/** The town this source is narrowed to, if any. */
+export function sourceCity(prefs: SourcePrefs, id: string): string | undefined {
+  return prefs[id as SourceId]?.city;
+}
+
+/**
+ * A town, folded for comparison: case, diacritics and spacing.
+ *
+ * The rows spell their own towns and not consistently — `SUCHOWOLA` beside `Suchowola`,
+ * `Piekary śląskie` beside `Piekary Śląskie` — so the comparison has to be about the town and not
+ * about the keyboard of whoever typed the race in. `ł` has no decomposition and is mapped by hand.
+ */
+export function foldCity(city: string): string {
+  return city
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ł/g, 'l')
+    .replace(/Ł/g, 'L')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Is this row's town the one asked for?
+ *
+ * Equal once folded, or the asked-for town followed by a separator: a title written
+ * `Warszawa, Bemowo, "…"` splits greedily into the city `Warszawa, Bemowo`, and `Warszawa-Wawer`
+ * is a district and not another town. A letter after the prefix is another word — `Warszawianka`
+ * is not Warszawa — so the next character has to be a space, a comma, a dash or a bracket.
+ */
+export function cityMatches(wanted: string, city: string): boolean {
+  const w = foldCity(wanted);
+  const c = foldCity(city);
+  if (!w) return true;
+  if (c === w) return true;
+  return c.startsWith(w) && /^[\s,\-\u2013\u2014(\/]/.test(c.slice(w.length));
+}
+
+/**
+ * Does this row reach the reader: its source is on, and it is in the town the source is narrowed to.
+ *
+ * **A row with no town passes.** The entry platform's rows state their town in the title, and a
+ * title that lost its `Miasto, "Nazwa"` shape is saved with no city rather than dropped — so a
+ * missing city means "not read", not "somewhere else". Hiding it would make a parsing failure look
+ * exactly like a quiet week in Warsaw; showing it costs one card the reader can judge. Same rule
+ * the classifier's fields have: nothing is excluded for want of a verdict.
+ *
+ * The one gate both runtimes ask — `buildFeed` for the screen and `noticesFor` for the lock screen
+ * — so a filter cannot mean one thing on each.
+ */
+export function sourceAdmits(prefs: SourcePrefs, event: { source: string; city?: string }): boolean {
+  const held = prefs[event.source as SourceId];
+  if (!held) return true;
+  if (!held.enabled) return false;
+  if (!held.city || !event.city) return true;
+  return cityMatches(held.city, event.city);
 }
 
 /**
@@ -147,9 +234,53 @@ export function normalizeSourcePrefs(raw: unknown): SourcePrefs {
   const out: SourcePrefs = {};
   for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!value || typeof value !== 'object') continue;
-    const { enabled, at } = value as { enabled?: unknown; at?: unknown };
+    const { enabled, at, city } = value as { enabled?: unknown; at?: unknown; city?: unknown };
     if (typeof enabled !== 'boolean' || typeof at !== 'number' || !Number.isFinite(at)) continue;
-    out[id as SourceId] = { enabled, at };
+    // A town that is not a non-empty string is dropped rather than the switch: the switch is still
+    // a readable fact, and a malformed filter read as "no filter" shows more, never less.
+    out[id as SourceId] =
+      typeof city === 'string' && city.trim() ? { enabled, at, city: city.trim() } : { enabled, at };
   }
   return out;
+}
+
+/** One town a source's rows name, as the picker offers it. */
+export interface TownOption {
+  /** The spelling most of the rows use — what is shown and what is stored. */
+  city: string;
+  count: number;
+}
+
+/**
+ * The towns a source's rows name, for the picker on its card.
+ *
+ * Grouped by `foldCity` so `SUCHOWOLA` and `Suchowola` are one entry, shown in whichever spelling
+ * most rows use, and sorted alphabetically in Polish — a list of a hundred towns is looked *up*,
+ * not read down, so the busiest one first would only move the town being looked for.
+ */
+export function townsOf(rows: ReadonlyArray<{ city?: string }>): TownOption[] {
+  const groups = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    const city = row.city?.trim();
+    if (!city) continue;
+    const key = foldCity(city);
+    const spellings = groups.get(key) ?? new Map<string, number>();
+    spellings.set(city, (spellings.get(city) ?? 0) + 1);
+    groups.set(key, spellings);
+  }
+  const out: TownOption[] = [];
+  for (const spellings of groups.values()) {
+    let best = '';
+    let bestCount = 0;
+    let count = 0;
+    for (const [spelling, n] of spellings) {
+      count += n;
+      if (n > bestCount) {
+        best = spelling;
+        bestCount = n;
+      }
+    }
+    out.push({ city: best, count });
+  }
+  return out.sort((a, b) => a.city.localeCompare(b.city, 'pl'));
 }

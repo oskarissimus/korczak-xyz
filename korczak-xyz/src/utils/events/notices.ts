@@ -15,7 +15,7 @@
  */
 
 import type { EventRecord, NoticeKind } from './types';
-import { announceFloor, sourceEnabled, type SourcePrefs } from './sourcePrefs';
+import { announceFloor, sourceAdmits, type SourcePrefs } from './sourcePrefs';
 import { daysUntil, noticeIdFor } from './normalize';
 import { FEED_PATH } from './links';
 
@@ -137,7 +137,8 @@ export function noticesFor(
   if (event.startsAt !== null && event.startsAt < ctx.now) return [];
 
   /*
-   * A source switched off on the Sources tab. Checked here rather than in `planRun` so both entry
+   * A source switched off on the Sources tab, or a row outside the town it is narrowed to (see
+   * `sourceAdmits`). Checked here rather than in `planRun` so both entry
    * points obey it, and checked before anything is built so **nothing is latched** — a switch is
    * meant to be reversible, and a run that claimed notice ids while a source was silent would
    * consume the `soon` reminder for a race the reader turns the source back on precisely to hear
@@ -147,7 +148,7 @@ export function noticesFor(
    * is what keeps the backlog quiet *after* the switch comes back on; the two rules are the same
    * instruction read at two different moments, and neither does the other's job.
    */
-  if (!sourceEnabled(ctx.sources, event.source)) return [];
+  if (!sourceAdmits(ctx.sources, event)) return [];
 
   const out: PendingNotice[] = [];
   const base = {

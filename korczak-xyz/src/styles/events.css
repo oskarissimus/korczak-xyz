@@ -563,6 +563,15 @@
   font-size: 1.05rem;
 }
 
+/* The town picker sits under the switch it narrows, as wide as its longest town and no wider. */
+.ev-source-city {
+  align-items: flex-start;
+}
+
+.ev-source-city .ev-input {
+  min-width: 12rem;
+}
+
 .ev-source-status {
   display: flex;
   flex-wrap: wrap;

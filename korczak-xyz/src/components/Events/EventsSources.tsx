@@ -47,6 +47,7 @@ import { pullSourceHealth } from '../../utils/events/browser/cloud';
 import { countryLabel } from '../../utils/events/countries';
 import { modelPasses, type ModelPass, type PassCoverage } from '../../utils/events/extraction';
 import { bySource } from '../../utils/events/feed';
+import { townsOf, type TownOption } from '../../utils/events/sourcePrefs';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
 import type { EventRecord, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
@@ -111,6 +112,11 @@ function SourcesPanel({ lang }: Props) {
   const passesBySource = useMemo(() => {
     const out = new Map<string, PassCoverage[]>();
     for (const [id, rows] of rowsBySource) out.set(id, modelPasses(rows));
+    return out;
+  }, [rowsBySource]);
+  const townsBySource = useMemo(() => {
+    const out = new Map<string, TownOption[]>();
+    for (const [id, rows] of rowsBySource) out.set(id, townsOf(rows));
     return out;
   }, [rowsBySource]);
   const byId = useMemo(() => new Map(health.map((row) => [row.id, row])), [health]);
@@ -189,6 +195,18 @@ function SourcesPanel({ lang }: Props) {
                 <span>{on ? t.sourceOn : t.sourceOff}</span>
               </label>
 
+              {on ? (
+                <TownPicker
+                  id={entry.id}
+                  towns={townsBySource.get(entry.id) ?? []}
+                  total={rows.length}
+                  selected={switches.city(entry.id)}
+                  disabled={!switches.ready}
+                  onChange={(city) => switches.setCity(entry.id, city)}
+                  t={t}
+                />
+              ) : null}
+
               <ul className="ev-pages">
                 {entry.pages(now).map((page) => (
                   <li className="ev-page" key={page.url}>
@@ -263,6 +281,65 @@ function SourcesPanel({ lang }: Props) {
           </ul>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Narrow one source to one town.
+ *
+ * Offered only where the rows name more than one town — a festival's blog stamps its one city on
+ * every item, and a picker with a single choice is a control that does nothing. A town already
+ * chosen is always offered, even when no upcoming row names it any more, so the setting on the
+ * screen is never one the select cannot show.
+ *
+ * Options come from the rows rather than a list of Polish towns: what can be chosen is what this
+ * source has actually said, in the spelling it says it in. `sourceAdmits` then compares folded,
+ * so `Warszawa` still catches `WARSZAWA` and `Warszawa-Wawer`.
+ */
+function TownPicker({
+  id,
+  towns,
+  total,
+  selected,
+  disabled,
+  onChange,
+  t,
+}: {
+  id: string;
+  towns: TownOption[];
+  total: number;
+  selected: string | undefined;
+  disabled: boolean;
+  onChange: (city: string | undefined) => void;
+  t: Translation;
+}) {
+  const options =
+    selected && !towns.some((town) => town.city === selected)
+      ? [{ city: selected, count: 0 }, ...towns]
+      : towns;
+  if (options.length < 2 && !selected) return null;
+  const inputId = `ev-source-city-${id}`;
+  return (
+    <div className="ev-field ev-source-city">
+      <label className="ev-field-label" htmlFor={inputId}>
+        {t.sourceCityLabel}
+      </label>
+      <select
+        id={inputId}
+        className="ev-input"
+        value={selected ?? ''}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">{fill(t.sourceCityAll, { count: total })}</option>
+        {options.map((town) => (
+          <option key={town.city} value={town.city}>
+            {fill(t.sourceCityOption, { city: town.city, count: town.count })}
+          </option>
+        ))}
+      </select>
+      {selected ? <p className="ev-hint">{fill(t.sourceCityOn, { city: selected })}</p> : null}
     </div>
   );
 }

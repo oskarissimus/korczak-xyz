@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEAD_DAYS, noticesFor, planRun, type PlanContext } from './notices';
-import { ALL_SOURCES_ON, setSourceEnabled } from './sourcePrefs';
+import { ALL_SOURCES_ON, setSourceCity, setSourceEnabled } from './sourcePrefs';
 import { fingerprintOf, noticeIdFor } from './normalize';
 import type { EventRecord } from './types';
 
@@ -373,6 +373,24 @@ describe('a source switched off', () => {
   it('latches nothing, so switching it back on does not eat its reminders', () => {
     const near = ev({ title: 'Soon', day: '2026-08-30' });
     const plan = planRun([near], new Set(), ctx({ sources: OFF }));
+    expect(plan.send).toEqual([]);
+    expect(plan.suppressed).toEqual([]);
+  });
+});
+
+describe('a source narrowed to one town', () => {
+  const WAW = setSourceCity({}, 'elektroniczne-zapisy', 'Warszawa', ARMED);
+
+  it('notifies about that town and says nothing about the others', () => {
+    const here = ev({ title: 'Maraton', source: 'elektroniczne-zapisy', city: 'Warszawa' });
+    const there = ev({ title: 'Dycha', source: 'elektroniczne-zapisy', city: 'Gdańsk' });
+    expect(noticesFor(here, new Set(), ctx({ sources: WAW }))).not.toEqual([]);
+    expect(noticesFor(there, new Set(), ctx({ sources: WAW }))).toEqual([]);
+  });
+
+  it('latches nothing for the other towns, so widening it again keeps their reminders', () => {
+    const near = ev({ title: 'Soon', source: 'elektroniczne-zapisy', city: 'Gdańsk', day: '2026-08-30' });
+    const plan = planRun([near], new Set(), ctx({ sources: WAW }));
     expect(plan.send).toEqual([]);
     expect(plan.suppressed).toEqual([]);
   });

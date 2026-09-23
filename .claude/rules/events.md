@@ -745,6 +745,29 @@ Three rules keep it honest, and the third is the one that is invisible until it 
 row happened to be collected, and hearing about it is why anybody switches a source back on. While a source is off, nothing is produced for
 it and **nothing is latched**, so no notice id is consumed and the reminders survive the silence.
 
+#### And the town picker beside it
+
+Added Sep 2026 at the owner's request — *only the races in Warszawa* — and it is the switch's
+second setting rather than a filter of its own: `SourceSwitch.city`, on the same document, merged
+by the same flip time, read through **`sourceAdmits`** by both `buildFeed` and `noticesFor`. The
+corpus is untouched; the fetch is still national, for the reason `?city_id=12` was turned down.
+
+- **Options are the towns the rows name** (`townsOf`, grouped by `foldCity`), and the picker only
+  appears where there are two or more — a feed that stamps one city on everything gets no control
+  that does nothing. It is offered on every source, so Ticketmaster gets one too.
+- **Matching is folded and takes a district**: `WARSZAWA`, `Warszawa, Bemowo` and `Warszawa-Wawer`
+  are Warszawa; `Warszawianka` is not.
+- **A row with no town passes.** A title that lost its `Miasto, "Nazwa"` shape is stored with no
+  city, and hiding it would make a parse failure look like a quiet week. Same rule as the
+  classifier's fields.
+- **Choosing or clearing a town moves `at`**, so `announceFloor` re-arms from the tap: widening back
+  to every town does not announce the backlog the filter had been keeping quiet. Rows outside the
+  town latch nothing, so their `soon` reminders survive the narrowing.
+
+Checked against the data when it shipped (23 Sep 2026): all 152 stored race rows had a city, three
+of them `Warszawa`, and the platform's own `?city_id=12` listing returned exactly the two of those
+still upcoming — no Warsaw race hiding under a district or a venue name.
+
 ### Where an event is, who it is for, and whether it is one
 
 Three fields a model writes, and **none of them filters anything any more.** They were built as

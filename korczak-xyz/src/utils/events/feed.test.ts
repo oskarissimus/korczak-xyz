@@ -9,7 +9,7 @@ import {
   saleWhenLabel,
   whenLabel,
 } from './feed';
-import { setSourceEnabled } from './sourcePrefs';
+import { setSourceCity, setSourceEnabled } from './sourcePrefs';
 import { fingerprintOf } from './normalize';
 import type { EventRecord } from './types';
 
@@ -107,6 +107,17 @@ describe('buildFeed', () => {
     const off = setSourceEnabled({}, 'feed', false, NOW);
     const race = ev({ title: 'X', source: 'elektroniczne-zapisy' });
     expect(buildFeed([race], NOW, { sources: off })[0].events).toHaveLength(1);
+  });
+
+  it('keeps only the town a source is narrowed to, and rows that state none', () => {
+    const waw = setSourceCity({}, 'elektroniczne-zapisy', 'Warszawa', NOW);
+    const races = [
+      ev({ title: 'Maraton', source: 'elektroniczne-zapisy', city: 'Warszawa' }),
+      ev({ title: 'Dycha', source: 'elektroniczne-zapisy', city: 'Gdańsk' }),
+      ev({ title: 'Unplaced', source: 'elektroniczne-zapisy', city: undefined }),
+    ];
+    const titles = buildFeed(races, NOW, { sources: waw }).flatMap((s) => s.events.map((e) => e.title));
+    expect(titles.sort()).toEqual(['Maraton', 'Unplaced']);
   });
 
   it('orders chronologically and groups in reading order', () => {

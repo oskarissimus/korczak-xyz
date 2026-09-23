@@ -27,7 +27,9 @@ import { pullSourcePrefs, pushSourcePrefs } from '../utils/events/browser/cloud'
 import {
   disabledSourceIds,
   mergeSourcePrefs,
+  setSourceCity,
   setSourceEnabled,
+  sourceCity,
   sourceEnabled,
   type SourcePrefs,
 } from '../utils/events/sourcePrefs';
@@ -41,6 +43,10 @@ export interface EventSourcePrefsData {
   disabled: string[];
   enabled: (id: string) => boolean;
   setEnabled: (id: SourceId, enabled: boolean) => void;
+  /** The town a source is narrowed to, if any. */
+  city: (id: string) => string | undefined;
+  /** Narrow a source to one town, or `undefined` for all of them. */
+  setCity: (id: SourceId, city: string | undefined) => void;
   /** The last sync failure, or null. Shown on the tab — a switch that did not save must say so. */
   error: string | null;
 }
@@ -107,6 +113,17 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
     [publish, sync],
   );
 
+  const setCity = useCallback(
+    (id: SourceId, city: string | undefined) => {
+      // Same order as a flip: applied and stored locally before the sync awaits anything.
+      const next = setSourceCity(prefsRef.current, id, city, Date.now());
+      publish(next);
+      saveSourcePrefs(next);
+      void sync();
+    },
+    [publish, sync],
+  );
+
   useEffect(() => {
     if (!user) {
       uidRef.current = null;
@@ -131,5 +148,7 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
   const disabled = useMemo(() => disabledSourceIds(prefs), [prefs]);
   const enabled = useCallback((id: string) => sourceEnabled(prefs, id), [prefs]);
 
-  return { ready, prefs, disabled, enabled, setEnabled, error };
+  const city = useCallback((id: string) => sourceCity(prefs, id), [prefs]);
+
+  return { ready, prefs, disabled, enabled, setEnabled, city, setCity, error };
 }

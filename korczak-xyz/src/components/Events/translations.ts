@@ -120,6 +120,13 @@ export const translations = {
     sourceOn: 'Watching — in your feed, and can notify you',
     sourceOff: 'Off — not in your feed, and cannot notify you. Still collected.',
     sourceSwitchFailed: 'That switch is set on this device but was not saved: {error}',
+    // The town picker on a source whose rows each state their own town. `{count}` is how many of
+    // this source's upcoming rows name it, so the choice is made against the list it will leave.
+    sourceCityLabel: 'Town',
+    sourceCityAll: 'Every town ({count})',
+    sourceCityOption: '{city} ({count})',
+    sourceCityOn:
+      'Only {city} reaches your feed and can notify you. So does a row that states no town, since nothing says where it is.',
     sourceLastRun: 'ran {when}',
     sourceInCorpus: '{count} collected',
     pageOptional: 'appears when announced',
@@ -251,6 +258,11 @@ export const translations = {
     sourceOn: 'Śledzone — jest na liście i może powiadamiać',
     sourceOff: 'Wyłączone — nie ma go na liście i nie powiadomi. Nadal jest zbierane.',
     sourceSwitchFailed: 'Ten przełącznik działa na tym urządzeniu, ale nie został zapisany: {error}',
+    sourceCityLabel: 'Miejscowość',
+    sourceCityAll: 'Wszystkie ({count})',
+    sourceCityOption: '{city} ({count})',
+    sourceCityOn:
+      'Tylko {city} trafia na listę i może powiadamiać. Wpis bez podanej miejscowości też — nie wiadomo, gdzie jest.',
     sourceLastRun: 'ostatnio {when}',
     sourceInCorpus: 'zebrane: {count}',
     pageOptional: 'pojawi się po ogłoszeniu',
