@@ -154,6 +154,7 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
           {!places.loading && places.empty && !places.error && (
             <p className="ag-chip">{t.attractionsEmpty}</p>
           )}
+          {places.zoomedOut && <p className="ag-chip">{t.attractionsZoomIn}</p>}
           {places.error && (
             <p className="ag-chip ag-chip-error">
               {attractionsMessage(places.error, t)}{' '}

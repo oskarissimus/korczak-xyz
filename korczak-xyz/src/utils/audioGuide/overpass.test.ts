@@ -18,7 +18,15 @@ describe("overpassQuery", () => {
   });
 
   it("asks for centres, so a way or relation still yields one point", () => {
-    expect(overpassQuery(bounds)).toContain("out center;");
+    expect(overpassQuery(bounds)).toContain("out center qt;");
+  });
+
+  it("asks Overpass to drop unnamed elements rather than sending them", () => {
+    expect(overpassQuery(bounds).match(/\["name"\]/g)).toHaveLength(3);
+  });
+
+  it("leaves out information boards and guideposts", () => {
+    expect(overpassQuery(bounds)).not.toContain("information");
   });
 });
 

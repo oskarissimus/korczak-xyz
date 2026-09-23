@@ -164,8 +164,31 @@ Three things about the pins that look like details and are not:
 - **The icon is anchored on the speaker glyph, not on the middle of the pill.** The point is the
   place; a pill centred on it puts its icon half a label away from the building it names.
 
-Overpass is a free, shared, IP-rate-limited endpoint. `useNearbyAttractions` debounces the
-viewport by 500ms, aborts the in-flight request when the map moves again, and retries **only** a
+Overpass is a free, shared, IP-rate-limited endpoint, and it is also what made the pins slow:
+until Sep 2026 every pan and zoom was a fresh query for exactly the visible rectangle, half a second
+after the map stopped, with nothing remembered. Now:
+
+- **The pins are cached by map square** (`utils/audioGuide/tiles.ts`). The world is cut into the
+  zoom-15 slippy-map grid (~750m squares in Poland) and each answer is filed under the squares it
+  covered, **empty ones included** — an empty square is an answer. A new viewport draws whatever
+  its squares already hold on the same frame, and asks Overpass only for the rectangle of squares
+  it is missing. Zooming in and panning back are free. The cache is in memory, 1500 squares, least
+  recently looked-at forgotten first — pins, unlike narration, are a few bytes each. Zoom 15 and
+  not coarser because the first answer is the one somebody waits for, and a coarser grid makes it
+  several times the screen.
+- **An attraction is filed under the one square its point falls in**, so a building astride a
+  boundary is one pin. When more than `MAX_MARKERS` are in view, the ones drawn are the nearest to
+  the middle of the screen (`nearestToCentre`), not the first in the answer.
+- **The query asks for `["name"]` on every clause** and leaves out `tourism=information`.
+  `transformAttractions` drops the unnamed anyway, but `historic` alone is mostly unnamed walls
+  and boundary stones — in an old town that was most of the response, serialised and sent for
+  nothing. **Do not put a count limit on `out`** (`out center qt 300`): a truncated answer would be
+  filed as the whole truth for its squares, and they would stay short of pins until the tab closed.
+- **Below zoom 13 nothing is asked for** (`MIN_ZOOM`); cached pins still show, with a chip saying
+  to zoom in.
+
+`useNearbyAttractions` debounces the network by 250ms (the cache is read without waiting), aborts
+the in-flight request when the map moves somewhere that needs another, and retries **only** a
 busy server — 429 or 504. **A 504 is not "the box was too big".** It was read that way at first,
 and a reader looking at one city block was told to zoom in: the public instance answers 504 when
 its queue is full, whatever was asked. A query that genuinely outgrows `[timeout:25]` or its memory
@@ -213,8 +236,9 @@ bar is there at all is that a phone showing nothing for twenty seconds gets tapp
 
 ### What is not kept
 
-Nothing. No narration is cached, in memory or anywhere else. Re-tapping the pin you are listening
-to replays it; coming back to it later pays for it again.
+No narration. None is cached, in memory or anywhere else. (The pins are, in memory — see *The map
+is Leaflet* — which is a different thing: bytes, not megabytes, and free to fetch again.)
+Re-tapping the pin you are listening to replays it; coming back to it later pays for it again.
 
 A cache is the first thing anyone proposes here and it is the wrong shape: the audio is megabytes
 per guide, the origin's ~5 MB localStorage budget is shared with the typing trainer's

@@ -81,6 +81,7 @@ export const translations = {
     attractionsBusy: 'The map data service is busy. Wait a moment and move the map again.',
     attractionsTooBig: 'That area was too big to answer. Zoom in and try again.',
     attractionsFailed: 'Could not load places for this area.',
+    attractionsZoomIn: 'Zoom in to look for places here.',
     retry: 'Retry',
 
     // Generating
@@ -177,6 +178,7 @@ export const translations = {
       'Serwis z danymi mapy jest zajęty. Poczekaj chwilę i przesuń mapę jeszcze raz.',
     attractionsTooBig: 'Ten obszar był za duży. Przybliż mapę i spróbuj ponownie.',
     attractionsFailed: 'Nie udało się pobrać miejsc dla tego obszaru.',
+    attractionsZoomIn: 'Przybliż mapę, żeby wyszukać tu miejsca.',
     retry: 'Ponów',
 
     generating: 'Piszę przewodnik',

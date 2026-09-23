@@ -7,7 +7,7 @@
  * There is no API key and no account here, which is the whole reason this runs in the browser
  * rather than behind the site's own backend. The public endpoint is shared and rate limited by
  * IP, so the two things that keep this polite are both here: the viewport is debounced before a
- * request is made at all (see `useAttractions`), and a 429 backs off rather than retrying at once.
+ * request is made at all (see `useNearbyAttractions`), and a 429 backs off rather than retrying at once.
  */
 
 import type { Attraction, Bounds } from './types';
@@ -40,7 +40,14 @@ export class OverpassBusyError extends Error {
  * `tourism` covers the obvious ones, `historic` the plaques and ruins that make a walk worth
  * taking, and places of worship are here because in most European old towns they are the oldest
  * thing standing. Everything else OSM knows - shops, benches, bus stops - would bury those under
- * pins nobody wants a story about.
+ * pins nobody wants a story about. `tourism=information` is left out for the same reason: it is
+ * every guidepost and map board, and a story about a signpost is not one.
+ *
+ * Every clause asks for `["name"]`. `transformAttractions` drops unnamed elements anyway, and
+ * `historic` alone is mostly unnamed walls, boundary stones and plaques - asking Overpass to drop
+ * them means it neither serialises nor sends them, which in an old town was most of the answer.
+ * `qt` sorts the output by location rather than by id, which Overpass documents as the cheaper
+ * of the two; the order means nothing here, since the cache refiles everything by square.
  */
 export function overpassQuery(bounds: Bounds): string {
   const { south, west, north, east } = bounds;
@@ -50,11 +57,11 @@ export function overpassQuery(bounds: Bounds): string {
   // do with a cathedral's outline is drop one pin in the middle of it.
   return `[out:json][timeout:25];
 (
-  nwr["tourism"~"museum|attraction|gallery|viewpoint|artwork|information"](${box});
-  nwr["historic"](${box});
-  nwr["amenity"="place_of_worship"](${box});
+  nwr["tourism"~"^(museum|attraction|gallery|viewpoint|artwork)$"]["name"](${box});
+  nwr["historic"]["name"](${box});
+  nwr["amenity"="place_of_worship"]["name"](${box});
 );
-out center;`;
+out center qt;`;
 }
 
 /** The OSM tag that best names what a thing is, for the model's benefit rather than the map's. */

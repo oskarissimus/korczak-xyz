@@ -37,7 +37,8 @@ interface MapPaneProps {
   user: { lat: number; lon: number; accuracy: number } | null;
   heading: number | null;
   onSelect: (attraction: Attraction) => void;
-  onBoundsChange: (bounds: Bounds) => void;
+  /** The rectangle on screen and the zoom it is drawn at, after every pan and zoom. */
+  onBoundsChange: (bounds: Bounds, zoom: number) => void;
   /** For the tile layer's `alt` and the map container's label. */
   label: string;
 }
@@ -133,12 +134,15 @@ export default function MapPane({
 
     const report = () => {
       const bounds = instance.getBounds();
-      latest.current.onBoundsChange({
-        south: bounds.getSouth(),
-        west: bounds.getWest(),
-        north: bounds.getNorth(),
-        east: bounds.getEast(),
-      });
+      latest.current.onBoundsChange(
+        {
+          south: bounds.getSouth(),
+          west: bounds.getWest(),
+          north: bounds.getNorth(),
+          east: bounds.getEast(),
+        },
+        instance.getZoom(),
+      );
     };
 
     instance.on('moveend', report);
