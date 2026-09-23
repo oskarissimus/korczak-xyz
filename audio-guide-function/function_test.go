@@ -219,3 +219,25 @@ func TestLanguageDefaultsToEnglish(t *testing.T) {
 		t.Errorf("%+v", a)
 	}
 }
+
+func TestLocationIsLabelledSoAStreetIsNotReadAsATown(t *testing.T) {
+	a := &Attraction{Latitude: 52.1285, Longitude: 21.0552}
+	got := describeLocation(a, &Location{
+		Street: "Rybałtów", Quarter: "Kabaty", Neighborhood: "Ursynów",
+		City: "Warszawa", Country: "Polska", Valid: true,
+	})
+	for _, want := range []string{
+		"Street: Rybałtów (a street name, not a town)",
+		"District: Kabaty, Ursynów",
+		"City: Warszawa",
+		"Coordinates: 52.128500, 21.055200",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+
+	if got := describeLocation(a, &Location{}); got != "Coordinates: 52.128500, 21.055200\n" {
+		t.Errorf("without geocoding: %q", got)
+	}
+}

@@ -53,7 +53,14 @@ because "1889" read aloud is "one thousand eight hundred and eighty-nine"); has 
 `eleven_multilingual_v2` read it; and answers with the MP3. If Nominatim failed it sets
 `X-Location-Warning`, which is why the player sometimes carries a notice about accuracy.
 
-The prompts, the model, the voice and the validation limits are the original's, unchanged. Two
+**The address goes to the model labelled, with the coordinates always beside it**
+(`describeLocation`). The original sent `Rybałtów, Ursynów, Warszawa, Polska` bare, and the model
+read the street as a village: a tap on the church of St Padre Pio in Kabaty, on ulica Rybałtów,
+got a guide to "a church in Rybałtów". Nominatim's `quarter` (Kabaty) is kept too — the suburb is
+often only the borough. The facts prompt also says to stay on this exact place and say less rather
+than borrow from a namesake. Do not go back to a comma-joined address.
+
+The model, the voice, the rest of the prompts and the validation limits are the original's. Two
 behaviours changed in the move: where the keys come from (next section), and this: a provider failure used to be a bare
 `Failed to generate audio`, with the provider's reason thrown away — so the `quota` branch of
 `classifyNarrationFailure` could never fire. The 502 now carries the provider's own sentence

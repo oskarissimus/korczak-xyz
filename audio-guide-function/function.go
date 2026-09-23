@@ -69,6 +69,7 @@ type Location struct {
 	City         string
 	Street       string
 	Neighborhood string
+	Quarter      string
 	Valid        bool // false if geocoding failed
 }
 
@@ -82,6 +83,7 @@ type nominatimResponse struct {
 		Village       string `json:"village"`
 		Suburb        string `json:"suburb"`
 		Neighbourhood string `json:"neighbourhood"`
+		Quarter       string `json:"quarter"`
 		Country       string `json:"country"`
 	} `json:"address"`
 }
@@ -178,6 +180,10 @@ func reverseGeocode(ctx context.Context, lat, lon float64) Location {
 	} else if nomResp.Address.Neighbourhood != "" {
 		loc.Neighborhood = nomResp.Address.Neighbourhood
 	}
+
+	// A quarter (Kabaty, Mokotów's Stegny) is the name a local would actually use, and the suburb
+	// above is often just the borough.
+	loc.Quarter = nomResp.Address.Quarter
 
 	return loc
 }
@@ -368,33 +374,16 @@ type chatResponse struct {
 func generateFacts(ctx context.Context, apiKey string, attraction *Attraction, location *Location) (string, error) {
 	systemPrompt := fmt.Sprintf("You are a knowledgeable tour guide with expertise in history, architecture, and culture. Provide accurate, engaging facts suitable for tourists. Write your response entirely in %s.", attraction.Language)
 
-	// Build location string
-	var locationParts []string
-	if location.Valid {
-		if location.Street != "" {
-			locationParts = append(locationParts, location.Street)
-		}
-		if location.Neighborhood != "" {
-			locationParts = append(locationParts, location.Neighborhood)
-		}
-		if location.City != "" {
-			locationParts = append(locationParts, location.City)
-		}
-		if location.Country != "" {
-			locationParts = append(locationParts, location.Country)
-		}
-	}
-
-	var locationInfo string
-	if len(locationParts) > 0 {
-		locationInfo = fmt.Sprintf("Location: %s\n", strings.Join(locationParts, ", "))
-	} else {
-		locationInfo = fmt.Sprintf("Coordinates: %f, %f\n", attraction.Latitude, attraction.Longitude)
-	}
+	locationInfo := describeLocation(attraction, location)
 
 	userPrompt := fmt.Sprintf(`Provide 3-5 truly fascinating facts about "%s" (%s).
 
+It is this exact place:
 %s
+Only give facts about the place at this address. Other places may share its name, and a street
+may share its name with a town elsewhere — do not borrow facts from any of them. If you know
+little about this particular place, say less rather than guess.
+
 Focus on:
 - Surprising or little-known facts that most visitors wouldn't know
 - Unique historical events or stories connected to this place
@@ -410,6 +399,35 @@ Avoid:
 Each fact should make the visitor say "I didn't know that!" Be concise but engaging. Each fact should be 1-2 sentences. Write entirely in %s.`, attraction.Name, attraction.Category, locationInfo, attraction.Language)
 
 	return chatCompletion(ctx, apiKey, systemPrompt, userPrompt, 500, 0.7)
+}
+
+// describeLocation labels each part of the address, because unlabelled it is ambiguous: "Rybałtów,
+// Ursynów, Warszawa" was read as a village called Rybałtów, and the guide to a church on that
+// street in Kabaty was about somewhere else entirely. The coordinates always go in as well.
+func describeLocation(attraction *Attraction, location *Location) string {
+	var b strings.Builder
+	if location.Valid {
+		if location.Street != "" {
+			fmt.Fprintf(&b, "Street: %s (a street name, not a town)\n", location.Street)
+		}
+		var areas []string
+		for _, a := range []string{location.Quarter, location.Neighborhood} {
+			if a != "" && (len(areas) == 0 || areas[len(areas)-1] != a) {
+				areas = append(areas, a)
+			}
+		}
+		if len(areas) > 0 {
+			fmt.Fprintf(&b, "District: %s\n", strings.Join(areas, ", "))
+		}
+		if location.City != "" {
+			fmt.Fprintf(&b, "City: %s\n", location.City)
+		}
+		if location.Country != "" {
+			fmt.Fprintf(&b, "Country: %s\n", location.Country)
+		}
+	}
+	fmt.Fprintf(&b, "Coordinates: %f, %f\n", attraction.Latitude, attraction.Longitude)
+	return b.String()
 }
 
 func generateScript(ctx context.Context, apiKey, attractionName, facts, language string) (string, error) {
