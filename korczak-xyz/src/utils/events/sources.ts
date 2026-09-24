@@ -86,6 +86,12 @@ export interface SourceCatalogueEntry {
    */
   countryPicker?: true;
   /**
+   * True where the Sources tab offers a reach picker on this source's card — at least national,
+   * or international only. Opt-in like the others; only python.org, where the classifier's `reach`
+   * is what tells PyCon US from a local meetup.
+   */
+  reachPicker?: true;
+  /**
    * The pages this source reads, as of `now`.
    *
    * Every entry ignores the argument today — the theatre's season pages, which were a function of
@@ -317,6 +323,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     label: 'python.org events',
     kind: 'ical',
     countryPicker: true,
+    reachPicker: true,
     pages: () => [
       { url: PYTHON_ORG_ICAL, label: displayUrl(PYTHON_ORG_ICAL), tags: ['tech', 'python'] },
     ],

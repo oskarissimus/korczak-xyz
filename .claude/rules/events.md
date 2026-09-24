@@ -48,7 +48,7 @@ thing this rule forbids, even when it is harmless.
 In practice:
 
 - A new filter is a flag on that source's `SOURCE_CATALOGUE` entry (`townPicker`, `countryPicker`,
-  `unclassified`)
+  `reachPicker`, `unclassified`)
   and is set only on the source it was asked for. Offering it to another source is a separate
   request, not a generalisation to make on the way.
 - Its setting lives on that source's switch in `sourcePrefs.ts` and is drawn on that source's
@@ -127,8 +127,8 @@ What is left of the grammar, and what is not:
   `Warsaw` to `Warszawa` had one reader. Every row still states its own town and the card prints
   it; nothing compares two spellings any more. Metro Watch keeps its own station alias table and
   the rule that outlived this one — **a wrong alias is worse than a missing one**.
-- **`EventKind`, `Reach` and `country` are all still written, and only `country` filters — on one
-  source, by opt-in** (python.org's country picker, below). Otherwise they are read on the card: the place chip, and the kind chip on anything that is not a `listing`. A `?`
+- **`EventKind`, `Reach` and `country` are all still written, and only `country` and `reach`
+  filter — on one source, by opt-in** (python.org's country and reach pickers, below). Otherwise they are read on the card: the place chip, and the kind chip on anything that is not a `listing`. A `?`
   there is how "the classifier has not reached this row" is said, and it is now the only sign in
   the app that the pass has stopped — which is why `extraction.ts` counts it per source.
 
@@ -808,11 +808,23 @@ would be offered a picker with one option.
   `withFilters`, so flipping the switch, choosing a town or choosing a country never drops the
   other narrowing.
 
+**And the reach picker beside it**, asked for the same day — `SourceSwitch.reach`, catalogue flag
+**`reachPicker`**, python.org only. Two things about it are deliberate:
+
+- **It is a floor, not an exact match.** *National or international* and *International only*;
+  `local` is not offered, because a floor of local is no filter and nobody wants only the meetups.
+  `reachAtLeast` reads the order off `REACHES`.
+- **With a country also chosen, the two are OR-ed**, which is the `places` rule below brought back
+  on purpose: `PL` + *International only* means "in Poland, plus anything worth flying to", where
+  AND would keep the handful of international conferences held in Poland. Each axis still passes
+  a row it has no verdict for. The hint under the picker says "or" out loud, because it is the one
+  thing about the control nobody would guess.
+
 ### Where an event is, who it is for, and whether it is one
 
 Three fields a model writes, and **none of them filters globally any more.** They were built as
-filters and the rules that read them went with the interests (Sep 2026); the one exception since is
-`country` on python.org, opt-in per source (*And the country picker* above). What is left is what they
+filters and the rules that read them went with the interests (Sep 2026); the exceptions since are
+`country` and `reach` on python.org, opt-in per source (*And the country picker* above). What is left is what they
 say on the card, which was always half the point — see *The filter has to be falsifiable from the
 outside* below, which is about exactly that. The history is kept because these fields are still
 written on every run, still cost model calls, and the reasons for their shapes are the reasons not
