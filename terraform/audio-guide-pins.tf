@@ -203,9 +203,12 @@ resource "google_cloud_scheduler_job" "audio_guide_pins" {
           # estimate.
           maxRunDuration = "21600s"
           maxRetryCount  = 3
+          # ONE policy: Batch refuses a second ("lifecycle_policies_count with value 2 is not in
+          # between 0 and 1"), which is how the first run of this job came back a 400. With a
+          # RETRY_TASK policy present, only the codes it names are retried - 50001 is Batch's code
+          # for a spot VM taken back - so the build's own failure (exit 1) is not repeated.
           lifecyclePolicies = [
             { action = "RETRY_TASK", actionCondition = { exitCodes = [50001] } },
-            { action = "FAIL_TASK", actionCondition = { exitCodes = [1] } },
           ]
 
           environment = {
