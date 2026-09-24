@@ -7,7 +7,8 @@
 // verbatim quote for each, checks every quote against its source (grounding.go), asks again for a
 // script written for a speech synthesiser from the facts that survived, and has ElevenLabs read
 // it aloud. A place with no sources, or none the checks let through, is answered with a 422
-// rather than a guess.
+// rather than a guess. What the model said, and the sources it said it from, are recorded in a
+// bucket for fact-checking later (record.go).
 //
 // THE KEYS ARE THE CALLER'S, not ours. They arrive with every request in two headers, typed into
 // the app's keys sheet the way sloper's and the backseat driver's are, and are used for that one
@@ -83,13 +84,13 @@ type Attraction struct {
 
 // Location represents reverse geocoded location data
 type Location struct {
-	Country      string
-	City         string
-	Street       string
-	Neighborhood string
-	Quarter      string
-	CountryCode  string // "pl"; picks which Wikipedia is read first
-	Valid        bool   // false if geocoding failed
+	Country      string `json:"country,omitempty"`
+	City         string `json:"city,omitempty"`
+	Street       string `json:"street,omitempty"`
+	Neighborhood string `json:"neighborhood,omitempty"`
+	Quarter      string `json:"quarter,omitempty"`
+	CountryCode  string `json:"countryCode,omitempty"` // "pl"; picks which Wikipedia is read first
+	Valid        bool   `json:"valid"`                 // false if geocoding failed
 }
 
 // nominatimResponse represents the Nominatim API response
@@ -283,34 +284,46 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	facts, err := extractFacts(ctx, openAIKey, &attraction, &location, sources)
+	proposed, facts, err := extractFacts(ctx, openAIKey, &attraction, &location, sources)
 	if err != nil {
 		log.Printf("generate-audio: facts: %v", err)
 		writeError(w, failureStatus(err), "Failed to generate facts: "+providerMessage(err))
 		return
 	}
+
+	// From here on the model has said something about this place, so what it said is kept for
+	// fact-checking, whatever becomes of the tap. See record.go.
+	rec := newGuideRecord(&attraction, location, sources, proposed, facts)
+	defer saveGuideRecord(ctx, rec)
+
 	if len(facts) == 0 {
 		log.Printf("generate-audio: no verified facts for %q from %d sources", attraction.Name, len(sources))
+		rec.Outcome = "no_verified_facts"
 		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "The sources found say nothing checkable about this place")
 		return
 	}
 
 	t := tierFor(facts)
+	rec.Tier = t.name
 	log.Printf("generate-audio: %q: %d sources, %d verified facts, %s script", attraction.Name, len(sources), len(facts), t.name)
 	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language, t)
 	if err != nil {
 		log.Printf("generate-audio: script: %v", err)
+		rec.Outcome, rec.Error = "script_failed", err.Error()
 		writeError(w, failureStatus(err), "Failed to generate script: "+providerMessage(err))
 		return
 	}
+	rec.Script = script
 
 	// Generate audio
 	audio, err := generateAudioTTS(ctx, elevenLabsKey, script)
 	if err != nil {
 		log.Printf("generate-audio: audio: %v", err)
+		rec.Outcome, rec.Error = "audio_failed", err.Error()
 		writeError(w, failureStatus(err), "Failed to generate audio: "+providerMessage(err))
 		return
 	}
+	rec.Outcome = "narrated"
 
 	w.Header().Set(sourcesHeader, strings.Join(citedURLs(facts, sources), " "))
 	w.Header().Set("Content-Type", "audio/mpeg")

@@ -59,10 +59,10 @@ var (
 // source is one document the facts may be drawn from. Text is what the model sees and what its
 // quotes are checked against; URL is what the reader is shown.
 type source struct {
-	ID    string
-	Label string
-	URL   string
-	Text  string
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	URL   string `json:"url"`
+	Text  string `json:"text"`
 }
 
 // osmFactTags are the tags that say something about the object itself. Name variants and the

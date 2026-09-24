@@ -232,8 +232,8 @@ jobs:
   # deletes functions carrying its own `deployment-tool` label, so `--force` above cannot remove
   # this one, and this job cannot touch those.
   #
-  # After `terraform` only so the two deploy jobs share its ordering; it needs nothing from it.
-  # No secrets either: the keys are the caller's and arrive with each request (see
+  # After `terraform` because the function writes each guide's record into a bucket that job
+  # creates and grants it (terraform/audio-guide.tf). No secrets either: the keys are the caller's and arrive with each request (see
   # audio-guide-function/function.go).
   audio-guide:
     needs: terraform
@@ -267,10 +267,16 @@ jobs:
       # `--max-instances` is a ceiling on what a stranger can use this for. The providers are paid
       # with the caller's keys, but the instance time is ours, and five at once is more than the
       # one page that calls this will ever ask for honestly.
+      #
+      # The two env vars are where each guide's record goes and which commit wrote it
+      # (audio-guide-function/record.go). The bucket is terraform/audio-guide.tf's, created by the
+      # job this one needs. `--set-env-vars` replaces the whole set, which is right: these are all
+      # there are.
       - name: Deploy generate-audio
         run: |
           gcloud functions deploy generate-audio \
             --project="${{ vars.FIREBASE_PROJECT_ID }}" \
+            --set-env-vars="GUIDE_RECORDS_BUCKET=${{ vars.FIREBASE_PROJECT_ID }}-audio-guide-records,GUIDE_RELEASE=$(git rev-parse --short HEAD)" \
             --gen2 \
             --runtime=go126 \
             --region=europe-central2 \

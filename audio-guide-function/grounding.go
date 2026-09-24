@@ -44,7 +44,9 @@ func tierFor(facts []fact) tier {
 	return tierShort
 }
 
-func extractFacts(ctx context.Context, apiKey string, a *Attraction, location *Location, sources []source) ([]fact, error) {
+// extractFacts answers with every fact the model proposed as well as the ones that survived the
+// checks: the difference is what the guide record (record.go) exists to let somebody read.
+func extractFacts(ctx context.Context, apiKey string, a *Attraction, location *Location, sources []source) (proposed, kept []fact, err error) {
 	systemPrompt := fmt.Sprintf(`You extract facts for a spoken audio guide from SOURCE MATERIAL you are given. You never use your own knowledge: a fact you know but cannot quote from the sources does not exist for this task. Write the "fact" fields in %s. Answer with JSON only.`, a.Language)
 
 	var b strings.Builder
@@ -79,16 +81,16 @@ Answer as: {"facts":[{"fact":"...","source":"S1","evidence":"..."}]}`,
 		ResponseFormat: &responseFormat{Type: "json_object"},
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var parsed struct {
 		Facts []fact `json:"facts"`
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
-		return nil, fmt.Errorf("facts were not JSON: %w", err)
+		return nil, nil, fmt.Errorf("facts were not JSON: %w", err)
 	}
-	return verifyFacts(parsed.Facts, sources), nil
+	return parsed.Facts, verifyFacts(parsed.Facts, sources), nil
 }
 
 // verifyFacts keeps the facts whose quotes are really in the sources they cite.

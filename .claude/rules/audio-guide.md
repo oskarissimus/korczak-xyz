@@ -37,9 +37,10 @@ functions, but not among them:
   functions carrying its own `deployment-tool` label, and a gcloud deploy carries none. Nothing
   about the Node codebase can reach this function, and nothing in this job can reach that one.
 - **It holds no keys.** They are the reader's, and arrive in `X-OpenAI-Key` and
-  `X-ElevenLabs-Key` on every request — see the next section. No Secret Manager, no env vars, no
-  fallback key of its own. A missing key, or one a provider refuses, is a **401**; everything else
-  a provider says no to is a 502.
+  `X-ElevenLabs-Key` on every request — see the next section. No Secret Manager, no fallback key
+  of its own; its only env vars say where its records go (*Every guide leaves a record*, below).
+  A missing key, or one a provider refuses, is a **401**; everything else a provider says no to
+  is a 502.
 - **`--max-instances=5`** is a ceiling on what a stranger can use it for — the providers are
   paid with the caller's keys, but the instance time is ours.
 - **Not in Sentry.** The four Node functions report to `korczak-xyz-functions`; this one logs each
@@ -97,6 +98,37 @@ voice of a tour guide. Every piece below exists to close one route by which that
 - **The reader sees the sources.** `X-Guide-Sources` carries the URLs of the sources a kept fact
   came from (percent-encoded, space-separated, exposed through CORS), and the player links them
   under the title: "Źródła: Wikipedia (pl) · Wikidata".
+
+### Every guide leaves a record, for fact-checking afterwards
+
+The quote check catches a quote that is not in its source. It cannot catch a fact that paraphrases
+its quote into something else, a script that drifts from its facts, or a true fact thrown away —
+those need somebody reading afterwards with everything the model saw. So since late Sep 2026
+**every tap the model answers writes one JSON object** to `gs://korczak-xyz-501720-audio-guide-records`
+(`record.go`, bucket in `terraform/audio-guide.tf`): the place and its tags, the labelled
+location, **every source in full**, `proposedFacts` (all the facts call returned) beside
+`verifiedFacts` (what survived), the tier, the script, the outcome (`narrated`,
+`no_verified_facts`, `script_failed`, `audio_failed`) and `release`, the short commit that
+deployed the function — so a record can be read against the prompts that produced it.
+
+- **Named by day**: `2026/09/24/143012-way-123-1a2b3c4d.json`. `gcloud storage ls
+  gs://korczak-xyz-501720-audio-guide-records/2026/09/24/` is one day's guides in order.
+- **No sources, no record.** A 422 before any model call has nothing to check. A 422 after one
+  (nothing survived) is recorded — what was dropped is half of what this is for.
+- **No keys, no account, no audio.** The function never learns who tapped. It does record where,
+  which is why the bucket enforces public-access prevention.
+- **It never fails a guide.** It is written by a `defer` after the answer, on its own 10-second
+  deadline; a refusal is logged (`generate-audio: record ...`) and the reader never knows. With
+  `GUIDE_RECORDS_BUCKET` unset — tests, a local run — nothing is written.
+- **Written with the function's own identity**, a metadata-server token and one POST to the GCS
+  upload API, not the storage client library: every other request in this package is plain
+  `net/http` too. The identity holds `objectCreator` on this bucket and nothing more, because the
+  function answers anybody — a stranger can add records, never read, change or remove them.
+- **No delete rule**, Nearline after 30 days. Before-and-after is the question, so the before
+  has to survive; a record is tens of kilobytes.
+
+This is not a cache, and *What is not kept* below still holds: nothing reads a record back into
+a guide.
 
 Every Wikimedia request carries the app's User-Agent, because anonymous-looking clients are
 refused outright ("You are making too many requests"), and a refusal is **logged**
@@ -296,7 +328,9 @@ bar is there at all is that a phone showing nothing for twenty seconds gets tapp
 ### What is not kept
 
 No narration. None is cached, in memory or anywhere else. (The pins are, in memory — see *The map
-is Leaflet* — which is a different thing: bytes, not megabytes, and free to fetch again.)
+is Leaflet* — which is a different thing: bytes, not megabytes, and free to fetch again. The
+script and its sources are *recorded* server-side for fact-checking — see *Every guide leaves a
+record* — but no guide is ever served from that record.)
 Re-tapping the pin you are listening to replays it; coming back to it later pays for it again.
 
 A cache is the first thing anyone proposes here and it is the wrong shape: the audio is megabytes
