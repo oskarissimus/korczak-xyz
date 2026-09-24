@@ -18,7 +18,7 @@
  */
 
 import { isNewsroomItem } from './newsroom';
-import { skipsClassifier } from './sources';
+import { asksKind, skipsClassifier } from './sources';
 import type { EventRecord } from './types';
 
 /** Which model pass wrote a field. Two, and they are kept apart for `events.md`'s three reasons. */
@@ -92,8 +92,14 @@ export function modelPasses(events: EventRecord[]): PassCoverage[] {
   const newsroom = events.filter(isNewsroomItem);
   const classified = events.filter((event) => !isNewsroomItem(event) && !skipsClassifier(event));
 
+  // A source of listings only is never asked the kind, so a `kind` count stuck at zero there would
+  // read as a stopped classifier rather than a question nobody asks.
+  const classifierFields = classified.some(asksKind)
+    ? CLASSIFIER_FIELDS
+    : CLASSIFIER_FIELDS.filter(({ field }) => field !== 'kind');
+
   return [
-    coverageOf('classifier', classified, CLASSIFIER_FIELDS, (event) => event.classifiedAt),
+    coverageOf('classifier', classified, classifierFields, (event) => event.classifiedAt),
     coverageOf('newsroom', newsroom, NEWSROOM_FIELDS, (event) => event.newsroomReadAt),
   ].filter((pass) => pass.rows > 0);
 }

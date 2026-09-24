@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  batchesOf,
   buildPrompt,
   classificationUpdate,
   classifyHashOf,
@@ -123,6 +124,44 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('international');
     // "Big" is not the question; where the people travelled from is.
     expect(prompt.toLowerCase()).toContain('who travels');
+  });
+});
+
+describe('the kind question, per source', () => {
+  const feedItem = (id: string) =>
+    ev({ id, title: 'Brand X partnerem maratonu', source: 'feed', sourceName: 'Maraton Warszawski' });
+  const conference = (id: string) => ev({ id, title: 'PyCon NL 2026' });
+
+  it('is left out of the prompt for a source of listings only', () => {
+    // python.org is a conference calendar: every row is the conference, so `kind` could only
+    // ever come back `listing` — which the card draws exactly as it draws no kind.
+    const prompt = buildPrompt([conference('p1')], false);
+    expect(prompt).not.toContain('kind');
+    expect(prompt).toContain('reach');
+    expect(prompt).toContain('country');
+    expect(buildPrompt([feedItem('f1')])).toContain('`kind`');
+  });
+
+  it('never mixes the two in one batch', () => {
+    const batches = batchesOf([conference('p1'), feedItem('f1'), conference('p2')]);
+    expect(batches.map((b) => [b.askKind, b.events.map((e) => e.id)])).toEqual([
+      [true, ['f1']],
+      [false, ['p1', 'p2']],
+    ]);
+  });
+
+  it('ignores a kind the model volunteered when it was not asked', () => {
+    const got = parseClassification(
+      reply([
+        { id: 'a', country: 'NL', reach: 'national', reason: 'x', kind: 'coverage', kindReason: 'y' },
+        { id: 'b', kind: 'listing' },
+      ]),
+      ['a', 'b'],
+      false,
+    );
+    expect(got.get('a')).toEqual({ country: 'NL', reach: 'national', reason: 'x' });
+    // A kind alone is no verdict when the kind was not the question.
+    expect(got.has('b')).toBe(false);
   });
 });
 

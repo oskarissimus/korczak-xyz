@@ -30,12 +30,14 @@ import {
   setSourceCity,
   setSourceCountry,
   setSourceEnabled,
+  setSourceReach,
   sourceCity,
   sourceCountry,
+  sourceReach,
   sourceEnabled,
   type SourcePrefs,
 } from '../utils/events/sourcePrefs';
-import type { SourceId } from '../utils/events/types';
+import type { Reach, SourceId } from '../utils/events/types';
 import type { AuthUser } from './useAuth';
 
 export interface EventSourcePrefsData {
@@ -53,6 +55,10 @@ export interface EventSourcePrefsData {
   country: (id: string) => string | undefined;
   /** Narrow a source to one country, or `undefined` for all of them. */
   setCountry: (id: SourceId, country: string | undefined) => void;
+  /** The minimum reach a source is narrowed to, if any. */
+  reach: (id: string) => Reach | undefined;
+  /** Narrow a source to at least this reach, or `undefined` for any. */
+  setReach: (id: SourceId, reach: Reach | undefined) => void;
   /** The last sync failure, or null. Shown on the tab — a switch that did not save must say so. */
   error: string | null;
 }
@@ -140,6 +146,16 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
     [publish, sync],
   );
 
+  const setReach = useCallback(
+    (id: SourceId, reach: Reach | undefined) => {
+      const next = setSourceReach(prefsRef.current, id, reach, Date.now());
+      publish(next);
+      saveSourcePrefs(next);
+      void sync();
+    },
+    [publish, sync],
+  );
+
   useEffect(() => {
     if (!user) {
       uidRef.current = null;
@@ -166,6 +182,7 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
 
   const city = useCallback((id: string) => sourceCity(prefs, id), [prefs]);
   const country = useCallback((id: string) => sourceCountry(prefs, id), [prefs]);
+  const reach = useCallback((id: string) => sourceReach(prefs, id), [prefs]);
 
   return {
     ready,
@@ -177,6 +194,8 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
     setCity,
     country,
     setCountry,
+    reach,
+    setReach,
     error,
   };
 }

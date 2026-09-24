@@ -146,6 +146,24 @@ describe('mergeRecord', () => {
     expect(record.country).toBe('PL');
   });
 
+  it('drops only the kind for a source whose rows are all listings', () => {
+    // python.org is no longer asked the kind; its reach and country are still the classifier's.
+    const before = stored({
+      source: 'python-org',
+      reach: 'national',
+      kind: 'coverage',
+      kindReason: 'guessed',
+      classifiedAt: 1000,
+      classifyHash: 'abc123',
+    });
+    const incoming = toRecord(raw(), 'python-org', 'python.org events', LATER);
+    const record = stripUndefined(mergeRecord(incoming, before, LATER).record);
+    expect(record).not.toHaveProperty('kind');
+    expect(record).not.toHaveProperty('kindReason');
+    expect(record.reach).toBe('national');
+    expect(record.classifyHash).toBe('abc123');
+  });
+
   it('lets a source that knows the country overrule the stored one', () => {
     // Ticketmaster is queried countryCode=PL and Teatr Wielki is in Warsaw: those are facts, and
     // they outrank whatever the classifier guessed before the source started saying so.

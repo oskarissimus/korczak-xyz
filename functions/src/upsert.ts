@@ -20,7 +20,7 @@ import {
 } from '../../korczak-xyz/src/utils/events/normalize';
 import { distancesOf } from '../../korczak-xyz/src/utils/events/distance';
 import { tagsWithTicketSale } from '../../korczak-xyz/src/utils/events/newsroom';
-import { skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
+import { asksKind, skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
 import type { RawEvent } from './sources/types';
 
 export interface UpsertResult {
@@ -155,8 +155,10 @@ export function mergeRecord(
         : {
             reach: stored.reach,
             reachReason: stored.reachReason,
-            kind: stored.kind,
-            kindReason: stored.kindReason,
+            // A source whose rows are all listings is no longer asked the kind: drop the old
+            // verdict for the same reason as above, rather than keep one nothing will refresh.
+            kind: asksKind(incoming) ? stored.kind : undefined,
+            kindReason: asksKind(incoming) ? stored.kindReason : undefined,
             classifiedAt: stored.classifiedAt,
             classifyHash: stored.classifyHash,
           }),

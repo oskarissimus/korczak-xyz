@@ -127,6 +127,7 @@ func getJSON(ctx context.Context, endpoint string, params url.Values, into any) 
 		// Logged, because a Wikimedia that refuses this function's IP looks from the outside like
 		// every place in the world having nothing written about it.
 		log.Printf("generate-audio: wikimedia %s: status %d", req.URL.Host, resp.StatusCode)
+		noteWikimediaRefusal(ctx)
 		return fmt.Errorf("status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(into)
@@ -620,6 +621,7 @@ func uniqueLangs(langs ...string) []string {
 // gatherSources collects everything known about the place. Nominatim runs beside the Wikidata
 // lookup, because the country it answers with decides which Wikipedia is read first.
 func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
+	defer stage(ctx, stageSources)()
 	narration := languageCode(a.Language)
 	tagLang, tagTitle := parseWikipediaTag(a.Tags["wikipedia"])
 	wdLangs := uniqueLangs(tagLang, narration, "pl", "en")
@@ -632,11 +634,13 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
+		defer stage(ctx, stageNominatim)()
 		location = reverseGeocode(ctx, a.Latitude, a.Longitude)
 	}()
 	go func() {
 		defer wg.Done()
 		if qid := strings.TrimSpace(a.Tags["wikidata"]); qid != "" {
+			defer stage(ctx, stageWikidata)()
 			wd = fetchWikidata(ctx, qid, wdLangs)
 		}
 	}()
@@ -662,6 +666,7 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 		wants = wants[:maxArticles]
 	}
 
+	doneArticles := stage(ctx, stageArticles)
 	articles := make([]*article, len(wants))
 	var subject *article
 	var subjectLabel string
@@ -679,6 +684,7 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 		subject, subjectLabel = fetchSubject(ctx, a, preferred)
 	}()
 	wg.Wait()
+	doneArticles()
 
 	found := 0
 	for _, art := range articles {
@@ -688,12 +694,14 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 	}
 	// No article linked, or the linked ones are gone: look around the pin, by name.
 	if found == 0 && tagTitle == "" && (wd == nil || len(wd.sitelinks) == 0) {
+		doneGeosearch := stage(ctx, stageGeosearch)
 		for _, l := range uniqueLangs(local, narration) {
 			if art := geosearchArticle(ctx, l, a); art != nil {
 				articles = append(articles, art)
 				break
 			}
 		}
+		doneGeosearch()
 	}
 
 	var sources []source

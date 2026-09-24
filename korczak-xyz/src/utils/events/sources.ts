@@ -70,6 +70,16 @@ export interface SourceCatalogueEntry {
    */
   unclassified?: true;
   /**
+   * True where every row this source produces is a listing, so the classifier is not asked `kind`.
+   *
+   * Narrower than `unclassified`: the rows still need a `country` and a `reach`, and only the third
+   * question is already answered. python.org is a calendar of conferences — each row a VEVENT with
+   * dates and a place, never an article about one — so a `kind` call there could only ever say
+   * `listing`, which the card draws exactly as it draws no kind at all. Read through `asksKind` by
+   * the prompt, `mergeRecord` (which drops the old verdicts) and the Sources tab.
+   */
+  listingsOnly?: true;
+  /**
    * True where the Sources tab offers a town picker on this source's card.
    *
    * Opt-in, not inferred from the rows: python.org's calendar names a city per conference too, and
@@ -85,6 +95,12 @@ export interface SourceCatalogueEntry {
    * country picker would have one option and do nothing.
    */
   countryPicker?: true;
+  /**
+   * True where the Sources tab offers a reach picker on this source's card — at least national,
+   * or international only. Opt-in like the others; only python.org, where the classifier's `reach`
+   * is what tells PyCon US from a local meetup.
+   */
+  reachPicker?: true;
   /**
    * The pages this source reads, as of `now`.
    *
@@ -316,7 +332,10 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'python-org',
     label: 'python.org events',
     kind: 'ical',
+    // A conference calendar: every row is the conference itself. Country and reach still asked.
+    listingsOnly: true,
     countryPicker: true,
+    reachPicker: true,
     pages: () => [
       { url: PYTHON_ORG_ICAL, label: displayUrl(PYTHON_ORG_ICAL), tags: ['tech', 'python'] },
     ],
@@ -361,4 +380,9 @@ export function catalogueEntry(id: string): SourceCatalogueEntry | undefined {
 /** Whether this record's source is one the classifier is never asked about. */
 export function skipsClassifier(event: { source: string }): boolean {
   return catalogueEntry(event.source)?.unclassified === true;
+}
+
+/** Whether the classifier asks this record's `kind` — false for a source of listings only. */
+export function asksKind(event: { source: string }): boolean {
+  return catalogueEntry(event.source)?.listingsOnly !== true;
 }

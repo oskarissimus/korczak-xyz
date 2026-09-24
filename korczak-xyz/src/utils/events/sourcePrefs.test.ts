@@ -10,10 +10,12 @@ import {
   setSourceCity,
   setSourceCountry,
   setSourceEnabled,
+  setSourceReach,
   sourceAdmits,
   sourceCity,
   sourceCountry,
   sourceEnabled,
+  sourceReach,
   townsOf,
   type SourcePrefs,
 } from './sourcePrefs';
@@ -222,6 +224,59 @@ describe('a source narrowed to one country', () => {
   it('survives the round trip through a store', () => {
     expect(normalizeSourcePrefs(JSON.parse(JSON.stringify(PL)))).toEqual(PL);
     expect(normalizeSourcePrefs({ feed: { enabled: true, at: NOW, country: 3 } })).toEqual({
+      feed: { enabled: true, at: NOW },
+    });
+  });
+});
+
+describe('a source narrowed to a reach', () => {
+  const conf = (reach?: 'local' | 'national' | 'international', country?: string) => ({
+    source: 'python-org',
+    reach,
+    country,
+  });
+
+  it('is a floor, not an exact match', () => {
+    const nat = setSourceReach({}, 'python-org', 'national', NOW);
+    expect(sourceAdmits(nat, conf('local'))).toBe(false);
+    expect(sourceAdmits(nat, conf('national'))).toBe(true);
+    expect(sourceAdmits(nat, conf('international'))).toBe(true);
+    const intl = setSourceReach({}, 'python-org', 'international', NOW);
+    expect(sourceAdmits(intl, conf('national'))).toBe(false);
+    expect(sourceAdmits(intl, conf('international'))).toBe(true);
+  });
+
+  it('lets an unjudged row through', () => {
+    expect(sourceAdmits(setSourceReach({}, 'python-org', 'international', NOW), conf())).toBe(true);
+  });
+
+  it('is OR-ed with a country: in Poland, plus anything worth flying to', () => {
+    const both = setSourceReach(
+      setSourceCountry({}, 'python-org', 'PL', NOW),
+      'python-org',
+      'international',
+      NOW + 1,
+    );
+    expect(sourceAdmits(both, conf('local', 'PL'))).toBe(true);
+    expect(sourceAdmits(both, conf('international', 'US'))).toBe(true);
+    expect(sourceAdmits(both, conf('national', 'NL'))).toBe(false);
+    expect(sourceCountry(both, 'python-org')).toBe('PL');
+  });
+
+  it('survives a flip, widens, and drops a word it does not know', () => {
+    const intl = setSourceReach({}, 'python-org', 'international', NOW);
+    const flipped = setSourceEnabled(
+      setSourceEnabled(intl, 'python-org', false, NOW + 1),
+      'python-org',
+      true,
+      NOW + 2,
+    );
+    expect(sourceReach(flipped, 'python-org')).toBe('international');
+    const any = setSourceReach(intl, 'python-org', undefined, NOW + 3);
+    expect(sourceReach(any, 'python-org')).toBeUndefined();
+    expect(announceFloor(any, 'python-org')).toBe(NOW + 3);
+    expect(normalizeSourcePrefs(JSON.parse(JSON.stringify(intl)))).toEqual(intl);
+    expect(normalizeSourcePrefs({ feed: { enabled: true, at: NOW, reach: 'galactic' } })).toEqual({
       feed: { enabled: true, at: NOW },
     });
   });

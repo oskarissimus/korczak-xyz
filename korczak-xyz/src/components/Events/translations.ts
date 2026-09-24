@@ -132,6 +132,15 @@ export const translations = {
     sourceCountryAll: 'Every country ({count})',
     sourceCountryOn:
       'Only {country} reaches your feed and can notify you. So does a row with no country yet, since the classifier has not said where it is.',
+    // The reach picker: a floor, not an exact match. With a country also chosen, the two are OR-ed.
+    sourceReachLabel: 'Reach',
+    sourceReachAll: 'Any reach',
+    sourceReachNational: 'National or international',
+    sourceReachInternational: 'International only',
+    sourceReachOn:
+      'Only events of at least this reach get through. So does a row the classifier has not judged yet.',
+    sourceReachOrCountry:
+      'Combined with the country as “or”: an event gets through if it is in that country, or of at least this reach anywhere. Rows the classifier has not judged yet get through too.',
     sourceLastRun: 'ran {when}',
     sourceInCorpus: '{count} collected',
     pageOptional: 'appears when announced',
@@ -272,6 +281,14 @@ export const translations = {
     sourceCountryAll: 'Wszystkie ({count})',
     sourceCountryOn:
       'Tylko {country} trafia na listę i może powiadamiać. Wpis bez kraju też — klasyfikator jeszcze nie ustalił, gdzie jest.',
+    sourceReachLabel: 'Zasięg',
+    sourceReachAll: 'Dowolny zasięg',
+    sourceReachNational: 'Krajowe lub międzynarodowe',
+    sourceReachInternational: 'Tylko międzynarodowe',
+    sourceReachOn:
+      'Przechodzą tylko wydarzenia o co najmniej takim zasięgu. Wpis, którego klasyfikator jeszcze nie ocenił, też.',
+    sourceReachOrCountry:
+      'Łączone z krajem przez „lub”: wydarzenie przechodzi, jeśli jest w tym kraju albo ma co najmniej taki zasięg gdziekolwiek. Wpisy jeszcze nieocenione przez klasyfikator też przechodzą.',
     sourceLastRun: 'ostatnio {when}',
     sourceInCorpus: 'zebrane: {count}',
     pageOptional: 'pojawi się po ogłoszeniu',

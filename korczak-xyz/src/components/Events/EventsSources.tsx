@@ -54,7 +54,7 @@ import {
   type TownOption,
 } from '../../utils/events/sourcePrefs';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
-import type { EventRecord, SourceHealth } from '../../utils/events/types';
+import type { EventRecord, Reach, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
 import { sourceName, sourceNote } from './sourceNames';
 import { fill, relativeTime, translations, type Lang, type Translation } from './translations';
@@ -225,6 +225,17 @@ function SourcesPanel({ lang }: Props) {
                   selected={switches.country(entry.id)}
                   disabled={!switches.ready}
                   onChange={(country) => switches.setCountry(entry.id, country)}
+                  t={t}
+                />
+              ) : null}
+
+              {on && entry.reachPicker ? (
+                <ReachPicker
+                  id={entry.id}
+                  selected={switches.reach(entry.id)}
+                  withCountry={entry.countryPicker === true && !!switches.country(entry.id)}
+                  disabled={!switches.ready}
+                  onChange={(reach) => switches.setReach(entry.id, reach)}
                   t={t}
                 />
               ) : null}
@@ -417,6 +428,53 @@ function CountryPicker({
       </select>
       {selected ? (
         <p className="ev-hint">{fill(t.sourceCountryOn, { country: countryLabel(selected) })}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Narrow one source to at least a reach.
+ *
+ * A fixed list rather than options counted off the rows: reach has three values and an order, and
+ * the choice is a floor — `local` would be no filter at all, so it is not offered. When a country
+ * is also chosen the two are OR-ed (see `sourceAdmits`), and the hint says so, because that is the
+ * one thing about this control a reader could not guess.
+ */
+function ReachPicker({
+  id,
+  selected,
+  withCountry,
+  disabled,
+  onChange,
+  t,
+}: {
+  id: string;
+  selected: Reach | undefined;
+  withCountry: boolean;
+  disabled: boolean;
+  onChange: (reach: Reach | undefined) => void;
+  t: Translation;
+}) {
+  const inputId = `ev-source-reach-${id}`;
+  return (
+    <div className="ev-field ev-source-city">
+      <label className="ev-field-label" htmlFor={inputId}>
+        {t.sourceReachLabel}
+      </label>
+      <select
+        id={inputId}
+        className="ev-input"
+        value={selected ?? ''}
+        disabled={disabled}
+        onChange={(e) => onChange((e.target.value || undefined) as Reach | undefined)}
+      >
+        <option value="">{t.sourceReachAll}</option>
+        <option value="national">{t.sourceReachNational}</option>
+        <option value="international">{t.sourceReachInternational}</option>
+      </select>
+      {selected ? (
+        <p className="ev-hint">{withCountry ? t.sourceReachOrCountry : t.sourceReachOn}</p>
       ) : null}
     </div>
   );

@@ -29,7 +29,7 @@
  * Portable: browser and Node, no imports outside this directory. See types.ts.
  */
 
-import type { SourceId } from './types';
+import { REACHES, type Reach, type SourceId } from './types';
 
 /** One source's switch: which way it is set, and when it was last flipped. */
 export interface SourceSwitch {
@@ -57,6 +57,12 @@ export interface SourceSwitch {
    * only on the source the catalogue marks for it.
    */
   country?: string;
+  /**
+   * Only rows of at least this reach, when set: `national` keeps national and international,
+   * `international` keeps only that. A floor rather than an exact match, because nobody wants
+   * *only* the local meetups. See `sourceAdmits` for how it combines with `country`.
+   */
+  reach?: Reach;
 }
 
 /**
@@ -99,11 +105,12 @@ export function setSourceEnabled(
  */
 function withFilters(
   next: { enabled: boolean; at: number },
-  from: Pick<SourceSwitch, 'city' | 'country'> | undefined,
+  from: Pick<SourceSwitch, 'city' | 'country' | 'reach'> | undefined,
 ): SourceSwitch {
   const out: SourceSwitch = { ...next };
   if (from?.city) out.city = from.city;
   if (from?.country) out.country = from.country;
+  if (from?.reach && REACHES.includes(from.reach)) out.reach = from.reach;
   return out;
 }
 
@@ -149,6 +156,34 @@ export function setSourceCountry(
       { ...held, country: kept || undefined },
     ),
   };
+}
+
+/**
+ * Narrow one source to rows of at least this reach, or widen it again with `undefined`.
+ *
+ * Moves `at`, like the other two narrowings, so widening does not announce the backlog.
+ */
+export function setSourceReach(
+  prefs: SourcePrefs,
+  id: SourceId,
+  reach: Reach | undefined,
+  now: number,
+): SourcePrefs {
+  const held = prefs[id];
+  return {
+    ...prefs,
+    [id]: withFilters({ enabled: held?.enabled ?? true, at: now }, { ...held, reach }),
+  };
+}
+
+/** The minimum reach this source is narrowed to, if any. */
+export function sourceReach(prefs: SourcePrefs, id: string): Reach | undefined {
+  return prefs[id as SourceId]?.reach;
+}
+
+/** Is `reach` at least `floor`? */
+export function reachAtLeast(reach: Reach, floor: Reach): boolean {
+  return REACHES.indexOf(reach) >= REACHES.indexOf(floor);
 }
 
 /** The country this source is narrowed to, if any. */
@@ -210,18 +245,28 @@ export function cityMatches(wanted: string, city: string): boolean {
  * A stopped classifier then shows up as a conference from somewhere else rather than as a feed
  * that has quietly gone empty.
  *
+ * **Country and reach are joined by OR, not AND**, when both are set. "In Poland, plus anything
+ * worth flying to" is one thought; AND-ed it reads "in Poland *and* international", which keeps
+ * almost nothing. This is the shape the interests' `countries` / `internationalAnywhere` pair had,
+ * recorded in events.md as the one to come back to. Each axis still passes a row it has no verdict
+ * for, so an unclassified row passes either way.
+ *
  * The one gate both runtimes ask — `buildFeed` for the screen and `noticesFor` for the lock screen
  * — so a filter cannot mean one thing on each.
  */
 export function sourceAdmits(
   prefs: SourcePrefs,
-  event: { source: string; city?: string; country?: string },
+  event: { source: string; city?: string; country?: string; reach?: Reach },
 ): boolean {
   const held = prefs[event.source as SourceId];
   if (!held) return true;
   if (!held.enabled) return false;
   if (held.city && event.city && !cityMatches(held.city, event.city)) return false;
-  if (held.country && event.country && held.country !== event.country) return false;
+  const countryOk = !event.country || held.country === event.country;
+  const reachOk = !event.reach || (held.reach !== undefined && reachAtLeast(event.reach, held.reach));
+  if (held.country && held.reach) return countryOk || reachOk;
+  if (held.country) return countryOk;
+  if (held.reach) return reachOk;
   return true;
 }
 
@@ -296,11 +341,12 @@ export function normalizeSourcePrefs(raw: unknown): SourcePrefs {
   const out: SourcePrefs = {};
   for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!value || typeof value !== 'object') continue;
-    const { enabled, at, city, country } = value as {
+    const { enabled, at, city, country, reach } = value as {
       enabled?: unknown;
       at?: unknown;
       city?: unknown;
       country?: unknown;
+      reach?: unknown;
     };
     if (typeof enabled !== 'boolean' || typeof at !== 'number' || !Number.isFinite(at)) continue;
     // A town or country that is not a non-empty string is dropped rather than the switch: the
@@ -311,6 +357,8 @@ export function normalizeSourcePrefs(raw: unknown): SourcePrefs {
       {
         city: typeof city === 'string' ? city.trim() : undefined,
         country: typeof country === 'string' ? country.trim() : undefined,
+        // Checked against `REACHES` in `withFilters`: an unknown word is no filter.
+        reach: typeof reach === 'string' ? (reach as Reach) : undefined,
       },
     );
   }

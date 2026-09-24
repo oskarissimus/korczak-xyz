@@ -91,6 +91,8 @@ export interface CacheLookup {
   attractions: Attraction[];
   /** The smallest rectangle of squares holding every one that is not here; null when none. */
   missing: TileRange | null;
+  /** How many squares in view are not here - fewer than `missing` covers when it has holes. */
+  missingCount: number;
 }
 
 export class AttractionCache {
@@ -105,11 +107,13 @@ export class AttractionCache {
   lookup(bounds: Bounds): CacheLookup {
     const attractions: Attraction[] = [];
     let missing: TileRange | null = null;
+    let missingCount = 0;
 
     for (const [x, y] of tilesIn(tilesCovering(bounds))) {
       const key = tileKey(x, y);
       const found = this.tiles.get(key);
       if (!found) {
+        missingCount++;
         missing = missing
           ? {
               minX: Math.min(missing.minX, x),
@@ -126,7 +130,7 @@ export class AttractionCache {
       for (const a of found) if (contains(bounds, a)) attractions.push(a);
     }
 
-    return { attractions, missing };
+    return { attractions, missing, missingCount };
   }
 
   /**

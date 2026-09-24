@@ -22,20 +22,28 @@
  * to it later does, and pays for it again. A cache is tempting and is the wrong shape here - the
  * audio is megabytes, the localStorage budget is shared with the typing trainer, and the thing
  * people do with an audio guide is walk away from it.
+ *
+ * EVERY TAP IS MEASURED. One `audioGuide.narration` measurement goes to Sentry per request, however
+ * it ends - played, refused, or abandoned by a tap elsewhere - with the wait split into the
+ * function's own stages (its Server-Timing header), what the function could not see (the
+ * preflight, the network, an instance booting: `overheadMs`), the download and the start of play.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
+import { recordMeasurement } from '../lib/sentry';
 import { missingKeys, type ApiKeys } from '../utils/audioGuide/keys';
-import { loadLanguage, saveLanguage } from '../utils/audioGuide/language';
+import { isPreset, loadLanguage, saveLanguage } from '../utils/audioGuide/language';
 import {
   classifyNarrationFailure,
   NarrationError,
   requestNarration,
   type GuideFailure,
+  type NarrationTiming,
 } from '../utils/audioGuide/narration';
 import { load as loadAudio, release, unlock } from '../utils/audioGuide/player';
+import { networkType } from '../utils/audioGuide/telemetry';
 import type { Attraction, AudioGuide, GuideStatus } from '../utils/audioGuide/types';
 
 export type { GuideFailure };
@@ -58,6 +66,49 @@ export interface AudioGuideState {
   retry: () => void;
   togglePlay: () => void;
   dismissError: () => void;
+}
+
+/** `facts` → `serverFactsMs`, so the function's stages sit beside the page's own fields. */
+function serverFields(server: Record<string, number>): Record<string, number | boolean> {
+  const out: Record<string, number | boolean> = { cold: server.cold === 1 };
+  for (const [name, value] of Object.entries(server)) {
+    if (name === 'cold') continue;
+    out[`server${name[0].toUpperCase()}${name.slice(1)}Ms`] = value;
+  }
+  return out;
+}
+
+/** One tap's measurement. `tapAt` and everything in `timing` are `performance.now()` readings. */
+function measureNarration(
+  outcome: string,
+  tapAt: number,
+  attraction: Attraction,
+  language: string,
+  retry: boolean,
+  timing: NarrationTiming | null,
+  extra: Record<string, number | string | boolean> = {},
+): void {
+  const now = performance.now();
+  const responseMs = timing ? Math.round(timing.headersAt - tapAt) : undefined;
+  const serverTotal = timing?.server.total;
+  recordMeasurement('audioGuide.narration', {
+    outcome,
+    totalMs: Math.round(now - tapAt),
+    responseMs,
+    downloadMs: timing ? Math.round(timing.bodyAt - timing.headersAt) : undefined,
+    bytes: timing?.bytes,
+    // What the function never saw: the preflight, both network legs, and an instance booting.
+    overheadMs:
+      responseMs !== undefined && serverTotal !== undefined ? responseMs - serverTotal : undefined,
+    ...(timing ? serverFields(timing.server) : {}),
+    category: attraction.category,
+    tags: Object.keys(attraction.tags ?? {}).length,
+    // The two named options as themselves; anything typed is only "other" - it is free text.
+    language: isPreset(language) ? language : 'other',
+    retry,
+    network: networkType(),
+    ...extra,
+  });
 }
 
 export function useAudioGuide(
@@ -105,9 +156,12 @@ export function useAudioGuide(
   }, []);
 
   const run = useCallback(
-    async (attraction: Attraction) => {
+    async (attraction: Attraction, retry = false) => {
       const controller = new AbortController();
       inFlight.current = controller;
+      const tapAt = performance.now();
+      const language = language_.current;
+      let timing: NarrationTiming | null = null;
 
       setStatus('generating');
       setStartedAt(Date.now());
@@ -123,9 +177,11 @@ export function useAudioGuide(
           keys_.current,
           controller.signal,
         );
+        timing = narration.timing;
         if (controller.signal.aborted) {
           // Nobody is waiting for this any more, and the URL would otherwise never be revoked.
           URL.revokeObjectURL(narration.audioUrl);
+          measureNarration('abandoned', tapAt, attraction, language, retry, timing);
           return;
         }
 
@@ -145,20 +201,42 @@ export function useAudioGuide(
 
         // Autoplay, which is allowed here and only here: the element was unlocked by the tap
         // that asked for this, and starting it is what the reader asked for by tapping.
+        const sources = narration.sources.length;
         element.play().then(
-          () => setPlaying(true),
+          () => {
+            setPlaying(true);
+            measureNarration('played', tapAt, attraction, language, retry, timing, {
+              playStartMs: Math.round(performance.now() - narration.timing.bodyAt),
+              sources,
+            });
+          },
           (e) => {
             // Not an error worth a toast - the player is on screen with a play button. It is
             // worth a log, because it is the signature of the unlock having failed.
             setPlaying(false);
             log.warn('audioGuide.autoplay.refused', describeError(e));
+            measureNarration('autoplay-refused', tapAt, attraction, language, retry, timing, {
+              sources,
+            });
           },
         );
       } catch (e) {
         if (controller.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) {
+          // Somebody gave up waiting - tapped another pin or closed the panel. How long they
+          // lasted is the most direct answer there is to "is it too slow".
+          measureNarration('abandoned', tapAt, attraction, language, retry, timing);
           return;
         }
         const failure = classifyNarrationFailure(e);
+        measureNarration(
+          failure,
+          tapAt,
+          attraction,
+          language,
+          retry,
+          e instanceof NarrationError ? e.timing : null,
+          { status: e instanceof NarrationError ? e.status : 0 },
+        );
         setError(failure);
         if (failure === 'keys') needKeys.current();
         setErrorDetail(e instanceof NarrationError ? e.message : null);
@@ -221,7 +299,7 @@ export function useAudioGuide(
     discard();
     setError(null);
     setErrorDetail(null);
-    void run(selected);
+    void run(selected, true);
   }, [discard, run, selected]);
 
   const togglePlay = useCallback(() => {

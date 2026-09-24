@@ -17,6 +17,7 @@
  */
 
 import type { ApiKeys } from './keys';
+import { parseServerTiming } from './telemetry';
 import type { Attraction } from './types';
 
 const BACKEND_URL = 'https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio';
@@ -41,6 +42,19 @@ export interface Narration {
   audioUrl: string;
   locationWarning: string | null;
   sources: string[];
+  timing: NarrationTiming;
+}
+
+/**
+ * How the request went, for the measurement `useAudioGuide` sends: when the headers arrived and
+ * when the MP3 had finished downloading (both `performance.now()`), its size, and the function's
+ * own stages from its Server-Timing header (`sources`, `facts`, `script`, `tts`, `total`, `cold`).
+ */
+export interface NarrationTiming {
+  headersAt: number;
+  bodyAt: number;
+  bytes: number;
+  server: Record<string, number>;
 }
 
 /**
@@ -56,6 +70,8 @@ export class NarrationError extends Error {
     readonly status: number,
     /** `no_sources` when nothing checkable is known about the place; otherwise absent. */
     readonly code: string | null = null,
+    /** How far the request got before it failed. Absent for a request that never answered. */
+    readonly timing: NarrationTiming | null = null,
   ) {
     super(message);
     this.name = 'NarrationError';
@@ -100,6 +116,9 @@ export async function requestNarration(
     }),
     signal,
   });
+  const headersAt = performance.now();
+  // Exposed by the function's Access-Control-Expose-Headers; without that it reads as null.
+  const server = parseServerTiming(response.headers.get('Server-Timing'));
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -110,10 +129,12 @@ export async function requestNarration(
       body?.error ?? `HTTP ${response.status}`,
       response.status,
       body?.code ?? null,
+      { headersAt, bodyAt: performance.now(), bytes: 0, server },
     );
   }
 
   const blob = await response.blob();
+  const timing = { headersAt, bodyAt: performance.now(), bytes: blob.size, server };
   // An empty header is not a warning. The function only sets it when it has something to say, but
   // a proxy that rewrites it to `""` would otherwise put a notice about accuracy on every guide.
   const warning = response.headers.get(LOCATION_WARNING_HEADER)?.trim();
@@ -121,6 +142,7 @@ export async function requestNarration(
     audioUrl: URL.createObjectURL(blob),
     locationWarning: warning ? warning : null,
     sources: parseSources(response.headers.get(SOURCES_HEADER)),
+    timing,
   };
 }
 
