@@ -78,6 +78,14 @@ export interface SourceCatalogueEntry {
    */
   townPicker?: true;
   /**
+   * True where the Sources tab offers a country picker on this source's card.
+   *
+   * Opt-in for the same reason as `townPicker`. python.org's calendar is worldwide and its rows'
+   * countries come from the classifier; every other source is in Poland by construction, where a
+   * country picker would have one option and do nothing.
+   */
+  countryPicker?: true;
+  /**
    * The pages this source reads, as of `now`.
    *
    * Every entry ignores the argument today — the theatre's season pages, which were a function of
@@ -308,6 +316,7 @@ export const SOURCE_CATALOGUE: SourceCatalogueEntry[] = [
     id: 'python-org',
     label: 'python.org events',
     kind: 'ical',
+    countryPicker: true,
     pages: () => [
       { url: PYTHON_ORG_ICAL, label: displayUrl(PYTHON_ORG_ICAL), tags: ['tech', 'python'] },
     ],

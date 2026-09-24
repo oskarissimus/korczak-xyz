@@ -47,7 +47,8 @@ thing this rule forbids, even when it is harmless.
 
 In practice:
 
-- A new filter is a flag on that source's `SOURCE_CATALOGUE` entry (`townPicker`, `unclassified`)
+- A new filter is a flag on that source's `SOURCE_CATALOGUE` entry (`townPicker`, `countryPicker`,
+  `unclassified`)
   and is set only on the source it was asked for. Offering it to another source is a separate
   request, not a generalisation to make on the way.
 - Its setting lives on that source's switch in `sourcePrefs.ts` and is drawn on that source's
@@ -126,8 +127,8 @@ What is left of the grammar, and what is not:
   `Warsaw` to `Warszawa` had one reader. Every row still states its own town and the card prints
   it; nothing compares two spellings any more. Metro Watch keeps its own station alias table and
   the rule that outlived this one — **a wrong alias is worse than a missing one**.
-- **`EventKind`, `Reach` and `country` are all still written, and none of them filters.** They are
-  read on the card: the place chip, and the kind chip on anything that is not a `listing`. A `?`
+- **`EventKind`, `Reach` and `country` are all still written, and only `country` filters — on one
+  source, by opt-in** (python.org's country picker, below). Otherwise they are read on the card: the place chip, and the kind chip on anything that is not a `listing`. A `?`
   there is how "the classifier has not reached this row" is said, and it is now the only sign in
   the app that the pass has stopped — which is why `extraction.ts` counts it per source.
 
@@ -498,9 +499,10 @@ more running discipline a line in `RUNNING_LISTINGS`, not code. An adapter retur
   else in the feed moves, `onSaleAt` being set only where a source stated it in advance.
 
 - **python.org** is an iCal feed — 874 VEVENTs, mostly historical, so `collect.ts` drops anything
-  already past. Geography is deliberately *not* filtered there: what is collected is a fact about
-  the world, so PyCon US is in the corpus whether or not anybody would fly to it, and the card says
-  which country it is in. RFC 5545 line unfolding is the one parsing bug
+  already past. Geography is deliberately *not* filtered at collection: what is collected is a fact
+  about the world, so PyCon US is in the corpus whether or not anybody would fly to it, and the card
+  says which country it is in. What reaches *this account* can be narrowed by the country picker on
+  its card — see *And the country picker* below. RFC 5545 line unfolding is the one parsing bug
   worth naming: miss it and every long `SUMMARY` truncates at 75 octets, which looks like the feed
   having short titles.
 - **RSS feeds** leave `startsAt` null on purpose. A feed item is an *article*: putting its `pubDate`
@@ -788,10 +790,29 @@ Checked against the data when it shipped (23 Sep 2026): all 152 stored race rows
 of them `Warszawa`, and the platform's own `?city_id=12` listing returned exactly the two of those
 still upcoming — no Warsaw race hiding under a district or a venue name.
 
+#### And the country picker
+
+Added Sep 2026 at the owner's request — *filter python events by country* — as the switch's third
+setting, built on the town picker's exact shape: `SourceSwitch.country`, on the same document,
+merged by the same flip time, read through the same `sourceAdmits`. The catalogue flag is
+**`countryPicker`**, set only on `python-org`; every other source is in Poland by construction and
+would be offered a picker with one option.
+
+- **Options are the codes the rows carry** (`countriesOf`), busiest first — a conference calendar
+  names a couple of dozen countries, not a hundred towns, so the list is read down. `ONLINE` is an
+  option like any other. Compared exactly: the stored form is already a code, nothing to fold.
+- **A row with no country passes**, and here that is literally the classifier rule: python.org's
+  countries come from the model, so an empty one is a row it has not reached. A stopped classifier
+  shows up as a foreign conference in the feed, never as a feed that went quietly empty.
+- **Choosing or clearing a country moves `at`**, same as a town. Every setter goes through
+  `withFilters`, so flipping the switch, choosing a town or choosing a country never drops the
+  other narrowing.
+
 ### Where an event is, who it is for, and whether it is one
 
-Three fields a model writes, and **none of them filters anything any more.** They were built as
-filters and the rules that read them went with the interests (Sep 2026); what is left is what they
+Three fields a model writes, and **none of them filters globally any more.** They were built as
+filters and the rules that read them went with the interests (Sep 2026); the one exception since is
+`country` on python.org, opt-in per source (*And the country picker* above). What is left is what they
 say on the card, which was always half the point — see *The filter has to be falsifiable from the
 outside* below, which is about exactly that. The history is kept because these fields are still
 written on every run, still cost model calls, and the reasons for their shapes are the reasons not

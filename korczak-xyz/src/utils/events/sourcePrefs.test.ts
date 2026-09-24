@@ -6,10 +6,13 @@ import {
   mergeSourcePrefs,
   normalizeSourcePrefs,
   cityMatches,
+  countriesOf,
   setSourceCity,
+  setSourceCountry,
   setSourceEnabled,
   sourceAdmits,
   sourceCity,
+  sourceCountry,
   sourceEnabled,
   townsOf,
   type SourcePrefs,
@@ -170,6 +173,76 @@ describe('a source narrowed to one town', () => {
     expect(normalizeSourcePrefs({ feed: { enabled: true, at: NOW, city: 3 } })).toEqual({
       feed: { enabled: true, at: NOW },
     });
+  });
+});
+
+describe('a source narrowed to one country', () => {
+  const PL = setSourceCountry({}, 'python-org', 'PL', NOW);
+  const conf = (country?: string) => ({ source: 'python-org', city: 'Somewhere', country });
+
+  it('keeps the rows in that country and drops the others', () => {
+    expect(sourceAdmits(PL, conf('PL'))).toBe(true);
+    expect(sourceAdmits(PL, conf('US'))).toBe(false);
+    expect(sourceAdmits(PL, conf('ONLINE'))).toBe(false);
+  });
+
+  it('lets a row the classifier has not reached through', () => {
+    expect(sourceAdmits(PL, conf(undefined))).toBe(true);
+    expect(sourceAdmits(PL, conf(''))).toBe(true);
+  });
+
+  it('leaves the other sources alone', () => {
+    expect(sourceAdmits(PL, { source: 'feed', country: 'DE' })).toBe(true);
+  });
+
+  it('keeps the country through a flip, and a town through a country', () => {
+    const off = setSourceEnabled(PL, 'python-org', false, NOW + 1000);
+    expect(sourceAdmits(off, conf('PL'))).toBe(false);
+    const on = setSourceEnabled(off, 'python-org', true, NOW + 2000);
+    expect(sourceCountry(on, 'python-org')).toBe('PL');
+
+    const both = setSourceCountry(
+      setSourceCity({}, 'python-org', 'Kraków', NOW),
+      'python-org',
+      'PL',
+      NOW + 1,
+    );
+    expect(sourceCity(both, 'python-org')).toBe('Kraków');
+    expect(sourceCity(setSourceCity(both, 'python-org', undefined, NOW + 2), 'python-org')).toBeUndefined();
+    expect(sourceCountry(setSourceCity(both, 'python-org', undefined, NOW + 2), 'python-org')).toBe('PL');
+  });
+
+  it('widens again, and re-arms from the moment it did', () => {
+    const all = setSourceCountry(PL, 'python-org', undefined, NOW + 5000);
+    expect(sourceAdmits(all, conf('US'))).toBe(true);
+    expect(sourceCountry(all, 'python-org')).toBeUndefined();
+    expect(announceFloor(all, 'python-org')).toBe(NOW + 5000);
+  });
+
+  it('survives the round trip through a store', () => {
+    expect(normalizeSourcePrefs(JSON.parse(JSON.stringify(PL)))).toEqual(PL);
+    expect(normalizeSourcePrefs({ feed: { enabled: true, at: NOW, country: 3 } })).toEqual({
+      feed: { enabled: true, at: NOW },
+    });
+  });
+});
+
+describe('countriesOf', () => {
+  it('counts each country, busiest first, and skips rows with none', () => {
+    const rows = [
+      { country: 'US' },
+      { country: 'PL' },
+      { country: 'US' },
+      { country: 'ONLINE' },
+      { country: 'DE' },
+      {},
+    ];
+    expect(countriesOf(rows)).toEqual([
+      { country: 'US', count: 2 },
+      { country: 'DE', count: 1 },
+      { country: 'ONLINE', count: 1 },
+      { country: 'PL', count: 1 },
+    ]);
   });
 });
 

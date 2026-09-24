@@ -106,7 +106,7 @@ export const translations = {
     noteTeatrWielki:
       'The theatre’s own news list, and nothing else from this house. It is read for one thing: the morning the tickets go on sale, which the theatre states in prose a fortnight or more ahead and which is the only fact here with a deadline on it. The season repertoire pages were dropped — what is programmed is never urgent, and they could not answer this.',
     notePythonOrg:
-      'Worldwide, and deliberately not narrowed by country: what is collected is a fact about the world, so PyCon US is here whether or not you would go. Each card says which country it is in.',
+      'Worldwide: what is collected is a fact about the world, so PyCon US is here whether or not you would go. Each card says which country it is in, and the country picker below narrows what reaches you without changing what is collected.',
     noteElektroniczneZapisy:
       'The running listings on an entry platform, nationwide — road, cross, obstacle and ultra. Each row says its own town, and there are well over a hundred of them, so this is the source to switch off first if the feed is too long; the sign-up form is a page of its own, which is what lets this one tell you entries have opened.',
     noteFeed:
@@ -127,6 +127,11 @@ export const translations = {
     sourceCityOption: '{city} ({count})',
     sourceCityOn:
       'Only {city} reaches your feed and can notify you. So does a row that states no town, since nothing says where it is.',
+    // The country picker, on a source whose rows' countries come from the classifier.
+    sourceCountryLabel: 'Country',
+    sourceCountryAll: 'Every country ({count})',
+    sourceCountryOn:
+      'Only {country} reaches your feed and can notify you. So does a row with no country yet, since the classifier has not said where it is.',
     sourceLastRun: 'ran {when}',
     sourceInCorpus: '{count} collected',
     pageOptional: 'appears when announced',
@@ -247,7 +252,7 @@ export const translations = {
     noteTeatrWielki:
       'Same aktualności teatru i nic więcej z tego domu. Czytane dla jednej rzeczy: ranka, w którym rusza sprzedaż biletów — teatr pisze o tym prostym zdaniem, zwykle z dwutygodniowym wyprzedzeniem, i to jedyny fakt tutaj z terminem. Strony repertuaru sezonu odpadły: co jest w planie, nigdy nie jest pilne, a tej daty i tak nie podawały.',
     notePythonOrg:
-      'Cały świat i celowo bez filtra kraju: to, co zbieramy, jest faktem o świecie, więc PyCon US jest tu niezależnie od tego, czy pojedziesz. Każda karta mówi, w jakim kraju się odbywa.',
+      'Cały świat: to, co zbieramy, jest faktem o świecie, więc PyCon US jest tu niezależnie od tego, czy pojedziesz. Każda karta mówi, w jakim kraju się odbywa, a wybór kraju poniżej zawęża to, co do ciebie trafia, nie zmieniając tego, co jest zbierane.',
     noteElektroniczneZapisy:
       'Biegowe listy na platformie zapisów, z całej Polski — szosa, przełaje, przeszkody i ultra. Każdy wiersz podaje własne miasto, a wierszy jest grubo ponad sto, więc to pierwsze źródło do wyłączenia, jeśli lista robi się za długa; formularz zapisów to osobna strona i stąd wiadomo, kiedy ruszyły zapisy.',
     noteFeed:
@@ -263,6 +268,10 @@ export const translations = {
     sourceCityOption: '{city} ({count})',
     sourceCityOn:
       'Tylko {city} trafia na listę i może powiadamiać. Wpis bez podanej miejscowości też — nie wiadomo, gdzie jest.',
+    sourceCountryLabel: 'Kraj',
+    sourceCountryAll: 'Wszystkie ({count})',
+    sourceCountryOn:
+      'Tylko {country} trafia na listę i może powiadamiać. Wpis bez kraju też — klasyfikator jeszcze nie ustalił, gdzie jest.',
     sourceLastRun: 'ostatnio {when}',
     sourceInCorpus: 'zebrane: {count}',
     pageOptional: 'pojawi się po ogłoszeniu',

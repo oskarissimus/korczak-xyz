@@ -47,7 +47,12 @@ import { pullSourceHealth } from '../../utils/events/browser/cloud';
 import { countryLabel } from '../../utils/events/countries';
 import { modelPasses, type ModelPass, type PassCoverage } from '../../utils/events/extraction';
 import { bySource } from '../../utils/events/feed';
-import { townsOf, type TownOption } from '../../utils/events/sourcePrefs';
+import {
+  countriesOf,
+  townsOf,
+  type CountryOption,
+  type TownOption,
+} from '../../utils/events/sourcePrefs';
 import { SOURCE_CATALOGUE, type SourceKind, type SourcePage } from '../../utils/events/sources';
 import type { EventRecord, SourceHealth } from '../../utils/events/types';
 import EventsGate from './EventsGate';
@@ -117,6 +122,11 @@ function SourcesPanel({ lang }: Props) {
   const townsBySource = useMemo(() => {
     const out = new Map<string, TownOption[]>();
     for (const [id, rows] of rowsBySource) out.set(id, townsOf(rows));
+    return out;
+  }, [rowsBySource]);
+  const countriesBySource = useMemo(() => {
+    const out = new Map<string, CountryOption[]>();
+    for (const [id, rows] of rowsBySource) out.set(id, countriesOf(rows));
     return out;
   }, [rowsBySource]);
   const byId = useMemo(() => new Map(health.map((row) => [row.id, row])), [health]);
@@ -203,6 +213,18 @@ function SourcesPanel({ lang }: Props) {
                   selected={switches.city(entry.id)}
                   disabled={!switches.ready}
                   onChange={(city) => switches.setCity(entry.id, city)}
+                  t={t}
+                />
+              ) : null}
+
+              {on && entry.countryPicker ? (
+                <CountryPicker
+                  id={entry.id}
+                  countries={countriesBySource.get(entry.id) ?? []}
+                  total={rows.length}
+                  selected={switches.country(entry.id)}
+                  disabled={!switches.ready}
+                  onChange={(country) => switches.setCountry(entry.id, country)}
                   t={t}
                 />
               ) : null}
@@ -340,6 +362,62 @@ function TownPicker({
         ))}
       </select>
       {selected ? <p className="ev-hint">{fill(t.sourceCityOn, { city: selected })}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Narrow one source to one country.
+ *
+ * The town picker's shape, for a source the catalogue marks `countryPicker`. The options are the
+ * codes the rows carry — ISO-2 or `online`, as the card's chip prints them — and a country already
+ * chosen is always offered, so the setting on the screen is one the select can show.
+ */
+function CountryPicker({
+  id,
+  countries,
+  total,
+  selected,
+  disabled,
+  onChange,
+  t,
+}: {
+  id: string;
+  countries: CountryOption[];
+  total: number;
+  selected: string | undefined;
+  disabled: boolean;
+  onChange: (country: string | undefined) => void;
+  t: Translation;
+}) {
+  const options =
+    selected && !countries.some((c) => c.country === selected)
+      ? [{ country: selected, count: 0 }, ...countries]
+      : countries;
+  if (options.length < 2 && !selected) return null;
+  const inputId = `ev-source-country-${id}`;
+  return (
+    <div className="ev-field ev-source-city">
+      <label className="ev-field-label" htmlFor={inputId}>
+        {t.sourceCountryLabel}
+      </label>
+      <select
+        id={inputId}
+        className="ev-input"
+        value={selected ?? ''}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">{fill(t.sourceCountryAll, { count: total })}</option>
+        {options.map((c) => (
+          <option key={c.country} value={c.country}>
+            {fill(t.sourceCityOption, { city: countryLabel(c.country), count: c.count })}
+          </option>
+        ))}
+      </select>
+      {selected ? (
+        <p className="ev-hint">{fill(t.sourceCountryOn, { country: countryLabel(selected) })}</p>
+      ) : null}
     </div>
   );
 }

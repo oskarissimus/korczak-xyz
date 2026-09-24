@@ -28,8 +28,10 @@ import {
   disabledSourceIds,
   mergeSourcePrefs,
   setSourceCity,
+  setSourceCountry,
   setSourceEnabled,
   sourceCity,
+  sourceCountry,
   sourceEnabled,
   type SourcePrefs,
 } from '../utils/events/sourcePrefs';
@@ -47,6 +49,10 @@ export interface EventSourcePrefsData {
   city: (id: string) => string | undefined;
   /** Narrow a source to one town, or `undefined` for all of them. */
   setCity: (id: SourceId, city: string | undefined) => void;
+  /** The country a source is narrowed to, if any. */
+  country: (id: string) => string | undefined;
+  /** Narrow a source to one country, or `undefined` for all of them. */
+  setCountry: (id: SourceId, country: string | undefined) => void;
   /** The last sync failure, or null. Shown on the tab — a switch that did not save must say so. */
   error: string | null;
 }
@@ -124,6 +130,16 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
     [publish, sync],
   );
 
+  const setCountry = useCallback(
+    (id: SourceId, country: string | undefined) => {
+      const next = setSourceCountry(prefsRef.current, id, country, Date.now());
+      publish(next);
+      saveSourcePrefs(next);
+      void sync();
+    },
+    [publish, sync],
+  );
+
   useEffect(() => {
     if (!user) {
       uidRef.current = null;
@@ -149,6 +165,18 @@ export function useEventSourcePrefs(user: AuthUser | null): EventSourcePrefsData
   const enabled = useCallback((id: string) => sourceEnabled(prefs, id), [prefs]);
 
   const city = useCallback((id: string) => sourceCity(prefs, id), [prefs]);
+  const country = useCallback((id: string) => sourceCountry(prefs, id), [prefs]);
 
-  return { ready, prefs, disabled, enabled, setEnabled, city, setCity, error };
+  return {
+    ready,
+    prefs,
+    disabled,
+    enabled,
+    setEnabled,
+    city,
+    setCity,
+    country,
+    setCountry,
+    error,
+  };
 }

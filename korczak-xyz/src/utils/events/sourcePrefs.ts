@@ -51,6 +51,12 @@ export interface SourceSwitch {
    * backlog it had been hiding.
    */
   city?: string;
+  /**
+   * Only rows in this country, when set: an ISO-2 code or `ONLINE`, compared exactly. See
+   * `sourceAdmits`. Beside `city` for the same reasons, and independent of it — each is offered
+   * only on the source the catalogue marks for it.
+   */
+  country?: string;
 }
 
 /**
@@ -82,8 +88,23 @@ export function setSourceEnabled(
   enabled: boolean,
   now: number,
 ): SourcePrefs {
-  const city = prefs[id]?.city;
-  return { ...prefs, [id]: city ? { enabled, at: now, city } : { enabled, at: now } };
+  return { ...prefs, [id]: withFilters({ enabled, at: now }, prefs[id]) };
+}
+
+/**
+ * A switch carrying whichever narrowings the previous one had.
+ *
+ * Every setter goes through here, so flipping a source off and on again — or choosing a town —
+ * never quietly drops the other filter behind the reader's back.
+ */
+function withFilters(
+  next: { enabled: boolean; at: number },
+  from: Pick<SourceSwitch, 'city' | 'country'> | undefined,
+): SourceSwitch {
+  const out: SourceSwitch = { ...next };
+  if (from?.city) out.city = from.city;
+  if (from?.country) out.country = from.country;
+  return out;
 }
 
 /**
@@ -99,9 +120,40 @@ export function setSourceCity(
   city: string | undefined,
   now: number,
 ): SourcePrefs {
-  const enabled = prefs[id]?.enabled ?? true;
+  const held = prefs[id];
   const kept = city?.trim();
-  return { ...prefs, [id]: kept ? { enabled, at: now, city: kept } : { enabled, at: now } };
+  return {
+    ...prefs,
+    [id]: withFilters({ enabled: held?.enabled ?? true, at: now }, { ...held, city: kept || undefined }),
+  };
+}
+
+/**
+ * Narrow one source to one country, or widen it again with `undefined`.
+ *
+ * Moves `at` for the same reason `setSourceCity` does: widening back to every country arms the
+ * rest of the world from now rather than announcing the conferences the filter had been hiding.
+ */
+export function setSourceCountry(
+  prefs: SourcePrefs,
+  id: SourceId,
+  country: string | undefined,
+  now: number,
+): SourcePrefs {
+  const held = prefs[id];
+  const kept = country?.trim();
+  return {
+    ...prefs,
+    [id]: withFilters(
+      { enabled: held?.enabled ?? true, at: now },
+      { ...held, country: kept || undefined },
+    ),
+  };
+}
+
+/** The country this source is narrowed to, if any. */
+export function sourceCountry(prefs: SourcePrefs, id: string): string | undefined {
+  return prefs[id as SourceId]?.country;
 }
 
 /** The town this source is narrowed to, if any. */
@@ -144,7 +196,8 @@ export function cityMatches(wanted: string, city: string): boolean {
 }
 
 /**
- * Does this row reach the reader: its source is on, and it is in the town the source is narrowed to.
+ * Does this row reach the reader: its source is on, and it is in the town and the country the
+ * source is narrowed to.
  *
  * **A row with no town passes.** The entry platform's rows state their town in the title, and a
  * title that lost its `Miasto, "Nazwa"` shape is saved with no city rather than dropped — so a
@@ -152,15 +205,24 @@ export function cityMatches(wanted: string, city: string): boolean {
  * exactly like a quiet week in Warsaw; showing it costs one card the reader can judge. Same rule
  * the classifier's fields have: nothing is excluded for want of a verdict.
  *
+ * **A row with no country passes too**, and there it is literally that rule: python.org's rows get
+ * their country from the classifier, so an empty one means the model has not reached the row yet.
+ * A stopped classifier then shows up as a conference from somewhere else rather than as a feed
+ * that has quietly gone empty.
+ *
  * The one gate both runtimes ask — `buildFeed` for the screen and `noticesFor` for the lock screen
  * — so a filter cannot mean one thing on each.
  */
-export function sourceAdmits(prefs: SourcePrefs, event: { source: string; city?: string }): boolean {
+export function sourceAdmits(
+  prefs: SourcePrefs,
+  event: { source: string; city?: string; country?: string },
+): boolean {
   const held = prefs[event.source as SourceId];
   if (!held) return true;
   if (!held.enabled) return false;
-  if (!held.city || !event.city) return true;
-  return cityMatches(held.city, event.city);
+  if (held.city && event.city && !cityMatches(held.city, event.city)) return false;
+  if (held.country && event.country && held.country !== event.country) return false;
+  return true;
 }
 
 /**
@@ -234,12 +296,23 @@ export function normalizeSourcePrefs(raw: unknown): SourcePrefs {
   const out: SourcePrefs = {};
   for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!value || typeof value !== 'object') continue;
-    const { enabled, at, city } = value as { enabled?: unknown; at?: unknown; city?: unknown };
+    const { enabled, at, city, country } = value as {
+      enabled?: unknown;
+      at?: unknown;
+      city?: unknown;
+      country?: unknown;
+    };
     if (typeof enabled !== 'boolean' || typeof at !== 'number' || !Number.isFinite(at)) continue;
-    // A town that is not a non-empty string is dropped rather than the switch: the switch is still
-    // a readable fact, and a malformed filter read as "no filter" shows more, never less.
-    out[id as SourceId] =
-      typeof city === 'string' && city.trim() ? { enabled, at, city: city.trim() } : { enabled, at };
+    // A town or country that is not a non-empty string is dropped rather than the switch: the
+    // switch is still a readable fact, and a malformed filter read as "no filter" shows more,
+    // never less.
+    out[id as SourceId] = withFilters(
+      { enabled, at },
+      {
+        city: typeof city === 'string' ? city.trim() : undefined,
+        country: typeof country === 'string' ? country.trim() : undefined,
+      },
+    );
   }
   return out;
 }
@@ -283,4 +356,31 @@ export function townsOf(rows: ReadonlyArray<{ city?: string }>): TownOption[] {
     out.push({ city: best, count });
   }
   return out.sort((a, b) => a.city.localeCompare(b.city, 'pl'));
+}
+
+/** One country a source's rows are in, as the picker offers it. */
+export interface CountryOption {
+  /** ISO-2, or `ONLINE` — what is stored and compared. */
+  country: string;
+  count: number;
+}
+
+/**
+ * The countries a source's rows are in, for the picker on its card.
+ *
+ * Busiest first, unlike the towns: a conference calendar names a dozen or two countries rather than
+ * a hundred towns, so the list is read down rather than looked up, and the country with the most
+ * on is the likeliest one to want. Ties go alphabetically so the order does not reshuffle. A row
+ * with no country is not an option — it is what passes every choice.
+ */
+export function countriesOf(rows: ReadonlyArray<{ country?: string }>): CountryOption[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const country = row.country?.trim();
+    if (!country) continue;
+    counts.set(country, (counts.get(country) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([country, count]) => ({ country, count }))
+    .sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
 }
