@@ -14,7 +14,8 @@ see *Error reporting* below). **Cloudflare** serves the site: `korczak-xyz/wrang
 Worker that is nothing but its own static assets, and the build is a plain `astro build` with no
 adapter — no SSR, no API routes, nothing running per request. **GCP** (`korczak-xyz-501720`) is the
 backend: Firestore, two gen-2 Cloud Functions in `europe-central2`, Cloud Scheduler, Secret
-Manager, and the project layer in `terraform/`. The browser talks to Firestore directly, so those
+Manager, a weekly Cloud Batch job that builds the audio guide's pins, and the project layer in
+`terraform/`. The browser talks to Firestore directly, so those
 two halves meet in the client and not on a server.
 
 This was Netlify until August 2026, behind Cloudflare's proxy — which meant two CDNs in the path,

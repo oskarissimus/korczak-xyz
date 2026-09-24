@@ -42,6 +42,13 @@ locals {
 
     # The classifier.
     "aiplatform.googleapis.com",
+
+    # The audio guide's weekly pins build (audio-guide-pins.tf): a Batch job on a spot VM, which
+    # is Compute Engine underneath - on already, since functions and Cloud Build use it, and
+    # listed so that stays written down.
+    "batch.googleapis.com",
+    "compute.googleapis.com",
+    "logging.googleapis.com",
   ]
 }
 

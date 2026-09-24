@@ -3,6 +3,8 @@ name: audio-guide
 description: The audio guide at /apps/audio-guide/ - the map and its pins, the Go backend, the sources every narration is grounded in and the checks on them, the keys and where they live, what a tap costs, the iOS audio unlock, and the narration language.
 paths:
   - "audio-guide-function/**"
+  - "audio-guide-pins/**"
+  - "terraform/audio-guide*.tf"
   - "**/hooks/useAudioGuideKeys.ts"
   - "**/utils/audioGuide/**"
   - "**/components/AudioGuide/**"
@@ -197,8 +199,8 @@ was a toy on GitHub Pages. So since Sep 2026 the whole island sits behind `Audio
 opens for **approved** accounts only (`auth.user`, see `.claude/rules/accounts.md`), says "waiting
 for approval" to a pending one, and offers sign-in, with a `redirect` back here, to everybody else.
 
-It gates the island, not the tap. The map and the pins are free to us, but behind the gate are a
-geolocation prompt and an Overpass request on every pan, and neither is worth spending on somebody
+It gates the island, not the tap. The map and the pins are nearly free to us, but behind the gate are a
+geolocation prompt and a pins request on every pan, and neither is worth spending on somebody
 who is then told they cannot have a guide. `AudioGuideApp` — everything with a hook in it — is not
 mounted until the gate opens. The gate draws the app's own frame (empty stage, footnote) so the
 page is the same height on both sides of it.
@@ -255,36 +257,94 @@ Three things about the pins that look like details and are not:
 - **The icon is anchored on the speaker glyph, not on the middle of the pill.** The point is the
   place; a pill centred on it puts its icon half a label away from the building it names.
 
-Overpass is a free, shared, IP-rate-limited endpoint, and it is also what made the pins slow:
-until Sep 2026 every pan and zoom was a fresh query for exactly the visible rectangle, half a second
-after the map stopped, with nothing remembered. Now:
+Where the pins come from changed twice in Sep 2026, and the order matters for reading the code.
+Until then every pan and zoom was a fresh Overpass query for exactly the visible rectangle, half a
+second after the map stopped, with nothing remembered. First the answers were cached by square;
+then the question stopped being asked live at all — see *The pins are built weekly* below. The
+cache is what both sources feed:
 
 - **The pins are cached by map square** (`utils/audioGuide/tiles.ts`). The world is cut into the
   zoom-15 slippy-map grid (~750m squares in Poland) and each answer is filed under the squares it
   covered, **empty ones included** — an empty square is an answer. A new viewport draws whatever
-  its squares already hold on the same frame, and asks Overpass only for the rectangle of squares
-  it is missing. Zooming in and panning back are free. The cache is in memory, 1500 squares, least
-  recently looked-at forgotten first — pins, unlike narration, are a few bytes each. Zoom 15 and
-  not coarser because the first answer is the one somebody waits for, and a coarser grid makes it
-  several times the screen.
+  its squares already hold on the same frame, and fetches only the squares it is missing. Zooming
+  in and panning back are free. The cache is in memory, 1500 squares, least recently looked-at
+  forgotten first — pins, unlike narration, are a few bytes each.
 - **An attraction is filed under the one square its point falls in**, so a building astride a
   boundary is one pin. When more than `MAX_MARKERS` are in view, the ones drawn are the nearest to
   the middle of the screen (`nearestToCentre`), not the first in the answer.
-- **The query asks for `["name"]` on every clause** and leaves out `tourism=information`.
-  `transformAttractions` drops the unnamed anyway, but `historic` alone is mostly unnamed walls
-  and boundary stones — in an old town that was most of the response, serialised and sent for
-  nothing. **Do not put a count limit on `out`** (`out center qt 300`): a truncated answer would be
-  filed as the whole truth for its squares, and they would stay short of pins until the tab closed.
 - **Below zoom 13 nothing is asked for** (`MIN_ZOOM`); cached pins still show, with a chip saying
   to zoom in.
 
-`useNearbyAttractions` debounces the network by 250ms (the cache is read without waiting), aborts
-the in-flight request when the map moves somewhere that needs another, and retries **only** a
-busy server — 429 or 504. **A 504 is not "the box was too big".** It was read that way at first,
-and a reader looking at one city block was told to zoom in: the public instance answers 504 when
-its queue is full, whatever was asked. A query that genuinely outgrows `[timeout:25]` or its memory
-comes back as a **200** with a `remark` (`runtime error: Query timed out…`), and that — checked by
-`ranOutOfRoom` — is the only thing that says zoom in. It is not retried; it would be too big again.
+`useNearbyAttractions` debounces the network by 250ms (the cache is read without waiting) and
+aborts the in-flight request when the map moves somewhere that needs another.
+
+### The pins are built weekly, for the whole world
+
+The app asks one question — named museums, attractions, galleries, viewpoints, artwork, historic
+things and places of worship in a box, with the story tags — and the public Overpass instance took
+seconds to tens of seconds to answer it, when it answered at all (a 17-second 200 after a 504 was a
+normal morning). So since late Sep 2026 the question is answered **for the whole planet once a
+week** and the browser reads the answer as a static file:
+
+- **`audio-guide-pins/build.py`** downloads the planet (~95 GB, from the FAU mirror), cuts it down
+  with `osmium tags-filter`, and in one pyosmium pass applies the rest of the Overpass query
+  (`matches`: the `["name"]`, the anchored tourism values) and gives each way and relation the
+  centre `out center` would — the middle of its bounding box. It files every place under the
+  **zoom-13** tile its point falls in (4×4 of the cache's squares) and writes one gzipped tile per
+  non-empty tile into a **PMTiles** archive. A tile is `{"elements": [...]}`, the shape of an
+  Overpass answer, so `transformAttractions` reads both and there is one definition of a pin.
+  Checked on a Warsaw extract against a live Overpass answer for the Old Town: every difference was
+  an edit made between the two data dates.
+- **`storyTags.json`** is the one list of kept tags, imported by `overpass.ts` and read by the
+  builder. Two copies would drift, and a tag added to only one would be on Overpass pins and
+  silently missing from every archive pin.
+- **It runs on Cloud Batch**, on a spot `e2-highmem-4` with a 250 GB SSD boot disk, started by
+  Cloud Scheduler on Saturdays at 04:07 Warsaw (`terraform/audio-guide-pins.tf`). About an hour
+  and a half, about a dollar a month. **The job carries its own code**: Terraform base64s
+  `run.sh`, `build.py`, its requirements and `storyTags.json` into the job's environment, so the
+  apply *is* the deploy, and the builder's unit tests (`audio-guide-pins` in `firebase-deploy.yml`)
+  gate the `terraform` job. To build now rather than on Saturday: `gcloud scheduler jobs run
+  audio-guide-pins-weekly --location=europe-central2`, then `gcloud batch jobs list
+  --location=europe-central2` and the job's log in Cloud Logging.
+- **Published to `gs://korczak-xyz-501720-audio-guide-pins`**, public to read, CORS open for
+  `GET`/`HEAD` with `Range`. An archive is immutable under its dated name
+  (`pins-20260926-020700.pmtiles`, cached a year); **`latest.json`** names the current one, cached
+  five minutes. The builder uploads the archive, then switches the pointer, then deletes all but
+  the new one and the one before — a page opened before the switch is still reading the old one.
+  Not an age-based lifecycle rule: after a month of failed builds that would delete the only one.
+  Not behind korczak.xyz: the Worker's per-file asset limit is far below a world archive, and
+  giving it a `main` to proxy one would take every page out from under `_headers`.
+- **A build that finds fewer than 500,000 places refuses to publish** (`PINS_MIN_PLACES`). The
+  world has millions; fewer is a truncated planet or a broken filter, and publishing it would empty
+  the map everywhere at once.
+
+**How a failure is seen, on each side.** The builder reports its own failure to Sentry
+(`korczak-xyz-functions`, fingerprint `audio-guide-pins.build.failed`) — a spot VM taken back is
+retried by Batch instead (exit 50001) and reports nothing. The page reports an archive more than
+21 days old as `audioGuide.pins.stale`, an error and so a Sentry event in `korczak-xyz`: that is
+the alarm for a schedule that stopped firing at all, which the builder cannot report because it
+never ran. **If pins look out of date, look for those two issues first.**
+
+**Overpass is the fallback, not gone** (`utils/audioGuide/pins.ts`, `useNearbyAttractions`). No
+`latest.json` (not built yet, bucket unreachable), or any archive tile that fails to read, and the
+whole missing range goes to Overpass exactly as before. A failed pointer fetch is not remembered,
+so a page that opened in a tunnel goes back to the archive on the next pan. What is still true of
+Overpass when it is used:
+
+- **The query asks for `["name"]` on every clause** and leaves out `tourism=information` —
+  `historic` alone is mostly unnamed walls and boundary stones. **Do not put a count limit on
+  `out`** (`out center qt 300`): a truncated answer would be filed as the whole truth for its
+  squares, and they would stay short of pins until the tab closed. The same goes for the archive's
+  tiles, which is why the builder writes every place and the map caps what it *draws*.
+- **It retries only a busy server** — 429 or 504. **A 504 is not "the box was too big".** It was
+  read that way at first, and a reader looking at one city block was told to zoom in: the public
+  instance answers 504 when its queue is full, whatever was asked. A query that genuinely outgrows
+  `[timeout:25]` or its memory comes back as a **200** with a `remark`, and that — checked by
+  `ranOutOfRoom` — is the only thing that says zoom in. It is not retried.
+
+What the archive gives up is freshness: a pin is up to a week old plus the planet's own few days,
+where Overpass was minutes. For churches and monuments that is nothing, and the narration still
+reads OSM, Wikipedia and Wikidata live when the pin is tapped.
 
 The tile layer is cross-origin, and the service worker never intercepts cross-origin requests. So
 **the app has an offline tier and is still useless offline**: the precache exists so the home
@@ -328,7 +388,7 @@ bar is there at all is that a phone showing nothing for twenty seconds gets tapp
 ### What is not kept
 
 No narration. None is cached, in memory or anywhere else. (The pins are, in memory — see *The map
-is Leaflet* — which is a different thing: bytes, not megabytes, and free to fetch again. The
+is Leaflet* — which is a different thing: bytes, not megabytes, and nearly free to fetch again. The
 script and its sources are *recorded* server-side for fact-checking — see *Every guide leaves a
 record* — but no guide is ever served from that record.)
 Re-tapping the pin you are listening to replays it; coming back to it later pays for it again.

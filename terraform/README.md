@@ -30,6 +30,7 @@ Both are project state. Project state that is not written down is state that get
 | the export bucket, its schedule and its two accounts | the **key** for the reader account |
 | the sloper bucket, and registering it with Firebase | `storage.rules` |
 | the audio guide's records bucket and its one write grant | |
+| the audio guide's pins bucket, its schedule, its two accounts, and the build's code (copied into the Batch job) | |
 
 Nothing may be in both columns. Two owners of one resource is permanent drift: every
 `terraform apply` reverts what the last `firebase deploy` did, and back again, with neither tool

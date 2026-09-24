@@ -1,0 +1,12 @@
+{
+  "story": [
+    "wikipedia", "wikidata", "subject:wikipedia", "subject:wikidata",
+    "start_date", "construction_date", "opening_date", "end_date",
+    "architect", "builder", "designer", "artist_name", "artist", "sculptor",
+    "building:architecture", "architecture", "inscription", "description", "subject",
+    "memorial:subject", "official_name", "old_name", "alt_name", "short_name",
+    "historic", "tourism", "amenity", "memorial", "memorial:type", "castle_type", "building",
+    "denomination", "religion", "material", "height"
+  ],
+  "nameLanguages": ["en", "pl", "de", "fr", "es", "it", "cs", "uk"]
+}

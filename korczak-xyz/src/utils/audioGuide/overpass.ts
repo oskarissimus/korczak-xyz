@@ -10,6 +10,7 @@
  * request is made at all (see `useNearbyAttractions`), and a 429 backs off rather than retrying at once.
  */
 
+import storyTagList from './storyTags.json';
 import type { Attraction, Bounds } from './types';
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
@@ -75,22 +76,19 @@ out center qt;`;
  *
  * A list rather than all of them: every pin in the tile cache carries these, and OSM's other tags
  * (opening hours, wheelchair access, `fixme`) say nothing a guide would read out.
+ *
+ * The list is `storyTags.json` rather than a literal here because the weekly pins build
+ * (`audio-guide-pins/build.py`) reads the same file to decide which tags go into the archive. Two
+ * copies would drift, and a tag added here but not there would be kept for pins fetched from
+ * Overpass and silently missing from every pin read out of the archive.
  */
-const STORY_TAGS = new Set([
-  'wikipedia', 'wikidata', 'subject:wikipedia', 'subject:wikidata',
-  'start_date', 'construction_date', 'opening_date', 'end_date',
-  'architect', 'builder', 'designer', 'artist_name', 'artist', 'sculptor',
-  'building:architecture', 'architecture', 'inscription', 'description', 'subject',
-  'memorial:subject', 'official_name', 'old_name', 'alt_name', 'short_name',
-  'historic', 'tourism', 'amenity', 'memorial', 'memorial:type', 'castle_type', 'building',
-  'denomination', 'religion', 'material', 'height',
-]);
+const STORY_TAGS = new Set(storyTagList.story);
 
 /**
  * Other languages' names, for matching an article to the place - a handful, not `name:*`: a
  * cathedral carries a hundred of them, and the function refuses more than sixty tags.
  */
-const NAME_TAGS = ['en', 'pl', 'de', 'fr', 'es', 'it', 'cs', 'uk'].map((l) => `name:${l}`);
+const NAME_TAGS = storyTagList.nameLanguages.map((l) => `name:${l}`);
 
 export function storyTags(tags: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};

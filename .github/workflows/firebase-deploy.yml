@@ -44,6 +44,11 @@ on:
       - "korczak-xyz/src/utils/sloper/tsconfig.json"
       - "terraform/**"
       - "audio-guide-function/**"
+      # The weekly pins build. Terraform base64s these into the Batch job's environment
+      # (terraform/audio-guide-pins.tf), so a change to either only reaches Saturday's build
+      # through an apply - and storyTags.json is the site's file, read by both sides.
+      - "audio-guide-pins/**"
+      - "korczak-xyz/src/utils/audioGuide/storyTags.json"
       - ".github/workflows/firebase-deploy.yml"
   # So rules can be pushed out without waiting for a code change to ride along.
   workflow_dispatch:
@@ -56,10 +61,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The audio guide's pins builder, tested before the job that ships it. There is no deploy step
+  # of its own: Terraform copies build.py into the weekly Batch job's definition, so the apply IS
+  # the deploy, and a builder that fails its tests must not reach it. Nothing here downloads a
+  # planet - the tests are the pure half and a hand-written ten-line extract.
+  audio-guide-pins:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audio-guide-pins
+    steps:
+      - uses: actions/checkout@v7
+
+      # 3.12 because that is the job's image (mirror.gcr.io/library/python:3.12-slim-bookworm).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Test
+        run: |
+          pip install --quiet -r requirements.txt
+          python -m unittest -v
+
   # The project layer: APIs, IAM, secret containers. Runs on every deploy, not only when
   # terraform/ changed — it is idempotent, costs a handful of API calls, and running it always is
   # what makes the ordering guarantee above hold.
   terraform:
+    needs: audio-guide-pins
     runs-on: ubuntu-latest
     permissions:
       id-token: write

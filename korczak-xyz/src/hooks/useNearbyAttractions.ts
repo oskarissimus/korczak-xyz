@@ -4,20 +4,29 @@
  * Every pan and every zoom is a question, but most of them are answered from `AttractionCache`
  * (see `utils/audioGuide/tiles.ts`) at once and without a request: zooming in, and panning back
  * over ground already covered, draw their pins on the same frame. Only the squares not yet seen
- * go to Overpass, which is a free, shared, rate-limited public endpoint. Four things keep that
- * from being rude, and all of them are here rather than in `overpass.ts`, because they are about
- * when to ask rather than how:
+ * are fetched, and from one of two places:
+ *
+ *  - **The weekly archive** (`utils/audioGuide/pins.ts`), first. The whole world's pins, built
+ *    ahead of time and read a zoom-13 tile at a time with a range request. Each tile answers
+ *    sixteen of the cache's squares, and each is filed the moment it arrives, so a screen that
+ *    needs four tiles fills in four steps rather than waiting for the slowest.
+ *  - **Overpass**, when there is no archive to read - none built yet, the bucket unreachable, a
+ *    tile that failed. It is a free, shared, rate-limited public endpoint and it takes seconds,
+ *    which is why it is the fallback now and not the source.
+ *
+ * Four things keep either from being wasted, and all of them are here rather than in the modules
+ * that fetch, because they are about when to ask rather than how:
  *
  *  - **The debounce.** A drag fires `moveend` once, but a pinch-zoom followed by a nudge fires
  *    three or four in a second. A quarter of a second of quiet before asking turns a fidget into
  *    one request. It was half a second, which was mostly dead time: the abort below already
  *    discards whatever a fidget does get sent. The cache is read without waiting for it.
- *  - **The zoom floor.** Below `MIN_ZOOM` nothing is asked for. A whole city is too big a box
- *    for the public instance and more pins than the map may draw; what is cached still shows,
- *    with a line saying to zoom in for more.
- *  - **The abort.** Moving again while a request is in flight abandons it. Overpass takes
- *    seconds to answer a dense box, and without this the answers arrive out of order and the map
- *    settles on the pins for a rectangle nobody is looking at any more.
+ *  - **The zoom floor.** Below `MIN_ZOOM` nothing is asked for. A whole city is more pins than
+ *    the map may draw, and for Overpass too big a box; what is cached still shows, with a line
+ *    saying to zoom in for more.
+ *  - **The abort.** Moving again while a request is in flight abandons it. Without this the
+ *    answers arrive out of order and the map settles on the pins for a rectangle nobody is
+ *    looking at any more.
  *  - **The unmount.** Leaving the page aborts too, so a navigation does not leave a request
  *    running against a component that no longer exists.
  */
@@ -26,10 +35,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
 import { fetchAttractions, MAX_MARKERS, OverpassBusyError } from '../utils/audioGuide/overpass';
+import { dataTilesFor, forgetPins, openPins, readPinsTile, squaresOf } from '../utils/audioGuide/pins';
 import {
   AttractionCache,
   boundsOfTiles,
   nearestToCentre,
+  tilesIn,
   type TileRange,
 } from '../utils/audioGuide/tiles';
 import type { Attraction, Bounds } from '../utils/audioGuide/types';
@@ -38,7 +49,8 @@ const DEBOUNCE_MS = 250;
 
 /**
  * The widest the map may be before it stops asking. At 13 a phone's screen is a few kilometres
- * across - an old town and its surroundings - which the public instance answers comfortably.
+ * across - an old town and its surroundings - which is two to six archive tiles, and a box the
+ * public Overpass instance answers comfortably when it has to.
  */
 export const MIN_ZOOM = 13;
 
@@ -82,6 +94,35 @@ export function useNearbyAttractions(): NearbyAttractions {
     return missing;
   }, []);
 
+  /**
+   * The archive's answer for a range, filed tile by tile as each arrives. True when every tile
+   * was read; false when there is no archive or a tile failed, and Overpass should be asked
+   * instead - for the whole range, since a partial answer from here is overwritten by a whole one.
+   */
+  const fromArchive = useCallback(
+    async (range: TileRange, signal: AbortSignal): Promise<boolean> => {
+      const archive = await openPins();
+      if (!archive || signal.aborted) return false;
+      try {
+        await Promise.all(
+          [...tilesIn(dataTilesFor(range))].map(async ([x, y]) => {
+            const found = await readPinsTile(archive, x, y, signal);
+            if (signal.aborted) return;
+            cache.current.store(squaresOf(x, y), found);
+            if (last.current) show(last.current.bounds);
+          }),
+        );
+        return !signal.aborted;
+      } catch (e) {
+        if (signal.aborted) return false;
+        forgetPins();
+        log.warn('audioGuide.pins.failed', describeError(e));
+        return false;
+      }
+    },
+    [show],
+  );
+
   const load = useCallback(
     async (range: TileRange) => {
       inFlight.current?.abort();
@@ -92,12 +133,15 @@ export function useNearbyAttractions(): NearbyAttractions {
       setError(null);
 
       try {
+        if (await fromArchive(range, controller.signal)) return;
+        if (controller.signal.aborted) return;
+
         const found = await fetchAttractions(boundsOfTiles(range), controller.signal);
         if (controller.signal.aborted) return;
 
         cache.current.store(range, found);
         if (last.current) show(last.current.bounds);
-        log.debug('audioGuide.attractions.loaded', { found: found.length });
+        log.debug('audioGuide.attractions.loaded', { found: found.length, source: 'overpass' });
       } catch (e) {
         // An abort is the map having moved on, not a failure. Reporting it would put an error
         // toast on the screen every time somebody pans twice quickly.
@@ -110,7 +154,7 @@ export function useNearbyAttractions(): NearbyAttractions {
         if (!controller.signal.aborted) setLoading(false);
       }
     },
-    [show],
+    [fromArchive, show],
   );
 
   const setBounds = useCallback(
