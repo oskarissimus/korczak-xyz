@@ -23,7 +23,9 @@
  * Two sets of rows are deliberately **never asked**. One is the theatre's newsroom items, which have
  * their own model pass in `readNewsroom.ts` and arrive already placed; `needsClassifying` says why.
  * The other is a source whose catalogue entry says `unclassified` (the running listings, whose pages
- * already state everything asked here). Everything else in the corpus comes through here.
+ * already state everything asked here). Everything else in the corpus comes through here — and a
+ * source whose entry says `listingsOnly` (python.org's conference calendar) is asked where and for
+ * whom but not whether, in batches of its own with a prompt that leaves the question out.
  *
  * There is **no API key**. Vertex AI on Application Default Credentials, which inside a Cloud
  * Function is the function's own runtime service account — it is already inside the project the
@@ -39,7 +41,7 @@ import type { EventKind, EventRecord, Reach } from '../../korczak-xyz/src/utils/
 import { KINDS, REACHES } from '../../korczak-xyz/src/utils/events/types';
 import { ONLINE } from '../../korczak-xyz/src/utils/events/countries';
 import { isNewsroomItem } from '../../korczak-xyz/src/utils/events/newsroom';
-import { skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
+import { asksKind, skipsClassifier } from '../../korczak-xyz/src/utils/events/sources';
 
 /**
  * Cheapest and fastest of the family, which is the right trade for a two-field judgement over a
@@ -109,27 +111,35 @@ export interface ClassifyOutcome {
  * `reason` is capped in the prompt rather than the schema, since a schema cannot express a length
  * and a truncated sentence is worse than a short one.
  */
-const RESPONSE_SCHEMA: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    events: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          id: { type: Type.STRING },
-          country: { type: Type.STRING },
-          reach: { type: Type.STRING, enum: [...REACHES] },
-          reason: { type: Type.STRING },
-          kind: { type: Type.STRING, enum: [...KINDS] },
-          kindReason: { type: Type.STRING },
+function responseSchema(askKind: boolean): Schema {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      events: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            id: { type: Type.STRING },
+            country: { type: Type.STRING },
+            reach: { type: Type.STRING, enum: [...REACHES] },
+            reason: { type: Type.STRING },
+            ...(askKind
+              ? {
+                  kind: { type: Type.STRING, enum: [...KINDS] },
+                  kindReason: { type: Type.STRING },
+                }
+              : {}),
+          },
+          required: askKind
+            ? ['id', 'country', 'reach', 'reason', 'kind', 'kindReason']
+            : ['id', 'country', 'reach', 'reason'],
         },
-        required: ['id', 'country', 'reach', 'reason', 'kind', 'kindReason'],
       },
     },
-  },
-  required: ['events'],
-};
+    required: ['events'],
+  };
+}
 
 /**
  * What the verdict was computed from.
@@ -193,8 +203,11 @@ export function needsClassifying(event: EventRecord): boolean {
  * The definitions matter more than the instruction does: `national` and `international` are the
  * distinction this whole feature turns on, and "big" or "important" are not what is being asked.
  * The question is where the people in the room travelled from.
+ *
+ * `askKind` false is the prompt for a source of listings only (`asksKind`): the same first three
+ * facts, and no `kind` — a batch is always one or the other, never mixed.
  */
-export function buildPrompt(events: EventRecord[]): string {
+export function buildPrompt(events: EventRecord[], askKind = true): string {
   const rows = events.map((event) => ({
     id: event.id,
     title: event.title,
@@ -206,12 +219,41 @@ export function buildPrompt(events: EventRecord[]): string {
     date: event.day ?? undefined,
   }));
 
-  return [
-    'You are labelling rows in a personal event-watching app. Each row was scraped from a',
-    'ticketing site, a venue programme, a race listing, or the RSS feed of a publication —',
-    'so a row is not necessarily an event. `source` is the publication or site it came from.',
+  const intro = askKind
+    ? [
+        'You are labelling rows in a personal event-watching app. Each row was scraped from a',
+        'ticketing site, a venue programme, a race listing, or the RSS feed of a publication —',
+        'so a row is not necessarily an event. `source` is the publication or site it came from.',
+      ]
+    : [
+        'You are labelling rows in a personal event-watching app. Each row is an event from a',
+        'calendar of events. `source` is the site it came from.',
+      ];
+
+  const kindQuestion = [
+    '4. `kind` — whether this row is an event, or writing about one:',
+    '   - "listing": the event itself. A concert, a race, a conference, an exhibition —',
+    '     something with a date or a season and a door to walk through.',
+    '   - "announcement": an article whose news IS an event or its practicalities.',
+    '     Entries opening, tickets going on sale, a date or route fixed, next season\'s',
+    '     calendar published, a new edition confirmed.',
+    '   - "coverage": anything else written about events. Sponsor and partner posts,',
+    '     results, pacer times, race reports, interviews, training and gear articles,',
+    '     recaps, photo galleries, thank-you notes.',
     '',
-    'For each row, return three facts:',
+    'A title that reads like a press release about a race ("Brand X is a partner of the',
+    '48th Warsaw Marathon", "Pacer times for the 10k") is "coverage", not "listing" — the',
+    'race it is about is listed separately. When a row is plainly a ticketed listing from a',
+    'venue or a ticketing site, it is "listing" whatever its title says.',
+    '',
+    '5. `kindReason` — under 100 characters, in English, saying why you chose that kind.',
+    '',
+  ];
+
+  return [
+    ...intro,
+    '',
+    'For each row, return these facts:',
     '',
     '1. `country` — the ISO 3166-1 alpha-2 code of the country it is held in, uppercase.',
     `   Use "${ONLINE}" if it is an online-only event. Use "" if you genuinely cannot tell.`,
@@ -233,23 +275,7 @@ export function buildPrompt(events: EventRecord[]): string {
     '',
     '3. `reason` — under 100 characters, in English, saying why you chose that reach.',
     '',
-    '4. `kind` — whether this row is an event, or writing about one:',
-    '   - "listing": the event itself. A concert, a race, a conference, an exhibition —',
-    '     something with a date or a season and a door to walk through.',
-    '   - "announcement": an article whose news IS an event or its practicalities.',
-    '     Entries opening, tickets going on sale, a date or route fixed, next season\'s',
-    '     calendar published, a new edition confirmed.',
-    '   - "coverage": anything else written about events. Sponsor and partner posts,',
-    '     results, pacer times, race reports, interviews, training and gear articles,',
-    '     recaps, photo galleries, thank-you notes.',
-    '',
-    'A title that reads like a press release about a race ("Brand X is a partner of the',
-    '48th Warsaw Marathon", "Pacer times for the 10k") is "coverage", not "listing" — the',
-    'race it is about is listed separately. When a row is plainly a ticketed listing from a',
-    'venue or a ticketing site, it is "listing" whatever its title says.',
-    '',
-    '5. `kindReason` — under 100 characters, in English, saying why you chose that kind.',
-    '',
+    ...(askKind ? kindQuestion : []),
     'Reply with one object per row, echoing the `id` exactly as given.',
     '',
     JSON.stringify(rows),
@@ -267,8 +293,15 @@ export function buildPrompt(events: EventRecord[]): string {
  * Total by construction: malformed JSON, a missing field, an unknown reach, a schema from some
  * later build. Anything unreadable simply yields no verdict for that event, which leaves it
  * unclassified — a state the matcher already handles.
+ *
+ * `askKind` false drops any `kind` the model volunteered anyway: a question nobody asked is not
+ * an answer, and a verdict that is only a kind would otherwise mark the row done.
  */
-export function parseClassification(text: string | undefined, asked: string[]): Map<string, Verdict> {
+export function parseClassification(
+  text: string | undefined,
+  asked: string[],
+  askKind = true,
+): Map<string, Verdict> {
   const out = new Map<string, Verdict>();
   if (!text) return out;
 
@@ -299,10 +332,10 @@ export function parseClassification(text: string | undefined, asked: string[]): 
       verdict.reach = reach as Reach;
     }
     if (typeof reason === 'string' && reason.trim()) verdict.reason = reason.trim().slice(0, 200);
-    if (typeof kind === 'string' && (KINDS as readonly string[]).includes(kind)) {
+    if (askKind && typeof kind === 'string' && (KINDS as readonly string[]).includes(kind)) {
       verdict.kind = kind as EventKind;
     }
-    if (typeof kindReason === 'string' && kindReason.trim()) {
+    if (askKind && typeof kindReason === 'string' && kindReason.trim()) {
       verdict.kindReason = kindReason.trim().slice(0, 200);
     }
 
@@ -378,18 +411,39 @@ function chunk<T>(items: T[], size: number): T[][] {
  */
 async function classifyBatch(
   client: GoogleGenAI,
-  events: EventRecord[],
+  { events, askKind }: Batch,
 ): Promise<Map<string, Verdict>> {
   const response = await client.models.generateContent({
     model: MODEL,
-    contents: buildPrompt(events),
+    contents: buildPrompt(events, askKind),
     config: {
       responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
+      responseSchema: responseSchema(askKind),
       abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     },
   });
-  return parseClassification(response.text, events.map((e) => e.id));
+  return parseClassification(response.text, events.map((e) => e.id), askKind);
+}
+
+interface Batch {
+  events: EventRecord[];
+  askKind: boolean;
+}
+
+/**
+ * The budget in batches, each asking one set of questions.
+ *
+ * Split by `asksKind` before chunking, because the prompt and the schema are per batch: a batch
+ * mixing the two would either ask python.org's conferences whether they are articles or drop the
+ * question for the feed items that need it.
+ */
+export function batchesOf(events: EventRecord[]): Batch[] {
+  const withKind = events.filter(asksKind);
+  const withoutKind = events.filter((event) => !asksKind(event));
+  return [
+    ...chunk(withKind, BATCH_SIZE).map((batch) => ({ events: batch, askKind: true })),
+    ...chunk(withoutKind, BATCH_SIZE).map((batch) => ({ events: batch, askKind: false })),
+  ];
 }
 
 export interface ClassifyContext {
@@ -437,7 +491,7 @@ export async function classifyEvents(
     project: ctx.project,
     location: ctx.location ?? LOCATION,
   });
-  const batches = chunk(budget, BATCH_SIZE);
+  const batches = batchesOf(budget);
 
   let classified = 0;
   let missing = 0;
@@ -466,11 +520,11 @@ export async function classifyEvents(
         // One batch's worth of events stays unclassified. The run goes on; the reason is kept for
         // the health row, where a persistent outage becomes visible.
         firstError ??= error instanceof Error ? error.message : String(error);
-        missing += batch.length;
+        missing += batch.events.length;
         continue;
       }
 
-      for (const event of batch) {
+      for (const event of batch.events) {
         const verdict = verdicts.get(event.id);
         if (!verdict) {
           missing += 1;

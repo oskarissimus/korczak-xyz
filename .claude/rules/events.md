@@ -933,6 +933,19 @@ block off that source's card. Every row there is a race, its town is in the row 
 by the page, so the pass answered nothing but `reach` — for the longest source in the feed, at a
 model call per row. Another source opts out with the same one line.
 
+**And python.org is not asked the kind**, a narrower opt-out on the same catalogue: `listingsOnly:
+true`, read through `asksKind`. Its rows still need the classifier for `country` and `reach` — that
+is what the country and reach pickers run on — but the calendar is conferences and nothing else,
+each row a VEVENT with dates and a place, so `kind` could only ever come back `listing`, which the
+card draws exactly as it draws no kind. `batchesOf` splits the budget by `asksKind` before chunking
+and those batches get a prompt and a schema without questions 4 and 5; `parseClassification` drops
+a kind the model volunteers anyway, so a kind alone never marks such a row done; `mergeRecord`
+drops the stored `kind`/`kindReason` on the next upsert while carrying `reach`, `country` and the
+hash forward; and the Sources tab leaves the `kind` count off that card rather than show a zero
+that would read as a stopped pass. `CLASSIFIER_VERSION` was deliberately **not** bumped: the hash
+does not read the kind, and re-asking every python.org row where and for whom to save nothing is
+exactly the cost the lever exists to make deliberate.
+
 **There is no API key.** Vertex AI on Application Default Credentials, which in this runtime is the
 function's own service account — the code already runs inside the project the model is billed to, so
 a credential to prove that would be one to store, rotate and leak. It also keeps the classifier off
