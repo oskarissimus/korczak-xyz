@@ -663,11 +663,18 @@
  *
  * Monospaced and not in VT323, for the Pipeline tab's reason — that face draws `l`, `1` and `I`
  * alike, and this is a string read character by character to be matched against a document.
+ *
+ * Plain text rather than the site's code chip: `Layout.astro` styles every `<code>` black-on-green
+ * with an inset border, and with `color` set here that was black on black — five solid bars with
+ * nothing readable in them.
  */
 .ev-extracted-name {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 0.95rem;
   color: var(--retro-black);
+  background: none;
+  border: none;
+  padding: 0;
   overflow-wrap: anywhere;
 }
 
