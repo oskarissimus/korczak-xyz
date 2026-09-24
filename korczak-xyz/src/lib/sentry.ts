@@ -22,6 +22,14 @@
  *   them a thing to switch on without deciding to.
  *
  * Both are one integration each if that changes. Keep the reasoning above in view first.
+ *
+ * What IS enabled beyond errors, since late Sep 2026, is **Sentry Logs**, for one narrow job:
+ * `recordMeasurement` below, a structured record of how long something the reader waited for took.
+ * It is not tracing — no spans, no integration, nothing sent unless a caller asks — and it exists
+ * because "the audio guide is slow" could not be answered from errors: a slow load is not an
+ * error. Each call is one log line with numeric attributes, queried in Sentry's Explore → Logs
+ * (`p75(totalMs)` grouped by `outcome`, say). Callers send numbers and categories, never
+ * coordinates, names or anything typed.
  */
 
 import {
@@ -37,6 +45,7 @@ import {
   init,
   inboundFiltersIntegration,
   linkedErrorsIntegration,
+  logger,
   setTag,
   setUser,
   withScope,
@@ -144,6 +153,10 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
        * real account or only on my laptop" answerable.
        */
       sendDefaultPii: false,
+
+      // For `recordMeasurement` only; nothing else here writes a Sentry log. Said explicitly
+      // because the SDK's default for it has changed between versions.
+      enableLogs: true,
 
       ignoreErrors: IGNORED_MESSAGES,
       denyUrls: DENY_URLS,
@@ -305,5 +318,28 @@ export function recordLog(
     });
   } catch {
     /* the logger's own contract: never throw into the caller */
+  }
+}
+
+/**
+ * One measurement of something the reader waited for, as a Sentry log line.
+ *
+ * `event` is a dotted name like the logger's (`audioGuide.pins.load`), and `attributes` are what a
+ * query groups and aggregates by: durations in milliseconds named `...Ms`, counts, and short
+ * categories. Keep them flat — strings, numbers and booleans are what Sentry indexes. Nothing
+ * identifying goes in; `client_id` and the uid ride along as they do on every event.
+ */
+export function recordMeasurement(
+  event: string,
+  attributes: Record<string, string | number | boolean | null | undefined>
+): void {
+  try {
+    const clean: Record<string, string | number | boolean> = { event };
+    for (const [k, v] of Object.entries(attributes)) {
+      if (v !== null && v !== undefined && !(typeof v === 'number' && !Number.isFinite(v))) clean[k] = v;
+    }
+    logger.info(event, clean);
+  } catch {
+    /* telemetry never throws into the caller */
   }
 }

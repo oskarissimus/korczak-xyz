@@ -66,6 +66,12 @@ the short version is that every span this site could produce would be a client-o
 Replay records the DOM of apps that hold somebody's actual life (the sleep log, the shopping
 list). The bundle is 27KB gzipped as configured; Replay would roughly triple it.
 
+The one exception is **Sentry Logs**, enabled Sep 2026 for `recordMeasurement` in
+`src/lib/sentry.ts`: an explicit, structured record of how long something took, sent only where a
+caller asks, with numbers and categories and nothing identifying. The audio guide is its only user
+so far (the pins, each narration, the first GPS fix — see `.claude/rules/audio-guide.md`,
+*Every wait is measured*). Nothing else writes a Sentry log; `log.*` still means breadcrumbs.
+
 The site's own structured logging feeds this rather than sitting beside it. `log.*` in
 `src/lib/logger.ts` is unchanged and so are its 165 call sites, but `debug`/`info`/`warn` are now
 Sentry breadcrumbs and `error` is a Sentry event. The localStorage ring buffer and the

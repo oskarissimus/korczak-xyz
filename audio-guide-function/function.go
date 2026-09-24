@@ -230,7 +230,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+openAIKeyHeader+", "+elevenLabsKeyHeader)
-	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning, "+sourcesHeader)
+	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning, Server-Timing, "+sourcesHeader)
 	// The key headers make every tap a preflighted request; this spares the second tap one. Safari
 	// caps it at ten minutes whatever is asked for.
 	w.Header().Set("Access-Control-Max-Age", "600")
@@ -245,6 +245,13 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Every POST is timed and logged, however it ends. See timing.go.
+	timings := newGuideTimings()
+	tw := &timedWriter{ResponseWriter: w, timings: timings}
+	w = tw
+	var outcome guideOutcome
+	defer func() { logTiming(timings, tw, &outcome) }()
+
 	var attraction Attraction
 	if err := json.NewDecoder(r.Body).Decode(&attraction); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
@@ -256,7 +263,9 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	outcome.attraction = &attraction
+
+	ctx, cancel := context.WithTimeout(withTimings(r.Context(), timings), requestTimeout)
 	defer cancel()
 
 	openAIKey := strings.TrimSpace(r.Header.Get(openAIKeyHeader))
@@ -271,6 +280,10 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	location, sources := gatherSources(ctx, &attraction)
+	outcome.countryCode, outcome.sources = location.CountryCode, len(sources)
+	for _, s := range sources {
+		outcome.sourceChars += len(s.Text)
+	}
 
 	// Set warning header if geocoding failed
 	if !location.Valid {
@@ -280,13 +293,18 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	// Nothing to ground a narration on: say so, and spend nothing on either provider.
 	if len(sources) == 0 {
 		log.Printf("generate-audio: no sources for %q (%s)", attraction.Name, attraction.OSM)
+		outcome.name = "no_sources"
 		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "No sources found about this place")
 		return
 	}
 
+	done := stage(ctx, stageFacts)
 	proposed, facts, err := extractFacts(ctx, openAIKey, &attraction, &location, sources)
+	done()
+	outcome.proposed, outcome.verified = len(proposed), len(facts)
 	if err != nil {
 		log.Printf("generate-audio: facts: %v", err)
+		outcome.name = "facts_failed"
 		writeError(w, failureStatus(err), "Failed to generate facts: "+providerMessage(err))
 		return
 	}
@@ -295,35 +313,45 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	// fact-checking, whatever becomes of the tap. See record.go.
 	rec := newGuideRecord(&attraction, location, sources, proposed, facts)
 	defer saveGuideRecord(ctx, rec)
+	// Deferred after the save, so it runs first: the record carries the whole request's clock.
+	defer func() { rec.Timings = timings.snapshot() }()
 
 	if len(facts) == 0 {
 		log.Printf("generate-audio: no verified facts for %q from %d sources", attraction.Name, len(sources))
 		rec.Outcome = "no_verified_facts"
+		outcome.name = rec.Outcome
 		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "The sources found say nothing checkable about this place")
 		return
 	}
 
 	t := tierFor(facts)
-	rec.Tier = t.name
+	rec.Tier, outcome.tier = t.name, t.name
 	log.Printf("generate-audio: %q: %d sources, %d verified facts, %s script", attraction.Name, len(sources), len(facts), t.name)
+	done = stage(ctx, stageScript)
 	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language, t)
+	done()
 	if err != nil {
 		log.Printf("generate-audio: script: %v", err)
 		rec.Outcome, rec.Error = "script_failed", err.Error()
+		outcome.name = rec.Outcome
 		writeError(w, failureStatus(err), "Failed to generate script: "+providerMessage(err))
 		return
 	}
-	rec.Script = script
+	rec.Script, outcome.scriptChars = script, len(script)
 
 	// Generate audio
+	done = stage(ctx, stageTTS)
 	audio, err := generateAudioTTS(ctx, elevenLabsKey, script)
+	done()
 	if err != nil {
 		log.Printf("generate-audio: audio: %v", err)
 		rec.Outcome, rec.Error = "audio_failed", err.Error()
+		outcome.name = rec.Outcome
 		writeError(w, failureStatus(err), "Failed to generate audio: "+providerMessage(err))
 		return
 	}
 	rec.Outcome = "narrated"
+	outcome.name, outcome.audioBytes = rec.Outcome, len(audio)
 
 	w.Header().Set(sourcesHeader, strings.Join(citedURLs(facts, sources), " "))
 	w.Header().Set("Content-Type", "audio/mpeg")

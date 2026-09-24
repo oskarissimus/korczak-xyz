@@ -57,6 +57,8 @@ describe("AttractionCache", () => {
     const first = cache.lookup(oldTown);
     expect(first.attractions).toEqual([]);
     expect(first.missing).toEqual(tilesCovering(oldTown));
+    const r = tilesCovering(oldTown);
+    expect(first.missingCount).toBe((r.maxX - r.minX + 1) * (r.maxY - r.minY + 1));
 
     cache.store(first.missing!, [place(1, 52.2479, 21.0136)]);
     const again = cache.lookup(oldTown);
@@ -83,7 +85,7 @@ describe("AttractionCache", () => {
   it("remembers an empty square, so it is not asked about again", () => {
     const cache = new AttractionCache();
     cache.store(tilesCovering(oldTown), []);
-    expect(cache.lookup(oldTown)).toEqual({ attractions: [], missing: null });
+    expect(cache.lookup(oldTown)).toEqual({ attractions: [], missing: null, missingCount: 0 });
   });
 
   it("asks only for the squares a pan uncovered", () => {

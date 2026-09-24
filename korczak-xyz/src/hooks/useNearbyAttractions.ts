@@ -20,18 +20,32 @@
  *    settles on the pins for a rectangle nobody is looking at any more.
  *  - **The unmount.** Leaving the page aborts too, so a navigation does not leave a request
  *    running against a component that no longer exists.
+ *
+ * EVERY REQUEST IS MEASURED. Each one that goes out - answered, refused, or abandoned because the
+ * map moved - ends in one `audioGuide.pins.load` measurement in Sentry (`recordMeasurement`):
+ * how long from the map stopping to the pins being drawn, how much of that was the debounce, the
+ * Overpass queue and the download, how many squares were asked for and how many the cache already
+ * had. "The pins are slow" is a question about which of those it is, and each has a different fix.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
-import { fetchAttractions, MAX_MARKERS, OverpassBusyError } from '../utils/audioGuide/overpass';
+import { recordMeasurement } from '../lib/sentry';
+import {
+  fetchAttractions,
+  MAX_MARKERS,
+  OverpassBusyError,
+  type OverpassTrace,
+} from '../utils/audioGuide/overpass';
 import {
   AttractionCache,
   boundsOfTiles,
   nearestToCentre,
+  tilesCovering,
   type TileRange,
 } from '../utils/audioGuide/tiles';
+import { networkType } from '../utils/audioGuide/telemetry';
 import type { Attraction, Bounds } from '../utils/audioGuide/types';
 
 const DEBOUNCE_MS = 250;
@@ -62,6 +76,18 @@ function classify(e: unknown): AttractionsError {
   return 'failed';
 }
 
+const rangeSize = (r: TileRange) => (r.maxX - r.minX + 1) * (r.maxY - r.minY + 1);
+
+/** What a load needs to know about the viewport that asked for it, for its measurement. */
+interface Ask {
+  /** `performance.now()` of the move that asked - the moment the reader started waiting. */
+  at: number;
+  zoom: number;
+  tilesInView: number;
+  /** Squares in view that were not in the cache (the request may cover more: it is a rectangle). */
+  tilesMissing: number;
+}
+
 export function useNearbyAttractions(): NearbyAttractions {
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,17 +99,23 @@ export function useNearbyAttractions(): NearbyAttractions {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef<AbortController | null>(null);
   const last = useRef<{ bounds: Bounds; zoom: number } | null>(null);
+  // For the measurements: when the app mounted, how many loads have gone out, and how many
+  // viewports the cache answered on its own since the last one.
+  const mountedAt = useRef(performance.now());
+  const loads = useRef(0);
+  const cachedViews = useRef(0);
 
   /** Draw what the cache holds for a viewport, and say what it does not. */
-  const show = useCallback((bounds: Bounds): TileRange | null => {
-    const { attractions: known, missing } = cache.current.lookup(bounds);
-    setAttractions(nearestToCentre(known, bounds, MAX_MARKERS));
+  const show = useCallback((bounds: Bounds): { missing: TileRange | null; missingCount: number; shown: number } => {
+    const { attractions: known, missing, missingCount } = cache.current.lookup(bounds);
+    const drawn = nearestToCentre(known, bounds, MAX_MARKERS);
+    setAttractions(drawn);
     setEmpty(missing === null && known.length === 0);
-    return missing;
+    return { missing, missingCount, shown: drawn.length };
   }, []);
 
   const load = useCallback(
-    async (range: TileRange) => {
+    async (range: TileRange, ask: Ask) => {
       inFlight.current?.abort();
       const controller = new AbortController();
       inFlight.current = controller;
@@ -91,20 +123,63 @@ export function useNearbyAttractions(): NearbyAttractions {
       setLoading(true);
       setError(null);
 
+      const started = performance.now();
+      const trace: OverpassTrace = { attempts: [] };
+      const nth = ++loads.current;
+      const measure = (outcome: string, extra: Record<string, number | string> = {}) => {
+        const now = performance.now();
+        const lastAttempt = trace.attempts.at(-1);
+        recordMeasurement('audioGuide.pins.load', {
+          outcome,
+          totalMs: Math.round(now - ask.at),
+          debounceMs: Math.round(started - ask.at),
+          requestMs: Math.round(now - started),
+          waitMs: lastAttempt?.waitMs,
+          downloadMs: lastAttempt?.downloadMs,
+          backoffMs: trace.attempts.reduce((sum, a) => sum + a.backoffMs, 0),
+          attempts: trace.attempts.length,
+          statuses: trace.attempts.map((a) => a.status).join(','),
+          bytes: lastAttempt?.bytes,
+          elements: lastAttempt?.elements,
+          zoom: Math.round(ask.zoom),
+          tilesInView: ask.tilesInView,
+          tilesMissing: ask.tilesMissing,
+          tilesRequested: rangeSize(range),
+          cachedViews: cachedViews.current,
+          nth,
+          sinceMountMs: Math.round(now - mountedAt.current),
+          network: networkType(),
+          ...extra,
+        });
+        cachedViews.current = 0;
+      };
+
       try {
-        const found = await fetchAttractions(boundsOfTiles(range), controller.signal);
-        if (controller.signal.aborted) return;
+        const found = await fetchAttractions(
+          boundsOfTiles(range),
+          controller.signal,
+          undefined,
+          trace,
+        );
+        if (controller.signal.aborted) {
+          measure('aborted');
+          return;
+        }
 
         cache.current.store(range, found);
-        if (last.current) show(last.current.bounds);
+        const shown = last.current ? show(last.current.bounds).shown : 0;
+        measure('ok', { found: found.length, shown });
         log.debug('audioGuide.attractions.loaded', { found: found.length });
       } catch (e) {
         // An abort is the map having moved on, not a failure. Reporting it would put an error
         // toast on the screen every time somebody pans twice quickly.
         if (controller.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) {
+          measure('aborted');
           return;
         }
-        setError(classify(e));
+        const kind = classify(e);
+        measure(kind);
+        setError(kind);
         log.warn('audioGuide.attractions.failed', describeError(e));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -118,7 +193,9 @@ export function useNearbyAttractions(): NearbyAttractions {
       last.current = { bounds, zoom };
       if (timer.current) clearTimeout(timer.current);
 
-      const missing = show(bounds);
+      const at = performance.now();
+      const { missing, missingCount } = show(bounds);
+      if (!missing) cachedViews.current++;
       const tooWide = zoom < MIN_ZOOM;
       setZoomedOut(tooWide && missing !== null);
 
@@ -129,7 +206,13 @@ export function useNearbyAttractions(): NearbyAttractions {
         setError(null);
         return;
       }
-      timer.current = setTimeout(() => void load(missing), DEBOUNCE_MS);
+      const ask: Ask = {
+        at,
+        zoom,
+        tilesInView: rangeSize(tilesCovering(bounds)),
+        tilesMissing: missingCount,
+      };
+      timer.current = setTimeout(() => void load(missing, ask), DEBOUNCE_MS);
     },
     [load, show],
   );

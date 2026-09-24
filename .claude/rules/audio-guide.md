@@ -45,7 +45,8 @@ functions, but not among them:
   paid with the caller's keys, but the instance time is ours.
 - **Not in Sentry.** The four Node functions report to `korczak-xyz-functions`; this one logs each
   provider failure with `log.Printf` to Cloud Logging and nothing else. Adding `sentry-go` is the
-  obvious next step if its failures ever need to be seen rather than looked up.
+  obvious next step if its failures ever need to be seen rather than looked up. (Its *timings* do
+  reach Sentry, carried by the page — see *Every wait is measured*.)
 
 What it does, in order: gathers sources (`sources.go`) - Nominatim's address beside the place's
 Wikidata item, then up to two Wikipedia articles and one about whoever a memorial commemorates;
@@ -296,6 +297,45 @@ tile usage policy requires, and the bottom right is where the player and the pro
 on a phone that left the one notice we are obliged to show underneath them. Leaflet's control
 corners are `z-index: 1000`, which is the number the overlays have to clear — 800 puts them under
 the attribution.
+
+### Every wait is measured
+
+The pins and the guides were both still slow after the tile cache went in, and nothing could say
+where the time went: a slow load is not an error, so Sentry saw nothing, and Cloud Run's request
+log has only a total. So since late Sep 2026 every wait the reader sits through leaves one
+structured measurement. **Look at these before changing anything for speed** — the guesses they
+replace were wrong once already (the 504 that was read as "zoom in").
+
+**On the page**, via `recordMeasurement` in `src/lib/sentry.ts` — a Sentry *log*, not an event, in
+project `korczak-xyz`, Explore → Logs, filtered by message. Numbers and categories only: no
+coordinates, no place names, and the free-text narration language only as `English`, `Polski` or
+`other`.
+
+| Message | One per | What it splits the wait into |
+|---|---|---|
+| `audioGuide.pins.load` | Overpass request, however it ends (`outcome`: `ok`, `aborted`, `busy`, `too-big`, `failed`) | `totalMs` from the map stopping to pins drawn = `debounceMs` + `requestMs`; of the last attempt `waitMs` (to headers: Overpass's queue and query) and `downloadMs`; `backoffMs`, `attempts`, `statuses` (`504,200`); `bytes`, `elements`, `found`, `shown`; `tilesInView`, `tilesMissing`, `tilesRequested`; `cachedViews` (viewports the cache answered alone since the previous request); `zoom`, `nth` and `sinceMountMs` (the first request is the one somebody is staring at), `network` |
+| `audioGuide.narration` | tap that sent a request (`outcome`: `played`, `autoplay-refused`, `abandoned`, or a `GuideFailure`) | `totalMs` from tap to sound = `responseMs` (to headers) + `downloadMs` + `playStartMs`; the function's stages as `serverSourcesMs`, `serverNominatimMs`, `serverWikidataMs`, `serverArticlesMs`, `serverGeosearchMs`, `serverFactsMs`, `serverScriptMs`, `serverTtsMs`, `serverTotalMs`; `overheadMs` = `responseMs − serverTotalMs`, what the function cannot see (preflight, network, an instance booting); `cold`; `bytes`, `sources`, `status`, `retry`, `category`, `tags`, `language`, `network` |
+| `audioGuide.position.first` | page visit | `ms` to the first fix or denial — the map sits on the fallback centre until then — `outcome`, `accuracyM` |
+
+`abandoned` is the one to watch: it is somebody who tapped elsewhere or closed the panel before the
+guide came, and its `totalMs` is how long they lasted.
+
+**In the function** (`timing.go`), each POST is timed by stage and reported three ways: a
+`Server-Timing` header (exposed through CORS; it is what the page reads for the `server*Ms`
+fields), one JSON line on stdout that Cloud Logging files as a structured payload, and `timings` in
+the guide record. The log line is the only one covering **every** POST — a 400, a 401, a 422
+before any model call — with `outcome`, `status`, `ms` by stage, `cold` (the instance's first POST)
+and `instanceAgeS`, the counts (`sources`, `sourceChars`, `proposedFacts`, `verifiedFacts`,
+`scriptChars`, `audioBytes`), `wikimediaRefusals`, and `release`:
+
+```
+gcloud logging read 'resource.labels.service_name="generate-audio" AND jsonPayload.event="generate-audio.timing"' \
+  --project=korczak-xyz-501720 --freshness=7d --format='value(jsonPayload.outcome,jsonPayload.ms.total,jsonPayload.ms.facts,jsonPayload.ms.tts,jsonPayload.cold)'
+```
+
+The stage names are shared by both halves; renaming one in Go loses its history in Sentry.
+`progress.ts`'s "~22 seconds" was measured by hand once — `serverTotalMs` and `responseMs` are
+what to recalibrate it from.
 
 ### The narration language is not the page language
 

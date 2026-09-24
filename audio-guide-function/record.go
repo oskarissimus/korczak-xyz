@@ -64,6 +64,9 @@ type guideRecord struct {
 	VerifiedFacts []fact `json:"verifiedFacts"`
 	Tier          string `json:"tier,omitempty"`
 	Script        string `json:"script,omitempty"`
+	// Milliseconds per stage and in total, as in the Server-Timing header (timing.go). The total
+	// stops where the handler did, before this record is written.
+	Timings map[string]int64 `json:"timings,omitempty"`
 }
 
 type placeRecord struct {

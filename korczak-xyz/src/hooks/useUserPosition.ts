@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
+import { recordMeasurement } from '../lib/sentry';
 import {
   compassNeedsPermission,
   GEOLOCATION_OPTIONS,
@@ -59,8 +60,23 @@ export function useUserPosition(): UserPositionState {
       return;
     }
 
+    // The first answer is measured: until it arrives the map sits on the fallback centre, and the
+    // pins the reader came for are not even asked for yet. It includes the permission prompt.
+    const startedAt = performance.now();
+    let measured = false;
+    const measure = (outcome: string, accuracy?: number) => {
+      if (measured) return;
+      measured = true;
+      recordMeasurement('audioGuide.position.first', {
+        outcome,
+        ms: Math.round(performance.now() - startedAt),
+        accuracyM: accuracy === undefined ? undefined : Math.round(accuracy),
+      });
+    };
+
     const id = navigator.geolocation.watchPosition(
       (fix) => {
+        measure('fix', fix.coords.accuracy);
         setPermission('granted');
         setPosition({
           lat: fix.coords.latitude,
@@ -72,6 +88,7 @@ export function useUserPosition(): UserPositionState {
         // A denial is permanent until the reader changes it in browser settings; a timeout or an
         // unavailable position may well answer on the next tick, so it must not be latched.
         if (error.code === error.PERMISSION_DENIED) {
+          measure('denied');
           setPermission('denied');
         } else {
           setPermission((current) => (current === 'granted' ? current : 'prompt'));

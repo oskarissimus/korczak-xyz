@@ -166,13 +166,22 @@ export function transformAttractions(response: unknown): Attraction[] {
  * comfortably past what some proxies will carry in a URL, and Overpass documents the form body as
  * the way to send a long one.
  */
-async function requestAttractions(bounds: Bounds, signal: AbortSignal): Promise<unknown> {
+async function requestAttractions(
+  bounds: Bounds,
+  signal: AbortSignal,
+  attempt?: OverpassAttempt,
+): Promise<unknown> {
+  const started = performance.now();
   const response = await fetch(OVERPASS_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(overpassQuery(bounds))}`,
     signal,
   });
+  if (attempt) {
+    attempt.status = response.status;
+    attempt.waitMs = Math.round(performance.now() - started);
+  }
 
   if (!response.ok) {
     // 429 is "you are asking too often" and 504 is "the server is too loaded to start" - the
@@ -182,9 +191,37 @@ async function requestAttractions(bounds: Bounds, signal: AbortSignal): Promise<
     throw new Error(`Overpass ${response.status}`);
   }
 
-  const body: unknown = await response.json();
+  const text = await response.text();
+  if (attempt) {
+    attempt.bytes = text.length;
+    attempt.downloadMs = Math.round(performance.now() - started) - attempt.waitMs;
+  }
+  const body: unknown = JSON.parse(text);
   if (ranOutOfRoom(body)) throw new OverpassBusyError('too-big');
+  if (attempt) attempt.elements = (body as { elements?: unknown[] })?.elements?.length ?? 0;
   return body;
+}
+
+/**
+ * One try at Overpass, as measured from here: `waitMs` is the request to its response headers -
+ * the queue and the query, mostly - and `downloadMs` the body after them. Filled in as it goes,
+ * so an attempt that failed half-way still says how far it got.
+ */
+export interface OverpassAttempt {
+  status: number;
+  waitMs: number;
+  downloadMs: number;
+  /** Characters of JSON, which for this ASCII-escaped answer is close enough to bytes. */
+  bytes: number;
+  /** Elements in the answer, before the unnamed and the unplaceable are dropped. */
+  elements: number;
+  /** How long the backoff slept before this attempt. */
+  backoffMs: number;
+}
+
+/** What `fetchAttractions` went through, for the pins measurement in `useNearbyAttractions`. */
+export interface OverpassTrace {
+  attempts: OverpassAttempt[];
 }
 
 /**
@@ -213,14 +250,26 @@ export async function fetchAttractions(
   bounds: Bounds,
   signal: AbortSignal,
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  trace?: OverpassTrace,
 ): Promise<Attraction[]> {
+  let slept = 0;
   for (let attempt = 0; ; attempt++) {
+    const record: OverpassAttempt = {
+      status: 0,
+      waitMs: 0,
+      downloadMs: 0,
+      bytes: 0,
+      elements: 0,
+      backoffMs: slept,
+    };
+    trace?.attempts.push(record);
     try {
-      return transformAttractions(await requestAttractions(bounds, signal));
+      return transformAttractions(await requestAttractions(bounds, signal, record));
     } catch (e) {
       const busy = e instanceof OverpassBusyError && e.kind === 'busy';
       if (!busy || attempt >= MAX_RETRIES) throw e;
-      await sleep(backoffMs(attempt));
+      slept = backoffMs(attempt);
+      await sleep(slept);
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     }
   }
