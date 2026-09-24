@@ -644,18 +644,34 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr) auto;
+  gap: 4px 8px;
 }
 
+/*
+ * A grid rather than a wrapping flex row: wrapped, a long description dropped under its name and
+ * pushed the count onto a line of its own at phone width. Here the description wraps inside its
+ * own column, the count stays on the first line, and the chip sits under the description.
+ *
+ * Subgrid lines the columns up across rows, so the descriptions share one left edge; where it is
+ * unsupported (before iOS 16) the declaration is dropped and each row keeps its own columns.
+ */
 .ev-extracted-item {
-  display: flex;
-  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr) auto;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  gap: 4px 8px;
+  gap: 2px 8px;
   font-size: 1.05rem;
+  line-height: 1.3;
   color: var(--retro-dark-gray);
+}
+
+.ev-extracted-item > .ev-chip {
+  grid-column: 2 / -1;
+  justify-self: start;
 }
 
 /*
@@ -670,7 +686,8 @@
  */
 .ev-extracted-name {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-  font-size: 0.95rem;
+  /* A system monospace sets far larger than VT323 at the same size; this matches its x-height. */
+  font-size: 0.8rem;
   color: var(--retro-black);
   background: none;
   border: none;
@@ -679,14 +696,13 @@
 }
 
 .ev-extracted-word {
-  flex: 1 1 auto;
   min-width: 0;
 }
 
 /* How many rows carry one. Right of the row, so five fields make a column that can be read down. */
 .ev-extracted-count {
   color: var(--retro-black);
-  margin-left: auto;
+  text-align: right;
 }
 
 /* --- sync badge ---------------------------------------------------------------------------- */
