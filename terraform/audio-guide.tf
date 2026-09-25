@@ -75,3 +75,43 @@ resource "google_storage_bucket_iam_member" "audio_guide_writes_records" {
   role   = "roles/storage.objectCreator"
   member = "serviceAccount:${local.functions_runtime_sa}"
 }
+
+/*
+ * How each tap ended, as a number over time: one count per POST to generate-audio, labelled by
+ * `outcome` (narrated, no_sources, no_verified_facts, ...) and the pin's `category`. It is read off
+ * the `generate-audio.timing` line timing.go writes for every POST, so it needs nothing from the
+ * function and covers the 422s that never reach a model. Metrics Explorer →
+ * logging/user/audio_guide_taps, grouped by outcome, is the share of pins with nothing written
+ * about them. The records above say which places; this says how many.
+ *
+ * Needs `roles/logging.configWriter` on the deploy account (terraform/README.md, bootstrap).
+ */
+resource "google_logging_metric" "audio_guide_taps" {
+  project = local.project_id
+  name    = "audio_guide_taps"
+  filter  = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="generate-audio"
+    jsonPayload.event="generate-audio.timing"
+  EOT
+
+  metric_descriptor {
+    metric_kind  = "DELTA"
+    value_type   = "INT64"
+    unit         = "1"
+    display_name = "Audio guide taps"
+    labels {
+      key        = "outcome"
+      value_type = "STRING"
+    }
+    labels {
+      key        = "category"
+      value_type = "STRING"
+    }
+  }
+
+  label_extractors = {
+    outcome  = "EXTRACT(jsonPayload.outcome)"
+    category = "EXTRACT(jsonPayload.category)"
+  }
+}
