@@ -574,6 +574,33 @@
   display: none;
 }
 
+/* In full screen the bar gives its row back to the map: the language, the keys and the compass
+   are set-up, done before the walk, and the only control left is the way out — floated over the
+   map's top right corner, inside the stage's bezel (8px padding + 3px border + 8px). The keys
+   sheet, if it was open, stays in the dock and closes with its own Done. */
+.ag-app-full .ag-bar {
+  position: absolute;
+  top: calc(19px + var(--safe-top));
+  right: calc(19px + var(--safe-right));
+  z-index: 1200;
+  border: none;
+  padding: 0;
+}
+
+.ag-app-full .ag-bar > :not(.ag-full-btn) {
+  display: none;
+}
+
+/* ...and the attribution, which lives in that corner, moves down below the button, and the
+   chips below both: a long one runs the width of the map and would go under them. */
+.ag-app-full .ag-stage .leaflet-bottom.leaflet-right {
+  top: 40px;
+}
+
+.ag-app-full .ag-overlay {
+  top: 60px;
+}
+
 html.ag-full,
 html.ag-full body {
   overflow: hidden;
