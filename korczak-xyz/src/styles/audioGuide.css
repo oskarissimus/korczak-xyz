@@ -551,7 +551,8 @@
 /* The app pinned over the whole viewport. This class is the full screen on every browser; the
    Fullscreen API, where there is one, only hides the browser's chrome on top of it (see
    `useFullscreen`). Above the taskbar (9999), below the status-bar band (10001), and padded by
-   the insets so nothing lands under a notch or the home indicator. */
+   the insets alone so nothing lands under a notch or the home indicator. No gray margin and no
+   bezel: the map runs to the edges of the screen, which is the point of the mode. */
 .ag-app.ag-app-full {
   position: fixed;
   inset: 0;
@@ -559,9 +560,12 @@
   height: auto;
   min-height: 0;
   max-height: none;
-  background: var(--retro-gray);
-  padding: calc(8px + var(--safe-top)) calc(8px + var(--safe-right))
-    calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  background: #1b1b1b;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+.ag-app-full .ag-stage {
+  border: none;
 }
 
 /* The footnote is a pitch and a licence notice Leaflet also prints on the map. */
@@ -571,12 +575,12 @@
 
 /* In full screen the bar gives its row back to the map: the language, the keys and the compass
    are set-up, done before the walk, and the only control left is the way out — floated over the
-   map's top right corner, inside the stage's bezel (8px padding + 3px border + 8px). The keys
+   map's top right corner, 8px in from the screen's edges, the same as the panels. The keys
    sheet, if it was open, stays in the dock and closes with its own Done. */
 .ag-app-full .ag-bar {
   position: absolute;
-  top: calc(19px + var(--safe-top));
-  right: calc(19px + var(--safe-right));
+  top: calc(8px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
   z-index: 1200;
   border: none;
   padding: 0;

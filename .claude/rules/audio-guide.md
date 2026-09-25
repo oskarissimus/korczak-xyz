@@ -368,7 +368,7 @@ depend on `:fullscreen`, or the iPhone gets a button that does nothing. Leaving 
 fullscreen leaves ours too. A `ResizeObserver` in `MapPane` calls `invalidateSize`, because
 Leaflet otherwise only re-measures on a window resize, and a container that grows without one
 leaves the map grey in the new space. While it is on, `html.ag-full` strips a dragged window's
-transform, because `position: fixed` inside a transformed ancestor is fixed to that ancestor. In full screen the bar
+transform, because `position: fixed` inside a transformed ancestor is fixed to that ancestor. In full screen there is no gray margin and no bezel, the map runs to the screen's edges, and the bar
 keeps only the exit button, floated over the map's top right corner, and the language, keys and
 compass controls are hidden. They are set up before a walk, and a full screen exists to give their
 row to the map.
