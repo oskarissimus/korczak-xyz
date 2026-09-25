@@ -7,7 +7,9 @@ package function
 // quote says, whether the script then stayed on the facts it was given, or which true facts were
 // thrown away. Those are questions for somebody reading afterwards, with everything the model saw
 // in front of them - so every tap the model answers leaves one JSON object in a bucket: the place,
-// the sources in full, every fact the model proposed, the ones that survived, and the script.
+// the sources in full, every fact the model proposed, the ones that survived, and the script. A
+// tap with no sources at all leaves one too, with the place and nothing else, so a walk's records
+// name every place that was tapped and not only the ones that could be narrated.
 //
 // It is a record, not a cache. Nothing ever reads it back into a guide (see "What is not kept" in
 // .claude/rules/audio-guide.md), there is no audio in it, and there are no keys in it: the
@@ -51,7 +53,7 @@ type guideRecord struct {
 	// The commit that deployed this function, so a record can be read against the prompts that
 	// produced it.
 	Release string `json:"release,omitempty"`
-	// narrated, no_verified_facts, script_failed or audio_failed.
+	// narrated, no_sources, no_verified_facts, script_failed or audio_failed.
 	Outcome string `json:"outcome"`
 	Error   string `json:"error,omitempty"`
 
@@ -80,6 +82,9 @@ type placeRecord struct {
 }
 
 func newGuideRecord(a *Attraction, location Location, sources []source, proposed, verified []fact) *guideRecord {
+	if sources == nil {
+		sources = []source{}
+	}
 	if proposed == nil {
 		proposed = []fact{}
 	}

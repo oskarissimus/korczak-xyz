@@ -114,12 +114,20 @@ func TestDroppedFactsAreRecordedToo(t *testing.T) {
 	}
 }
 
-func TestNoSourcesMeansNoRecord(t *testing.T) {
-	newFakeProviders(t)
+func TestNoSourcesIsRecordedWithoutSources(t *testing.T) {
+	f := newFakeProviders(t)
 	s := newFakeStorage(t)
-	post(`{"name":"Kapliczka","category":"historic","latitude":52.2,"longitude":21.0,"language":"Polski"}`)
-	if len(s.records) != 0 {
-		t.Errorf("%d records for a place the model was never asked about", len(s.records))
+	post(`{"name":"Kapliczka","category":"historic","latitude":52.2,"longitude":21.0,"language":"Polski","osm":"node/7"}`)
+	if len(s.records) != 1 {
+		t.Fatalf("%d records, want 1", len(s.records))
+	}
+	r := s.records[0]
+	if r.Outcome != "no_sources" || r.Place.Name != "Kapliczka" || r.Place.OSM != "node/7" ||
+		r.Sources == nil || len(r.Sources) != 0 || len(r.ProposedFacts) != 0 || r.Script != "" {
+		t.Errorf("record %+v", r)
+	}
+	if f.chatCalls != 0 || f.ttsCalls != 0 {
+		t.Errorf("%d chat and %d TTS calls for a place nothing is known about", f.chatCalls, f.ttsCalls)
 	}
 }
 

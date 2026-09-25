@@ -290,10 +290,16 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Location-Warning", "Location details unavailable - information may be less accurate")
 	}
 
-	// Nothing to ground a narration on: say so, and spend nothing on either provider.
+	// Nothing to ground a narration on: say so, and spend nothing on either provider. The tap is
+	// still recorded - the place, the labelled location and no sources - so a walk's record lists
+	// the places that had nothing written about them beside the ones that were narrated.
 	if len(sources) == 0 {
 		log.Printf("generate-audio: no sources for %q (%s)", attraction.Name, attraction.OSM)
 		outcome.name = "no_sources"
+		rec := newGuideRecord(&attraction, location, sources, nil, nil)
+		rec.Outcome = outcome.name
+		defer saveGuideRecord(ctx, rec)
+		defer func() { rec.Timings = timings.snapshot() }()
 		writeErrorCode(w, http.StatusUnprocessableEntity, noSourcesCode, "No sources found about this place")
 		return
 	}

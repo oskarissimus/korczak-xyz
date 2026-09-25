@@ -110,14 +110,18 @@ those need somebody reading afterwards with everything the model saw. So since l
 **every tap the model answers writes one JSON object** to `gs://korczak-xyz-501720-audio-guide-records`
 (`record.go`, bucket in `terraform/audio-guide.tf`): the place and its tags, the labelled
 location, **every source in full**, `proposedFacts` (all the facts call returned) beside
-`verifiedFacts` (what survived), the tier, the script, the outcome (`narrated`,
+`verifiedFacts` (what survived), the tier, the script, the outcome (`narrated`, `no_sources`,
 `no_verified_facts`, `script_failed`, `audio_failed`) and `release`, the short commit that
 deployed the function — so a record can be read against the prompts that produced it.
 
 - **Named by day**: `2026/09/24/143012-way-123-1a2b3c4d.json`. `gcloud storage ls
   gs://korczak-xyz-501720-audio-guide-records/2026/09/24/` is one day's guides in order.
-- **No sources, no record.** A 422 before any model call has nothing to check. A 422 after one
-  (nothing survived) is recorded — what was dropped is half of what this is for.
+- **No sources is recorded too**, as `no_sources` with the place, the labelled location and an
+  empty `sources` — nothing to fact-check, but without it a walk's records named only the places
+  that were narrated, and "which pins had nothing written about them" is a question the owner
+  asks (added 25 Sep 2026; before that only the `no sources for "..." (node/...)` log line kept
+  them). A 422 after a model call (nothing survived) is recorded as `no_verified_facts` — what
+  was dropped is half of what this is for.
 - **No keys, no account, no audio.** The function never learns who tapped. It does record where,
   which is why the bucket enforces public-access prevention.
 - **It never fails a guide.** It is written by a `defer` after the answer, on its own 10-second
