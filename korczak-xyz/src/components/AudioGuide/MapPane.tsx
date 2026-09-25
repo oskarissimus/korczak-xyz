@@ -30,6 +30,14 @@ const FALLBACK_ZOOM = 15;
 /** Close enough to read street names, which is the zoom an audio guide is used at. */
 const LOCATED_ZOOM = 16;
 
+/**
+ * Below this a pin is a dot, not a labelled pill. At 15 a Warsaw neighbourhood is a hundred pills
+ * stacked on each other, covering the map and naming nothing legibly; at 16 they mostly sit apart.
+ * The dot still says "something here", and tapping one zooms to it rather than playing it — at
+ * that scale a tap cannot tell which of five neighbours it meant, and a narration costs money.
+ */
+const LABEL_ZOOM = 16;
+
 interface MapPaneProps {
   attractions: Attraction[];
   selectedKey: string | null;
@@ -133,6 +141,9 @@ export default function MapPane({
     }).addTo(instance);
 
     const report = () => {
+      // One class on the container rather than a new icon per pin: every pin changes at once,
+      // and none of them loses its selection or its pulse.
+      container.current?.classList.toggle('ag-map-far', instance.getZoom() < LABEL_ZOOM);
       const bounds = instance.getBounds();
       latest.current.onBoundsChange(
         {
@@ -191,7 +202,13 @@ export default function MapPane({
         keyboard: true,
       })
         .addTo(instance)
-        .on('click', () => latest.current.onSelect(attraction));
+        .on('click', () => {
+          if (instance.getZoom() < LABEL_ZOOM) {
+            instance.setView([attraction.lat, attraction.lon], LABEL_ZOOM);
+          } else {
+            latest.current.onSelect(attraction);
+          }
+        });
       markers.current.set(attraction.key, marker);
     }
   }, [attractions]);

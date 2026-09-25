@@ -261,6 +261,11 @@ Three things about the pins that look like details and are not:
   smoothly.
 - **The icon is anchored on the speaker glyph, not on the middle of the pill.** The point is the
   place; a pill centred on it puts its icon half a label away from the building it names.
+- **Below zoom 16 (`LABEL_ZOOM`) a pin is a dot.** At 15 a neighbourhood is a hundred pills on
+  top of each other and the map under them is gone. It is one `ag-map-far` class on the container,
+  toggled on `zoomend`, not a new icon per pin, so selection and the pulse survive it. A tapped dot
+  zooms to 16 on that spot rather than playing: at dot scale a finger cannot tell neighbours
+  apart, and a narration is not free.
 
 Where the pins come from changed twice in Sep 2026, and the order matters for reading the code.
 Until then every pan and zoom was a fresh Overpass query for exactly the visible rectangle, half a

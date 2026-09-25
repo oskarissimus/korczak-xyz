@@ -192,6 +192,48 @@
   }
 }
 
+/* Zoomed out (`LABEL_ZOOM` in MapPane): the pill becomes a dot on the spot the pill is anchored
+   to, the speaker glyph at (15, 17) of the icon. Leaflet still sizes the icon 104x34, so the icon
+   itself stops taking taps and only the 26px circle round the dot does — otherwise an invisible
+   label-shaped box swallows taps meant for the map and the dots beside it. */
+.ag-map-far .ag-marker.leaflet-interactive {
+  pointer-events: none;
+}
+
+.ag-map-far .ag-marker-body {
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  pointer-events: auto;
+}
+
+.ag-map-far .ag-marker-body::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--retro-black);
+  border: 2px solid var(--retro-white);
+}
+
+.ag-map-far .ag-marker-selected .ag-marker-body::before {
+  background: var(--retro-navy);
+}
+
+.ag-map-far .ag-marker-icon,
+.ag-map-far .ag-marker-label {
+  display: none;
+}
+
 /* --- the arrow --------------------------------------------------------------------------- */
 
 .ag-user {
