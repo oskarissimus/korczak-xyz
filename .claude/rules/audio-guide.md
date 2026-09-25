@@ -352,9 +352,11 @@ The tile layer is cross-origin, and the service worker never intercepts cross-or
 screen icon opens the app rather than `/offline`, which matters in exactly the place someone has
 no signal — abroad, in front of the thing they wanted a guide to.
 
-Leaflet's attribution is **moved to the top right** in `audioGuide.css`. It is a licence notice the
-tile usage policy requires, and the bottom right is where the player and the progress panel sit;
-on a phone that left the one notice we are obliged to show underneath them. Leaflet's control
+Leaflet's attribution **stays in the bottom right**, and the dock is lifted clear of it
+(`.ag-dock { bottom: 26px }`). It is a licence notice the tile usage policy requires, and the
+bottom right is where the player and the progress panel sit, so without that lift they cover the
+one notice we are obliged to show. (Until late Sep 2026 it was moved to the top right instead,
+which put it under the full-screen button.) Leaflet's control
 corners are `z-index: 1000`, which is the number the overlays have to clear — 800 puts them under
 the attribution.
 

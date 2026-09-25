@@ -124,15 +124,9 @@
 
 /* Leaflet's attribution is a licence notice and has to stay legible; it is restyled to the
    site's type rather than hidden, which the tile usage policy does not allow.
-   It is also MOVED, from the bottom right to the top right, because the bottom right is where the
-   player and the progress panel live — and the panels have to sit above the map, which on a
-   phone left the one notice we are obliged to show underneath them. Nothing else is in the top
-   right: the chips are aligned left. */
-.ag-stage .leaflet-bottom.leaflet-right {
-  top: 0;
-  bottom: auto;
-}
-
+   It stays in Leaflet's bottom right corner, which is where a map's small print is looked for, and
+   the dock lifts its panels clear of it (`.ag-dock`, below) so the player never covers the one
+   notice we are obliged to show. */
 .ag-stage .leaflet-control-attribution {
   font-family: 'VT323', monospace;
   font-size: 0.85rem;
@@ -269,7 +263,8 @@
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 8px;
+  /* Clear of the attribution line in the bottom right corner, which is on the map under here. */
+  bottom: 26px;
   z-index: 1100;
   display: flex;
   flex-direction: column;
@@ -591,14 +586,10 @@
   display: none;
 }
 
-/* ...and the attribution, which lives in that corner, moves down below the button, and the
-   chips below both: a long one runs the width of the map and would go under them. */
-.ag-app-full .ag-stage .leaflet-bottom.leaflet-right {
-  top: 40px;
-}
-
+/* ...and the chips move down below it: a long one runs the width of the map and would go under
+   the button. */
 .ag-app-full .ag-overlay {
-  top: 60px;
+  top: 48px;
 }
 
 html.ag-full,
