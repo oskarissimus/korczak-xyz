@@ -75,6 +75,10 @@ export const translations = {
     compassHint: 'So the arrow points the way you are facing.',
     compassDenied: 'Compass off — the arrow points north.',
 
+    // Full screen
+    fullscreen: 'Full screen',
+    fullscreenExit: 'Exit full screen',
+
     // Loading the pins
     attractionsLoading: 'Looking for places…',
     attractionsEmpty: 'Nothing tagged around here. Zoom out, or move the map.',
@@ -177,6 +181,9 @@ export const translations = {
     compassEnable: 'Włącz kompas',
     compassHint: 'Żeby strzałka pokazywała kierunek, w którym patrzysz.',
     compassDenied: 'Kompas wyłączony — strzałka wskazuje północ.',
+
+    fullscreen: 'Pełny ekran',
+    fullscreenExit: 'Zamknij pełny ekran',
 
     attractionsLoading: 'Szukam miejsc…',
     attractionsEmpty: 'Nic tu nie jest oznaczone. Oddal mapę albo przesuń ją gdzie indziej.',

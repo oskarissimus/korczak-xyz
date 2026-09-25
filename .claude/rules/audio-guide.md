@@ -358,6 +358,16 @@ on a phone that left the one notice we are obliged to show underneath them. Leaf
 corners are `z-index: 1000`, which is the number the overlays have to clear — 800 puts them under
 the attribution.
 
+**Full screen is a class first and the Fullscreen API second.** The button in the bar pins
+`.ag-app` over the viewport with `ag-app-full`, and only then asks for `requestFullscreen` where
+it exists, which on Android hides the address bar as well. iPhone Safari has no element
+fullscreen at all (only `<video>`), so there the class is the whole feature. Do not make the layout
+depend on `:fullscreen`, or the iPhone gets a button that does nothing. Leaving the browser's own
+fullscreen leaves ours too. A `ResizeObserver` in `MapPane` calls `invalidateSize`, because
+Leaflet otherwise only re-measures on a window resize, and a container that grows without one
+leaves the map grey in the new space. While it is on, `html.ag-full` strips a dragged window's
+transform, because `position: fixed` inside a transformed ancestor is fixed to that ancestor.
+
 ### Every wait is measured
 
 The pins and the guides were both still slow after the tile cache went in, and nothing could say

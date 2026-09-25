@@ -150,7 +150,14 @@ export default function MapPane({
     map.current = instance;
     report();
 
+    // Leaflet measures its container once and then only on a window resize. Going full screen
+    // resizes the container without one, and a map that does not know leaves grey where the new
+    // space is and pins placed for the old size. Its `moveend` then reports the larger bounds.
+    const resized = new ResizeObserver(() => instance.invalidateSize());
+    resized.observe(container.current);
+
     return () => {
+      resized.disconnect();
       instance.remove();
       map.current = null;
       markers.current.clear();

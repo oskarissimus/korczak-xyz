@@ -537,6 +537,56 @@
   }
 }
 
+/* --- full screen ------------------------------------------------------------------------ */
+
+/* The last thing in the bar, in its right-hand corner. The compass controls already claim that
+   corner with an auto margin; when one is there, this sits beside it rather than splitting the
+   space between them. */
+.ag-full-btn {
+  padding: 5px 12px;
+  font-size: 1rem;
+  margin-left: auto;
+}
+
+.ag-compass ~ .ag-full-btn,
+.ag-compass-off ~ .ag-full-btn {
+  margin-left: 0;
+}
+
+/* The app pinned over the whole viewport. This class is the full screen on every browser; the
+   Fullscreen API, where there is one, only hides the browser's chrome on top of it (see
+   `useFullscreen`). Above the taskbar (9999), below the status-bar band (10001), and padded by
+   the insets so nothing lands under a notch or the home indicator. */
+.ag-app.ag-app-full {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  background: var(--retro-gray);
+  padding: calc(8px + var(--safe-top)) calc(8px + var(--safe-right))
+    calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+}
+
+/* The footnote is a pitch and a licence notice Leaflet also prints on the map. */
+.ag-app-full .ag-foot {
+  display: none;
+}
+
+html.ag-full,
+html.ag-full body {
+  overflow: hidden;
+}
+
+/* A window dragged on a desktop carries an inline transform, and `position: fixed` inside a
+   transformed ancestor is fixed to that ancestor, not the viewport. Its z-index is raised too: it
+   is the stacking context the app's 10000 is counted in. */
+html.ag-full .audio-guide-window {
+  transform: none !important;
+  z-index: 10000 !important;
+}
+
 /* --- the keys ----------------------------------------------------------------------------- */
 
 .ag-keys-btn {

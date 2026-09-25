@@ -22,7 +22,7 @@
  * language, one localStorage key. A guide itself is megabytes of MP3 that a walk leaves behind.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useAudioGuide } from '../../hooks/useAudioGuide';
 import { useAudioGuideKeys } from '../../hooks/useAudioGuideKeys';
@@ -71,6 +71,64 @@ function guideMessage(error: ReturnType<typeof useAudioGuide>['error'], t: Trans
   }
 }
 
+/*
+ * Full screen, for a phone held in one hand: the navbar, the window's title bar and the footnote
+ * take about a third of a phone's height, and all of it is map lost.
+ *
+ * TWO MECHANISMS, BECAUSE THE IPHONE HAS ONE. The app is pinned over the viewport by a class
+ * (`ag-app-full`) whatever the browser, and the Fullscreen API is asked on top of that where it
+ * exists, so Android also loses its address bar. iPhone Safari has no element fullscreen at all —
+ * only for `<video>` — so there the class is the whole of it, and an installed app already has no
+ * browser chrome to hide. The class, not the API, is what the layout keys on, so the two can never
+ * disagree about what is on screen.
+ *
+ * Leaving the browser's own fullscreen (Escape, the back gesture) leaves ours too, or the map would
+ * stay pinned under a returned address bar.
+ */
+function useFullscreen(target: RefObject<HTMLElement | null>) {
+  const [full, setFull] = useState(false);
+
+  const enter = useCallback(() => {
+    setFull(true);
+    const el = target.current;
+    if (el?.requestFullscreen && !document.fullscreenElement) {
+      // Refused (no gesture, an iframe, a policy) is fine: the class has already done the work.
+      el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    }
+  }, [target]);
+
+  const exit = useCallback(() => {
+    setFull(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) setFull(false);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!full) return;
+    // On the root so the page behind cannot scroll, and so the window this app sits in can drop a
+    // dragged transform — `position: fixed` inside a transformed ancestor is fixed to *it*.
+    document.documentElement.classList.add('ag-full');
+    // Escape is the browser's to handle while it is fullscreen; this is for the class alone.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.fullscreenElement) setFull(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.documentElement.classList.remove('ag-full');
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [full]);
+
+  return { full, enter, exit };
+}
+
 export default function AudioGuide({ lang }: AudioGuideProps) {
   const auth = useAuth();
   return (
@@ -106,9 +164,11 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
   }, [keys.ready, keys.sync, keysMissing]);
 
   const generating = guide.status === 'generating';
+  const app = useRef<HTMLDivElement | null>(null);
+  const fullscreen = useFullscreen(app);
 
   return (
-    <div className="ag-app">
+    <div ref={app} className={fullscreen.full ? 'ag-app ag-app-full' : 'ag-app'}>
       <div className="ag-bar">
         <LanguagePicker value={guide.language} onChange={guide.setLanguage} t={t} />
 
@@ -135,6 +195,15 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
         )}
 
         {position.compass === 'denied' && <span className="ag-compass-off">{t.compassDenied}</span>}
+
+        <button
+          type="button"
+          className="retro-btn ag-full-btn"
+          aria-pressed={fullscreen.full}
+          onClick={fullscreen.full ? fullscreen.exit : fullscreen.enter}
+        >
+          {fullscreen.full ? t.fullscreenExit : t.fullscreen}
+        </button>
       </div>
 
       <div className="ag-stage">
