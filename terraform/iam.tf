@@ -52,3 +52,14 @@ resource "google_project_iam_member" "firebasestorage_reads_firestore" {
   role    = "roles/firebaserules.firestoreServiceAgent"
   member  = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-firebasestorage.iam.gserviceaccount.com"
 }
+
+/*
+ * The deploy account's right to create log-based metrics, which `audio_guide_taps` in
+ * audio-guide.tf needs and none of its bootstrap roles carries. The account grants this to itself
+ * (it holds projectIamAdmin), so the metric depends on it: the grant lands first in the same apply.
+ */
+resource "google_project_iam_member" "deployer_log_metrics" {
+  project = local.project_id
+  role    = "roles/logging.configWriter"
+  member  = "serviceAccount:github-deployer@${local.project_id}.iam.gserviceaccount.com"
+}

@@ -122,8 +122,7 @@ for ROLE in roles/serviceusage.serviceUsageAdmin \
             roles/artifactregistry.admin \
             roles/run.admin \
             roles/storage.admin \
-            roles/iam.serviceAccountAdmin \
-            roles/logging.configWriter; do
+            roles/iam.serviceAccountAdmin; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:$SA" --role="$ROLE"
 done
@@ -133,9 +132,6 @@ done
 first service accounts this directory creates. The account already held `serviceAccountUser` — the
 right to *act as* an account — which is a different thing from the right to make one, and a plan
 that creates a service account fails without it.
-
-`logging.configWriter` came with `audio_guide_taps` in `audio-guide.tf`, the first log-based metric:
-none of the roles above may create one.
 
 Then push anything, or re-run the workflow.
 

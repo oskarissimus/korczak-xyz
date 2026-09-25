@@ -84,7 +84,7 @@ resource "google_storage_bucket_iam_member" "audio_guide_writes_records" {
  * logging/user/audio_guide_taps, grouped by outcome, is the share of pins with nothing written
  * about them. The records above say which places; this says how many.
  *
- * Needs `roles/logging.configWriter` on the deploy account (terraform/README.md, bootstrap).
+ * Needs `roles/logging.configWriter` on the deploy account, granted in iam.tf.
  */
 resource "google_logging_metric" "audio_guide_taps" {
   project = local.project_id
@@ -114,4 +114,6 @@ resource "google_logging_metric" "audio_guide_taps" {
     outcome  = "EXTRACT(jsonPayload.outcome)"
     category = "EXTRACT(jsonPayload.category)"
   }
+
+  depends_on = [google_project_iam_member.deployer_log_metrics]
 }
