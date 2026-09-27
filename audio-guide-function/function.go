@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"strings"
@@ -511,6 +512,18 @@ func describeLocation(attraction *Attraction, location *Location) string {
 	return b.String()
 }
 
+// openings are the ways a script may begin. Told only to "start with a short welcome", every
+// guide opened with the same greeting ("Witaj w ..."), and each call cannot know what the last one
+// said, so the variety has to come from here: one is drawn per script.
+var openings = []string{
+	"Open with the single most striking fact, then name the place in the next sentence.",
+	"Open with a short question to the listener that one of the facts answers, naming the place in it or right after it.",
+	"Open by naming the place and saying plainly what it is, as if pointing it out on a walk.",
+	"Open with where the listener is standing - the street or district from the facts, if one is given - and then the place.",
+	"Open with the oldest date or earliest event in the facts, and bring in the place's name from there.",
+	"Open with the people connected to the place in the facts - who built, founded, used or is commemorated by it - and then the place.",
+}
+
 // generateScript turns the verified facts into something to be read aloud. It sees the facts and
 // nothing else, and is told that everything it adds is an error: this is the step where a
 // "warm, engaging" script used to grow a founding legend of its own.
@@ -537,13 +550,14 @@ CRITICAL TEXT-TO-SPEECH REQUIREMENTS:
 
 %s
 Requirements:
-- Start with a short welcome mentioning the attraction name
+- %s Mention the attraction name early.
+- Do not begin with a greeting or a welcome ("Welcome to", "Witaj w", "Hello") - the listener hears many of these in a row
 - Use the facts in the order that tells the best story; you may leave a weak one out
 - Use conversational, engaging language
 - End with a short invitation to look around
 - Keep it between %d and %d words
 - Write the entire script in %s
-- IMPORTANT: All numbers, dates, and abbreviations must be written as full words for text-to-speech`, attractionName, list.String(), t.minWords, t.maxWords, language)
+- IMPORTANT: All numbers, dates, and abbreviations must be written as full words for text-to-speech`, attractionName, list.String(), openings[rand.IntN(len(openings))], t.minWords, t.maxWords, language)
 
 	return chatCompletion(ctx, apiKey, chatRequest{
 		Messages: []chatMessage{

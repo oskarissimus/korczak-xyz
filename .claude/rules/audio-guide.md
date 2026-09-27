@@ -116,6 +116,11 @@ voice of a tour guide. Every piece below exists to close one route by which that
 - **The script sees only the surviving facts**, at temperature 0.3, and is told that any name,
   date, number or claim it adds is an error. The old "share the most interesting facts" prompt is
   where founding legends used to grow.
+- **The opening is drawn, not left to the model.** "Start with a short welcome" made every guide
+  open "Witaj w ...", and one call cannot see what the previous one said. `openings` in
+  `function.go` lists six ways to begin (the most striking fact, a question, where you are
+  standing, the oldest date, the people); `generateScript` picks one at random, and the prompt
+  forbids a greeting outright.
 - **The length follows what is known.** Three or more verified facts: 80-150 words. One or two:
   35-70 (`tierFor`). None - no sources at all, or none of the facts survived - is a **422 with
   `code: "no_sources"`**, and the app says in its own words that nothing reliable is written
