@@ -64,6 +64,9 @@ describe('the sources header', () => {
         'https://pl.wikipedia.org/wiki/Pa%C5%82ac_Staszica  https://www.wikidata.org/wiki/Q1 javascript:alert(1) nonsense',
       ),
     ).toEqual(['https://pl.wikipedia.org/wiki/Pa%C5%82ac_Staszica', 'https://www.wikidata.org/wiki/Q1']);
+    expect(
+      parseSources('http://visitkonstancin.pl/o-konstancinie/zabytki/willa-grazyna-ul-mickiewicza-4/ ftp://x.pl/a'),
+    ).toEqual(['http://visitkonstancin.pl/o-konstancinie/zabytki/willa-grazyna-ul-mickiewicza-4/']);
     expect(parseSources(null)).toEqual([]);
     expect(parseSources('')).toEqual([]);
   });
@@ -72,5 +75,7 @@ describe('the sources header', () => {
     expect(sourceLabel('https://pl.wikipedia.org/wiki/X')).toBe('Wikipedia (pl)');
     expect(sourceLabel('https://www.wikidata.org/wiki/Q1')).toBe('Wikidata');
     expect(sourceLabel('https://www.openstreetmap.org/way/1')).toBe('OpenStreetMap');
+    expect(sourceLabel('http://visitkonstancin.pl/zabytki/')).toBe('visitkonstancin.pl');
+    expect(sourceLabel('https://www.zabytek.pl/pl/obiekty/x')).toBe('zabytek.pl');
   });
 });

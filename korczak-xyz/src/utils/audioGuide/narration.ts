@@ -146,14 +146,22 @@ export async function requestNarration(
   };
 }
 
-/** The sources header, as links. Anything that is not an https URL is dropped, not linked. */
+/**
+ * The sources header, as links. Anything that is not a web URL is dropped, not linked.
+ *
+ * Plain http counts: a page found by the function's web search may only be readable over http
+ * (visitkonstancin.pl serves https with another site's certificate), and the function hands back
+ * the address it actually read. Until late Sep 2026 this took https alone, and Willa Grażyna's
+ * guide - six facts, all from that page - played with no source under its title.
+ */
 export function parseSources(header: string | null): string[] {
   if (!header) return [];
   return header
     .split(/\s+/)
     .filter((u) => {
       try {
-        return new URL(u).protocol === 'https:';
+        const { protocol } = new URL(u);
+        return protocol === 'https:' || protocol === 'http:';
       } catch {
         return false;
       }
@@ -167,7 +175,8 @@ export function sourceLabel(link: string): string {
   if (wiki) return `Wikipedia (${wiki[1]})`;
   if (host.endsWith('wikidata.org')) return 'Wikidata';
   if (host.endsWith('openstreetmap.org')) return 'OpenStreetMap';
-  return host;
+  // A page the web search found goes by its site's name.
+  return host.replace(/^www\./, '');
 }
 
 /**

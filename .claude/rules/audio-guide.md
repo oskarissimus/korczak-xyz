@@ -128,7 +128,9 @@ voice of a tour guide. Every piece below exists to close one route by which that
   tap spends); no surviving facts means no script and no voice. The app shows no Retry for it: asking again finds the same nothing and pays for it.
 - **The reader sees the sources.** `X-Guide-Sources` carries the URLs of the sources a kept fact
   came from (percent-encoded, space-separated, exposed through CORS), and the player links them
-  under the title: "Źródła: Wikipedia (pl) · Wikidata".
+  under the title: "Źródła: Wikipedia (pl) · Wikidata", or a web page by its site's name
+  ("visitkonstancin.pl"). `parseSources` takes `http:` as well as `https:` — a page the search
+  found may only be readable over http, and dropping it left a guide with no source shown.
 
 ### Every guide leaves a record, for fact-checking afterwards
 
