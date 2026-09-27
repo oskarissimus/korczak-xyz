@@ -60,7 +60,9 @@ export default function PlayerBar({
         </div>
 
         <button type="button" className="ag-player-close" onClick={onClose} aria-label={t.close}>
-          ×
+          <svg className="ag-player-close-glyph" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
+          </svg>
         </button>
       </div>
 
