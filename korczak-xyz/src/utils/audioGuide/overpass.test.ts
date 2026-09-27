@@ -97,6 +97,44 @@ describe("transformAttractions", () => {
     });
   });
 
+  it("drops exhibits and unlinked murals, which are not places", () => {
+    const node = (id: number, tags: Record<string, string>) => ({
+      id,
+      type: "node",
+      lat: 1,
+      lon: 2,
+      tags,
+    });
+    const out = transformAttractions({
+      elements: [
+        node(1, { name: "85mm D-44", historic: "gun", tourism: "attraction" }),
+        node(2, { name: "T-34", historic: "tank" }),
+        node(3, {
+          name: "Julian Ursyn Niemcewicz",
+          tourism: "artwork",
+          artwork_type: "mural",
+        }),
+        node(4, {
+          name: "Mural Powstania",
+          tourism: "artwork",
+          artwork_type: "mural",
+          wikidata: "Q1",
+        }),
+        node(5, {
+          name: "Syrenka",
+          tourism: "artwork",
+          artwork_type: "statue",
+        }),
+        node(6, { name: "ORP Błyskawica", historic: "ship" }),
+      ],
+    });
+    expect(out.map((a) => a.name)).toEqual([
+      "Mural Powstania",
+      "Syrenka",
+      "ORP Błyskawica",
+    ]);
+  });
+
   it("drops an element with neither a point nor a centre", () => {
     expect(
       transformAttractions({

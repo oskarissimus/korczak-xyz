@@ -5,7 +5,7 @@
     "architect", "builder", "designer", "artist_name", "artist", "sculptor",
     "building:architecture", "architecture", "inscription", "description", "subject",
     "memorial:subject", "official_name", "old_name", "alt_name", "short_name",
-    "historic", "tourism", "amenity", "memorial", "memorial:type", "castle_type", "building",
+    "historic", "tourism", "amenity", "memorial", "memorial:type", "castle_type", "building", "artwork_type",
     "denomination", "religion", "material", "height"
   ],
   "nameLanguages": ["en", "pl", "de", "fr", "es", "it", "cs", "uk"]

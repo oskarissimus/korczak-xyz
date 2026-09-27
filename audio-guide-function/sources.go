@@ -15,6 +15,7 @@ package function
 //     about whoever a memorial commemorates.
 //   - When OSM links nothing, Wikipedia's own geosearch around the pin, accepted only on a strict
 //     name match. A near miss is exactly how the guide ended up in another town of the same name.
+//   - When there is still no article, pages found by a web search and read here (websearch.go).
 //
 // Every fetch is best effort. A source that fails is a source that is missing, and a place with
 // none left is told so rather than narrated (see grounding.go).
@@ -80,7 +81,7 @@ var osmFactTags = []string{
 // the facts are about, but never make a source on their own.
 var osmContextTags = []string{
 	"historic", "tourism", "amenity", "memorial", "memorial:type", "castle_type",
-	"building", "denomination", "religion", "material", "height",
+	"building", "denomination", "religion", "material", "height", "artwork_type",
 }
 
 func osmSource(a *Attraction) *source {
@@ -620,7 +621,10 @@ func uniqueLangs(langs ...string) []string {
 
 // gatherSources collects everything known about the place. Nominatim runs beside the Wikidata
 // lookup, because the country it answers with decides which Wikipedia is read first.
-func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
+//
+// When no Wikipedia article about the place is found at all, the web is searched on the reader's
+// OpenAI key (websearch.go). An empty apiKey - the tests of the Wikimedia half - skips it.
+func gatherSources(ctx context.Context, a *Attraction, apiKey string) (Location, []source) {
 	defer stage(ctx, stageSources)()
 	narration := languageCode(a.Language)
 	tagLang, tagTitle := parseWikipediaTag(a.Tags["wikipedia"])
@@ -704,6 +708,15 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 		doneGeosearch()
 	}
 
+	// Still nothing about the place itself: a villa, a station, a memorial stone that no
+	// encyclopaedia covers. What is written about it is on the web, if anywhere.
+	var web []source
+	if !anyArticle(articles) && apiKey != "" {
+		doneSearch := stage(ctx, stageSearch)
+		web = webSources(ctx, apiKey, a, &location)
+		doneSearch()
+	}
+
 	var sources []source
 	if s := osmSource(a); s != nil {
 		sources = append(sources, *s)
@@ -721,6 +734,7 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 			Text:  art.text,
 		})
 	}
+	sources = append(sources, web...)
 	if subject != nil {
 		sources = append(sources, source{
 			Label: fmt.Sprintf("Wikipedia (%s) article %q - about %s, whom or what this place commemorates, NOT about the place itself", subject.lang, subject.title, subjectLabel),
@@ -732,6 +746,15 @@ func gatherSources(ctx context.Context, a *Attraction) (Location, []source) {
 		sources[i].ID = fmt.Sprintf("S%d", i+1)
 	}
 	return location, sources
+}
+
+func anyArticle(articles []*article) bool {
+	for _, art := range articles {
+		if art != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // fetchSubject follows OSM's subject:wikipedia or subject:wikidata to one article.

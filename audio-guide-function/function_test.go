@@ -30,11 +30,18 @@ type fakeProviders struct {
 	// Geosearch titles by language.
 	geosearch map[string][]string
 
+	// What the web search answers with: the URLs it cites, and the pages at /page/{name}.
+	searchURLs  []string
+	pages       map[string]string
+	searchCalls int
+	searchBody  string
+
 	chatCalls    int
 	ttsCalls     int
 	scriptPrompt string
 	factsPrompt  string
 	wikiRequests []string
+	srvURL       string
 }
 
 const staszicText = "Pałac Staszica – klasycystyczny pałac w Warszawie przy ulicy Nowy Świat 72. " +
@@ -61,6 +68,7 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 		entities:  map[string]any{},
 		articles:  map[string]string{"pl:Pałac Staszica": staszicText},
 		geosearch: map[string][]string{},
+		pages:     map[string]string{},
 	}
 
 	mux := http.NewServeMux()
@@ -126,8 +134,47 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 		}
 		json.NewEncoder(w).Encode(map[string]any{"query": map[string]any{"pages": []any{page}}})
 	})
+	mux.HandleFunc("/responses", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.searchCalls++
+		f.searchBody = string(body)
+		f.mu.Unlock()
+		if r.Header.Get("Authorization") != "Bearer sk-test" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		var annotations []any
+		for _, u := range f.searchURLs {
+			annotations = append(annotations, map[string]any{"type": "url_citation", "url": u, "title": "t"})
+		}
+		text := "NONE"
+		if len(f.searchURLs) > 0 {
+			text = strings.Join(f.searchURLs, "\n")
+		}
+		json.NewEncoder(w).Encode(map[string]any{"output": []any{
+			map[string]any{"type": "web_search_call", "status": "completed"},
+			map[string]any{"type": "message", "content": []any{
+				map[string]any{"type": "output_text", "text": text, "annotations": annotations},
+			}},
+		}})
+	})
+	mux.HandleFunc("/page/{name}", func(w http.ResponseWriter, r *http.Request) {
+		page, ok := f.pages[r.PathValue("name")]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		io.WriteString(w, page)
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
+
+	prevResponses, prevPrivate := openAIResponsesEndpoint, allowPrivateFetch
+	openAIResponsesEndpoint, allowPrivateFetch = srv.URL+"/responses", true
+	t.Cleanup(func() { openAIResponsesEndpoint, allowPrivateFetch = prevResponses, prevPrivate })
+	f.srvURL = srv.URL
 
 	prev := [5]string{nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint, wikidataEndpoint, wikipediaEndpoint}
 	nominatimEndpoint, openAIEndpoint, elevenLabsEndpoint = srv.URL+"/reverse", srv.URL+"/chat", srv.URL+"/tts"
@@ -243,7 +290,7 @@ func TestHappyPathReturnsMP3WithItsSources(t *testing.T) {
 	}
 }
 
-func TestAPlaceWithNoSourcesIsToldSoAndCostsNothing(t *testing.T) {
+func TestAPlaceWithNoSourcesIsToldSoAndCostsOnlyTheSearch(t *testing.T) {
 	f := newFakeProviders(t)
 	rec := post(`{"name":"Kapliczka","category":"historic:wayside_shrine","latitude":52.1,"longitude":21.0,"tags":{"historic":"wayside_shrine"}}`)
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -251,6 +298,9 @@ func TestAPlaceWithNoSourcesIsToldSoAndCostsNothing(t *testing.T) {
 	}
 	if _, code := errorBody(t, rec); code != "no_sources" {
 		t.Errorf("code %q", code)
+	}
+	if f.searchCalls != 1 {
+		t.Errorf("%d searches, want one before giving up", f.searchCalls)
 	}
 	if f.chatCalls != 0 || f.ttsCalls != 0 {
 		t.Errorf("%d chat and %d TTS calls for a place nothing is known about", f.chatCalls, f.ttsCalls)

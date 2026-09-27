@@ -39,6 +39,7 @@ const (
 	stageWikidata  = "wikidata"
 	stageArticles  = "articles"  // the Wikipedia articles and the memorial's subject, in parallel
 	stageGeosearch = "geosearch" // only when OSM links no article
+	stageSearch    = "search"    // web search and the pages it named, only when no article was found
 	stageSources   = "sources"   // all of the above, wall clock
 	stageFacts     = "facts"     // the first OpenAI call
 	stageScript    = "script"    // the second
@@ -63,6 +64,8 @@ type guideTimings struct {
 	stages map[string]time.Duration
 	// Wikimedia answers that were not 200 - almost always a 429 - during this request.
 	wikimediaRefusals int
+	// What a web search named, and how many of those pages were let in as sources.
+	webURLs, webPages int
 	cold              bool
 	instanceAge       time.Duration
 }
@@ -106,6 +109,14 @@ func noteWikimediaRefusal(ctx context.Context) {
 	if t := timingsFrom(ctx); t != nil {
 		t.mu.Lock()
 		t.wikimediaRefusals++
+		t.mu.Unlock()
+	}
+}
+
+func noteWebSearch(ctx context.Context, urls, pages int) {
+	if t := timingsFrom(ctx); t != nil {
+		t.mu.Lock()
+		t.webURLs, t.webPages = urls, pages
 		t.mu.Unlock()
 	}
 }
@@ -196,6 +207,8 @@ type timingLine struct {
 	ScriptChars   int    `json:"scriptChars"`
 	AudioBytes    int    `json:"audioBytes"`
 	WikiRefusals  int    `json:"wikimediaRefusals"`
+	WebURLs       int    `json:"webURLs"`
+	WebPages      int    `json:"webPages"`
 }
 
 // guideOutcome is what the handler learns as it goes, for the log line.
@@ -211,7 +224,7 @@ type guideOutcome struct {
 
 func logTiming(t *guideTimings, w *timedWriter, o *guideOutcome) {
 	t.mu.Lock()
-	refusals := t.wikimediaRefusals
+	refusals, webURLs, webPages := t.wikimediaRefusals, t.webURLs, t.webPages
 	t.mu.Unlock()
 	outcome := o.name
 	if outcome == "" {
@@ -236,6 +249,8 @@ func logTiming(t *guideTimings, w *timedWriter, o *guideOutcome) {
 		ScriptChars:   o.scriptChars,
 		AudioBytes:    o.audioBytes,
 		WikiRefusals:  refusals,
+		WebURLs:       webURLs,
+		WebPages:      webPages,
 	}
 	if a := o.attraction; a != nil {
 		line.Category, line.Language, line.Tags = a.Category, a.Language, len(a.Tags)

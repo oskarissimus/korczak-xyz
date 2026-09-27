@@ -3,7 +3,8 @@
 //
 // A name, a category, a pair of coordinates and the place's OpenStreetMap tags come in; an MP3
 // goes out. In between it gathers what is actually known about the place - the tags, its Wikidata
-// item, its Wikipedia articles (sources.go) - has gpt-4o-mini pick facts out of those with a
+// item, its Wikipedia articles, and for a place with none, pages a web search found (sources.go,
+// websearch.go) - has gpt-4o-mini pick facts out of those with a
 // verbatim quote for each, checks every quote against its source (grounding.go), asks again for a
 // script written for a speech synthesiser from the facts that survived, and has ElevenLabs read
 // it aloud. A place with no sources, or none the checks let through, is answered with a 422
@@ -279,7 +280,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location, sources := gatherSources(ctx, &attraction)
+	location, sources := gatherSources(ctx, &attraction, openAIKey)
 	outcome.countryCode, outcome.sources = location.CountryCode, len(sources)
 	for _, s := range sources {
 		outcome.sourceChars += len(s.Text)
@@ -290,7 +291,8 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Location-Warning", "Location details unavailable - information may be less accurate")
 	}
 
-	// Nothing to ground a narration on: say so, and spend nothing on either provider. The tap is
+	// Nothing to ground a narration on: say so, and spend nothing more - the web search, if one
+	// ran, is the only thing this tap cost. The tap is
 	// still recorded - the place, the labelled location and no sources - so a walk's record lists
 	// the places that had nothing written about them beside the ones that were narrated.
 	if len(sources) == 0 {

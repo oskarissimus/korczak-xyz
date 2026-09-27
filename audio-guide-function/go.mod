@@ -2,7 +2,10 @@ module github.com/oskarissimus/korczak-xyz/audio-guide-function
 
 go 1.24
 
-require github.com/GoogleCloudPlatform/functions-framework-go v1.8.1
+require (
+	github.com/GoogleCloudPlatform/functions-framework-go v1.8.1
+	golang.org/x/net v0.38.0
+)
 
 require (
 	github.com/cloudevents/sdk-go/v2 v2.14.0 // indirect

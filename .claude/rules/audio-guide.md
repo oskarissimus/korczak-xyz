@@ -83,6 +83,25 @@ voice of a tour guide. Every piece below exists to close one route by which that
   allowed). The nearest article to a wayside shrine is usually the parish, the street or the
   district, and any of them would be read out as if it were the shrine. **Do not loosen this into
   "nearest article" or a fuzzy score** - a near miss is how the guide ended up about another town.
+- **The web, for places Wikipedia does not have** (`websearch.go`, late Sep 2026). When no
+  article about the place is found at all - linked, via Wikidata, or by geosearch - the function
+  asks OpenAI's `web_search_preview` (Responses API, `gpt-4o-mini`, `search_context_size: low`,
+  the country and town as `user_location`) **for URLs and nothing else**, on the reader's own key.
+  It then downloads up to five of them itself, reduces the HTML to text (no `script`, `nav`,
+  `header`, `footer`, `aside`, `form`), and lets a page in as a source only if it names the place
+  - every word of one of its names, by stem, so "Willi Grażyna" counts - **and** the town, when
+  Nominatim gave one; at most three pages, 5,000 characters each, cut from just before the
+  paragraph that first names the place. **Do not replace this with the search model's own answer.**
+  It is a paraphrase with links, and a paraphrase cannot be quote-checked; that is exactly the
+  route by which invented facts came back. Wikipedia, Wikidata, OSM, Google and the social
+  networks are skipped (`skippedHosts`). The fetch dials **public unicast addresses only**, after
+  DNS and on every redirect (`publicOnly`): the URLs are a model's choice, and the metadata server
+  that hands out this function's identity is one link-local address away. A search that fails
+  (a refused key, a 400, a timeout) is a missing source and a `generate-audio: web search` log
+  line, never a failed tap. It costs the reader a search call - about a cent, not measured - on
+  every tap of a place with no article, including the ones that still end in `no_sources`; a
+  place with an article is never searched. `stageSearch` (`search` in Server-Timing, so
+  `serverSearchMs` in Sentry) times it, and the log line carries `webURLs` and `webPages`.
 - **The quotes are checked in Go, not by the model.** The facts call returns JSON
   (`response_format: json_object`, temperature 0.1): each fact, the id of the source it came from,
   and a verbatim quote. `verifyFacts` keeps a fact only if its quote - normalised for case,
@@ -96,8 +115,8 @@ voice of a tour guide. Every piece below exists to close one route by which that
 - **The length follows what is known.** Three or more verified facts: 80-150 words. One or two:
   35-70 (`tierFor`). None - no sources at all, or none of the facts survived - is a **422 with
   `code: "no_sources"`**, and the app says in its own words that nothing reliable is written
-  about the place. No sources means no OpenAI call either; no surviving facts means no script and
-  no voice. The app shows no Retry for it: asking again finds the same nothing and pays for it.
+  about the place. No sources means no facts call (the web search above is the only thing such a
+  tap spends); no surviving facts means no script and no voice. The app shows no Retry for it: asking again finds the same nothing and pays for it.
 - **The reader sees the sources.** `X-Guide-Sources` carries the URLs of the sources a kept fact
   came from (percent-encoded, space-separated, exposed through CORS), and the player links them
   under the title: "Źródła: Wikipedia (pl) · Wikidata".
@@ -351,6 +370,18 @@ Overpass when it is used:
   instance answers 504 when its queue is full, whatever was asked. A query that genuinely outgrows
   `[timeout:25]` or its memory comes back as a **200** with a `remark`, and that — checked by
   `ranOutOfRoom` — is the only thing that says zoom in. It is not retried.
+
+**Exhibits and murals are not pins** (`notAPlace` in `overpass.ts`, late Sep 2026). A walk's
+`no_sources` records were half tanks, field guns and portraits on walls: `historic=tank|gun|
+cannon|aircraft|locomotive|railway_car|vehicle`, and `tourism=artwork` with `artwork_type=mural|
+graffiti` unless it links `wikipedia`/`wikidata`/`subject:*`. What is written about those is about
+the model or the person, never about this one, and the owner asked for them gone rather than
+narrated. Checked on Warsaw's archive pins (4,020): the exhibit rule drops 138. Plaques were
+considered and kept — 800 unlinked ones in Warsaw alone, and a plaque marking an execution site
+is about exactly that spot. Only as good as OSM's tagging: an exhibit tagged just
+`tourism=attraction` keeps its pin. It runs in `transformAttractions`, so it covers archive and
+Overpass pins alike, but `artwork_type` reaches archive pins only from the first weekly build
+after it was added to `storyTags.json`.
 
 What the archive gives up is freshness: a pin is up to a week old plus the planet's own few days,
 where Overpass was minutes. For churches and monuments that is nothing, and the narration still

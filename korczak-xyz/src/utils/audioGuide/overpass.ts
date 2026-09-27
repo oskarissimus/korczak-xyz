@@ -110,6 +110,36 @@ function categoryOf(tags: Record<string, string>): string {
   return 'attraction';
 }
 
+/**
+ * Pins that are not places, and are dropped before they reach the map.
+ *
+ * Added late Sep 2026 after reading a walk's `no_sources` records: a third of the pins nobody
+ * could say anything about were one of two things, and neither is somewhere to stand.
+ *
+ * - **Exhibits**: a tank, a howitzer, a locomotive on a plinth. What is written about them is about
+ *   the model (the T-34, the D-44), never about this one, so the guide had nothing to say, and a
+ *   museum yard or a railway heritage park is a dozen such pins on top of the one that matters.
+ *   Their tag is `historic` (`gun`, not `cannon`, is what OSM uses for a field gun). A wreck or a
+ *   museum ship is left alone: those are places, and often have an article of their own.
+ * - **Murals of a person**: `tourism=artwork` + `artwork_type=mural` - a portrait of Niemcewicz on
+ *   a school wall. The article is about the person, which is not a guide to the wall. Only without
+ *   a `wikipedia`/`wikidata`/`subject:*` link: a mural somebody thought worth an article is kept.
+ *
+ * Only by tags, so it is exactly as good as OSM's tagging: an exhibit tagged just
+ * `tourism=attraction` (Ursynów's "wieża T-70") still gets a pin. `artwork_type` reaches archive
+ * pins only from the build after it was added to `storyTags.json`.
+ */
+const EXHIBITS = new Set(['tank', 'gun', 'cannon', 'aircraft', 'locomotive', 'railway_car', 'vehicle']);
+const MURALS = new Set(['mural', 'graffiti']);
+const LINKS = ['wikipedia', 'wikidata', 'subject:wikipedia', 'subject:wikidata'];
+
+export function notAPlace(tags: Record<string, string>): boolean {
+  if (EXHIBITS.has(tags.historic)) return true;
+  return (
+    tags.tourism === 'artwork' && MURALS.has(tags.artwork_type) && !LINKS.some((k) => tags[k])
+  );
+}
+
 interface OverpassElement {
   id: number;
   type: string;
@@ -125,7 +155,8 @@ interface OverpassElement {
  * Unnamed elements go first and take most of the response with them: OSM is full of historic
  * walls and untagged ruins, and a pin labelled nothing is a pin nobody taps. What is left must
  * have a position - a node carries one directly, a way or relation only as `center`, and an
- * element with neither is a data error rather than a place.
+ * element with neither is a data error rather than a place. Exhibits and murals go too - see
+ * `notAPlace`.
  */
 export function transformAttractions(response: unknown): Attraction[] {
   const elements = (response as { elements?: OverpassElement[] })?.elements;
@@ -142,6 +173,7 @@ export function transformAttractions(response: unknown): Attraction[] {
 
     const type = el.type as Attraction['type'];
     if (type !== 'node' && type !== 'way' && type !== 'relation') continue;
+    if (notAPlace(el.tags ?? {})) continue;
 
     out.push({
       id: el.id,
