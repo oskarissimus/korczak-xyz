@@ -278,6 +278,8 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
               name={guide.guide.attractionName}
               playing={guide.playing}
               ended={guide.ended}
+              position={guide.position}
+              duration={guide.duration}
               locationWarning={guide.guide.locationWarning !== null}
               sources={guide.guide.sources}
               onToggle={guide.togglePlay}

@@ -57,6 +57,10 @@ export interface AudioGuideState {
   errorDetail: string | null;
   playing: boolean;
   ended: boolean;
+  /** Seconds played of the current narration. */
+  position: number;
+  /** Its length in seconds, or null until the element knows it (or if it never does). */
+  duration: number | null;
   /** When the request started, for the progress bar. Null when nothing is running. */
   startedAt: number | null;
   language: string;
@@ -123,6 +127,8 @@ export function useAudioGuide(
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [language, setLanguageState] = useState(() => loadLanguage(lang));
 
@@ -332,12 +338,28 @@ export function useAudioGuide(
       setEnded(false);
     };
     const onPause = () => setPlaying(false);
+    // `timeupdate` fires a few times a second while playing, which is fine enough for a bar that
+    // is never dragged. A duration that is not finite (a stream the browser cannot measure) stays
+    // null, and the bar with it.
+    const onTime = () => setPosition(element.currentTime);
+    const onDuration = () =>
+      setDuration(
+        Number.isFinite(element.duration) && element.duration > 0 ? element.duration : null,
+      );
+    onTime();
+    onDuration();
 
     element.addEventListener('ended', onEnded);
+    element.addEventListener('timeupdate', onTime);
+    element.addEventListener('durationchange', onDuration);
+    element.addEventListener('loadedmetadata', onDuration);
     element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPause);
     return () => {
       element.removeEventListener('ended', onEnded);
+      element.removeEventListener('timeupdate', onTime);
+      element.removeEventListener('durationchange', onDuration);
+      element.removeEventListener('loadedmetadata', onDuration);
       element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPause);
     };
@@ -358,6 +380,8 @@ export function useAudioGuide(
     errorDetail,
     playing,
     ended,
+    position,
+    duration,
     startedAt,
     language,
     setLanguage,

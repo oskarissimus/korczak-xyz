@@ -438,6 +438,7 @@
 .ag-player-state {
   font-size: 0.95rem;
   color: #303030;
+  font-variant-numeric: tabular-nums;
 }
 
 .ag-player-close {
@@ -467,6 +468,21 @@
 
 .ag-player-close:active {
   border-style: inset;
+}
+
+/* How far through. A sunken track, like every other well in this theme; only shows, never drags. */
+.ag-progress {
+  margin-top: 8px;
+  height: 10px;
+  background: var(--retro-white);
+  border: 2px inset var(--retro-white);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ag-progress-fill {
+  height: 100%;
+  background: #000080;
 }
 
 /* Where the facts came from. Small, but links a thumb can hit: the gap is the separator's. */
