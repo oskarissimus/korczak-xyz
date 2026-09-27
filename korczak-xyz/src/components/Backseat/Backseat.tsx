@@ -26,6 +26,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useBackseatConfig } from '../../hooks/useBackseatConfig';
 import { useBackseatRide } from '../../hooks/useBackseatRide';
+import { remarkLanguage } from '../../utils/backseat/defaults';
 import RideScreen from './RideScreen';
 import SetupScreen from './SetupScreen';
 import { cameraMessage, translations, type Lang, type Translation } from './translations';
@@ -48,7 +49,7 @@ export default function Backseat({ lang }: BackseatProps) {
   const t: Translation = translations[lang];
   const auth = useAuth();
   const { config, ready, sync, borrowed, update, reset } = useBackseatConfig(auth.user);
-  const ride = useBackseatRide(config, lang);
+  const ride = useBackseatRide(config, remarkLanguage(config, lang));
 
   const riding = ride.status !== 'idle';
 

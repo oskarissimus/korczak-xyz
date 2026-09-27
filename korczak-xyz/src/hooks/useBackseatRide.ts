@@ -31,7 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
-import { canStart } from '../utils/backseat/defaults';
+import { canStart, speechLocale } from '../utils/backseat/defaults';
 import {
   cameraConstraints,
   cameraSupported,
@@ -42,7 +42,7 @@ import {
 } from '../utils/backseat/frame';
 import { isRepeat, recentTexts, sanitizeRemark, systemPrompt, USER_PROMPT } from '../utils/backseat/remarks';
 import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
-import type { BackseatConfig, Remark, RideStatus } from '../utils/backseat/types';
+import type { BackseatConfig, Remark, RemarkLanguage, RideStatus } from '../utils/backseat/types';
 import { askForRemark, VisionError } from '../utils/backseat/vision';
 import { createWakeLock } from '../utils/wakeLock';
 
@@ -92,7 +92,7 @@ function nextRemarkId(): string {
   return `r${Date.now().toString(36)}-${remarkCounter}`;
 }
 
-export function useBackseatRide(config: BackseatConfig, lang: string): RideApi {
+export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): RideApi {
   const [status, setStatus] = useState<RideStatus>('idle');
   const [remarks, setRemarks] = useState<Remark[]>([]);
   const [current, setCurrent] = useState<Remark | null>(null);
@@ -263,7 +263,7 @@ export function useBackseatRide(config: BackseatConfig, lang: string): RideApi {
       try {
         await speak(settings, {
           text,
-          lang: langRef.current === 'pl' ? 'pl-PL' : 'en-GB',
+          lang: speechLocale(langRef.current),
           rate: settings.voice.rate,
           signal: speechController.signal,
         });

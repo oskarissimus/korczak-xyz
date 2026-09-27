@@ -89,8 +89,12 @@ export function watchVoices(onChange: (voices: DeviceVoice[]) => void): () => vo
 }
 
 /**
- * The voice to use: the one chosen if it is still installed, else the best match for the language,
- * else whatever the browser defaults to.
+ * The voice to use: the one chosen if it is still installed and speaks the language, else the best
+ * match for the language, else whatever the browser defaults to.
+ *
+ * "Speaks the language" is because the passenger's language is its own setting: a Polish voice
+ * picked last week, left selected after switching the passenger to English, would read English in
+ * Polish phonetics. The choice is not lost — switch back and it is used again.
  *
  * "Still installed" is not hypothetical — voices come and go with OS updates and with the language
  * packs somebody has downloaded, and a saved `voiceURI` that no longer resolves makes the
@@ -103,10 +107,10 @@ export function pickVoice(
 ): DeviceVoice | null {
   if (voices.length === 0) return null;
 
-  const chosen = voices.find((voice) => voice.uri === preferredUri);
-  if (chosen) return chosen;
-
   const prefix = lang.toLowerCase().slice(0, 2);
+  const chosen = voices.find((voice) => voice.uri === preferredUri);
+  if (chosen && chosen.lang.toLowerCase().startsWith(prefix)) return chosen;
+
   return voices.find((voice) => voice.lang.toLowerCase().startsWith(prefix)) ?? null;
 }
 

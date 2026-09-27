@@ -22,6 +22,7 @@ import type {
   Intensity,
   KeyName,
   Persona,
+  RemarkLanguage,
   VisionProvider,
   VoiceEngine,
 } from './types';
@@ -37,6 +38,8 @@ export const PERSONAS: readonly Persona[] = [
 ];
 
 export const INTENSITIES: readonly Intensity[] = ['mild', 'normal', 'relentless'];
+
+export const REMARK_LANGUAGES: readonly RemarkLanguage[] = ['en', 'pl'];
 
 export const MIN_INTERVAL = 6;
 export const MAX_INTERVAL = 120;
@@ -54,7 +57,7 @@ export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_CONFIG: BackseatConfig = {
   apiKeys: { openai: null, google: null, elevenLabs: null },
   vision: { provider: 'openai', model: 'gpt-4o-mini' },
-  remarks: { intervalSeconds: 15, persona: 'nervous', intensity: 'normal' },
+  remarks: { intervalSeconds: 15, persona: 'nervous', intensity: 'normal', language: null },
   voice: {
     engine: 'device',
     deviceVoiceUri: '',
@@ -129,6 +132,11 @@ export function normalizeConfig(value: unknown): BackseatConfig {
       ),
       persona: asOneOf(remarks.persona, PERSONAS, DEFAULT_CONFIG.remarks.persona),
       intensity: asOneOf(remarks.intensity, INTENSITIES, DEFAULT_CONFIG.remarks.intensity),
+      language:
+        typeof remarks.language === 'string' &&
+        (REMARK_LANGUAGES as readonly string[]).includes(remarks.language)
+          ? (remarks.language as RemarkLanguage)
+          : null,
     },
     voice: {
       engine: asOneOf(voice.engine, VOICE_ENGINES, DEFAULT_CONFIG.voice.engine),
@@ -140,6 +148,16 @@ export function normalizeConfig(value: unknown): BackseatConfig {
       facing: asOneOf(camera.facing, FACINGS, DEFAULT_CONFIG.camera.facing),
     },
   };
+}
+
+/** The language the passenger speaks: the one chosen, or the page's until somebody chooses. */
+export function remarkLanguage(config: BackseatConfig, pageLang: RemarkLanguage): RemarkLanguage {
+  return config.remarks.language ?? pageLang;
+}
+
+/** BCP-47 for the device synthesiser. */
+export function speechLocale(lang: RemarkLanguage): string {
+  return lang === 'pl' ? 'pl-PL' : 'en-GB';
 }
 
 /**

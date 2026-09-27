@@ -7,6 +7,7 @@ import {
   canStart,
   missingKeys,
   normalizeConfig,
+  remarkLanguage,
   requiredKeys,
 } from './defaults';
 
@@ -39,10 +40,24 @@ describe('normalizeConfig', () => {
       intervalSeconds: 30,
       persona: 'codriver',
       intensity: 'relentless',
+      language: null,
     });
     expect(config.voice.engine).toBe('elevenlabs');
     expect(config.voice.rate).toBeCloseTo(1.3);
     expect(config.camera.facing).toBe('user');
+  });
+
+  it('keeps a chosen passenger language and reads anything else as not chosen', () => {
+    expect(normalizeConfig({ remarks: { language: 'pl' } }).remarks.language).toBe('pl');
+    expect(normalizeConfig({ remarks: { language: 'en' } }).remarks.language).toBe('en');
+    expect(normalizeConfig({ remarks: { language: 'de' } }).remarks.language).toBeNull();
+    expect(normalizeConfig({ remarks: {} }).remarks.language).toBeNull();
+  });
+
+  it('speaks the page language until one is chosen', () => {
+    expect(remarkLanguage(DEFAULT_CONFIG, 'pl')).toBe('pl');
+    const english = normalizeConfig({ remarks: { language: 'en' } });
+    expect(remarkLanguage(english, 'pl')).toBe('en');
   });
 
   it('trims a key and reads an empty one as not set', () => {

@@ -21,8 +21,11 @@ import {
   MAX_INTERVAL,
   MIN_INTERVAL,
   PERSONAS,
+  REMARK_LANGUAGES,
   canStart,
   missingKeys,
+  remarkLanguage,
+  speechLocale,
 } from '../../utils/backseat/defaults';
 import {
   fetchElevenLabsVoices,
@@ -37,12 +40,13 @@ import type {
   CameraFacing,
   Intensity,
   Persona,
+  RemarkLanguage,
   VisionProvider,
   VoiceEngine,
 } from '../../utils/backseat/types';
 import { fetchVisionModels } from '../../utils/backseat/vision';
 import { Fieldset, KeyField, Row, Select, Slider } from './fields';
-import { fill, type Translation } from './translations';
+import { fill, translations, type Translation } from './translations';
 
 const PERSONA_LABELS: Record<Persona, keyof Translation> = {
   nervous: 'personaNervous',
@@ -51,6 +55,10 @@ const PERSONA_LABELS: Record<Persona, keyof Translation> = {
   child: 'personaChild',
   codriver: 'personaCodriver',
 };
+
+/* Each language named in itself, as a language picker always is: somebody looking for Polish is
+   looking for the word "Polski", whichever locale the page happens to be in. */
+const LANGUAGE_LABELS: Record<RemarkLanguage, string> = { en: 'English', pl: 'Polski' };
 
 const INTENSITY_LABELS: Record<Intensity, keyof Translation> = {
   mild: 'intensityMild',
@@ -190,9 +198,11 @@ export default function SetupScreen({
     // Before anything is awaited, for the reason in `speech.ts`: this click is a gesture and the
     // clip element has to be woken inside it or iOS refuses every clip that follows.
     primeVoices();
+    // In the passenger's language, not the page's: the test is of the voice the ride will use.
+    const spoken = remarkLanguage(configRef.current, lang);
     void speak(configRef.current, {
-      text: t.voiceTestLine,
-      lang: lang === 'pl' ? 'pl-PL' : 'en-GB',
+      text: translations[spoken].voiceTestLine,
+      lang: speechLocale(spoken),
       rate: configRef.current.voice.rate,
     }).catch((e) => setTestError(e instanceof Error ? e.message : String(e)));
   };
@@ -303,6 +313,20 @@ export default function SetupScreen({
                 label: t[PERSONA_LABELS[persona]],
               }))}
               onChange={(value) => update({ remarks: { ...config.remarks, persona: value } })}
+            />
+          )}
+        </Row>
+
+        <Row label={t.languageLabel} hint={t.languageHint}>
+          {(id) => (
+            <Select<RemarkLanguage>
+              id={id}
+              value={remarkLanguage(config, lang)}
+              options={REMARK_LANGUAGES.map((language) => ({
+                value: language,
+                label: LANGUAGE_LABELS[language],
+              }))}
+              onChange={(value) => update({ remarks: { ...config.remarks, language: value } })}
             />
           )}
         </Row>

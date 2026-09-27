@@ -30,6 +30,9 @@ export type Persona = 'nervous' | 'instructor' | 'parent' | 'child' | 'codriver'
 /** How hard the passenger goes. The same persona at three volumes, roughly. */
 export type Intensity = 'mild' | 'normal' | 'relentless';
 
+/** The language the passenger speaks in. */
+export type RemarkLanguage = 'en' | 'pl';
+
 export type VoiceEngine = 'device' | 'elevenlabs';
 
 export type CameraFacing = 'environment' | 'user';
@@ -46,6 +49,12 @@ export interface BackseatConfig {
     intervalSeconds: number;
     persona: Persona;
     intensity: Intensity;
+    /**
+     * What the passenger speaks. `null` means nobody has picked one, and the passenger follows the
+     * language the page is read in — so a first visit to /pl/ gets a Polish passenger without
+     * asking. Once picked it is a setting like any other and syncs with the rest.
+     */
+    language: RemarkLanguage | null;
   };
   voice: {
     engine: VoiceEngine;

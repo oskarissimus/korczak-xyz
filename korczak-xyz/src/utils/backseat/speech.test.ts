@@ -35,6 +35,13 @@ describe('pickVoice', () => {
     expect(pickVoice(voices, '', 'en-GB')?.name).toBe('Daniel');
   });
 
+  it('passes over a chosen voice in the wrong language', () => {
+    // Zosia picked, then the passenger switched to English: Daniel, not English in Polish phonetics.
+    expect(pickVoice(voices, voices[1].uri, 'en-GB')?.name).toBe('Daniel');
+    // And the same choice is honoured again once the passenger speaks Polish.
+    expect(pickVoice(voices, voices[1].uri, 'pl-PL')?.name).toBe('Zosia');
+  });
+
   it('matches on the language rather than the region', () => {
     // en-AU has no voice here; an English one is much better than a Polish one.
     expect(pickVoice(voices, '', 'en-AU')?.lang).toMatch(/^en/);

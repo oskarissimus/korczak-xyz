@@ -9,8 +9,9 @@
  *  - Whatever an API returns. Every error from OpenAI, Google or ElevenLabs is shown verbatim, in
  *    English, because it is the string you would paste into their support page. The sentence
  *    around it is translated; the quote is not.
- *  - The remarks themselves, obviously — those are written by the model, in the language the app
- *    is being read in, which is what `systemPrompt` is handed `lang` for.
+ *  - The remarks themselves, obviously — those are written by the model, in the language picked on
+ *    the setup sheet (the page's own until somebody picks), which is what `systemPrompt` is
+ *    handed `lang` for.
  */
 
 import type { CameraFailure } from '../../utils/backseat/frame';
@@ -76,6 +77,8 @@ export const translations = {
     personaParent: 'Your mother',
     personaChild: 'Bored child',
     personaCodriver: 'Rally co-driver',
+    languageLabel: 'Speaks',
+    languageHint: 'The language of the remarks and the voice. The page itself follows the site’s language switch.',
     intensityLabel: 'How much of it',
     intensityMild: 'Mild — the odd sigh',
     intensityNormal: 'Normal — properly annoying',
@@ -196,6 +199,8 @@ export const translations = {
     personaParent: 'Twoja mama',
     personaChild: 'Znudzone dziecko',
     personaCodriver: 'Pilot rajdowy',
+    languageLabel: 'Mówi po',
+    languageHint: 'Język uwag i głosu. Sama strona zmienia język przełącznikiem w menu serwisu.',
     intensityLabel: 'W jakim natężeniu',
     intensityMild: 'Łagodnie — od czasu do czasu westchnie',
     intensityNormal: 'Normalnie — porządnie irytująco',

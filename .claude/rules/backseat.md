@@ -91,6 +91,15 @@ has actually come back from a provider. It also **drops a repeat outright** rath
 it: a dropped round costs one interval of silence, and the same sentence twice is the one thing
 that makes the app read as broken rather than annoying.
 
+**The language is its own setting, not the page's.** `remarks.language` is `'en'`, `'pl'` or
+`null`, and `null` means nobody has picked: the passenger then speaks the language of the locale
+the page is read in, so a first visit to `/pl/` is Polish without a question. Once picked it syncs
+with everything else, and the UI stays on the site's own switch — the two are different questions
+(somebody reading English may want a Polish passenger). It reaches the prompt, the device
+synthesiser's `lang` and the Test button's line. `pickVoice` passes over a chosen device voice
+whose language does not match, because the voice picked for Polish, left selected after switching
+to English, would otherwise read English in Polish phonetics.
+
 The persona is a **closed list**, not a text box. The prompt around it is written to be hard to talk
 out of its shape, and a box somebody types into is a box somebody types "ignore the above" into.
 
