@@ -104,15 +104,21 @@ export class AttractionCache {
     return this.tiles.size;
   }
 
-  lookup(bounds: Bounds): CacheLookup {
+  /**
+   * `drawn` may reach past `bounds` - the margin where a pin off screen still shows part of its
+   * label. Pins there come from whatever squares are already here; only `bounds` counts as missing.
+   */
+  lookup(bounds: Bounds, drawn: Bounds = bounds): CacheLookup {
     const attractions: Attraction[] = [];
     let missing: TileRange | null = null;
     let missingCount = 0;
+    const inView = tilesCovering(bounds);
 
-    for (const [x, y] of tilesIn(tilesCovering(bounds))) {
+    for (const [x, y] of tilesIn(tilesCovering(drawn))) {
       const key = tileKey(x, y);
       const found = this.tiles.get(key);
       if (!found) {
+        if (x < inView.minX || x > inView.maxX || y < inView.minY || y > inView.maxY) continue;
         missingCount++;
         missing = missing
           ? {
@@ -127,7 +133,7 @@ export class AttractionCache {
       // Touch it, so the squares being looked at are the last to be forgotten.
       this.tiles.delete(key);
       this.tiles.set(key, found);
-      for (const a of found) if (contains(bounds, a)) attractions.push(a);
+      for (const a of found) if (contains(drawn, a)) attractions.push(a);
     }
 
     return { attractions, missing, missingCount };

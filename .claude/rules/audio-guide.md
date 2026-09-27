@@ -282,8 +282,14 @@ Three things about the pins that look like details and are not:
 - **`MAX_MARKERS` is 100** and a dense old town answers with several hundred. Every pin is a
   `DivIcon`, which is real DOM with a label in it; this is the number at which a phone still pans
   smoothly.
-- **The icon is anchored on the speaker glyph, not on the middle of the pill.** The point is the
-  place; a pill centred on it puts its icon half a label away from the building it names.
+- **The pill is centred on its point, both ways** (Oskar's call, Sep 2026; it used to be anchored
+  on the speaker glyph, which read as the point sitting in the pill's bottom-left corner). The
+  icon is zero-sized and the pill is `translate(-50%, -50%)` in CSS, because a pill's width
+  depends on its name and no fixed `iconSize`/`iconAnchor` can centre every one.
+- **Pins are drawn a margin past the screen** (`OFFSCREEN_X`/`_Y` in MapPane, passed as `drawn` to
+  `setBounds` and `lookup`). A centred pill is ~200px wide, so a pin whose point has just left the
+  screen still shows half its pill; filtering by the screen alone made pills vanish in plain view.
+  Only the screen itself is fetched; the margin shows what the cache already holds.
 - **Below zoom 16 (`LABEL_ZOOM`) a pin is a dot.** At 15 a neighbourhood is a hundred pills on
   top of each other and the map under them is gone. It is one `ag-map-far` class on the container,
   toggled on `zoomend`, not a new icon per pin, so selection and the pulse survive it. A tapped dot

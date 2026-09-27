@@ -28,6 +28,14 @@ import type { Attraction, Bounds } from '../../utils/audioGuide/types';
 const FALLBACK_CENTER: [number, number] = [52.2497, 21.0122];
 const FALLBACK_ZOOM = 15;
 
+/**
+ * How far past the edge of the screen a pin is still drawn, in pixels. A pill is centred on its
+ * point and about 200px wide, so a pin whose point has just left the screen still has half its
+ * pill on it; dropping it there makes pills vanish while you can still see them.
+ */
+const OFFSCREEN_X = 110;
+const OFFSCREEN_Y = 20;
+
 /** Close enough to read street names, which is the zoom an audio guide is used at. */
 const LOCATED_ZOOM = 16;
 
@@ -46,8 +54,11 @@ interface MapPaneProps {
   user: { lat: number; lon: number; accuracy: number } | null;
   heading: number | null;
   onSelect: (attraction: Attraction) => void;
-  /** The rectangle on screen and the zoom it is drawn at, after every pan and zoom. */
-  onBoundsChange: (bounds: Bounds, zoom: number) => void;
+  /**
+   * The rectangle on screen and the zoom it is drawn at, after every pan and zoom, and the
+   * slightly larger rectangle whose pins can still show a piece of their pill on screen.
+   */
+  onBoundsChange: (bounds: Bounds, zoom: number, drawn: Bounds) => void;
   /** For the tile layer's `alt` and the map container's label. */
   label: string;
 }
@@ -69,11 +80,11 @@ function speakerIcon(name: string, selected: boolean): L.DivIcon {
         </span>
         <span class="ag-marker-label">${escapeHtml(shown)}</span>
       </span>`,
-    iconSize: [104, 34],
-    // Anchored on the speaker glyph, not on the middle of the pill: the point is the place, and
-    // a pill centred on it puts its icon half a label to the left of the building it names. The
-    // label then runs to the right of the spot, the way a caption does.
-    iconAnchor: [15, 17],
+    // A zero-sized icon on the point, with the pill centred on it in CSS. Leaflet anchors a box
+    // of a size given here, and a pill's width depends on its name, so no fixed size and anchor
+    // can put the middle of every pill on its place; a translate of -50% can.
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 
@@ -148,16 +159,19 @@ export default function MapPane({
       // Below the zoom nothing is fetched at, a city's worth of cached dots is one black smudge
       // over whichever district was last looked at. Only the selected pin stays, as a landmark.
       container.current?.classList.toggle('ag-map-none', instance.getZoom() < MIN_ZOOM);
-      const bounds = instance.getBounds();
-      latest.current.onBoundsChange(
-        {
-          south: bounds.getSouth(),
-          west: bounds.getWest(),
-          north: bounds.getNorth(),
-          east: bounds.getEast(),
-        },
-        instance.getZoom(),
+      const toBounds = (b: L.LatLngBounds): Bounds => ({
+        south: b.getSouth(),
+        west: b.getWest(),
+        north: b.getNorth(),
+        east: b.getEast(),
+      });
+      const pixels = instance.getPixelBounds();
+      const margin = L.point(OFFSCREEN_X, OFFSCREEN_Y);
+      const drawn = L.latLngBounds(
+        instance.unproject(pixels.min!.subtract(margin)),
+        instance.unproject(pixels.max!.add(margin)),
       );
+      latest.current.onBoundsChange(toBounds(instance.getBounds()), instance.getZoom(), toBounds(drawn));
     };
 
     instance.on('moveend', report);

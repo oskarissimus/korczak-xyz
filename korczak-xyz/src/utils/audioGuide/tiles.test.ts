@@ -105,6 +105,24 @@ describe("AttractionCache", () => {
     expect(cache.lookup(oldTown).attractions).toHaveLength(1);
   });
 
+  it("draws a pin just past the screen edge, without asking for squares beyond the screen", () => {
+    const cache = new AttractionCache();
+    const justEast = place(2, 52.25, oldTown.east + 0.001);
+    cache.store(tilesCovering(oldTown), [place(1, 52.25, 21.01), justEast]);
+    const drawn = { ...oldTown, east: oldTown.east + 0.002 };
+    expect(cache.lookup(oldTown).attractions).toHaveLength(1);
+    const wide = cache.lookup(oldTown, drawn);
+    expect(wide.attractions.map((a) => a.id).sort()).toEqual([1, 2]);
+    expect(wide.missing).toBeNull();
+  });
+
+  it("does not count a square only the margin touches as missing", () => {
+    const cache = new AttractionCache();
+    cache.store(tilesCovering(oldTown), []);
+    const drawn = { ...oldTown, east: oldTown.east + 0.05 };
+    expect(cache.lookup(oldTown, drawn).missing).toBeNull();
+  });
+
   it("forgets the least recently looked-at squares first", () => {
     const cache = new AttractionCache(2);
     const r = (x: number) => ({ minX: x, maxX: x, minY: 10784, maxY: 10784 });

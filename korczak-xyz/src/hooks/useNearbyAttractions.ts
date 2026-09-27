@@ -81,7 +81,8 @@ export interface NearbyAttractions {
   zoomedOut: boolean;
   error: AttractionsError | null;
   /** Hand it the map's current rectangle and zoom; it decides whether and when to ask. */
-  setBounds: (bounds: Bounds, zoom: number) => void;
+  /** `drawn` is the screen plus a margin: pins there are drawn, but only the screen is fetched. */
+  setBounds: (bounds: Bounds, zoom: number, drawn?: Bounds) => void;
   retry: () => void;
 }
 
@@ -117,7 +118,7 @@ export function useNearbyAttractions(): NearbyAttractions {
   const cache = useRef(new AttractionCache());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef<AbortController | null>(null);
-  const last = useRef<{ bounds: Bounds; zoom: number } | null>(null);
+  const last = useRef<{ bounds: Bounds; zoom: number; drawn?: Bounds } | null>(null);
   // For the measurements: when the app mounted, how many loads have gone out, and how many
   // viewports the cache answered on its own since the last one.
   const mountedAt = useRef(performance.now());
@@ -125,8 +126,8 @@ export function useNearbyAttractions(): NearbyAttractions {
   const cachedViews = useRef(0);
 
   /** Draw what the cache holds for a viewport, and say what it does not. */
-  const show = useCallback((bounds: Bounds): { missing: TileRange | null; missingCount: number; shown: number } => {
-    const { attractions: known, missing, missingCount } = cache.current.lookup(bounds);
+  const show = useCallback((bounds: Bounds, drawnBounds: Bounds = bounds): { missing: TileRange | null; missingCount: number; shown: number } => {
+    const { attractions: known, missing, missingCount } = cache.current.lookup(bounds, drawnBounds);
     const drawn = nearestToCentre(known, bounds, MAX_MARKERS);
     setAttractions(drawn);
     setEmpty(missing === null && known.length === 0);
@@ -152,7 +153,7 @@ export function useNearbyAttractions(): NearbyAttractions {
             if (signal.aborted) return;
             found += places.length;
             cache.current.store(squaresOf(x, y), places);
-            if (last.current) show(last.current.bounds);
+            if (last.current) show(last.current.bounds, last.current.drawn);
           }),
         );
         return signal.aborted ? { ok: false, reason: 'aborted' } : { ok: true, found, tiles: tiles.length };
@@ -213,7 +214,7 @@ export function useNearbyAttractions(): NearbyAttractions {
           return;
         }
         if (pins.ok) {
-          const shown = last.current ? show(last.current.bounds).shown : 0;
+          const shown = last.current ? show(last.current.bounds, last.current.drawn).shown : 0;
           measure('ok', { source: 'archive', found: pins.found, tilesRead: pins.tiles, shown });
           log.debug('audioGuide.attractions.loaded', { found: pins.found, source: 'archive' });
           return;
@@ -231,7 +232,7 @@ export function useNearbyAttractions(): NearbyAttractions {
         }
 
         cache.current.store(range, found);
-        const shown = last.current ? show(last.current.bounds).shown : 0;
+        const shown = last.current ? show(last.current.bounds, last.current.drawn).shown : 0;
         measure('ok', { source: 'overpass', archive: pins.reason, found: found.length, shown });
         log.debug('audioGuide.attractions.loaded', { found: found.length, source: 'overpass' });
       } catch (e) {
@@ -253,12 +254,12 @@ export function useNearbyAttractions(): NearbyAttractions {
   );
 
   const setBounds = useCallback(
-    (bounds: Bounds, zoom: number) => {
-      last.current = { bounds, zoom };
+    (bounds: Bounds, zoom: number, drawn?: Bounds) => {
+      last.current = { bounds, zoom, drawn };
       if (timer.current) clearTimeout(timer.current);
 
       const at = performance.now();
-      const { missing, missingCount } = show(bounds);
+      const { missing, missingCount } = show(bounds, drawn);
       if (!missing) cachedViews.current++;
       const tooWide = zoom < MIN_ZOOM;
       setZoomedOut(tooWide && missing !== null);
@@ -282,7 +283,7 @@ export function useNearbyAttractions(): NearbyAttractions {
   );
 
   const retry = useCallback(() => {
-    if (last.current) setBounds(last.current.bounds, last.current.zoom);
+    if (last.current) setBounds(last.current.bounds, last.current.zoom, last.current.drawn);
   }, [setBounds]);
 
   useEffect(

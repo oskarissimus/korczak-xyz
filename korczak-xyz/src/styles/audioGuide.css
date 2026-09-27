@@ -147,7 +147,13 @@
   border: none;
 }
 
+/* The icon is a zero-sized box on the point (MapPane's `speakerIcon`), and the pill is centred on
+   it both ways, whatever the length of its name. */
 .ag-marker-body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -192,24 +198,14 @@
   }
 }
 
-/* Zoomed out (`LABEL_ZOOM` in MapPane): the pill becomes a dot on the spot the pill is anchored
-   to, the speaker glyph at (15, 17) of the icon. Leaflet still sizes the icon 104x34, so the icon
-   itself stops taking taps and only the 26px circle round the dot does — otherwise an invisible
-   label-shaped box swallows taps meant for the map and the dots beside it. */
-.ag-map-far .ag-marker.leaflet-interactive {
-  pointer-events: none;
-}
-
+/* Zoomed out (`LABEL_ZOOM` in MapPane): the pill becomes a dot on the point. The body shrinks to
+   a 26px tap target, still centred by the transform above, with the 12px dot in its middle. */
 .ag-map-far .ag-marker-body {
-  position: absolute;
-  left: 2px;
-  top: 4px;
   width: 26px;
   height: 26px;
   padding: 0;
   border: none;
   background: none;
-  pointer-events: auto;
 }
 
 .ag-map-far .ag-marker-body::before {
