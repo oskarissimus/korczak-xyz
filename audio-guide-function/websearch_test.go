@@ -55,6 +55,9 @@ func TestAPlaceWithoutWikipediaIsReadFromTheWebPagesItself(t *testing.T) {
 	if f.searchCalls != 1 {
 		t.Errorf("%d searches", f.searchCalls)
 	}
+	if !strings.Contains(f.searchBody, `"tool_choice":{"type":"web_search_preview"}`) {
+		t.Errorf("the search is not forced: %s", f.searchBody)
+	}
 	if !strings.Contains(f.searchBody, `"country":"PL"`) || !strings.Contains(f.searchBody, "Konstancin-Jeziorna") {
 		t.Errorf("the search was not told where the place is: %s", f.searchBody)
 	}

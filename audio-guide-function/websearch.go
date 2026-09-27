@@ -81,7 +81,7 @@ func skippedHost(host string) bool {
 
 // webSources searches for pages about the place and returns the ones that pass, as sources.
 func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location) []source {
-	urls, err := searchURLs(ctx, apiKey, a, loc)
+	urls, answer, err := searchURLs(ctx, apiKey, a, loc)
 	if err != nil {
 		// Not the reader's problem unless it is their key, and then the facts call says so.
 		log.Printf("generate-audio: web search: %v", err)
@@ -105,6 +105,12 @@ func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location
 	for i, u := range urls {
 		report = append(report, u+" ("+verdicts[i]+")")
 	}
+	if len(urls) == 0 {
+		if r := []rune(strings.Join(strings.Fields(answer), " ")); len(r) > 300 {
+			answer = string(r[:300])
+		}
+		report = append(report, fmt.Sprintf("answer %q", answer))
+	}
 	log.Printf("generate-audio: web search for %q: %d urls: %s", a.Name, len(urls), strings.Join(report, ", "))
 
 	var out []source
@@ -121,6 +127,7 @@ type responsesRequest struct {
 	Model           string           `json:"model"`
 	Input           string           `json:"input"`
 	Tools           []map[string]any `json:"tools"`
+	ToolChoice      map[string]any   `json:"tool_choice,omitempty"`
 	MaxOutputTokens int              `json:"max_output_tokens"`
 	Store           bool             `json:"store"`
 }
@@ -143,8 +150,13 @@ var urlInTextRE = regexp.MustCompile(`https?://[^\s<>()\[\]"']+`)
 
 // searchURLs asks the search model where this place is written about. Its answer is read for
 // links only - the citations it attached, then any it wrote out - and nothing it says is kept.
-func searchURLs(ctx context.Context, apiKey string, a *Attraction, loc *Location) ([]string, error) {
-	tool := map[string]any{"type": "web_search_preview", "search_context_size": "low"}
+//
+// The answer's text comes back too, for the log line when no URL does: "found nothing" and "never
+// searched" read the same from the outside.
+func searchURLs(ctx context.Context, apiKey string, a *Attraction, loc *Location) ([]string, string, error) {
+	// Medium, not low: on low, Willa Wierzbówka - a listed villa with pages about it - came back
+	// with no URL at all.
+	tool := map[string]any{"type": "web_search_preview", "search_context_size": "medium"}
 	if loc.Valid && len(loc.CountryCode) == 2 {
 		ul := map[string]any{"type": "approximate", "country": strings.ToUpper(loc.CountryCode)}
 		if loc.City != "" {
@@ -164,36 +176,39 @@ Answer only with the URLs of up to %d such pages, one per line, best first. If y
 		a.Name, a.Category, describeLocation(a, loc), maxWebPages+2)
 
 	body, err := json.Marshal(responsesRequest{
-		Model:           "gpt-4o-mini",
-		Input:           prompt,
-		Tools:           []map[string]any{tool},
+		Model: "gpt-4o-mini",
+		Input: prompt,
+		Tools: []map[string]any{tool},
+		// Forced: left to itself the model sometimes answers NONE from memory without searching.
+		ToolChoice:      map[string]any{"type": "web_search_preview"},
 		MaxOutputTokens: 400,
 		Store:           false,
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIResponsesEndpoint, bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, newProviderError("OpenAI", resp.StatusCode, b)
+		return nil, "", newProviderError("OpenAI", resp.StatusCode, b)
 	}
 	var out responsesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var found []string
+	var answer strings.Builder
 	for _, item := range out.Output {
 		for _, c := range item.Content {
 			for _, an := range c.Annotations {
@@ -202,9 +217,10 @@ Answer only with the URLs of up to %d such pages, one per line, best first. If y
 				}
 			}
 			found = append(found, urlInTextRE.FindAllString(c.Text, -1)...)
+			answer.WriteString(c.Text)
 		}
 	}
-	return candidateURLs(found), nil
+	return candidateURLs(found), answer.String(), nil
 }
 
 // candidateURLs cleans, de-duplicates and filters what the search named, keeping its order.
