@@ -285,6 +285,9 @@ Three things about the pins that look like details and are not:
   toggled on `zoomend`, not a new icon per pin, so selection and the pulse survive it. A tapped dot
   zooms to 16 on that spot rather than playing: at dot scale a finger cannot tell neighbours
   apart, and a narration is not free.
+- **Below zoom 13 (`MIN_ZOOM`) there are no dots at all**, except the selected pin (`ag-map-none`).
+  At city scale the cached dots are one clump over the district last looked at, and the chip
+  already says to zoom in.
 
 Where the pins come from changed twice in Sep 2026, and the order matters for reading the code.
 Until then every pan and zoom was a fresh Overpass query for exactly the visible rectangle, half a

@@ -234,6 +234,12 @@
   display: none;
 }
 
+/* Below `MIN_ZOOM` (useNearbyAttractions) no dots at all, bar the selected one: the chip already
+   says to zoom in, and the cached dots are a clump over one district of a whole city. */
+.ag-map-none .ag-marker:not(.ag-marker-selected) {
+  display: none;
+}
+
 /* --- the arrow --------------------------------------------------------------------------- */
 
 .ag-user {

@@ -21,6 +21,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 
+import { MIN_ZOOM } from '../../hooks/useNearbyAttractions';
 import type { Attraction, Bounds } from '../../utils/audioGuide/types';
 
 /** Where the map opens before it knows better: Warsaw's old town. */
@@ -144,6 +145,9 @@ export default function MapPane({
       // One class on the container rather than a new icon per pin: every pin changes at once,
       // and none of them loses its selection or its pulse.
       container.current?.classList.toggle('ag-map-far', instance.getZoom() < LABEL_ZOOM);
+      // Below the zoom nothing is fetched at, a city's worth of cached dots is one black smudge
+      // over whichever district was last looked at. Only the selected pin stays, as a landmark.
+      container.current?.classList.toggle('ag-map-none', instance.getZoom() < MIN_ZOOM);
       const bounds = instance.getBounds();
       latest.current.onBoundsChange(
         {
