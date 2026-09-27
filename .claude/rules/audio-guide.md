@@ -98,7 +98,11 @@ voice of a tour guide. Every piece below exists to close one route by which that
   DNS and on every redirect (`publicOnly`): the URLs are a model's choice, and the metadata server
   that hands out this function's identity is one link-local address away. A search that fails
   (a refused key, a 400, a timeout) is a missing source and a `generate-audio: web search` log
-  line, never a failed tap. It costs the reader a search call - about a cent, not measured - on
+  line, never a failed tap. Each search also logs `generate-audio: web search for "..."` with
+  every URL it named and what became of it (`ok`, a status, `does not name the place and its town`).
+  An https URL whose certificate does not verify is retried over plain http: small municipal sites
+  (visitkonstancin.pl) serve https with a stranger's certificate, and the first Willa Grażyna tap
+  after this shipped found exactly that page and lost it that way. It costs the reader a search call - about a cent, not measured - on
   every tap of a place with no article, including the ones that still end in `no_sources`; a
   place with an article is never searched. `stageSearch` (`search` in Server-Timing, so
   `serverSearchMs` in Sentry) times it, and the log line carries `webURLs` and `webPages`.

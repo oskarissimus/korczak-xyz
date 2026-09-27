@@ -1,7 +1,11 @@
 package function
 
 import (
+	"context"
+	"crypto/tls"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -142,5 +146,20 @@ func TestAboutPlaceNeedsTheNameAndTheTown(t *testing.T) {
 	}
 	if aboutPlace("Dworzec w Konstancinie zbudowano w 1936 roku.", a, loc) != "" {
 		t.Error("a page naming only part of the place was let in")
+	}
+}
+
+// A site with somebody else's certificate is read over plain http, which the retry relies on
+// being told apart by type rather than by message.
+func TestABadCertificateIsRecognisedForTheHTTPRetry(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	prev := allowPrivateFetch
+	allowPrivateFetch = true
+	defer func() { allowPrivateFetch = prev }()
+	_, err := getWebPage(context.Background(), srv.URL)
+	var certErr *tls.CertificateVerificationError
+	if !errors.As(err, &certErr) {
+		t.Fatalf("error %v (%T) is not a certificate verification error", err, err)
 	}
 }

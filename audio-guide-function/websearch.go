@@ -24,6 +24,7 @@ package function
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -88,15 +89,23 @@ func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location
 	}
 
 	pages := make([]*source, len(urls))
+	verdicts := make([]string, len(urls))
 	var wg sync.WaitGroup
 	for i, u := range urls {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			pages[i] = fetchWebPage(ctx, u, a, loc)
+			pages[i], verdicts[i] = fetchWebPage(ctx, u, a, loc)
 		}()
 	}
 	wg.Wait()
+	// Which pages the search named and what became of each: the one thing a no_sources after a
+	// search cannot otherwise tell apart - nothing found, or found and refused, and why.
+	var report []string
+	for i, u := range urls {
+		report = append(report, u+" ("+verdicts[i]+")")
+	}
+	log.Printf("generate-audio: web search for %q: %d urls: %s", a.Name, len(urls), strings.Join(report, ", "))
 
 	var out []source
 	for _, p := range pages {
@@ -281,34 +290,36 @@ var webClient = &http.Client{
 // A browser-like Accept, and the app's name: some municipal sites refuse Go's default agent.
 const webUserAgent = "Mozilla/5.0 (compatible; KorczakXyzAudioGuide/1.0; +https://korczak.xyz/apps/audio-guide/)"
 
-// fetchWebPage downloads one page and returns it as a source if it is about this place.
-func fetchWebPage(ctx context.Context, rawURL string, a *Attraction, loc *Location) *source {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil
+// fetchWebPage downloads one page and returns it as a source if it is about this place, or nil
+// and the reason it was not, for the log line: from the outside every rejection looks the same.
+func fetchWebPage(ctx context.Context, rawURL string, a *Attraction, loc *Location) (*source, string) {
+	resp, err := getWebPage(ctx, rawURL)
+	var certErr *tls.CertificateVerificationError
+	if err != nil && errors.As(err, &certErr) && strings.HasPrefix(rawURL, "https://") {
+		// Small municipal and tourist sites often serve https with somebody else's certificate
+		// (visitkonstancin.pl does) and the page itself over plain http, which is what the
+		// search links anyway. The page is public text that has to pass the same checks either
+		// way, so the retry costs nothing in trust.
+		resp, err = getWebPage(ctx, "http://"+strings.TrimPrefix(rawURL, "https://"))
 	}
-	req.Header.Set("User-Agent", webUserAgent)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
-	req.Header.Set("Accept-Language", "pl,en;q=0.8,*;q=0.5")
-	resp, err := webClient.Do(req)
 	if err != nil {
-		return nil
+		return nil, "fetch: " + err.Error()
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil
+		return nil, fmt.Sprintf("status %d", resp.StatusCode)
 	}
 	if mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type")); mt != "text/html" && mt != "application/xhtml+xml" {
-		return nil
+		return nil, "content-type " + mt
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, webPageMaxBytes))
 	if err != nil {
-		return nil
+		return nil, "read: " + err.Error()
 	}
 	title, text := htmlText(body)
 	text = aboutPlace(text, a, loc)
 	if len([]rune(text)) < minWebPageChars {
-		return nil
+		return nil, "does not name the place and its town"
 	}
 	host := resp.Request.URL.Hostname()
 	label := fmt.Sprintf("Web page on %s", host)
@@ -319,7 +330,18 @@ func fetchWebPage(ctx context.Context, rawURL string, a *Attraction, loc *Locati
 		Label: label + " - found by web search; use it only if it is clearly about this place",
 		URL:   resp.Request.URL.String(),
 		Text:  text,
+	}, "ok"
+}
+
+func getWebPage(ctx context.Context, rawURL string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
 	}
+	req.Header.Set("User-Agent", webUserAgent)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
+	req.Header.Set("Accept-Language", "pl,en;q=0.8,*;q=0.5")
+	return webClient.Do(req)
 }
 
 // skippedElements hold no prose, or prose that is the site's rather than the page's.
