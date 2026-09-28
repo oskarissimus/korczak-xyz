@@ -51,6 +51,6 @@
     "sharp": "^0.35.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
-    "wrangler": "^4.42.0"
+    "wrangler": "^4.140.0"
   }
 }
