@@ -35,6 +35,8 @@ type fakeProviders struct {
 	pages       map[string]string
 	searchCalls int
 	searchBody  string
+	// A model the search answers 400 for, as for a project without access to it.
+	searchRefuses string
 
 	chatCalls    int
 	ttsCalls     int
@@ -142,6 +144,11 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 		f.mu.Unlock()
 		if r.Header.Get("Authorization") != "Bearer sk-test" {
 			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if f.searchRefuses != "" && strings.Contains(string(body), `"model":"`+f.searchRefuses+`"`) {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"error":{"message":"model not available"}}`)
 			return
 		}
 		var annotations []any

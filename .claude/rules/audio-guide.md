@@ -85,14 +85,18 @@ voice of a tour guide. Every piece below exists to close one route by which that
   "nearest article" or a fuzzy score** - a near miss is how the guide ended up about another town.
 - **The web, for places Wikipedia does not have** (`websearch.go`, late Sep 2026). When no
   article about the place is found at all - linked, via Wikidata, or by geosearch - the function
-  asks OpenAI's `web_search_preview` (Responses API, `gpt-4o-mini`, `search_context_size: medium`
+  asks OpenAI's `web_search_preview` (Responses API, `gpt-4.1-mini` - `gpt-4o-mini` told Willa
+  Wierzbówka's reader nothing is written about it while an ordinary search's first page has two
+  pages on it, and is kept only as the fallback for a key that cannot use 4.1 -
+  `search_context_size: medium`
   and `tool_choice` forcing the search - on `low` and unforced, Willa Wierzbówka came back with no
   URL at all,
   the country and town as `user_location`) **for URLs and nothing else**, on the reader's own key.
   It then downloads up to five of them itself, reduces the HTML to text (no `script`, `nav`,
   `header`, `footer`, `aside`, `form`), and lets a page in as a source only if it names the place
   - every word of one of its names, by stem, so "Willi Grażyna" counts - **and** the town, when
-  Nominatim gave one; at most three pages, 5,000 characters each, cut from just before the
+  Nominatim gave one (the page's `<title>` counts for the town: small sites name it only there
+  and in the footer, which is cut); at most three pages, 5,000 characters each, cut from just before the
   paragraph that first names the place. **Do not replace this with the search model's own answer.**
   It is a paraphrase with links, and a paraphrase cannot be quote-checked; that is exactly the
   route by which invented facts came back. Wikipedia, Wikidata, OSM, Google and the social

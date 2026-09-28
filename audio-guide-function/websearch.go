@@ -63,6 +63,8 @@ var skippedHosts = map[string]bool{
 	"facebook.com": true, "instagram.com": true, "tiktok.com": true, "x.com": true,
 	"twitter.com": true, "youtube.com": true, "pinterest.com": true, "linkedin.com": true,
 	"google.com": true, "maps.app.goo.gl": true, "openstreetmap.org": true,
+	// Street directories: they name every street and landmark in a town and say nothing about any.
+	"sprawdzadres.pl": true,
 }
 
 func skippedHost(host string) bool {
@@ -81,7 +83,14 @@ func skippedHost(host string) bool {
 
 // webSources searches for pages about the place and returns the ones that pass, as sources.
 func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location) []source {
-	urls, answer, err := searchURLs(ctx, apiKey, a, loc)
+	urls, answer, err := searchURLs(ctx, apiKey, searchModel, a, loc)
+	var pe *providerError
+	if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
+		// A key or a project without access to the search model: the older one searches worse
+		// but searches.
+		log.Printf("generate-audio: web search on %s: %v; retrying on %s", searchModel, err, fallbackSearchModel)
+		urls, answer, err = searchURLs(ctx, apiKey, fallbackSearchModel, a, loc)
+	}
 	if err != nil {
 		// Not the reader's problem unless it is their key, and then the facts call says so.
 		log.Printf("generate-audio: web search: %v", err)
@@ -146,6 +155,14 @@ type responsesResponse struct {
 	} `json:"output"`
 }
 
+// Not gpt-4o-mini, which writes the facts and the script: as a searcher it told Willa
+// Wierzbówka's reader that nothing is written about it, when the first page of an ordinary search
+// is visitkonstancin.pl's page on it and its zabytek.pl entry. It stays as the fallback.
+const (
+	searchModel         = "gpt-4.1-mini"
+	fallbackSearchModel = "gpt-4o-mini"
+)
+
 var urlInTextRE = regexp.MustCompile(`https?://[^\s<>()\[\]"']+`)
 
 // searchURLs asks the search model where this place is written about. Its answer is read for
@@ -153,7 +170,7 @@ var urlInTextRE = regexp.MustCompile(`https?://[^\s<>()\[\]"']+`)
 //
 // The answer's text comes back too, for the log line when no URL does: "found nothing" and "never
 // searched" read the same from the outside.
-func searchURLs(ctx context.Context, apiKey string, a *Attraction, loc *Location) ([]string, string, error) {
+func searchURLs(ctx context.Context, apiKey, model string, a *Attraction, loc *Location) ([]string, string, error) {
 	// Medium, not low: on low, Willa Wierzbówka - a listed villa with pages about it - came back
 	// with no URL at all.
 	tool := map[string]any{"type": "web_search_preview", "search_context_size": "medium"}
@@ -172,11 +189,13 @@ Kind: %s
 %s
 Look for pages about exactly this place - a municipal or tourist-office page, a heritage register, a local history site, a guidebook. Search in the local language. Not Wikipedia, not social media, not pages about a different place with a similar name.
 
+Start with a search for: %s
+
 Answer only with the URLs of up to %d such pages, one per line, best first. If you find none, answer NONE.`,
-		a.Name, a.Category, describeLocation(a, loc), maxWebPages+2)
+		a.Name, a.Category, describeLocation(a, loc), searchQuery(a, loc), maxWebPages+2)
 
 	body, err := json.Marshal(responsesRequest{
-		Model: "gpt-4o-mini",
+		Model: model,
 		Input: prompt,
 		Tools: []map[string]any{tool},
 		// Forced: left to itself the model sometimes answers NONE from memory without searching.
@@ -221,6 +240,14 @@ Answer only with the URLs of up to %d such pages, one per line, best first. If y
 		}
 	}
 	return candidateURLs(found), answer.String(), nil
+}
+
+// searchQuery is what a person would type: the name and the town.
+func searchQuery(a *Attraction, loc *Location) string {
+	if loc.Valid && loc.City != "" {
+		return a.Name + " " + loc.City
+	}
+	return a.Name
 }
 
 // candidateURLs cleans, de-duplicates and filters what the search named, keeping its order.
@@ -333,7 +360,7 @@ func fetchWebPage(ctx context.Context, rawURL string, a *Attraction, loc *Locati
 		return nil, "read: " + err.Error()
 	}
 	title, text := htmlText(body)
-	text = aboutPlace(text, a, loc)
+	text = aboutPlace(title, text, a, loc)
 	if len([]rune(text)) < minWebPageChars {
 		return nil, "does not name the place and its town"
 	}
@@ -471,11 +498,13 @@ func mentions(folded []string, name string) bool {
 // the town. What is
 // kept starts a little before the paragraph that first names the place, so that a long page's
 // menu, cookie notice and unrelated news do not fill the model's reading.
-func aboutPlace(text string, a *Attraction, loc *Location) string {
+func aboutPlace(title, text string, a *Attraction, loc *Location) string {
 	lines := strings.Split(text, "\n")
 	all := nameTokens(text)
 	// The town by its longest word: "Konstancin-Jeziorna" is "Konstancin" on most pages about it.
-	if loc.Valid && loc.City != "" && !mentionsAnyWord(all, loc.City) {
+	// The title counts for the town: a small site names its town once, in the title and the
+	// footer ("Willa Wierzbówka, ul. Matejki 10 | Konstancin-Jeziorna"), and the footer is cut.
+	if loc.Valid && loc.City != "" && !mentionsAnyWord(append(nameTokens(title), all...), loc.City) {
 		return ""
 	}
 	first := -1

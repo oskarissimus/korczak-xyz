@@ -141,14 +141,20 @@ func TestAboutPlaceNeedsTheNameAndTheTown(t *testing.T) {
 	loc := &Location{Valid: true, City: "Konstancin-Jeziorna"}
 	text := "Menu\nAktualności\nDworzec kolejki wilanowskiej w Klarysewie zbudowano w 1936 roku. " +
 		"Dziś w budynku dworca w Konstancinie działa biblioteka."
-	if got := aboutPlace(text, a, loc); !strings.Contains(got, "1936") {
+	if got := aboutPlace("", text, a, loc); !strings.Contains(got, "1936") {
 		t.Errorf("an inflected mention was not recognised: %q", got)
 	}
-	if aboutPlace(strings.ReplaceAll(text, "Konstancinie", "Piasecznie"), a, loc) != "" {
+	if aboutPlace("", strings.ReplaceAll(text, "Konstancinie", "Piasecznie"), a, loc) != "" {
 		t.Error("a page that never names the town was let in")
 	}
-	if aboutPlace("Dworzec w Konstancinie zbudowano w 1936 roku.", a, loc) != "" {
+	if aboutPlace("", "Dworzec w Konstancinie zbudowano w 1936 roku.", a, loc) != "" {
 		t.Error("a page naming only part of the place was let in")
+	}
+	// A small site names its town in the title and the footer only.
+	w := &Attraction{Name: "Willa Wierzbówka"}
+	body := "Willa Wierzbówka, ul. Matejki 10\nWybudowana 1904 roku na zlecenie Stanisława Wierzbowskiego w modnym nurcie Arts and Crafts, w stylu nawiązującym do architektury elżbietańskiej."
+	if aboutPlace("Willa Wierzbówka, ul. Matejki 10 | Konstancin-Jeziorna", body, w, loc) == "" {
+		t.Error("the town in the title did not count")
 	}
 }
 
@@ -164,5 +170,17 @@ func TestABadCertificateIsRecognisedForTheHTTPRetry(t *testing.T) {
 	var certErr *tls.CertificateVerificationError
 	if !errors.As(err, &certErr) {
 		t.Fatalf("error %v (%T) is not a certificate verification error", err, err)
+	}
+}
+
+func TestASearchModelTheKeyCannotUseFallsBackToTheOlderOne(t *testing.T) {
+	f := grazynaProviders(t)
+	f.searchRefuses = searchModel
+	f.searchURLs = []string{f.srvURL + "/page/grazyna"}
+	if rec := post(grazynaBody); rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if f.searchCalls != 2 || !strings.Contains(f.searchBody, fallbackSearchModel) {
+		t.Errorf("%d searches, last %s", f.searchCalls, f.searchBody)
 	}
 }
