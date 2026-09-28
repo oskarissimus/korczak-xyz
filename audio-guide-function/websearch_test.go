@@ -52,8 +52,8 @@ func TestAPlaceWithoutWikipediaIsReadFromTheWebPagesItself(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	if f.searchCalls != 1 {
-		t.Errorf("%d searches", f.searchCalls)
+	if f.searchCalls != 2 {
+		t.Errorf("%d searches, want the name with the town and with the street", f.searchCalls)
 	}
 	for _, want := range []string{`"tool_choice":"required"`, `"type":"web_search"`, `"include":["web_search_call.action.sources"]`} {
 		if !strings.Contains(f.searchBody, want) {
@@ -99,7 +99,7 @@ func TestAFailedSearchIsAMissingSource(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	if f.searchCalls != 1 || f.chatCalls != 0 {
+	if f.searchCalls != 2 || f.chatCalls != 0 {
 		t.Errorf("%d searches, %d chat calls", f.searchCalls, f.chatCalls)
 	}
 }
@@ -182,7 +182,7 @@ func TestASearchModelTheKeyCannotUseFallsBackToTheOlderOne(t *testing.T) {
 	if rec := post(grazynaBody); rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	if f.searchCalls != 2 || !strings.Contains(f.searchBody, `"model":"`+fallbackSearch.model+`"`) {
+	if f.searchCalls != 4 || !strings.Contains(f.searchBody, `"model":"`+fallbackSearch.model+`"`) {
 		t.Errorf("%d searches, last %s", f.searchCalls, f.searchBody)
 	}
 }
@@ -197,5 +197,14 @@ func TestTheSearchsOwnResultsAreReadWhenTheModelCitesNothing(t *testing.T) {
 	}
 	if got, want := rec.Header().Get("X-Guide-Sources"), f.srvURL+"/page/grazyna"; got != want {
 		t.Errorf("sources %q, want %q", got, want)
+	}
+}
+
+func TestSearchQueriesAreWhatAPersonWouldType(t *testing.T) {
+	a := &Attraction{Name: "Willa Wierzbówka"}
+	loc := &Location{Valid: true, City: "Konstancin-Jeziorna", Street: "Jana Matejki"}
+	got := strings.Join(searchQueries(a, loc), " | ")
+	if want := "Willa Wierzbówka Konstancin-Jeziorna | Willa Wierzbówka Jana Matejki Konstancin-Jeziorna"; got != want {
+		t.Errorf("got %q", got)
 	}
 }

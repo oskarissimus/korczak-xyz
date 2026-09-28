@@ -313,8 +313,8 @@ func TestAPlaceWithNoSourcesIsToldSoAndCostsOnlyTheSearch(t *testing.T) {
 	if _, code := errorBody(t, rec); code != "no_sources" {
 		t.Errorf("code %q", code)
 	}
-	if f.searchCalls != 1 {
-		t.Errorf("%d searches, want one before giving up", f.searchCalls)
+	if f.searchCalls != 2 {
+		t.Errorf("%d searches, want two (name and town, name and street) before giving up", f.searchCalls)
 	}
 	if f.chatCalls != 0 || f.ttsCalls != 0 {
 		t.Errorf("%d chat and %d TTS calls for a place nothing is known about", f.chatCalls, f.ttsCalls)

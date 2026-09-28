@@ -86,8 +86,13 @@ voice of a tour guide. Every piece below exists to close one route by which that
 - **The web, for places Wikipedia does not have** (`websearch.go`, late Sep 2026). When no
   article about the place is found at all - linked, via Wikidata, or by geosearch - the function
   asks OpenAI to search - `gpt-4.1-mini` with the `web_search` tool, `tool_choice: required`,
-  `search_context_size: medium`, the country and town as `user_location`, starting from
-  "name town" - **for URLs and nothing else**, on the reader's own key.
+  `search_context_size: medium`, the country and town as `user_location` - with **two queries
+  side by side, "name town" and "name street town"**, and **the input is the bare query**:
+  gpt-4.1-mini hands its input to the search engine verbatim, so a prompt of instructions was
+  searched for as a paragraph (seen with a real key, 28 Sep 2026). The street query is what found
+  the only text about Willa Wierzbówka in the index, an okolicekonstancina.pl article on ul.
+  Matejki; visitkonstancin.pl's own page on it is not in OpenAI's index at all. Results are
+  merged one from each query in turn - **for URLs and nothing else**, on the reader's own key.
   **The URLs are the search's own results, not only the model's picks**
   (`include: web_search_call.action.sources`): on Willa Wierzbówka the model answered three times
   that nothing is written about the villa while an ordinary search's first result is

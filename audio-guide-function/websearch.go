@@ -85,12 +85,7 @@ func skippedHost(host string) bool {
 
 // webSources searches for pages about the place and returns the ones that pass, as sources.
 func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location) []source {
-	urls, answer, err := searchURLs(ctx, apiKey, primarySearch, a, loc)
-	var pe *providerError
-	if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
-		log.Printf("generate-audio: web search on %s/%s: %v; retrying on %s/%s", primarySearch.model, primarySearch.tool, err, fallbackSearch.model, fallbackSearch.tool)
-		urls, answer, err = searchURLs(ctx, apiKey, fallbackSearch, a, loc)
-	}
+	urls, answer, err := searchAll(ctx, apiKey, searchQueries(a, loc), loc)
 	if err != nil {
 		// Not the reader's problem unless it is their key, and then the facts call says so.
 		log.Printf("generate-audio: web search: %v", err)
@@ -197,7 +192,7 @@ var urlInTextRE = regexp.MustCompile(`https?://[^\s<>()\[\]"']+`)
 //
 // The answer's text comes back too, for the log line when no URL does: "found nothing" and "never
 // searched" read the same from the outside.
-func searchURLs(ctx context.Context, apiKey string, setup searchSetup, a *Attraction, loc *Location) ([]string, string, error) {
+func searchURLs(ctx context.Context, apiKey string, setup searchSetup, query string, loc *Location) ([]string, string, error) {
 	// Medium, not low: on low, Willa Wierzbówka came back with no URL at all.
 	tool := map[string]any{"type": setup.tool, "search_context_size": "medium"}
 	if loc.Valid && len(loc.CountryCode) == 2 {
@@ -208,20 +203,12 @@ func searchURLs(ctx context.Context, apiKey string, setup searchSetup, a *Attrac
 		tool["user_location"] = ul
 	}
 
-	prompt := fmt.Sprintf(`Search the web for pages about this specific place:
-
-Name: %s
-Kind: %s
-%s
-Search for: %s
-Search in the local language. Useful pages are a municipal or tourist-office page, a heritage register, a local history site, a guidebook - even a short one.
-
-List the URL of every result that is about exactly this place, one per line, best first - even if it says only a sentence or two about it. Not Wikipedia, not social media, not a different place with a similar name. Only if no result mentions this place at all, answer NONE.`,
-		a.Name, a.Category, describeLocation(a, loc), searchQuery(a, loc))
-
 	body, err := json.Marshal(responsesRequest{
-		Model:           setup.model,
-		Input:           prompt,
+		Model: setup.model,
+		// The query itself and nothing else. gpt-4.1-mini hands its input to the search engine
+		// verbatim: a paragraph of instructions was searched for as a paragraph, and the results
+		// were whatever matched it.
+		Input:           query,
 		Tools:           []map[string]any{tool},
 		ToolChoice:      setup.toolChoice,
 		Include:         setup.include,
@@ -269,15 +256,80 @@ List the URL of every result that is about exactly this place, one per line, bes
 			answer.WriteString(c.Text)
 		}
 	}
-	return candidateURLs(append(chosen, results...)), answer.String(), nil
+	return append(chosen, results...), answer.String(), nil
 }
 
-// searchQuery is what a person would type: the name and the town.
-func searchQuery(a *Attraction, loc *Location) string {
-	if loc.Valid && loc.City != "" {
-		return a.Name + " " + loc.City
+// searchQueries are what a person would type: the name and the town, and the name with the
+// street as well. The second is not a refinement for its own sake: for Willa Wierzbówka "name town"
+// returned the neighbouring villas, and "name street town" returned a local history article on
+// ul. Matejki that lists its first owner - the only text about it the search's index has.
+func searchQueries(a *Attraction, loc *Location) []string {
+	if !loc.Valid || loc.City == "" {
+		return []string{a.Name}
 	}
-	return a.Name
+	qs := []string{a.Name + " " + loc.City}
+	if loc.Street != "" {
+		qs = append(qs, a.Name+" "+loc.Street+" "+loc.City)
+	}
+	return qs
+}
+
+// searchAll runs the queries side by side and merges what they found.
+// A search setup the key cannot use (400, 404) is retried on the fallback.
+func searchAll(ctx context.Context, apiKey string, queries []string, loc *Location) ([]string, string, error) {
+	type result struct {
+		urls   []string
+		answer string
+		err    error
+	}
+	results := make([]result, len(queries))
+	var wg sync.WaitGroup
+	for i, q := range queries {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			urls, answer, err := searchURLs(ctx, apiKey, primarySearch, q, loc)
+			var pe *providerError
+			if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
+				log.Printf("generate-audio: web search on %s/%s: %v; retrying on %s/%s", primarySearch.model, primarySearch.tool, err, fallbackSearch.model, fallbackSearch.tool)
+				urls, answer, err = searchURLs(ctx, apiKey, fallbackSearch, q, loc)
+			}
+			results[i] = result{urls, answer, err}
+		}()
+	}
+	wg.Wait()
+
+	var lists [][]string
+	var answers []string
+	var firstErr error
+	for _, r := range results {
+		if r.err != nil {
+			if firstErr == nil {
+				firstErr = r.err
+			}
+			continue
+		}
+		lists = append(lists, candidateURLs(r.urls))
+		answers = append(answers, r.answer)
+	}
+	if len(lists) == 0 {
+		return nil, "", firstErr
+	}
+	// Taken in turn, one from each query, so the street query's best result is not cut off
+	// behind the name query's fifteenth.
+	var all []string
+	for i := 0; ; i++ {
+		more := false
+		for _, l := range lists {
+			if i < len(l) {
+				all, more = append(all, l[i]), true
+			}
+		}
+		if !more {
+			break
+		}
+	}
+	return candidateURLs(all), strings.Join(answers, " / "), nil
 }
 
 // candidateURLs cleans, de-duplicates and filters what the search named, keeping its order.
