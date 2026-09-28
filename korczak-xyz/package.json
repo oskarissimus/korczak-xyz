@@ -18,7 +18,7 @@
   "dependencies": {
     "@astrojs/markdown-remark": "^7.2.1",
     "@astrojs/mdx": "^7.0.3",
-    "@astrojs/react": "^6.0.1",
+    "@astrojs/react": "^7.0.0",
     "@astrojs/sitemap": "^3.7.4",
     "@calcom/embed-react": "^1.5.3",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
