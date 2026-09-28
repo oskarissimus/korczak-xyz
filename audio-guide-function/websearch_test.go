@@ -55,8 +55,10 @@ func TestAPlaceWithoutWikipediaIsReadFromTheWebPagesItself(t *testing.T) {
 	if f.searchCalls != 1 {
 		t.Errorf("%d searches", f.searchCalls)
 	}
-	if !strings.Contains(f.searchBody, `"tool_choice":{"type":"web_search_preview"}`) {
-		t.Errorf("the search is not forced: %s", f.searchBody)
+	for _, want := range []string{`"tool_choice":"required"`, `"type":"web_search"`, `"include":["web_search_call.action.sources"]`} {
+		if !strings.Contains(f.searchBody, want) {
+			t.Errorf("the search request lacks %s: %s", want, f.searchBody)
+		}
 	}
 	if !strings.Contains(f.searchBody, `"country":"PL"`) || !strings.Contains(f.searchBody, "Konstancin-Jeziorna") {
 		t.Errorf("the search was not told where the place is: %s", f.searchBody)
@@ -175,12 +177,25 @@ func TestABadCertificateIsRecognisedForTheHTTPRetry(t *testing.T) {
 
 func TestASearchModelTheKeyCannotUseFallsBackToTheOlderOne(t *testing.T) {
 	f := grazynaProviders(t)
-	f.searchRefuses = searchModel
+	f.searchRefuses = primarySearch.model
 	f.searchURLs = []string{f.srvURL + "/page/grazyna"}
 	if rec := post(grazynaBody); rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	if f.searchCalls != 2 || !strings.Contains(f.searchBody, fallbackSearchModel) {
+	if f.searchCalls != 2 || !strings.Contains(f.searchBody, `"model":"`+fallbackSearch.model+`"`) {
 		t.Errorf("%d searches, last %s", f.searchCalls, f.searchBody)
+	}
+}
+
+// The model said it found nothing; the search had returned the page. The page is read anyway.
+func TestTheSearchsOwnResultsAreReadWhenTheModelCitesNothing(t *testing.T) {
+	f := grazynaProviders(t)
+	f.searchResults = []string{f.srvURL + "/page/zakopane", f.srvURL + "/page/grazyna"}
+	rec := post(grazynaBody)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if got, want := rec.Header().Get("X-Guide-Sources"), f.srvURL+"/page/grazyna"; got != want {
+		t.Errorf("sources %q, want %q", got, want)
 	}
 }

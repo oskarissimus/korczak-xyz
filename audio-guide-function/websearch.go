@@ -47,7 +47,9 @@ import (
 var openAIResponsesEndpoint = "https://api.openai.com/v1/responses"
 
 const (
-	maxWebPages     = 3
+	maxWebPages = 3
+	// URLs fetched per search: the model's picks first, then the search's own results.
+	maxCandidates   = 8
 	webPageChars    = 5000
 	webPageMaxBytes = 2 << 20
 	webFetchTimeout = 8 * time.Second
@@ -83,13 +85,11 @@ func skippedHost(host string) bool {
 
 // webSources searches for pages about the place and returns the ones that pass, as sources.
 func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location) []source {
-	urls, answer, err := searchURLs(ctx, apiKey, searchModel, a, loc)
+	urls, answer, err := searchURLs(ctx, apiKey, primarySearch, a, loc)
 	var pe *providerError
 	if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
-		// A key or a project without access to the search model: the older one searches worse
-		// but searches.
-		log.Printf("generate-audio: web search on %s: %v; retrying on %s", searchModel, err, fallbackSearchModel)
-		urls, answer, err = searchURLs(ctx, apiKey, fallbackSearchModel, a, loc)
+		log.Printf("generate-audio: web search on %s/%s: %v; retrying on %s/%s", primarySearch.model, primarySearch.tool, err, fallbackSearch.model, fallbackSearch.tool)
+		urls, answer, err = searchURLs(ctx, apiKey, fallbackSearch, a, loc)
 	}
 	if err != nil {
 		// Not the reader's problem unless it is their key, and then the facts call says so.
@@ -136,14 +136,21 @@ type responsesRequest struct {
 	Model           string           `json:"model"`
 	Input           string           `json:"input"`
 	Tools           []map[string]any `json:"tools"`
-	ToolChoice      map[string]any   `json:"tool_choice,omitempty"`
+	ToolChoice      any              `json:"tool_choice,omitempty"`
+	Include         []string         `json:"include,omitempty"`
 	MaxOutputTokens int              `json:"max_output_tokens"`
 	Store           bool             `json:"store"`
 }
 
 type responsesResponse struct {
 	Output []struct {
-		Type    string `json:"type"`
+		Type string `json:"type"`
+		// A web_search_call's search, with every result it returned when asked for them.
+		Action *struct {
+			Sources []struct {
+				URL string `json:"url"`
+			} `json:"sources"`
+		} `json:"action"`
 		Content []struct {
 			Type        string `json:"type"`
 			Text        string `json:"text"`
@@ -155,25 +162,44 @@ type responsesResponse struct {
 	} `json:"output"`
 }
 
-// Not gpt-4o-mini, which writes the facts and the script: as a searcher it told Willa
-// Wierzbówka's reader that nothing is written about it, when the first page of an ordinary search
-// is visitkonstancin.pl's page on it and its zabytek.pl entry. It stays as the fallback.
-const (
-	searchModel         = "gpt-4.1-mini"
-	fallbackSearchModel = "gpt-4o-mini"
+// searchSetup is one way of asking OpenAI to search.
+type searchSetup struct {
+	model, tool string
+	toolChoice  any
+	include     []string
+}
+
+var (
+	// The search's own result list, not the model's opinion of it. On Willa Wierzbówka the model
+	// answered three times that nothing is written about the villa - on gpt-4o-mini and on
+	// gpt-4.1-mini, forced to search - while an ordinary search's first page has visitkonstancin.pl's
+	// page on it. The model judges a two-sentence page "not detailed" and leaves it out; the
+	// checks here would have let it in. So `web_search` (not the preview) with
+	// `web_search_call.action.sources`: every URL the search returned comes back, whatever the
+	// model then writes, and aboutPlace decides.
+	primarySearch = searchSetup{
+		model: "gpt-4.1-mini", tool: "web_search", toolChoice: "required",
+		include: []string{"web_search_call.action.sources"},
+	}
+	// For a key or a project that cannot use the above: what shipped first, which searches worse
+	// but searches.
+	fallbackSearch = searchSetup{
+		model: "gpt-4o-mini", tool: "web_search_preview",
+		toolChoice: map[string]any{"type": "web_search_preview"},
+	}
 )
 
 var urlInTextRE = regexp.MustCompile(`https?://[^\s<>()\[\]"']+`)
 
-// searchURLs asks the search model where this place is written about. Its answer is read for
-// links only - the citations it attached, then any it wrote out - and nothing it says is kept.
+// searchURLs asks OpenAI to search for this place and returns the URLs: the citations the model
+// attached, any it wrote out, then every result the search itself returned. Nothing the model
+// says about the place is kept.
 //
 // The answer's text comes back too, for the log line when no URL does: "found nothing" and "never
 // searched" read the same from the outside.
-func searchURLs(ctx context.Context, apiKey, model string, a *Attraction, loc *Location) ([]string, string, error) {
-	// Medium, not low: on low, Willa Wierzbówka - a listed villa with pages about it - came back
-	// with no URL at all.
-	tool := map[string]any{"type": "web_search_preview", "search_context_size": "medium"}
+func searchURLs(ctx context.Context, apiKey string, setup searchSetup, a *Attraction, loc *Location) ([]string, string, error) {
+	// Medium, not low: on low, Willa Wierzbówka came back with no URL at all.
+	tool := map[string]any{"type": setup.tool, "search_context_size": "medium"}
 	if loc.Valid && len(loc.CountryCode) == 2 {
 		ul := map[string]any{"type": "approximate", "country": strings.ToUpper(loc.CountryCode)}
 		if loc.City != "" {
@@ -182,25 +208,24 @@ func searchURLs(ctx context.Context, apiKey, model string, a *Attraction, loc *L
 		tool["user_location"] = ul
 	}
 
-	prompt := fmt.Sprintf(`Find web pages that describe this specific place and its history:
+	prompt := fmt.Sprintf(`Search the web for pages about this specific place:
 
 Name: %s
 Kind: %s
 %s
-Look for pages about exactly this place - a municipal or tourist-office page, a heritage register, a local history site, a guidebook. Search in the local language. Not Wikipedia, not social media, not pages about a different place with a similar name.
+Search for: %s
+Search in the local language. Useful pages are a municipal or tourist-office page, a heritage register, a local history site, a guidebook - even a short one.
 
-Start with a search for: %s
-
-Answer only with the URLs of up to %d such pages, one per line, best first. If you find none, answer NONE.`,
-		a.Name, a.Category, describeLocation(a, loc), searchQuery(a, loc), maxWebPages+2)
+List the URL of every result that is about exactly this place, one per line, best first - even if it says only a sentence or two about it. Not Wikipedia, not social media, not a different place with a similar name. Only if no result mentions this place at all, answer NONE.`,
+		a.Name, a.Category, describeLocation(a, loc), searchQuery(a, loc))
 
 	body, err := json.Marshal(responsesRequest{
-		Model: model,
-		Input: prompt,
-		Tools: []map[string]any{tool},
-		// Forced: left to itself the model sometimes answers NONE from memory without searching.
-		ToolChoice:      map[string]any{"type": "web_search_preview"},
-		MaxOutputTokens: 400,
+		Model:           setup.model,
+		Input:           prompt,
+		Tools:           []map[string]any{tool},
+		ToolChoice:      setup.toolChoice,
+		Include:         setup.include,
+		MaxOutputTokens: 600,
 		Store:           false,
 	})
 	if err != nil {
@@ -226,20 +251,25 @@ Answer only with the URLs of up to %d such pages, one per line, best first. If y
 		return nil, "", err
 	}
 
-	var found []string
+	var chosen, results []string
 	var answer strings.Builder
 	for _, item := range out.Output {
+		if item.Action != nil {
+			for _, src := range item.Action.Sources {
+				results = append(results, src.URL)
+			}
+		}
 		for _, c := range item.Content {
 			for _, an := range c.Annotations {
 				if an.Type == "url_citation" {
-					found = append(found, an.URL)
+					chosen = append(chosen, an.URL)
 				}
 			}
-			found = append(found, urlInTextRE.FindAllString(c.Text, -1)...)
+			chosen = append(chosen, urlInTextRE.FindAllString(c.Text, -1)...)
 			answer.WriteString(c.Text)
 		}
 	}
-	return candidateURLs(found), answer.String(), nil
+	return candidateURLs(append(chosen, results...)), answer.String(), nil
 }
 
 // searchQuery is what a person would type: the name and the town.
@@ -273,7 +303,7 @@ func candidateURLs(raw []string) []string {
 			seen[s] = true
 			out = append(out, s)
 		}
-		if len(out) == maxWebPages+2 {
+		if len(out) == maxCandidates {
 			break
 		}
 	}

@@ -85,14 +85,16 @@ voice of a tour guide. Every piece below exists to close one route by which that
   "nearest article" or a fuzzy score** - a near miss is how the guide ended up about another town.
 - **The web, for places Wikipedia does not have** (`websearch.go`, late Sep 2026). When no
   article about the place is found at all - linked, via Wikidata, or by geosearch - the function
-  asks OpenAI's `web_search_preview` (Responses API, `gpt-4.1-mini` - `gpt-4o-mini` told Willa
-  Wierzbówka's reader nothing is written about it while an ordinary search's first page has two
-  pages on it, and is kept only as the fallback for a key that cannot use 4.1 -
-  `search_context_size: medium`
-  and `tool_choice` forcing the search - on `low` and unforced, Willa Wierzbówka came back with no
-  URL at all,
-  the country and town as `user_location`) **for URLs and nothing else**, on the reader's own key.
-  It then downloads up to five of them itself, reduces the HTML to text (no `script`, `nav`,
+  asks OpenAI to search - `gpt-4.1-mini` with the `web_search` tool, `tool_choice: required`,
+  `search_context_size: medium`, the country and town as `user_location`, starting from
+  "name town" - **for URLs and nothing else**, on the reader's own key.
+  **The URLs are the search's own results, not only the model's picks**
+  (`include: web_search_call.action.sources`): on Willa Wierzbówka the model answered three times
+  that nothing is written about the villa while an ordinary search's first result is
+  visitkonstancin.pl's page on it - it judged a two-sentence page not worth listing, which is not
+  its call to make. `gpt-4o-mini` with `web_search_preview` is kept only as the fallback when that
+  request is refused (400/404). It then downloads up to eight of them itself - the model's picks
+  first - reduces the HTML to text (no `script`, `nav`,
   `header`, `footer`, `aside`, `form`), and lets a page in as a source only if it names the place
   - every word of one of its names, by stem, so "Willi Grażyna" counts - **and** the town, when
   Nominatim gave one (the page's `<title>` counts for the town: small sites name it only there

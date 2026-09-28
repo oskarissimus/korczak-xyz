@@ -31,10 +31,12 @@ type fakeProviders struct {
 	geosearch map[string][]string
 
 	// What the web search answers with: the URLs it cites, and the pages at /page/{name}.
-	searchURLs  []string
-	pages       map[string]string
-	searchCalls int
-	searchBody  string
+	searchURLs []string
+	// What the search itself returned, which the model did not cite.
+	searchResults []string
+	pages         map[string]string
+	searchCalls   int
+	searchBody    string
 	// A model the search answers 400 for, as for a project without access to it.
 	searchRefuses string
 
@@ -159,8 +161,13 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 		if len(f.searchURLs) > 0 {
 			text = strings.Join(f.searchURLs, "\n")
 		}
+		var results []any
+		for _, u := range f.searchResults {
+			results = append(results, map[string]any{"type": "url", "url": u})
+		}
 		json.NewEncoder(w).Encode(map[string]any{"output": []any{
-			map[string]any{"type": "web_search_call", "status": "completed"},
+			map[string]any{"type": "web_search_call", "status": "completed",
+				"action": map[string]any{"type": "search", "sources": results}},
 			map[string]any{"type": "message", "content": []any{
 				map[string]any{"type": "output_text", "text": text, "annotations": annotations},
 			}},
