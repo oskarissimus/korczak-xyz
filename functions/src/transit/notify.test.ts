@@ -58,10 +58,22 @@ describe('the banner', () => {
    * distinguishes tonight's from last week's is which stations are shut, and a lock screen has no
    * card to open.
    */
-  it('leads with the stops that put it on the route', () => {
-    const payload = payloadFor(pending({ closedStops: ['Centrum', 'Politechnika'], reason: 'awaria taboru' }));
-    expect(payload.body.startsWith('Centrum, Politechnika')).toBe(true);
-    expect(payload.body).toContain('awaria taboru');
+  it('says which stations on the route are shut, and nothing else', () => {
+    const payload = payloadFor(
+      pending({
+        closedStops: ['Centrum', 'Politechnika', 'Kabaty'],
+        summary: 'Pociągi nie kursują',
+        reason: 'awaria taboru',
+        effectiveFrom: NOW,
+      }),
+    );
+    expect(payload.body).toBe('Zamknięte: Centrum, Politechnika');
+  });
+
+  it('says the route is open when only another stretch of the line is shut', () => {
+    expect(payloadFor(pending({ closedStops: ['Kabaty'], reason: 'awaria taboru' })).body).toBe(
+      'Stacje na Twojej trasie są otwarte.',
+    );
   });
 
   it('says when it does not know, rather than shouting about nothing', () => {

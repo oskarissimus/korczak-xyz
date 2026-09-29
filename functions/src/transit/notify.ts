@@ -88,9 +88,8 @@ async function loadAccount(
  * screen, and so is *"Utrudnienia w komunikacji: M1"*, which is every metro headline WTP writes.
  * What distinguishes tonight's from last week's is which stations are shut.
  *
- * Language-neutral by construction, like every payload this repo sends: the station names, the
- * line codes and the operator's own reason are Polish either way, and the one word of scaffolding
- * is the same in both locales.
+ * Language-neutral by construction, like every payload this repo sends: the station names and the
+ * line codes are Polish either way, and the few words of scaffolding are the same in both locales.
  */
 export function payloadFor(pending: PendingAlert): PushPayload {
   const { item, verdict, kind } = pending;
@@ -116,44 +115,29 @@ export function payloadFor(pending: PendingAlert): PushPayload {
   };
 }
 
+/*
+ * Which stations on the reader's route are shut, and nothing else.
+ *
+ * The body used to append the model's summary, WTP's reason and the start time after the stop
+ * list, and on a lock screen that buries the one fact the banner exists for under three that the
+ * card in the app already carries. Asked for by the reader, 29 Sep 2026: *"krótko — które stacje z
+ * mojej trasy są zamknięte i tyle"*. `verdict.stops` is exactly that set for a route alert — the
+ * overlap `impactOf` computed, not every station the communiqué named.
+ */
 function bodyFor(pending: PendingAlert): string {
-  const { item, verdict } = pending;
-  const parts: string[] = [];
+  const { item, verdict, kind } = pending;
 
   /*
-   * The uncertain case leads with the fact that it is uncertain. An unread communiqué is escalated
-   * to route priority by `impactOf` precisely so it cannot be missed — and a banner that shouts
-   * without saying it does not actually know is worse than no banner, because it teaches the reader
-   * that the loud kind is unreliable.
+   * The uncertain case still says it is uncertain. An unread communiqué is escalated to route
+   * priority by `impactOf` precisely so it cannot be missed — and a banner that shouts without
+   * saying it does not actually know is worse than no banner, because it teaches the reader that
+   * the loud kind is unreliable.
    */
-  if (!verdict.certain) {
-    parts.push('Nie udało się odczytać szczegółów — otwórz komunikat.');
-  } else if (item.wholeLine) {
-    parts.push('Cała linia wstrzymana');
-  } else if (verdict.stops.length > 0) {
-    parts.push(verdict.stops.join(', '));
-  } else if (item.summary) {
-    parts.push(item.summary);
-  }
-
-  if (verdict.certain && item.summary && parts.length > 0 && parts[0] !== item.summary) {
-    // The stop list answers "does this touch me"; the summary answers "what happened". Both fit.
-    parts.push(item.summary);
-  }
-  if (item.reason) parts.push(item.reason);
-  if (item.effectiveFrom !== undefined) parts.push(`od ${when(item.effectiveFrom)}`);
-
-  return parts.join(' · ').slice(0, 300) || item.title;
-}
-
-function when(at: number): string {
-  return new Intl.DateTimeFormat('pl-PL', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Warsaw',
-  }).format(new Date(at));
+  if (!verdict.certain) return 'Nie udało się odczytać, które stacje są zamknięte.';
+  if (item.wholeLine) return `Cała linia ${verdict.lines.join(' + ')} zamknięta`;
+  if (kind === 'route' && verdict.stops.length > 0) return `Zamknięte: ${verdict.stops.join(', ')}`.slice(0, 300);
+  // Line level: something on the line, nothing on the route — which is the answer to the question.
+  return 'Stacje na Twojej trasie są otwarte.';
 }
 
 export async function notifyAccount(

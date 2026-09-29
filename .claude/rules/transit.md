@@ -106,8 +106,8 @@ a missed opera and a missed closure is standing on a platform.
 
 The cost is bounded and worth naming: a handful of over-priority alerts on a line the reader rides,
 on the days the model is down. `ImpactVerdict.certain` travels with the verdict so the card and the
-push body say which kind of answer this is — the banner leads with *"Nie udało się odczytać
-szczegółów"* rather than shouting about nothing, because a loud alert that turns out to know
+push body say which kind of answer this is — the banner says *"Nie udało się odczytać, które
+stacje są zamknięte"* rather than shouting about nothing, because a loud alert that turns out to know
 nothing teaches the reader that the loud kind is unreliable.
 
 Four states, and the card draws all four, because **"no station is closed" and "nobody has looked"
@@ -450,6 +450,17 @@ sentences of Polish, and the only way to check that is to read the four sentence
 
 `RETAIN_DAYS` is 45 against a 14-day feed window, so nothing the app can draw is missing its source.
 The sweep is capped per run, so the first one after a long gap cannot eat the run's budget.
+
+### The push body is the closed stations on the route, and nothing else
+
+`bodyFor` in `functions/src/transit/notify.ts`. The title already says the line and whether it is
+the route; the body answers the one remaining question — *which of my stations are shut* — as
+`Zamknięte: Centrum, Politechnika`, drawn from `verdict.stops`, the overlap `impactOf` computed
+with the reader's legs rather than every station the communiqué named. It used to append the
+model's summary, WTP's reason and the start time, and on a lock screen that buried the answer
+under three facts the card already carries; the owner asked for it short (29 Sep 2026). The other
+three bodies are one fixed sentence each: the whole line, the uncertain reading, and a line-level
+alert, which says the route's stations are open.
 
 ### Two schedules, and why not one
 
