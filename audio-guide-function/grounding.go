@@ -46,7 +46,7 @@ func tierFor(facts []fact) tier {
 
 // extractFacts answers with every fact the model proposed as well as the ones that survived the
 // checks: the difference is what the guide record (record.go) exists to let somebody read.
-func extractFacts(ctx context.Context, apiKey string, a *Attraction, location *Location, sources []source) (proposed, kept []fact, err error) {
+func extractFacts(ctx context.Context, author writer, a *Attraction, location *Location, sources []source) (proposed, kept []fact, err error) {
 	systemPrompt := fmt.Sprintf(`You extract facts for a spoken audio guide from SOURCE MATERIAL you are given. You never use your own knowledge: a fact you know but cannot quote from the sources does not exist for this task. Write the "fact" fields in %s. Answer with JSON only.`, a.Language)
 
 	var b strings.Builder
@@ -71,7 +71,7 @@ Rules:
 Answer as: {"facts":[{"fact":"...","source":"S1","evidence":"..."}]}`,
 		a.Name, a.Category, describeLocation(a, location), b.String(), maxFacts)
 
-	content, err := chatCompletion(ctx, apiKey, chatRequest{
+	content, err := chatCompletion(ctx, author, chatRequest{
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -87,7 +87,7 @@ Answer as: {"facts":[{"fact":"...","source":"S1","evidence":"..."}]}`,
 	var parsed struct {
 		Facts []fact `json:"facts"`
 	}
-	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(jsonObject(content)), &parsed); err != nil {
 		return nil, nil, fmt.Errorf("facts were not JSON: %w", err)
 	}
 	return parsed.Facts, verifyFacts(parsed.Facts, sources), nil

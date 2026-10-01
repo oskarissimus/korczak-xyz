@@ -102,7 +102,7 @@ export async function requestNarration(
       'Content-Type': 'application/json',
       // Named in the function's Access-Control-Allow-Headers; a header it does not list fails the
       // preflight and the tap with it.
-      'X-OpenAI-Key': keys.openai ?? '',
+      'X-Google-Key': keys.google ?? '',
       'X-ElevenLabs-Key': keys.elevenLabs ?? '',
     },
     body: JSON.stringify({
@@ -200,6 +200,9 @@ export function classifyNarrationFailure(e: unknown): GuideFailure {
   if (e.code === 'no_sources') return 'no-sources';
   // Before the 401: ElevenLabs answers an exhausted quota with a 401 of its own, and sending the
   // reader to re-paste a key that is fine would be the wrong advice.
+  // Google's free tier answers a per-minute limit with "You exceeded your current quota … Please
+  // retry in 31s" — a wait, not an empty account, so the retry hint is read first.
+  if (/retry in|per.?minute/i.test(e.message)) return 'rate-limited';
   if (/quota|billing|credit|insufficient/i.test(e.message)) return 'quota';
   if (e.status === 401) return 'keys';
   if (e.status === 429) return 'rate-limited';

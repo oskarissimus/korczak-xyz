@@ -40,6 +40,7 @@ type fakeProviders struct {
 	// A model the search answers 400 for, as for a project without access to it.
 	searchRefuses string
 
+	googleCalls  []string
 	chatCalls    int
 	ttsCalls     int
 	scriptPrompt string
@@ -173,6 +174,54 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 			}},
 		}})
 	})
+	// Google: Gemma's generateContent for the facts and the script, Gemini's with google_search
+	// for the web search. The search answers with f.searchURLs as its grounding chunks.
+	mux.HandleFunc("/google/{call}", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.googleCalls = append(f.googleCalls, r.PathValue("call"))
+		f.mu.Unlock()
+		if r.Header.Get("x-goog-api-key") != "AIza-test" {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"error":{"code":400,"message":"API key not valid. Please pass a valid API key."}}`)
+			return
+		}
+		var req googleRequest
+		json.Unmarshal(body, &req)
+		prompt := req.Contents[0].Parts[0].Text
+		if len(req.Tools) > 0 {
+			f.mu.Lock()
+			f.searchCalls++
+			f.searchBody = string(body)
+			f.mu.Unlock()
+			var chunks []any
+			for _, u := range f.searchURLs {
+				chunks = append(chunks, map[string]any{"web": map[string]string{"uri": u, "title": "t"}})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"candidates": []any{map[string]any{
+				"content":           map[string]any{"parts": []any{map[string]string{"text": "Found it."}}},
+				"groundingMetadata": map[string]any{"groundingChunks": chunks},
+			}}})
+			return
+		}
+		f.mu.Lock()
+		f.chatCalls++
+		f.mu.Unlock()
+		content := "Witamy przy pałacu."
+		if strings.Contains(prompt, `Answer as: {"facts"`) {
+			f.factsPrompt = prompt
+			// Gemma has no JSON mode, and fences its JSON more often than not.
+			content = "Oto fakty:\n```json\n" + f.factsJSON + "\n```"
+		} else {
+			f.scriptPrompt = prompt
+		}
+		json.NewEncoder(w).Encode(map[string]any{"candidates": []any{map[string]any{
+			"content": map[string]any{"parts": []any{map[string]string{"text": content}}},
+		}}})
+	})
+	mux.HandleFunc("/grounding-api-redirect/{name}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, f.srvURL+"/page/"+r.PathValue("name"), http.StatusFound)
+	})
 	mux.HandleFunc("/page/{name}", func(w http.ResponseWriter, r *http.Request) {
 		page, ok := f.pages[r.PathValue("name")]
 		if !ok {
@@ -184,6 +233,10 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
+
+	prevGoogle := googleModelsEndpoint
+	googleModelsEndpoint = srv.URL + "/google"
+	t.Cleanup(func() { googleModelsEndpoint = prevGoogle })
 
 	prevResponses, prevPrivate := openAIResponsesEndpoint, allowPrivateFetch
 	openAIResponsesEndpoint, allowPrivateFetch = srv.URL+"/responses", true
@@ -250,7 +303,7 @@ func TestPreflightAllowsTheKeyHeaders(t *testing.T) {
 		t.Errorf("allow-origin %q", got)
 	}
 	allowed := rec.Header().Get("Access-Control-Allow-Headers")
-	for _, h := range []string{"Content-Type", "X-OpenAI-Key", "X-ElevenLabs-Key"} {
+	for _, h := range []string{"Content-Type", "X-Google-Key", "X-OpenAI-Key", "X-ElevenLabs-Key"} {
 		if !strings.Contains(allowed, h) {
 			t.Errorf("allow-headers %q lacks %s: every tap would fail its preflight", allowed, h)
 		}

@@ -16,14 +16,18 @@
  * Everything in this file is pure, so the borrow can be pinned by a test without a browser.
  */
 
-export type KeyName = 'openai' | 'elevenLabs';
+export type KeyName = 'google' | 'elevenLabs';
 
 export type ApiKeys = Record<KeyName, string | null>;
 
-export const NO_KEYS: ApiKeys = { openai: null, elevenLabs: null };
+export const NO_KEYS: ApiKeys = { google: null, elevenLabs: null };
 
-/** Both are needed for every guide: OpenAI writes it, ElevenLabs reads it. */
-export const KEY_NAMES: readonly KeyName[] = ['openai', 'elevenLabs'];
+/**
+ * Both are needed for every guide: Google writes it (Gemma, and Gemini for the web search), and
+ * ElevenLabs reads it. It was OpenAI until Oct 2026, when the account it ran on ran out of credit;
+ * an OpenAI key saved here before then is simply no longer read.
+ */
+export const KEY_NAMES: readonly KeyName[] = ['google', 'elevenLabs'];
 
 export interface StampedKeys {
   keys: ApiKeys;
@@ -49,7 +53,7 @@ function asKey(value: unknown): string | null {
 
 /**
  * The two keys out of anything with an `apiKeys` object — this app's own config, sloper's, or the
- * backseat driver's, which all spell them `openai` and `elevenLabs`.
+ * backseat driver's, which all spell them `google` and `elevenLabs`.
  *
  * Tolerant by design: it reads blobs written by older builds of other apps, and the worst case has
  * to be two nulls rather than a throw on a page that was working a moment ago.
@@ -60,11 +64,11 @@ export function keysFrom(value: unknown): ApiKeys {
     typeof raw.apiKeys === 'object' && raw.apiKeys !== null
       ? (raw.apiKeys as Record<string, unknown>)
       : {};
-  return { openai: asKey(apiKeys.openai), elevenLabs: asKey(apiKeys.elevenLabs) };
+  return { google: asKey(apiKeys.google), elevenLabs: asKey(apiKeys.elevenLabs) };
 }
 
 export function anyKey(keys: ApiKeys): boolean {
-  return Boolean(keys.openai || keys.elevenLabs);
+  return Boolean(keys.google || keys.elevenLabs);
 }
 
 /** What a tap still needs. Empty means a guide can be asked for. */
@@ -85,7 +89,7 @@ export function shouldBorrow(keys: ApiKeys, settled: boolean): boolean {
  * The keys to start from, given the other apps' copies in order of preference.
  *
  * Per key, first source that has it: sloper keeps both, the backseat driver keeps ElevenLabs only
- * when a voice of theirs is picked, and somebody may have typed OpenAI into one and ElevenLabs into
+ * when a voice of theirs is picked, and somebody may have typed Google into one and ElevenLabs into
  * the other. Taking whole configs would leave half the pair behind.
  */
 export function borrowKeys(sources: ApiKeys[]): ApiKeys {

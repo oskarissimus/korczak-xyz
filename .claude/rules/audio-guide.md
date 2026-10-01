@@ -38,8 +38,9 @@ functions, but not among them:
 - **The CLI will not delete it either.** `firebase deploy --only functions --force` prunes only
   functions carrying its own `deployment-tool` label, and a gcloud deploy carries none. Nothing
   about the Node codebase can reach this function, and nothing in this job can reach that one.
-- **It holds no keys.** They are the reader's, and arrive in `X-OpenAI-Key` and
-  `X-ElevenLabs-Key` on every request — see the next section. No Secret Manager, no fallback key
+- **It holds no keys.** They are the reader's, and arrive in `X-Google-Key` and
+  `X-ElevenLabs-Key` on every request (`X-OpenAI-Key` is still read when no Google key comes,
+  for a page loaded before Oct 2026 — see *Google writes the guide* below) — see the next section. No Secret Manager, no fallback key
   of its own; its only env vars say where its records go (*Every guide leaves a record*, below).
   A missing key, or one a provider refuses, is a **401**; everything else a provider says no to
   is a 502.
@@ -145,6 +146,33 @@ voice of a tour guide. Every piece below exists to close one route by which that
   under the title: "Źródła: Wikipedia (pl) · Wikidata", or a web page by its site's name
   ("visitkonstancin.pl"). `parseSources` takes `http:` as well as `https:` — a page the search
   found may only be readable over http, and dropping it left a guide with no source shown.
+
+### Google writes the guide, since Oct 2026
+
+Everything above that says OpenAI, `gpt-4.1-mini` or `gpt-4o-mini` describes the path a request
+takes **only when it carries an OpenAI key and no Google key** — kept for a page loaded before the
+switch. On 1 Oct 2026 the OpenAI account the guide ran on ran out of credit, and the app now sends
+`X-Google-Key` (a Google AI Studio key) instead; `google.go` is that path:
+
+- **Facts and script are Gemma** (`gemma-3-27b-it`), free on an AI Studio key. Gemma on that API
+  refuses `systemInstruction`, so the system prompt leads the user turn; and it has no JSON mode,
+  so the facts come back as text and `jsonObject` cuts the object out of it (a ```` ```json ````
+  fence, more often than not). The quote check does not care who wrote the facts — which is the
+  reason swapping the model was safe.
+- **The web search is Gemini** (`gemini-2.5-flash`, `gemini-flash-latest` on a 400/404), with
+  Grounding with Google Search: Gemma has no tools, and there is no Gemma that searches. The bare
+  query goes in, as before. The grounding chunks are not pages but
+  `vertexaisearch.cloud.google.com/grounding-api-redirect/…` links, and that host is a
+  `google.com` one `skippedHosts` refuses — so `resolveGroundingRedirects` asks each where it goes,
+  without following it, and the page it names goes through the same checks as ever. There is no
+  `user_location` on Google's tool; the town is in the query.
+- **The free tier is per minute as well as per day** (Gemma: about 15k input tokens a minute), and
+  a facts prompt with two articles is several thousand. Two taps in quick succession can come back
+  429 with *"… Please retry in 31s"*, which `classifyNarrationFailure` reads as a rate limit, not
+  an empty account, because it says "quota" too.
+- **The app's key is `google`** in `audio-guide-config` and the account document; an `openai` key
+  saved there before is no longer read. A config settled before the switch has no Google key and
+  is not borrowed into, so the sheet opens once and asks for it.
 
 ### Every guide leaves a record, for fact-checking afterwards
 

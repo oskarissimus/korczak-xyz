@@ -96,10 +96,10 @@ export default function KeysSheet({ api, onClose, t }: KeysSheetProps) {
       {api.borrowed && <p className="ag-keys-note">{t.keysBorrowed}</p>}
 
       <KeyField
-        label={t.keyOpenai}
-        value={api.keys.openai}
-        placeholder="sk-…"
-        onCommit={set('openai')}
+        label={t.keyGoogle}
+        value={api.keys.google}
+        placeholder="AIza…"
+        onCommit={set('google')}
         t={t}
       />
       <KeyField

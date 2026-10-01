@@ -4,14 +4,14 @@
 // A name, a category, a pair of coordinates and the place's OpenStreetMap tags come in; an MP3
 // goes out. In between it gathers what is actually known about the place - the tags, its Wikidata
 // item, its Wikipedia articles, and for a place with none, pages a web search found (sources.go,
-// websearch.go) - has gpt-4o-mini pick facts out of those with a
+// websearch.go) - has Gemma (google.go) pick facts out of those with a
 // verbatim quote for each, checks every quote against its source (grounding.go), asks again for a
 // script written for a speech synthesiser from the facts that survived, and has ElevenLabs read
 // it aloud. A place with no sources, or none the checks let through, is answered with a 422
 // rather than a guess. What the model said, and the sources it said it from, are recorded in a
 // bucket for fact-checking later (record.go).
 //
-// THE KEYS ARE THE CALLER'S, not ours. They arrive with every request in two headers, typed into
+// THE KEYS ARE THE CALLER'S, not ours. They arrive with every request in headers, typed into
 // the app's keys sheet the way sloper's and the backseat driver's are, and are used for that one
 // request and forgotten: nothing here stores, logs or falls back to a key of its own. That is what
 // makes it safe for this function to answer anybody - a stranger who posts here pays for their
@@ -231,7 +231,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	// CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+openAIKeyHeader+", "+elevenLabsKeyHeader)
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+googleKeyHeader+", "+openAIKeyHeader+", "+elevenLabsKeyHeader)
 	w.Header().Set("Access-Control-Expose-Headers", "X-Location-Warning, Server-Timing, "+sourcesHeader)
 	// The key headers make every tap a preflighted request; this spares the second tap one. Safari
 	// caps it at ten minutes whatever is asked for.
@@ -270,10 +270,15 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(withTimings(r.Context(), timings), requestTimeout)
 	defer cancel()
 
-	openAIKey := strings.TrimSpace(r.Header.Get(openAIKeyHeader))
+	// Google when a Google key came, which is every request from the app since Oct 2026; OpenAI
+	// only for a page loaded before then, which sends that key and nothing else. See google.go.
+	author := writer{provider: "google", key: strings.TrimSpace(r.Header.Get(googleKeyHeader))}
+	if author.key == "" {
+		author = writer{provider: "openai", key: strings.TrimSpace(r.Header.Get(openAIKeyHeader))}
+	}
 	elevenLabsKey := strings.TrimSpace(r.Header.Get(elevenLabsKeyHeader))
-	if openAIKey == "" {
-		writeError(w, http.StatusUnauthorized, "No OpenAI key was sent")
+	if author.key == "" {
+		writeError(w, http.StatusUnauthorized, "No Google key was sent")
 		return
 	}
 	if elevenLabsKey == "" {
@@ -281,7 +286,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location, sources := gatherSources(ctx, &attraction, openAIKey)
+	location, sources := gatherSources(ctx, &attraction, author)
 	outcome.countryCode, outcome.sources = location.CountryCode, len(sources)
 	for _, s := range sources {
 		outcome.sourceChars += len(s.Text)
@@ -308,7 +313,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	done := stage(ctx, stageFacts)
-	proposed, facts, err := extractFacts(ctx, openAIKey, &attraction, &location, sources)
+	proposed, facts, err := extractFacts(ctx, author, &attraction, &location, sources)
 	done()
 	outcome.proposed, outcome.verified = len(proposed), len(facts)
 	if err != nil {
@@ -337,7 +342,7 @@ func GenerateAudio(w http.ResponseWriter, r *http.Request) {
 	rec.Tier, outcome.tier = t.name, t.name
 	log.Printf("generate-audio: %q: %d sources, %d verified facts, %s script", attraction.Name, len(sources), len(facts), t.name)
 	done = stage(ctx, stageScript)
-	script, err := generateScript(ctx, openAIKey, attraction.Name, facts, attraction.Language, t)
+	script, err := generateScript(ctx, author, attraction.Name, facts, attraction.Language, t)
 	done()
 	if err != nil {
 		log.Printf("generate-audio: script: %v", err)
@@ -381,7 +386,7 @@ func (e *providerError) Error() string {
 
 // newProviderError pulls the human sentence out of a provider's error body.
 //
-// OpenAI answers {"error": {"message": ...}}, ElevenLabs {"detail": {"message": ...}} or
+// OpenAI and Google answer {"error": {"message": ...}}, ElevenLabs {"detail": {"message": ...}} or
 // {"detail": "..."}. That sentence is what the client shows verbatim and what it matches on to tell
 // an exhausted account from a rate limit, so it is passed through rather than collapsed into
 // "Failed to generate audio". Anything unparseable falls back to the raw body, capped.
@@ -527,7 +532,7 @@ var openings = []string{
 // generateScript turns the verified facts into something to be read aloud. It sees the facts and
 // nothing else, and is told that everything it adds is an error: this is the step where a
 // "warm, engaging" script used to grow a founding legend of its own.
-func generateScript(ctx context.Context, apiKey, attractionName string, facts []fact, language string, t tier) (string, error) {
+func generateScript(ctx context.Context, author writer, attractionName string, facts []fact, language string, t tier) (string, error) {
 	systemPrompt := fmt.Sprintf(`You are a professional audio guide scriptwriter. Write natural, conversational scripts for text-to-speech narration. Avoid visual references like "as you can see". Write entirely in %s.
 
 YOU USE ONLY THE FACTS YOU ARE GIVEN. Do not add any name, date, number, person, event, legend, record or claim that is not in them - not even one you believe is true, and not as colour or as a "some say". No superlatives the facts do not state. Connecting sentences are fine; new information is not. A short script that is true beats a long one that is not.
@@ -559,7 +564,7 @@ Requirements:
 - Write the entire script in %s
 - IMPORTANT: All numbers, dates, and abbreviations must be written as full words for text-to-speech`, attractionName, list.String(), openings[rand.IntN(len(openings))], t.minWords, t.maxWords, language)
 
-	return chatCompletion(ctx, apiKey, chatRequest{
+	return chatCompletion(ctx, author, chatRequest{
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -569,7 +574,12 @@ Requirements:
 	})
 }
 
-func chatCompletion(ctx context.Context, apiKey string, reqBody chatRequest) (string, error) {
+// chatCompletion is one model call, on whichever provider is writing this guide.
+func chatCompletion(ctx context.Context, author writer, reqBody chatRequest) (string, error) {
+	if author.google() {
+		return gemmaCompletion(ctx, author.key, reqBody)
+	}
+	apiKey := author.key
 	reqBody.Model = "gpt-4o-mini"
 
 	jsonBody, err := json.Marshal(reqBody)

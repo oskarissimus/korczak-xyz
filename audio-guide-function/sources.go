@@ -623,8 +623,8 @@ func uniqueLangs(langs ...string) []string {
 // lookup, because the country it answers with decides which Wikipedia is read first.
 //
 // When no Wikipedia article about the place is found at all, the web is searched on the reader's
-// OpenAI key (websearch.go). An empty apiKey - the tests of the Wikimedia half - skips it.
-func gatherSources(ctx context.Context, a *Attraction, apiKey string) (Location, []source) {
+// key (websearch.go). An empty key - the tests of the Wikimedia half - skips it.
+func gatherSources(ctx context.Context, a *Attraction, author writer) (Location, []source) {
 	defer stage(ctx, stageSources)()
 	narration := languageCode(a.Language)
 	tagLang, tagTitle := parseWikipediaTag(a.Tags["wikipedia"])
@@ -711,9 +711,9 @@ func gatherSources(ctx context.Context, a *Attraction, apiKey string) (Location,
 	// Still nothing about the place itself: a villa, a station, a memorial stone that no
 	// encyclopaedia covers. What is written about it is on the web, if anywhere.
 	var web []source
-	if !anyArticle(articles) && apiKey != "" {
+	if !anyArticle(articles) && author.key != "" {
 		doneSearch := stage(ctx, stageSearch)
-		web = webSources(ctx, apiKey, a, &location)
+		web = webSources(ctx, author, a, &location)
 		doneSearch()
 	}
 

@@ -41,7 +41,7 @@ const (
 	stageGeosearch = "geosearch" // only when OSM links no article
 	stageSearch    = "search"    // web search and the pages it named, only when no article was found
 	stageSources   = "sources"   // all of the above, wall clock
-	stageFacts     = "facts"     // the first OpenAI call
+	stageFacts     = "facts"     // the first model call
 	stageScript    = "script"    // the second
 	stageTTS       = "tts"       // ElevenLabs
 )

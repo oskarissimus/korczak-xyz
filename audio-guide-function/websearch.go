@@ -6,7 +6,8 @@ package function
 // suburban station of a narrow-gauge line, a memorial stone - and what is written about it is on
 // the gmina's website, a heritage register or a local history portal. Until late Sep 2026 every
 // one of those taps ended in no_sources. So when no Wikipedia article is found, the web is
-// searched - with OpenAI's web search, on the reader's own key, so the function still holds no
+// searched - with Gemini's Grounding with Google Search (google.go), or OpenAI's web search for a
+// caller still sending an OpenAI key, on the reader's own key, so the function still holds no
 // key of its own - and the pages it names are fetched and read **here**, not summarised by the
 // search model.
 //
@@ -84,8 +85,8 @@ func skippedHost(host string) bool {
 }
 
 // webSources searches for pages about the place and returns the ones that pass, as sources.
-func webSources(ctx context.Context, apiKey string, a *Attraction, loc *Location) []source {
-	urls, answer, err := searchAll(ctx, apiKey, searchQueries(a, loc), loc)
+func webSources(ctx context.Context, author writer, a *Attraction, loc *Location) []source {
+	urls, answer, err := searchAll(ctx, author, searchQueries(a, loc), loc)
 	if err != nil {
 		// Not the reader's problem unless it is their key, and then the facts call says so.
 		log.Printf("generate-audio: web search: %v", err)
@@ -276,7 +277,7 @@ func searchQueries(a *Attraction, loc *Location) []string {
 
 // searchAll runs the queries side by side and merges what they found.
 // A search setup the key cannot use (400, 404) is retried on the fallback.
-func searchAll(ctx context.Context, apiKey string, queries []string, loc *Location) ([]string, string, error) {
+func searchAll(ctx context.Context, author writer, queries []string, loc *Location) ([]string, string, error) {
 	type result struct {
 		urls   []string
 		answer string
@@ -288,6 +289,17 @@ func searchAll(ctx context.Context, apiKey string, queries []string, loc *Locati
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if author.google() {
+				urls, answer, err := googleSearchURLs(ctx, author.key, googleSearchModels[0], q)
+				var pe *providerError
+				if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
+					log.Printf("generate-audio: web search on %s: %v; retrying on %s", googleSearchModels[0], err, googleSearchModels[1])
+					urls, answer, err = googleSearchURLs(ctx, author.key, googleSearchModels[1], q)
+				}
+				results[i] = result{urls, answer, err}
+				return
+			}
+			apiKey := author.key
 			urls, answer, err := searchURLs(ctx, apiKey, primarySearch, q, loc)
 			var pe *providerError
 			if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {

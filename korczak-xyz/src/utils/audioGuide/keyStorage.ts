@@ -39,7 +39,7 @@ function keysInBrowser(): ApiKeys {
 }
 
 const EMPTY: StampedKeys = {
-  keys: { openai: null, elevenLabs: null },
+  keys: { google: null, elevenLabs: null },
   updatedAt: 0,
   borrowed: false,
   settled: false,

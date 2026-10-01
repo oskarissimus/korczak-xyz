@@ -12,7 +12,7 @@ const fail = (status: number, message = 'something') =>
 describe('classifyNarrationFailure', () => {
   it('reads a 401 as the reader’s keys, missing or refused', () => {
     // The one failure the reader can fix on the spot; the app opens the keys sheet for it.
-    expect(fail(401, 'No OpenAI key was sent')).toBe('keys');
+    expect(fail(401, 'No Google key was sent')).toBe('keys');
     expect(fail(401, 'Failed to generate audio: ElevenLabs 401: Invalid API key')).toBe('keys');
   });
 
@@ -33,6 +33,10 @@ describe('classifyNarrationFailure', () => {
 
   it('finds a provider’s rate limit inside the same 502', () => {
     expect(fail(502, 'Failed to generate script: OpenAI 429: Rate limit reached')).toBe('rate-limited');
+    // Google's free tier says "quota" for a per-minute limit too; the retry hint is what tells it apart.
+    expect(
+      fail(502, 'Failed to generate facts: Google 429: You exceeded your current quota, please check your plan and billing details. Please retry in 31.2s.'),
+    ).toBe('rate-limited');
   });
 
   it('falls back rather than guessing, which is what the verbatim quote is for', () => {

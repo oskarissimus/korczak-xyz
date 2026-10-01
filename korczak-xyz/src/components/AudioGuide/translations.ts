@@ -8,7 +8,7 @@
  *  - The narration language names. "Polski" is what the guide is written in, and a language is
  *    named in itself — a Polish speaker looking for Polish is looking for "Polski", on either
  *    version of the page.
- *  - Whatever the backend says went wrong. Its errors are English sentences from OpenAI or
+ *  - Whatever the backend says went wrong. Its errors are English sentences from Google or
  *    ElevenLabs, shown verbatim under a translated one, because that is the string you would
  *    paste into their support page.
  */
@@ -39,10 +39,10 @@ export const translations = {
     keysButtonMissing: 'Add keys',
     keysTitle: 'API keys',
     keysBlurb:
-      'Yours, billed to you. OpenAI writes each guide and ElevenLabs reads it. The keys go to ' +
+      'Yours, billed to you. Google (Gemma) writes each guide and ElevenLabs reads it. The keys go to ' +
       'this site’s narration function with every tap, are used for that one guide, and are not ' +
       'kept there.',
-    keyOpenai: 'OpenAI key',
+    keyGoogle: 'Google AI Studio key',
     keyElevenLabs: 'ElevenLabs key',
     keyShow: 'Show',
     keyHide: 'Hide',
@@ -147,10 +147,10 @@ export const translations = {
     keysButtonMissing: 'Dodaj klucze',
     keysTitle: 'Klucze API',
     keysBlurb:
-      'Twoje, na twój rachunek. OpenAI pisze każdy przewodnik, a ElevenLabs go czyta. Klucze ' +
+      'Twoje, na twój rachunek. Google (Gemma) pisze każdy przewodnik, a ElevenLabs go czyta. Klucze ' +
       'trafiają z każdym dotknięciem do funkcji narracji tej strony, służą do tego jednego ' +
       'przewodnika i nie są tam przechowywane.',
-    keyOpenai: 'Klucz OpenAI',
+    keyGoogle: 'Klucz Google AI Studio',
     keyElevenLabs: 'Klucz ElevenLabs',
     keyShow: 'Pokaż',
     keyHide: 'Ukryj',
