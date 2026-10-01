@@ -15,8 +15,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
 import { pullBorrowableKeys, pullKeys, pushKeys } from '../utils/audioGuide/keyCloud';
-import { anyKey, NO_KEYS, shouldBorrow, type ApiKeys } from '../utils/audioGuide/keys';
-import { loadKeys, saveKeys } from '../utils/audioGuide/keyStorage';
+import { anyKey, NO_KEYS, shouldBorrow, withGoogleKey, type ApiKeys } from '../utils/audioGuide/keys';
+import { keysInBrowser, loadKeys, saveKeys } from '../utils/audioGuide/keyStorage';
 import type { AuthUser } from './useAuth';
 
 export type KeySync = 'local' | 'syncing' | 'synced' | 'error';
@@ -98,6 +98,20 @@ export function useAudioGuideKeys(user: AuthUser | null): AudioGuideKeysApi {
             publish(borrowedKeys, now, false);
             setBorrowed(true);
             await pushKeys(uid, borrowedKeys, now, false);
+            if (cancelled) return;
+          }
+        }
+
+        // The one-time Google key for a copy saved while the guide was written by OpenAI.
+        if (!keysRef.current.google && updatedAtRef.current > 0) {
+          const google = keysInBrowser().google ?? (await pullBorrowableKeys(uid)).google;
+          if (cancelled) return;
+          const filled = withGoogleKey(keysRef.current, updatedAtRef.current, google);
+          if (filled) {
+            const now = Date.now();
+            publish(filled, now, settledRef.current);
+            setBorrowed(true);
+            await pushKeys(uid, filled, now, settledRef.current);
             if (cancelled) return;
           }
         }

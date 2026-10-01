@@ -171,8 +171,9 @@ switch. On 1 Oct 2026 the OpenAI account the guide ran on ran out of credit, and
   429 with *"… Please retry in 31s"*, which `classifyNarrationFailure` reads as a rate limit, not
   an empty account, because it says "quota" too.
 - **The app's key is `google`** in `audio-guide-config` and the account document; an `openai` key
-  saved there before is no longer read. A config settled before the switch has no Google key and
-  is not borrowed into, so the sheet opens once and asks for it.
+  saved there before is no longer read. A copy settled before the switch is not borrowed into by the
+  ordinary rule, so `withGoogleKey` fills its Google key alone, once, from sloper's or the
+  backseat driver's copy (keyed on `updatedAt < GOOGLE_SWITCH_AT`); with none there, the sheet asks.
 
 ### Every guide leaves a record, for fact-checking afterwards
 

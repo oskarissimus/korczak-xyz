@@ -23,7 +23,7 @@ export const KEYS_STORAGE_KEY = 'audio-guide-config';
  */
 const BORROW_FROM = ['sloper-config', 'sloper-api-config', 'backseat-config'];
 
-function keysInBrowser(): ApiKeys {
+export function keysInBrowser(): ApiKeys {
   const sources: ApiKeys[] = [];
   for (const name of BORROW_FROM) {
     try {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { borrowKeys, keysFrom, missingKeys, shouldBorrow } from './keys';
+import { borrowKeys, GOOGLE_SWITCH_AT, keysFrom, missingKeys, shouldBorrow, withGoogleKey } from './keys';
 
 describe('keysFrom', () => {
   it('reads sloper’s, the backseat driver’s and its own shape alike', () => {
@@ -53,5 +53,23 @@ describe('missingKeys', () => {
     expect(missingKeys({ google: null, elevenLabs: null })).toEqual(['google', 'elevenLabs']);
     expect(missingKeys({ google: 'sk', elevenLabs: null })).toEqual(['elevenLabs']);
     expect(missingKeys({ google: 'sk', elevenLabs: 'el' })).toEqual([]);
+  });
+});
+
+describe('withGoogleKey', () => {
+  const before = GOOGLE_SWITCH_AT - 1;
+
+  it('fills only the Google key of a copy saved before the switch', () => {
+    expect(withGoogleKey({ google: null, elevenLabs: 'el' }, before, 'g')).toEqual({
+      google: 'g',
+      elevenLabs: 'el',
+    });
+  });
+
+  it('never fills one edited since, one that has a key, or with nothing to fill it from', () => {
+    expect(withGoogleKey({ google: null, elevenLabs: 'el' }, GOOGLE_SWITCH_AT + 1, 'g')).toBeNull();
+    expect(withGoogleKey({ google: 'mine', elevenLabs: 'el' }, before, 'g')).toBeNull();
+    expect(withGoogleKey({ google: null, elevenLabs: 'el' }, before, null)).toBeNull();
+    expect(withGoogleKey({ google: null, elevenLabs: 'el' }, 0, 'g')).toBeNull();
   });
 });

@@ -24,7 +24,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { pullConfig, pullSloperKeys, pushConfig } from '../utils/backseat/cloud';
 import { DEFAULT_CONFIG } from '../utils/backseat/defaults';
-import { anyKey, configWithBorrowedKeys, shouldBorrow } from '../utils/backseat/importKeys';
+import {
+  anyKey,
+  configWithBorrowedKeys,
+  shouldBorrow,
+  sloperKeysInBrowser,
+  switchedToGoogle,
+} from '../utils/backseat/importKeys';
 import { clearConfig, loadConfig, saveConfig } from '../utils/backseat/storage';
 import type { BackseatConfig } from '../utils/backseat/types';
 import type { AuthUser } from './useAuth';
@@ -144,6 +150,21 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
             publish(borrowedConfig, now, false);
             setBorrowed(true);
             await pushConfig(uid, borrowedConfig, now, false);
+            if (cancelled) return;
+          }
+        }
+
+        // The one-time move off OpenAI, for a config saved before Gemma was the default.
+        // See `switchedToGoogle`.
+        if (configRef.current.vision.provider === 'openai') {
+          const sloperGoogle =
+            sloperKeysInBrowser().google ?? (await pullSloperKeys(uid)).google;
+          if (cancelled) return;
+          const switched = switchedToGoogle(configRef.current, updatedAtRef.current, sloperGoogle);
+          if (switched) {
+            const now = Date.now();
+            publish(switched, now, settledRef.current);
+            await pushConfig(uid, switched, now, settledRef.current);
             if (cancelled) return;
           }
         }

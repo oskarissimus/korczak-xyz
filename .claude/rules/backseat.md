@@ -29,8 +29,10 @@ The app shipped on OpenAI's `gpt-4o-mini`, and on 1 Oct 2026 the account it ran 
 mid-drive: *"You have no credits remaining"*, in the banner, every round. The default is now
 provider `google`, model `gemma-3-27b-it` — Gemma is free on an ordinary AI Studio key, at a daily
 allowance a remark every fifteen seconds does not approach, and the 27B is the largest Gemma that
-takes an image. OpenAI is still on the list; a saved config that names it keeps it until somebody
-changes the dropdown.
+takes an image. OpenAI is still on the list. A config saved on OpenAI before the switch (`updatedAt` earlier than
+`GOOGLE_SWITCH_AT`) is moved to Gemma once, on the first signed-in load, with its own Google key or
+the wizard's (`switchedToGoogle`) — its owner could not paste a key from the car. Anything chosen
+after that is left alone.
 
 Two things about Gemma on Google's API that Gemini does not share:
 

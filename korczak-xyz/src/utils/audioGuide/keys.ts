@@ -99,3 +99,23 @@ export function borrowKeys(sources: ApiKeys[]): ApiKeys {
   }
   return result;
 }
+
+/** When the guide moved from OpenAI to Google (1 Oct 2026, 10:00 UTC). See `withGoogleKey`. */
+export const GOOGLE_SWITCH_AT = Date.UTC(2026, 9, 1, 10, 0);
+
+/**
+ * A copy last edited before the switch has an OpenAI key and no Google one, and is settled — so
+ * the ordinary borrow never fills it. This fills the Google key alone, once, from the other apps'
+ * copies: the owner found the guide dead in the street with no way to paste a key. Keyed on
+ * `updatedAt`, so a Google key cleared here afterwards is never put back. Null: nothing to do.
+ */
+export function withGoogleKey(
+  keys: ApiKeys,
+  updatedAt: number,
+  borrowedGoogle: string | null,
+): ApiKeys | null {
+  if (keys.google || !borrowedGoogle || updatedAt >= GOOGLE_SWITCH_AT || updatedAt === 0) {
+    return null;
+  }
+  return { ...keys, google: borrowedGoogle };
+}
