@@ -31,6 +31,13 @@ const MAX_TOKENS = 120;
  */
 const TEMPERATURE = 1;
 
+/**
+ * Gemini's own, a little hotter. Its range is 0–2 like OpenAI's, but at 1 it settled on one joke
+ * shape per ride; 1.3 is where the remarks stopped sounding like each other without starting to
+ * not sound like sentences.
+ */
+const GOOGLE_TEMPERATURE = 1.3;
+
 export interface VisionRequest {
   provider: VisionProvider;
   apiKey: string;
@@ -131,7 +138,7 @@ export function isGemma(model: string): boolean {
  * length that is spoken either way; the token cap here was only ever a backstop.
  */
 export function googleGeneration(model: string): Record<string, unknown> {
-  const base = { temperature: TEMPERATURE };
+  const base = { temperature: GOOGLE_TEMPERATURE };
   if (isGemma(model)) return { ...base, maxOutputTokens: MAX_TOKENS };
   if (/^gemini-2\.5-flash/.test(model)) {
     return { ...base, maxOutputTokens: MAX_TOKENS, thinkingConfig: { thinkingBudget: 0 } };

@@ -7,6 +7,8 @@ import {
   recentTexts,
   sanitizeRemark,
   systemPrompt,
+  ANGLES,
+  pickAngle,
 } from './remarks';
 import type { Remark } from './types';
 
@@ -200,4 +202,28 @@ it('asks for something that is really in the picture', () => {
   const prompt = systemPrompt({ persona: 'nervous', intensity: 'normal', lang: 'en', recent: [] });
   expect(prompt).toContain('really in the picture');
   expect(prompt).toContain('Never invent');
+});
+
+/*
+ * Every remark of the second Gemini ride was "careful, you will hit the grey square": one call per
+ * frame cannot vary its own shape, so the shape is drawn outside it.
+ */
+describe('the angle of a remark', () => {
+  it('goes into the prompt, and the dull warning shape is ruled out', () => {
+    const prompt = systemPrompt({
+      persona: 'nervous',
+      intensity: 'normal',
+      lang: 'pl',
+      recent: [],
+      angle: ANGLES[3],
+    });
+    expect(prompt).toContain(`This time, make it ${ANGLES[3]}.`);
+    expect(prompt).toContain('Do NOT use the shape');
+  });
+
+  it('never repeats the previous one', () => {
+    for (const previous of ANGLES) {
+      for (const r of [0, 0.5, 0.999]) expect(pickAngle(previous, () => r)).not.toBe(previous);
+    }
+  });
 });

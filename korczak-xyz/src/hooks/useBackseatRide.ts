@@ -40,7 +40,14 @@ import {
   secureContext,
   type CameraFailure,
 } from '../utils/backseat/frame';
-import { isRepeat, recentTexts, sanitizeRemark, systemPrompt, USER_PROMPT } from '../utils/backseat/remarks';
+import {
+  isRepeat,
+  pickAngle,
+  recentTexts,
+  sanitizeRemark,
+  systemPrompt,
+  USER_PROMPT,
+} from '../utils/backseat/remarks';
 import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
 import type { BackseatConfig, Remark, RemarkLanguage, RideStatus } from '../utils/backseat/types';
 import { RELEASE, rideIdFor, saveRound, type RoundRecord } from '../utils/backseat/rideLog';
@@ -150,7 +157,7 @@ export function useBackseatRide(
   const uidRef = useRef(uid);
   uidRef.current = uid;
   /** This ride's id and how many rounds it has had, for the saved records. */
-  const rideRef = useRef({ id: '', rounds: 0 });
+  const rideRef = useRef({ id: '', rounds: 0, angle: null as string | null });
 
   /* The spoken history, for the prompt. Kept beside the state because the loop needs it
      synchronously and `setState` is not readable on the same tick it is called. */
@@ -235,7 +242,10 @@ export function useBackseatRide(
     const visionController = new AbortController();
     visionAbortRef.current = visionController;
 
+    const angle = pickAngle(rideRef.current.angle);
+    rideRef.current.angle = angle;
     const system = systemPrompt({
+      angle,
       persona: settings.remarks.persona,
       intensity: settings.remarks.intensity,
       lang: langRef.current,
@@ -251,6 +261,7 @@ export function useBackseatRide(
       model: settings.vision.model,
       persona: settings.remarks.persona,
       intensity: settings.remarks.intensity,
+      angle,
       lang: langRef.current,
       system,
       user: USER_PROMPT,
@@ -368,7 +379,7 @@ export function useBackseatRide(
     setError(null);
     setCameraError(null);
     failuresRef.current = 0;
-    rideRef.current = { id: rideIdFor(Date.now()), rounds: 0 };
+    rideRef.current = { id: rideIdFor(Date.now()), rounds: 0, angle: null };
 
     if (!secureContext()) {
       setCameraError('unsupported');

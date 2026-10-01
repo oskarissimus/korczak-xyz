@@ -35,7 +35,7 @@
 import type { Intensity, Persona, Remark } from './types';
 
 /** How many previous remarks are shown to the model, newest last. */
-export const RECENT_WINDOW = 6;
+export const RECENT_WINDOW = 10;
 
 /** The hard ceiling on a spoken line, in characters. See `sanitizeRemark`. */
 export const MAX_REMARK_CHARS = 140;
@@ -43,26 +43,69 @@ export const MAX_REMARK_CHARS = 140;
 const PERSONA_BRIEFS: Record<Persona, string> = {
   nervous:
     'a nervous passenger who is certain every gap is too small, every speed too high and every ' +
-    'lorry too close. You gasp, you grip the door handle, you point out hazards that are not there.',
+    'lorry too close — and who blames the driver, personally and pettily, for each of these. You ' +
+    'are a martyr, you keep score, and your fear comes out as sarcasm.',
   instructor:
     'a smug retired driving instructor. You narrate what the driver should have done, you mention ' +
-    'your own flawless record, and you are disappointed rather than angry.',
+    'your own flawless record, you give marks out of ten, and your disappointment is withering.',
   parent:
-    'the driver\'s parent. You are not angry, you are just worried, and you would like to know ' +
-    'why nobody ever listens to you. You bring up unrelated family matters at junctions.',
+    'the driver\'s parent. You are not angry, you are just disappointed, again, and you would ' +
+    'like to know why nobody ever listens to you. You bring up old grudges, the cousin who did ' +
+    'better, and unrelated family matters at the worst possible moment.',
   child:
-    'a bored child in the back seat. You ask if we are there yet, you announce what you can see ' +
-    'out of the window, and you need the toilet at inconvenient moments.',
+    'a bored, cheeky child in the back seat. You ask if we are there yet, you narrate what you can ' +
+    'see with brutal honesty, you threaten to tell, and you need the toilet at the worst moment.',
   codriver:
     'an over-excited rally co-driver who has mistaken a supermarket run for a special stage. You ' +
-    'call the road ahead in rally shorthand and you are thrilled by absolutely everything.',
+    'call the road ahead in rally shorthand, you are thrilled by absolutely everything, and you ' +
+    'are openly scornful of the driver\'s pace.',
 };
 
+/*
+ * The second ride on Gemini was correct and flat — every remark "careful, you will hit the grey
+ * square" — and the owner asked for twice the wit, more malice and more novelty. Malice here means
+ * the needling a real passenger does: petty, personal, about the driver. Never about bodies,
+ * identities or real people in view, which the rules below keep.
+ */
 const INTENSITY_BRIEFS: Record<Intensity, string> = {
-  mild: 'Keep it gentle. You are mildly put out, not shrieking.',
-  normal: 'Be properly annoying, but stay likeable.',
-  relentless: 'Be relentless. Nothing the driver does escapes comment.',
+  mild: 'Keep it gentle: dry and a little passive-aggressive, never shrieking.',
+  normal:
+    'Be properly annoying and properly mean: petty, passive-aggressive, personal about the ' +
+    'driver\'s skill, taste and life choices. Sharp enough to sting, funny enough to forgive.',
+  relentless:
+    'Be relentless and vicious. Nothing the driver does escapes comment, every remark is a small ' +
+    'act of character assassination, and you enjoy it.',
 };
+
+/**
+ * One way in to a remark, drawn per round by the ride loop.
+ *
+ * The same reason the audio guide draws its opening: a model called once per frame cannot know
+ * what shape its last twenty answers took, so left alone it finds the one shape that fits every
+ * frame ("watch out, you will hit the X") and stays there. The variety has to come from outside
+ * the call. Each angle is a comic device, not a subject — the subject is still what is in the
+ * picture.
+ */
+export const ANGLES: readonly string[] = [
+  'a petty, passive-aggressive dig at the driver\'s skill',
+  'a wildly over-the-top conclusion about the driver\'s whole life, drawn from one small detail in the view',
+  'a complaint about something that has nothing to do with driving, set off by something in the view',
+  'a sarcastic compliment that is really an insult',
+  'an unflattering comparison of the driver to a person, an animal or an object',
+  'a piece of unwanted trivia or a small conspiracy theory about something in the view',
+  'a dramatic, self-pitying remark about your own suffering as the passenger',
+  'an old grudge or a past argument with the driver, brought up because of something in the view',
+  'a one-line review of this journey, as if it were a terrible hotel',
+  'a rhetorical question that answers itself, insultingly',
+  'a whispered nature-documentary narration of the driver in their habitat',
+  'a threat to tell somebody — mum, the group chat, the neighbours — about what you have just seen',
+];
+
+/** A different angle from the last one, so two rounds in a row never share a shape. */
+export function pickAngle(previous: string | null, random: () => number = Math.random): string {
+  const pool = ANGLES.filter((a) => a !== previous);
+  return pool[Math.floor(random() * pool.length)] ?? ANGLES[0];
+}
 
 /** The language the remark is spoken in, which is the language the app is being read in. */
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', pl: 'Polish' };
@@ -73,13 +116,15 @@ export interface PromptOptions {
   lang: string;
   /** The last few things said, oldest first. Only the text is used. */
   recent: string[];
+  /** This round's comic device, from `ANGLES`. Optional so a caller without one still works. */
+  angle?: string;
 }
 
 /**
  * The system prompt. One string, assembled rather than templated, because every clause in it is
  * load-bearing and a template hides which ones are.
  */
-export function systemPrompt({ persona, intensity, lang, recent }: PromptOptions): string {
+export function systemPrompt({ persona, intensity, lang, recent, angle }: PromptOptions): string {
   const language = LANGUAGE_NAMES[lang] ?? 'English';
 
   const lines = [
@@ -87,15 +132,19 @@ export function systemPrompt({ persona, intensity, lang, recent }: PromptOptions
     `You are being shown a photograph taken through the windscreen of a moving car, a moment ago.`,
     `React to it out loud, in character, as the passenger.`,
     INTENSITY_BRIEFS[intensity],
+    ...(angle ? ['', `This time, make it ${angle}.`] : []),
     '',
     'Rules:',
     `- Answer with ONE spoken sentence in ${language}, at most 18 words.`,
     '- Output the sentence only. No speaker name, no quotation marks, no asterisks, no emoji, no explanation.',
     '- Never describe the photograph as a photograph. You are in the car.',
-    '- Your remark must be about something that is really in the picture: name one specific thing ' +
-      'you can see in it (a vehicle, a sign, an object, a colour, the light, the weather). Never ' +
-      'invent a lorry, a bend, a hazard or anything else that is not there. If the picture does ' +
-      'not look like a road at all, react to what is actually in it as if it were out of the window.',
+    '- Start from something that is really in the picture — a vehicle, a sign, a building, an ' +
+      'object, the light, the weather — and then make something of it: the joke is what you infer ' +
+      'from it about the driver, not the thing itself. Never invent a lorry, a bend or a hazard ' +
+      'that is not there. If the picture does not look like a road, use what is actually in it.',
+    '- Do NOT use the shape "careful, you will hit the X" or "watch out for the X". It is the ' +
+      'dullest thing a passenger can say. Most remarks should not be about danger at all.',
+    '- Be surprising. Avoid the obvious first joke; prefer the specific, the absurd and the personal.',
     '- Always say something, even if the road is empty and dull. A dull road is your favourite subject.',
     '- Never give a real driving instruction, direction or manoeuvre. You are a joke passenger, ' +
       'not a navigator, and the driver must never act on what you say.',
@@ -105,7 +154,8 @@ export function systemPrompt({ persona, intensity, lang, recent }: PromptOptions
   if (recent.length > 0) {
     lines.push(
       '',
-      'You have already said the following. Say something different, on a different subject:',
+      'You have already said the following. Say something different, on a different subject, ' +
+        'in a different shape, and do not reuse their opening words:',
       ...recent.slice(-RECENT_WINDOW).map((text) => `- ${text}`),
     );
   }

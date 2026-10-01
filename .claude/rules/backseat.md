@@ -100,7 +100,7 @@ Five things follow from that and each of them was a failure first:
 
 `utils/backseat/remarks.ts`. Everything else is plumbing to get a photograph to a model and a
 sentence to a speaker; this is what decides whether the result is funny for twenty minutes or
-tiresome after three. Five clauses are load-bearing:
+tiresome after three. Six clauses are load-bearing:
 
 | clause | what it prevents |
 |---|---|
@@ -109,6 +109,7 @@ tiresome after three. Five clauses are load-bearing:
 | the last six remarks, to be avoided | one sentence on a loop — each call sees one frame and has no memory, so the same motorway produces the same line for ever |
 | always say something | "nothing notable", which is the one answer the app cannot use. An empty road is where a real annoying passenger is at their best |
 | about something really in the picture | a passenger who ignores the frame — pointed at a desk, Gemini Pro warned about the lorry ahead, because the prompt said "moving car" and nothing tied the remark to what was seen. The image also goes before the text for Google |
+| an angle drawn per round, and no "watch out for the X" | one joke shape for a whole ride — the second Gemini ride said "careful, you will hit the grey square" every time. `ANGLES` is twelve comic devices (a sarcastic compliment, an old grudge, a hotel review of the journey…), `pickAngle` never repeats the last one, the warning shape is banned outright, and the malice was turned up at the owner's request: personal and petty about the driver, never about bodies, identities or people in view. Gemini runs at temperature 1.3 |
 
 `sanitizeRemark` enforces the second in code as well as asking for it, because a model asked for
 twelve words will sometimes send thirty with a stage direction on the front. Everything it strips

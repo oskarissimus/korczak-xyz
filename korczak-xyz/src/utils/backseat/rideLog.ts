@@ -37,6 +37,8 @@ export interface RoundRecord {
   model: string;
   persona: string;
   intensity: string;
+  /** The comic device drawn for this round (`ANGLES` in remarks.ts). */
+  angle: string;
   lang: string;
   system: string;
   user: string;
