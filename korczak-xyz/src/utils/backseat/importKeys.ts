@@ -36,7 +36,12 @@
  */
 
 import { describeError, log } from '../../lib/logger';
-import { DEFAULT_CONFIG, DEFAULT_GOOGLE_MODEL, DEFAULT_OPENAI_MODEL } from './defaults';
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_GOOGLE_MODEL,
+  DEFAULT_OPENAI_MODEL,
+  FIRST_GOOGLE_MODEL,
+} from './defaults';
 import type { ApiKeys, BackseatConfig } from './types';
 
 /** sloper's own localStorage keys, named here rather than imported — see the note in cloud.ts. */
@@ -153,6 +158,9 @@ export function borrowFromBrowser(): { config: BackseatConfig; borrowed: boolean
  */
 export const GOOGLE_SWITCH_AT = Date.UTC(2026, 9, 1, 10, 0);
 
+/** When the Google default moved from Gemma to Gemini Flash-Lite, after the first ride on it. */
+export const SMARTER_SWITCH_AT = Date.UTC(2026, 9, 1, 11, 10);
+
 /**
  * The one-time move of a config saved on OpenAI to Gemma, with a Google key from wherever one is
  * — this config, or the wizard's copy. Null when there is nothing to do or no key to do it with.
@@ -168,6 +176,14 @@ export function switchedToGoogle(
   updatedAt: number,
   sloperGoogleKey: string | null,
 ): BackseatConfig | null {
+  // Moved onto Gemma by the first version of this, before anybody chose it: on to Flash-Lite.
+  if (
+    config.vision.provider === 'google' &&
+    config.vision.model === FIRST_GOOGLE_MODEL &&
+    updatedAt < SMARTER_SWITCH_AT
+  ) {
+    return { ...config, vision: { provider: 'google', model: DEFAULT_GOOGLE_MODEL } };
+  }
   if (config.vision.provider !== 'openai' || updatedAt >= GOOGLE_SWITCH_AT) return null;
   const google = config.apiKeys.google ?? sloperGoogleKey;
   if (!google) return null;

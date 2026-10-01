@@ -217,10 +217,11 @@ describe('the model lists', () => {
     expect(models).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro']);
   });
 
-  it('lists the Gemma models that take an image first, largest first', () => {
+  it('lists the default first, then Gemini, then the Gemma models that take an image', () => {
     const models = filterGoogleVisionModels(
       [
         'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
         'gemma-3-1b-it',
         'gemma-3-4b-it',
         'gemma-3-27b-it',
@@ -229,7 +230,13 @@ describe('the model lists', () => {
       ].map((id) => ({ name: `models/${id}`, supportedGenerationMethods: ['generateContent'] })),
     );
 
-    expect(models).toEqual(['gemma-3-27b-it', 'gemma-3-12b-it', 'gemma-3-4b-it', 'gemini-2.5-flash']);
+    expect(models).toEqual([
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemma-3-27b-it',
+      'gemma-3-12b-it',
+      'gemma-3-4b-it',
+    ]);
   });
 
   it('says a key is required before spending a request finding out', async () => {

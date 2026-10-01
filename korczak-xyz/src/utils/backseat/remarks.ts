@@ -127,12 +127,13 @@ export const USER_PROMPT = 'Here is what I can see out of the windscreen right n
 export function sanitizeRemark(raw: string): string | null {
   if (typeof raw !== 'string') return null;
 
-  // Only the first paragraph: the explanation a model adds after a blank line is never in
-  // character and is often longer than the line itself.
-  let text = raw.split(/\n\s*\n/)[0] ?? '';
-
-  // Then only the first line of it, for the same reason at a smaller scale.
-  text = text.split('\n')[0] ?? '';
+  // Only the first line that is not a heading: the explanation a model adds after it is never in
+  // character and is often longer than the line itself. A heading is what Gemma put on top of its
+  // answer on the first ride — "**Nervous passenger.**", then the remark — and taking the first
+  // line spoke the heading and nothing else.
+  const lines = raw.split('\n').filter((line) => line.trim() !== '');
+  while (lines.length > 1 && isHeading(lines[0])) lines.shift();
+  let text = lines[0] ?? '';
 
   text = text.trim();
 
@@ -169,6 +170,17 @@ export function sanitizeRemark(raw: string): string | null {
   }
 
   return text;
+}
+
+/**
+ * A line that labels the answer rather than being it: marked up as a heading or in bold, ending
+ * in a colon, or naming the passenger. Never one with a ! or ?, which is a remark however short.
+ */
+function isHeading(line: string): boolean {
+  const t = line.trim();
+  if (/[!?]/.test(t)) return false;
+  if (/^#+\s/.test(t) || /^\*\*[^*]+\*\*$/.test(t) || /:$/.test(t)) return true;
+  return t.split(/\s+/).length <= 3 && /passenger|pasażer/i.test(t);
 }
 
 /** Comparable form: case, punctuation and spacing are not what makes two remarks the same. */

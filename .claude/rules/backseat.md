@@ -23,13 +23,16 @@ account does is hold the keys. That is the whole architecture, and it is worth s
 because every other app here that talks to a provider has a server half and this one has none to
 find.
 
-### Google and Gemma are the default, since Oct 2026
+### Google is the default, since Oct 2026
 
 The app shipped on OpenAI's `gpt-4o-mini`, and on 1 Oct 2026 the account it ran on went dry
 mid-drive: *"You have no credits remaining"*, in the banner, every round. The default is now
-provider `google`, model `gemma-3-27b-it` — Gemma is free on an ordinary AI Studio key, at a daily
-allowance a remark every fifteen seconds does not approach, and the 27B is the largest Gemma that
-takes an image. OpenAI is still on the list. A config saved on OpenAI before the switch (`updatedAt` earlier than
+provider `google`, model `gemini-2.5-flash-lite`, free on an ordinary AI Studio key (15 a minute,
+about a thousand a day). For its first hour it was `gemma-3-27b-it`, and the first ride on Gemma
+answered a pavement with a heading, *"Nervous passenger."*, and flat lines after it; configs put
+on Gemma by that migration move to Flash-Lite once (`SMARTER_SWITCH_AT`), and `sanitizeRemark`
+now skips a heading line (`isHeading`). A 2.5 Flash gets `thinkingBudget: 0`, because its thinking
+counts against the 120-token cap and would leave no remark. OpenAI is still on the list. A config saved on OpenAI before the switch (`updatedAt` earlier than
 `GOOGLE_SWITCH_AT`) is moved to Gemma once, on the first signed-in load, with its own Google key or
 the wizard's (`switchedToGoogle`) — its owner could not paste a key from the car. Anything chosen
 after that is left alone.

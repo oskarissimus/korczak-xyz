@@ -273,3 +273,18 @@ describe('switchedToGoogle', () => {
     expect(switchedToGoogle(DEFAULT_CONFIG, before, 'AIza-w')).toBeNull();
   });
 });
+
+describe('switchedToGoogle, off the first Gemma default', () => {
+  const onGemma = {
+    ...DEFAULT_CONFIG,
+    apiKeys: { openai: null, google: 'AIza', elevenLabs: null },
+    vision: { provider: 'google' as const, model: 'gemma-3-27b-it' },
+  };
+
+  it('moves a config put on Gemma before the second switch to the new default, once', () => {
+    expect(switchedToGoogle(onGemma, Date.UTC(2026, 9, 1, 10, 57), null)?.vision.model).toBe(
+      DEFAULT_GOOGLE_MODEL,
+    );
+    expect(switchedToGoogle(onGemma, Date.UTC(2026, 9, 1, 12, 0), null)).toBeNull();
+  });
+});

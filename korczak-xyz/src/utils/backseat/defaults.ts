@@ -47,16 +47,24 @@ export const MAX_INTERVAL = 120;
 /**
  * Where a Google setup starts, and since Oct 2026 where every setup starts.
  *
- * Gemma rather than Gemini, and Google rather than OpenAI, because of the bill: Gemma on Google's
- * API is free on an ordinary AI Studio key, at a daily allowance a ride every fifteen seconds does
- * not come near, and the OpenAI account this app was first run on ran out of credit mid-drive
- * ("You have no credits remaining"). The 27B is the largest Gemma that takes an image; the 1B and
- * the 3n family on that API take text only and are filtered out of the list (`vision.ts`).
+ * Google rather than OpenAI because of the bill: the OpenAI account this app was first run on ran
+ * out of credit mid-drive ("You have no credits remaining"), and Gemini Flash-Lite is free on an
+ * ordinary AI Studio key. Gemma is on the list too (see FIRST_GOOGLE_MODEL for why it is not the
+ * default).
  *
  * Named rather than inlined because `importKeys.ts` needs it. If the guess is wrong for the
  * account, the model list replaces it as soon as it comes back.
  */
-export const DEFAULT_GOOGLE_MODEL = 'gemma-3-27b-it';
+export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash-lite';
+
+/**
+ * The default for the first hour after the switch, and not a good one: on the first ride it
+ * answered a road with a heading ("Nervous passenger.") rather than a remark, and its jokes were
+ * flat. Flash-Lite is free on the same key (15 a minute, about a thousand a day, so four hours of
+ * riding at fifteen seconds), follows a system prompt it is actually given, and is moved onto from
+ * this once (`switchedToGoogle`).
+ */
+export const FIRST_GOOGLE_MODEL = 'gemma-3-27b-it';
 
 /** Where an OpenAI setup starts — only ever chosen by hand, or borrowed with an OpenAI-only set. */
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';

@@ -89,7 +89,7 @@ describe('normalizeConfig', () => {
 
   it('falls back to the model of the provider that was saved, not the default provider', () => {
     expect(normalizeConfig({ vision: { provider: 'openai' } }).vision.model).toBe('gpt-4o-mini');
-    expect(normalizeConfig({}).vision).toEqual({ provider: 'google', model: 'gemma-3-27b-it' });
+    expect(normalizeConfig({}).vision).toEqual({ provider: 'google', model: 'gemini-2.5-flash-lite' });
   });
 
   it('falls back on any value outside a closed list', () => {

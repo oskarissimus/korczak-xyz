@@ -18,6 +18,7 @@
  * essay is cut off at the wire rather than at the speaker.
  */
 
+import { DEFAULT_GOOGLE_MODEL } from './defaults';
 import type { Frame, VisionProvider } from './types';
 
 /** Enough for one sentence in either language, with the room a model needs to finish it. */
@@ -147,7 +148,13 @@ async function askGoogle(request: VisionRequest): Promise<string> {
           ],
         },
       ],
-      generationConfig: { maxOutputTokens: MAX_TOKENS, temperature: TEMPERATURE },
+      generationConfig: {
+        maxOutputTokens: MAX_TOKENS,
+        temperature: TEMPERATURE,
+        // A 2.5 Flash thinks by default, and its thinking is billed against maxOutputTokens: left
+        // on, 120 tokens of it and no remark. Zero turns it off; Pro cannot, and is not worth it.
+        ...(/^gemini-2\.5-flash/.test(request.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
     }),
   });
 
@@ -200,11 +207,15 @@ export function filterOpenAiVisionModels(ids: string[]): string[] {
  */
 const GEMMA_TEXT_ONLY = ['-1b', '-270m', 'gemma-3n'];
 
-/** Gemma first, largest first — the first entry is what the setup sheet picks for you. */
+/**
+ * The default first, then Gemini, then Gemma largest first — the first entry is what the setup
+ * sheet picks for you when the saved model is not on offer.
+ */
 function googleRank(id: string): [number, number] {
+  if (id === DEFAULT_GOOGLE_MODEL) return [0, 0];
   if (!isGemma(id)) return [1, 0];
   const size = Number(/-(\d+)b-/.exec(id)?.[1] ?? 0);
-  return [0, -size];
+  return [2, -size];
 }
 
 export function filterGoogleVisionModels(

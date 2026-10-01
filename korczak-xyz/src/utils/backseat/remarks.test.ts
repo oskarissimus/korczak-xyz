@@ -175,3 +175,19 @@ describe('systemPrompt', () => {
     expect(codriver).toContain('co-driver');
   });
 });
+
+describe('sanitizeRemark, headings', () => {
+  it('skips the heading Gemma put on top of its answer', () => {
+    expect(sanitizeRemark('**Nervous passenger.**\n\nOh no, the tiles are so close!')).toBe(
+      'Oh no, the tiles are so close!',
+    );
+    expect(sanitizeRemark('Nervous passenger.\nMind the kerb, mind the kerb!')).toBe(
+      'Mind the kerb, mind the kerb!',
+    );
+    expect(sanitizeRemark('## Remark\nAre we there yet?')).toBe('Are we there yet?');
+  });
+
+  it('keeps a short remark that comes before an explanation', () => {
+    expect(sanitizeRemark('Slow down!\n\nThe passenger is nervous because...')).toBe('Slow down!');
+  });
+});

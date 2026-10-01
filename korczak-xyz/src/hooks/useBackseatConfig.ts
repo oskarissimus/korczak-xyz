@@ -156,9 +156,11 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
 
         // The one-time move off OpenAI, for a config saved before Gemma was the default.
         // See `switchedToGoogle`.
-        if (configRef.current.vision.provider === 'openai') {
+        if (configRef.current.vision.provider === 'openai' || configRef.current.vision.provider === 'google') {
           const sloperGoogle =
-            sloperKeysInBrowser().google ?? (await pullSloperKeys(uid)).google;
+            configRef.current.vision.provider === 'openai'
+              ? (sloperKeysInBrowser().google ?? (await pullSloperKeys(uid)).google)
+              : null;
           if (cancelled) return;
           const switched = switchedToGoogle(configRef.current, updatedAtRef.current, sloperGoogle);
           if (switched) {
