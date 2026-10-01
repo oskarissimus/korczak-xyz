@@ -1,21 +1,17 @@
 package function
 
-// Google, on the reader's own AI Studio key: Gemma writes the facts and the script, and Gemini
-// searches the web.
+// Google, on the reader's own AI Studio key: Gemini writes the facts and the script, and searches
+// the web.
 //
 // It was OpenAI until Oct 2026, when the account the guide ran on ran out of credit. Gemma is free
-// on an ordinary AI Studio key, so a guide now costs the reader only its minute of ElevenLabs. An
+// on an ordinary AI Studio key, and so is Gemini Flash at a walk's rate, so a guide now costs the
+// reader only its minute of ElevenLabs. An
 // OpenAI key is still honoured when it is the only one sent - a page loaded before the switch
 // sends nothing else - but the app sends the Google key and nothing else from then on.
 //
-// Two things about Gemma on this API shape everything below:
-//
-//   - It has no system prompt. A `systemInstruction` is refused outright ("Developer instruction
-//     is not enabled"), so the system text leads the one user turn, which is what Gemma's own chat
-//     template does with one anyway.
-//   - It has no JSON mode either, and no tools. So the facts come back as text that should be
-//     JSON and are cut out of it (jsonObject), and the web search is Gemini's, not Gemma's:
-//     Grounding with Google Search is a Gemini tool and there is no Gemma equivalent.
+// It was Gemma (gemma-3-27b-it) for the first hours, which has no system prompt, no JSON mode and
+// no tools on this API; see writerModels for why it is Gemini now. jsonObject stays: it costs
+// nothing and a fenced answer is still an answer.
 
 import (
 	"bytes"
@@ -32,11 +28,13 @@ import (
 
 const (
 	googleKeyHeader = "X-Google-Key"
-
-	// The largest Gemma that is served on the API. It reads Polish well enough to quote a source
-	// character for character, which is the one thing the facts call cannot do without.
-	gemmaModel = "gemma-3-27b-it"
 )
+
+// What writes the facts and the script. Gemma for the first few hours after the switch, until the
+// passenger's first rides on it (same day, same family) came back flat and once spoke its own
+// heading: Gemini follows a system prompt it is actually given, has a JSON mode, and is free on
+// the same key at a rate a walk does not approach (two calls a tap).
+var writerModels = []string{"gemini-2.5-flash", "gemini-flash-latest"}
 
 // A variable so the tests can point it at httptest, as with the other providers.
 var googleModelsEndpoint = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -64,9 +62,10 @@ type googleContent struct {
 }
 
 type googleRequest struct {
-	Contents         []googleContent  `json:"contents"`
-	Tools            []map[string]any `json:"tools,omitempty"`
-	GenerationConfig map[string]any   `json:"generationConfig,omitempty"`
+	SystemInstruction *googleContent   `json:"systemInstruction,omitempty"`
+	Contents          []googleContent  `json:"contents"`
+	Tools             []map[string]any `json:"tools,omitempty"`
+	GenerationConfig  map[string]any   `json:"generationConfig,omitempty"`
 }
 
 type googleResponse struct {
@@ -127,8 +126,11 @@ func generateContent(ctx context.Context, apiKey, model string, body googleReque
 	return &out, nil
 }
 
-// gemmaCompletion is chatCompletion for Gemma: the system message folded into the user turn.
-func gemmaCompletion(ctx context.Context, apiKey string, reqBody chatRequest) (string, error) {
+// googleCompletion is chatCompletion on Google: Gemini, with a real system instruction, JSON mode
+// when the caller asks for JSON, and thinking off - a 2.5 Flash bills its thinking against
+// maxOutputTokens, and the facts call's 1200 would otherwise go on thinking. The alias is tried
+// when the dated model is refused (400/404), with thinking left to it and room to do it.
+func googleCompletion(ctx context.Context, apiKey string, reqBody chatRequest) (string, error) {
 	var system, user []string
 	for _, m := range reqBody.Messages {
 		if m.Role == "system" {
@@ -137,15 +139,32 @@ func gemmaCompletion(ctx context.Context, apiKey string, reqBody chatRequest) (s
 			user = append(user, m.Content)
 		}
 	}
-	prompt := strings.Join(append(system, user...), "\n\n")
+	build := func(thinkingOff bool) googleRequest {
+		config := map[string]any{"temperature": reqBody.Temperature}
+		if thinkingOff {
+			config["maxOutputTokens"] = reqBody.MaxTokens
+			config["thinkingConfig"] = map[string]any{"thinkingBudget": 0}
+		} else {
+			config["maxOutputTokens"] = reqBody.MaxTokens + 4096
+		}
+		if reqBody.ResponseFormat != nil {
+			config["responseMimeType"] = "application/json"
+		}
+		req := googleRequest{
+			Contents:         []googleContent{{Role: "user", Parts: []googlePart{{Text: strings.Join(user, "\n\n")}}}},
+			GenerationConfig: config,
+		}
+		if len(system) > 0 {
+			req.SystemInstruction = &googleContent{Parts: []googlePart{{Text: strings.Join(system, "\n\n")}}}
+		}
+		return req
+	}
 
-	out, err := generateContent(ctx, apiKey, gemmaModel, googleRequest{
-		Contents: []googleContent{{Role: "user", Parts: []googlePart{{Text: prompt}}}},
-		GenerationConfig: map[string]any{
-			"maxOutputTokens": reqBody.MaxTokens,
-			"temperature":     reqBody.Temperature,
-		},
-	})
+	out, err := generateContent(ctx, apiKey, writerModels[0], build(true))
+	var pe *providerError
+	if errors.As(err, &pe) && (pe.status == http.StatusBadRequest || pe.status == http.StatusNotFound) {
+		out, err = generateContent(ctx, apiKey, writerModels[1], build(false))
+	}
 	if err != nil {
 		return "", err
 	}

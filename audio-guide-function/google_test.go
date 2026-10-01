@@ -17,7 +17,7 @@ func postWithGoogleKey(body, googleKey string) *httptest.ResponseRecorder {
 	return rec
 }
 
-func TestAGoogleKeyIsWrittenByGemma(t *testing.T) {
+func TestAGoogleKeyIsWrittenByGemini(t *testing.T) {
 	f := newFakeProviders(t)
 	rec := postWithGoogleKey(validBody, "AIza-test")
 	if rec.Code != http.StatusOK {
@@ -27,11 +27,10 @@ func TestAGoogleKeyIsWrittenByGemma(t *testing.T) {
 		t.Fatalf("calls %v, want the facts and the script", f.googleCalls)
 	}
 	for _, c := range f.googleCalls {
-		if c != gemmaModel+":generateContent" {
-			t.Errorf("call %q, want Gemma", c)
+		if c != writerModels[0]+":generateContent" {
+			t.Errorf("call %q, want %s", c, writerModels[0])
 		}
 	}
-	// Gemma refuses a systemInstruction, so the system prompt has to be in the turn itself.
 	if !strings.Contains(f.factsPrompt, "You extract facts") || !strings.Contains(f.scriptPrompt, "scriptwriter") {
 		t.Error("the system prompt did not reach Gemma")
 	}

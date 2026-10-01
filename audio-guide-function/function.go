@@ -4,7 +4,7 @@
 // A name, a category, a pair of coordinates and the place's OpenStreetMap tags come in; an MP3
 // goes out. In between it gathers what is actually known about the place - the tags, its Wikidata
 // item, its Wikipedia articles, and for a place with none, pages a web search found (sources.go,
-// websearch.go) - has Gemma (google.go) pick facts out of those with a
+// websearch.go) - has Gemini (google.go) pick facts out of those with a
 // verbatim quote for each, checks every quote against its source (grounding.go), asks again for a
 // script written for a speech synthesiser from the facts that survived, and has ElevenLabs read
 // it aloud. A place with no sources, or none the checks let through, is answered with a 422
@@ -577,7 +577,7 @@ Requirements:
 // chatCompletion is one model call, on whichever provider is writing this guide.
 func chatCompletion(ctx context.Context, author writer, reqBody chatRequest) (string, error) {
 	if author.google() {
-		return gemmaCompletion(ctx, author.key, reqBody)
+		return googleCompletion(ctx, author.key, reqBody)
 	}
 	apiKey := author.key
 	reqBody.Model = "gpt-4o-mini"

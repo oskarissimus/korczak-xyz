@@ -154,11 +154,14 @@ takes **only when it carries an OpenAI key and no Google key** — kept for a pa
 switch. On 1 Oct 2026 the OpenAI account the guide ran on ran out of credit, and the app now sends
 `X-Google-Key` (a Google AI Studio key) instead; `google.go` is that path:
 
-- **Facts and script are Gemma** (`gemma-3-27b-it`), free on an AI Studio key. Gemma on that API
-  refuses `systemInstruction`, so the system prompt leads the user turn; and it has no JSON mode,
-  so the facts come back as text and `jsonObject` cuts the object out of it (a ```` ```json ````
-  fence, more often than not). The quote check does not care who wrote the facts — which is the
-  reason swapping the model was safe.
+- **Facts and script are Gemini** (`gemini-2.5-flash`, `gemini-flash-latest` on a 400/404 —
+  `writerModels`), with a real `systemInstruction`, `responseMimeType: application/json` for the
+  facts, and `thinkingBudget: 0`, because a 2.5 Flash bills its thinking against the output cap.
+  For the first hours it was Gemma (`gemma-3-27b-it`: no system prompt, no JSON mode, so the
+  system text led the user turn and `jsonObject` cut the facts out of fenced text); the passenger's
+  first rides on Gemma were flat enough that it was dropped here before anybody tapped a pin on it.
+  `jsonObject` stays. The quote check does not care who wrote the facts — which is the reason
+  swapping the model was safe.
 - **The web search is Gemini** (`gemini-2.5-flash`, `gemini-flash-latest` on a 400/404), with
   Grounding with Google Search: Gemma has no tools, and there is no Gemma that searches. The bare
   query goes in, as before. The grounding chunks are not pages but
@@ -166,8 +169,8 @@ switch. On 1 Oct 2026 the OpenAI account the guide ran on ran out of credit, and
   `google.com` one `skippedHosts` refuses — so `resolveGroundingRedirects` asks each where it goes,
   without following it, and the page it names goes through the same checks as ever. There is no
   `user_location` on Google's tool; the town is in the query.
-- **The free tier is per minute as well as per day** (Gemma: about 15k input tokens a minute), and
-  a facts prompt with two articles is several thousand. Two taps in quick succession can come back
+- **The free tier is per minute as well as per day** (Gemini Flash: ten requests a minute, a few
+  hundred a day; two per tap). Two taps in quick succession can come back
   429 with *"… Please retry in 31s"*, which `classifyNarrationFailure` reads as a rate limit, not
   an empty account, because it says "quota" too.
 - **The app's key is `google`** in `audio-guide-config` and the account document; an `openai` key

@@ -189,6 +189,9 @@ func newFakeProviders(t *testing.T) *fakeProviders {
 		var req googleRequest
 		json.Unmarshal(body, &req)
 		prompt := req.Contents[0].Parts[0].Text
+		if req.SystemInstruction != nil {
+			prompt = req.SystemInstruction.Parts[0].Text + "\n\n" + prompt
+		}
 		if len(req.Tools) > 0 {
 			f.mu.Lock()
 			f.searchCalls++
