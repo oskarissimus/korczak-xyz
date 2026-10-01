@@ -7,6 +7,7 @@ import {
   fetchVisionModels,
   filterGoogleVisionModels,
   filterOpenAiVisionModels,
+  googleGeneration,
 } from './vision';
 
 const frame: Frame = {
@@ -265,5 +266,27 @@ describe('the model lists', () => {
     mockFetch({ ok: false, status: 400, json: async () => ({}) });
     const result = await fetchVisionModels('google', 'AIza-bad');
     expect(result.error).toBe('Invalid Google API key');
+  });
+});
+
+/*
+ * Thinking counts against the output cap: gemini-pro-latest spent the 120 tokens thinking and the
+ * ride spoke "Boże," and nothing more.
+ */
+describe('googleGeneration', () => {
+  it('turns thinking off on Flash and keeps the tight cap', () => {
+    expect(googleGeneration('gemini-2.5-flash-lite')).toMatchObject({
+      maxOutputTokens: 120,
+      thinkingConfig: { thinkingBudget: 0 },
+    });
+  });
+
+  it('gives a model that cannot stop thinking room to finish the sentence', () => {
+    expect(googleGeneration('gemini-pro-latest')).toMatchObject({
+      maxOutputTokens: 2048,
+      thinkingConfig: { thinkingLevel: 'low' },
+    });
+    expect(googleGeneration('gemini-2.5-pro').maxOutputTokens).toBe(2048);
+    expect(googleGeneration('gemma-3-27b-it')).not.toHaveProperty('thinkingConfig');
   });
 });

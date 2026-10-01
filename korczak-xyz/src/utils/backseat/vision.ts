@@ -122,6 +122,31 @@ export function isGemma(model: string): boolean {
   return model.startsWith('gemma');
 }
 
+/**
+ * Gemini thinks before it answers, and its thinking is counted against `maxOutputTokens`. With
+ * the 120 a remark needs, a thinking model spent them all and the ride spoke one word of the
+ * answer — "Boże," on gemini-pro-latest, the first time anybody picked it. So thinking is turned
+ * off where it can be (a 2.5 Flash), turned down where it cannot (Pro, and the 3 family), and a
+ * thinking model gets room to think and still finish the sentence. `sanitizeRemark` caps the
+ * length that is spoken either way; the token cap here was only ever a backstop.
+ */
+export function googleGeneration(model: string): Record<string, unknown> {
+  const base = { temperature: TEMPERATURE };
+  if (isGemma(model)) return { ...base, maxOutputTokens: MAX_TOKENS };
+  if (/^gemini-2\.5-flash/.test(model)) {
+    return { ...base, maxOutputTokens: MAX_TOKENS, thinkingConfig: { thinkingBudget: 0 } };
+  }
+  if (/^gemini-2\.5-pro/.test(model)) {
+    // The smallest budget 2.5 Pro takes; it cannot be turned off.
+    return { ...base, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 128 } };
+  }
+  if (/^gemini-([3-9]|\w+-latest)/.test(model)) {
+    // The 3 family takes a level rather than a budget, and an alias may be any of them.
+    return { ...base, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'low' } };
+  }
+  return { ...base, maxOutputTokens: 2048 };
+}
+
 async function askGoogle(request: VisionRequest): Promise<string> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(request.model)}` +
@@ -148,13 +173,7 @@ async function askGoogle(request: VisionRequest): Promise<string> {
           ],
         },
       ],
-      generationConfig: {
-        maxOutputTokens: MAX_TOKENS,
-        temperature: TEMPERATURE,
-        // A 2.5 Flash thinks by default, and its thinking is billed against maxOutputTokens: left
-        // on, 120 tokens of it and no remark. Zero turns it off; Pro cannot, and is not worth it.
-        ...(/^gemini-2\.5-flash/.test(request.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      },
+      generationConfig: googleGeneration(request.model),
     }),
   });
 
