@@ -251,7 +251,7 @@ jobs:
         # deploy TARGET name (the `.firebaserc` kind), not a sub-resource the way `firestore:rules`
         # does. There are no storage targets here, so `storage:rules` fails with "Could not find
         # rules for the following storage targets: rules". Bare `storage` deploys every entry in
-        # firebase.json's `storage` array, which is the one bucket.
+        # firebase.json's `storage` array: the sloper bucket and the backseat one.
         run: npx --yes firebase-tools@15 deploy --only firestore:rules,firestore:indexes,storage,functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive --force
 
   # The audio guide's backend, in Go, so it is not something the Firebase CLI can deploy — the CLI

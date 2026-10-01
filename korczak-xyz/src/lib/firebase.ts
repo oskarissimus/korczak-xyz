@@ -96,3 +96,16 @@ export function recycleDb(): boolean {
 export function getStorageClient(): FirebaseStorage | null {
   return storageInstance;
 }
+
+let backseatStorage: FirebaseStorage | null = null;
+
+/**
+ * The passenger's own bucket, `{projectId}-backseat` (terraform/storage.tf), for the rounds of a
+ * ride. Derived from the project id rather than another env var: it exists only where Terraform
+ * made it, which is the production project, and a build without Storage gets null as above.
+ */
+export function getBackseatStorageClient(): FirebaseStorage | null {
+  if (!app || !storageInstance || !config.projectId) return null;
+  backseatStorage ??= getStorage(app, `gs://${config.projectId}-backseat`);
+  return backseatStorage;
+}

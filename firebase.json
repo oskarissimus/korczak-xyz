@@ -7,6 +7,10 @@
     {
       "bucket": "korczak-xyz-501720-sloper",
       "rules": "storage.rules"
+    },
+    {
+      "bucket": "korczak-xyz-501720-backseat",
+      "rules": "storage.rules"
     }
   ],
   "functions": [

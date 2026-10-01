@@ -1,8 +1,10 @@
 rules_version = '2';
 
-// What may be put in `korczak-xyz-501720-sloper`, which is the only bucket this site's clients
-// ever touch. It holds one thing: the pictures, narrations and finished MP4s of `/apps/sloper/`,
-// under `users/{uid}/sloper/{projectId}/`.
+// What may be put in the two buckets this site's clients ever touch, which share these rules:
+// `korczak-xyz-501720-sloper` (the pictures, narrations and finished MP4s of `/apps/sloper/`, under
+// `users/{uid}/sloper/{projectId}/`) and `korczak-xyz-501720-backseat` (every round of a ride on
+// `/apps/backseat/`, under `users/{uid}/backseat/rides/`). Both are firebase.json entries naming
+// this one file; the per-account subtree below is the whole of what either needs.
 //
 // The shape deliberately mirrors `firestore.rules`: a per-account subtree, owner-only, with the
 // path itself carrying the authorization. What it does NOT mirror is the household share — there

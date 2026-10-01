@@ -8,9 +8,9 @@
  * `.json` beside it (the model, the persona, the full system and user prompts, the raw answer,
  * what was spoken, and what became of it).
  *
- * The bucket is sloper's, `korczak-xyz-501720-sloper`, whose rules already give every approved
- * account its own `users/{uid}/` subtree and nothing else — no rules change was needed. Signed out
- * there is nowhere to put it, and nothing is written.
+ * The bucket is the passenger's own, `korczak-xyz-501720-backseat` (terraform/storage.tf). It
+ * shares `storage.rules` with sloper's, which give every approved account its own `users/{uid}/`
+ * subtree and nothing else. Signed out there is nowhere to put it, and nothing is written.
  *
  * It never fails a round, and it is never awaited by one: an upload is fire-and-forget, a refusal
  * is a log line, and the passenger goes on talking. The keys are never in it.
@@ -18,7 +18,7 @@
 
 import { ref, uploadBytes, uploadString } from 'firebase/storage';
 
-import { getStorageClient } from '../../lib/firebase';
+import { getBackseatStorageClient } from '../../lib/firebase';
 import { describeError, log } from '../../lib/logger';
 import type { Frame } from './types';
 
@@ -68,7 +68,7 @@ function frameBlob(frame: Frame): Blob {
 /** Writes the round down, and never throws or makes the caller wait. */
 export function saveRound(uid: string | null, record: RoundRecord, frame: Frame): void {
   if (!uid) return;
-  const storage = getStorageClient();
+  const storage = getBackseatStorageClient();
   if (!storage) return;
 
   const base = roundPath(uid, record);

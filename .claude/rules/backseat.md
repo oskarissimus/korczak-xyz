@@ -280,13 +280,14 @@ app's document is a poor trade for a convenience.
 ### Every round is saved to the account, and nothing is saved in the browser
 
 **Since Oct 2026, at the owner's request**, each round of a signed-in ride writes two objects to
-sloper's bucket (`korczak-xyz-501720-sloper`): `users/{uid}/backseat/rides/{rideId}/{n}-{at}.jpg`,
+its own bucket (`korczak-xyz-501720-backseat`, terraform/storage.tf — it was sloper's for the
+first hour, and finding the passenger under the wizard's name was not where anybody would look): `users/{uid}/backseat/rides/{rideId}/{n}-{at}.jpg`,
 the frame exactly as the model got it, and `.json` beside it, with the model, persona, the full
 system and user prompts, the raw answer, what was spoken, the outcome (`spoken`, `unspoken`,
 `dropped_repeat`, `dropped_empty`, `failed`) and the release. `rideLog.ts`. It exists for one
 question — is a flat remark the model's fault, the prompt's or the frame's — which only the three
-side by side answer. The storage rules already give every approved account `users/{uid}/**`, so
-no rules change was needed; signed out, nothing is written. It is fire-and-forget: never awaited
+side by side answer. It shares `storage.rules` with sloper's bucket (both are
+`firebase.json` entries), which gives every approved account `users/{uid}/**`; signed out, nothing is written. It is fire-and-forget: never awaited
 by a round, a failure is a log line. The setup sheet says it in a line before the camera goes on,
 because a camera that keeps what it sees has to say so. The keys are never in a record.
 

@@ -145,3 +145,37 @@ resource "google_firebase_storage_bucket" "sloper" {
   project   = local.project_id
   bucket_id = google_storage_bucket.sloper.name
 }
+
+/*
+ * Where /apps/backseat/ keeps every round of a ride: the frame the model saw and a JSON record
+ * of the prompts and the answer (korczak-xyz/src/utils/backseat/rideLog.ts), for reading
+ * afterwards. Added Oct 2026.
+ *
+ * ITS OWN BUCKET, NOT A PREFIX IN SLOPER'S. It went into the sloper bucket first, because the
+ * rules there already covered `users/{uid}/**`, and the owner's verdict was that finding the
+ * passenger's photographs under the video wizard's name is not where anybody would look. A bucket
+ * per app is also what lets the two be kept, priced and deleted apart.
+ *
+ * Same shape as the one above and for the same reasons — public access prevented, registered with
+ * Firebase so the browser SDK and `storage.rules` can reach it — minus the CORS block: nothing
+ * reads these back from a page, and an upload goes to the API's upload endpoint, which sets its
+ * own CORS headers.
+ */
+resource "google_storage_bucket" "backseat" {
+  project  = local.project_id
+  name     = "${local.project_id}-backseat"
+  location = local.region
+
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_firebase_storage_bucket" "backseat" {
+  provider  = google-beta
+  project   = local.project_id
+  bucket_id = google_storage_bucket.backseat.name
+}
