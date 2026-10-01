@@ -191,3 +191,13 @@ describe('sanitizeRemark, headings', () => {
     expect(sanitizeRemark('Slow down!\n\nThe passenger is nervous because...')).toBe('Slow down!');
   });
 });
+
+/*
+ * Pointed at a desk, Gemini Pro warned about the lorry we were about to hit: the prompt said
+ * "windscreen of a moving car" and nothing said the remark had to be about the picture.
+ */
+it('asks for something that is really in the picture', () => {
+  const prompt = systemPrompt({ persona: 'nervous', intensity: 'normal', lang: 'en', recent: [] });
+  expect(prompt).toContain('really in the picture');
+  expect(prompt).toContain('Never invent');
+});

@@ -105,8 +105,8 @@ describe('askForRemark, Google', () => {
     // the model may answer about.
     expect(body.systemInstruction.parts[0].text).toBe('be annoying');
     // The prefix left on is rejected with an error about the image rather than the encoding.
-    expect(body.contents[0].parts[1].inline_data.data).toBe('AAEC');
-    expect(body.contents[0].parts[1].inline_data.data).not.toContain('data:');
+    expect(body.contents[0].parts[0].inline_data.data).toBe('AAEC');
+    expect(body.contents[0].parts[0].inline_data.data).not.toContain('data:');
   });
 
   /*
@@ -129,8 +129,8 @@ describe('askForRemark, Google', () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.systemInstruction).toBeUndefined();
-    expect(body.contents[0].parts[0].text).toBe('be annoying\n\nlook');
-    expect(body.contents[0].parts[1].inline_data.data).toBe('AAEC');
+    expect(body.contents[0].parts[1].text).toBe('be annoying\n\nlook');
+    expect(body.contents[0].parts[0].inline_data.data).toBe('AAEC');
   });
 
   it('joins a multi-part answer rather than taking the first part', async () => {

@@ -166,10 +166,12 @@ async function askGoogle(request: VisionRequest): Promise<string> {
         {
           role: 'user',
           parts: [
-            { text: gemma ? `${request.system}\n\n${request.user}` : request.user },
+            // The image first: Google's guidance for a single image, and the order in which the
+            // text reads as being about it.
             // Base64 without the data-URL prefix — Google rejects the whole payload if the
             // prefix is left on, with an error about the image rather than about the encoding.
             { inline_data: { mime_type: request.frame.mimeType, data: request.frame.base64 } },
+            { text: gemma ? `${request.system}\n\n${request.user}` : request.user },
           ],
         },
       ],
