@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_CONFIG, DEFAULT_GOOGLE_MODEL } from './defaults';
+import { DEFAULT_CONFIG, DEFAULT_GOOGLE_MODEL, DEFAULT_OPENAI_MODEL } from './defaults';
 import {
   anyKey,
   borrowFromBrowser,
@@ -83,7 +83,11 @@ describe('anyKey and hasNoKeys', () => {
 });
 
 describe('configWithBorrowedKeys', () => {
-  it('keeps the OpenAI defaults when an OpenAI key came along', () => {
+  /*
+   * A Google key wins when both came along: Gemma is free on it, and the OpenAI account this app
+   * was first run on ran out of credit mid-drive.
+   */
+  it('starts on Gemma when a Google key came along, whatever else did', () => {
     const config = configWithBorrowedKeys(DEFAULT_CONFIG, {
       openai: 'sk-a',
       google: 'AIza-c',
@@ -91,23 +95,23 @@ describe('configWithBorrowedKeys', () => {
     });
 
     expect(config.apiKeys.openai).toBe('sk-a');
-    expect(config.vision).toEqual(DEFAULT_CONFIG.vision);
+    expect(config.vision).toEqual({ provider: 'google', model: DEFAULT_GOOGLE_MODEL });
   });
 
   /*
-   * The difference between the import working and the import looking broken: the default provider
-   * is OpenAI, so a Google-only borrow would fill in a key the app never asks for and leave Start
-   * dead with nothing on screen explaining why.
+   * The difference between the import working and the import looking broken: a borrow holding
+   * only the other provider's key would fill in a key the app never asks for and leave Start dead
+   * with nothing on screen explaining why.
    */
-  it('moves the provider when only a Google key came along', () => {
+  it('moves the provider when only an OpenAI key came along', () => {
     const config = configWithBorrowedKeys(DEFAULT_CONFIG, {
-      openai: null,
-      google: 'AIza-c',
+      openai: 'sk-a',
+      google: null,
       elevenLabs: null,
     });
 
-    expect(config.vision.provider).toBe('google');
-    expect(config.vision.model).toBe(DEFAULT_GOOGLE_MODEL);
+    expect(config.vision.provider).toBe('openai');
+    expect(config.vision.model).toBe(DEFAULT_OPENAI_MODEL);
   });
 
   it('leaves everything that is not a key alone', () => {

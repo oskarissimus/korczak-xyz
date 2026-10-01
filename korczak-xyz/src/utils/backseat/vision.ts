@@ -2,7 +2,8 @@
  * Showing a frame to a model, from the browser, on the reader's own key.
  *
  * Two providers, because those are the two that will look at an image for a key pasted into a web
- * page: OpenAI's chat completions and Google's `generateContent`. DeepSeek is in sloper's list and
+ * page: OpenAI's chat completions and Google's `generateContent` — which serves Gemma as well as
+ * Gemini, and Gemma (free on an AI Studio key) is the default since Oct 2026. DeepSeek is in sloper's list and
  * not in this one — it has no vision model — and that asymmetry is the reason this app has its own
  * provider list rather than sharing sloper's.
  *
@@ -111,24 +112,35 @@ async function askOpenAi(request: VisionRequest): Promise<string> {
   return data?.choices?.[0]?.message?.content ?? '';
 }
 
+/**
+ * Gemma on Google's API refuses a `systemInstruction` outright — "Developer instruction is not
+ * enabled for models/gemma-3-27b-it", a 400 on every round — so for Gemma the system prompt goes
+ * at the head of the user turn instead, which is what Gemma's own chat template does with one.
+ */
+export function isGemma(model: string): boolean {
+  return model.startsWith('gemma');
+}
+
 async function askGoogle(request: VisionRequest): Promise<string> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(request.model)}` +
     `:generateContent?key=${encodeURIComponent(request.apiKey)}`;
+  const gemma = isGemma(request.model);
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: request.signal,
     body: JSON.stringify({
-      // Google takes the system prompt in its own field rather than as a message, and putting it
-      // in `contents` instead makes it one more thing the model may answer about.
-      systemInstruction: { parts: [{ text: request.system }] },
+      // Gemini takes the system prompt in its own field rather than as a message, and putting it
+      // in `contents` instead makes it one more thing the model may answer about. Gemma has no
+      // such field (see `isGemma`), so there it leads the user turn.
+      ...(gemma ? {} : { systemInstruction: { parts: [{ text: request.system }] } }),
       contents: [
         {
           role: 'user',
           parts: [
-            { text: request.user },
+            { text: gemma ? `${request.system}\n\n${request.user}` : request.user },
             // Base64 without the data-URL prefix — Google rejects the whole payload if the
             // prefix is left on, with an error about the image rather than about the encoding.
             { inline_data: { mime_type: request.frame.mimeType, data: request.frame.base64 } },
@@ -182,6 +194,19 @@ export function filterOpenAiVisionModels(ids: string[]): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Gemma ids on Google's API that read text only: the 1B, the 270M, and the 3n family (which takes
+ * images on a device but not through `generateContent`).
+ */
+const GEMMA_TEXT_ONLY = ['-1b', '-270m', 'gemma-3n'];
+
+/** Gemma first, largest first — the first entry is what the setup sheet picks for you. */
+function googleRank(id: string): [number, number] {
+  if (!isGemma(id)) return [1, 0];
+  const size = Number(/-(\d+)b-/.exec(id)?.[1] ?? 0);
+  return [0, -size];
+}
+
 export function filterGoogleVisionModels(
   models: { name: string; supportedGenerationMethods?: string[] }[],
 ): string[] {
@@ -189,8 +214,16 @@ export function filterGoogleVisionModels(
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
     .map((m) => m.name.replace('models/', ''))
     // Every current Gemini takes an image; the older text-only families and the embedders do not.
-    .filter((id) => id.startsWith('gemini') && !id.includes('embedding'))
-    .sort((a, b) => a.localeCompare(b));
+    .filter(
+      (id) =>
+        (id.startsWith('gemini') && !id.includes('embedding')) ||
+        (isGemma(id) && !GEMMA_TEXT_ONLY.some((bad) => id.includes(bad))),
+    )
+    .sort((a, b) => {
+      const [ga, sa] = googleRank(a);
+      const [gb, sb] = googleRank(b);
+      return ga - gb || sa - sb || a.localeCompare(b);
+    });
 }
 
 function networkFailure(err: unknown): ModelListResult {

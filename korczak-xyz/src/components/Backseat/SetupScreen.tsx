@@ -270,8 +270,8 @@ export default function SetupScreen({
               id={id}
               value={config.vision.provider}
               options={[
+                { value: 'google', label: 'Google (Gemma, Gemini)' },
                 { value: 'openai', label: 'OpenAI' },
-                { value: 'google', label: 'Google Gemini' },
               ]}
               onChange={(value) =>
                 update({ vision: { ...config.vision, provider: value, model: '' } })

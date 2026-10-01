@@ -108,6 +108,30 @@ describe('askForRemark, Google', () => {
     expect(body.contents[0].parts[1].inline_data.data).not.toContain('data:');
   });
 
+  /*
+   * Gemma on Google's API answers a `systemInstruction` with a 400 ("Developer instruction is not
+   * enabled"), every round, so for Gemma the system prompt leads the user turn.
+   */
+  it('puts the system prompt in the user turn for Gemma', async () => {
+    const fetchMock = mockFetch({
+      json: async () => ({ candidates: [{ content: { parts: [{ text: 'Mind the bus.' }] } }] }),
+    });
+
+    await askForRemark({
+      provider: 'google',
+      apiKey: 'AIza-test',
+      model: 'gemma-3-27b-it',
+      system: 'be annoying',
+      user: 'look',
+      frame,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.systemInstruction).toBeUndefined();
+    expect(body.contents[0].parts[0].text).toBe('be annoying\n\nlook');
+    expect(body.contents[0].parts[1].inline_data.data).toBe('AAEC');
+  });
+
   it('joins a multi-part answer rather than taking the first part', async () => {
     mockFetch({
       json: async () => ({ candidates: [{ content: { parts: [{ text: 'Mind ' }, { text: 'the bus.' }] } }] }),
@@ -191,6 +215,21 @@ describe('the model lists', () => {
     ]);
 
     expect(models).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro']);
+  });
+
+  it('lists the Gemma models that take an image first, largest first', () => {
+    const models = filterGoogleVisionModels(
+      [
+        'gemini-2.5-flash',
+        'gemma-3-1b-it',
+        'gemma-3-4b-it',
+        'gemma-3-27b-it',
+        'gemma-3n-e4b-it',
+        'gemma-3-12b-it',
+      ].map((id) => ({ name: `models/${id}`, supportedGenerationMethods: ['generateContent'] })),
+    );
+
+    expect(models).toEqual(['gemma-3-27b-it', 'gemma-3-12b-it', 'gemma-3-4b-it', 'gemini-2.5-flash']);
   });
 
   it('says a key is required before spending a request finding out', async () => {

@@ -87,8 +87,13 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ voice: { rate: 'fast' } }).voice.rate).toBe(DEFAULT_CONFIG.voice.rate);
   });
 
+  it('falls back to the model of the provider that was saved, not the default provider', () => {
+    expect(normalizeConfig({ vision: { provider: 'openai' } }).vision.model).toBe('gpt-4o-mini');
+    expect(normalizeConfig({}).vision).toEqual({ provider: 'google', model: 'gemma-3-27b-it' });
+  });
+
   it('falls back on any value outside a closed list', () => {
-    expect(normalizeConfig({ vision: { provider: 'anthropic' } }).vision.provider).toBe('openai');
+    expect(normalizeConfig({ vision: { provider: 'anthropic' } }).vision.provider).toBe('google');
     expect(normalizeConfig({ remarks: { persona: 'dog' } }).remarks.persona).toBe('nervous');
     expect(normalizeConfig({ remarks: { intensity: 'loud' } }).remarks.intensity).toBe('normal');
     expect(normalizeConfig({ voice: { engine: 'azure' } }).voice.engine).toBe('device');
@@ -111,10 +116,10 @@ describe('normalizeConfig', () => {
 
 describe('which keys a ride actually needs', () => {
   it('asks only for the provider that is selected', () => {
-    expect(requiredKeys(DEFAULT_CONFIG)).toEqual(['openai']);
+    expect(requiredKeys(DEFAULT_CONFIG)).toEqual(['google']);
     expect(
-      requiredKeys({ ...DEFAULT_CONFIG, vision: { provider: 'google', model: 'x' } }),
-    ).toEqual(['google']);
+      requiredKeys({ ...DEFAULT_CONFIG, vision: { provider: 'openai', model: 'x' } }),
+    ).toEqual(['openai']);
   });
 
   /* The whole reason the device synthesiser is the default: one key and the app runs. */
@@ -129,15 +134,15 @@ describe('which keys a ride actually needs', () => {
   });
 
   it('reports exactly what is missing', () => {
-    expect(missingKeys(DEFAULT_CONFIG)).toEqual(['openai']);
+    expect(missingKeys(DEFAULT_CONFIG)).toEqual(['google']);
     expect(
-      missingKeys({ ...DEFAULT_CONFIG, apiKeys: { ...DEFAULT_CONFIG.apiKeys, openai: 'sk' } }),
+      missingKeys({ ...DEFAULT_CONFIG, apiKeys: { ...DEFAULT_CONFIG.apiKeys, google: 'AIza' } }),
     ).toEqual([]);
   });
 });
 
 describe('canStart', () => {
-  const withKey = { ...DEFAULT_CONFIG, apiKeys: { ...DEFAULT_CONFIG.apiKeys, openai: 'sk' } };
+  const withKey = { ...DEFAULT_CONFIG, apiKeys: { ...DEFAULT_CONFIG.apiKeys, google: 'AIza' } };
 
   it('wants a key and a model, and says no without either', () => {
     expect(canStart(DEFAULT_CONFIG)).toBe(false);

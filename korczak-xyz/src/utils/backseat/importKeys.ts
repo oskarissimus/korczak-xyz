@@ -36,7 +36,7 @@
  */
 
 import { describeError, log } from '../../lib/logger';
-import { DEFAULT_CONFIG, DEFAULT_GOOGLE_MODEL } from './defaults';
+import { DEFAULT_CONFIG, DEFAULT_GOOGLE_MODEL, DEFAULT_OPENAI_MODEL } from './defaults';
 import type { ApiKeys, BackseatConfig } from './types';
 
 /** sloper's own localStorage keys, named here rather than imported — see the note in cloud.ts. */
@@ -120,20 +120,23 @@ export function sloperKeysInBrowser(): ApiKeys {
  * The config to start from, given borrowed keys.
  *
  * The provider is moved to whichever key actually turned up, which is the difference between the
- * import working and the import looking broken: the default provider is OpenAI, so borrowing a
- * Google-only setup would fill in a key the app then never asks for and leave Start dead with
- * nothing on screen explaining why. The model moves with it; if that guess is wrong for the
- * account, the model list replaces it as soon as it comes back.
+ * import working and the import looking broken: borrowing a set with only the other provider's key
+ * would fill in a key the app then never asks for and leave Start dead with nothing on screen
+ * explaining why. A Google key wins when both came along — Gemma is free on it and OpenAI is not.
+ * The model moves with it; if that guess is wrong for the account, the model list replaces it as
+ * soon as it comes back.
  */
 export function configWithBorrowedKeys(base: BackseatConfig, keys: ApiKeys): BackseatConfig {
-  const googleOnly = !keys.openai && Boolean(keys.google);
+  const vision: BackseatConfig['vision'] = keys.google
+    ? { provider: 'google', model: DEFAULT_GOOGLE_MODEL }
+    : keys.openai
+      ? { provider: 'openai', model: DEFAULT_OPENAI_MODEL }
+      : base.vision;
 
   return {
     ...base,
     apiKeys: { ...base.apiKeys, ...keys },
-    vision: googleOnly
-      ? { provider: 'google', model: DEFAULT_GOOGLE_MODEL }
-      : base.vision,
+    vision,
   };
 }
 

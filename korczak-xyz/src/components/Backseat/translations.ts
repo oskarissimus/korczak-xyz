@@ -50,7 +50,7 @@ export const translations = {
     keysBlurb:
       'Yours, billed to you, used straight from this page. Nothing goes through korczak.xyz at all.',
     keyOpenai: 'OpenAI key',
-    keyGoogle: 'Google key',
+    keyGoogle: 'Google AI Studio key',
     keyElevenLabs: 'ElevenLabs key',
     keyShow: 'Show',
     keyHide: 'Hide',
@@ -174,7 +174,7 @@ export const translations = {
     keysBlurb:
       'Twoje, na twój rachunek, używane prosto z tej strony. Nic nie idzie przez korczak.xyz.',
     keyOpenai: 'Klucz OpenAI',
-    keyGoogle: 'Klucz Google',
+    keyGoogle: 'Klucz Google AI Studio',
     keyElevenLabs: 'Klucz ElevenLabs',
     keyShow: 'Pokaż',
     keyHide: 'Ukryj',

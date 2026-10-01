@@ -45,18 +45,29 @@ export const MIN_INTERVAL = 6;
 export const MAX_INTERVAL = 120;
 
 /**
- * Where a Google setup starts.
+ * Where a Google setup starts, and since Oct 2026 where every setup starts.
  *
- * Named rather than inlined because `importKeys.ts` needs it: borrowing a Google-only set of keys
- * has to move the provider as well, and leaving the OpenAI default model behind would be a config
- * that names one provider and one of the other's models. If the guess is wrong for the account,
- * the model list replaces it as soon as it comes back.
+ * Gemma rather than Gemini, and Google rather than OpenAI, because of the bill: Gemma on Google's
+ * API is free on an ordinary AI Studio key, at a daily allowance a ride every fifteen seconds does
+ * not come near, and the OpenAI account this app was first run on ran out of credit mid-drive
+ * ("You have no credits remaining"). The 27B is the largest Gemma that takes an image; the 1B and
+ * the 3n family on that API take text only and are filtered out of the list (`vision.ts`).
+ *
+ * Named rather than inlined because `importKeys.ts` needs it. If the guess is wrong for the
+ * account, the model list replaces it as soon as it comes back.
  */
-export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GOOGLE_MODEL = 'gemma-3-27b-it';
+
+/** Where an OpenAI setup starts — only ever chosen by hand, or borrowed with an OpenAI-only set. */
+export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+
+export function defaultModelFor(provider: VisionProvider): string {
+  return provider === 'google' ? DEFAULT_GOOGLE_MODEL : DEFAULT_OPENAI_MODEL;
+}
 
 export const DEFAULT_CONFIG: BackseatConfig = {
   apiKeys: { openai: null, google: null, elevenLabs: null },
-  vision: { provider: 'openai', model: 'gpt-4o-mini' },
+  vision: { provider: 'google', model: DEFAULT_GOOGLE_MODEL },
   remarks: { intervalSeconds: 15, persona: 'nervous', intensity: 'normal', language: null },
   voice: {
     engine: 'device',
@@ -117,11 +128,14 @@ export function normalizeConfig(value: unknown): BackseatConfig {
   const voice = asRecord(raw.voice);
   const camera = asRecord(raw.camera);
 
+  const provider = asOneOf(vision.provider, VISION_PROVIDERS, DEFAULT_CONFIG.vision.provider);
+
   return {
     apiKeys: normalizeApiKeys(raw.apiKeys),
     vision: {
-      provider: asOneOf(vision.provider, VISION_PROVIDERS, DEFAULT_CONFIG.vision.provider),
-      model: asString(vision.model, DEFAULT_CONFIG.vision.model),
+      provider,
+      // The fallback follows the provider: one provider's name with the other's model is a 404.
+      model: asString(vision.model, defaultModelFor(provider)),
     },
     remarks: {
       intervalSeconds: asInt(

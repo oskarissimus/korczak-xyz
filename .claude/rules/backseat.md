@@ -23,6 +23,25 @@ account does is hold the keys. That is the whole architecture, and it is worth s
 because every other app here that talks to a provider has a server half and this one has none to
 find.
 
+### Google and Gemma are the default, since Oct 2026
+
+The app shipped on OpenAI's `gpt-4o-mini`, and on 1 Oct 2026 the account it ran on went dry
+mid-drive: *"You have no credits remaining"*, in the banner, every round. The default is now
+provider `google`, model `gemma-3-27b-it` — Gemma is free on an ordinary AI Studio key, at a daily
+allowance a remark every fifteen seconds does not approach, and the 27B is the largest Gemma that
+takes an image. OpenAI is still on the list; a saved config that names it keeps it until somebody
+changes the dropdown.
+
+Two things about Gemma on Google's API that Gemini does not share:
+
+- **No `systemInstruction`.** Gemma answers it with a 400 (*"Developer instruction is not
+  enabled"*), so `askGoogle` puts the system prompt at the head of the user turn for any `gemma*`
+  model. Gemini still gets the field.
+- **Not every Gemma sees.** The 1B, the 270M and the 3n family take text only through
+  `generateContent`; `filterGoogleVisionModels` leaves them out and puts the rest first, largest
+  first, because the first entry is what the setup sheet picks when the saved model is not on
+  offer.
+
 ### The sentence that has to stay on the screen
 
 This app puts a synthetic voice in a moving car saying things like "watch out for that truck" about
@@ -243,9 +262,10 @@ Two things fell out of that repair and both are load-bearing:
   somebody typed here last week. It still pushes up when the account has no copy at all, which is
   the case it exists for. The account-side borrow is stamped `Date.now()` instead, because it has
   been through the account and is the copy of record from there on.
-- **A Google-only borrow moves the provider too.** The default provider is OpenAI, so filling in a
-  Google key alone would leave Start dead with the key it needs sitting right there unasked for.
-  `DEFAULT_GOOGLE_MODEL` goes with it, and the model list corrects it if that guess is wrong.
+- **A borrow moves the provider to the key that came along.** Filling in only the other
+  provider's key would leave Start dead with the key it needs sitting right there unasked for. A
+  Google key wins when both came (Gemma is free on it; see below). `DEFAULT_GOOGLE_MODEL` or
+  `DEFAULT_OPENAI_MODEL` goes with it, and the model list corrects it if that guess is wrong.
 
 `pullSloperKeys` **never fails the caller**: a missing document, a rules refusal or a dead client
 all come back as three nulls. An app that would not open because it could not read a different
