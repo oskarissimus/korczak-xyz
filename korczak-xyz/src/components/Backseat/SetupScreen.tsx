@@ -81,6 +81,8 @@ interface SetupScreenProps {
   onStart: () => void;
   /** The keys on screen came from the video generation wizard rather than from this app. */
   borrowed: boolean;
+  /** Signed in, so every round of a ride is saved to the account (`rideLog.ts`). */
+  saving: boolean;
   t: Translation;
   lang: 'en' | 'pl';
 }
@@ -90,6 +92,7 @@ export default function SetupScreen({
   update,
   reset,
   onStart,
+  saving,
   borrowed,
   t,
   lang,
@@ -224,6 +227,9 @@ export default function SetupScreen({
         <h3 className="bks-warning-title">{t.disclaimerTitle}</h3>
         <p>{t.disclaimerBody}</p>
       </aside>
+
+      {/* A camera that keeps what it sees has to say so before it is switched on. */}
+      {saving && <p className="bks-note">{t.ridesSaved}</p>}
 
       <Fieldset legend={t.keysTitle} hint={t.keysBlurb}>
         {/* A key appearing in an app you never typed it into is startling, and a key you believe

@@ -49,7 +49,7 @@ export default function Backseat({ lang }: BackseatProps) {
   const t: Translation = translations[lang];
   const auth = useAuth();
   const { config, ready, sync, borrowed, update, reset } = useBackseatConfig(auth.user);
-  const ride = useBackseatRide(config, remarkLanguage(config, lang));
+  const ride = useBackseatRide(config, remarkLanguage(config, lang), auth.user?.uid ?? null);
 
   const riding = ride.status !== 'idle';
 
@@ -138,6 +138,7 @@ export default function Backseat({ lang }: BackseatProps) {
             update={update}
             reset={reset}
             borrowed={borrowed}
+            saving={Boolean(auth.user)}
             /* Handed the hook's own callback, with nothing awaited in between: the speech engine
                is unlocked by an utterance spoken inside a real user gesture, and one `await`
                before that point loses the gesture on iOS — the app is then silent for the whole

@@ -277,17 +277,26 @@ Two things fell out of that repair and both are load-bearing:
 all come back as three nulls. An app that would not open because it could not read a different
 app's document is a poor trade for a convenience.
 
-### Nothing about a ride is saved
+### Every round is saved to the account, and nothing is saved in the browser
 
-Not in localStorage and not in Firestore. The localStorage half is the budget argument the other
-apps already made — a frame is hundreds of kilobytes and the origin's ~5 MB is shared with the
-typing trainer's `typedHistory`. The remarks alone would fit and are still not kept, for a different
-reason: **what makes the needling funny is that it is happening now.** A log of it read back cold is
-a list of complaints about a road you are no longer on.
+**Since Oct 2026, at the owner's request**, each round of a signed-in ride writes two objects to
+sloper's bucket (`korczak-xyz-501720-sloper`): `users/{uid}/backseat/rides/{rideId}/{n}-{at}.jpg`,
+the frame exactly as the model got it, and `.json` beside it, with the model, persona, the full
+system and user prompts, the raw answer, what was spoken, the outcome (`spoken`, `unspoken`,
+`dropped_repeat`, `dropped_empty`, `failed`) and the release. `rideLog.ts`. It exists for one
+question — is a flat remark the model's fault, the prompt's or the frame's — which only the three
+side by side answer. The storage rules already give every approved account `users/{uid}/**`, so
+no rules change was needed; signed out, nothing is written. It is fire-and-forget: never awaited
+by a round, a failure is a log line. The setup sheet says it in a line before the camera goes on,
+because a camera that keeps what it sees has to say so. The keys are never in a record.
 
-So there is no project, no history tab, and no resume. The in-memory list is capped at 50 and the
-screen shows the last handful. If this is ever revisited, note that the thing somebody would
-actually want is a *shareable* transcript of one drive, which is a different feature from a log.
+**This reverses what this section used to say** ("nothing about a ride is saved", the remarks
+being funny only now). That was a product judgement about a log for the *user*; this is a record
+for whoever tunes the prompt, and nothing in the app reads it back.
+
+The browser half still holds: nothing about a ride goes in localStorage — a frame is hundreds of
+kilobytes and the origin's ~5 MB is shared with the typing trainer's `typedHistory`. The in-memory
+list is capped at 50 and the screen shows the last handful.
 
 ### One island, and why the camera makes that firmer than sloper's
 

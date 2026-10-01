@@ -70,6 +70,9 @@ export const translations = {
     visionModelsHint: 'Only models that can look at a picture are listed.',
 
     // The passenger
+    ridesSaved:
+      'Every snapshot, the prompt it was sent with and what came back are saved to your account, ' +
+      'for reading afterwards.',
     personaTitle: 'The passenger',
     personaWho: 'Who is sitting there',
     personaNervous: 'Nervous wreck',
@@ -192,6 +195,9 @@ export const translations = {
     visionModelsEmpty: 'Wpisz klucz, żeby zobaczyć modele',
     visionModelsHint: 'Na liście są tylko modele, które potrafią patrzeć na zdjęcie.',
 
+    ridesSaved:
+      'Każde zdjęcie, prompt, z którym poszło, i odpowiedź zapisują się na twoim koncie, ' +
+      'do późniejszej analizy.',
     personaTitle: 'Pasażer',
     personaWho: 'Kto tam siedzi',
     personaNervous: 'Kłębek nerwów',

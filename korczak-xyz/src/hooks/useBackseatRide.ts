@@ -43,6 +43,7 @@ import {
 import { isRepeat, recentTexts, sanitizeRemark, systemPrompt, USER_PROMPT } from '../utils/backseat/remarks';
 import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
 import type { BackseatConfig, Remark, RemarkLanguage, RideStatus } from '../utils/backseat/types';
+import { RELEASE, rideIdFor, saveRound, type RoundRecord } from '../utils/backseat/rideLog';
 import { askForRemark, VisionError } from '../utils/backseat/vision';
 import { createWakeLock } from '../utils/wakeLock';
 
@@ -92,7 +93,12 @@ function nextRemarkId(): string {
   return `r${Date.now().toString(36)}-${remarkCounter}`;
 }
 
-export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): RideApi {
+export function useBackseatRide(
+  config: BackseatConfig,
+  lang: RemarkLanguage,
+  /** The account a ride's rounds are saved under (`rideLog.ts`); null saves nothing. */
+  uid: string | null = null,
+): RideApi {
   const [status, setStatus] = useState<RideStatus>('idle');
   const [remarks, setRemarks] = useState<Remark[]>([]);
   const [current, setCurrent] = useState<Remark | null>(null);
@@ -140,6 +146,11 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
 
   const langRef = useRef(lang);
   langRef.current = lang;
+
+  const uidRef = useRef(uid);
+  uidRef.current = uid;
+  /** This ride's id and how many rounds it has had, for the saved records. */
+  const rideRef = useRef({ id: '', rounds: 0 });
 
   /* The spoken history, for the prompt. Kept beside the state because the loop needs it
      synchronously and `setState` is not readable on the same tick it is called. */
@@ -224,27 +235,53 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
     const visionController = new AbortController();
     visionAbortRef.current = visionController;
 
+    const system = systemPrompt({
+      persona: settings.remarks.persona,
+      intensity: settings.remarks.intensity,
+      lang: langRef.current,
+      recent: recentTexts(historyRef.current),
+    });
+    rideRef.current.rounds += 1;
+    // What this round is, for the saved record; `outcome` and the rest are filled in as it goes.
+    const record: RoundRecord = {
+      rideId: rideRef.current.id,
+      n: rideRef.current.rounds,
+      at: startedAt,
+      provider: settings.vision.provider,
+      model: settings.vision.model,
+      persona: settings.remarks.persona,
+      intensity: settings.remarks.intensity,
+      lang: langRef.current,
+      system,
+      user: USER_PROMPT,
+      raw: null,
+      text: null,
+      outcome: 'failed',
+      error: null,
+      release: RELEASE,
+    };
+    const save = () => saveRound(uidRef.current, record, frame);
+
     try {
       const raw = await askForRemark({
         provider: settings.vision.provider,
         apiKey: settings.apiKeys[settings.vision.provider === 'google' ? 'google' : 'openai'] ?? '',
         model: settings.vision.model,
-        system: systemPrompt({
-          persona: settings.remarks.persona,
-          intensity: settings.remarks.intensity,
-          lang: langRef.current,
-          recent: recentTexts(historyRef.current),
-        }),
+        system,
         user: USER_PROMPT,
         frame,
         signal: visionController.signal,
       });
+      record.raw = raw;
 
       if (!runningRef.current) return;
       failuresRef.current = 0;
 
       const text = sanitizeRemark(raw);
+      record.text = text;
       if (!text || isRepeat(text, recentTexts(historyRef.current))) {
+        record.outcome = text ? 'dropped_repeat' : 'dropped_empty';
+        save();
         // A dropped round costs one interval of silence and is much cheaper than the same
         // sentence twice, which is what makes the app read as broken.
         log.debug('backseat.remark.dropped', { repeat: Boolean(text) });
@@ -258,6 +295,7 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
 
       const speechController = new AbortController();
       speechAbortRef.current = speechController;
+      record.outcome = 'spoken';
 
       setSpeaking(true);
       try {
@@ -277,6 +315,8 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
          * to be told why.
          */
         const message = e instanceof Error ? e.message : 'Speech failed';
+        record.outcome = 'unspoken';
+        record.error = message;
         log.warn('backseat.speak.failed', describeError(e));
         setError(message);
         historyRef.current = historyRef.current.map((r) =>
@@ -285,6 +325,7 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
         setRemarks([...historyRef.current].reverse());
       } finally {
         setSpeaking(false);
+        save();
       }
 
       if (!runningRef.current) return;
@@ -296,6 +337,8 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
 
       const message = e instanceof Error ? e.message : 'The model would not answer.';
       log.warn('backseat.vision.failed', describeError(e));
+      record.error = message;
+      save();
 
       if (e instanceof VisionError && e.fatal) {
         // A rejected key will not start working on the next attempt, and going on would be
@@ -325,6 +368,7 @@ export function useBackseatRide(config: BackseatConfig, lang: RemarkLanguage): R
     setError(null);
     setCameraError(null);
     failuresRef.current = 0;
+    rideRef.current = { id: rideIdFor(Date.now()), rounds: 0 };
 
     if (!secureContext()) {
       setCameraError('unsupported');
