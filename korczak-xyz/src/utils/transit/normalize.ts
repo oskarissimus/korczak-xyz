@@ -162,6 +162,32 @@ export function hasProse(parts: Prose): boolean {
 }
 
 /**
+ * Whether WTP has marked this communiqué as over.
+ *
+ * WTP does not open a new post when a disruption ends; it rewrites the live one. The RSS row's
+ * description becomes `Zakończone utrudnienia w kursowaniu pociągów metra linia M2` (or, in the
+ * older wording, `ZAKOŃCZONO: Utrudnienia w kursowaniu…`), and the article keeps the closure's
+ * prose **struck through** under a new first line, *"Trwa przywracanie podstawowej organizacji
+ * ruchu."* That edit moves `contentHash`, so it reaches `planAlerts` as a fresh revision.
+ *
+ * Read off the feed's own text and **anchored at the start**, because that is where WTP puts it and
+ * nowhere else: a communiqué's prose may well say *"do czasu zakończenia prac"*. The article is
+ * never consulted here — and it is still read by the extractor, deliberately: a closure first seen
+ * already over (12 Sep 2026's M1 was) has only its struck-through text to say *where* it was, and
+ * for an ended item `closedStops` means "were closed", which is all `impactOf` uses it for.
+ *
+ * 2 Oct 2026 is what this is for. The M2 closure at Dworzec Wileński was over by the 06:27 run, and the mirror
+ * handed over the article's one live sentence — 77 characters, under `MIN_PROSE_CHARS` — so
+ * `hasProse` escalated it and the phone said *"Nie udało się odczytać, które stacje są
+ * zamknięte"* about a closure that had just reopened.
+ */
+export function isEnded(parts: { title: string; body?: string }): boolean {
+  return ENDED.test(foldText(parts.body ?? '')) || ENDED.test(foldText(parts.title));
+}
+
+const ENDED = /^\s*(zakonczono|zakonczone|zakonczenie utrudnien)\b/;
+
+/**
  * What the extractor was shown, as a short digest.
  *
  * FNV-1a over the folded title and prose, not a cryptographic hash — this is a change detector, and

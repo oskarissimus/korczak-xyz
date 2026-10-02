@@ -196,6 +196,8 @@ export interface ImpactVerdict {
   lines: MetroLine[];
   /** The stations that put it on the route, for the card and the push body. */
   stops: string[];
+  /** WTP has marked the communiqué as over — see `isEnded`. Absent means live. */
+  ended?: boolean;
 }
 
 /** Why a notification fired. The impact, verbatim: the two levels are the two kinds. */
@@ -226,6 +228,8 @@ export interface TransitAlert {
   lines: MetroLine[];
   stops: string[];
   certain: boolean;
+  /** The alert said the disruption is over. */
+  ended?: boolean;
   claimedAt: number;
   sentAt: number | null;
   failed?: string;

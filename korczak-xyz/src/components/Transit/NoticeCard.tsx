@@ -18,7 +18,7 @@
  */
 import type { ImpactVerdict, TransitItem } from '../../utils/transit/types';
 import { extractionIsStale, isMetro } from '../../utils/transit/feed';
-import { hasProse } from '../../utils/transit/normalize';
+import { hasProse, isEnded } from '../../utils/transit/normalize';
 import { translations, whenLabel, type Lang } from './translations';
 
 interface Props {
@@ -39,8 +39,13 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
    * closed*, about a line cut in half. `impactOf` makes the same call for the same reason.
    */
   const unreadable = isMetro(item) && !hasProse(item);
-  const unread = item.extractHash === undefined || unreadable;
-  const stale = !unreadable && extractionIsStale(item);
+  /*
+   * Over, in WTP's own headline. Nothing about its reading is worth a badge then: the article is
+   * the closure struck through, and whatever was read from it is history, drawn as "were closed".
+   */
+  const ended = isEnded(item);
+  const unread = !ended && (item.extractHash === undefined || unreadable);
+  const stale = !ended && !unreadable && extractionIsStale(item);
 
   return (
     <article className={`ev-card tr-card${verdict?.impact === 'route' ? ' tr-card--route' : ''}`}>
@@ -69,6 +74,7 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
           * quiet because the notice closes nothing or because nobody has read it — and only one of
           * those is a reason to open the link.
           */}
+        {ended ? <span className="ev-chip">{t.ended}</span> : null}
         {unread ? (
           <span className="ev-chip tr-chip--unread">
             {unreadable ? t.noProse : item.extractError ? t.unreadFailed : t.unread}
@@ -83,7 +89,18 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
         * answering the only question it could about one sentence — and printing it is precisely the
         * card that started this: **No station closed**, above a line running in two halves.
         */}
-      {unreadable ? null : (
+      {ended ? (
+        item.closedStops && item.closedStops.length > 0 ? (
+          <p className="tr-stops">
+            <span className="tr-stops-label">{t.wereClosed}:</span>{' '}
+            {item.closedStops.map((stop) => (
+              <span key={stop} className="tr-stop">
+                {stop}
+              </span>
+            ))}
+          </p>
+        ) : null
+      ) : unreadable ? null : (
         <>
           {item.wholeLine ? (
             <p className="tr-stops tr-stops--whole">{t.wholeLine}</p>
@@ -128,7 +145,7 @@ export default function NoticeCard({ item, verdict, lang }: Props) {
         */}
       <p className="tr-source-title">{item.title}</p>
 
-      {verdict && verdict.stops.length > 0 ? (
+      {verdict && verdict.stops.length > 0 && !ended ? (
         <p className="ev-card-sub tr-mine">
           {t.yourStops}: {verdict.stops.join(', ')}
         </p>

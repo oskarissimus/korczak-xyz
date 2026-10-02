@@ -62,6 +62,9 @@ export const translations = {
     closedStops: 'No stops at',
     wholeLine: 'Whole line suspended',
     noClosure: 'No station closed',
+    // WTP has marked it as over. The stops it lists were shut, and are no longer.
+    ended: 'Over',
+    wereClosed: 'Were closed',
     reason: 'Reason',
     from: 'From',
     until: 'until',
@@ -179,6 +182,8 @@ export const translations = {
     closedStops: 'Bez zatrzymania na',
     wholeLine: 'Cała linia wstrzymana',
     noClosure: 'Żadna stacja nie jest zamknięta',
+    ended: 'Zakończone',
+    wereClosed: 'Były zamknięte',
     reason: 'Powód',
     from: 'Od',
     until: 'do',

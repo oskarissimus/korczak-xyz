@@ -160,6 +160,7 @@ export function alertRecordFor(pending: PendingAlert, now: number): TransitAlert
     lines: verdict.lines,
     stops: verdict.stops,
     certain: verdict.certain,
+    ...(verdict.ended ? { ended: true } : {}),
     claimedAt: now,
     sentAt: null,
     title: item.title,

@@ -108,7 +108,9 @@ describe('buildTransitFeed', () => {
   it('counts separately the metro notices that hold nothing to read', () => {
     const feed = buildTransitFeed(
       [
-        item('headline', { body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.' }),
+        item('headline', { body: 'Utrudnienia w kursowaniu pociągów metra na linii M1.' }),
+        // Over, and saying so is the whole of what it has to say — not a notice missing its details.
+        item('ended', { body: 'Zakończone utrudnienia w kursowaniu pociągów metra linia M1' }),
         item('read', {
           body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.',
           article:
@@ -123,7 +125,7 @@ describe('buildTransitFeed', () => {
       SEGMENTS,
       { now: NOW },
     );
-    expect(feed.metroCount).toBe(2);
+    expect(feed.metroCount).toBe(3);
     expect(feed.noProseCount).toBe(1);
   });
 });

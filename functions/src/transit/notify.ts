@@ -88,21 +88,25 @@ async function loadAccount(
  * screen, and so is *"Utrudnienia w komunikacji: M1"*, which is every metro headline WTP writes.
  * What distinguishes tonight's from last week's is which stations are shut.
  *
+ * The body opens with the hour and minute, Warsaw time — see `eventTimeOf` — and an ended
+ * communiqué gets a title of its own: it is the one banner here that is good news.
+ *
  * Language-neutral by construction, like every payload this repo sends: the station names and the
  * line codes are Polish either way, and the few words of scaffolding are the same in both locales.
  */
-export function payloadFor(pending: PendingAlert): PushPayload {
+export function payloadFor(pending: PendingAlert, now: number): PushPayload {
   const { item, verdict, kind } = pending;
   const lines = verdict.lines.join(' + ');
 
-  const title =
-    kind === 'route'
+  const title = verdict.ended
+    ? `✅ ${lines} · koniec utrudnień`
+    : kind === 'route'
       ? `⚠️ ${lines} · Twoja trasa`
       : `${lines} · ${item.feed === 'change' ? 'zmiana' : 'utrudnienie'}`;
 
   return {
     title: title.slice(0, 110),
-    body: bodyFor(pending),
+    body: `${clockOf(eventTimeOf(pending, now))} · ${bodyFor(pending)}`.slice(0, 300),
     url: APP_URL,
     tag: pending.alertId,
     /*
@@ -113,6 +117,31 @@ export function payloadFor(pending: PendingAlert): PushPayload {
      */
     kind: 'source-health',
   };
+}
+
+/*
+ * The hour and minute the banner is about, in Warsaw.
+ *
+ * Asked for by the reader, 2 Oct 2026: iOS stamps a notification "1h ago", which is not when the
+ * metro stopped. A closure is WTP's own `pubDate`, the moment it was published. An ending has no
+ * such stamp — WTP rewrites the live post and leaves its date alone, so `publishedAt` would put the
+ * reopening at the minute the closure began — and the nearest fact there is, is the run that saw
+ * the rewrite: at most one ten-minute schedule after it.
+ */
+export function eventTimeOf(pending: PendingAlert, now: number): number {
+  return pending.verdict.ended ? now : pending.item.publishedAt;
+}
+
+const CLOCK = new Intl.DateTimeFormat('pl-PL', {
+  timeZone: 'Europe/Warsaw',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** `07:05`, Warsaw time, whatever zone the function runs in. */
+export function clockOf(at: number): string {
+  return CLOCK.format(at);
 }
 
 /*
@@ -133,9 +162,16 @@ function bodyFor(pending: PendingAlert): string {
    * saying it does not actually know is worse than no banner, because it teaches the reader that
    * the loud kind is unreliable.
    */
+  // Over. WTP's article then says the service is being restored rather than restored, and the
+  // banner keeps that distinction rather than promising a train that is still on its way back.
+  if (verdict.ended) {
+    return /przywracan/i.test(item.article ?? '')
+      ? 'Koniec utrudnień, trwa przywracanie ruchu.'
+      : 'Koniec utrudnień.';
+  }
   if (!verdict.certain) return 'Nie udało się odczytać, które stacje są zamknięte.';
   if (item.wholeLine) return `Cała linia ${verdict.lines.join(' + ')} zamknięta`;
-  if (kind === 'route' && verdict.stops.length > 0) return `Zamknięte: ${verdict.stops.join(', ')}`.slice(0, 300);
+  if (kind === 'route' && verdict.stops.length > 0) return `Zamknięte: ${verdict.stops.join(', ')}`;
   // Line level: something on the line, nothing on the route — which is the answer to the question.
   return 'Stacje na Twojej trasie są otwarte.';
 }
@@ -166,7 +202,7 @@ export async function notifyAccount(
     claimed += 1;
 
     if (!send || subs.length === 0) return;
-    const outcome = await sendToAll(db, uid, subs, payloadFor(pending));
+    const outcome = await sendToAll(db, uid, subs, payloadFor(pending, now));
     delivered += outcome.delivered;
     pruned += outcome.pruned;
     await alerts.doc(record.id).set(

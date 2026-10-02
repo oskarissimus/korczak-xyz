@@ -36,6 +36,11 @@ function item(patch: Partial<TransitItem> = {}): TransitItem {
   };
 }
 
+/** The banner as the run at `NOW` would send it. */
+function at(alert: PendingAlert, now = NOW) {
+  return payloadFor(alert, now);
+}
+
 function pending(patch: Partial<TransitItem>): PendingAlert {
   const record = item(patch);
   const verdict = impactOf(record, SEGMENTS)!;
@@ -45,11 +50,11 @@ function pending(patch: Partial<TransitItem>): PendingAlert {
 
 describe('the banner', () => {
   it('puts the priority in the title, because that is what a glance takes in', () => {
-    const route = payloadFor(pending({ closedStops: ['Centrum', 'Politechnika'] }));
+    const route = at(pending({ closedStops: ['Centrum', 'Politechnika'] }));
     expect(route.title).toContain('Twoja trasa');
     expect(route.title).toContain('M1');
 
-    const line = payloadFor(pending({ closedStops: ['Kabaty'] }));
+    const line = at(pending({ closedStops: ['Kabaty'] }));
     expect(line.title).not.toContain('Twoja trasa');
   });
 
@@ -59,7 +64,7 @@ describe('the banner', () => {
    * card to open.
    */
   it('says which stations on the route are shut, and nothing else', () => {
-    const payload = payloadFor(
+    const payload = at(
       pending({
         closedStops: ['Centrum', 'Politechnika', 'Kabaty'],
         summary: 'Pociągi nie kursują',
@@ -67,28 +72,71 @@ describe('the banner', () => {
         effectiveFrom: NOW,
       }),
     );
-    expect(payload.body).toBe('Zamknięte: Centrum, Politechnika');
+    expect(payload.body).toBe('20:10 · Zamknięte: Centrum, Politechnika');
   });
 
   it('says the route is open when only another stretch of the line is shut', () => {
-    expect(payloadFor(pending({ closedStops: ['Kabaty'], reason: 'awaria taboru' })).body).toBe(
-      'Stacje na Twojej trasie są otwarte.',
+    expect(at(pending({ closedStops: ['Kabaty'], reason: 'awaria taboru' })).body).toBe(
+      '20:10 · Stacje na Twojej trasie są otwarte.',
     );
   });
 
   it('says when it does not know, rather than shouting about nothing', () => {
-    const payload = payloadFor(pending({}));
+    const payload = at(pending({}));
     expect(payload.body).toContain('Nie udało się odczytać');
   });
 
   it('says so when the whole line is down', () => {
-    expect(payloadFor(pending({ wholeLine: true, closedStops: [] })).body).toContain('Cała linia');
+    expect(at(pending({ wholeLine: true, closedStops: [] })).body).toContain('Cała linia');
   });
 
   it('tags on the alert id, so an edited communiqué replaces its own banner group', () => {
-    const payload = payloadFor(pending({ closedStops: ['Centrum'] }));
+    const payload = at(pending({ closedStops: ['Centrum'] }));
     expect(payload.tag).toContain('aaaaaaaaaaaaaaaa');
     expect(payload.url).toBe('/apps/transit');
+  });
+});
+
+/*
+ * The ending of a closure, 2 Oct 2026 as it was stored: WTP rewrote the row's description to say it
+ * is over, and the mirror's article was the one sentence left un-struck — too short for `hasProse`,
+ * which used to make this the "could not read it" banner.
+ */
+describe('an ended communiqué', () => {
+  const ended = {
+    body: 'Zakończone utrudnienia w kursowaniu pociągów metra linia M1',
+    article: 'Trwa przywracanie podstawowej organizacji ruchu.\n\nPrzepraszamy za utrudnienia',
+    closedStops: ['Centrum', 'Politechnika'],
+  };
+
+  it('says it is over, not that it could not be read', () => {
+    const payload = at(pending(ended), NOW + 3 * 3600_000);
+    expect(payload.title).toBe('✅ M1 · koniec utrudnień');
+    expect(payload.body).toBe('23:10 · Koniec utrudnień, trwa przywracanie ruchu.');
+  });
+
+  it('is filed where the closure was, from the reading taken while it was live', () => {
+    expect(pending(ended).kind).toBe('route');
+    expect(pending({ ...ended, closedStops: ['Kabaty'] }).kind).toBe('line');
+    // Nothing placed to go on: the route, as everything unknown is.
+    expect(pending({ ...ended, closedStops: undefined }).kind).toBe('route');
+  });
+
+  it('reads the older ZAKOŃCZONO: prefix too', () => {
+    const payload = at(pending({ body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.' }));
+    expect(payload.body).toBe('20:10 · Koniec utrudnień.');
+  });
+});
+
+describe('the time on the banner', () => {
+  it('is the publication time in Warsaw for a closure, summer and winter alike', () => {
+    expect(at(pending({ publishedAt: Date.parse('2026-10-02T03:23:43Z') })).body).toMatch(/^05:23 · /);
+    expect(at(pending({ publishedAt: Date.parse('2026-12-02T03:23:43Z') })).body).toMatch(/^04:23 · /);
+  });
+
+  it('pads the hour', () => {
+    expect(at(pending({ publishedAt: Date.parse('2026-12-02T07:05:00Z') })).body).toMatch(/^08:05 · /);
+    expect(at(pending({ publishedAt: Date.parse('2026-12-01T23:30:00Z') })).body).toMatch(/^00:30 · /);
   });
 });
 

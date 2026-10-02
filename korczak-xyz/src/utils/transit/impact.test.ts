@@ -113,11 +113,32 @@ describe('what happens when the reading fails', () => {
    */
   it('escalates a reading that was taken from a headline, however current it is', () => {
     const headline = item({
-      body: 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.',
+      body: 'Utrudnienia w kursowaniu pociągów metra na linii M1.',
       closedStops: [],
       extractHash: 'abcd1234abcd1234',
     });
     expect(impactOf(headline, SEGMENTS)).toMatchObject({ impact: 'route', certain: false, stops: [] });
+  });
+
+  /*
+   * 2 Oct 2026: the end of an M2 closure arrived as a rewritten headline over an article with one
+   * live sentence, and the phone said it could not read which stations were shut. An ending is
+   * WTP's own word, so it is certain whatever there is to read.
+   */
+  it('files an ended notice where its closure was, as certain', () => {
+    const ended = { body: 'Zakończone utrudnienia w kursowaniu pociągów metra linia M1' };
+    expect(impactOf(item({ ...ended, closedStops: ['Centrum'] }), SEGMENTS)).toMatchObject({
+      impact: 'route',
+      certain: true,
+      ended: true,
+      stops: ['Centrum'],
+    });
+    expect(impactOf(item({ ...ended, closedStops: ['Kabaty'] }), SEGMENTS)).toMatchObject({
+      impact: 'line',
+      ended: true,
+    });
+    expect(impactOf(item(ended), SEGMENTS)).toMatchObject({ impact: 'route', certain: true, ended: true });
+    expect(impactOf(item({ closedStops: ['Centrum'] }), SEGMENTS)?.ended).toBeUndefined();
   });
 
   it('escalates a station name this build cannot place', () => {

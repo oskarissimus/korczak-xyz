@@ -26,7 +26,7 @@
  */
 
 import { canonicalStation, metroLinesInTitle } from './lines';
-import { hasProse } from './normalize';
+import { hasProse, isEnded } from './normalize';
 import { segmentStations } from './segments';
 import type { ImpactVerdict, MetroLine, TransitItem, WatchedSegment } from './types';
 import { METRO_LINES } from './types';
@@ -46,6 +46,27 @@ export function impactOf(item: TransitItem, segments: WatchedSegment[]): ImpactV
   if (lines.length === 0) return null;
 
   const onLine = live.filter((segment) => lines.includes(segment.line));
+
+  /*
+   * Over. Checked before `hasProse`, because an ended communiqué is the one case where having
+   * nothing to read is not "unknown": WTP has struck the closure through and said so in the
+   * headline.
+   *
+   * It is filed where the closure it ends was filed, from the reading stored while it was live —
+   * an "it is over" about your stretch is as much about your route as the closure was. With no
+   * placed reading to go on, it goes to the route, for the same reason everything unknown does:
+   * the reopening of a station you were told was shut is the half of the story you most want.
+   * `certain` is true either way: what this verdict asserts is that it is over, and that is WTP's
+   * own word.
+   */
+  if (isEnded(item)) {
+    const reading = item.wholeLine || !item.closedStops?.length ? null : placedVerdict(item, lines, onLine);
+    const verdict =
+      reading && reading.certain
+        ? reading
+        : { impact: 'route' as const, certain: true, segmentIds: onLine.map((s) => s.id), lines, stops: [] };
+    return { ...verdict, certain: true, ended: true };
+  }
 
   /*
    * Nobody has read the prose yet, the reading failed, or there was no prose to read. Uncertain, and
@@ -70,6 +91,15 @@ export function impactOf(item: TransitItem, segments: WatchedSegment[]): ImpactV
     return { impact: 'route', certain: true, segmentIds: onLine.map((s) => s.id), lines, stops: [] };
   }
 
+  return placedVerdict(item, lines, onLine);
+}
+
+/** The verdict a stored, readable list of closed stations gives on these segments. */
+function placedVerdict(
+  item: TransitItem,
+  lines: MetroLine[],
+  onLine: WatchedSegment[],
+): ImpactVerdict {
   /*
    * Place every station the extractor named. A name this build cannot place — a station that has
    * just opened, a hand-typed spelling, a model inventing — means the app does not know where on

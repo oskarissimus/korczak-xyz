@@ -15,7 +15,7 @@
  */
 
 import { impactOf } from './impact';
-import { hasProse, hashOfExtract } from './normalize';
+import { hasProse, hashOfExtract, isEnded } from './normalize';
 import type { FeedKind, ImpactVerdict, TransitItem, WatchedSegment } from './types';
 
 export type SectionKey = 'route' | 'line' | 'other';
@@ -104,7 +104,7 @@ export function buildTransitFeed(
     metroCount: metro.length,
     // `hasProse` too: a reading taken from a headline is not one, however current its hash.
     extractedCount: metro.filter((row) => row.item.extractHash !== undefined && hasProse(row.item)).length,
-    noProseCount: metro.filter((row) => !hasProse(row.item)).length,
+    noProseCount: metro.filter((row) => !hasProse(row.item) && !isEnded(row.item)).length,
     totalCount: rows.length,
   };
 }

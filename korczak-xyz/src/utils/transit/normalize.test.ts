@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isEnded,
   alertIdFor,
   contentHashOf,
   feedHashOf,
@@ -180,5 +181,17 @@ describe('contentHashOf', () => {
       seen.add(contentHashOf({ title: `Utrudnienia w komunikacji: ${i}`, body: `Stacja nr ${i} zamknięta.` }));
     }
     expect(seen.size).toBe(4000);
+  });
+});
+
+describe('isEnded', () => {
+  it('reads both of the ways WTP marks a communiqué as over', () => {
+    expect(isEnded({ title: 'Utrudnienia w komunikacji: M2', body: 'Zakończone utrudnienia w kursowaniu pociągów metra linia M2' })).toBe(true);
+    expect(isEnded({ title: 'Utrudnienia w komunikacji: M1', body: STUB })).toBe(true);
+  });
+
+  it('only at the start, where WTP puts it', () => {
+    expect(isEnded({ title: 'Utrudnienia w komunikacji: M1', body: 'Utrudnienia w kursowaniu pociągów metra linii M1' })).toBe(false);
+    expect(isEnded({ title: 'Zmiany w komunikacji: M1', body: 'Zmiany do czasu zakończenia prac na stacji Wilanowska' })).toBe(false);
   });
 });

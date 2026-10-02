@@ -462,6 +462,29 @@ under three facts the card already carries; the owner asked for it short (29 Sep
 three bodies are one fixed sentence each: the whole line, the uncertain reading, and a line-level
 alert, which says the route's stations are open.
 
+**Every body opens with the hour and minute, Warsaw time** (`05:23 · Zamknięte: …`), asked for on
+2 Oct 2026 because iOS only says *"1h ago"*. A closure is stamped with WTP's `pubDate`. An ending
+has no stamp of its own — WTP rewrites the live post and leaves its date alone — so it carries the
+time of the run that saw the rewrite, at most one schedule late (`eventTimeOf`).
+
+### An ending is news, and it is certain
+
+WTP closes an incident by rewriting the live post: the description becomes *"Zakończone
+utrudnienia w kursowaniu pociągów metra linia M2"* (older wording: *"ZAKOŃCZONO: …"*), and the
+article strikes the closure through under *"Trwa przywracanie podstawowej organizacji ruchu."*
+`isEnded` reads that off the start of the feed's own text. Before it existed, the 2 Oct 2026 M2
+ending reached `impactOf` as a fresh revision whose article was that one 77-character sentence, so
+`hasProse` escalated it and the phone said *"Nie udało się odczytać, które stacje są zamknięte"*
+about a line that had just reopened.
+
+So `isEnded` is checked **before** `hasProse`: the verdict carries `ended: true`, is `certain`
+(the claim is that it is over, which is WTP's own word), and is filed where the closure was —
+from the stored `closedStops`, which for an ended item mean "were closed" — or at route level when
+there is no placed reading, as everything unknown is. The banner is `✅ M2 · koniec utrudnień`; the
+card shows an *Over* chip and the stops as *Were closed*, with no unread or stale badge. The
+extractor still reads an ended article: for a closure first seen already over, the struck-through
+text is the only thing that says where it was.
+
 ### Two schedules, and why not one
 
 `collectTransit` runs **every 10 minutes**; `collectEvents` runs every six hours. An opera season
