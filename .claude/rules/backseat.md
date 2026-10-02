@@ -199,6 +199,9 @@ stream above rarer rather than constant.
 
 ### The keys, and the trade being made
 
+> Since Oct 2026 the keys themselves are the account's shared store — see `account-keys.md`. This
+> app's documents keep its settings and an emptied `apiKeys`.
+
 Three of them — OpenAI, Google, ElevenLabs — in `localStorage` under `backseat-config`, and, for a
 signed-in account, in `users/{uid}/backseat/config` under the existing `users/{uid}/{document=**}`
 rule. **No rules change was needed and none should be added.** This is deliberately the same
@@ -221,6 +224,9 @@ only asks for it then. A key field for a service the current settings never call
 nobody should have to answer.
 
 ### The keys are borrowed from sloper on a first visit
+
+> **Superseded Oct 2026.** The keys are now one shared store (`account-keys.md`); the borrow below
+> is gone and its `settled`/seed lessons live on in `useAccountKeys`. Kept as the history of why.
 
 Both apps are paid for with the same three keys off the same three accounts, so `importKeys.ts`
 seeds this one from the wizard's config rather than asking for the same OpenAI key twice. Two

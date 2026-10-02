@@ -1,0 +1,189 @@
+/* The account page: the API keys every app shares, and which provider each app uses.
+   The admissions panel's card, for the same reason — it is read on a phone. */
+
+.acct {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  color: var(--retro-black);
+}
+
+.acct-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.acct-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acct-heading {
+  font-family: 'VT323', monospace;
+  font-size: 1.5rem;
+  margin: 8px 0 0;
+}
+
+.acct-card {
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.acct-card-server {
+  background: var(--retro-white);
+  border-style: inset;
+}
+
+.acct-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.acct-card-head h3 {
+  font-family: 'VT323', monospace;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.acct-dim {
+  color: var(--retro-dark-gray);
+  margin: 0;
+}
+
+.acct-reason {
+  overflow-wrap: anywhere;
+}
+
+.acct-chip {
+  font-size: 1rem;
+  background: var(--retro-white);
+  border: 1px solid var(--retro-dark-gray);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+/* Never colour alone: each state carries its own glyph in the markup — ✓ or ! — as the admissions
+   panel and the charts do. */
+.acct-ok {
+  color: #007000;
+}
+
+.acct-warn {
+  color: #900000;
+}
+
+.acct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acct-field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.acct-field input,
+.acct-field select {
+  font-family: 'VT323', monospace;
+  font-size: 1.15rem;
+  padding: 3px 6px;
+  border: 2px inset var(--retro-dark-gray);
+  background: var(--retro-white);
+  color: var(--retro-black);
+  min-width: 0;
+}
+
+.acct-field input {
+  flex: 1;
+}
+
+.acct-field .retro-btn {
+  flex: none;
+}
+
+.acct-prefix {
+  flex: none;
+}
+
+/* A label and its value, two columns where there is room and stacked where there is not. */
+.acct-numbers {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.acct-numbers dt {
+  color: var(--retro-dark-gray);
+}
+
+.acct-numbers dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.acct-line {
+  display: block;
+}
+
+.acct-details summary {
+  cursor: pointer;
+}
+
+.acct-details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .acct-numbers {
+    grid-template-columns: 1fr;
+  }
+
+  .acct-numbers dd {
+    margin-bottom: 4px;
+  }
+}
+
+/* On the window's teal, outside a card: light text, as the rest of the page content has. */
+.acct > .acct-dim,
+.acct-section > .acct-dim,
+.acct-heading {
+  color: var(--retro-white);
+}
+
+/* Inside the gray cards the page's own link and heading colours are built for teal and vanish on
+   gray, so the cards set their own. */
+.acct-card h3,
+.acct-card a {
+  color: var(--retro-navy);
+}
+
+.acct-card a {
+  text-decoration: underline;
+}
+
+/* The admissions panel's dark gray is faint on this much running text; a shade darker reads. */
+.acct-card .acct-dim,
+.acct-numbers dt {
+  color: #3a3a3a;
+}

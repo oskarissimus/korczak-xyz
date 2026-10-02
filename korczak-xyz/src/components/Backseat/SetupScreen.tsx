@@ -44,6 +44,7 @@ import type {
   VisionProvider,
   VoiceEngine,
 } from '../../utils/backseat/types';
+import { accountPath } from '../../utils/accountKeys/keys';
 import { fetchVisionModels } from '../../utils/backseat/vision';
 import { Fieldset, KeyField, Row, Select, Slider } from './fields';
 import { fill, translations, type Translation } from './translations';
@@ -79,8 +80,6 @@ interface SetupScreenProps {
   update: (patch: Partial<BackseatConfig>) => void;
   reset: () => void;
   onStart: () => void;
-  /** The keys on screen came from the video generation wizard rather than from this app. */
-  borrowed: boolean;
   /** Signed in, so every round of a ride is saved to the account (`rideLog.ts`). */
   saving: boolean;
   t: Translation;
@@ -93,7 +92,6 @@ export default function SetupScreen({
   reset,
   onStart,
   saving,
-  borrowed,
   t,
   lang,
 }: SetupScreenProps) {
@@ -232,10 +230,11 @@ export default function SetupScreen({
       {saving && <p className="bks-note">{t.ridesSaved}</p>}
 
       <Fieldset legend={t.keysTitle} hint={t.keysBlurb}>
-        {/* A key appearing in an app you never typed it into is startling, and a key you believe
-            you have revoked in one place while a copy of it works in another is worse. Both are
-            said here, where the key is, rather than in a paragraph at the top. */}
-        {borrowed && <p className="bks-note">{t.keysBorrowed}</p>}
+        {/* Said where the key is: a key typed here is the one every other app uses too, and
+            clearing it here clears it there. */}
+        <p className="bks-note">
+          {t.keysShared} <a href={accountPath(lang)}>{t.keysSharedLink}</a>
+        </p>
 
         {provider === 'openai' ? (
           <KeyField

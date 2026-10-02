@@ -18,15 +18,23 @@
  *  - `pulledRef` gates the push, not `user`. Pushing before the pull has answered would race the
  *    account's own copy with whatever this browser happened to have, and the edit that loses is
  *    the one somebody just typed.
+ *
+ * THE KEYS ARE NOT IN HERE ANY MORE. Since Oct 2026 they are the account's (`useAccountKeys`,
+ * `users/{uid}/keys/config`), shared with every other app and shown on the account page. This hook
+ * lays them over `config.apiKeys` on the way out and routes an `apiKeys` patch there on the way in,
+ * so the wizard's key fields still work and edit the one shared copy. What this hook saves has its
+ * `apiKeys` emptied — see `storage.ts`. The account hook is called first, deliberately: its seed
+ * reads this app's old localStorage copy before this hook's next save empties it.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
 import { pullConfig, pushConfig } from '../utils/sloper/cloud';
 import { DEFAULT_CONFIG } from '../utils/sloper/defaults';
 import { clearConfig, loadConfig, saveConfig } from '../utils/sloper/storage';
 import type { SloperConfig } from '../utils/sloper/types';
+import { combineSync, useAccountKeys } from './useAccountKeys';
 import type { AuthUser } from './useAuth';
 
 export type SyncState = 'local' | 'syncing' | 'synced' | 'error';
@@ -41,6 +49,8 @@ export interface SloperConfigApi {
 }
 
 export function useSloperConfig(user: AuthUser | null): SloperConfigApi {
+  // First, before anything of this hook's own — see the header.
+  const account = useAccountKeys(user);
   const [config, setConfig] = useState<SloperConfig>(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
   const [sync, setSync] = useState<SyncState>('local');
@@ -111,8 +121,13 @@ export function useSloperConfig(user: AuthUser | null): SloperConfigApi {
     };
   }, [publish, user]);
 
+  const { setKeys } = account;
   const update = useCallback(
-    (patch: Partial<SloperConfig>) => {
+    (fullPatch: Partial<SloperConfig>) => {
+      const { apiKeys, ...patch } = fullPatch;
+      if (apiKeys) setKeys(apiKeys);
+      if (Object.keys(patch).length === 0) return;
+
       const next = { ...configRef.current, ...patch };
       const now = Date.now();
       publish(next, now);
@@ -127,12 +142,12 @@ export function useSloperConfig(user: AuthUser | null): SloperConfigApi {
           setSync('error');
         });
     },
-    [publish, user],
+    [publish, setKeys, user],
   );
 
   /**
-   * Back to the defaults, here and in the account. Deliberately the same edit as any other —
-   * clearing the keys must propagate, or a device holding the old copy puts a revoked key back.
+   * The settings back to their defaults, here and in the account. The keys are not touched: they
+   * are shared with the other apps now, and clearing one is done on the account page.
    */
   const reset = useCallback(() => {
     clearConfig();
@@ -150,5 +165,25 @@ export function useSloperConfig(user: AuthUser | null): SloperConfigApi {
       });
   }, [publish, user]);
 
-  return { config, ready, sync, update, reset };
+  const accountKeys = account.keys;
+  const merged = useMemo<SloperConfig>(
+    () => ({
+      ...config,
+      apiKeys: {
+        openai: accountKeys.openai,
+        deepseek: accountKeys.deepseek,
+        google: accountKeys.google,
+        elevenLabs: accountKeys.elevenLabs,
+      },
+    }),
+    [config, accountKeys],
+  );
+
+  return {
+    config: merged,
+    ready: ready && account.ready,
+    sync: combineSync(sync, account.sync),
+    update,
+    reset,
+  };
 }

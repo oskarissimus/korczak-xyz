@@ -259,6 +259,10 @@ getting its own, so the answer was never to put a sitting in it. The answer was 
 
 ### The keys, and the trade being made
 
+> Since Oct 2026 the four keys live in the account's shared store (`account-keys.md`), not in
+> `sloper-config`; that document keeps the settings and an emptied `apiKeys`. The trade below is
+> unchanged and is why the store is still in the browser.
+
 Four of them — OpenAI, DeepSeek, Google, ElevenLabs — in `localStorage` under `sloper-config`,
 and, for a signed-in account, in `users/{uid}/sloper/config` under the existing
 `users/{uid}/{document=**}` rule. **No rules change was needed and none should be added**: that

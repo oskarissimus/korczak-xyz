@@ -17,22 +17,24 @@
  *  - `pulledRef` gates the push, not `user`. Pushing before the pull has answered races the
  *    account's own copy with whatever this browser happened to have, and the edit that loses is
  *    the one somebody just typed.
+ *
+ * THE KEYS ARE NOT IN HERE ANY MORE. Since Oct 2026 they are the account's (`useAccountKeys`,
+ * `users/{uid}/keys/config`), one copy shared with every app and shown on the account page; the
+ * borrow from sloper that used to live here has nothing left to do. This hook lays the shared keys
+ * over `config.apiKeys` on the way out and routes an `apiKeys` patch there on the way in, and what
+ * it saves has its keys emptied. The account hook is called first, deliberately: its seed reads
+ * this app's old localStorage copy before this hook's next save empties it.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
-import { pullConfig, pullSloperKeys, pushConfig } from '../utils/backseat/cloud';
+import { pullConfig, pushConfig } from '../utils/backseat/cloud';
 import { DEFAULT_CONFIG } from '../utils/backseat/defaults';
-import {
-  anyKey,
-  configWithBorrowedKeys,
-  shouldBorrow,
-  sloperKeysInBrowser,
-  switchedToGoogle,
-} from '../utils/backseat/importKeys';
+import { switchedToGoogle } from '../utils/backseat/importKeys';
 import { clearConfig, loadConfig, saveConfig } from '../utils/backseat/storage';
 import type { BackseatConfig } from '../utils/backseat/types';
+import { combineSync, useAccountKeys } from './useAccountKeys';
 import type { AuthUser } from './useAuth';
 
 export type SyncState = 'local' | 'syncing' | 'synced' | 'error';
@@ -42,21 +44,19 @@ export interface BackseatConfigApi {
   /** False until localStorage has been read; nothing should render settings before it. */
   ready: boolean;
   sync: SyncState;
-  /**
-   * True while the keys on screen are the video generation wizard's rather than ones typed here.
-   * The setup sheet says so under the key, and the first edit clears it — from then on they are
-   * this app's own copies. See `utils/backseat/importKeys.ts` for what that does and does not mean.
-   */
-  borrowed: boolean;
   update: (patch: Partial<BackseatConfig>) => void;
   reset: () => void;
 }
 
 export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
+  // First, before anything of this hook's own — see the header.
+  const account = useAccountKeys(user);
+  const accountGoogleRef = useRef<string | null>(null);
+  accountGoogleRef.current = account.keys.google;
+
   const [config, setConfig] = useState<BackseatConfig>(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
   const [sync, setSync] = useState<SyncState>('local');
-  const [borrowed, setBorrowed] = useState(false);
 
   // The current value, readable from a callback that must not depend on the render it was made
   // in — `update` is handed to every control on the sheet and re-creating it on each keystroke
@@ -64,7 +64,7 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
   const configRef = useRef<BackseatConfig>(DEFAULT_CONFIG);
   const updatedAtRef = useRef(0);
   const pulledRef = useRef(false);
-  /** Whether somebody has decided what the keys here are. See `utils/backseat/importKeys.ts`. */
+  /** Whether somebody has decided what the settings here are. See `utils/backseat/storage.ts`. */
   const settledRef = useRef(false);
 
   const publish = useCallback((next: BackseatConfig, updatedAt: number, settled: boolean) => {
@@ -75,14 +75,13 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
     saveConfig(next, updatedAt, settled);
   }, []);
 
-  // What this browser holds — or, when it has never held anything, what sloper left beside it.
+  // What this browser holds.
   useEffect(() => {
     const stored = loadConfig();
     configRef.current = stored.config;
     updatedAtRef.current = stored.updatedAt;
     settledRef.current = stored.settled;
     setConfig(stored.config);
-    setBorrowed(stored.borrowed);
     setReady(true);
   }, []);
 
@@ -111,10 +110,7 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
             settledRef.current,
           );
         } else if (remote.updatedAt > updatedAtRef.current) {
-          // The account is ahead. A borrow is something a browser did, so it never survives being
-          // replaced by the account's own copy.
           publish(remote.config, remote.updatedAt, remote.settled);
-          setBorrowed(false);
         } else if (remote.updatedAt < updatedAtRef.current) {
           // This browser is ahead — typed while signed out, most likely. Send it up.
           await pushConfig(uid, configRef.current, updatedAtRef.current, settledRef.current);
@@ -122,53 +118,18 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
 
         if (cancelled) return;
 
-        /*
-         * THE ACCOUNT-SIDE BORROW, and it runs after the three branches above rather than inside
-         * one of them. That placement is the bug this hook shipped with: it used to live in the
-         * `!remote` branch alone, so an account holding an empty-but-existing document could never
-         * be borrowed into — and the sync itself creates exactly such a document the first time
-         * anybody opens the app signed in. Within minutes of going live, every account that had
-         * opened the page was in the one state the import could not repair.
-         *
-         * Here it asks the question the state deserves rather than the question the control flow
-         * happened to be in: whatever we have ended up holding, is it keyless and unsettled? That
-         * covers a first sign-in on a fresh phone (nothing local to borrow from, wizard keys in the
-         * account) and it covers the empty documents already out there.
-         *
-         * Stamped `Date.now()` rather than 0, unlike the browser-side borrow, because this one has
-         * been through the account and is the copy of record from here on.
-         */
-        if (shouldBorrow(configRef.current, settledRef.current)) {
-          const keys = await pullSloperKeys(uid);
+        // The one-time move off OpenAI, for a config saved before Google was the default, with
+        // the account's Google key. See `switchedToGoogle`.
+        const switched = switchedToGoogle(
+          { ...configRef.current, apiKeys: { ...configRef.current.apiKeys, google: accountGoogleRef.current } },
+          updatedAtRef.current,
+          null,
+        );
+        if (switched) {
+          const now = Date.now();
+          publish(switched, now, settledRef.current);
+          await pushConfig(uid, switched, now, settledRef.current);
           if (cancelled) return;
-
-          if (anyKey(keys)) {
-            const borrowedConfig = configWithBorrowedKeys(configRef.current, keys);
-            const now = Date.now();
-            // Still unsettled: they were borrowed, not decided. The first edit decides them, and
-            // until then this stays repairable from the wizard.
-            publish(borrowedConfig, now, false);
-            setBorrowed(true);
-            await pushConfig(uid, borrowedConfig, now, false);
-            if (cancelled) return;
-          }
-        }
-
-        // The one-time move off OpenAI, for a config saved before Gemma was the default.
-        // See `switchedToGoogle`.
-        if (configRef.current.vision.provider === 'openai' || configRef.current.vision.provider === 'google') {
-          const sloperGoogle =
-            configRef.current.vision.provider === 'openai'
-              ? (sloperKeysInBrowser().google ?? (await pullSloperKeys(uid)).google)
-              : null;
-          if (cancelled) return;
-          const switched = switchedToGoogle(configRef.current, updatedAtRef.current, sloperGoogle);
-          if (switched) {
-            const now = Date.now();
-            publish(switched, now, settledRef.current);
-            await pushConfig(uid, switched, now, settledRef.current);
-            if (cancelled) return;
-          }
         }
 
         pulledRef.current = true;
@@ -187,14 +148,16 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
     };
   }, [publish, user]);
 
+  const { setKeys } = account;
   const update = useCallback(
-    (patch: Partial<BackseatConfig>) => {
+    (fullPatch: Partial<BackseatConfig>) => {
+      const { apiKeys, ...patch } = fullPatch;
+      if (apiKeys) setKeys(apiKeys);
+      if (Object.keys(patch).length === 0) return;
+
       const next = { ...configRef.current, ...patch };
       const now = Date.now();
-      // Settled: an edit is somebody deciding what the keys here are, and that is what stops a key
-      // cleared in this very call being borrowed straight back on the next load.
       publish(next, now, true);
-      setBorrowed(false);
 
       const uid = user?.uid;
       if (!uid || !pulledRef.current) return;
@@ -206,22 +169,17 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
           setSync('error');
         });
     },
-    [publish, user],
+    [publish, setKeys, user],
   );
 
   /**
-   * Back to the defaults, here and in the account. Deliberately the same edit as any other —
-   * clearing the keys must propagate, or a device holding the old copy puts a revoked key back.
+   * The settings back to their defaults, here and in the account. The keys are not touched: they
+   * are shared with the other apps now, and clearing one is done on the account page.
    */
   const reset = useCallback(() => {
     clearConfig();
     const now = Date.now();
-    /*
-     * Settled, which is the whole reason Clear everything sticks: an app that refilled itself from
-     * the wizard on the very next reload could not be cleared at all.
-     */
     publish(DEFAULT_CONFIG, now, true);
-    setBorrowed(false);
 
     const uid = user?.uid;
     if (!uid || !pulledRef.current) return;
@@ -234,5 +192,24 @@ export function useBackseatConfig(user: AuthUser | null): BackseatConfigApi {
       });
   }, [publish, user]);
 
-  return { config, ready, sync, borrowed, update, reset };
+  const accountKeys = account.keys;
+  const merged = useMemo<BackseatConfig>(
+    () => ({
+      ...config,
+      apiKeys: {
+        openai: accountKeys.openai,
+        google: accountKeys.google,
+        elevenLabs: accountKeys.elevenLabs,
+      },
+    }),
+    [config, accountKeys],
+  );
+
+  return {
+    config: merged,
+    ready: ready && account.ready,
+    sync: combineSync(sync, account.sync),
+    update,
+    reset,
+  };
 }

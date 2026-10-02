@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { accountPath } from '../../utils/accountKeys/keys';
 import { DEFAULT_CONFIG, TTS_PLANS, missingKeys } from '../../utils/sloper/defaults';
 import {
   SCRAPED_AT,
@@ -252,6 +253,9 @@ export default function ConfigStage({ config, update, reset, onStart, t, lang }:
   return (
     <div className="slp-stage">
       <Fieldset legend={t.keysTitle} hint={t.keysBlurb}>
+        <p className="slp-note">
+          {t.keysShared} <a href={accountPath(lang)}>{t.keysSharedLink}</a>
+        </p>
         <KeyField
           label={t.keyOpenai}
           value={config.apiKeys.openai}

@@ -31,7 +31,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
 import { normalizeConfig } from './defaults';
-import type { StampedConfig } from './storage';
+import { withoutKeys, type StampedConfig } from './storage';
 import type { SloperConfig } from './types';
 
 function configDoc(uid: string) {
@@ -58,5 +58,5 @@ export async function pushConfig(
   updatedAt: number,
 ): Promise<void> {
   if (!getDb()) return;
-  await runCloud('sloper.config.push', () => setDoc(configDoc(uid), { ...config, updatedAt }));
+  await runCloud('sloper.config.push', () => setDoc(configDoc(uid), { ...withoutKeys(config), updatedAt }));
 }

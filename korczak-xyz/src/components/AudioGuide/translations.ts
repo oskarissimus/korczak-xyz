@@ -39,25 +39,27 @@ export const translations = {
     keysButtonMissing: 'Add keys',
     keysTitle: 'API keys',
     keysBlurb:
-      'Yours, billed to you. Google (Gemini) writes each guide and ElevenLabs reads it. The keys go to ' +
+      'Yours, billed to you. Google (Gemini) or OpenAI writes each guide and ElevenLabs reads it. The keys go to ' +
       'this site’s narration function with every tap, are used for that one guide, and are not ' +
       'kept there.',
+    writerLabel: 'Written by',
+    writerGoogle: 'Google (Gemini)',
+    writerOpenai: 'OpenAI',
     keyGoogle: 'Google AI Studio key',
+    keyOpenai: 'OpenAI key',
     keyElevenLabs: 'ElevenLabs key',
     keyShow: 'Show',
     keyHide: 'Hide',
     keyNotSet: 'not set',
     keySet: 'set',
-    keysBorrowed:
-      'Filled in from the Video Generation Wizard or the Annoying Passenger Simulator, so you do ' +
-      'not have to paste them twice. They are copies: changing one here does not change it there.',
+    keysShared: 'These keys are your account’s, shared by every app on the site.',
+    keysSharedLink: 'All keys and what is left on them',
     keysNeeded: 'Both keys are needed before a pin can be read to you.',
     syncLocal: 'This browser only',
     syncSyncing: 'Checking the account…',
     syncSynced: 'Saved to your account',
     syncError: 'Not saved to the account — still in this browser. The next edit tries again.',
     keysDone: 'Done',
-    keysClear: 'Clear keys',
 
     // The narration language
     languageLabel: 'Narration in',
@@ -147,25 +149,27 @@ export const translations = {
     keysButtonMissing: 'Dodaj klucze',
     keysTitle: 'Klucze API',
     keysBlurb:
-      'Twoje, na twój rachunek. Google (Gemini) pisze każdy przewodnik, a ElevenLabs go czyta. Klucze ' +
+      'Twoje, na twój rachunek. Google (Gemini) albo OpenAI pisze każdy przewodnik, a ElevenLabs go czyta. Klucze ' +
       'trafiają z każdym dotknięciem do funkcji narracji tej strony, służą do tego jednego ' +
       'przewodnika i nie są tam przechowywane.',
+    writerLabel: 'Pisze',
+    writerGoogle: 'Google (Gemini)',
+    writerOpenai: 'OpenAI',
     keyGoogle: 'Klucz Google AI Studio',
+    keyOpenai: 'Klucz OpenAI',
     keyElevenLabs: 'Klucz ElevenLabs',
     keyShow: 'Pokaż',
     keyHide: 'Ukryj',
     keyNotSet: 'brak',
     keySet: 'jest',
-    keysBorrowed:
-      'Wzięte z Kreatora generowania wideo albo z Symulatora upierdliwego pasażera, żeby nie ' +
-      'wklejać ich drugi raz. To kopie: zmiana tutaj nie zmienia ich tam.',
+    keysShared: 'Te klucze są twojego konta, wspólne dla wszystkich aplikacji na stronie.',
+    keysSharedLink: 'Wszystkie klucze i ile na nich zostało',
     keysNeeded: 'Potrzebne są oba klucze, zanim pinezka zostanie ci przeczytana.',
     syncLocal: 'Tylko ta przeglądarka',
     syncSyncing: 'Sprawdzam konto…',
     syncSynced: 'Zapisane na koncie',
     syncError: 'Niezapisane na koncie — zostają w tej przeglądarce. Następna zmiana spróbuje ponownie.',
     keysDone: 'Gotowe',
-    keysClear: 'Wyczyść klucze',
 
     languageLabel: 'Narracja w języku',
     languageOther: 'Inny…',

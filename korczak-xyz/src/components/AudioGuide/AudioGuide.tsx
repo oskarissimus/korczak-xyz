@@ -241,7 +241,7 @@ function AudioGuideApp({ lang, user }: AudioGuideProps & { user: AuthUser }) {
         </div>
 
         <div className="ag-dock">
-          {keysOpen && <KeysSheet api={keys} onClose={() => setKeysOpen(false)} t={t} />}
+          {keysOpen && <KeysSheet api={keys} onClose={() => setKeysOpen(false)} t={t} lang={lang} />}
 
           {generating && guide.startedAt !== null && (
             <GenerationBar

@@ -1,5 +1,5 @@
 /*
- * The two keys a guide is paid with.
+ * The keys a guide is paid with, and who writes it.
  *
  * A panel over the map rather than a screen of its own: there is one island and no routes here
  * (see `AudioGuide.tsx`), and the map behind it is what the keys are for. It opens by itself the
@@ -15,7 +15,8 @@
 import { useEffect, useId, useState } from 'react';
 
 import type { AudioGuideKeysApi } from '../../hooks/useAudioGuideKeys';
-import { missingKeys, type KeyName } from '../../utils/audioGuide/keys';
+import { accountPath } from '../../utils/accountKeys/keys';
+import { missingKeys, requiredKeys, type KeyName } from '../../utils/audioGuide/keys';
 import type { Translation } from './translations';
 
 interface KeyFieldProps {
@@ -74,6 +75,7 @@ interface KeysSheetProps {
   api: AudioGuideKeysApi;
   onClose: () => void;
   t: Translation;
+  lang: 'en' | 'pl';
 }
 
 const SYNC_LABEL = {
@@ -83,7 +85,14 @@ const SYNC_LABEL = {
   error: 'syncError',
 } as const;
 
-export default function KeysSheet({ api, onClose, t }: KeysSheetProps) {
+const KEY_FIELD = {
+  google: { label: 'keyGoogle', placeholder: 'AIza…' },
+  openai: { label: 'keyOpenai', placeholder: 'sk-…' },
+  elevenLabs: { label: 'keyElevenLabs', placeholder: 'sk_…' },
+} as const;
+
+export default function KeysSheet({ api, onClose, t, lang }: KeysSheetProps) {
+  const id = useId();
   const set = (name: KeyName) => (value: string | null) => api.setKey(name, value);
   const missing = missingKeys(api.keys).length > 0;
 
@@ -91,24 +100,40 @@ export default function KeysSheet({ api, onClose, t }: KeysSheetProps) {
     <section className="ag-keys" aria-label={t.keysTitle}>
       <p className="ag-gate-title">{t.keysTitle}</p>
       <p className="ag-keys-blurb">{t.keysBlurb}</p>
-      {/* Said where the key is: a key appearing in an app you never typed it into is startling,
-          and one you think you revoked while a copy still works elsewhere is worse. */}
-      {api.borrowed && <p className="ag-keys-note">{t.keysBorrowed}</p>}
 
-      <KeyField
-        label={t.keyGoogle}
-        value={api.keys.google}
-        placeholder="AIza…"
-        onCommit={set('google')}
-        t={t}
-      />
-      <KeyField
-        label={t.keyElevenLabs}
-        value={api.keys.elevenLabs}
-        placeholder="sk_…"
-        onCommit={set('elevenLabs')}
-        t={t}
-      />
+      <div className="ag-key">
+        <label className="ag-key-label" htmlFor={id}>
+          <span>{t.writerLabel}</span>
+        </label>
+        <select
+          id={id}
+          className="ag-select"
+          value={api.keys.writer}
+          onChange={(e) => api.setWriter(e.target.value === 'openai' ? 'openai' : 'google')}
+        >
+          <option value="google">{t.writerGoogle}</option>
+          <option value="openai">{t.writerOpenai}</option>
+        </select>
+      </div>
+
+      {/* Only the keys the chosen writer needs: a field for a service this app will not call is a
+          question nobody should have to answer. The rest are on the account page. */}
+      {requiredKeys(api.keys).map((name) => (
+        <KeyField
+          key={name}
+          label={t[KEY_FIELD[name].label]}
+          value={api.keys[name]}
+          placeholder={KEY_FIELD[name].placeholder}
+          onCommit={set(name)}
+          t={t}
+        />
+      ))}
+
+      {/* Said where the key is: a key typed here is the one every other app uses too, and
+          clearing it here clears it there. */}
+      <p className="ag-keys-note">
+        {t.keysShared} <a href={accountPath(lang)}>{t.keysSharedLink}</a>
+      </p>
 
       {missing && <p className="ag-keys-note">{t.keysNeeded}</p>}
       <p className={api.sync === 'error' ? 'ag-keys-sync ag-keys-sync-error' : 'ag-keys-sync'}>
@@ -118,9 +143,6 @@ export default function KeysSheet({ api, onClose, t }: KeysSheetProps) {
       <div className="ag-error-actions">
         <button type="button" className="retro-btn" onClick={onClose}>
           {t.keysDone}
-        </button>
-        <button type="button" className="retro-btn" onClick={api.clear}>
-          {t.keysClear}
         </button>
       </div>
     </section>

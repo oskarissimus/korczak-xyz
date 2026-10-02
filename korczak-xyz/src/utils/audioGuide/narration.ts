@@ -10,13 +10,12 @@
  * `korczak-xyz-501720` beside the site's other functions. It came from `oskarissimus/audio-guide-v2`
  * (project `prompt-compressor-1`) in Sep 2026.
  *
- * The keys are the reader's, typed into the keys sheet or borrowed from sloper or the backseat
- * driver (`keys.ts`), and travel in two headers on every request. The function uses them for that
- * one guide and keeps nothing - which is also why it can answer anybody: a stranger posting here
+ * The keys are the reader's, the account's shared copy (`keys.ts`), and travel in two headers on
+ * every request. The function uses them for that one guide and keeps nothing - which is also why it can answer anybody: a stranger posting here
  * pays for their own guide.
  */
 
-import type { ApiKeys } from './keys';
+import { keyHeaders, type ApiKeys } from './keys';
 import { parseServerTiming } from './telemetry';
 import type { Attraction } from './types';
 
@@ -102,8 +101,7 @@ export async function requestNarration(
       'Content-Type': 'application/json',
       // Named in the function's Access-Control-Allow-Headers; a header it does not list fails the
       // preflight and the tap with it.
-      'X-Google-Key': keys.google ?? '',
-      'X-ElevenLabs-Key': keys.elevenLabs ?? '',
+      ...keyHeaders(keys),
     },
     body: JSON.stringify({
       name: attraction.name,

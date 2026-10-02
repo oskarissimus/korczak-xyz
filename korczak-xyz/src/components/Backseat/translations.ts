@@ -57,9 +57,8 @@ export const translations = {
     keyNotSet: 'not set',
     keySet: 'set',
     keyElevenLabsHint: 'Only needed if you pick an ElevenLabs voice below.',
-    keysBorrowed:
-      'Filled in from the Video Generation Wizard, so you do not have to paste them twice. ' +
-      'They are copies: changing one here does not change it there.',
+    keysShared: 'These keys are your account’s, shared by every app on the site.',
+    keysSharedLink: 'All keys and what is left on them',
 
     // The eyes
     visionTitle: 'The eyes',
@@ -119,7 +118,7 @@ export const translations = {
     hush: 'Be quiet',
     settings: 'Settings',
     resetAll: 'Clear everything',
-    resetConfirm: 'Clear every key and setting on this device and in your account?',
+    resetConfirm: 'Clear every setting on this device and in your account? Your API keys stay.',
 
     // Ride screen
     waitingFirst: 'Getting a look at the road…',
@@ -184,9 +183,8 @@ export const translations = {
     keyNotSet: 'brak',
     keySet: 'jest',
     keyElevenLabsHint: 'Potrzebny tylko wtedy, gdy wybierzesz niżej głos z ElevenLabs.',
-    keysBorrowed:
-      'Wzięte z Kreatora generowania wideo, żeby nie wklejać ich drugi raz. To kopie: zmiana ' +
-      'tutaj nie zmienia ich tam.',
+    keysShared: 'Te klucze są twojego konta, wspólne dla wszystkich aplikacji na stronie.',
+    keysSharedLink: 'Wszystkie klucze i ile na nich zostało',
 
     visionTitle: 'Oczy',
     visionProvider: 'Patrzy przez',
@@ -242,7 +240,7 @@ export const translations = {
     hush: 'Cicho już',
     settings: 'Ustawienia',
     resetAll: 'Wyczyść wszystko',
-    resetConfirm: 'Usunąć wszystkie klucze i ustawienia z tego urządzenia i z konta?',
+    resetConfirm: 'Usunąć wszystkie ustawienia z tego urządzenia i z konta? Klucze API zostają.',
 
     waitingFirst: 'Zerkam na drogę…',
     speakingNow: 'Mówi',

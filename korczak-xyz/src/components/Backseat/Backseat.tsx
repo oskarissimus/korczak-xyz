@@ -48,7 +48,7 @@ interface BackseatProps {
 export default function Backseat({ lang }: BackseatProps) {
   const t: Translation = translations[lang];
   const auth = useAuth();
-  const { config, ready, sync, borrowed, update, reset } = useBackseatConfig(auth.user);
+  const { config, ready, sync, update, reset } = useBackseatConfig(auth.user);
   const ride = useBackseatRide(config, remarkLanguage(config, lang), auth.user?.uid ?? null);
 
   const riding = ride.status !== 'idle';
@@ -137,7 +137,6 @@ export default function Backseat({ lang }: BackseatProps) {
             config={config}
             update={update}
             reset={reset}
-            borrowed={borrowed}
             saving={Boolean(auth.user)}
             /* Handed the hook's own callback, with nothing awaited in between: the speech engine
                is unlocked by an utterance spoken inside a real user gesture, and one `await`

@@ -9,8 +9,8 @@ interface NavAuthProps {
 }
 
 const translations = {
-  en: { login: 'Login', logout: 'Logout' },
-  pl: { login: 'Zaloguj', logout: 'Wyloguj' },
+  en: { login: 'Login', logout: 'Logout', account: 'Account' },
+  pl: { login: 'Zaloguj', logout: 'Wyloguj', account: 'Konto' },
 };
 
 // Shorten an email to fit a narrow status bar. Elides the local part rather than the
@@ -169,10 +169,20 @@ export default function NavAuth({ lang, variant = 'control' }: NavAuthProps) {
       await signOut();
       window.location.reload();
     };
+    // The account page — the API keys every app shares — only for an approved account: one still
+    // waiting has no keys to keep and could not read them if it did.
     return (
-      <button className="nav-auth-btn" onClick={handleLogout}>
-        {t.logout}
-      </button>
+      <>
+        {user && (
+          <a href={lang === 'en' ? '/account/' : '/pl/account/'} className="nav-auth nav-auth-login">
+            <span className="nav-icon">⚿</span>
+            <span>{t.account}</span>
+          </a>
+        )}
+        <button className="nav-auth-btn" onClick={handleLogout}>
+          {t.logout}
+        </button>
+      </>
     );
   }
 

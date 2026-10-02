@@ -1,121 +1,52 @@
 /*
- * The two API keys a guide is paid with, and where a first visit borrows them from.
+ * The keys a guide is paid with, and who writes it.
  *
- * The same arrangement as sloper's and the backseat driver's, on purpose: an app that holds
- * somebody's keys should not differ from the other two in where it puts them or who can read them.
- * They live in localStorage under `audio-guide-config` and, for the signed-in account this app
- * always has, in `users/{uid}/audioGuide/config` under the `users/{uid}/{document=**}` rule — see
- * `keyStorage.ts` and `keyCloud.ts`. The reasoning for storing them at all is sloper's and is in
- * `.claude/rules/sloper.md`.
+ * Since Oct 2026 the keys are the account's, one copy shared by every app on the site
+ * (`utils/accountKeys/`, `users/{uid}/keys/config`), and so is the one choice this app has: who
+ * writes the guide. Until then the guide kept its own copy under `audio-guide-config` and
+ * `users/{uid}/audioGuide/config`, borrowed from sloper and the backseat driver on a first visit;
+ * those copies seeded the shared store and were emptied.
  *
- * The one difference is where they go next. The other two apps call the providers from the page;
- * this one hands them to its own Go function with each request (`narration.ts`), because a guide is
+ * What is unchanged is where they go next. The other apps call the providers from the page; this
+ * one hands the keys to its own Go function with each request (`narration.ts`), because a guide is
  * four steps and a minute of MP3 rather than one call. The function uses them for that request and
- * keeps nothing.
+ * keeps nothing. It takes Google's path when `X-Google-Key` is set and OpenAI's when only
+ * `X-OpenAI-Key` is — so the writer is chosen by which of the two is sent, and only one ever is.
  *
- * Everything in this file is pure, so the borrow can be pinned by a test without a browser.
+ * Everything in this file is pure.
  */
 
-export type KeyName = 'google' | 'elevenLabs';
+import type { AudioGuideWriter } from '../accountKeys/keys';
 
-export type ApiKeys = Record<KeyName, string | null>;
+export type { AudioGuideWriter };
 
-export const NO_KEYS: ApiKeys = { google: null, elevenLabs: null };
+export type KeyName = 'google' | 'openai' | 'elevenLabs';
 
-/**
- * Both are needed for every guide: Google writes it (Gemma, and Gemini for the web search), and
- * ElevenLabs reads it. It was OpenAI until Oct 2026, when the account it ran on ran out of credit;
- * an OpenAI key saved here before then is simply no longer read.
- */
-export const KEY_NAMES: readonly KeyName[] = ['google', 'elevenLabs'];
-
-export interface StampedKeys {
-  keys: ApiKeys;
-  /** When this copy was last edited, by whichever device edited it. 0 means "never". */
-  updatedAt: number;
-  /** True while the keys on screen were borrowed from another app rather than typed here. */
-  borrowed: boolean;
-  /**
-   * Somebody has decided what the keys here are — typed one, cleared one, or pressed Clear. The
-   * backseat driver's flag, for the backseat driver's reason: a fact that exists as a side-effect
-   * of a sync (a document being there) cannot carry the meaning "do not borrow into this", and the
-   * version of that app which tried shipped broken. See `.claude/rules/backseat.md`.
-   */
-  settled: boolean;
+/** What a tap needs: the writer, its key, and ElevenLabs to read it out. */
+export interface ApiKeys {
+  writer: AudioGuideWriter;
+  google: string | null;
+  openai: string | null;
+  elevenLabs: string | null;
 }
 
-/** A trimmed non-empty string, or null. The same rule the other two apps write keys with. */
-function asKey(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
-}
+export const NO_KEYS: ApiKeys = { writer: 'google', google: null, openai: null, elevenLabs: null };
 
-/**
- * The two keys out of anything with an `apiKeys` object — this app's own config, sloper's, or the
- * backseat driver's, which all spell them `google` and `elevenLabs`.
- *
- * Tolerant by design: it reads blobs written by older builds of other apps, and the worst case has
- * to be two nulls rather than a throw on a page that was working a moment ago.
- */
-export function keysFrom(value: unknown): ApiKeys {
-  const raw = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  const apiKeys =
-    typeof raw.apiKeys === 'object' && raw.apiKeys !== null
-      ? (raw.apiKeys as Record<string, unknown>)
-      : {};
-  return { google: asKey(apiKeys.google), elevenLabs: asKey(apiKeys.elevenLabs) };
-}
-
-export function anyKey(keys: ApiKeys): boolean {
-  return Boolean(keys.google || keys.elevenLabs);
+/** The keys the current writer needs, in the order the sheet shows them. */
+export function requiredKeys(keys: Pick<ApiKeys, 'writer'>): KeyName[] {
+  return [keys.writer, 'elevenLabs'];
 }
 
 /** What a tap still needs. Empty means a guide can be asked for. */
 export function missingKeys(keys: ApiKeys): KeyName[] {
-  return KEY_NAMES.filter((name) => !keys[name]);
+  return requiredKeys(keys).filter((name) => !keys[name]);
 }
 
-/**
- * Whether to borrow into this copy: only when it holds nothing *and* nobody has decided that it
- * should. The second condition is what stops a key cleared here being resurrected from another
- * app's copy on the next load, which is the one bug worth going out of the way to avoid.
- */
-export function shouldBorrow(keys: ApiKeys, settled: boolean): boolean {
-  return !settled && !anyKey(keys);
-}
-
-/**
- * The keys to start from, given the other apps' copies in order of preference.
- *
- * Per key, first source that has it: sloper keeps both, the backseat driver keeps ElevenLabs only
- * when a voice of theirs is picked, and somebody may have typed Google into one and ElevenLabs into
- * the other. Taking whole configs would leave half the pair behind.
- */
-export function borrowKeys(sources: ApiKeys[]): ApiKeys {
-  const result: ApiKeys = { ...NO_KEYS };
-  for (const name of KEY_NAMES) {
-    result[name] = sources.find((source) => source[name])?.[name] ?? null;
-  }
-  return result;
-}
-
-/** When the guide moved from OpenAI to Google (1 Oct 2026, 10:00 UTC). See `withGoogleKey`. */
-export const GOOGLE_SWITCH_AT = Date.UTC(2026, 9, 1, 10, 0);
-
-/**
- * A copy last edited before the switch has an OpenAI key and no Google one, and is settled — so
- * the ordinary borrow never fills it. This fills the Google key alone, once, from the other apps'
- * copies: the owner found the guide dead in the street with no way to paste a key. Keyed on
- * `updatedAt`, so a Google key cleared here afterwards is never put back. Null: nothing to do.
- */
-export function withGoogleKey(
-  keys: ApiKeys,
-  updatedAt: number,
-  borrowedGoogle: string | null,
-): ApiKeys | null {
-  if (keys.google || !borrowedGoogle || updatedAt >= GOOGLE_SWITCH_AT || updatedAt === 0) {
-    return null;
-  }
-  return { ...keys, google: borrowedGoogle };
+/** The two headers a request carries: the writer's key, and ElevenLabs'. Never both writers. */
+export function keyHeaders(keys: ApiKeys): Record<string, string> {
+  return {
+    [keys.writer === 'openai' ? 'X-OpenAI-Key' : 'X-Google-Key']:
+      (keys.writer === 'openai' ? keys.openai : keys.google) ?? '',
+    'X-ElevenLabs-Key': keys.elevenLabs ?? '',
+  };
 }

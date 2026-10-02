@@ -49,6 +49,8 @@ export const translations = {
     keysTitle: 'API keys',
     keysBlurb:
       'Yours, billed to you, used straight from this page. Nothing goes through korczak.xyz except the last step.',
+    keysShared: 'These keys are your account’s, shared by every app on the site.',
+    keysSharedLink: 'All keys and what is left on them',
     keyOpenai: 'OpenAI key',
     keyDeepseek: 'DeepSeek key',
     keyGoogle: 'Google key',
@@ -157,7 +159,7 @@ export const translations = {
     startMissingKeys: 'Still needed: {keys}',
     startNoModel: 'Pick a model for the script.',
     reset: 'Reset the settings',
-    resetConfirm: 'Clear every setting and key, here and on your account?',
+    resetConfirm: 'Clear every setting, here and on your account? Your API keys stay.',
 
     // Script stage
     scenesTitle: 'The script',
@@ -274,6 +276,8 @@ export const translations = {
     keysTitle: 'Klucze API',
     keysBlurb:
       'Twoje, płacone przez Ciebie, używane prosto z tej strony. Przez korczak.xyz idzie tylko ostatni krok.',
+    keysShared: 'Te klucze są twojego konta, wspólne dla wszystkich aplikacji na stronie.',
+    keysSharedLink: 'Wszystkie klucze i ile na nich zostało',
     keyOpenai: 'Klucz OpenAI',
     keyDeepseek: 'Klucz DeepSeek',
     keyGoogle: 'Klucz Google',
@@ -343,7 +347,7 @@ export const translations = {
     startMissingKeys: 'Brakuje jeszcze: {keys}',
     startNoModel: 'Wybierz model do scenariusza.',
     reset: 'Wyczyść ustawienia',
-    resetConfirm: 'Usunąć wszystkie ustawienia i klucze, tutaj i na koncie?',
+    resetConfirm: 'Usunąć wszystkie ustawienia, tutaj i na koncie? Klucze API zostają.',
 
     scenesTitle: 'Scenariusz',
     promptLabel: 'O czym jest to wideo?',

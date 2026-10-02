@@ -22,7 +22,7 @@
 
 import { isQuotaError } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
-import { normalizeConfig } from './defaults';
+import { DEFAULT_CONFIG, normalizeConfig } from './defaults';
 import type { SloperConfig } from './types';
 
 export const CONFIG_KEY = 'sloper-config';
@@ -60,11 +60,19 @@ export function loadConfig(): StampedConfig {
   }
 }
 
+/**
+ * The config with its keys emptied. The keys are the account's since Oct 2026
+ * (`utils/accountKeys/`); a copy kept here would be a second place to miss when one is revoked.
+ */
+export function withoutKeys(config: SloperConfig): SloperConfig {
+  return { ...config, apiKeys: DEFAULT_CONFIG.apiKeys };
+}
+
 export function saveConfig(config: SloperConfig, updatedAt: number): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...config, updatedAt }));
+    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...withoutKeys(config), updatedAt }));
   } catch (e) {
     // Nothing to evict — this app owns one key and it is already the smallest it can be. The
     // report is the point: a silent failure here is what makes a key "not stick" after a reload.

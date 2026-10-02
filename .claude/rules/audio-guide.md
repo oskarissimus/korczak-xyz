@@ -238,6 +238,10 @@ the diagnosis.** A network error or timeout says only that, never our own plumbi
 
 ### The keys are the reader's, typed in the app like sloper's
 
+> **Oct 2026:** the keys and the writer choice (Google or OpenAI) are now the account's shared store
+> (`account-keys.md`); `keyStorage.ts`, `keyCloud.ts` and the borrow are gone, and the sheet sends
+> only the chosen writer's header. What follows is the history.
+
 OpenAI and ElevenLabs, in localStorage under `audio-guide-config` and in
 `users/{uid}/audioGuide/config` — the same arrangement as sloper's and the backseat driver's, down
 to the shape: `keys.ts` (pure), `keyStorage.ts`, `keyCloud.ts`, `useAudioGuideKeys`. Everything

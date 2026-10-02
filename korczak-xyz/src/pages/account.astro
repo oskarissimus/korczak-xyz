@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import Account from '../components/Account/Account';
+import { useTranslations } from '../i18n';
+import '../styles/account.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('auth.account')} | korczak.xyz`} lang={lang}>
+  <PageContent title={t('auth.account')}>
+    <Account client:only="react" lang={lang} />
+  </PageContent>
+</Layout>
