@@ -323,44 +323,106 @@ export default function SetupScreen({
         )}
       </Fieldset>
 
-      <Fieldset legend={t.visionTitle}>
-        <Row label={t.visionProvider}>
+      {/* One step or two, before any model: the rest of the sheet depends on the answer. */}
+      <Fieldset legend={t.modeTitle}>
+        <Row label={t.modeLabel} hint={usingLive ? t.modeOneHint : t.modeTwoHint}>
           {(id) => (
-            <Select<VisionProvider>
+            <Select<'one' | 'two'>
               id={id}
-              value={config.vision.provider}
+              value={usingLive ? 'one' : 'two'}
               options={[
-                { value: 'google', label: 'Google (Gemma, Gemini)' },
-                { value: 'openai', label: 'OpenAI' },
+                { value: 'two', label: t.modeTwo },
+                { value: 'one', label: t.modeOne },
               ]}
               onChange={(value) =>
-                update({ vision: { ...config.vision, provider: value, model: '' } })
+                update({
+                  voice: {
+                    ...config.voice,
+                    // Back to two steps: the voice that needs no key unless one is there.
+                    engine:
+                      value === 'one' ? 'live' : config.apiKeys.elevenLabs ? 'elevenlabs' : 'device',
+                  },
+                })
               }
             />
           )}
         </Row>
+      </Fieldset>
 
-        <Row
-          label={t.visionModel}
-          hint={models.items.length > 0 ? t.visionModelsHint : undefined}
-          error={models.error}
-        >
-          {(id) =>
-            models.items.length > 0 ? (
+      {usingLive ? (
+        <Fieldset legend={t.liveTitle}>
+          <p className="bks-note">{t.voiceLiveNote}</p>
+          <Row label={t.voiceLiveModel} error={liveModels.error}>
+            {(id) =>
+              liveModels.items.length > 0 ? (
+                <Select
+                  id={id}
+                  value={config.voice.liveModel}
+                  options={liveModels.items.map((model) => ({ value: model, label: model }))}
+                  onChange={(value) => update({ voice: { ...config.voice, liveModel: value } })}
+                />
+              ) : (
+                <p className="bks-hint" id={id}>
+                  {liveModels.loading ? t.voiceElevenLabsLoading : config.voice.liveModel}
+                </p>
+              )
+            }
+          </Row>
+          <Row label={t.voiceLiveVoice}>
+            {(id) => (
               <Select
                 id={id}
-                value={config.vision.model}
-                options={models.items.map((model) => ({ value: model, label: model }))}
-                onChange={(value) => update({ vision: { ...config.vision, model: value } })}
+                value={config.voice.liveVoice}
+                options={LIVE_VOICES.map((name) => ({ value: name, label: name }))}
+                onChange={(value) => update({ voice: { ...config.voice, liveVoice: value } })}
               />
-            ) : (
-              <p className="bks-hint" id={id}>
-                {models.loading ? t.visionModelsLoading : t.visionModelsEmpty}
-              </p>
-            )
-          }
-        </Row>
-      </Fieldset>
+            )}
+          </Row>
+          <button type="button" className="retro-btn bks-test" onClick={testVoice}>
+            {t.voiceTest}
+          </button>
+          {testError && <p className="bks-error">{testError}</p>}
+        </Fieldset>
+      ) : (
+        <Fieldset legend={t.visionTitle}>
+          <Row label={t.visionProvider}>
+            {(id) => (
+              <Select<VisionProvider>
+                id={id}
+                value={config.vision.provider}
+                options={[
+                  { value: 'google', label: 'Google (Gemma, Gemini)' },
+                  { value: 'openai', label: 'OpenAI' },
+                ]}
+                onChange={(value) =>
+                  update({ vision: { ...config.vision, provider: value, model: '' } })
+                }
+              />
+            )}
+          </Row>
+
+          <Row
+            label={t.visionModel}
+            hint={models.items.length > 0 ? t.visionModelsHint : undefined}
+            error={models.error}
+          >
+            {(id) =>
+              models.items.length > 0 ? (
+                <Select
+                  id={id}
+                  value={config.vision.model}
+                  options={models.items.map((model) => ({ value: model, label: model }))}
+                  onChange={(value) => update({ vision: { ...config.vision, model: value } })}
+                />
+              ) : (
+                <p className="bks-hint" id={id}>
+                  {models.loading ? t.visionModelsLoading : t.visionModelsEmpty}
+                </p>
+              )
+            }
+          </Row>
+        </Fieldset>
+      )}
 
       <Fieldset legend={t.personaTitle}>
         <Row label={t.personaWho}>
@@ -426,125 +488,94 @@ export default function SetupScreen({
         </Row>
       </Fieldset>
 
-      <Fieldset legend={t.voiceTitle}>
-        <Row label={t.voiceEngine}>
-          {(id) => (
-            <Select<VoiceEngine>
-              id={id}
-              value={config.voice.engine}
-              options={[
-                { value: 'device', label: t.voiceEngineDevice },
-                { value: 'elevenlabs', label: t.voiceEngineElevenLabs },
-                { value: 'live', label: t.voiceEngineLive },
-              ]}
-              onChange={(value) => update({ voice: { ...config.voice, engine: value } })}
-            />
-          )}
-        </Row>
-
-        {usingElevenLabs && (
-          <Row label={t.voiceElevenModel} hint={t.voiceElevenModelHint}>
+      {!usingLive && (
+        <Fieldset legend={t.voiceTitle}>
+          <Row label={t.voiceEngine}>
             {(id) => (
-              <Select<ElevenModel>
+              <Select<VoiceEngine>
                 id={id}
-                value={config.voice.elevenModel}
+                value={config.voice.engine}
                 options={[
-                  { value: 'eleven_flash_v2_5', label: t.voiceElevenModelFlash },
-                  { value: 'eleven_multilingual_v2', label: t.voiceElevenModelMultilingual },
+                  { value: 'device', label: t.voiceEngineDevice },
+                  { value: 'elevenlabs', label: t.voiceEngineElevenLabs },
                 ]}
-                onChange={(value) => update({ voice: { ...config.voice, elevenModel: value } })}
+                onChange={(value) => update({ voice: { ...config.voice, engine: value } })}
               />
             )}
           </Row>
-        )}
 
-        {usingLive && (
-          <>
-            <p className="bks-note">{t.voiceLiveNote}</p>
-            <Row label={t.voiceLiveModel} error={liveModels.error}>
+          {usingElevenLabs && (
+            <Row label={t.voiceElevenModel} hint={t.voiceElevenModelHint}>
+              {(id) => (
+                <Select<ElevenModel>
+                  id={id}
+                  value={config.voice.elevenModel}
+                  options={[
+                    { value: 'eleven_flash_v2_5', label: t.voiceElevenModelFlash },
+                    { value: 'eleven_multilingual_v2', label: t.voiceElevenModelMultilingual },
+                  ]}
+                  onChange={(value) => update({ voice: { ...config.voice, elevenModel: value } })}
+                />
+              )}
+            </Row>
+          )}
+
+          {usingElevenLabs ? (
+            <Row label={t.voiceElevenLabs} error={elevenVoices.error}>
               {(id) =>
-                liveModels.items.length > 0 ? (
+                elevenVoices.items.length > 0 ? (
                   <Select
                     id={id}
-                    value={config.voice.liveModel}
-                    options={liveModels.items.map((model) => ({ value: model, label: model }))}
-                    onChange={(value) => update({ voice: { ...config.voice, liveModel: value } })}
+                    value={config.voice.voiceId}
+                    options={elevenVoices.items.map((voice) => ({
+                      value: voice.id,
+                      label: voice.name,
+                    }))}
+                    onChange={(value) => update({ voice: { ...config.voice, voiceId: value } })}
                   />
                 ) : (
                   <p className="bks-hint" id={id}>
-                    {liveModels.loading ? t.voiceElevenLabsLoading : config.voice.liveModel}
+                    {elevenVoices.loading ? t.voiceElevenLabsLoading : t.voiceElevenLabsEmpty}
                   </p>
                 )
               }
             </Row>
-            <Row label={t.voiceLiveVoice}>
+          ) : (
+            <Row
+              label={t.voiceDevice}
+              hint={deviceVoices.length === 0 ? t.voiceDeviceEmpty : undefined}
+            >
               {(id) => (
                 <Select
                   id={id}
-                  value={config.voice.liveVoice}
-                  options={LIVE_VOICES.map((name) => ({ value: name, label: name }))}
-                  onChange={(value) => update({ voice: { ...config.voice, liveVoice: value } })}
+                  value={config.voice.deviceVoiceUri}
+                  options={deviceVoiceOptions}
+                  onChange={(value) => update({ voice: { ...config.voice, deviceVoiceUri: value } })}
                 />
               )}
             </Row>
-          </>
-        )}
+          )}
 
-        {usingLive ? null : usingElevenLabs ? (
-          <Row label={t.voiceElevenLabs} error={elevenVoices.error}>
-            {(id) =>
-              elevenVoices.items.length > 0 ? (
-                <Select
-                  id={id}
-                  value={config.voice.voiceId}
-                  options={elevenVoices.items.map((voice) => ({
-                    value: voice.id,
-                    label: voice.name,
-                  }))}
-                  onChange={(value) => update({ voice: { ...config.voice, voiceId: value } })}
-                />
-              ) : (
-                <p className="bks-hint" id={id}>
-                  {elevenVoices.loading ? t.voiceElevenLabsLoading : t.voiceElevenLabsEmpty}
-                </p>
-              )
-            }
-          </Row>
-        ) : (
-          <Row
-            label={t.voiceDevice}
-            hint={deviceVoices.length === 0 ? t.voiceDeviceEmpty : undefined}
-          >
+          <Row label={fill(t.voiceRate, { value: config.voice.rate.toFixed(1) })} error={testError}>
             {(id) => (
-              <Select
+              <Slider
                 id={id}
-                value={config.voice.deviceVoiceUri}
-                options={deviceVoiceOptions}
-                onChange={(value) => update({ voice: { ...config.voice, deviceVoiceUri: value } })}
+                value={config.voice.rate}
+                min={0.5}
+                max={2}
+                step={0.1}
+                lowLabel={t.voiceSlow}
+                highLabel={t.voiceFast}
+                onChange={(value) => update({ voice: { ...config.voice, rate: value } })}
               />
             )}
           </Row>
-        )}
 
-        <Row label={fill(t.voiceRate, { value: config.voice.rate.toFixed(1) })} error={testError}>
-          {(id) => (
-            <Slider
-              id={id}
-              value={config.voice.rate}
-              min={0.5}
-              max={2}
-              step={0.1}
-              lowLabel={t.voiceSlow}
-              highLabel={t.voiceFast}
-              onChange={(value) => update({ voice: { ...config.voice, rate: value } })}
-            />
-          )}
-        </Row>
-
-        <button type="button" className="retro-btn bks-test" onClick={testVoice}>
-          {t.voiceTest}
-        </button>
-      </Fieldset>
+          <button type="button" className="retro-btn bks-test" onClick={testVoice}>
+            {t.voiceTest}
+          </button>
+        </Fieldset>
+      )}
 
       <Fieldset legend={t.cameraTitle}>
         <Row label={t.cameraFacing}>

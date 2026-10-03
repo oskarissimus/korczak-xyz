@@ -54,6 +54,8 @@ export interface SpeakOptions {
   /** Called when the sound starts — the end of the wait the ride measures. May fire again after a
    * stall; the caller keeps the first. */
   onStart?: () => void;
+  /** Stage marks for the round's timeline (`rideLog.ts`). */
+  onMark?: (name: string) => void;
 }
 
 /** What the settings screen shows in the device-voice dropdown. */
@@ -267,6 +269,7 @@ function speakWithDevice(options: SpeakOptions, voiceUri: string): Promise<void>
     };
 
     try {
+      options.onMark?.('tts.sent');
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       finish(err instanceof Error ? err : new Error('Speech failed'));
@@ -319,6 +322,7 @@ async function speakWithElevenLabs(
 ) {
   const { speed, playbackRate } = splitSpeed(options.rate);
 
+  options.onMark?.('tts.sent');
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}` +
       `?output_format=${ELEVENLABS_OUTPUT_FORMAT}`,
@@ -334,6 +338,7 @@ async function speakWithElevenLabs(
     },
   );
 
+  options.onMark?.('tts.headers');
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(
@@ -348,6 +353,7 @@ async function speakWithElevenLabs(
   if (!player) throw new Error('This browser will not play audio clips.');
 
   const url = URL.createObjectURL(await response.blob());
+  options.onMark?.('tts.body');
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -382,6 +388,7 @@ async function speakWithElevenLabs(
 
       player.src = url;
       player.playbackRate = playbackRate;
+      options.onMark?.('audio.play');
       // `play()` rejects rather than throwing, and the rejection is the one worth reporting: on
       // iOS it is `NotAllowedError`, which means this element was never unlocked by a gesture.
       void player.play().catch((err) =>

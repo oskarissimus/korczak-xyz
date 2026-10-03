@@ -471,6 +471,30 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The latency as it happens: big digits while a round waits, dimmed once the voice starts. */
+.bks-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0 0;
+  color: var(--retro-dark-gray);
+}
+
+.bks-clock-value {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5ch;
+}
+
+.bks-clock-live .bks-clock-value {
+  color: inherit;
+  font-weight: bold;
+}
+
+.bks-clock-label {
+  font-size: 0.9rem;
+}
+
 .bks-log-latency {
   flex: none;
   color: var(--retro-dark-gray);

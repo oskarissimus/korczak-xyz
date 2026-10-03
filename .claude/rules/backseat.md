@@ -89,8 +89,28 @@ chain at all. What it costs, and why it is a third engine rather than the defaul
   thinking is set up again without it and remembered for the tab. A close reason naming the API
   key is fatal (403), like a rejected key elsewhere — Google closes with 1007 and *"API key not
   valid"* in words, verified against the endpoint.
-- **Untested against a real key when it shipped** (none in the container). If it fails on the
-  image, the first suspect is the frame going in `clientContent` rather than `realtimeInput`.
+- **The first Live ride (3 Oct 2026, 15:53 UTC) spoke once and then went quiet.** Round 1, on a
+  session made for it, was heard at 4.75 s; rounds 2–5, each on a session prepared during the
+  previous remark, came back `dropped_empty` in 0.6–0.8 s with no audio, no transcript and no
+  error. The records then carried no per-message detail, so the cause was not readable from them.
+  Since then an empty answer from a prepared session is asked again on a fresh one in the same
+  round (`live.retry`, `live.retried`), and every round saves `events` (each server message's
+  `messageKinds`, timed), `live.early` (anything the session received before the frame was sent),
+  `live.close` and `live.usage`. Read those before touching the prewarm.
+- For comparison, the same day's two-step ride (Gemini 3.8 Flash on `minimal` + ElevenLabs Flash):
+  `vision.body` 1.8–2.6 s, first sound 2.3–3.0 s (4.5 s on the first round, a cold TTS
+  connection).
+
+**Every round's `trace`** (`rideLog.ts`) is the timeline in ms from the photograph, first
+occurrence of each stage: `frame`, `vision.sent/.headers/.body`, `tts.sent/.headers/.body`,
+`audio.play`, `firstSound`, the `live.*` marks, `done`. Plus `network` where the browser says. The
+ride screen counts the same wait live (`LatencyClock`): seconds since the photo and what it is
+waiting on (`pending.stage`), frozen at the first sound.
+
+**One step or two is the first question on the setup sheet** (`modeTitle`), at the owner's request:
+the Live engine was a third entry in the voice list beside the vision model it ignores, which read
+as both being used. Two steps shows the eyes and the voice; one step shows only the Live model and
+voice. Switching back picks ElevenLabs if its key is there, else the device voice.
 
 ### The sentence that has to stay on the screen
 

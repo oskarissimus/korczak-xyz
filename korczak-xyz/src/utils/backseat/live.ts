@@ -210,6 +210,10 @@ export interface LiveAsk {
   onStart?: () => void;
   /** The transcript so far, each time it grows. */
   onText?: (soFar: string) => void;
+  /** Stage marks for the round's timeline (`rideLog.ts`). */
+  onMark?: (name: string) => void;
+  /** Every server message, by what it carried (`messageKinds`), for the saved timeline. */
+  onEvent?: (kind: string) => void;
 }
 
 export interface LiveAnswer {
@@ -225,6 +229,37 @@ export interface LiveAnswer {
  * is asked again without it and remembered, the same shape as `NO_MINIMAL` in `vision.ts`.
  */
 const NO_THINKING_CONFIG = new Set<string>();
+
+/**
+ * What a server message carried, as short names: `audio`, `text`, `turnComplete`,
+ * `generationComplete`, `interrupted`, `usage`, `goAway`, or the top-level key for anything else.
+ * Saved per round so a remark that never came can be read message by message afterwards.
+ */
+export function messageKinds(message: Record<string, unknown>): string[] {
+  const kinds: string[] = [];
+  for (const [key, value] of Object.entries(message)) {
+    if (key === 'serverContent' && value && typeof value === 'object') {
+      const content = value as Record<string, unknown>;
+      const parts = (content.modelTurn as { parts?: { inlineData?: unknown; text?: unknown }[] })
+        ?.parts;
+      for (const part of parts ?? []) {
+        if (part.inlineData) kinds.push('audio');
+        else if (part.text) kinds.push('modelText');
+        else kinds.push('part');
+      }
+      if (content.outputTranscription) kinds.push('text');
+      for (const flag of ['turnComplete', 'generationComplete', 'interrupted', 'waitingForInput']) {
+        if (content[flag]) kinds.push(flag);
+      }
+      if (kinds.length === 0) kinds.push(`serverContent:${Object.keys(content).join('+')}`);
+    } else if (key === 'usageMetadata') {
+      kinds.push('usage');
+    } else {
+      kinds.push(key);
+    }
+  }
+  return kinds;
+}
 
 function closeError(event: CloseEvent): VisionError {
   const reason = event.reason || `Live connection closed (${event.code})`;
@@ -265,6 +300,17 @@ export class LiveSession {
   private onClosed: ((error: VisionError) => void) | null = null;
   private used = false;
 
+  /** Wall-clock times, for the timeline: made, socket open, `setupComplete`. */
+  readonly createdAt = Date.now();
+  openedAt: number | null = null;
+  setupAt: number | null = null;
+  /** How the socket closed, once it has. */
+  closeInfo: { code: number; reason: string; at: number } | null = null;
+  /** Kinds of any message that arrived while nobody was asking (between setup and `ask`). */
+  readonly early: string[] = [];
+  /** The last `usageMetadata` the server sent. */
+  usage: unknown = null;
+
   constructor(settings: LiveSettings) {
     this.settings = settings;
     this.ready = this.open(!NO_THINKING_CONFIG.has(settings.model)).catch(async (e) => {
@@ -304,6 +350,7 @@ export class LiveSession {
       }, SETUP_TIMEOUT_MS);
 
       socket.onopen = () => {
+        this.openedAt = Date.now();
         socket.send(
           JSON.stringify({
             setup: {
@@ -329,10 +376,13 @@ export class LiveSession {
           if (!settled && 'setupComplete' in message) {
             settled = true;
             clearTimeout(timer);
+            this.setupAt = Date.now();
             resolve();
             return;
           }
-          this.listener?.(message);
+          if ('usageMetadata' in message) this.usage = message.usageMetadata;
+          if (this.listener) this.listener(message);
+          else if (this.early.length < 20) this.early.push(...messageKinds(message));
         });
       };
 
@@ -341,6 +391,7 @@ export class LiveSession {
       };
 
       socket.onclose = (event) => {
+        this.closeInfo = { code: event.code, reason: event.reason, at: Date.now() };
         const error = closeError(event);
         this.closedWith = error;
         if (!settled) {
@@ -387,6 +438,7 @@ export class LiveSession {
     }
 
     await this.ready;
+    request.onMark?.('live.ready');
     if (this.closedWith) throw this.closedWith;
 
     const ctx = audioContext();
@@ -459,13 +511,20 @@ export class LiveSession {
 
         let turnComplete = false;
         this.onClosed = (error) => {
+          request.onMark?.('live.closed');
           // Closed after the turn: the audio already here still plays out.
           if (turnComplete) return;
           if (started) finishWhenPlayed();
           else fail(error);
         };
 
+        let firstMessage = true;
         this.listener = (message) => {
+          if (firstMessage) {
+            firstMessage = false;
+            request.onMark?.('live.firstMessage');
+          }
+          for (const kind of messageKinds(message)) request.onEvent?.(kind);
           const content = message.serverContent as
             | {
                 modelTurn?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] };
@@ -493,16 +552,19 @@ export class LiveSession {
             sources.push(source);
             if (!started) {
               started = true;
+              request.onMark?.('live.firstAudio');
               request.onStart?.();
             }
           }
 
           if (content.outputTranscription?.text) {
+            if (!text) request.onMark?.('live.firstText');
             text += content.outputTranscription.text;
             request.onText?.(text.trim());
           }
 
           if (content.turnComplete) {
+            request.onMark?.('live.turnComplete');
             turnComplete = true;
             finishWhenPlayed();
           }
@@ -515,6 +577,7 @@ export class LiveSession {
           });
         }
         parts.push({ text: request.user });
+        request.onMark?.('live.sent');
         this.socket?.send(
           JSON.stringify({
             clientContent: { turns: [{ role: 'user', parts }], turnComplete: true },

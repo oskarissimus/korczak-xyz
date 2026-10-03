@@ -46,6 +46,8 @@ export interface VisionRequest {
   user: string;
   frame: Frame;
   signal?: AbortSignal;
+  /** Stage marks for the round's timeline (`rideLog.ts`): sent, headers, body. */
+  onMark?: (name: string) => void;
 }
 
 /**
@@ -81,6 +83,7 @@ async function errorFrom(response: Response): Promise<VisionError> {
 }
 
 async function askOpenAi(request: VisionRequest): Promise<string> {
+  request.onMark?.('vision.sent');
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -114,9 +117,11 @@ async function askOpenAi(request: VisionRequest): Promise<string> {
     }),
   });
 
+  request.onMark?.('vision.headers');
   if (!response.ok) throw await errorFrom(response);
 
   const data = await response.json();
+  request.onMark?.('vision.body');
   return data?.choices?.[0]?.message?.content ?? '';
 }
 
@@ -197,6 +202,7 @@ async function askGoogleOnce(request: VisionRequest): Promise<string> {
     `:generateContent?key=${encodeURIComponent(request.apiKey)}`;
   const gemma = isGemma(request.model);
 
+  request.onMark?.('vision.sent');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -223,9 +229,11 @@ async function askGoogleOnce(request: VisionRequest): Promise<string> {
     }),
   });
 
+  request.onMark?.('vision.headers');
   if (!response.ok) throw await errorFrom(response);
 
   const data = await response.json();
+  request.onMark?.('vision.body');
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return '';
   return parts

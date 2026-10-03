@@ -74,6 +74,18 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 
 export type { RideStatus };
 
+export interface PendingRound {
+  at: number;
+  /** `looking`: the model has the photo. `voicing`: the sentence is being turned into speech. */
+  stage: 'looking' | 'voicing';
+}
+
+/** The connection type where the browser says (Chrome, Android); absent on iOS. */
+function networkType(): string | undefined {
+  return (navigator as unknown as { connection?: { effectiveType?: string } }).connection
+    ?.effectiveType;
+}
+
 export interface RideApi {
   status: RideStatus;
   /** Attach to the `<video>`; the hook owns the stream. */
@@ -83,6 +95,13 @@ export interface RideApi {
   /** The one being spoken, or the last one spoken. Null before the first. */
   current: Remark | null;
   speaking: boolean;
+  /**
+   * The round waiting for its first sound: when the photograph was taken and what it is waiting
+   * on. Null while speaking or between rounds. The ride screen counts up from `at`.
+   */
+  pending: PendingRound | null;
+  /** The last round's photo-to-first-sound, kept on screen after the count stops. */
+  lastLatencyMs: number | null;
   /** Something worth a banner. Cleared by starting again. */
   error: string | null;
   /** A camera refusal, which needs a different sentence from a provider error. */
@@ -118,6 +137,8 @@ export function useBackseatRide(
   const [current, setCurrent] = useState<Remark | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingRound | null>(null);
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<CameraFailure | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -228,6 +249,7 @@ export function useBackseatRide(
     wakeLockRef.current = null;
 
     setSpeaking(false);
+    setPending(null);
   }, [clearTimer]);
 
   const stop = useCallback(() => {
@@ -268,6 +290,9 @@ export function useBackseatRide(
 
     const visionController = new AbortController();
     visionAbortRef.current = visionController;
+    const frameMs = Date.now() - startedAt;
+    // What the screen counts from: the photograph, until the first sound.
+    setPending({ at: startedAt, stage: 'looking' });
 
     const live = settings.voice.engine === 'live';
     const liveSettings = {
@@ -325,10 +350,27 @@ export function useBackseatRide(
             ? `live:${settings.voice.liveVoice}`
             : 'device',
       timings: {},
+      trace: { frame: frameMs },
+      network: networkType(),
     };
     const timings = record.timings!;
+    const trace = record.trace!;
     const since = () => Date.now() - startedAt;
+    const mark = (name: string) => {
+      if (!(name in trace)) trace[name] = since();
+    };
+    /** The first sound: the end of the wait, on the screen and in the record. */
+    const heard = () => {
+      if (timings.firstSoundMs !== undefined) return timings.firstSoundMs;
+      timings.firstSoundMs = since();
+      mark('firstSound');
+      setPending(null);
+      setLastLatencyMs(timings.firstSoundMs);
+      return timings.firstSoundMs;
+    };
     const save = () => {
+      trace.done = since();
+      setPending(null);
       saveRound(uidRef.current, record, frame);
       // The wait from photograph to voice, which is what the passenger's timing lives or dies
       // on: one measurement per round, numbers and categories only — never the remark.
@@ -345,6 +387,9 @@ export function useBackseatRide(
             ? timings.firstSoundMs - timings.visionMs
             : undefined,
         doneMs: timings.doneMs,
+        livePrepared: record.live?.prepared,
+        liveRetried: record.live?.retried,
+        network: record.network,
         chars: record.text?.length,
         frameBytes: Math.round((frame.base64.length * 3) / 4),
       });
@@ -352,8 +397,6 @@ export function useBackseatRide(
 
     try {
       if (live) {
-        const session = prepared?.session ?? prepareLive({ ...liveSettings, system });
-        liveNowRef.current = session;
         const speechController = new AbortController();
         speechAbortRef.current = speechController;
         const remark: Remark = { id: nextRemarkId(), text: '…', at: startedAt, error: null };
@@ -371,23 +414,66 @@ export function useBackseatRide(
           }
           setCurrent({ ...remark });
         };
+        const events: [number, string][] = [];
+        record.events = events;
+
+        const askOn = async (session: LiveSession, wasPrepared: boolean) => {
+          liveNowRef.current = session;
+          try {
+            return await session.ask({
+              frame,
+              user: USER_PROMPT,
+              signal: visionController.signal,
+              hush: speechController.signal,
+              onMark: mark,
+              onEvent: (kind) => {
+                if (events.length < 120) events.push([since(), kind]);
+              },
+              onStart: () => {
+                setSpeaking(true);
+                show({ latencyMs: heard() });
+              },
+              onText: (soFar) => show({ text: soFar }),
+            });
+          } finally {
+            liveNowRef.current = null;
+            record.live = {
+              ...record.live,
+              prepared: wasPrepared,
+              sessionAgeMs: startedAt - session.createdAt,
+              setupMs: session.setupAt ? session.setupAt - session.createdAt : null,
+              early: [...session.early],
+              close: session.closeInfo
+                ? {
+                    code: session.closeInfo.code,
+                    reason: session.closeInfo.reason,
+                    ms: session.closeInfo.at - startedAt,
+                  }
+                : null,
+              usage: session.usage,
+            };
+          }
+        };
 
         let answer;
         try {
-          answer = await session.ask({
-            frame,
-            user: USER_PROMPT,
-            signal: visionController.signal,
-            hush: speechController.signal,
-            onStart: () => {
-              timings.firstSoundMs = since();
-              setSpeaking(true);
-              show({ latencyMs: timings.firstSoundMs });
-            },
-            onText: (soFar) => show({ text: soFar }),
-          });
+          answer = await askOn(
+            prepared?.session ?? prepareLive({ ...liveSettings, system }),
+            Boolean(prepared),
+          );
+          /*
+           * The first Live ride (3 Oct 2026) spoke once and then answered every prepared session
+           * with nothing, in under a second, no error. Until the saved events say why, an empty
+           * answer from a prepared session is asked again on a fresh one in the same round, and
+           * both are on the record (`live.retry`, `live.retried`).
+           */
+          if (prepared && !answer.spoke && !answer.text && runningRef.current) {
+            mark('live.retry');
+            events.push([since(), '— retry on a fresh session —']);
+            answer = await askOn(prepareLive({ ...liveSettings, system }), false);
+            record.live = { ...record.live!, retried: true };
+          }
         } finally {
-          liveNowRef.current = null;
           setSpeaking(false);
         }
         timings.doneMs = since();
@@ -438,9 +524,11 @@ export function useBackseatRide(
         user: USER_PROMPT,
         frame,
         signal: visionController.signal,
+        onMark: mark,
       });
       record.raw = raw;
       timings.visionMs = since();
+      setPending({ at: startedAt, stage: 'voicing' });
 
       if (!runningRef.current) return;
       failuresRef.current = 0;
@@ -472,10 +560,10 @@ export function useBackseatRide(
           lang: speechLocale(langRef.current),
           rate: settings.voice.rate,
           signal: speechController.signal,
+          onMark: mark,
           onStart: () => {
             if (timings.firstSoundMs !== undefined) return;
-            timings.firstSoundMs = since();
-            const latencyMs = timings.firstSoundMs;
+            const latencyMs = heard();
             historyRef.current = historyRef.current.map((r) =>
               r.id === remark.id ? { ...r, latencyMs } : r,
             );
@@ -545,6 +633,7 @@ export function useBackseatRide(
 
     setError(null);
     setCameraError(null);
+    setLastLatencyMs(null);
     failuresRef.current = 0;
     rideRef.current = { id: rideIdFor(Date.now()), rounds: 0, angle: null };
 
@@ -628,6 +717,8 @@ export function useBackseatRide(
     remarks,
     current,
     speaking,
+    pending,
+    lastLatencyMs,
     error,
     cameraError,
     start,

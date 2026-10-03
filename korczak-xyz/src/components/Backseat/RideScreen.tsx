@@ -19,9 +19,12 @@
  *    where that is being heard rather than two screens back.
  */
 
+import { useEffect, useState } from 'react';
+
 import { cameraMessage, localeOf, type Lang, type Translation } from './translations';
 import type { CameraFailure } from '../../utils/backseat/frame';
 import type { Remark, RideStatus } from '../../utils/backseat/types';
+import type { PendingRound } from '../../hooks/useBackseatRide';
 
 interface RideScreenProps {
   status: RideStatus;
@@ -29,6 +32,8 @@ interface RideScreenProps {
   remarks: Remark[];
   current: Remark | null;
   speaking: boolean;
+  pending: PendingRound | null;
+  lastLatencyMs: number | null;
   error: string | null;
   cameraError: CameraFailure | null;
   onStop: () => void;
@@ -38,12 +43,64 @@ interface RideScreenProps {
   lang: Lang;
 }
 
+function seconds(ms: number, lang: Lang): string {
+  return (ms / 1000).toLocaleString(localeOf(lang), {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
+/**
+ * Seconds since the photograph, counting until the first sound — the latency as it happens, so a
+ * ride shows where the wait is without anybody reading a record afterwards. Once the voice starts
+ * the count stops and the last value stays, dimmed, until the next photograph.
+ */
+function LatencyClock({
+  pending,
+  lastLatencyMs,
+  t,
+  lang,
+}: {
+  pending: PendingRound | null;
+  lastLatencyMs: number | null;
+  t: Translation;
+  lang: Lang;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!pending) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, [pending]);
+
+  if (pending) {
+    return (
+      <p className="bks-clock bks-clock-live">
+        <span className="bks-clock-value">{seconds(Math.max(0, now - pending.at), lang)} s</span>
+        <span className="bks-clock-label">
+          {pending.stage === 'looking' ? t.clockLooking : t.clockVoicing}
+        </span>
+      </p>
+    );
+  }
+  if (lastLatencyMs === null) return null;
+  return (
+    <p className="bks-clock">
+      <span className="bks-clock-value">{seconds(lastLatencyMs, lang)} s</span>
+      <span className="bks-clock-label">{t.clockLast}</span>
+    </p>
+  );
+}
+
 export default function RideScreen({
   status,
   videoRef,
   remarks,
   current,
   speaking,
+  pending,
+  lastLatencyMs,
   error,
   cameraError,
   onStop,
@@ -74,6 +131,8 @@ export default function RideScreen({
         />
         {status === 'starting' && <p className="bks-viewport-note">{t.cameraStarting}</p>}
       </div>
+
+      <LatencyClock pending={pending} lastLatencyMs={lastLatencyMs} t={t} lang={lang} />
 
       {/*
         The remark, as large as it goes. `aria-live="polite"` rather than assertive: it is spoken
@@ -137,11 +196,7 @@ export default function RideScreen({
                     lives on, on the screen so a ride shows whether a change made it better. */}
                 {typeof remark.latencyMs === 'number' && (
                   <span className="bks-log-latency" title={t.remarkLatency}>
-                    {(remark.latencyMs / 1000).toLocaleString(localeOf(lang), {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                    s
+                    {seconds(remark.latencyMs, lang)} s
                   </span>
                 )}
                 <span className="bks-log-text">{remark.text}</span>

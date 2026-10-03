@@ -97,6 +97,8 @@ export default function Backseat({ lang }: BackseatProps) {
           remarks={ride.remarks}
           current={ride.current}
           speaking={ride.speaking}
+          pending={ride.pending}
+          lastLatencyMs={ride.lastLatencyMs}
           error={ride.error}
           cameraError={ride.cameraError}
           onStop={ride.stop}

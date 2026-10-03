@@ -58,6 +58,32 @@ export interface RoundRecord {
    * happened.
    */
   timings?: { visionMs?: number; firstSoundMs?: number; doneMs?: number };
+  /**
+   * Every stage of the round, in ms from `at`, first occurrence only: `frame` (captured),
+   * `vision.sent`/`.headers`/`.body`, `tts.sent`/`.headers`/`.body`, `audio.play`, `firstSound`,
+   * and for Gemini Live `live.ready`, `live.sent`, `live.firstMessage`, `live.firstAudio`,
+   * `live.firstText`, `live.turnComplete`, `live.closed`, `live.retry`. `done` ends it.
+   */
+  trace?: Record<string, number>;
+  /** Gemini Live only: each server message's kinds (`messageKinds`), as [ms from `at`, kind]. */
+  events?: [number, string][];
+  /** Gemini Live only: the session this round used, and how it ended. */
+  live?: {
+    /** Opened during the previous remark, rather than for this one. */
+    prepared: boolean;
+    /** From the session being made to this round starting. Negative when made for this round. */
+    sessionAgeMs: number;
+    /** From the session being made to `setupComplete`. */
+    setupMs: number | null;
+    /** Messages that arrived between setup and the frame being sent. */
+    early: string[];
+    close: { code: number; reason: string; ms: number } | null;
+    usage: unknown;
+    /** The prepared session answered with nothing, and a fresh one was asked instead. */
+    retried?: boolean;
+  };
+  /** `navigator.connection.effectiveType` where the browser has it. */
+  network?: string;
 }
 
 /** A ride's id: its start time, sortable and readable in a bucket listing. */

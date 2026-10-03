@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterLiveModels, pcmRate, pcmToFloat } from './live';
+import { filterLiveModels, messageKinds, pcmRate, pcmToFloat } from './live';
 import { canStart, DEFAULT_CONFIG, normalizeConfig, requiredKeys } from './defaults';
 
 describe('filterLiveModels', () => {
@@ -54,5 +54,25 @@ describe('the Live engine in the settings', () => {
     expect(requiredKeys(config)).toEqual(['google']);
     expect(canStart({ ...config, apiKeys: { ...config.apiKeys, google: 'AIza' } })).toBe(true);
     expect(config.voice.liveVoice).toBe(DEFAULT_CONFIG.voice.liveVoice);
+  });
+});
+
+describe('messageKinds', () => {
+  it('names what a server message carried, for the saved timeline', () => {
+    expect(
+      messageKinds({
+        serverContent: {
+          modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm', data: 'AA==' } }] },
+          outputTranscription: { text: 'Hej' },
+        },
+      }),
+    ).toEqual(['audio', 'text']);
+    expect(
+      messageKinds({ serverContent: { turnComplete: true }, usageMetadata: { totalTokenCount: 3 } }),
+    ).toEqual(['turnComplete', 'usage']);
+    expect(messageKinds({ goAway: { timeLeft: '1s' } })).toEqual(['goAway']);
+    expect(messageKinds({ serverContent: { somethingNew: 1 } })).toEqual([
+      'serverContent:somethingNew',
+    ]);
   });
 });
