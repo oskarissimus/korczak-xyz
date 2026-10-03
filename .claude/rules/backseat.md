@@ -97,6 +97,13 @@ chain at all. What it costs, and why it is a third engine rather than the defaul
   round (`live.retry`, `live.retried`), and every round saves `events` (each server message's
   `messageKinds`, timed), `live.early` (anything the session received before the frame was sent),
   `live.close` and `live.usage`. Read those before touching the prewarm.
+- **The second ride (16:39, with those events) named the cause: nothing reached the model.** Every
+  round, fresh session or prepared, got `generationComplete` + `turnComplete` + an empty
+  `usageMetadata` 0.6–0.8 s after the send — no tokens in, nothing out. The frame and the line had
+  gone as a `clientContent` turn, which is Live's channel for seeding history, not for a turn to
+  be answered. They now go as `realtimeInput` (`video`, then `text`). An answer with no audio and
+  no text is a `VisionError` from then on: the banner says so and three in a row stop the ride,
+  rather than a counter that climbs and then silence.
 - For comparison, the same day's two-step ride (Gemini 3.8 Flash on `minimal` + ElevenLabs Flash):
   `vision.body` 1.8–2.6 s, first sound 2.3–3.0 s (4.5 s on the first round, a cold TTS
   connection).

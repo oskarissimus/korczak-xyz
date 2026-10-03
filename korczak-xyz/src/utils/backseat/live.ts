@@ -570,19 +570,26 @@ export class LiveSession {
           }
         };
 
-        const parts: Record<string, unknown>[] = [];
-        if (request.frame) {
-          parts.push({
-            inlineData: { mimeType: request.frame.mimeType, data: request.frame.base64 },
-          });
-        }
-        parts.push({ text: request.user });
+        /*
+         * As realtime input, not `clientContent`. The first two Live rides sent the frame and the
+         * line as one `clientContent` turn, and from the second remark on (and on every remark of
+         * the second ride, fresh sessions included) the native-audio model answered with
+         * `generationComplete` + `turnComplete` and an empty `usageMetadata` within a second: no
+         * tokens in, nothing out. `clientContent` is Live's channel for seeding history; a turn
+         * the model is meant to answer goes in `realtimeInput`, the frame as `video` and then the
+         * line as `text`, in that order on the one socket.
+         */
         request.onMark?.('live.sent');
-        this.socket?.send(
-          JSON.stringify({
-            clientContent: { turns: [{ role: 'user', parts }], turnComplete: true },
-          }),
-        );
+        if (request.frame) {
+          this.socket?.send(
+            JSON.stringify({
+              realtimeInput: {
+                video: { mimeType: request.frame.mimeType, data: request.frame.base64 },
+              },
+            }),
+          );
+        }
+        this.socket?.send(JSON.stringify({ realtimeInput: { text: request.user } }));
       });
     } finally {
       this.listener = null;

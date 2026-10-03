@@ -473,6 +473,14 @@ export function useBackseatRide(
             answer = await askOn(prepareLive({ ...liveSettings, system }), false);
             record.live = { ...record.live!, retried: true };
           }
+          if (!answer.spoke && !answer.text && runningRef.current) {
+            // Silence with no error is the one thing nobody can see from the driver's seat: it
+            // goes to the banner and counts as a failure, so three in a row stop the ride.
+            throw new VisionError(
+              'Gemini Live answered with nothing (turn complete, no audio, no text).',
+              null,
+            );
+          }
         } finally {
           setSpeaking(false);
         }
