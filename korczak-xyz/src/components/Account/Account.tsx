@@ -592,9 +592,19 @@ function AppsSection({
         </header>
         <dl className="acct-numbers">
           <dt>{t.roleEyes}</dt>
-          <dd>{withModel(backseat.vision.provider, backseat.vision.model)}</dd>
+          <dd>
+            {backseat.voice.engine === 'live'
+              ? `Gemini Live (${backseat.voice.liveModel})`
+              : withModel(backseat.vision.provider, backseat.vision.model)}
+          </dd>
           <dt>{t.roleVoice}</dt>
-          <dd>{backseat.voice.engine === 'elevenlabs' ? 'ElevenLabs' : t.deviceVoice}</dd>
+          <dd>
+            {backseat.voice.engine === 'elevenlabs'
+              ? 'ElevenLabs'
+              : backseat.voice.engine === 'live'
+                ? `Gemini Live (${backseat.voice.liveVoice})`
+                : t.deviceVoice}
+          </dd>
         </dl>
         <p className="acct-dim">
           <a href={appPath(lang, 'backseat')}>{t.changeInApp}</a>

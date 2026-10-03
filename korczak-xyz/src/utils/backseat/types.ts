@@ -33,7 +33,12 @@ export type Intensity = 'mild' | 'normal' | 'relentless';
 /** The language the passenger speaks in. */
 export type RemarkLanguage = 'en' | 'pl';
 
-export type VoiceEngine = 'device' | 'elevenlabs';
+/**
+ * `live` is not a voice in front of a vision call but both at once: Gemini Live looks at the frame
+ * and answers in speech (`live.ts`). It ignores `vision`, needs only the Google key, and is the
+ * fastest of the three to the first word.
+ */
+export type VoiceEngine = 'device' | 'elevenlabs' | 'live';
 
 /**
  * Which ElevenLabs model reads the remark. Flash is the default since Oct 2026 because it starts
@@ -71,6 +76,10 @@ export interface BackseatConfig {
     voiceId: string;
     /** ElevenLabs only. */
     elevenModel: ElevenModel;
+    /** Gemini Live only: the model the session is opened on. */
+    liveModel: string;
+    /** Gemini Live only: one of Google's prebuilt voices (`LIVE_VOICES`). */
+    liveVoice: string;
     /** 0.5–2. Both engines take it, and both mean roughly the same thing by it. */
     rate: number;
   };

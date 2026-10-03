@@ -67,6 +67,14 @@ export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash-lite';
  */
 export const FIRST_GOOGLE_MODEL = 'gemma-3-27b-it';
 
+/**
+ * The guess before the model list has come back. Replaced by the first native-audio model the key
+ * can reach (`filterLiveModels` in `live.ts`), so a rename on Google's side costs one list fetch, not a fix.
+ */
+export const DEFAULT_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+
+export const DEFAULT_LIVE_VOICE = 'Kore';
+
 /** Where an OpenAI setup starts — only ever chosen by hand, or borrowed with an OpenAI-only set. */
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
@@ -85,13 +93,15 @@ export const DEFAULT_CONFIG: BackseatConfig = {
     // somebody picks a voice from their account.
     voiceId: '21m00Tcm4TlvDq8ikWAM',
     elevenModel: 'eleven_flash_v2_5',
+    liveModel: DEFAULT_LIVE_MODEL,
+    liveVoice: DEFAULT_LIVE_VOICE,
     rate: 1,
   },
   camera: { facing: 'environment' },
 };
 
 const VISION_PROVIDERS: readonly VisionProvider[] = ['openai', 'google'];
-const VOICE_ENGINES: readonly VoiceEngine[] = ['device', 'elevenlabs'];
+const VOICE_ENGINES: readonly VoiceEngine[] = ['device', 'elevenlabs', 'live'];
 const FACINGS: readonly CameraFacing[] = ['environment', 'user'];
 export const ELEVEN_MODELS: readonly ElevenModel[] = ['eleven_flash_v2_5', 'eleven_multilingual_v2'];
 
@@ -168,6 +178,8 @@ export function normalizeConfig(value: unknown): BackseatConfig {
       deviceVoiceUri: asString(voice.deviceVoiceUri, DEFAULT_CONFIG.voice.deviceVoiceUri),
       voiceId: asString(voice.voiceId, DEFAULT_CONFIG.voice.voiceId),
       elevenModel: asOneOf(voice.elevenModel, ELEVEN_MODELS, DEFAULT_CONFIG.voice.elevenModel),
+      liveModel: asString(voice.liveModel, DEFAULT_CONFIG.voice.liveModel) || DEFAULT_LIVE_MODEL,
+      liveVoice: asString(voice.liveVoice, DEFAULT_CONFIG.voice.liveVoice) || DEFAULT_LIVE_VOICE,
       rate: asNumber(voice.rate, DEFAULT_CONFIG.voice.rate, 0.5, 2),
     },
     camera: {
@@ -194,6 +206,8 @@ export function speechLocale(lang: RemarkLanguage): string {
  * the device synthesiser is the default: one key and the app runs.
  */
 export function requiredKeys(config: BackseatConfig): KeyName[] {
+  // Gemini Live does the looking and the speaking, so the vision provider's key is not asked for.
+  if (config.voice.engine === 'live') return ['google'];
   const needed: KeyName[] = [config.vision.provider === 'openai' ? 'openai' : 'google'];
   if (config.voice.engine === 'elevenlabs') needed.push('elevenLabs');
   return needed;
@@ -206,5 +220,6 @@ export function missingKeys(config: BackseatConfig): KeyName[] {
 
 /** Whether a ride could begin at all: every required key present, and a model chosen. */
 export function canStart(config: BackseatConfig): boolean {
-  return missingKeys(config).length === 0 && config.vision.model.trim() !== '';
+  const model = config.voice.engine === 'live' ? config.voice.liveModel : config.vision.model;
+  return missingKeys(config).length === 0 && model.trim() !== '';
 }

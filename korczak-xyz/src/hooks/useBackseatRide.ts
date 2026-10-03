@@ -50,6 +50,7 @@ import {
   USER_PROMPT,
 } from '../utils/backseat/remarks';
 import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
+import { prepareLive, primeLiveAudio, sessionFits, type LiveSession } from '../utils/backseat/live';
 import type { BackseatConfig, Remark, RemarkLanguage, RideStatus } from '../utils/backseat/types';
 import { RELEASE, rideIdFor, saveRound, type RoundRecord } from '../utils/backseat/rideLog';
 import { askForRemark, VisionError } from '../utils/backseat/vision';
@@ -95,6 +96,11 @@ export interface RideApi {
 }
 
 let remarkCounter = 0;
+
+/** What a Live session's prompt was built from, beyond the history and the angle. */
+function promptKeyOf(config: BackseatConfig, lang: RemarkLanguage): string {
+  return `${config.remarks.persona}|${config.remarks.intensity}|${lang}`;
+}
 
 function nextRemarkId(): string {
   remarkCounter += 1;
@@ -160,6 +166,21 @@ export function useBackseatRide(
   /** This ride's id and how many rounds it has had, for the saved records. */
   const rideRef = useRef({ id: '', rounds: 0, angle: null as string | null });
 
+  /*
+   * Gemini Live's next session, opened while the current remark is still being spoken so that the
+   * next snapshot finds it set up (see `live.ts`). It carries the prompt it was opened with, and
+   * `promptKey` says what that prompt was built from: a persona or language changed in between
+   * means a fresh session rather than a remark in the old voice.
+   */
+  const liveNextRef = useRef<{
+    session: LiveSession;
+    angle: string;
+    system: string;
+    promptKey: string;
+  } | null>(null);
+  /** The session answering right now, so teardown can close it. */
+  const liveNowRef = useRef<LiveSession | null>(null);
+
   /* The spoken history, for the prompt. Kept beside the state because the loop needs it
      synchronously and `setState` is not readable on the same tick it is called. */
   const historyRef = useRef<Remark[]>([]);
@@ -191,6 +212,11 @@ export function useBackseatRide(
     speechAbortRef.current = null;
 
     cancelSpeech();
+
+    liveNextRef.current?.session.close();
+    liveNextRef.current = null;
+    liveNowRef.current?.close();
+    liveNowRef.current = null;
 
     // Stopping the tracks is what turns the camera light off. A stream left running is the single
     // most alarming thing a page like this can do.
@@ -243,23 +269,44 @@ export function useBackseatRide(
     const visionController = new AbortController();
     visionAbortRef.current = visionController;
 
-    const angle = pickAngle(rideRef.current.angle);
+    const live = settings.voice.engine === 'live';
+    const liveSettings = {
+      apiKey: settings.apiKeys.google ?? '',
+      model: settings.voice.liveModel,
+      voice: settings.voice.liveVoice,
+    };
+    // A session opened during the last remark, if it still fits what the settings now say.
+    let prepared = liveNextRef.current;
+    liveNextRef.current = null;
+    if (
+      prepared &&
+      (!live ||
+        prepared.promptKey !== promptKeyOf(settings, langRef.current) ||
+        !sessionFits(prepared.session, liveSettings))
+    ) {
+      prepared.session.close();
+      prepared = null;
+    }
+
+    const angle = prepared?.angle ?? pickAngle(rideRef.current.angle);
     rideRef.current.angle = angle;
-    const system = systemPrompt({
-      angle,
-      persona: settings.remarks.persona,
-      intensity: settings.remarks.intensity,
-      lang: langRef.current,
-      recent: recentTexts(historyRef.current),
-    });
+    const system =
+      prepared?.system ??
+      systemPrompt({
+        angle,
+        persona: settings.remarks.persona,
+        intensity: settings.remarks.intensity,
+        lang: langRef.current,
+        recent: recentTexts(historyRef.current),
+      });
     rideRef.current.rounds += 1;
     // What this round is, for the saved record; `outcome` and the rest are filled in as it goes.
     const record: RoundRecord = {
       rideId: rideRef.current.id,
       n: rideRef.current.rounds,
       at: startedAt,
-      provider: settings.vision.provider,
-      model: settings.vision.model,
+      provider: live ? 'google-live' : settings.vision.provider,
+      model: live ? settings.voice.liveModel : settings.vision.model,
       persona: settings.remarks.persona,
       intensity: settings.remarks.intensity,
       angle,
@@ -274,7 +321,9 @@ export function useBackseatRide(
       voice:
         settings.voice.engine === 'elevenlabs'
           ? `elevenlabs:${settings.voice.elevenModel}`
-          : 'device',
+          : live
+            ? `live:${settings.voice.liveVoice}`
+            : 'device',
       timings: {},
     };
     const timings = record.timings!;
@@ -302,6 +351,85 @@ export function useBackseatRide(
     };
 
     try {
+      if (live) {
+        const session = prepared?.session ?? prepareLive({ ...liveSettings, system });
+        liveNowRef.current = session;
+        const speechController = new AbortController();
+        speechAbortRef.current = speechController;
+        const remark: Remark = { id: nextRemarkId(), text: '…', at: startedAt, error: null };
+        let shown = false;
+        const show = (patch: Partial<Remark>) => {
+          Object.assign(remark, patch);
+          if (!shown) {
+            shown = true;
+            pushRemark({ ...remark });
+          } else {
+            historyRef.current = historyRef.current.map((r) =>
+              r.id === remark.id ? { ...remark } : r,
+            );
+            setRemarks([...historyRef.current].reverse());
+          }
+          setCurrent({ ...remark });
+        };
+
+        let answer;
+        try {
+          answer = await session.ask({
+            frame,
+            user: USER_PROMPT,
+            signal: visionController.signal,
+            hush: speechController.signal,
+            onStart: () => {
+              timings.firstSoundMs = since();
+              setSpeaking(true);
+              show({ latencyMs: timings.firstSoundMs });
+            },
+            onText: (soFar) => show({ text: soFar }),
+          });
+        } finally {
+          liveNowRef.current = null;
+          setSpeaking(false);
+        }
+        timings.doneMs = since();
+        record.raw = answer.text;
+
+        if (!runningRef.current) return;
+        failuresRef.current = 0;
+
+        // Heard already, so this only tidies what is shown and remembered (see `live.ts`).
+        const text = sanitizeRemark(answer.text) || answer.text || null;
+        record.text = text;
+        if (answer.spoke && text) {
+          record.outcome = 'spoken';
+          show({ text });
+        } else {
+          record.outcome = 'dropped_empty';
+          if (shown) {
+            historyRef.current = historyRef.current.filter((r) => r.id !== remark.id);
+            setRemarks([...historyRef.current].reverse());
+          }
+        }
+        save();
+
+        // The next session, opened now so the next snapshot does not wait for a handshake.
+        const nextAngle = pickAngle(angle);
+        const nextSystem = systemPrompt({
+          angle: nextAngle,
+          persona: settings.remarks.persona,
+          intensity: settings.remarks.intensity,
+          lang: langRef.current,
+          recent: recentTexts(historyRef.current),
+        });
+        liveNextRef.current = {
+          session: prepareLive({ ...liveSettings, system: nextSystem }),
+          angle: nextAngle,
+          system: nextSystem,
+          promptKey: promptKeyOf(settings, langRef.current),
+        };
+        schedule(untilNext());
+        return;
+      }
+
       const raw = await askForRemark({
         provider: settings.vision.provider,
         apiKey: settings.apiKeys[settings.vision.provider === 'google' ? 'google' : 'openai'] ?? '',
@@ -437,6 +565,8 @@ export function useBackseatRide(
      * note at the top of `speech.ts`.
      */
     primeVoices();
+    // Gemini Live plays through Web Audio, which has its own gesture unlock (`live.ts`).
+    if (configRef.current.voice.engine === 'live') primeLiveAudio();
 
     setStatus('starting');
     const startId = startIdRef.current + 1;

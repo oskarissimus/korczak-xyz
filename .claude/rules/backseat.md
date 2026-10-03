@@ -67,13 +67,30 @@ Every round now carries `timings` in its saved record (`visionMs`, `firstSoundMs
 from `at`) and sends one `backseat.round` measurement to Sentry Logs (numbers and categories, never
 the remark). The ride screen shows the photo-to-first-word seconds beside each remark.
 
-**Not done, and why:** a single call that returns speech (Gemini Live native audio, OpenAI
-realtime). It would give up the chosen ElevenLabs voice, and the text would only exist as a
-transcript of audio already playing — so `sanitizeRemark` and the repeat drop could not stop a
-stage direction or a repeated line before it was heard. Streaming the MP3 into the element
-(MediaSource) was also left out: iOS has only `ManagedMediaSource`, nothing here can be tested on
-an iPhone, and a Flash clip for one sentence is small. Read the measurements before reaching for
-either.
+**Then the single call, at the owner's request the same day: Gemini Live** (`voice.engine: 'live'`,
+`live.ts`). A native-audio model gets the frame and the system prompt over one WebSocket and answers
+in streamed 24 kHz PCM, played chunk by chunk through Web Audio, so there is no text-then-speech
+chain at all. What it costs, and why it is a third engine rather than the default:
+
+- **The text is Google's transcript (`outputAudioTranscription`) of audio already playing.**
+  `sanitizeRemark` and the repeat check only tidy what is shown and remembered; nothing can stop a
+  line before it is heard.
+- **Google's prebuilt voices** (`LIVE_VOICES`), not ElevenLabs'. The rate slider does nothing.
+- **One session per remark, opened during the previous one** (`liveNextRef`, `prepareLive`). A Live
+  session remembers everything it was sent, so one per ride would drag every old frame into every
+  answer and freeze the per-round prompt; a fresh one per remark would add the handshake and
+  `setup` to the wait. So the next round's prompt (its angle, the remarks so far) is built as soon
+  as the current remark ends and its session is opened then; a persona, language, key, model or
+  voice changed in between discards it (`promptKey`, `sessionFits`).
+- **Web Audio has its own iOS unlock**: `primeLiveAudio`, beside `primeVoices` in the Start and Test
+  handlers, resumes one `AudioContext` inside the gesture and sets `navigator.audioSession.type =
+  'playback'` (iOS 17+) so the silent switch does not mute it.
+- `thinkingConfig: { thinkingBudget: 0 }` is sent in `setup`; a model whose close reason names
+  thinking is set up again without it and remembered for the tab. A close reason naming the API
+  key is fatal (403), like a rejected key elsewhere — Google closes with 1007 and *"API key not
+  valid"* in words, verified against the endpoint.
+- **Untested against a real key when it shipped** (none in the container). If it fails on the
+  image, the first suspect is the frame going in `clientContent` rather than `realtimeInput`.
 
 ### The sentence that has to stay on the screen
 
@@ -174,7 +191,7 @@ high-detail read of a blurry windscreen photograph buys a joke nothing.
 one fails with `OverconstrainedError` rather than falling back — the app would refuse to start on
 the machine it is developed on.
 
-### Two voice engines, and the free one is the default
+### Two voice engines (three since Gemini Live, above), and the free one is the default
 
 A phone already has a speech synthesiser. Asking for a second API key and a second bill to hear "oh,
 slow down" is a bad trade, so `device` is the default and **the whole app runs on one vision key**.

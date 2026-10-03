@@ -47,6 +47,7 @@ import type {
 } from '../../utils/backseat/types';
 import { accountPath } from '../../utils/accountKeys/keys';
 import { fetchVisionModels } from '../../utils/backseat/vision';
+import { fetchLiveModels, LIVE_VOICES, prepareLive, primeLiveAudio } from '../../utils/backseat/live';
 import { Fieldset, KeyField, Row, Select, Slider } from './fields';
 import { fill, translations, type Translation } from './translations';
 
@@ -155,6 +156,7 @@ export default function SetupScreen({
   const [elevenVoices, setElevenVoices] = useState<FetchState<ElevenLabsVoice>>(IDLE);
   const elevenKey = config.apiKeys.elevenLabs;
   const usingElevenLabs = config.voice.engine === 'elevenlabs';
+  const usingLive = config.voice.engine === 'live';
 
   useEffect(() => {
     if (!usingElevenLabs || !elevenKey) {
@@ -190,6 +192,44 @@ export default function SetupScreen({
     };
   }, [elevenKey, usingElevenLabs]);
 
+  /* Gemini Live's models, from the Google key: the ones that open a Live session at all. */
+  const [liveModels, setLiveModels] = useState<FetchState<string>>(IDLE);
+  const googleKey = config.apiKeys.google;
+
+  useEffect(() => {
+    if (!usingLive || !googleKey) {
+      setLiveModels(IDLE);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLiveModels({ loading: true, items: [], error: null });
+
+      void fetchLiveModels(googleKey).then((result) => {
+        if (cancelled) return;
+        setLiveModels({
+          loading: false,
+          items: result.models,
+          error: result.success ? null : (result.error ?? null),
+        });
+        if (
+          result.models.length > 0 &&
+          !result.models.includes(configRef.current.voice.liveModel)
+        ) {
+          updateRef.current({
+            voice: { ...configRef.current.voice, liveModel: result.models[0] },
+          });
+        }
+      });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [googleKey, usingLive]);
+
   /*
    * The test button, which is also how the speech engine gets unlocked on iOS ahead of the first
    * ride: it is a real click, and the utterance it speaks is spoken from inside it.
@@ -202,6 +242,20 @@ export default function SetupScreen({
     primeVoices();
     // In the passenger's language, not the page's: the test is of the voice the ride will use.
     const spoken = remarkLanguage(configRef.current, lang);
+    if (configRef.current.voice.engine === 'live') {
+      // Its own audio path and its own unlock, also inside this click (`live.ts`).
+      primeLiveAudio();
+      const { apiKeys, voice } = configRef.current;
+      void prepareLive({
+        apiKey: apiKeys.google ?? '',
+        model: voice.liveModel,
+        voice: voice.liveVoice,
+        system: 'Read the line the user gives you aloud, word for word, and say nothing else.',
+      })
+        .ask({ frame: null, user: translations[spoken].voiceTestLine })
+        .catch((e) => setTestError(e instanceof Error ? e.message : String(e)));
+      return;
+    }
     void speak(configRef.current, {
       text: translations[spoken].voiceTestLine,
       lang: speechLocale(spoken),
@@ -237,7 +291,7 @@ export default function SetupScreen({
           {t.keysShared} <a href={accountPath(lang)}>{t.keysSharedLink}</a>
         </p>
 
-        {provider === 'openai' ? (
+        {provider === 'openai' && !usingLive ? (
           <KeyField
             label={t.keyOpenai}
             value={config.apiKeys.openai}
@@ -381,6 +435,7 @@ export default function SetupScreen({
               options={[
                 { value: 'device', label: t.voiceEngineDevice },
                 { value: 'elevenlabs', label: t.voiceEngineElevenLabs },
+                { value: 'live', label: t.voiceEngineLive },
               ]}
               onChange={(value) => update({ voice: { ...config.voice, engine: value } })}
             />
@@ -403,7 +458,39 @@ export default function SetupScreen({
           </Row>
         )}
 
-        {usingElevenLabs ? (
+        {usingLive && (
+          <>
+            <p className="bks-note">{t.voiceLiveNote}</p>
+            <Row label={t.voiceLiveModel} error={liveModels.error}>
+              {(id) =>
+                liveModels.items.length > 0 ? (
+                  <Select
+                    id={id}
+                    value={config.voice.liveModel}
+                    options={liveModels.items.map((model) => ({ value: model, label: model }))}
+                    onChange={(value) => update({ voice: { ...config.voice, liveModel: value } })}
+                  />
+                ) : (
+                  <p className="bks-hint" id={id}>
+                    {liveModels.loading ? t.voiceElevenLabsLoading : config.voice.liveModel}
+                  </p>
+                )
+              }
+            </Row>
+            <Row label={t.voiceLiveVoice}>
+              {(id) => (
+                <Select
+                  id={id}
+                  value={config.voice.liveVoice}
+                  options={LIVE_VOICES.map((name) => ({ value: name, label: name }))}
+                  onChange={(value) => update({ voice: { ...config.voice, liveVoice: value } })}
+                />
+              )}
+            </Row>
+          </>
+        )}
+
+        {usingLive ? null : usingElevenLabs ? (
           <Row label={t.voiceElevenLabs} error={elevenVoices.error}>
             {(id) =>
               elevenVoices.items.length > 0 ? (

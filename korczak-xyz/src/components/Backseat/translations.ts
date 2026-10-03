@@ -94,6 +94,11 @@ export const translations = {
     voiceEngine: 'Spoken by',
     voiceEngineDevice: 'This device (free)',
     voiceEngineElevenLabs: 'ElevenLabs (your key)',
+    voiceEngineLive: 'Gemini Live (looks and speaks in one go, fastest)',
+    voiceLiveNote:
+      'Gemini Live looks at the photo and answers in its own voice, so the vision model above is not used, only your Google key. The speed slider does not apply.',
+    voiceLiveModel: 'Gemini Live model',
+    voiceLiveVoice: 'Gemini voice',
     voiceDevice: 'Device voice',
     voiceDeviceDefault: 'Whatever the device picks',
     voiceDeviceEmpty: 'This browser lists no voices.',
@@ -223,6 +228,11 @@ export const translations = {
     voiceEngine: 'Mówi przez',
     voiceEngineDevice: 'To urządzenie (za darmo)',
     voiceEngineElevenLabs: 'ElevenLabs (twój klucz)',
+    voiceEngineLive: 'Gemini Live (patrzy i mówi naraz, najszybszy)',
+    voiceLiveNote:
+      'Gemini Live sam ogląda zdjęcie i odpowiada własnym głosem, więc model wizyjny powyżej nie jest używany, tylko klucz Google. Suwak tempa tu nie działa.',
+    voiceLiveModel: 'Model Gemini Live',
+    voiceLiveVoice: 'Głos Gemini',
     voiceDevice: 'Głos urządzenia',
     voiceDeviceDefault: 'Co urządzenie wybierze',
     voiceDeviceEmpty: 'Ta przeglądarka nie podaje żadnych głosów.',
