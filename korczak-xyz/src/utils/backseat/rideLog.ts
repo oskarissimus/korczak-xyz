@@ -50,6 +50,14 @@ export interface RoundRecord {
   error: string | null;
   /** The commit the page was built from, so a record can be read against the prompt of its day. */
   release: string;
+  /** The voice engine (and ElevenLabs model) that read it, for reading the timings. */
+  voice?: string;
+  /**
+   * Where the wait went, in ms from the snapshot: `visionMs` when the model answered,
+   * `firstSoundMs` when the voice was first heard, `doneMs` when it finished. Absent stages never
+   * happened.
+   */
+  timings?: { visionMs?: number; firstSoundMs?: number; doneMs?: number };
 }
 
 /** A ride's id: its start time, sortable and readable in a bucket listing. */

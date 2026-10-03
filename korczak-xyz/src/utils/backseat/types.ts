@@ -35,6 +35,13 @@ export type RemarkLanguage = 'en' | 'pl';
 
 export type VoiceEngine = 'device' | 'elevenlabs';
 
+/**
+ * Which ElevenLabs model reads the remark. Flash is the default since Oct 2026 because it starts
+ * speaking in a fraction of the time Multilingual v2 takes; v2 is kept for anybody who prefers its
+ * delivery and will wait for it. See `speech.ts`.
+ */
+export type ElevenModel = 'eleven_flash_v2_5' | 'eleven_multilingual_v2';
+
 export type CameraFacing = 'environment' | 'user';
 
 export interface BackseatConfig {
@@ -62,6 +69,8 @@ export interface BackseatConfig {
     deviceVoiceUri: string;
     /** ElevenLabs only. */
     voiceId: string;
+    /** ElevenLabs only. */
+    elevenModel: ElevenModel;
     /** 0.5–2. Both engines take it, and both mean roughly the same thing by it. */
     rate: number;
   };
@@ -87,6 +96,8 @@ export interface Remark {
   at: number;
   /** Set when the remark was never spoken, and why. */
   error: string | null;
+  /** From the snapshot to the first sound, in ms. Null until the voice starts, or if it never does. */
+  latencyMs?: number | null;
 }
 
 /** A frame on its way to a model: a data URL for the `<img>` half and the parts a provider wants. */

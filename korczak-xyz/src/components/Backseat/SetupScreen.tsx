@@ -42,6 +42,7 @@ import type {
   Persona,
   RemarkLanguage,
   VisionProvider,
+  ElevenModel,
   VoiceEngine,
 } from '../../utils/backseat/types';
 import { accountPath } from '../../utils/accountKeys/keys';
@@ -385,6 +386,22 @@ export default function SetupScreen({
             />
           )}
         </Row>
+
+        {usingElevenLabs && (
+          <Row label={t.voiceElevenModel} hint={t.voiceElevenModelHint}>
+            {(id) => (
+              <Select<ElevenModel>
+                id={id}
+                value={config.voice.elevenModel}
+                options={[
+                  { value: 'eleven_flash_v2_5', label: t.voiceElevenModelFlash },
+                  { value: 'eleven_multilingual_v2', label: t.voiceElevenModelMultilingual },
+                ]}
+                onChange={(value) => update({ voice: { ...config.voice, elevenModel: value } })}
+              />
+            )}
+          </Row>
+        )}
 
         {usingElevenLabs ? (
           <Row label={t.voiceElevenLabs} error={elevenVoices.error}>

@@ -51,6 +51,9 @@ export interface SpeakOptions {
   lang: string;
   rate: number;
   signal?: AbortSignal;
+  /** Called when the sound starts — the end of the wait the ride measures. May fire again after a
+   * stall; the caller keeps the first. */
+  onStart?: () => void;
 }
 
 /** What the settings screen shows in the device-voice dropdown. */
@@ -250,6 +253,7 @@ function speakWithDevice(options: SpeakOptions, voiceUri: string): Promise<void>
     };
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
+    utterance.onstart = () => options.onStart?.();
     utterance.onend = () => finish();
     // `interrupted` and `canceled` arrive here too, and both are ordinary: they are what a Stop
     // button produces. Only a genuine synthesis failure is worth reporting.
@@ -290,25 +294,41 @@ export function splitSpeed(rate: number): { speed: number; playbackRate: number 
 }
 
 /**
+ * The clip's encoding. 64 kbps rather than their default 128: a remark is a voice in a car, and
+ * half the bytes is half the download on mobile data before the first word can play.
+ */
+export const ELEVENLABS_OUTPUT_FORMAT = 'mp3_44100_64';
+
+/**
  * ElevenLabs, for anybody who wants the passenger to sound like a person.
  *
  * The plain `/text-to-speech/{voice}` endpoint, not sloper's `/with-timestamps`: that one exists
  * to hold a picture for exactly as long as the narration, and nothing here is timed against
  * anything. What comes back is an MP3, played through the one unlocked element at the top of this
  * file — never a fresh `new Audio()`, for the reason given there.
+ *
+ * The model is `eleven_flash_v2_5` unless the settings say otherwise. Multilingual v2, which this
+ * shipped on, generates the whole sentence at its slowest model's pace before a byte comes back;
+ * Flash is their low-latency model, speaks Polish, and takes the same voices and `speed`.
  */
-async function speakWithElevenLabs(options: SpeakOptions, apiKey: string, voiceId: string) {
+async function speakWithElevenLabs(
+  options: SpeakOptions,
+  apiKey: string,
+  voiceId: string,
+  model: string,
+) {
   const { speed, playbackRate } = splitSpeed(options.rate);
 
   const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}` +
+      `?output_format=${ELEVENLABS_OUTPUT_FORMAT}`,
     {
       method: 'POST',
       headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
       signal: options.signal,
       body: JSON.stringify({
         text: options.text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: model,
         voice_settings: { stability: 0.4, similarity_boost: 0.75, speed },
       }),
     },
@@ -356,6 +376,7 @@ async function speakWithElevenLabs(options: SpeakOptions, apiKey: string, voiceI
       };
       options.signal?.addEventListener('abort', onAbort, { once: true });
 
+      player.onplaying = () => options.onStart?.();
       player.onended = () => finish();
       player.onerror = () => finish(new Error('The voice clip would not play.'));
 
@@ -370,6 +391,7 @@ async function speakWithElevenLabs(options: SpeakOptions, apiKey: string, voiceI
   } finally {
     // The element outlives the clip, so its handlers have to be taken off or the next clip
     // resolves the previous one's promise.
+    player.onplaying = null;
     player.onended = null;
     player.onerror = null;
     // Always, including on an abort: one object URL per remark for an hour is a leak nobody would
@@ -383,7 +405,7 @@ export function speak(config: BackseatConfig, options: SpeakOptions): Promise<vo
   if (config.voice.engine === 'elevenlabs') {
     const key = config.apiKeys.elevenLabs;
     if (!key) return Promise.reject(new Error('No ElevenLabs key.'));
-    return speakWithElevenLabs(options, key, config.voice.voiceId);
+    return speakWithElevenLabs(options, key, config.voice.voiceId, config.voice.elevenModel);
   }
   return speakWithDevice(options, config.voice.deviceVoiceUri);
 }

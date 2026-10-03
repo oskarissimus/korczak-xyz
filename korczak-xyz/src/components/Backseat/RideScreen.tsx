@@ -133,6 +133,17 @@ export default function RideScreen({
             {remarks.map((remark) => (
               <li key={remark.id} className="bks-log-item">
                 <span className="bks-log-time">{timeOf(remark.at)}</span>
+                {/* How long the photograph waited for a voice: the number the passenger's timing
+                    lives on, on the screen so a ride shows whether a change made it better. */}
+                {typeof remark.latencyMs === 'number' && (
+                  <span className="bks-log-latency" title={t.remarkLatency}>
+                    {(remark.latencyMs / 1000).toLocaleString(localeOf(lang), {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                    s
+                  </span>
+                )}
                 <span className="bks-log-text">{remark.text}</span>
                 {/* A line that was written but never heard. Said in words, because "it is grey"
                     is not a message. */}

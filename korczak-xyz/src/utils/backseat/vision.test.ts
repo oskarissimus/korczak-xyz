@@ -289,4 +289,52 @@ describe('googleGeneration', () => {
     expect(googleGeneration('gemini-2.5-pro').maxOutputTokens).toBe(2048);
     expect(googleGeneration('gemma-3-27b-it')).not.toHaveProperty('thinkingConfig');
   });
+
+  /* Oct 2026: thinking was most of the wait between the photograph and the voice. */
+  it('asks a 3.x Flash to think minimally, and Pro still on low', () => {
+    expect(googleGeneration('gemini-3.8-flash')).toMatchObject({
+      thinkingConfig: { thinkingLevel: 'minimal' },
+    });
+    expect(googleGeneration('gemini-flash-latest')).toMatchObject({
+      thinkingConfig: { thinkingLevel: 'minimal' },
+    });
+    expect(googleGeneration('gemini-3-pro-preview')).toMatchObject({
+      thinkingConfig: { thinkingLevel: 'low' },
+    });
+  });
+
+  it('asks again on low when a Flash refuses minimal, and remembers it', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({ error: { message: 'thinking_level minimal is not supported' } }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ candidates: [{ content: { parts: [{ text: 'Hej.' }] } }] }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = {
+      provider: 'google' as const,
+      apiKey: 'k',
+      model: 'gemini-3.9-flash',
+      system: 's',
+      user: 'u',
+      frame,
+    };
+    expect(await askForRemark(request)).toBe('Hej.');
+    const level = (call: number) =>
+      JSON.parse(fetchMock.mock.calls[call][1].body).generationConfig.thinkingConfig.thinkingLevel;
+    expect(level(0)).toBe('minimal');
+    expect(level(1)).toBe('low');
+
+    await askForRemark(request);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(level(2)).toBe('low');
+  });
 });

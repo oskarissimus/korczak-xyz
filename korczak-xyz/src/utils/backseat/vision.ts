@@ -137,6 +137,22 @@ export function isGemma(model: string): boolean {
  * thinking model gets room to think and still finish the sentence. `sanitizeRemark` caps the
  * length that is spoken either way; the token cap here was only ever a backstop.
  */
+/**
+ * Flash models in the 3 family that have not refused `thinkingLevel: 'minimal'`.
+ *
+ * Thinking is most of the wait between the photograph and the voice: on `low`, a 3.x Flash thinks
+ * for a second or two before writing an eighteen-word sentence, and the joke does not get better
+ * for it — the angle, the persona and the banned shapes are all in the prompt already. `minimal`
+ * is the Flash family's near-off. Pro does not take it, and a Flash that answers it with a 400 is
+ * remembered here for the rest of the tab and asked again on `low` (`askGoogle`), so a model
+ * Google ships without `minimal` costs one retried round rather than a ride of failures.
+ */
+const NO_MINIMAL = new Set<string>();
+
+export function thinksMinimally(model: string): boolean {
+  return /^gemini-([3-9][\d.]*-flash|flash(-lite)?-latest)/.test(model) && !NO_MINIMAL.has(model);
+}
+
 export function googleGeneration(model: string): Record<string, unknown> {
   const base = { temperature: GOOGLE_TEMPERATURE };
   if (isGemma(model)) return { ...base, maxOutputTokens: MAX_TOKENS };
@@ -148,13 +164,34 @@ export function googleGeneration(model: string): Record<string, unknown> {
     return { ...base, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 128 } };
   }
   if (/^gemini-([3-9]|\w+-latest)/.test(model)) {
-    // The 3 family takes a level rather than a budget, and an alias may be any of them.
-    return { ...base, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'low' } };
+    // The 3 family takes a level rather than a budget, and an alias may be any of them. A Flash
+    // goes to `minimal`, which is the latency fix of Oct 2026 — see `thinksMinimally`.
+    const level = thinksMinimally(model) ? 'minimal' : 'low';
+    return { ...base, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: level } };
   }
   return { ...base, maxOutputTokens: 2048 };
 }
 
 async function askGoogle(request: VisionRequest): Promise<string> {
+  try {
+    return await askGoogleOnce(request);
+  } catch (e) {
+    // A Flash that will not think minimally says so with a 400 naming the field; ask it again the
+    // way every 3.x model accepts, and never ask it for `minimal` again in this tab.
+    if (
+      e instanceof VisionError &&
+      e.status === 400 &&
+      thinksMinimally(request.model) &&
+      /thinking/i.test(e.message)
+    ) {
+      NO_MINIMAL.add(request.model);
+      return askGoogleOnce(request);
+    }
+    throw e;
+  }
+}
+
+async function askGoogleOnce(request: VisionRequest): Promise<string> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(request.model)}` +
     `:generateContent?key=${encodeURIComponent(request.apiKey)}`;

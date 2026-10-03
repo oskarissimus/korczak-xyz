@@ -44,6 +44,14 @@ describe('normalizeConfig', () => {
     });
     expect(config.voice.engine).toBe('elevenlabs');
     expect(config.voice.rate).toBeCloseTo(1.3);
+    // Saved before the model was a setting: Flash, the fast one.
+    expect(config.voice.elevenModel).toBe('eleven_flash_v2_5');
+    expect(
+      normalizeConfig({ voice: { elevenModel: 'eleven_multilingual_v2' } }).voice.elevenModel,
+    ).toBe('eleven_multilingual_v2');
+    expect(normalizeConfig({ voice: { elevenModel: 'nope' } }).voice.elevenModel).toBe(
+      'eleven_flash_v2_5',
+    );
     expect(config.camera.facing).toBe('user');
   });
 

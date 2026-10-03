@@ -47,6 +47,34 @@ Two things about Gemma on Google's API that Gemini does not share:
   first, because the first entry is what the setup sheet picks when the saved model is not on
   offer.
 
+### The wait from photograph to voice is measured, and was cut in Oct 2026
+
+The joke is about a moment that is already behind the car, so the seconds between the snapshot and
+the first word are the app's quality, not a performance detail. Before Oct 2026 the owner's setup
+(Gemini 3.8 Flash on `thinkingLevel: 'low'`, ElevenLabs `eleven_multilingual_v2`, full MP3 before
+playback) took roughly 4–6 s, read off the saved rounds: the `.json` lands after the clip ends,
+about 10.5–12.8 s after `at`, of which a ~110-character Polish sentence is 6–7 s of audio. Two
+changes, both one call each, no new provider:
+
+- **A 3.x Flash thinks `minimal`, not `low`** (`thinksMinimally`). The prompt already carries the
+  angle and the banned shapes; the thinking bought latency, not jokes. Pro does not take `minimal`;
+  a Flash that answers it with a 400 naming thinking is asked again on `low` and remembered for the
+  tab, so one retried round is the worst case.
+- **ElevenLabs reads with `eleven_flash_v2_5` by default** (`voice.elevenModel`, a setting — v2 is
+  one select away for anybody who prefers its delivery), at `mp3_44100_64`.
+
+Every round now carries `timings` in its saved record (`visionMs`, `firstSoundMs`, `doneMs`, all
+from `at`) and sends one `backseat.round` measurement to Sentry Logs (numbers and categories, never
+the remark). The ride screen shows the photo-to-first-word seconds beside each remark.
+
+**Not done, and why:** a single call that returns speech (Gemini Live native audio, OpenAI
+realtime). It would give up the chosen ElevenLabs voice, and the text would only exist as a
+transcript of audio already playing — so `sanitizeRemark` and the repeat drop could not stop a
+stage direction or a repeated line before it was heard. Streaming the MP3 into the element
+(MediaSource) was also left out: iOS has only `ManagedMediaSource`, nothing here can be tested on
+an iPhone, and a Flash clip for one sentence is small. Read the measurements before reaching for
+either.
+
 ### The sentence that has to stay on the screen
 
 This app puts a synthetic voice in a moving car saying things like "watch out for that truck" about

@@ -31,6 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { describeError, log } from '../lib/logger';
+import { recordMeasurement } from '../lib/sentry';
 import { canStart, speechLocale } from '../utils/backseat/defaults';
 import {
   cameraConstraints,
@@ -270,8 +271,35 @@ export function useBackseatRide(
       outcome: 'failed',
       error: null,
       release: RELEASE,
+      voice:
+        settings.voice.engine === 'elevenlabs'
+          ? `elevenlabs:${settings.voice.elevenModel}`
+          : 'device',
+      timings: {},
     };
-    const save = () => saveRound(uidRef.current, record, frame);
+    const timings = record.timings!;
+    const since = () => Date.now() - startedAt;
+    const save = () => {
+      saveRound(uidRef.current, record, frame);
+      // The wait from photograph to voice, which is what the passenger's timing lives or dies
+      // on: one measurement per round, numbers and categories only — never the remark.
+      recordMeasurement('backseat.round', {
+        outcome: record.outcome,
+        provider: record.provider,
+        model: record.model,
+        voice: record.voice,
+        lang: record.lang,
+        visionMs: timings.visionMs,
+        firstSoundMs: timings.firstSoundMs,
+        ttsMs:
+          timings.firstSoundMs !== undefined && timings.visionMs !== undefined
+            ? timings.firstSoundMs - timings.visionMs
+            : undefined,
+        doneMs: timings.doneMs,
+        chars: record.text?.length,
+        frameBytes: Math.round((frame.base64.length * 3) / 4),
+      });
+    };
 
     try {
       const raw = await askForRemark({
@@ -284,6 +312,7 @@ export function useBackseatRide(
         signal: visionController.signal,
       });
       record.raw = raw;
+      timings.visionMs = since();
 
       if (!runningRef.current) return;
       failuresRef.current = 0;
@@ -315,7 +344,17 @@ export function useBackseatRide(
           lang: speechLocale(langRef.current),
           rate: settings.voice.rate,
           signal: speechController.signal,
+          onStart: () => {
+            if (timings.firstSoundMs !== undefined) return;
+            timings.firstSoundMs = since();
+            const latencyMs = timings.firstSoundMs;
+            historyRef.current = historyRef.current.map((r) =>
+              r.id === remark.id ? { ...r, latencyMs } : r,
+            );
+            setRemarks([...historyRef.current].reverse());
+          },
         });
+        timings.doneMs = since();
       } catch (e) {
         /*
          * The remark exists and is on the screen; only the voice failed. It is marked on the line

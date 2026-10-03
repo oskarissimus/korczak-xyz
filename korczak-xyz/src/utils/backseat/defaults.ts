@@ -19,6 +19,7 @@ import type {
   ApiKeys,
   BackseatConfig,
   CameraFacing,
+  ElevenModel,
   Intensity,
   KeyName,
   Persona,
@@ -83,6 +84,7 @@ export const DEFAULT_CONFIG: BackseatConfig = {
     // ElevenLabs' own "Rachel". Only read when the engine is theirs, and replaced the moment
     // somebody picks a voice from their account.
     voiceId: '21m00Tcm4TlvDq8ikWAM',
+    elevenModel: 'eleven_flash_v2_5',
     rate: 1,
   },
   camera: { facing: 'environment' },
@@ -91,6 +93,7 @@ export const DEFAULT_CONFIG: BackseatConfig = {
 const VISION_PROVIDERS: readonly VisionProvider[] = ['openai', 'google'];
 const VOICE_ENGINES: readonly VoiceEngine[] = ['device', 'elevenlabs'];
 const FACINGS: readonly CameraFacing[] = ['environment', 'user'];
+export const ELEVEN_MODELS: readonly ElevenModel[] = ['eleven_flash_v2_5', 'eleven_multilingual_v2'];
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -164,6 +167,7 @@ export function normalizeConfig(value: unknown): BackseatConfig {
       engine: asOneOf(voice.engine, VOICE_ENGINES, DEFAULT_CONFIG.voice.engine),
       deviceVoiceUri: asString(voice.deviceVoiceUri, DEFAULT_CONFIG.voice.deviceVoiceUri),
       voiceId: asString(voice.voiceId, DEFAULT_CONFIG.voice.voiceId),
+      elevenModel: asOneOf(voice.elevenModel, ELEVEN_MODELS, DEFAULT_CONFIG.voice.elevenModel),
       rate: asNumber(voice.rate, DEFAULT_CONFIG.voice.rate, 0.5, 2),
     },
     camera: {

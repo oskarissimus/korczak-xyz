@@ -98,6 +98,10 @@ export const translations = {
     voiceDeviceDefault: 'Whatever the device picks',
     voiceDeviceEmpty: 'This browser lists no voices.',
     voiceElevenLabs: 'ElevenLabs voice',
+    voiceElevenModel: 'ElevenLabs model',
+    voiceElevenModelHint: 'Flash starts talking sooner; Multilingual v2 is a little richer and slower.',
+    voiceElevenModelFlash: 'Flash v2.5 (fast)',
+    voiceElevenModelMultilingual: 'Multilingual v2 (slower)',
     voiceElevenLabsLoading: 'Asking for your voices…',
     voiceElevenLabsEmpty: 'Enter a key to list your voices',
     voiceRate: 'Speed: {value}×',
@@ -126,6 +130,7 @@ export const translations = {
     remarksTitle: 'Already said',
     remarksEmpty: 'Nothing yet.',
     remarkFailed: 'not spoken',
+    remarkLatency: 'From the photo to the first word',
     cameraStarting: 'Asking for the camera…',
 
     // Blockers
@@ -222,6 +227,10 @@ export const translations = {
     voiceDeviceDefault: 'Co urządzenie wybierze',
     voiceDeviceEmpty: 'Ta przeglądarka nie podaje żadnych głosów.',
     voiceElevenLabs: 'Głos ElevenLabs',
+    voiceElevenModel: 'Model ElevenLabs',
+    voiceElevenModelHint: 'Flash zaczyna mówić szybciej; Multilingual v2 brzmi nieco bogaciej i wolniej.',
+    voiceElevenModelFlash: 'Flash v2.5 (szybki)',
+    voiceElevenModelMultilingual: 'Multilingual v2 (wolniejszy)',
     voiceElevenLabsLoading: 'Pytam o twoje głosy…',
     voiceElevenLabsEmpty: 'Wpisz klucz, żeby zobaczyć swoje głosy',
     voiceRate: 'Tempo: {value}×',
@@ -247,6 +256,7 @@ export const translations = {
     remarksTitle: 'Już powiedziane',
     remarksEmpty: 'Jeszcze nic.',
     remarkFailed: 'niewypowiedziane',
+    remarkLatency: 'Od zdjęcia do pierwszego słowa',
     cameraStarting: 'Proszę o kamerę…',
 
     needKey: 'Wpisz klucz do wybranego dostawcy, zanim ruszysz.',
