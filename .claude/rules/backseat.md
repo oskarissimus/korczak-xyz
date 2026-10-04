@@ -97,13 +97,28 @@ chain at all. What it costs, and why it is a third engine rather than the defaul
   round (`live.retry`, `live.retried`), and every round saves `events` (each server message's
   `messageKinds`, timed), `live.early` (anything the session received before the frame was sent),
   `live.close` and `live.usage`. Read those before touching the prewarm.
-- **The second ride (16:39, with those events) named the cause: nothing reached the model.** Every
-  round, fresh session or prepared, got `generationComplete` + `turnComplete` + an empty
-  `usageMetadata` 0.6–0.8 s after the send — no tokens in, nothing out. The frame and the line had
-  gone as a `clientContent` turn, which is Live's channel for seeding history, not for a turn to
-  be answered. They now go as `realtimeInput` (`video`, then `text`). An answer with no audio and
-  no text is a `VisionError` from then on: the banner says so and three in a row stop the ride,
-  rather than a counter that climbs and then silence.
+- **The second ride (16:39) showed an empty `usageMetadata`, and that was misread.** f693a03 moved the
+  frame to `realtimeInput` on the theory that `clientContent` never reached the model. An
+  end-to-end test the next day (4 Oct, the owner's key from Firestore, the real system prompt, a
+  synthetic road JPEG, from the container) proved it wrong both ways: in `realtimeInput` the model
+  never sees the frame (usage counts no IMAGE tokens, and it invents a bend); in `clientContent`
+  it does. **The empty turns were the model plus `thinkingBudget: 0`:**
+  `gemini-2.5-flash-native-audio-preview-09-2025` answered this prompt with an empty turn every
+  time thinking was turned off, and spoke (after ~3 s of thinking) every time it was not. With a
+  one-line prompt it spoke either way, which is why a quick check would not have caught it.
+- **`gemini-3.1-flash-live-preview` is the default since then** (`DEFAULT_LIVE_MODEL`; configs on
+  the old one move once in `normalizeConfig`). In the same test: ten of ten answered, first audio
+  0.75–1.0 s after the send on a set-up session, 1.2–1.6 s including setup. `thinkingBudget: 0` is
+  sent only to `flash-live` models (`wantsThinkingOff`). The model list drops transcribers,
+  translators, robotics and extended-thinking models and ranks `flash-live` first.
+- **One answer in about ten is words with no sound** — a transcript and `turnComplete` in one
+  message, no audio chunk. The phone's synthesiser then reads the transcript
+  (`live.deviceFallback`) rather than losing the round. A wholly empty answer is asked again once
+  on a fresh session, then raised in the banner.
+- Each Live record also carries `live.input`, `live.thinkingOff`, `live.audioChunks` and
+  `live.audioSeconds`. The test harness was the app's own `live.ts` under `tsx`, with `ws` behind
+  the proxy (`binaryType = 'arraybuffer'`, since `ws` hands over Buffers where a browser hands
+  Blobs) and a counting stand-in for `AudioContext`.
 - For comparison, the same day's two-step ride (Gemini 3.8 Flash on `minimal` + ElevenLabs Flash):
   `vision.body` 1.8–2.6 s, first sound 2.3–3.0 s (4.5 s on the first round, a cold TTS
   connection).

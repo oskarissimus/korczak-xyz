@@ -451,6 +451,10 @@ export function useBackseatRide(
                   }
                 : null,
               usage: session.usage,
+              input: 'clientContent',
+              thinkingOff: session.thinkingOff,
+              audioChunks: session.audioChunks,
+              audioSeconds: Math.round(session.audioSeconds * 100) / 100,
             };
           }
         };
@@ -467,11 +471,35 @@ export function useBackseatRide(
            * answer from a prepared session is asked again on a fresh one in the same round, and
            * both are on the record (`live.retry`, `live.retried`).
            */
-          if (prepared && !answer.spoke && !answer.text && runningRef.current) {
+          if (!answer.spoke && !answer.text && runningRef.current) {
             mark('live.retry');
             events.push([since(), '— retry on a fresh session —']);
             answer = await askOn(prepareLive({ ...liveSettings, system }), false);
             record.live = { ...record.live!, retried: true };
+          }
+          /*
+           * Words with no sound: the 4 Oct test saw it once in ten on a Live model, a full
+           * transcript and not one audio chunk. The sentence exists, so the phone's own
+           * synthesiser says it rather than the round being lost.
+           */
+          if (!answer.spoke && answer.text && runningRef.current) {
+            mark('live.deviceFallback');
+            const fallbackText = sanitizeRemark(answer.text) || answer.text;
+            show({ text: fallbackText });
+            setSpeaking(true);
+            await speak(
+              { ...settings, voice: { ...settings.voice, engine: 'device' } },
+              {
+                text: fallbackText,
+                lang: speechLocale(langRef.current),
+                rate: settings.voice.rate,
+                signal: speechController.signal,
+                onMark: mark,
+                onStart: () => show({ latencyMs: heard() }),
+              },
+            ).catch((e) => log.warn('backseat.live.fallback.failed', describeError(e)));
+            answer = { ...answer, spoke: timings.firstSoundMs !== undefined };
+            record.live = { ...record.live!, deviceFallback: true };
           }
           if (!answer.spoke && !answer.text && runningRef.current) {
             // Silence with no error is the one thing nobody can see from the driver's seat: it

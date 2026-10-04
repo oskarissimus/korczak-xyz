@@ -81,6 +81,14 @@ export interface RoundRecord {
     usage: unknown;
     /** The prepared session answered with nothing, and a fresh one was asked instead. */
     retried?: boolean;
+    /** Had words but no sound, and the phone's synthesiser read the transcript. */
+    deviceFallback?: boolean;
+    /** How the frame went: `clientContent` (the only channel in which the model sees it). */
+    input?: string;
+    /** Whether `setup` carried `thinkingBudget: 0`. */
+    thinkingOff?: boolean;
+    audioChunks?: number;
+    audioSeconds?: number;
   };
   /** `navigator.connection.effectiveType` where the browser has it. */
   network?: string;

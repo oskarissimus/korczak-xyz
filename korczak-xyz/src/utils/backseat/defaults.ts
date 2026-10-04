@@ -68,10 +68,16 @@ export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash-lite';
 export const FIRST_GOOGLE_MODEL = 'gemma-3-27b-it';
 
 /**
- * The guess before the model list has come back. Replaced by the first native-audio model the key
- * can reach (`filterLiveModels` in `live.ts`), so a rename on Google's side costs one list fetch, not a fix.
+ * The Live model a setup starts on, chosen by an end-to-end test on 4 Oct 2026 with the owner's
+ * key and the real system prompt (`backseat.md`, *Gemini Live*): ten of ten remarks answered,
+ * first audio 0.75–1.0 s after the frame was sent. `FIRST_LIVE_MODEL` answered the same prompt
+ * with an empty turn every time once `thinkingBudget: 0` was set, and is moved off once by
+ * `normalizeConfig`.
  */
-export const DEFAULT_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+export const DEFAULT_LIVE_MODEL = 'gemini-3.1-flash-live-preview';
+
+/** The Live default for its first day, which never spoke with this app's prompt. */
+export const FIRST_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 export const DEFAULT_LIVE_VOICE = 'Kore';
 
@@ -142,6 +148,11 @@ export function normalizeApiKeys(value: unknown): ApiKeys {
   return keys;
 }
 
+function liveModelFrom(value: unknown): string {
+  const model = asString(value, DEFAULT_LIVE_MODEL);
+  return model === '' || model === FIRST_LIVE_MODEL ? DEFAULT_LIVE_MODEL : model;
+}
+
 export function normalizeConfig(value: unknown): BackseatConfig {
   const raw = asRecord(value);
   const vision = asRecord(raw.vision);
@@ -178,7 +189,7 @@ export function normalizeConfig(value: unknown): BackseatConfig {
       deviceVoiceUri: asString(voice.deviceVoiceUri, DEFAULT_CONFIG.voice.deviceVoiceUri),
       voiceId: asString(voice.voiceId, DEFAULT_CONFIG.voice.voiceId),
       elevenModel: asOneOf(voice.elevenModel, ELEVEN_MODELS, DEFAULT_CONFIG.voice.elevenModel),
-      liveModel: asString(voice.liveModel, DEFAULT_CONFIG.voice.liveModel) || DEFAULT_LIVE_MODEL,
+      liveModel: liveModelFrom(voice.liveModel),
       liveVoice: asString(voice.liveVoice, DEFAULT_CONFIG.voice.liveVoice) || DEFAULT_LIVE_VOICE,
       rate: asNumber(voice.rate, DEFAULT_CONFIG.voice.rate, 0.5, 2),
     },

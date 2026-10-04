@@ -93,17 +93,42 @@ const ANSWER_TIMEOUT_MS = 20000;
  * first — it is the one that speaks rather than reading its own text aloud — and newest first
  * within each, by name, which is how Google dates them.
  */
+/**
+ * `bidiGenerateContent` is also how Google serves models that cannot be this passenger at all —
+ * a transcriber, a translator, a robot planner — and a model that thinks at length before it
+ * speaks, which defeats the point. They are left off the list.
+ */
+const NOT_A_PASSENGER = ['transcribe', 'translate', 'robotics', 'extended-thinking'];
+
+/**
+ * Ranked by what the 4 Oct 2026 test found: a `flash-live` model first (it answered every time,
+ * fastest), then the other `live` models, then native audio, newest name first within each.
+ */
+function liveRank(id: string): number {
+  if (id.includes('flash-live')) return 0;
+  if (id.includes('-live')) return 1;
+  if (id.includes('native-audio')) return 2;
+  return 3;
+}
+
 export function filterLiveModels(
   models: { name: string; supportedGenerationMethods?: string[] }[],
 ): string[] {
   return models
     .filter((m) => m.supportedGenerationMethods?.includes('bidiGenerateContent'))
     .map((m) => m.name.replace('models/', ''))
-    .sort((a, b) => {
-      const na = a.includes('native-audio') ? 0 : 1;
-      const nb = b.includes('native-audio') ? 0 : 1;
-      return na - nb || b.localeCompare(a);
-    });
+    .filter((id) => !NOT_A_PASSENGER.some((bad) => id.includes(bad)))
+    .sort((a, b) => liveRank(a) - liveRank(b) || b.localeCompare(a));
+}
+
+/**
+ * Whether to send `thinkingBudget: 0` in `setup`. Only to a `flash-live` model, where the test
+ * showed it changes nothing for the worse: the 09-2025 native-audio model answered this prompt
+ * with an empty turn every time it was sent, and spoke (after thinking for three seconds) every
+ * time it was not.
+ */
+export function wantsThinkingOff(model: string): boolean {
+  return model.includes('flash-live');
 }
 
 export async function fetchLiveModels(
@@ -310,16 +335,23 @@ export class LiveSession {
   readonly early: string[] = [];
   /** The last `usageMetadata` the server sent. */
   usage: unknown = null;
+  /** Whether `setup` asked for no thinking (`wantsThinkingOff`). */
+  thinkingOff = false;
+  /** Audio received for the remark: chunks, and seconds of sound. */
+  audioChunks = 0;
+  audioSeconds = 0;
 
   constructor(settings: LiveSettings) {
     this.settings = settings;
-    this.ready = this.open(!NO_THINKING_CONFIG.has(settings.model)).catch(async (e) => {
+    this.thinkingOff = wantsThinkingOff(settings.model) && !NO_THINKING_CONFIG.has(settings.model);
+    this.ready = this.open(this.thinkingOff).catch(async (e) => {
       if (
         e instanceof VisionError &&
         /thinking/i.test(e.message) &&
         !NO_THINKING_CONFIG.has(settings.model)
       ) {
         NO_THINKING_CONFIG.add(settings.model);
+        this.thinkingOff = false;
         return this.open(false);
       }
       throw e;
@@ -550,6 +582,8 @@ export class LiveSession {
             source.start(playAt);
             playAt += buffer.duration;
             sources.push(source);
+            this.audioChunks += 1;
+            this.audioSeconds += buffer.duration;
             if (!started) {
               started = true;
               request.onMark?.('live.firstAudio');
@@ -571,25 +605,26 @@ export class LiveSession {
         };
 
         /*
-         * As realtime input, not `clientContent`. The first two Live rides sent the frame and the
-         * line as one `clientContent` turn, and from the second remark on (and on every remark of
-         * the second ride, fresh sessions included) the native-audio model answered with
-         * `generationComplete` + `turnComplete` and an empty `usageMetadata` within a second: no
-         * tokens in, nothing out. `clientContent` is Live's channel for seeding history; a turn
-         * the model is meant to answer goes in `realtimeInput`, the frame as `video` and then the
-         * line as `text`, in that order on the one socket.
+         * One `clientContent` turn with the frame and the line. Tested end to end on 4 Oct 2026:
+         * sent as `realtimeInput` instead (`video`, then `text`) the model answered without ever
+         * seeing the frame — `usageMetadata` counted text tokens and no image — and invented a
+         * bend that was not there. In `clientContent` the image is counted (258 or 1064 tokens,
+         * by model). The empty answers the first rides got were the model and `thinkingBudget: 0`
+         * (`wantsThinkingOff`), not this channel; f693a03 moved it here by mistake for a day.
          */
-        request.onMark?.('live.sent');
+        const parts: Record<string, unknown>[] = [];
         if (request.frame) {
-          this.socket?.send(
-            JSON.stringify({
-              realtimeInput: {
-                video: { mimeType: request.frame.mimeType, data: request.frame.base64 },
-              },
-            }),
-          );
+          parts.push({
+            inlineData: { mimeType: request.frame.mimeType, data: request.frame.base64 },
+          });
         }
-        this.socket?.send(JSON.stringify({ realtimeInput: { text: request.user } }));
+        parts.push({ text: request.user });
+        request.onMark?.('live.sent');
+        this.socket?.send(
+          JSON.stringify({
+            clientContent: { turns: [{ role: 'user', parts }], turnComplete: true },
+          }),
+        );
       });
     } finally {
       this.listener = null;
