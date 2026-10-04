@@ -392,6 +392,14 @@ export class LiveSession {
                 temperature: LIVE_TEMPERATURE,
                 maxOutputTokens: LIVE_MAX_TOKENS,
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+                /*
+                 * MEDIUM reads the frame as ~266 tokens instead of 1064 on a flash-live model. On
+                 * 4 Oct 2026 it was measured beside the default and LOW (8 rounds each, real
+                 * prompt): first audio 769 ms against 816 ms — noise, not a speed-up — and 8/8
+                 * answered, where LOW (63 tokens) lost the sound twice. It is here for the
+                 * quota: a quarter of the input tokens for the same remarks.
+                 */
+                mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                 ...(withThinkingConfig ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
               },
               systemInstruction: { parts: [{ text: system }] },

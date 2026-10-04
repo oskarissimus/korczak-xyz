@@ -115,6 +115,15 @@ chain at all. What it costs, and why it is a third engine rather than the defaul
   message, no audio chunk. The phone's synthesiser then reads the transcript
   (`live.deviceFallback`) rather than losing the round. A wholly empty answer is asked again once
   on a fresh session, then raised in the banner.
+- **What does not make it faster (measured 4 Oct, flash-live, real prompt, from the container):**
+  the server's floor is ~0.75 s from the send to the first audio chunk, and none of the knobs
+  move it beyond noise. `mediaResolution` LOW (63 image tokens) / MEDIUM (266) / default (1064):
+  medians 776 / 769 / 816 ms; a 256px frame instead of 512px: no change (Google tiles it the same,
+  1064 tokens); a one-line prompt instead of the real one: ~100 ms faster, at the cost of every
+  clause in *The prompt is the app*. MEDIUM is set for the quota, not the speed. The audio is
+  already streamed (played from the first chunk) and the session already set up ahead, so what
+  is left is the phone's own network and the frame capture — read `trace.frame`, `live.ready` and
+  `live.sent` on a real ride before chasing anything else.
 - Each Live record also carries `live.input`, `live.thinkingOff`, `live.audioChunks` and
   `live.audioSeconds`. The test harness was the app's own `live.ts` under `tsx`, with `ws` behind
   the proxy (`binaryType = 'arraybuffer'`, since `ws` hands over Buffers where a browser hands
