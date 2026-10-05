@@ -34,7 +34,15 @@ export interface DemoSettings {
    * reads to the browser exactly like "off".
    */
   keyUid: string;
-  /** The model the demo runs on. Flash-Lite, because the demo is free and so is the quota. */
+  /**
+   * The model the demo runs on. Flash-Lite, because the demo is free and so is the quota.
+   *
+   * It is a field rather than a constant because Google retires these from under a key: the demo's
+   * first live call came back *"This model models/gemini-2.5-flash-lite is no longer available to
+   * new users"* (5 Oct 2026) although the apps' own default is still that name — availability is
+   * per project, and a key that has never called a model can be too late for it. So the model is
+   * one text field in the panel, changeable without a deploy, which is what that failure wanted.
+   */
   model: string;
   /** Per address, per app, per day. */
   perIpDaily: number;
@@ -58,7 +66,8 @@ export interface DemoSettings {
 export const DEMO_DEFAULTS: DemoSettings = {
   enabled: true,
   keyUid: '',
-  model: 'gemini-2.5-flash-lite',
+  // Google's own replacement for 2.5 Flash-Lite, named in the 400 that refused it.
+  model: 'gemini-3.5-flash-lite',
   perIpDaily: 15,
   perAppDaily: 400,
   apps: { backseat: true, roaster: true },

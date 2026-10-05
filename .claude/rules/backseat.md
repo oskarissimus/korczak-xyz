@@ -509,6 +509,13 @@ Everything about it follows from the fact that it is somebody else's key:
   (the per-app one). Checked in that order, because "you have had your go" and "the site has had
   its day" are different sentences. Defaults: 15 per device, 400 per app, per Warsaw day, 12s
   between remarks. The maxima a panel may set are in `demoLimits.ts`.
+- **The model is a field in the panel, not a constant**, and the first live demo call is why: it
+  came back *"This model models/gemini-2.5-flash-lite is no longer available to new users. Please
+  update your code to use models/gemini-3.5-flash-lite"* — on the same key the apps ride on, where
+  that name still works. **Availability is per project**, so a key that has never called a model
+  can be too late for it, and the apps only get away with `DEFAULT_GOOGLE_MODEL` because the model
+  list replaces a guess that is not on offer. The demo has no list to correct it, so the dial is
+  one text field and changing it needs no deploy.
 - **No IP is stored.** The counter's key is `sha256(day + ':' + ip)` truncated to 32 hex, with the
   day in the **salt** as well as in the path, so two days' documents cannot be joined up and
   nothing in the database says who was here. The only durable trace of a demo call is two integers
