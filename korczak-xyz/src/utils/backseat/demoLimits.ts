@@ -22,6 +22,20 @@
 /** Which app is asking. The same two flavours as `flavour.ts`. */
 export type DemoApp = 'backseat' | 'roaster';
 
+/**
+ * What kind of call is being counted. `remark` is one two-step answer (a frame in, a sentence
+ * out, the phone reads it). `live` is one Gemini Live session — a single-use token the browser
+ * opens a socket with, one remark spoken by the model itself. The roaster's demo is `live`.
+ *
+ * They are counted apart, against caps of their own, because they are not the same unit: the
+ * roaster's demo speaks every three seconds, so a cap sized for two-step remarks every twelve
+ * would end it in under a minute, and one sized for it would let the two-step demo run for an
+ * hour.
+ */
+export type DemoMode = 'remark' | 'live';
+
+export const DEMO_MODES: readonly DemoMode[] = ['remark', 'live'];
+
 export const DEMO_APPS: readonly DemoApp[] = ['backseat', 'roaster'];
 
 export interface DemoSettings {
@@ -52,6 +66,12 @@ export interface DemoSettings {
   apps: Record<DemoApp, boolean>;
   /** The floor the demo puts under the interval slider, in seconds. */
   minIntervalSeconds: number;
+  /** The Live model the roaster's one-button demo is set up on. */
+  liveModel: string;
+  /** Live sessions (one remark each) per address, per app, per day. */
+  livePerIpDaily: number;
+  /** Live sessions per app, per day, across everybody. */
+  livePerAppDaily: number;
 }
 
 /**
@@ -72,6 +92,16 @@ export const DEMO_DEFAULTS: DemoSettings = {
   perAppDaily: 400,
   apps: { backseat: true, roaster: true },
   minIntervalSeconds: 12,
+  /*
+   * The roaster's demo, at the owner's request: one button, Live, a remark every three seconds.
+   * A session is a remark, and at that pace a remark lands every four or five seconds once the
+   * speaking is counted — so 60 is about five minutes of being roasted, which is a demo, and 1500
+   * a day is twenty-odd people having that. `gemini-3.1-flash-live-preview` is the model the
+   * 4 Oct 2026 test settled on (ten of ten answered on the owner's key; `backseat.md`).
+   */
+  liveModel: 'gemini-3.1-flash-live-preview',
+  livePerIpDaily: 60,
+  livePerAppDaily: 1500,
 };
 
 /** The caps a panel may set. Above these the owner is not configuring a demo, they are donating. */
@@ -115,7 +145,24 @@ export function normalizeSettings(value: unknown): DemoSettings {
       1,
       MAX_MIN_INTERVAL,
     ),
+    liveModel: typeof raw.liveModel === 'string' && raw.liveModel.trim() !== ''
+      ? raw.liveModel.trim()
+      : DEMO_DEFAULTS.liveModel,
+    livePerIpDaily: asInt(raw.livePerIpDaily, DEMO_DEFAULTS.livePerIpDaily, 0, MAX_PER_IP_DAILY),
+    livePerAppDaily: asInt(
+      raw.livePerAppDaily,
+      DEMO_DEFAULTS.livePerAppDaily,
+      0,
+      MAX_PER_APP_DAILY,
+    ),
   };
+}
+
+/** The two caps that apply to a kind of call. */
+export function capsFor(settings: DemoSettings, mode: DemoMode): { ip: number; app: number } {
+  return mode === 'live'
+    ? { ip: settings.livePerIpDaily, app: settings.livePerAppDaily }
+    : { ip: settings.perIpDaily, app: settings.perAppDaily };
 }
 
 /** Why the demo said no. The browser turns each of these into one sentence. */
@@ -140,12 +187,14 @@ export function checkDemo(
   settings: DemoSettings,
   app: DemoApp,
   used: { ip: number; app: number },
+  mode: DemoMode = 'remark',
 ): DemoVerdict {
+  const caps = capsFor(settings, mode);
   if (!settings.enabled) return { ok: false, reason: 'disabled', status: 503 };
   if (!settings.keyUid) return { ok: false, reason: 'no-key', status: 503 };
   if (!settings.apps[app]) return { ok: false, reason: 'app-off', status: 503 };
-  if (used.ip >= settings.perIpDaily) return { ok: false, reason: 'ip-cap', status: 429 };
-  if (used.app >= settings.perAppDaily) return { ok: false, reason: 'app-cap', status: 429 };
+  if (used.ip >= caps.ip) return { ok: false, reason: 'ip-cap', status: 429 };
+  if (used.app >= caps.app) return { ok: false, reason: 'app-cap', status: 429 };
   return { ok: true };
 }
 
@@ -153,9 +202,11 @@ export function checkDemo(
 export function remaining(
   settings: DemoSettings,
   used: { ip: number; app: number },
+  mode: DemoMode = 'remark',
 ): { ip: number; app: number } {
+  const caps = capsFor(settings, mode);
   return {
-    ip: Math.max(0, settings.perIpDaily - used.ip),
-    app: Math.max(0, settings.perAppDaily - used.app),
+    ip: Math.max(0, caps.ip - used.ip),
+    app: Math.max(0, caps.app - used.app),
   };
 }

@@ -591,6 +591,61 @@
   padding: 8px 14px;
 }
 
+/* The roaster demo's language flag: on the ride screen because that demo has no settings, and
+   large enough to hit while the phone is held out at somebody. */
+.bks-lang {
+  align-self: flex-end;
+  font-size: 1.25rem;
+  padding: 8px 16px;
+  min-height: 48px;
+}
+
+/* The roaster's one-button demo: the whole sheet is one button and a sentence. */
+.bks-quick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.bks-quick-go {
+  font-size: 1.6rem;
+  padding: 22px 12px;
+  min-height: 84px;
+}
+
+.bks-quick-go:disabled {
+  color: var(--retro-dark-gray);
+  cursor: not-allowed;
+}
+
+.bks-quick-lang {
+  display: flex;
+  gap: 8px;
+}
+
+.bks-quick-lang .retro-btn {
+  flex: 1;
+  font-size: 1.1rem;
+  padding: 8px;
+}
+
+.bks-quick-lang .retro-btn[aria-pressed='true'] {
+  box-shadow: inset 1px 1px 0 var(--retro-dark-gray), inset -1px -1px 0 var(--retro-white);
+}
+
+.bks-linkish {
+  align-self: center;
+  background: none;
+  border: 0;
+  color: var(--retro-navy);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
 /*
  * Full screen: the island is the whole display, so it provides its own background — the page's is
  * behind it and not painted — and the remark takes the room the window chrome was using. The

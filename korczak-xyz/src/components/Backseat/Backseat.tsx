@@ -26,9 +26,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useBackseatConfig } from '../../hooks/useBackseatConfig';
 import { useBackseatRide } from '../../hooks/useBackseatRide';
-import { demoRestrictions, remarkLanguage } from '../../utils/backseat/defaults';
+import { demoRestrictions, quickRoastConfig, remarkLanguage } from '../../utils/backseat/defaults';
 import { fetchDemoStatus, type DemoStatus } from '../../utils/backseat/demo';
 import { FLAVOURS, type FlavourId } from '../../utils/backseat/flavour';
+import type { RemarkLanguage } from '../../utils/backseat/types';
+import QuickRoast from './QuickRoast';
 import RideScreen from './RideScreen';
 import SetupScreen from './SetupScreen';
 import { cameraMessage, forFlavour, type Lang, type Translation } from './translations';
@@ -65,26 +67,62 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
    * interval floor. Null means "not asked yet or cannot be asked", which the sheet reads as no
    * demo — a function that is down and a demo that is switched off are the same thing from here.
    */
+  const roaster = flavourId === 'roaster';
   const [demo, setDemo] = useState<DemoStatus | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchDemoStatus(flavourId, controller.signal).then((status) => {
-      if (!controller.signal.aborted) setDemo(status);
-    });
-    return () => controller.abort();
-  }, [flavourId]);
+  /*
+   * Which screen the roaster shows when it is not roasting: `auto` is the one-button demo for
+   * somebody with no key (or who chose the demo), the setup sheet for everybody else, and either
+   * can be asked for by name from the other.
+   */
+  const [view, setView] = useState<'auto' | 'quick' | 'setup'>('auto');
+  /** The one-button demo's language: the page's, until the flag is tapped. */
+  const [quickLang, setQuickLang] = useState<RemarkLanguage>(lang);
 
-  // What the ride actually runs on: the demo cannot lend a Live session and puts a floor under the
-  // interval (`demoRestrictions`). A pass-through when the demo is off.
-  const effective = demoRestrictions(config, demo?.minIntervalSeconds);
+  /*
+   * The roaster's demo is the one-button screen, not a fieldset on the setup sheet. It is offered
+   * while it is open and also once it has run out for this device or for today — then the button
+   * is greyed with the sentence why, which is better than the screen silently turning into a form
+   * asking for an API key.
+   */
+  const demoOffered =
+    roaster &&
+    demo !== null &&
+    (demo.available || demo.reason === 'ip-cap' || demo.reason === 'app-cap');
+  const quick =
+    demoOffered &&
+    (view === 'quick' || (view === 'auto' && (config.demoMode || !config.apiKeys.google)));
+
+  // The two-step demo cannot lend a Live session and puts a floor under the interval
+  // (`demoRestrictions`); the roaster's one-button demo is Live on tokens and sets everything
+  // itself (`quickRoastConfig`). A pass-through when neither is on.
+  const effective =
+    quick && demo
+      ? quickRoastConfig(config, { liveModel: demo.model, lang: quickLang })
+      : demoRestrictions(config, demo?.minIntervalSeconds);
   const ride = useBackseatRide(
     effective,
-    remarkLanguage(effective, lang),
+    quick ? quickLang : remarkLanguage(effective, lang),
     auth.user?.uid ?? null,
     flavour,
   );
 
   const riding = ride.status !== 'idle';
+
+  /*
+   * Asked again whenever a ride ends, so a demo that ran out mid-ride shows as spent rather than
+   * offering a button that will be refused. The roaster's demo is Live sessions, counted apart
+   * from the passenger's two-step remarks (`demoLimits.ts`), so it asks about those.
+   */
+  useEffect(() => {
+    if (riding) return;
+    const controller = new AbortController();
+    void fetchDemoStatus(flavourId, controller.signal, roaster ? 'live' : 'remark').then(
+      (status) => {
+        if (!controller.signal.aborted) setDemo(status);
+      },
+    );
+    return () => controller.abort();
+  }, [flavourId, roaster, riding]);
 
   /*
    * What goes full screen. The whole island rather than the preview: a full-screen viewfinder is
@@ -120,10 +158,13 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
   if (!ready) return <div className="bks-loading" />;
 
   const syncLabel =
-    sync === 'synced' ? t.syncSynced
-    : sync === 'syncing' ? t.syncSyncing
-    : sync === 'error' ? t.syncError
-    : t.syncLocal;
+    sync === 'synced'
+      ? t.syncSynced
+      : sync === 'syncing'
+        ? t.syncSyncing
+        : sync === 'error'
+          ? t.syncError
+          : t.syncLocal;
 
   return (
     <div className="bks-app" ref={appRef}>
@@ -143,6 +184,14 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
           pending={ride.pending}
           lastLatencyMs={ride.lastLatencyMs}
           demoRemaining={ride.demoRemaining}
+          language={
+            quick
+              ? {
+                  value: quickLang,
+                  onToggle: () => setQuickLang((l) => (l === 'pl' ? 'en' : 'pl')),
+                }
+              : undefined
+          }
           error={ride.error}
           cameraError={ride.cameraError}
           onStop={ride.stop}
@@ -169,31 +218,56 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
             </div>
           )}
 
-          {!auth.user && auth.enabled && (
-            <aside className="bks-signin">
-              <h3 className="bks-subhead">{t.signedOutTitle}</h3>
-              <p>{t.signedOutBody}</p>
-              <a className="retro-btn" href={loginPath(lang)}>
-                {t.signedOutLink}
-              </a>
-            </aside>
-          )}
+          {quick && demo ? (
+            <QuickRoast
+              demo={demo}
+              language={quickLang}
+              onLanguage={setQuickLang}
+              /* Straight to the hook, nothing awaited: see the Start note below. */
+              onStart={ride.start}
+              onOwnKey={() => {
+                if (config.demoMode) update({ demoMode: false });
+                setView('setup');
+              }}
+              t={t}
+              lang={lang}
+            />
+          ) : (
+            <>
+              {demoOffered && (
+                <button type="button" className="bks-linkish" onClick={() => setView('quick')}>
+                  {t.quickBackToDemo}
+                </button>
+              )}
 
-          <SetupScreen
-            config={config}
-            update={update}
-            reset={reset}
-            saving={Boolean(auth.user)}
-            /* Handed the hook's own callback, with nothing awaited in between: the speech engine
+              {!auth.user && auth.enabled && (
+                <aside className="bks-signin">
+                  <h3 className="bks-subhead">{t.signedOutTitle}</h3>
+                  <p>{t.signedOutBody}</p>
+                  <a className="retro-btn" href={loginPath(lang)}>
+                    {t.signedOutLink}
+                  </a>
+                </aside>
+              )}
+
+              <SetupScreen
+                config={config}
+                update={update}
+                reset={reset}
+                saving={Boolean(auth.user)}
+                /* Handed the hook's own callback, with nothing awaited in between: the speech engine
                is unlocked by an utterance spoken inside a real user gesture, and one `await`
                before that point loses the gesture on iOS — the app is then silent for the whole
                ride with nothing in any log. See `primeVoices`. */
-            onStart={ride.start}
-            demo={demo}
-            flavour={flavourId}
-            t={t}
-            lang={lang}
-          />
+                onStart={ride.start}
+                /* The roaster's demo is the one-button screen above, never the sheet's fieldset. */
+                demo={roaster ? null : demo}
+                flavour={flavourId}
+                t={t}
+                lang={lang}
+              />
+            </>
+          )}
         </>
       )}
 

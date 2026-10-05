@@ -28,17 +28,30 @@
  * a salted hash of the address with the day in the salt (`limits.ts`). The only durable trace of a
  * demo call is two integers getting bigger.
  *
- * IT IS TWO-STEP ONLY. Gemini Live is a WebSocket the browser opens with a key in the URL, so
- * there is no way to lend it without lending the key itself; the demo answers with text and the
- * phone's own synthesiser reads it, which costs nobody anything. The browser knows this and does
- * not offer the mode (`defaults.ts`, `demoRestrictions`).
+ * TWO KINDS OF CALL. `remark` (the passenger's demo) answers with text, and the phone's own
+ * synthesiser reads it. `live` (the roaster's one-button demo, Oct 2026) answers with a single-use
+ * EPHEMERAL TOKEN for Gemini Live: Google's own way of letting a browser open a Live socket
+ * without the key. The token is good for one session, opens within a minute, dies within three,
+ * and has this function's prompt and the whole generation config locked into it — so the browser
+ * can open exactly one session that says exactly one remark in the voice and the persona it was
+ * asked for, and nothing it sends in its own `setup` changes that. That is what made Live
+ * lendable at all; until then it was a WebSocket with the key in the URL.
  */
 
 import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
+import { GoogleGenAI, type LiveConnectConfig } from '@google/genai';
 
-import { INTENSITIES, REMARK_LANGUAGES } from '../../../korczak-xyz/src/utils/backseat/defaults';
+import {
+  DEFAULT_LIVE_VOICE,
+  INTENSITIES,
+  REMARK_LANGUAGES,
+} from '../../../korczak-xyz/src/utils/backseat/defaults';
+import {
+  liveGenerationConfig,
+  wantsThinkingOff,
+} from '../../../korczak-xyz/src/utils/backseat/liveConfig';
 import { FLAVOURS } from '../../../korczak-xyz/src/utils/backseat/flavour';
 import {
   anglesFor,
@@ -55,6 +68,7 @@ import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 import {
   DEMO_APPS,
+  DEMO_MODES,
   callerIp,
   checkDemo,
   dayKey,
@@ -62,6 +76,7 @@ import {
   normalizeSettings,
   remaining,
   type DemoApp,
+  type DemoMode,
   type DemoSettings,
 } from './limits';
 
@@ -118,13 +133,21 @@ async function demoKey(uid: string): Promise<string | null> {
   return snap.exists ? keysFrom(snap.data()).google : null;
 }
 
-function counters(app: DemoApp, day: string, ip: string) {
-  const appDoc = db.collection('demoUsage').doc(`${app}-${day}`);
+/** The day's buckets: `roaster-2026-10-05`, and `roaster-live-2026-10-05` for Live sessions. */
+function counters(app: DemoApp, day: string, ip: string, mode: DemoMode) {
+  const appDoc = db
+    .collection('demoUsage')
+    .doc(mode === 'live' ? `${app}-live-${day}` : `${app}-${day}`);
   return { appDoc, ipDoc: appDoc.collection('ips').doc(ipKey(ip, day)) };
 }
 
-async function readUsed(app: DemoApp, day: string, ip: string): Promise<{ ip: number; app: number }> {
-  const { appDoc, ipDoc } = counters(app, day, ip);
+async function readUsed(
+  app: DemoApp,
+  day: string,
+  ip: string,
+  mode: DemoMode,
+): Promise<{ ip: number; app: number }> {
+  const { appDoc, ipDoc } = counters(app, day, ip, mode);
   const [appSnap, ipSnap] = await Promise.all([appDoc.get(), ipDoc.get()]);
   const count = (snap: FirebaseFirestore.DocumentSnapshot): number => {
     const value = snap.exists ? snap.data()?.count : 0;
@@ -146,8 +169,9 @@ async function claim(
   day: string,
   ip: string,
   settings: DemoSettings,
+  mode: DemoMode,
 ): Promise<{ ok: true; used: { ip: number; app: number } } | { ok: false; status: number; reason: string }> {
-  const { appDoc, ipDoc } = counters(app, day, ip);
+  const { appDoc, ipDoc } = counters(app, day, ip, mode);
 
   return db.runTransaction(async (tx) => {
     const [appSnap, ipSnap] = await Promise.all([tx.get(appDoc), tx.get(ipDoc)]);
@@ -158,7 +182,7 @@ async function claim(
       ip: number(ipSnap.exists ? ipSnap.data()?.count : 0),
     };
 
-    const verdict = checkDemo(settings, app, used);
+    const verdict = checkDemo(settings, app, used, mode);
     if (!verdict.ok) return { ok: false as const, status: verdict.status, reason: verdict.reason };
 
     // `day` on the document as well as in its id, so a listing is readable without parsing ids,
@@ -173,6 +197,7 @@ class BadDemoRequest extends Error {}
 
 interface DemoAsk {
   app: DemoApp;
+  mode: DemoMode;
   persona: Persona;
   intensity: Intensity;
   lang: RemarkLanguage;
@@ -192,6 +217,7 @@ export function parseAsk(body: unknown): DemoAsk {
 
   const app = DEMO_APPS.find((name) => name === raw.app);
   if (!app) throw new BadDemoRequest('Unknown app');
+  const mode = DEMO_MODES.find((name) => name === raw.mode) ?? 'remark';
 
   const flavour = FLAVOURS[app];
   const persona = flavour.personas.find((name) => name === raw.persona) ?? flavour.defaultPersona;
@@ -205,7 +231,11 @@ export function parseAsk(body: unknown): DemoAsk {
         .map((line) => line.slice(0, MAX_RECENT_CHARS))
     : [];
 
+  // A Live token carries no frame: the browser sends it to Google over the socket it opens.
   const base64 = typeof raw.image === 'string' ? raw.image : '';
+  if (mode === 'live') {
+    return { app, mode, persona, intensity, lang, recent, base64: '', mimeType: 'image/jpeg' };
+  }
   if (!base64) throw new BadDemoRequest('No image');
   // Cheap length arithmetic rather than decoding: base64 is 4 characters per 3 bytes.
   if ((base64.length * 3) / 4 > MAX_IMAGE_BYTES) throw new BadDemoRequest('Image too large');
@@ -215,27 +245,35 @@ export function parseAsk(body: unknown): DemoAsk {
     ? raw.mimeType
     : 'image/jpeg';
 
-  return { app, persona, intensity, lang, recent, base64, mimeType };
+  return { app, mode, persona, intensity, lang, recent, base64, mimeType };
 }
 
 /** What the browser is told when it asks whether the demo is open, before it starts a camera. */
 async function status(req: Request, res: Response): Promise<void> {
   const settings = await readSettings();
   const app = DEMO_APPS.find((name) => name === req.query.app) ?? 'roaster';
+  const mode = DEMO_MODES.find((name) => name === req.query.mode) ?? 'remark';
   const day = dayKey();
-  const used = await readUsed(app, day, callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip));
-  const verdict = checkDemo(settings, app, used);
+  const used = await readUsed(
+    app,
+    day,
+    callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip),
+    mode,
+  );
+  const verdict = checkDemo(settings, app, used, mode);
+  const live = mode === 'live';
 
   res.status(200).json({
     // One flag, so the browser never has to work out which of five reasons means "not today".
     available: verdict.ok,
     reason: verdict.ok ? null : verdict.reason,
-    remaining: remaining(settings, used),
-    perIpDaily: settings.perIpDaily,
-    perAppDaily: settings.perAppDaily,
+    remaining: remaining(settings, used, mode),
+    perIpDaily: live ? settings.livePerIpDaily : settings.perIpDaily,
+    perAppDaily: live ? settings.livePerAppDaily : settings.perAppDaily,
     minIntervalSeconds: settings.minIntervalSeconds,
-    // Named so the setup sheet can say what is looking, rather than claiming a model it is not on.
-    model: settings.model,
+    // Named so the setup sheet can say what is looking, and so a Live socket's `setup` names
+    // the model its token was locked to.
+    model: live ? settings.liveModel : settings.model,
   });
 }
 
@@ -245,7 +283,7 @@ async function remark(req: Request, res: Response): Promise<void> {
   const day = dayKey();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
 
-  const claimed = await claim(ask.app, day, ip, settings);
+  const claimed = await claim(ask.app, day, ip, settings, ask.mode);
   if (!claimed.ok) {
     res.status(claimed.status).json({ reason: claimed.reason, available: false });
     return;
@@ -254,6 +292,11 @@ async function remark(req: Request, res: Response): Promise<void> {
   const key = await demoKey(settings.keyUid);
   if (!key) {
     res.status(503).json({ reason: 'no-key', available: false });
+    return;
+  }
+
+  if (ask.mode === 'live') {
+    await liveToken(ask, settings, key, claimed.used, res);
     return;
   }
 
@@ -289,6 +332,77 @@ async function remark(req: Request, res: Response): Promise<void> {
     text,
     angle,
     remaining: remaining(settings, claimed.used),
+  });
+}
+
+/** How long a minted token may wait to be opened, and how long its one session may last. */
+const TOKEN_OPEN_WITHIN_MS = 60_000;
+const TOKEN_LIVES_MS = 3 * 60_000;
+
+/**
+ * One Live session's worth of the owner's key: a single-use ephemeral token with this function's
+ * prompt locked into it.
+ *
+ * `liveConnectConstraints` set means every field of the config below is LOCKED — Google ignores
+ * whatever the browser puts in its own `setup` for them (the SDK's own words: "changing
+ * `outputAudioTranscription` in the Live API connection will be ignored by the API"). So the
+ * prompt built here from closed lists is the prompt the model gets, exactly as in the two-step
+ * branch, and the token is worth one remark: `uses: 1`, opened within a minute, gone in three.
+ *
+ * The generation config is `liveGenerationConfig`, the same function the browser's own Live
+ * sessions are set up with, so the demo cannot drift from the rides it is a demo of.
+ */
+async function liveToken(
+  ask: DemoAsk,
+  settings: DemoSettings,
+  key: string,
+  used: { ip: number; app: number },
+  res: Response,
+): Promise<void> {
+  const angle = pickAngle(null, Math.random, anglesFor(ask.app));
+  const system = systemPrompt({
+    flavour: ask.app,
+    angle,
+    persona: ask.persona,
+    intensity: ask.intensity,
+    lang: ask.lang,
+    recent: ask.recent,
+  });
+  const model = settings.liveModel;
+  const now = Date.now();
+
+  const config = {
+    ...liveGenerationConfig(DEFAULT_LIVE_VOICE, wantsThinkingOff(model)),
+    systemInstruction: system,
+    outputAudioTranscription: {},
+  } as unknown as LiveConnectConfig;
+
+  let token: string | undefined;
+  try {
+    const ai = new GoogleGenAI({ apiKey: key, httpOptions: { apiVersion: 'v1alpha' } });
+    const created = await ai.authTokens.create({
+      config: {
+        uses: 1,
+        expireTime: new Date(now + TOKEN_LIVES_MS).toISOString(),
+        newSessionExpireTime: new Date(now + TOKEN_OPEN_WITHIN_MS).toISOString(),
+        liveConnectConstraints: { model, config },
+        httpOptions: { apiVersion: 'v1alpha' },
+      },
+    });
+    token = created.name;
+  } catch (e) {
+    // The owner's key refused: reported, and the caller hears only that the model would not.
+    const status = (e as { status?: number }).status ?? null;
+    throw new VisionError(e instanceof Error ? e.message : 'Token refused', status);
+  }
+  if (!token) throw new VisionError('Google returned no token', null);
+
+  res.status(200).json({
+    token,
+    model,
+    voice: DEFAULT_LIVE_VOICE,
+    angle,
+    remaining: remaining(settings, used, 'live'),
   });
 }
 

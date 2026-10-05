@@ -127,3 +127,40 @@ describe('the day and the bucket', () => {
     expect(ipKey('198.51.100.7', '2026-10-05')).not.toBe(ipKey('198.51.100.7', '2026-10-06'));
   });
 });
+
+/*
+ * The roaster's demo speaks every three seconds over Live, so it is counted in sessions against
+ * caps of its own. The failure this guards is one set of caps reaching the other: two-step caps
+ * sized for a remark every twelve seconds would end a Live demo in under a minute, and the
+ * reverse would let the two-step demo run for an hour.
+ */
+describe('the Live demo is counted apart', () => {
+  const settings = normalizeSettings({ keyUid: 'owner', perIpDaily: 15, livePerIpDaily: 60 });
+
+  it('checks a live call against the live caps', () => {
+    expect(checkDemo(settings, 'roaster', { ip: 20, app: 20 }, 'live')).toEqual({ ok: true });
+    expect(checkDemo(settings, 'roaster', { ip: 20, app: 20 }, 'remark')).toMatchObject({
+      reason: 'ip-cap',
+    });
+    expect(checkDemo(settings, 'roaster', { ip: 60, app: 60 }, 'live')).toMatchObject({
+      reason: 'ip-cap',
+      status: 429,
+    });
+  });
+
+  it('says what is left in the same units', () => {
+    expect(remaining(settings, { ip: 10, app: 100 }, 'live')).toEqual({
+      ip: 50,
+      app: DEMO_DEFAULTS.livePerAppDaily - 100,
+    });
+  });
+
+  /* A settings document saved before the Live demo existed has none of these fields, and must
+     get the defaults rather than a cap of `undefined` — that document is the one in production. */
+  it('fills the live fields into a document written before they existed', () => {
+    const old = normalizeSettings({ keyUid: 'owner', model: 'gemini-2.5-flash-lite', perIpDaily: 15 });
+    expect(old.liveModel).toBe(DEMO_DEFAULTS.liveModel);
+    expect(old.livePerIpDaily).toBe(DEMO_DEFAULTS.livePerIpDaily);
+    expect(old.livePerAppDaily).toBe(DEMO_DEFAULTS.livePerAppDaily);
+  });
+});

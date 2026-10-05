@@ -23,7 +23,7 @@
  */
 
 import { VisionError } from './vision';
-import type { DemoApp, DemoReason } from './demoLimits';
+import type { DemoApp, DemoMode, DemoReason } from './demoLimits';
 import type { Frame, Intensity, Persona, RemarkLanguage } from './types';
 
 /** What the function says about itself when asked. */
@@ -109,11 +109,13 @@ function asStatus(value: unknown): DemoStatus | null {
 export async function fetchDemoStatus(
   app: DemoApp,
   signal?: AbortSignal,
+  mode: DemoMode = 'remark',
 ): Promise<DemoStatus | null> {
   const url = demoUrl();
   if (!url) return null;
   try {
-    const response = await fetch(`${url}?app=${encodeURIComponent(app)}`, { signal });
+    const query = `app=${encodeURIComponent(app)}${mode === 'live' ? '&mode=live' : ''}`;
+    const response = await fetch(`${url}?${query}`, { signal });
     if (!response.ok) return null;
     return asStatus(await response.json());
   } catch {
@@ -153,17 +155,42 @@ const MESSAGES: Record<string, string> = {
   failed: 'The demo is not working at the moment.',
 };
 
+async function post(url: string, payload: object, signal?: AbortSignal) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify(payload),
+  });
+  return response;
+}
+
+async function bodyOf(response: Response): Promise<Record<string, unknown>> {
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    const reason = typeof body.reason === 'string' ? body.reason : 'failed';
+    throw new DemoError(MESSAGES[reason] ?? MESSAGES.failed, response.status, reason as never);
+  }
+  return body;
+}
+
+function remainingOf(body: Record<string, unknown>): { ip: number; app: number } {
+  const left = (typeof body.remaining === 'object' && body.remaining !== null
+    ? body.remaining
+    : {}) as Record<string, unknown>;
+  const count = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
+  return { ip: count(left.ip), app: count(left.app) };
+}
+
 /** One remark, on the owner's key. The angle and the prompt are the function's business. */
 export async function askDemo(ask: DemoAsk): Promise<DemoRemark> {
   const url = demoUrl();
   if (!url) throw new DemoError(MESSAGES.failed, null, 'failed');
 
   ask.onMark?.('vision.sent');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: ask.signal,
-    body: JSON.stringify({
+  const response = await post(
+    url,
+    {
       app: ask.app,
       persona: ask.persona,
       intensity: ask.intensity,
@@ -171,27 +198,66 @@ export async function askDemo(ask: DemoAsk): Promise<DemoRemark> {
       recent: ask.recent,
       image: ask.frame.base64,
       mimeType: ask.frame.mimeType,
-    }),
-  });
+    },
+    ask.signal,
+  );
   ask.onMark?.('vision.headers');
-
-  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  const body = await bodyOf(response);
   ask.onMark?.('vision.body');
 
-  if (!response.ok) {
-    const reason = typeof body.reason === 'string' ? body.reason : 'failed';
-    throw new DemoError(MESSAGES[reason] ?? MESSAGES.failed, response.status, reason as never);
-  }
-
-  const text = typeof body.text === 'string' ? body.text : '';
-  const left = (typeof body.remaining === 'object' && body.remaining !== null
-    ? body.remaining
-    : {}) as Record<string, unknown>;
-  const count = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
-
   return {
-    text,
+    text: typeof body.text === 'string' ? body.text : '',
     angle: typeof body.angle === 'string' ? body.angle : 'demo',
-    remaining: { ip: count(left.ip), app: count(left.app) },
+    remaining: remainingOf(body),
+  };
+}
+
+export type DemoTokenAsk = Omit<DemoAsk, 'frame' | 'onMark'>;
+
+export interface DemoToken {
+  /** `auth_tokens/…`: good for one Live session, opened within a minute. */
+  token: string;
+  /** The model and voice locked into it, for the record. */
+  model: string;
+  voice: string;
+  angle: string;
+  remaining: { ip: number; app: number };
+}
+
+/**
+ * One Gemini Live session, on the owner's key, without the key.
+ *
+ * The function mints a single-use ephemeral token with the model, the voice and the whole system
+ * prompt locked into it (`functions/src/demo/handler.ts`), so the browser opens the socket itself —
+ * which is what keeps the one-step latency — and still cannot ask it for anything but a remark
+ * about what the camera sees. No frame goes to the function: it goes to Google, over that socket.
+ */
+export async function askDemoToken(ask: DemoTokenAsk): Promise<DemoToken> {
+  const url = demoUrl();
+  if (!url) throw new DemoError(MESSAGES.failed, null, 'failed');
+
+  const body = await bodyOf(
+    await post(
+      url,
+      {
+        mode: 'live',
+        app: ask.app,
+        persona: ask.persona,
+        intensity: ask.intensity,
+        lang: ask.lang,
+        recent: ask.recent,
+      },
+      ask.signal,
+    ),
+  );
+  if (typeof body.token !== 'string' || !body.token) {
+    throw new DemoError(MESSAGES.provider, 502, 'provider');
+  }
+  return {
+    token: body.token,
+    model: typeof body.model === 'string' ? body.model : '',
+    voice: typeof body.voice === 'string' ? body.voice : '',
+    angle: typeof body.angle === 'string' ? body.angle : 'demo',
+    remaining: remainingOf(body),
   };
 }

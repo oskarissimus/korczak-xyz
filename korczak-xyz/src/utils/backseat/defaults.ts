@@ -15,7 +15,7 @@
  * 120 because a passenger silent for longer than two minutes is not the joke this app is.
  */
 
-import { BACKSEAT, BACKSEAT_PERSONAS, type Flavour } from './flavour';
+import { BACKSEAT, BACKSEAT_PERSONAS, FLAVOURS, type Flavour } from './flavour';
 import type {
   ApiKeys,
   BackseatConfig,
@@ -233,6 +233,43 @@ export function demoRestrictions(
       // ElevenLabs stays available: that is the reader's own key and their own bill.
       engine: config.voice.engine === 'live' ? 'device' : config.voice.engine,
     },
+  };
+}
+
+/** How often the roaster's one-button demo roasts: one remark every three seconds. */
+export const QUICK_ROAST_INTERVAL = 3;
+
+/**
+ * The settings the roaster's one-button demo runs on, whatever the setup sheet says.
+ *
+ * At the owner's request (Oct 2026) the demo is a single "Roast me" button and nothing to choose:
+ * Gemini Live (one step, so the wait is a second rather than three), the front camera, the default
+ * comic, a remark every three seconds. The one thing left to the person is the language, which is
+ * a flag on the ride screen rather than a setting. Nothing here is saved: the saved config is
+ * untouched, so somebody who later pastes their own key finds their own settings where they left
+ * them. The model is the one the function's tokens are locked to, from its status.
+ */
+export function quickRoastConfig(
+  config: BackseatConfig,
+  options: { liveModel: string; lang: RemarkLanguage },
+): BackseatConfig {
+  return {
+    ...config,
+    demoMode: true,
+    remarks: {
+      ...config.remarks,
+      persona: FLAVOURS.roaster.defaultPersona,
+      intensity: 'normal',
+      intervalSeconds: QUICK_ROAST_INTERVAL,
+      language: options.lang,
+    },
+    voice: {
+      ...config.voice,
+      engine: 'live',
+      liveModel: options.liveModel || DEFAULT_LIVE_MODEL,
+      liveVoice: DEFAULT_LIVE_VOICE,
+    },
+    camera: { ...config.camera, facing: 'user' },
   };
 }
 

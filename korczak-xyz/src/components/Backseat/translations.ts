@@ -141,6 +141,15 @@ export const translations = {
     demoModelNote: 'The demo looks with {model} and reads with this phone’s own voice.',
     demoClosed: 'The demo is not open at the moment. A key of your own still works.',
     demoNoLive: 'One step needs a key of your own: a demo cannot lend one.',
+    // The roaster's one-button demo (Live, on the site's key, nothing to set)
+    quickRoast: 'Roast me',
+    quickBlurb:
+      "The front camera, a roast every few seconds, on the site's own key. Nothing to set up.",
+    quickCapped:
+      "That is all of today's demo roasts on this device. A key of your own still works.",
+    quickOwnKey: 'My own key and settings',
+    quickBackToDemo: 'Back to the one-button demo',
+    langSwitch: 'Language of the roast',
 
     // Camera
     cameraTitle: 'The camera',
@@ -305,6 +314,12 @@ export const translations = {
     demoModelNote: 'Demo patrzy modelem {model} i czyta głosem tego telefonu.',
     demoClosed: 'Demo jest teraz zamknięte. Własny klucz nadal działa.',
     demoNoLive: 'Jeden krok wymaga własnego klucza — demo go nie pożyczy.',
+    quickRoast: 'Zroastuj mnie',
+    quickBlurb: 'Przednia kamera, roast co kilka sekund, na kluczu strony. Nic do ustawiania.',
+    quickCapped: 'To wszystkie dzisiejsze roasty demo na tym urządzeniu. Własny klucz nadal działa.',
+    quickOwnKey: 'Własny klucz i ustawienia',
+    quickBackToDemo: 'Wróć do demo jednym guzikiem',
+    langSwitch: 'Język roastu',
 
     cameraTitle: 'Kamera',
     cameraFacing: 'Która kamera',
@@ -401,6 +416,7 @@ const ROASTER: Record<Lang, Partial<Translation>> = {
       'meant. Point it at people only if they are in on it, and not at anybody who did not agree ' +
       'to be filmed.',
     disclaimerShort: 'Made up by a model. Only roast people who are in on it.',
+    demoLeft: '{n} demo roasts left today.',
   },
   pl: {
     setupTitle: 'Zanim zaczniemy',
@@ -433,6 +449,7 @@ const ROASTER: Record<Lang, Partial<Translation>> = {
       'ani nie jest na serio. Kieruj go na ludzi tylko wtedy, gdy wiedzą, o co chodzi, i nie na ' +
       'nikogo, kto nie zgodził się na nagrywanie.',
     disclaimerShort: 'Zmyślone przez model. Roastuj tylko tych, którzy wiedzą, o co chodzi.',
+    demoLeft: 'Zostało {n} roastów demo na dziś.',
   },
 };
 

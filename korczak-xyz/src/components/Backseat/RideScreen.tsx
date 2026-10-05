@@ -29,7 +29,7 @@ import {
   watchFullscreen,
 } from '../../utils/backseat/fullscreen';
 import type { CameraFailure } from '../../utils/backseat/frame';
-import type { Remark, RideStatus } from '../../utils/backseat/types';
+import type { Remark, RemarkLanguage, RideStatus } from '../../utils/backseat/types';
 import type { PendingRound } from '../../hooks/useBackseatRide';
 
 interface RideScreenProps {
@@ -52,6 +52,12 @@ interface RideScreenProps {
   lastLatencyMs: number | null;
   /** Demo rides: remarks left for this device today, as the function last said. Null otherwise. */
   demoRemaining: number | null;
+  /**
+   * The roaster's one-button demo: the language of the roast, switched by a flag on this screen
+   * because that demo has no settings. Takes effect from the next remark. Absent elsewhere, where
+   * the language is a setting like any other.
+   */
+  language?: { value: RemarkLanguage; onToggle: () => void };
   error: string | null;
   cameraError: CameraFailure | null;
   onStop: () => void;
@@ -122,6 +128,7 @@ export default function RideScreen({
   pending,
   lastLatencyMs,
   demoRemaining,
+  language,
   error,
   cameraError,
   onStop,
@@ -166,6 +173,19 @@ export default function RideScreen({
         />
         {status === 'starting' && <p className="bks-viewport-note">{t.cameraStarting}</p>}
       </div>
+
+      {/* The flag says what it is speaking now, and a tap switches to the other one. A flag and
+          the code beside it, because a flag alone is a picture some systems draw as two letters. */}
+      {language && (
+        <button
+          type="button"
+          className="retro-btn bks-lang"
+          onClick={language.onToggle}
+          aria-label={`${t.langSwitch}: ${language.value === 'pl' ? 'polski' : 'English'}`}
+        >
+          <span aria-hidden="true">{language.value === 'pl' ? '🇵🇱 PL' : '🇬🇧 EN'}</span>
+        </button>
+      )}
 
       <LatencyClock pending={pending} lastLatencyMs={lastLatencyMs} t={t} lang={lang} />
 

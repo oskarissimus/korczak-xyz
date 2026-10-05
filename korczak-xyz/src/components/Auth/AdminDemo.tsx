@@ -61,8 +61,16 @@ const translations = {
     payerHint:
       'Read at call time from that account’s own key store. Clearing the Google key there closes ' +
       'the demo too.',
-    model: 'Model',
+    model: 'Model (two steps: the passenger)',
     modelHint: 'A cheap one. The demo is free to whoever uses it and should be nearly free to you.',
+    live: 'The roaster’s one-button demo (Gemini Live)',
+    liveHint:
+      'One session is one roast, about every three seconds, so these caps count sessions and are ' +
+      'counted apart from the remarks above. 60 is about five minutes of being roasted.',
+    liveModel: 'Live model',
+    liveModelHint: 'Locked into every single-use token the function mints.',
+    livePerIp: 'Sessions per device, per day',
+    livePerApp: 'Sessions per app, per day',
     perIp: 'Per device, per day',
     perIpHint: 'Enough to see what the app is. Counted per address, which is per household.',
     perApp: 'Per app, per day',
@@ -97,8 +105,16 @@ const translations = {
     payerHint:
       'Czytany w momencie wywołania z magazynu kluczy tego konta. Usunięcie tam klucza Google ' +
       'też zamyka demo.',
-    model: 'Model',
+    model: 'Model (dwa kroki: pasażer)',
     modelHint: 'Tani. Demo jest darmowe dla gościa i powinno być prawie darmowe dla ciebie.',
+    live: 'Demo roastera jednym guzikiem (Gemini Live)',
+    liveHint:
+      'Jedna sesja to jeden roast, mniej więcej co trzy sekundy, więc te limity liczą sesje i są ' +
+      'liczone osobno od uwag powyżej. 60 to około pięciu minut roastowania.',
+    liveModel: 'Model Live',
+    liveModelHint: 'Zablokowany w każdym jednorazowym tokenie, który wydaje funkcja.',
+    livePerIp: 'Sesji na urządzenie, dziennie',
+    livePerApp: 'Sesji na aplikację, dziennie',
     perIp: 'Na urządzenie, dziennie',
     perIpHint: 'Tyle, żeby zobaczyć, o co chodzi. Liczone na adres, czyli na dom.',
     perApp: 'Na aplikację, dziennie',
@@ -282,6 +298,26 @@ export default function AdminDemo({ lang }: AdminDemoProps) {
       {number(t.interval, t.intervalHint, settings.minIntervalSeconds, MAX_MIN_INTERVAL, (n) =>
         edit({ minIntervalSeconds: n }),
       )}
+
+      <fieldset className="admin-demo-group">
+        <legend className="admin-demo-label">{t.live}</legend>
+        <p className="admin-demo-hint">{t.liveHint}</p>
+        <label className="admin-demo-field">
+          <span className="admin-demo-label">{t.liveModel}</span>
+          <input
+            type="text"
+            value={settings.liveModel}
+            onChange={(e) => edit({ liveModel: e.target.value })}
+          />
+          <span className="admin-demo-hint">{t.liveModelHint}</span>
+        </label>
+        {number(t.livePerIp, t.perIpHint, settings.livePerIpDaily, MAX_PER_IP_DAILY, (n) =>
+          edit({ livePerIpDaily: n }),
+        )}
+        {number(t.livePerApp, t.perAppHint, settings.livePerAppDaily, MAX_PER_APP_DAILY, (n) =>
+          edit({ livePerAppDaily: n }),
+        )}
+      </fieldset>
 
       <fieldset className="admin-demo-group">
         <legend className="admin-demo-label">{t.apps}</legend>

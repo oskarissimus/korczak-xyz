@@ -23,6 +23,8 @@ import { createHash } from 'node:crypto';
 export {
   DEMO_APPS,
   DEMO_DEFAULTS,
+  DEMO_MODES,
+  capsFor,
   MAX_MIN_INTERVAL,
   MAX_PER_APP_DAILY,
   MAX_PER_IP_DAILY,
@@ -32,6 +34,7 @@ export {
 } from '../../../korczak-xyz/src/utils/backseat/demoLimits';
 export type {
   DemoApp,
+  DemoMode,
   DemoReason,
   DemoRefusal,
   DemoSettings,

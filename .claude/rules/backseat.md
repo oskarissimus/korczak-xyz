@@ -508,7 +508,8 @@ Everything about it follows from the fact that it is somebody else's key:
   ten minutes (the per-IP cap); a hundred people each inside their own limit can do it more slowly
   (the per-app one). Checked in that order, because "you have had your go" and "the site has had
   its day" are different sentences. Defaults: 15 per device, 400 per app, per Warsaw day, 12s
-  between remarks. The maxima a panel may set are in `demoLimits.ts`.
+  between remarks (the roaster's Live demo has its own, below). The maxima a panel may set are in
+  `demoLimits.ts`.
 - **The model is a field in the panel, not a constant**, and the first live demo call is why: it
   came back *"This model models/gemini-2.5-flash-lite is no longer available to new users. Please
   update your code to use models/gemini-3.5-flash-lite"* — on the same key the apps ride on, where
@@ -529,12 +530,11 @@ Everything about it follows from the fact that it is somebody else's key:
 - **A refusal is fatal to the ride.** `DemoError.fatal` is true for every reason, which is the
   opposite reading from a provider's own 429: a cap is a cap for the rest of the day, and the
   loop's three-strikes rule would otherwise spend two more rounds discovering it.
-- **It is two-step only.** Gemini Live is a WebSocket the browser opens with the key in the URL, so
-  there is no way to lend it without lending the key. `demoRestrictions` moves a demo config off
-  `live` and puts the function's interval floor under the slider, and the setup sheet does not draw
-  the mode or model groups at all while the demo is on — a dropdown that cannot change anything is
-  a question somebody tries to answer. An ElevenLabs voice stays available: that is the reader's
-  own key and their own bill.
+- **The passenger's demo is two-step; the roaster's is Live, on tokens** (next section).
+  `demoRestrictions` moves the setup sheet's demo config off `live` and puts the function's
+  interval floor under the slider, and the sheet does not draw the mode or model groups while the
+  demo is on — a dropdown that cannot change anything is a question somebody tries to answer. An
+  ElevenLabs voice stays available: that is the reader's own key and their own bill.
 - **Nothing about a demo ride is written down.** `rideLog.ts` writes only for a signed-in account
   and a demo has none, so no frame, prompt or remark is stored. The round's record would say
   `provider: 'demo'` and name no prompt, since the one this browser would have built is not what
@@ -550,6 +550,46 @@ state out of the box is *ready, nobody is paying* and every call is refused with
 the switch being off produces. The dials are on `/apps/admin/` (`AdminDemo.tsx`): the payer as
 three states — nobody, mine, another account — the model, both caps, the interval floor and a
 checkbox per app.
+
+### The roaster's demo is one button, on Gemini Live (Oct 2026)
+
+At the owner's request, the same day as the demo: *only a "Roast me" button, the one-step Live
+model by default, a flag on the roast screen to switch Polish to English, a roast every three
+seconds, and no settings in the demo.* So on `/apps/roaster/` the demo is not the setup sheet's
+fieldset at all — it is `QuickRoast.tsx`, shown instead of the sheet to anybody with no Google key
+(or with `demoMode` saved), with a link to the sheet and one back. `quickRoastConfig` is the whole
+of its settings: Live, the status's Live model, `Kore`, the front camera (mirrored), the default
+comic, `normal`, `QUICK_ROAST_INTERVAL` = 3 s, and the language from the flag — never saved, so
+somebody who later pastes a key finds their own settings untouched. The flag
+(`RideScreen`'s `language` prop) takes effect on the next remark: `promptKeyOf` includes the
+language, so the session prepared in the old one is discarded.
+
+**Live was impossible to lend, and an ephemeral token is what made it possible.** The browser
+opens Live's WebSocket itself — that is the one-step latency — and the only credential it could
+put in the URL was the key. Now `roastDemo` answers a `mode: 'live'` POST by minting a
+**single-use ephemeral token** (`ai.authTokens.create`, `v1alpha`): `uses: 1`, a new session
+within 60 s, dead after 180 s, and `liveConnectConstraints` carrying the model, the generation
+config and **the system prompt, built by the function from the same closed lists** as the
+two-step demo. Under constraints Google ignores whatever `setup` the browser sends, so the token
+cannot be talked into a different prompt, model or voice; the socket goes to the
+`BidiGenerateContentConstrained` endpoint with `?access_token=`. No frame passes through the
+function — it goes straight to Google over that socket. `liveConfig.ts` is the setup both sides
+use, compiled into the function like `demoLimits.ts`, so the config locked into a token is the
+one the rides are tuned with.
+
+- **A session is the unit, counted apart.** One session is one remark, and at three seconds a
+  remark lands every four or five once the speaking is counted — a cap sized for two-step remarks
+  every twelve would end it in under a minute. So `DemoMode` is `remark | live`, each with its own
+  caps and counters (`{app}-live-{day}`): **60 sessions per device** (about five minutes of being
+  roasted) and **1500 per app** per Warsaw day, `gemini-3.1-flash-live-preview`, all three in the
+  panel. A stored settings document without the fields gets these defaults.
+- **The next session's token is fetched while the current remark is spoken**, exactly as the
+  key-based prewarm opens the next session then — so the token round trip is off the wait. The
+  cost is one session claimed and unused when somebody presses Stop. A retry on an empty answer
+  takes a token of its own.
+- **The angle comes back with the token** and is what the round's record names.
+- The thinking retry (`NO_THINKING_CONFIG`) is skipped under a token: the config is the
+  function's, and a token is good for one session.
 
 ### The roaster: the same island, another prompt (Oct 2026)
 

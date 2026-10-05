@@ -34,7 +34,9 @@
  */
 
 import { VisionError } from './vision';
+import { liveGenerationConfig, wantsThinkingOff } from './liveConfig';
 export { DEFAULT_LIVE_MODEL, DEFAULT_LIVE_VOICE } from './defaults';
+export { wantsThinkingOff } from './liveConfig';
 import type { Frame } from './types';
 
 /** Google's prebuilt voices, which every Live model takes. */
@@ -74,11 +76,14 @@ export const LIVE_VOICES = [
 const LIVE_URL =
   'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 
-/** Same warmth as the Gemini vision call (`vision.ts`), for the same reason. */
-const LIVE_TEMPERATURE = 1.3;
-
-/** Room for one sentence of speech: audio tokens are ~25 a second, and a remark is under ten. */
-const LIVE_MAX_TOKENS = 600;
+/*
+ * Where a session opened with an ephemeral token goes instead: the constrained method, v1alpha
+ * only, with `access_token` where the key would be. The roaster's demo is the one caller — the
+ * owner's key never reaches the browser, a single-use token minted by `roastDemo` does, with the
+ * prompt and the whole generation config locked into it (`liveConfig.ts`).
+ */
+const LIVE_TOKEN_URL =
+  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained';
 
 /** A session that never says `setupComplete` is a dead one; a ride should not wait on it. */
 const SETUP_TIMEOUT_MS = 10000;
@@ -121,15 +126,6 @@ export function filterLiveModels(
     .sort((a, b) => liveRank(a) - liveRank(b) || b.localeCompare(a));
 }
 
-/**
- * Whether to send `thinkingBudget: 0` in `setup`. Only to a `flash-live` model, where the test
- * showed it changes nothing for the worse: the 09-2025 native-audio model answered this prompt
- * with an empty turn every time it was sent, and spoke (after thinking for three seconds) every
- * time it was not.
- */
-export function wantsThinkingOff(model: string): boolean {
-  return model.includes('flash-live');
-}
 
 export async function fetchLiveModels(
   apiKey: string,
@@ -221,6 +217,12 @@ export interface LiveSettings {
   model: string;
   voice: string;
   system: string;
+  /**
+   * The demo's way in: fetch a single-use ephemeral token instead of using `apiKey`. Called once,
+   * when the session opens (which for a prepared session is during the previous remark). The
+   * token's own locked config is what the model gets, so `system` is not the prompt then.
+   */
+  getToken?: () => Promise<string>;
 }
 
 export interface LiveAsk {
@@ -346,6 +348,8 @@ export class LiveSession {
     this.thinkingOff = wantsThinkingOff(settings.model) && !NO_THINKING_CONFIG.has(settings.model);
     this.ready = this.open(this.thinkingOff).catch(async (e) => {
       if (
+        // A token is good for one session, and its config is the function's, not ours to retry.
+        !settings.getToken &&
         e instanceof VisionError &&
         /thinking/i.test(e.message) &&
         !NO_THINKING_CONFIG.has(settings.model)
@@ -361,12 +365,17 @@ export class LiveSession {
   }
 
   /** Open and set up; resolves on `setupComplete`. */
-  private open(withThinkingConfig: boolean): Promise<void> {
+  private async open(withThinkingConfig: boolean): Promise<void> {
+    const token = this.settings.getToken ? await this.settings.getToken() : null;
     return new Promise<void>((resolve, reject) => {
       const { apiKey, model, voice, system } = this.settings;
       let socket: WebSocket;
       try {
-        socket = new WebSocket(`${LIVE_URL}?key=${encodeURIComponent(apiKey)}`);
+        socket = new WebSocket(
+          token
+            ? `${LIVE_TOKEN_URL}?access_token=${encodeURIComponent(token)}`
+            : `${LIVE_URL}?key=${encodeURIComponent(apiKey)}`,
+        );
       } catch (e) {
         reject(new VisionError(e instanceof Error ? e.message : 'Live connection failed', null));
         return;
@@ -387,22 +396,10 @@ export class LiveSession {
           JSON.stringify({
             setup: {
               model: `models/${model}`,
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                temperature: LIVE_TEMPERATURE,
-                maxOutputTokens: LIVE_MAX_TOKENS,
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-                /*
-                 * MEDIUM reads the frame as ~266 tokens instead of 1064 on a flash-live model. On
-                 * 4 Oct 2026 it was measured beside the default and LOW (8 rounds each, real
-                 * prompt): first audio 769 ms against 816 ms — noise, not a speed-up — and 8/8
-                 * answered, where LOW (63 tokens) lost the sound twice. It is here for the
-                 * quota: a quarter of the input tokens for the same remarks.
-                 */
-                mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
-                ...(withThinkingConfig ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-              },
-              systemInstruction: { parts: [{ text: system }] },
+              // Shared with the demo function, which locks the same config into its tokens.
+              generationConfig: liveGenerationConfig(voice, withThinkingConfig),
+              // Under a token this is ignored: the function's prompt is locked into it.
+              ...(token ? {} : { systemInstruction: { parts: [{ text: system }] } }),
               // The words, for the screen, the history and the saved record — see the header.
               outputAudioTranscription: {},
             },
@@ -652,6 +649,7 @@ export function sessionFits(session: LiveSession | null, settings: Omit<LiveSett
     session !== null &&
     session.usable &&
     session.settings.apiKey === settings.apiKey &&
+    Boolean(session.settings.getToken) === Boolean(settings.getToken) &&
     session.settings.model === settings.model &&
     session.settings.voice === settings.voice
   );

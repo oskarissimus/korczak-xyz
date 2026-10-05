@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DemoError, askDemo, demoUrl, fetchDemoStatus } from './demo';
+import { DemoError, askDemo, askDemoToken, demoUrl, fetchDemoStatus } from './demo';
 import type { Frame } from './types';
 
 const frame: Frame = {
@@ -155,5 +155,55 @@ describe('fetchDemoStatus', () => {
     // `undefined` somewhere the sheet reads as a number.
     vi.stubGlobal('fetch', reply('not an object'));
     expect(await fetchDemoStatus('roaster')).toBeNull();
+  });
+});
+
+describe('askDemoToken', () => {
+  const { frame: _frame, ...tokenAsk } = ask;
+
+  it('asks for a Live session with no frame, prompt, model or key, and hands back the token', async () => {
+    const fetchMock = reply({
+      token: 'auth_tokens/abc',
+      model: 'gemini-3.1-flash-live-preview',
+      voice: 'Kore',
+      angle: 'a hotel review',
+      remaining: { ip: 59, app: 1499 },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const minted = await askDemoToken(tokenAsk);
+    expect(minted.token).toBe('auth_tokens/abc');
+    expect(minted.angle).toBe('a hotel review');
+    expect(minted.remaining.ip).toBe(59);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      mode: 'live',
+      app: 'roaster',
+      persona: 'comedian',
+      intensity: 'normal',
+      lang: 'en',
+      recent: ['that shirt again'],
+    });
+  });
+
+  it('is fatal on a refusal, and on an answer with no token in it', async () => {
+    vi.stubGlobal('fetch', reply({ reason: 'ip-cap' }, 429));
+    const capped = await askDemoToken(tokenAsk).catch((e) => e);
+    expect((capped as DemoError).reason).toBe('ip-cap');
+    expect((capped as DemoError).fatal).toBe(true);
+
+    vi.stubGlobal('fetch', reply({ remaining: { ip: 3, app: 3 } }));
+    const empty = await askDemoToken(tokenAsk).catch((e) => e);
+    expect(empty).toBeInstanceOf(DemoError);
+  });
+});
+
+describe('fetchDemoStatus for the Live demo', () => {
+  it('asks about Live sessions, which are counted apart', async () => {
+    const fetchMock = reply({ available: true, remaining: { ip: 60, app: 1500 } });
+    vi.stubGlobal('fetch', fetchMock);
+    await fetchDemoStatus('roaster', undefined, 'live');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://demo.test/roastDemo?app=roaster&mode=live');
   });
 });

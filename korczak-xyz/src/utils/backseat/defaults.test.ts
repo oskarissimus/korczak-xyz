@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_CONFIG,
+  DEFAULT_LIVE_MODEL,
   MAX_INTERVAL,
+  QUICK_ROAST_INTERVAL,
   MIN_INTERVAL,
   canStart,
   demoRestrictions,
   missingKeys,
   normalizeConfig,
+  quickRoastConfig,
   remarkLanguage,
   requiredKeys,
 } from './defaults';
+import { FLAVOURS } from './flavour';
 
 /*
  * `normalizeConfig` is fed three things it does not control: a localStorage blob written by an
@@ -213,5 +217,28 @@ describe('the demo', () => {
     expect(normalizeConfig({}).demoMode).toBe(false);
     expect(normalizeConfig({ demoMode: 'yes' }).demoMode).toBe(false);
     expect(normalizeConfig({ demoMode: true }).demoMode).toBe(true);
+  });
+});
+
+describe('quickRoastConfig', () => {
+  it('is Live, front camera, the default comic, every three seconds, in the chosen language', () => {
+    const saved = normalizeConfig({}, FLAVOURS.roaster);
+    const quick = quickRoastConfig(saved, { liveModel: 'gemini-x-flash-live', lang: 'en' });
+    expect(quick.demoMode).toBe(true);
+    expect(quick.voice.engine).toBe('live');
+    expect(quick.voice.liveModel).toBe('gemini-x-flash-live');
+    expect(quick.camera.facing).toBe('user');
+    expect(quick.remarks.persona).toBe('comedian');
+    expect(quick.remarks.intervalSeconds).toBe(QUICK_ROAST_INTERVAL);
+    expect(quick.remarks.language).toBe('en');
+    // Nothing a Live demo would ask a key for.
+    expect(canStart(quick)).toBe(true);
+    // And the saved settings are not touched.
+    expect(saved.demoMode).toBe(false);
+  });
+
+  it('falls back to the default Live model when the status named none', () => {
+    const quick = quickRoastConfig(normalizeConfig({}, FLAVOURS.roaster), { liveModel: '', lang: 'pl' });
+    expect(quick.voice.liveModel).toBe(DEFAULT_LIVE_MODEL);
   });
 });

@@ -33,7 +33,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { recordMeasurement } from '../lib/sentry';
 import { canStart, speechLocale } from '../utils/backseat/defaults';
-import { askDemo } from '../utils/backseat/demo';
+import { askDemo, askDemoToken } from '../utils/backseat/demo';
 import {
   cameraConstraints,
   cameraSupported,
@@ -213,6 +213,8 @@ export function useBackseatRide(
     angle: string;
     system: string;
     promptKey: string;
+    /** Demo sessions only: the angle the function drew, once its token is in. */
+    token?: { angle: string | null };
   } | null>(null);
   /** The session answering right now, so teardown can close it. */
   const liveNowRef = useRef<LiveSession | null>(null);
@@ -319,11 +321,30 @@ export function useBackseatRide(
     // What the screen counts from: the photograph, until the first sound.
     setPending({ at: startedAt, stage: 'looking' });
 
-    // Never both: there is no way to lend a Live WebSocket without lending the key, so
-    // `demoRestrictions` has already moved a demo config off it. Belt and braces.
-    const live = settings.voice.engine === 'live' && !demo;
+    const live = settings.voice.engine === 'live';
+    /*
+     * The roaster's one-button demo: Live on the owner's key, through a single-use token the
+     * function mints per session with the prompt locked into it (`demo.ts`, `askDemoToken`). The
+     * setup sheet's demo never gets here — `demoRestrictions` moves it off Live — so a demo config
+     * on Live is that screen's and nothing else's.
+     */
+    const demoLive = demo && live;
+    /** What the function drew for a token's session: its angle, once the token has come back. */
+    const tokenFor = (meta: { angle: string | null }, recent: string[], lang: RemarkLanguage) =>
+      async () => {
+        const minted = await askDemoToken({
+          app: app.id,
+          persona: settings.remarks.persona,
+          intensity: settings.remarks.intensity,
+          lang,
+          recent,
+        });
+        meta.angle = minted.angle;
+        setDemoRemaining(minted.remaining.ip);
+        return minted.token;
+      };
     const liveSettings = {
-      apiKey: settings.apiKeys.google ?? '',
+      apiKey: demoLive ? '' : (settings.apiKeys.google ?? ''),
       model: settings.voice.liveModel,
       voice: settings.voice.liveVoice,
     };
@@ -334,6 +355,7 @@ export function useBackseatRide(
       prepared &&
       (!live ||
         prepared.promptKey !== promptKeyOf(settings, langRef.current) ||
+        Boolean(prepared.token) !== demoLive ||
         !sessionFits(prepared.session, liveSettings))
     ) {
       prepared.session.close();
@@ -358,8 +380,15 @@ export function useBackseatRide(
       rideId: rideRef.current.id,
       n: rideRef.current.rounds,
       at: startedAt,
-      provider: demo ? 'demo' : live ? 'google-live' : settings.vision.provider,
-      model: demo ? 'demo' : live ? settings.voice.liveModel : settings.vision.model,
+      provider: demoLive
+        ? 'demo-live'
+        : demo
+          ? 'demo'
+          : live
+            ? 'google-live'
+            : settings.vision.provider,
+      // A Live demo's model is the one its tokens are locked to, which the status named.
+      model: live ? settings.voice.liveModel : demo ? 'demo' : settings.vision.model,
       persona: settings.remarks.persona,
       intensity: settings.remarks.intensity,
       angle,
@@ -489,12 +518,21 @@ export function useBackseatRide(
           }
         };
 
+        /** A fresh session for this round: on a token of its own in the demo. */
+        let tokenMeta = prepared?.token ?? { angle: null };
+        const freshSession = () => {
+          if (!demoLive) return prepareLive({ ...liveSettings, system });
+          tokenMeta = { angle: null };
+          return prepareLive({
+            ...liveSettings,
+            system,
+            getToken: tokenFor(tokenMeta, recentTexts(historyRef.current), langRef.current),
+          });
+        };
+
         let answer;
         try {
-          answer = await askOn(
-            prepared?.session ?? prepareLive({ ...liveSettings, system }),
-            Boolean(prepared),
-          );
+          answer = await askOn(prepared?.session ?? freshSession(), Boolean(prepared));
           /*
            * The first Live ride (3 Oct 2026) spoke once and then answered every prepared session
            * with nothing, in under a second, no error. Until the saved events say why, an empty
@@ -504,7 +542,7 @@ export function useBackseatRide(
           if (!answer.spoke && !answer.text && runningRef.current) {
             mark('live.retry');
             events.push([since(), '— retry on a fresh session —']);
-            answer = await askOn(prepareLive({ ...liveSettings, system }), false);
+            answer = await askOn(freshSession(), false);
             record.live = { ...record.live!, retried: true };
           }
           /*
@@ -544,6 +582,8 @@ export function useBackseatRide(
         }
         timings.doneMs = since();
         record.raw = answer.text;
+        // The function drew the demo's angle, so the record names the one actually used.
+        if (demoLive && tokenMeta.angle) record.angle = tokenMeta.angle;
 
         if (!runningRef.current) return;
         failuresRef.current = 0;
@@ -573,11 +613,25 @@ export function useBackseatRide(
           lang: langRef.current,
           recent: recentTexts(historyRef.current),
         });
+        const nextToken = demoLive ? { angle: null as string | null } : undefined;
         liveNextRef.current = {
-          session: prepareLive({ ...liveSettings, system: nextSystem }),
+          session: prepareLive({
+            ...liveSettings,
+            system: nextSystem,
+            ...(nextToken
+              ? {
+                  getToken: tokenFor(
+                    nextToken,
+                    recentTexts(historyRef.current),
+                    langRef.current,
+                  ),
+                }
+              : {}),
+          }),
           angle: nextAngle,
           system: nextSystem,
           promptKey: promptKeyOf(settings, langRef.current),
+          token: nextToken,
         };
         schedule(untilNext());
         return;

@@ -42,7 +42,7 @@ on:
       # whether these tests can run at all, so it has to be able to run them.
       - "korczak-xyz/src/utils/sloper/job.ts"
       - "korczak-xyz/src/utils/sloper/tsconfig.json"
-      # The six files of `utils/backseat/` the demo function compiles in: the prompt it builds,
+      # The seven files of `utils/backseat/` the demo function compiles in: the prompt it builds,
       # the lists it validates against and the Google call it makes. Listed one by one for the
       # same reason sloper's are — the rest of that directory is cameras, speech synthesis and
       # Firestore, and none of it could compile into a function.
@@ -52,6 +52,7 @@ on:
       - "korczak-xyz/src/utils/backseat/remarks.ts"
       - "korczak-xyz/src/utils/backseat/vision.ts"
       - "korczak-xyz/src/utils/backseat/demoLimits.ts"
+      - "korczak-xyz/src/utils/backseat/liveConfig.ts"
       # And the tsconfig that stops Vite walking up to the site's Astro one: without it the
       # functions' own test run cannot transform any of the files above. It cost a deploy once.
       - "korczak-xyz/src/utils/backseat/tsconfig.json"

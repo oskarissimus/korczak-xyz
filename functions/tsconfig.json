@@ -24,6 +24,7 @@
     "../korczak-xyz/src/utils/backseat/remarks.ts",
     "../korczak-xyz/src/utils/backseat/vision.ts",
     "../korczak-xyz/src/utils/backseat/demoLimits.ts",
+    "../korczak-xyz/src/utils/backseat/liveConfig.ts",
     "../korczak-xyz/src/utils/accountKeys/keys.ts"
   ],
   "exclude": [
