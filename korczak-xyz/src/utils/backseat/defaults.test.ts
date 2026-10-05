@@ -5,6 +5,7 @@ import {
   MAX_INTERVAL,
   MIN_INTERVAL,
   canStart,
+  demoRestrictions,
   missingKeys,
   normalizeConfig,
   remarkLanguage,
@@ -156,5 +157,61 @@ describe('canStart', () => {
     expect(canStart(DEFAULT_CONFIG)).toBe(false);
     expect(canStart(withKey)).toBe(true);
     expect(canStart({ ...withKey, vision: { ...withKey.vision, model: '  ' } })).toBe(false);
+  });
+});
+
+/*
+ * The demo rides on the site's key, and these three are what that changes about the settings. Each
+ * was a way for the app to be wrong: a demo that asked for a key it does not need, a Start button
+ * dead for want of a model the function chooses, and a Live session that cannot be lent because
+ * its key goes in a WebSocket URL.
+ */
+describe('the demo', () => {
+  const demo = { ...DEFAULT_CONFIG, demoMode: true };
+
+  it('asks for no key at all', () => {
+    expect(requiredKeys(demo)).toEqual([]);
+    expect(missingKeys(demo)).toEqual([]);
+    expect(canStart(demo)).toBe(true);
+  });
+
+  /* An ElevenLabs voice is the reader's own key on the reader's own bill either way, so it is
+     still asked for — and it is the one key field the sheet keeps while the demo is on. */
+  it('still asks for ElevenLabs when an ElevenLabs voice is chosen', () => {
+    const withEleven = { ...demo, voice: { ...demo.voice, engine: 'elevenlabs' as const } };
+    expect(requiredKeys(withEleven)).toEqual(['elevenLabs']);
+    expect(canStart(withEleven)).toBe(false);
+  });
+
+  it('starts without a model, because the function picks it', () => {
+    expect(canStart({ ...demo, vision: { ...demo.vision, model: '' } })).toBe(true);
+  });
+
+  it('moves a demo ride off Gemini Live and puts the function\'s floor under the interval', () => {
+    const restricted = demoRestrictions(
+      { ...demo, voice: { ...demo.voice, engine: 'live' }, remarks: { ...demo.remarks, intervalSeconds: 6 } },
+      12,
+    );
+    expect(restricted.voice.engine).toBe('device');
+    expect(restricted.remarks.intervalSeconds).toBe(12);
+  });
+
+  it('leaves a slower interval and an ElevenLabs voice alone', () => {
+    const restricted = demoRestrictions(
+      { ...demo, voice: { ...demo.voice, engine: 'elevenlabs' }, remarks: { ...demo.remarks, intervalSeconds: 30 } },
+      12,
+    );
+    expect(restricted.voice.engine).toBe('elevenlabs');
+    expect(restricted.remarks.intervalSeconds).toBe(30);
+  });
+
+  it('is a pass-through when the demo is off', () => {
+    expect(demoRestrictions(DEFAULT_CONFIG, 60)).toBe(DEFAULT_CONFIG);
+  });
+
+  it('is off unless the stored config says so in so many words', () => {
+    expect(normalizeConfig({}).demoMode).toBe(false);
+    expect(normalizeConfig({ demoMode: 'yes' }).demoMode).toBe(false);
+    expect(normalizeConfig({ demoMode: true }).demoMode).toBe(true);
   });
 });

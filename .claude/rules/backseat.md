@@ -453,6 +453,95 @@ The icon is the same Win95 device as the others — navy body, raised bezel, sun
 a yellow speech bubble over a green road running to a vanishing point. Three lines of nothing in
 particular inside the bubble: it is always full and never says anything.
 
+### The front camera is mirrored, and the ride screen goes full screen (Oct 2026)
+
+Two small things asked for the day the roaster shipped, and one of them has a trap in it.
+
+**The preview is mirrored when the facing camera is the front one** (`bks-video-mirror`, a
+`scaleX(-1)`). A preview of your own face that moves the wrong way when you move is the one thing
+every phone camera app gets right and a naive `<video>` gets wrong, and the roaster points the
+front camera at somebody deliberately. **The FRAME is not mirrored**: what goes to the model is
+what the lens saw, so a model reading a label, a sign or a T-shirt in the shot reads it the right
+way round. Mirroring the canvas as well would be a quiet accuracy loss for a cosmetic gain.
+
+**Full screen is `fullscreen.ts`, and it is the island that goes full screen, not the preview.** A
+full-screen viewfinder is the layout this app exists not to have (*The sentence that has to stay on
+the screen*, above), and what somebody wants bigger is the remark. Three disagreements between
+browsers, and the third decides the UI: Safari answers only to `webkitRequestFullscreen`; the
+request is granted only inside a gesture, so `toggleFullscreen` is handed the click directly with
+nothing awaited first (the same rule as `primeVoices` and `primeLiveAudio`); and **the iPhone has
+no element full screen at all** — only a `<video>` may take the screen there — so the button is not
+drawn rather than drawn and broken. `supportsFullscreen` is a question about the browser, read once
+after mount because `document` does not exist while the island renders on the server. Nothing in
+that file throws at the caller: a refusal leaves a working ride screen.
+
+The CSS trap is worth knowing: `.bks-app:fullscreen` and `.bks-app:-webkit-full-screen` are
+**separate rules**, not a selector list. A list containing one pseudo-class the browser does not
+know is dropped whole, so written together neither would apply anywhere.
+
+### The demo: a few remarks on the owner's key (Oct 2026)
+
+Both apps are otherwise entirely in the browser on the reader's own key, and that is the whole
+architecture — except this. Somebody with no account and no API key can hear a few remarks, paid
+for by the owner's own Google key, because the apps are the sort of thing you have to see working
+before you will go and make an AI Studio key, and *paste an API key* is where every one of them
+stops. It is the **one server call either app makes**: `roastDemo`
+(`functions/src/demo/handler.ts`), the browser half in `utils/backseat/demo.ts`.
+
+Everything about it follows from the fact that it is somebody else's key:
+
+- **The prompt is built by the function, not sent to it.** A request names an app, a persona, an
+  intensity, a language and at most ten recent remarks, each checked against the same closed lists
+  `normalizeConfig` validates settings against, and the system prompt is assembled by the *same*
+  `systemPrompt` the browser uses. A handler that accepted a prompt would be a free,
+  unauthenticated Gemini proxy with the owner's name on the bill, which is a different product from
+  a demo of a joke app. The angle comes **back** rather than going out, because the function draws
+  it. `demo.test.ts` pins the request's shape for that reason.
+- **The key is read at call time from `users/{keyUid}/keys/config`** — the account's own shared key
+  store (`account-keys.md`) — and is **not** a Secret Manager secret. That buys three things: no
+  second copy to rotate, clearing the key on the account page closes the demo, and switching it on
+  is a uid in a document rather than a deploy. It costs one Admin SDK read of a document no browser
+  could see; the uid is the one the panel wrote, and nothing in a request names it.
+- **Two caps, because they fail differently.** One person with a loop can spend a day's quota in
+  ten minutes (the per-IP cap); a hundred people each inside their own limit can do it more slowly
+  (the per-app one). Checked in that order, because "you have had your go" and "the site has had
+  its day" are different sentences. Defaults: 15 per device, 400 per app, per Warsaw day, 12s
+  between remarks. The maxima a panel may set are in `demoLimits.ts`.
+- **No IP is stored.** The counter's key is `sha256(day + ':' + ip)` truncated to 32 hex, with the
+  day in the **salt** as well as in the path, so two days' documents cannot be joined up and
+  nothing in the database says who was here. The only durable trace of a demo call is two integers
+  getting bigger. `callerIp` takes the **last** `x-forwarded-for` entry — Cloud Run's front end
+  appends, and taking the first would let anybody mint a fresh bucket per request with one header.
+- **The claim happens before the model call**, in a transaction, so two tabs on one phone cannot
+  both pass the cap and a provider error spends a demo call. That is the strict direction; the
+  alternative is a refund path a loop can fail on purpose.
+- **`demoUsage` has no rule in `firestore.rules`, deliberately.** Unmatched means denied, only the
+  Admin SDK writes it, and nothing in the panel reads it. `demo/config` has one, admins only.
+- **A refusal is fatal to the ride.** `DemoError.fatal` is true for every reason, which is the
+  opposite reading from a provider's own 429: a cap is a cap for the rest of the day, and the
+  loop's three-strikes rule would otherwise spend two more rounds discovering it.
+- **It is two-step only.** Gemini Live is a WebSocket the browser opens with the key in the URL, so
+  there is no way to lend it without lending the key. `demoRestrictions` moves a demo config off
+  `live` and puts the function's interval floor under the slider, and the setup sheet does not draw
+  the mode or model groups at all while the demo is on — a dropdown that cannot change anything is
+  a question somebody tries to answer. An ElevenLabs voice stays available: that is the reader's
+  own key and their own bill.
+- **Nothing about a demo ride is written down.** `rideLog.ts` writes only for a signed-in account
+  and a demo has none, so no frame, prompt or remark is stored. The round's record would say
+  `provider: 'demo'` and name no prompt, since the one this browser would have built is not what
+  the model saw.
+- **`demoLimits.ts` is compiled twice**, by Astro for the admin panel and by `tsc` into the
+  function (`functions/tsconfig.json`, re-exported from `src/demo/limits.ts`), for Event Watch's
+  one-rule-two-runtimes reason: the panel writes the document the handler decides from, and a cap
+  must not mean one number in one and another in the other. What stays in the function's own file
+  is what needs node's crypto and the proxy header.
+
+**The switch is the key, not the flag.** `enabled` ships true and `keyUid` ships empty, so the
+state out of the box is *ready, nobody is paying* and every call is refused with the same sentence
+the switch being off produces. The dials are on `/apps/admin/` (`AdminDemo.tsx`): the payer as
+three states — nobody, mine, another account — the model, both caps, the interval floor and a
+checkbox per app.
+
 ### The roaster: the same island, another prompt (Oct 2026)
 
 At the owner's request, a generalisation of the passenger: "just roast what it sees, without the

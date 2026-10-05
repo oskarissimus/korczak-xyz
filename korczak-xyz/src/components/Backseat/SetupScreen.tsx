@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import type { DemoStatus } from '../../utils/backseat/demo';
 import {
   INTENSITIES,
   MAX_INTERVAL,
@@ -89,6 +90,12 @@ interface SetupScreenProps {
   onStart: () => void;
   /** Signed in, so every round of a ride is saved to the account (`rideLog.ts`). */
   saving: boolean;
+  /**
+   * What the site's own key says about itself, or null when there is no demo to offer — a function
+   * that is down, a build with no project configured, and a demo switched off all arrive as null
+   * or as `available: false`, and this sheet treats them alike.
+   */
+  demo: DemoStatus | null;
   /** Which app's personas and test line. */
   flavour: FlavourId;
   t: Translation;
@@ -101,6 +108,7 @@ export default function SetupScreen({
   reset,
   onStart,
   saving,
+  demo,
   flavour,
   t,
   lang,
@@ -274,6 +282,19 @@ export default function SetupScreen({
   const missing = missingKeys(config);
   const ready = canStart(config);
 
+  /*
+   * On the demo, the whole middle of this sheet is somebody else's business: the key, the provider
+   * and the model are the function's, and one-step Live cannot be lent at all. So those groups are
+   * not drawn rather than drawn and disabled — a dropdown that cannot change anything is a
+   * question somebody tries to answer.
+   */
+  const onDemo = config.demoMode;
+  // Offered while it is open, and still shown to somebody already on it so they can get off.
+  const offerDemo = onDemo || demo?.available === true;
+  const demoFloor = demo?.minIntervalSeconds ?? MIN_INTERVAL;
+  const minInterval = onDemo ? Math.max(MIN_INTERVAL, demoFloor) : MIN_INTERVAL;
+  const interval = Math.max(config.remarks.intervalSeconds, minInterval);
+
   const deviceVoiceOptions = [
     { value: '', label: t.voiceDeviceDefault },
     ...deviceVoices.map((voice) => ({ value: voice.uri, label: `${voice.name} (${voice.lang})` })),
@@ -292,6 +313,51 @@ export default function SetupScreen({
       {/* A camera that keeps what it sees has to say so before it is switched on. */}
       {saving && <p className="bks-note">{t.ridesSaved}</p>}
 
+      {offerDemo && (
+        <Fieldset legend={t.demoTitle} hint={t.demoBlurb}>
+          <Row
+            label={t.demoLabel}
+            hint={
+              onDemo && demo?.model
+                ? fill(t.demoModelNote, { model: demo.model })
+                : demo
+                  ? fill(t.demoLimits, { ip: demo.perIpDaily, app: demo.perAppDaily })
+                  : undefined
+            }
+          >
+            {(id) => (
+              <Select<'site' | 'mine'>
+                id={id}
+                value={onDemo ? 'site' : 'mine'}
+                options={[
+                  { value: 'mine', label: t.demoOff },
+                  { value: 'site', label: t.demoOn },
+                ]}
+                onChange={(value) =>
+                  update({
+                    demoMode: value === 'site',
+                    // Live is a WebSocket opened with a key in the URL, so the demo moves off it
+                    // here rather than failing at the first round.
+                    voice:
+                      value === 'site' && config.voice.engine === 'live'
+                        ? { ...config.voice, engine: config.apiKeys.elevenLabs ? 'elevenlabs' : 'device' }
+                        : config.voice,
+                  })
+                }
+              />
+            )}
+          </Row>
+          {onDemo && typeof demo?.remaining.ip === 'number' && (
+            <p className="bks-note">{fill(t.demoLeft, { n: demo.remaining.ip })}</p>
+          )}
+          {onDemo && demo?.available === false && <p className="bks-error">{t.demoClosed}</p>}
+          {onDemo && <p className="bks-hint">{t.demoNoLive}</p>}
+        </Fieldset>
+      )}
+
+      {/* The keys, which the demo does not need — except ElevenLabs, which is the reader's own
+          voice on the reader's own bill either way. */}
+      {(!onDemo || usingElevenLabs) && (
       <Fieldset legend={t.keysTitle} hint={t.keysBlurb}>
         {/* Said where the key is: a key typed here is the one every other app uses too, and
             clearing it here clears it there. */}
@@ -330,8 +396,10 @@ export default function SetupScreen({
           />
         )}
       </Fieldset>
+      )}
 
       {/* One step or two, before any model: the rest of the sheet depends on the answer. */}
+      {!onDemo && (
       <Fieldset legend={t.modeTitle}>
         <Row label={t.modeLabel} hint={usingLive ? t.modeOneHint : t.modeTwoHint}>
           {(id) => (
@@ -356,8 +424,9 @@ export default function SetupScreen({
           )}
         </Row>
       </Fieldset>
+      )}
 
-      {usingLive ? (
+      {onDemo ? null : usingLive ? (
         <Fieldset legend={t.liveTitle}>
           <p className="bks-note">{t.voiceLiveNote}</p>
           <Row label={t.voiceLiveModel} error={liveModels.error}>
@@ -475,18 +544,15 @@ export default function SetupScreen({
           )}
         </Row>
 
-        <Row
-          label={fill(t.intervalLabel, { n: config.remarks.intervalSeconds })}
-          hint={t.intervalHint}
-        >
+        <Row label={fill(t.intervalLabel, { n: interval })} hint={t.intervalHint}>
           {(id) => (
             <Slider
               id={id}
-              value={config.remarks.intervalSeconds}
-              min={MIN_INTERVAL}
+              value={interval}
+              min={minInterval}
               max={MAX_INTERVAL}
               step={1}
-              lowLabel={`${MIN_INTERVAL}s`}
+              lowLabel={`${minInterval}s`}
               highLabel={`${MAX_INTERVAL}s`}
               onChange={(value) =>
                 update({ remarks: { ...config.remarks, intervalSeconds: Math.round(value) } })

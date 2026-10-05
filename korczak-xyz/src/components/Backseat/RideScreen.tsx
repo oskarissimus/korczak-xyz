@@ -21,7 +21,13 @@
 
 import { useEffect, useState } from 'react';
 
-import { cameraMessage, localeOf, type Lang, type Translation } from './translations';
+import { cameraMessage, fill, localeOf, type Lang, type Translation } from './translations';
+import {
+  isFullscreen,
+  supportsFullscreen,
+  toggleFullscreen,
+  watchFullscreen,
+} from '../../utils/backseat/fullscreen';
 import type { CameraFailure } from '../../utils/backseat/frame';
 import type { Remark, RideStatus } from '../../utils/backseat/types';
 import type { PendingRound } from '../../hooks/useBackseatRide';
@@ -29,11 +35,23 @@ import type { PendingRound } from '../../hooks/useBackseatRide';
 interface RideScreenProps {
   status: RideStatus;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /**
+   * The front camera, which is shown mirrored. A preview of your own face that moves the wrong way
+   * when you move is the one thing every phone camera app gets right and every naive `<video>`
+   * gets wrong, and this app points the front camera at somebody deliberately. The FRAME is not
+   * mirrored — what goes to the model is what the lens saw, so a model reading a label or a sign
+   * in the shot reads it the right way round.
+   */
+  mirrored: boolean;
+  /** The element that goes full screen: the whole app, not the preview. */
+  fullscreenTarget: React.RefObject<HTMLElement | null>;
   remarks: Remark[];
   current: Remark | null;
   speaking: boolean;
   pending: PendingRound | null;
   lastLatencyMs: number | null;
+  /** Demo rides: remarks left for this device today, as the function last said. Null otherwise. */
+  demoRemaining: number | null;
   error: string | null;
   cameraError: CameraFailure | null;
   onStop: () => void;
@@ -96,11 +114,14 @@ function LatencyClock({
 export default function RideScreen({
   status,
   videoRef,
+  mirrored,
+  fullscreenTarget,
   remarks,
   current,
   speaking,
   pending,
   lastLatencyMs,
+  demoRemaining,
   error,
   cameraError,
   onStop,
@@ -109,6 +130,20 @@ export default function RideScreen({
   t,
   lang,
 }: RideScreenProps) {
+  /*
+   * The button is drawn only where the browser has element full screen at all — not on an iPhone,
+   * where only a `<video>` may take the screen and a button that does nothing is worse than no
+   * button. Read once, after mount: `document` does not exist while this renders on the server.
+   */
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    setCanFullscreen(supportsFullscreen());
+    setFull(isFullscreen());
+    // Escape and the browser's own exit are changes nobody told us about; the label follows them.
+    return watchFullscreen(() => setFull(isFullscreen()));
+  }, []);
+
   const timeOf = (at: number) =>
     new Date(at).toLocaleTimeString(localeOf(lang), { hour: '2-digit', minute: '2-digit' });
 
@@ -121,7 +156,7 @@ export default function RideScreen({
       <div className="bks-viewport">
         <video
           ref={videoRef}
-          className="bks-video"
+          className={mirrored ? 'bks-video bks-video-mirror' : 'bks-video'}
           playsInline
           muted
           autoPlay
@@ -167,6 +202,27 @@ export default function RideScreen({
           {t.hush}
         </button>
       </div>
+
+      {/* Full screen is not one of the two big controls: it is used once, before the phone goes
+          into the cradle or into somebody's hand, and the two that are used mid-ride must not
+          shrink to make room for it. Handed the click directly — the request is granted only
+          inside a gesture. */}
+      {canFullscreen && (
+        <button
+          type="button"
+          className="retro-btn bks-fullscreen"
+          onClick={() => toggleFullscreen(fullscreenTarget.current)}
+          aria-pressed={full}
+        >
+          {full ? t.fullscreenExit : t.fullscreenEnter}
+        </button>
+      )}
+
+      {/* A demo ride stops at a cap, so the count that is running out is on the screen while it
+          still says something useful — not in the sentence that explains why it stopped. */}
+      {demoRemaining !== null && (
+        <p className="bks-note">{fill(t.demoLeft, { n: demoRemaining })}</p>
+      )}
 
       <p className="bks-disclaimer">{t.disclaimerShort}</p>
 

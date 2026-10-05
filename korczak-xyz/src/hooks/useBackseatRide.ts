@@ -33,6 +33,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError, log } from '../lib/logger';
 import { recordMeasurement } from '../lib/sentry';
 import { canStart, speechLocale } from '../utils/backseat/defaults';
+import { askDemo } from '../utils/backseat/demo';
 import {
   cameraConstraints,
   cameraSupported,
@@ -104,6 +105,12 @@ export interface RideApi {
   pending: PendingRound | null;
   /** The last round's photo-to-first-sound, kept on screen after the count stops. */
   lastLatencyMs: number | null;
+  /**
+   * Demo rides only: how many remarks this device has left today, as the function last said.
+   * Null off the demo, and until the first answer. On the screen because a ride that is about to
+   * stop at a cap should say so before it does rather than after.
+   */
+  demoRemaining: number | null;
   /** Something worth a banner. Cleared by starting again. */
   error: string | null;
   /** A camera refusal, which needs a different sentence from a provider error. */
@@ -143,6 +150,7 @@ export function useBackseatRide(
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingRound | null>(null);
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const [demoRemaining, setDemoRemaining] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<CameraFailure | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -270,6 +278,13 @@ export function useBackseatRide(
 
     const settings = configRef.current;
     const startedAt = Date.now();
+    /*
+     * The demo: the looking is a function of ours on the site's key rather than a provider on the
+     * reader's (`utils/backseat/demo.ts`). Everything else about the round is unchanged — the same
+     * frame, the same sanitiser, the same repeat check, the same chain of timeouts — and that is
+     * deliberate: the demo is the same app with a different payer, not a reduced one.
+     */
+    const demo = settings.demoMode;
     const app = flavourRef.current;
     const angles = anglesFor(app.id);
     const USER_PROMPT = userPromptFor(app.id);
@@ -304,7 +319,9 @@ export function useBackseatRide(
     // What the screen counts from: the photograph, until the first sound.
     setPending({ at: startedAt, stage: 'looking' });
 
-    const live = settings.voice.engine === 'live';
+    // Never both: there is no way to lend a Live WebSocket without lending the key, so
+    // `demoRestrictions` has already moved a demo config off it. Belt and braces.
+    const live = settings.voice.engine === 'live' && !demo;
     const liveSettings = {
       apiKey: settings.apiKeys.google ?? '',
       model: settings.voice.liveModel,
@@ -341,13 +358,15 @@ export function useBackseatRide(
       rideId: rideRef.current.id,
       n: rideRef.current.rounds,
       at: startedAt,
-      provider: live ? 'google-live' : settings.vision.provider,
-      model: live ? settings.voice.liveModel : settings.vision.model,
+      provider: demo ? 'demo' : live ? 'google-live' : settings.vision.provider,
+      model: demo ? 'demo' : live ? settings.voice.liveModel : settings.vision.model,
       persona: settings.remarks.persona,
       intensity: settings.remarks.intensity,
       angle,
       lang: langRef.current,
-      system,
+      // The demo's prompt is assembled by the function out of the persona, intensity and language
+      // it was sent, so the one this browser would have used is not what the model saw.
+      system: demo ? '(demo: the prompt is built by the roastDemo function)' : system,
       user: USER_PROMPT,
       raw: null,
       text: null,
@@ -564,16 +583,34 @@ export function useBackseatRide(
         return;
       }
 
-      const raw = await askForRemark({
-        provider: settings.vision.provider,
-        apiKey: settings.apiKeys[settings.vision.provider === 'google' ? 'google' : 'openai'] ?? '',
-        model: settings.vision.model,
-        system,
-        user: USER_PROMPT,
-        frame,
-        signal: visionController.signal,
-        onMark: mark,
-      });
+      let raw: string;
+      if (demo) {
+        const answer = await askDemo({
+          app: app.id,
+          persona: settings.remarks.persona,
+          intensity: settings.remarks.intensity,
+          lang: langRef.current,
+          recent: recentTexts(historyRef.current),
+          frame,
+          signal: visionController.signal,
+          onMark: mark,
+        });
+        raw = answer.text;
+        // The function drew the angle, so the record names the one actually used.
+        record.angle = answer.angle;
+        setDemoRemaining(answer.remaining.ip);
+      } else {
+        raw = await askForRemark({
+          provider: settings.vision.provider,
+          apiKey: settings.apiKeys[settings.vision.provider === 'google' ? 'google' : 'openai'] ?? '',
+          model: settings.vision.model,
+          system,
+          user: USER_PROMPT,
+          frame,
+          signal: visionController.signal,
+          onMark: mark,
+        });
+      }
       record.raw = raw;
       timings.visionMs = since();
       setPending({ at: startedAt, stage: 'voicing' });
@@ -682,6 +719,7 @@ export function useBackseatRide(
     setError(null);
     setCameraError(null);
     setLastLatencyMs(null);
+    setDemoRemaining(null);
     failuresRef.current = 0;
     rideRef.current = { id: rideIdFor(Date.now()), rounds: 0, angle: null };
 
@@ -767,6 +805,7 @@ export function useBackseatRide(
     speaking,
     pending,
     lastLatencyMs,
+    demoRemaining,
     error,
     cameraError,
     start,

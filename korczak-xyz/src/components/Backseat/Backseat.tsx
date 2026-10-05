@@ -21,12 +21,13 @@
  * notice is a notice and not a gate.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useBackseatConfig } from '../../hooks/useBackseatConfig';
 import { useBackseatRide } from '../../hooks/useBackseatRide';
-import { remarkLanguage } from '../../utils/backseat/defaults';
+import { demoRestrictions, remarkLanguage } from '../../utils/backseat/defaults';
+import { fetchDemoStatus, type DemoStatus } from '../../utils/backseat/demo';
 import { FLAVOURS, type FlavourId } from '../../utils/backseat/flavour';
 import RideScreen from './RideScreen';
 import SetupScreen from './SetupScreen';
@@ -56,14 +57,42 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
   const t: Translation = forFlavour(flavourId, lang);
   const auth = useAuth();
   const { config, ready, sync, update, reset } = useBackseatConfig(auth.user, flavour);
+
+  /*
+   * Whether the site's own key is answering today, asked once per load and before any camera.
+   *
+   * The setup sheet needs it to know whether to offer the demo at all, and the ride needs its
+   * interval floor. Null means "not asked yet or cannot be asked", which the sheet reads as no
+   * demo — a function that is down and a demo that is switched off are the same thing from here.
+   */
+  const [demo, setDemo] = useState<DemoStatus | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchDemoStatus(flavourId, controller.signal).then((status) => {
+      if (!controller.signal.aborted) setDemo(status);
+    });
+    return () => controller.abort();
+  }, [flavourId]);
+
+  // What the ride actually runs on: the demo cannot lend a Live session and puts a floor under the
+  // interval (`demoRestrictions`). A pass-through when the demo is off.
+  const effective = demoRestrictions(config, demo?.minIntervalSeconds);
   const ride = useBackseatRide(
-    config,
-    remarkLanguage(config, lang),
+    effective,
+    remarkLanguage(effective, lang),
     auth.user?.uid ?? null,
     flavour,
   );
 
   const riding = ride.status !== 'idle';
+
+  /*
+   * What goes full screen. The whole island rather than the preview: a full-screen viewfinder is
+   * the layout this app exists not to have (`backseat.css`), and what somebody wants bigger is the
+   * sentence. It is on the island's own root so the Win95 window, the navbar and the taskbar all
+   * stay behind it.
+   */
+  const appRef = useRef<HTMLDivElement | null>(null);
 
   /*
    * The unload warning, armed only while the camera is actually on.
@@ -97,7 +126,7 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
     : t.syncLocal;
 
   return (
-    <div className="bks-app">
+    <div className="bks-app" ref={appRef}>
       <header className="bks-head">
         <h2 className="bks-head-title">{riding ? t.rideTitle : t.setupTitle}</h2>
       </header>
@@ -106,11 +135,14 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
         <RideScreen
           status={ride.status}
           videoRef={ride.videoRef}
+          mirrored={effective.camera.facing === 'user'}
+          fullscreenTarget={appRef}
           remarks={ride.remarks}
           current={ride.current}
           speaking={ride.speaking}
           pending={ride.pending}
           lastLatencyMs={ride.lastLatencyMs}
+          demoRemaining={ride.demoRemaining}
           error={ride.error}
           cameraError={ride.cameraError}
           onStop={ride.stop}
@@ -157,6 +189,7 @@ export default function Backseat({ lang, flavour: flavourId = 'backseat' }: Back
                before that point loses the gesture on iOS — the app is then silent for the whole
                ride with nothing in any log. See `primeVoices`. */
             onStart={ride.start}
+            demo={demo}
             flavour={flavourId}
             t={t}
             lang={lang}

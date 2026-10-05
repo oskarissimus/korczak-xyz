@@ -426,3 +426,59 @@ button.typing-sync-cell:active {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* --- The demo's dials --- */
+/* The one panel on this site that decides how much of somebody's money a stranger may spend, so
+   every control carries its sentence under it rather than beside it: a number field whose meaning
+   is in a heading two rows up is a number somebody changes by a factor of ten. */
+.admin-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'VT323', monospace;
+}
+
+.admin-demo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 1.2rem;
+  color: var(--retro-black);
+}
+
+.admin-demo-field input[type='text'],
+.admin-demo-field input[type='number'] {
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+  padding: 6px 8px;
+  border: 2px inset var(--retro-white);
+  background: var(--retro-white);
+  color: var(--retro-black);
+  /* A uid is 28 characters and a cap is three; both sit in a column 420px wide. */
+  max-width: 24rem;
+}
+
+.admin-demo-label {
+  font-size: 1.2rem;
+  color: var(--retro-black);
+}
+
+.admin-demo-hint {
+  font-size: 1rem;
+  color: var(--retro-dark-gray);
+}
+
+.admin-demo-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+  padding: 8px 10px;
+  margin: 0;
+}
+
+.admin-demo-radio {
+  font-size: 1.2rem;
+  color: var(--retro-black);
+}

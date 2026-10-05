@@ -137,6 +137,14 @@ which had to be edited together and silently did not. The island itself sits ins
 an ordinary item: Astro gives `<astro-island>` `display: contents`, so the `<li>` is the flex item
 and a card that renders nothing for everybody else occupies nothing.
 
+**It has a second section since Oct 2026**, and it is not about admissions at all: `AdminDemo`
+holds the dials for the camera apps' demo — whose API key pays for a stranger's few remarks, the
+per-device and per-day caps, and which apps offer it (`backseat.md`, *The demo*). It is here
+because it is the other decision on this site that only the owner may make, it is read through
+`isAdmin` and written through an admins-only rule on `demo/config`, and a page of its own for one
+form would be a page nobody remembers the address of. It draws nothing for a non-admin, the
+heading above it having already said so.
+
 It is deliberately **not installable**: no manifest, no icon, no precache tier. `apps.ts` says what
 qualifies — "a thing you reach for away from a desk" — and approving an account once a fortnight is
 not it. Making it one is an SVG, `npm run icons`, a `PWA_APPS` entry, a scope pattern and two tier

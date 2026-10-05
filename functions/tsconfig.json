@@ -17,7 +17,13 @@
     "src/**/*.ts",
     "../korczak-xyz/src/utils/events/*.ts",
     "../korczak-xyz/src/utils/transit/*.ts",
-    "../korczak-xyz/src/utils/sloper/job.ts"
+    "../korczak-xyz/src/utils/sloper/job.ts",
+    "../korczak-xyz/src/utils/backseat/types.ts",
+    "../korczak-xyz/src/utils/backseat/flavour.ts",
+    "../korczak-xyz/src/utils/backseat/defaults.ts",
+    "../korczak-xyz/src/utils/backseat/remarks.ts",
+    "../korczak-xyz/src/utils/backseat/vision.ts",
+    "../korczak-xyz/src/utils/backseat/demoLimits.ts"
   ],
   "exclude": [
     "../korczak-xyz/src/utils/events/*.test.ts",

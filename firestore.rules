@@ -235,6 +235,37 @@ service cloud.firestore {
     }
 
     /*
+     * The demo's settings: whether a stranger with no key may hear a few remarks on somebody
+     * else's, whose key pays for them, and how many a day (`functions/src/demo/limits.ts`).
+     *
+     * ONE DOCUMENT, WRITTEN FROM THE ADMISSIONS PANEL, READ BY A CLOUD FUNCTION. The function
+     * reads it on the Admin SDK and bypasses this block entirely, so what is written here is only
+     * about the browser — and the browser that matters is the panel at /apps/admin/, where the
+     * same admin who approves accounts decides whether the demo is open.
+     *
+     * **Readable by an admin only, and that is deliberate even though it holds no secret.** It
+     * names a uid and two caps, and a stranger who knew the caps would know exactly how much is
+     * left to spend. The page that actually needs the numbers — the setup sheet of an app, opened
+     * by somebody signed in to nothing — gets them from the function instead, which answers for
+     * the caller's own address and tells them only what is left to *them*.
+     *
+     * `keyUid` is the field to be careful with: it names the account whose Google key the demo
+     * spends, so writing it is a way of volunteering somebody else's key. Only an admin can, and
+     * the panel writes nothing but their own uid into it.
+     */
+    match /demo/config {
+      allow read, write: if isAdmin();
+    }
+
+    /*
+     * The demo's counters live at `demoUsage/{app}-{day}` with a subcollection of hashed
+     * addresses, and there is deliberately NO match block for them: a path no block mentions is
+     * denied to every client, and the only writer is the function on the Admin SDK. They are
+     * rate-limit buckets rather than records — nothing in them names a person — and nothing in
+     * the site ever reads one, so a rule that granted any of it would only be a way in.
+     */
+
+    /*
      * The public-transport corpus: the parsed communiqués, the raw feed archive, and how each of
      * WTP's two feeds last answered.
      *

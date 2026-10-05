@@ -100,6 +100,7 @@ export const DEFAULT_CONFIG: BackseatConfig = {
     rate: 1,
   },
   camera: { facing: 'environment' },
+  demoMode: false,
 };
 
 /** Where a first session of the given app starts: the same, but for whose persona it is. */
@@ -200,6 +201,38 @@ export function normalizeConfig(value: unknown, flavour: Flavour = BACKSEAT): Ba
     camera: {
       facing: asOneOf(camera.facing, FACINGS, DEFAULT_CONFIG.camera.facing),
     },
+    demoMode: raw.demoMode === true,
+  };
+}
+
+/**
+ * The settings a demo ride actually runs on, which are not quite the ones on the screen.
+ *
+ * Two things cannot be offered on somebody else's key and both are enforced here rather than by
+ * hiding a control: the one-step Gemini Live engine is a WebSocket the browser opens with the key
+ * in the URL, so there is no way to lend it without lending the key; and the interval has a floor
+ * the function sets, because a three-second gap on a shared daily cap is one phone spending
+ * everybody's. `minIntervalSeconds` comes from the function's own status (`demo.ts`).
+ *
+ * A pass-through when the demo is off, so the ride loop and the setup sheet can both call it
+ * without asking first.
+ */
+export function demoRestrictions(
+  config: BackseatConfig,
+  minIntervalSeconds = MIN_INTERVAL,
+): BackseatConfig {
+  if (!config.demoMode) return config;
+  return {
+    ...config,
+    remarks: {
+      ...config.remarks,
+      intervalSeconds: Math.max(config.remarks.intervalSeconds, minIntervalSeconds),
+    },
+    voice: {
+      ...config.voice,
+      // ElevenLabs stays available: that is the reader's own key and their own bill.
+      engine: config.voice.engine === 'live' ? 'device' : config.voice.engine,
+    },
   };
 }
 
@@ -221,6 +254,14 @@ export function speechLocale(lang: RemarkLanguage): string {
  * the device synthesiser is the default: one key and the app runs.
  */
 export function requiredKeys(config: BackseatConfig): KeyName[] {
+  /*
+   * The demo asks for nothing, which is the whole of it: the looking is paid for by the site's key
+   * and the speaking by the phone's own synthesiser. An ElevenLabs voice chosen anyway is still
+   * the reader's own key and is still asked for, below.
+   */
+  if (config.demoMode) {
+    return config.voice.engine === 'elevenlabs' ? ['elevenLabs'] : [];
+  }
   // Gemini Live does the looking and the speaking, so the vision provider's key is not asked for.
   if (config.voice.engine === 'live') return ['google'];
   const needed: KeyName[] = [config.vision.provider === 'openai' ? 'openai' : 'google'];
@@ -235,6 +276,8 @@ export function missingKeys(config: BackseatConfig): KeyName[] {
 
 /** Whether a ride could begin at all: every required key present, and a model chosen. */
 export function canStart(config: BackseatConfig): boolean {
+  // In the demo the model is the function's to choose, so there is no local model to check.
+  if (config.demoMode) return missingKeys(config).length === 0;
   const model = config.voice.engine === 'live' ? config.voice.liveModel : config.vision.model;
   return missingKeys(config).length === 0 && model.trim() !== '';
 }

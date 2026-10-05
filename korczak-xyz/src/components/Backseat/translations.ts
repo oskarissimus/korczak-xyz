@@ -128,6 +128,20 @@ export const translations = {
     voiceTest: 'Test the voice',
     voiceTestLine: 'Oh, slow down, would you? There is a lorry.',
 
+    // The demo, on the site's own key
+    demoTitle: 'Try it without a key',
+    demoBlurb:
+      "A few remarks on the site's own key, so you can hear what this is before going and making " +
+      'one of your own. Capped per device and per day, and shared with everybody else trying it.',
+    demoLabel: 'Whose key',
+    demoOn: "The site's key (demo)",
+    demoOff: 'My own key',
+    demoLimits: '{ip} a day on this device, {app} a day in total.',
+    demoLeft: '{n} demo remarks left today.',
+    demoModelNote: 'The demo looks with {model} and reads with this phone’s own voice.',
+    demoClosed: 'The demo is not open at the moment. A key of your own still works.',
+    demoNoLive: 'One step needs a key of your own: a demo cannot lend one.',
+
     // Camera
     cameraTitle: 'The camera',
     cameraFacing: 'Which camera',
@@ -139,6 +153,8 @@ export const translations = {
     stop: 'That is enough',
     hush: 'Be quiet',
     settings: 'Settings',
+    fullscreenEnter: 'Full screen',
+    fullscreenExit: 'Leave full screen',
     resetAll: 'Clear everything',
     resetConfirm: 'Clear every setting on this device and in your account? Your API keys stay.',
 
@@ -276,6 +292,20 @@ export const translations = {
     voiceTest: 'Sprawdź głos',
     voiceTestLine: 'Ojej, zwolnij trochę. Tam jest ciężarówka.',
 
+    demoTitle: 'Spróbuj bez klucza',
+    demoBlurb:
+      'Kilka uwag na koszt klucza tej strony, żebyś usłyszał, o co w tym chodzi, przed ' +
+      'wyrabianiem własnego. Limit na urządzenie i na dzień, wspólny ze wszystkimi, którzy ' +
+      'właśnie próbują.',
+    demoLabel: 'Czyj klucz',
+    demoOn: 'Klucz strony (demo)',
+    demoOff: 'Mój własny klucz',
+    demoLimits: '{ip} dziennie na tym urządzeniu, {app} dziennie łącznie.',
+    demoLeft: 'Zostało {n} uwag demo na dziś.',
+    demoModelNote: 'Demo patrzy modelem {model} i czyta głosem tego telefonu.',
+    demoClosed: 'Demo jest teraz zamknięte. Własny klucz nadal działa.',
+    demoNoLive: 'Jeden krok wymaga własnego klucza — demo go nie pożyczy.',
+
     cameraTitle: 'Kamera',
     cameraFacing: 'Która kamera',
     cameraBack: 'Tylna — skierowana na drogę',
@@ -285,6 +315,8 @@ export const translations = {
     stop: 'Wystarczy',
     hush: 'Cicho już',
     settings: 'Ustawienia',
+    fullscreenEnter: 'Pełny ekran',
+    fullscreenExit: 'Wyjdź z pełnego ekranu',
     resetAll: 'Wyczyść wszystko',
     resetConfirm: 'Usunąć wszystkie ustawienia z tego urządzenia i z konta? Klucze API zostają.',
 

@@ -570,3 +570,58 @@
     aspect-ratio: 16 / 9;
   }
 }
+
+/*
+ * The front camera, mirrored.
+ *
+ * Every phone's own camera app mirrors its selfie preview, so an unmirrored one reads as broken:
+ * you lean left and the person on the screen leans right. It is the preview only — `captureFrame`
+ * sends the lens's own picture, so a model reading a sign or a label in the shot reads it the
+ * right way round rather than backwards.
+ */
+.bks-video-mirror {
+  transform: scaleX(-1);
+}
+
+/* Used once, before the phone is put down or handed over, so it is a normal button under the two
+   thumb-sized ones rather than a third of the row they share. */
+.bks-fullscreen {
+  align-self: flex-start;
+  font-size: 1.05rem;
+  padding: 8px 14px;
+}
+
+/*
+ * Full screen: the island is the whole display, so it provides its own background — the page's is
+ * behind it and not painted — and the remark takes the room the window chrome was using. The
+ * preview keeps its strip shape; a viewfinder is the layout this app exists not to have.
+ */
+/* `:fullscreen` is the standard spelling and `-webkit-full-screen` is Safari's, and a selector
+   list containing one a browser does not know is dropped WHOLE — so they are written as separate
+   rules rather than comma-joined, which is the one way to get this wrong silently. */
+.bks-app:-webkit-full-screen {
+  background: var(--retro-gray);
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.bks-app:fullscreen {
+  background: var(--retro-gray);
+  overflow-y: auto;
+  padding: 24px;
+  /* A phone's notch and home bar are still there in full screen, and the controls must clear them. */
+  padding-top: calc(24px + var(--safe-top, 0px));
+  padding-bottom: calc(24px + var(--safe-bottom, 0px));
+}
+
+.bks-app:-webkit-full-screen .bks-current-text {
+  font-size: clamp(2rem, 7vw, 4rem);
+}
+
+.bks-app:fullscreen .bks-current-text {
+  font-size: clamp(2rem, 7vw, 4rem);
+}
+
+.bks-app:fullscreen .bks-viewport {
+  aspect-ratio: 16 / 6;
+}

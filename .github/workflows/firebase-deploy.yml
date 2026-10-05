@@ -42,6 +42,16 @@ on:
       # whether these tests can run at all, so it has to be able to run them.
       - "korczak-xyz/src/utils/sloper/job.ts"
       - "korczak-xyz/src/utils/sloper/tsconfig.json"
+      # The five files of `utils/backseat/` the demo function compiles in: the prompt it builds,
+      # the lists it validates against and the Google call it makes. Listed one by one for the
+      # same reason sloper's are — the rest of that directory is cameras, speech synthesis and
+      # Firestore, and none of it could compile into a function.
+      - "korczak-xyz/src/utils/backseat/types.ts"
+      - "korczak-xyz/src/utils/backseat/flavour.ts"
+      - "korczak-xyz/src/utils/backseat/defaults.ts"
+      - "korczak-xyz/src/utils/backseat/remarks.ts"
+      - "korczak-xyz/src/utils/backseat/vision.ts"
+      - "korczak-xyz/src/utils/backseat/demoLimits.ts"
       - "terraform/**"
       - "audio-guide-function/**"
       # The weekly pins build. Terraform base64s these into the Batch job's environment

@@ -92,6 +92,16 @@ export interface BackseatConfig {
   camera: {
     facing: CameraFacing;
   };
+  /**
+   * Ride on the site's own key instead of this reader's (`demo.ts`).
+   *
+   * A setting rather than a mode the app is launched in, so it survives a reload and syncs like
+   * everything else — and so that somebody who has since pasted a key can turn it off and keep
+   * their persona, their interval and their voice. It is capped per address and per day by the
+   * function, never offers the one-step Live engine (there is no way to lend a WebSocket key), and
+   * `requiredKeys` asks for nothing while it is on.
+   */
+  demoMode: boolean;
 }
 
 /**

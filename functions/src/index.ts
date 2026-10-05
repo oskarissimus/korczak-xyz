@@ -21,6 +21,7 @@ import { runCollection } from './collect';
 import { runTransitCollection } from './transit/collect';
 import { configureWebPush, sendTo } from './push';
 import { handleAssembleVideo } from './sloper/handler';
+import { handleRoastDemo } from './demo/handler';
 import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
@@ -235,4 +236,35 @@ export const assembleVideo = onRequest(
     cors: false,
   },
   handleAssembleVideo,
+);
+
+/**
+ * The demo: one remark for somebody with no key, on the owner's.
+ *
+ * `/apps/backseat/` and `/apps/roaster/` have no server half at all — the whole point of them is
+ * that the frame goes from the canvas to Google and nothing passes through this site. This is the
+ * one exception, and it buys the thing those apps most need: somebody can see one work before
+ * being asked to go and make an API key. Everything about spending somebody else's quota safely
+ * is in `demo/handler.ts` and `demo/limits.ts`.
+ *
+ * It holds no secrets. The key is read at call time from the owner's own account document, and
+ * which account that is, whether the demo runs at all and what the caps are all live in one
+ * Firestore document the admin panel writes. So there is nothing here to rotate and nothing on
+ * the deploy path that can fail for want of a secret.
+ *
+ * Small and bounded on purpose: a demo that can scale is a demo that can cost. Six instances at
+ * eight concurrent calls is far more than the caps can let through, and the ceiling is what stops
+ * a loop from turning into a bill before the counters stop it.
+ */
+export const roastDemo = onRequest(
+  {
+    region: REGION,
+    memory: '256MiB',
+    timeoutSeconds: 30,
+    concurrency: 8,
+    maxInstances: 6,
+    // Answered by the handler, which has the allowlist — same reasoning as `assembleVideo`.
+    cors: false,
+  },
+  handleRoastDemo,
 );
