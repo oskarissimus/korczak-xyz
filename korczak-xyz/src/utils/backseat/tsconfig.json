@@ -1,0 +1,40 @@
+{
+  // Why this file exists — the fourth copy of the same lesson, after `src/utils/events/`,
+  // `src/utils/transit/` and `src/utils/sloper/`, and the second one to cost a deploy.
+  //
+  // Five files in this directory are compiled by two projects: Astro for the browser, and `tsc`
+  // into the Cloud Functions bundle, because the demo function builds the same prompt out of the
+  // same closed lists the browser validates its settings against (`functions/tsconfig.json` names
+  // them by path rather than keeping a copy — see `.claude/rules/backseat.md`, *The demo*).
+  //
+  // Vite resolves a tsconfig by walking UP from the file it is transforming. Without this file that
+  // walk reaches korczak-xyz/tsconfig.json, which `extends: "astro/tsconfigs/strict"` — resolvable
+  // only where the site's node_modules are installed. The CI runner that deploys the functions
+  // installs only the functions' dependencies, so `functions/src/demo/limits.test.ts` died with
+  // `Failed to load tsconfig 'astro/tsconfigs/strict': Tsconfig not found`, naming
+  // `demoLimits.ts`, which has nothing wrong with it. It passes locally, where the site's
+  // dependencies happen to be there.
+  //
+  // WHAT IS DIFFERENT HERE, and it is the same caveat `sloper/` carries: this directory is NOT
+  // portable as a whole. `frame.ts` wants a canvas, `speech.ts` and `live.ts` want an audio
+  // context, `cloud.ts` imports `firebase/*`, `demo.ts` reads `import.meta.env`. Only
+  // `types.ts`, `flavour.ts`, `defaults.ts`, `remarks.ts`, `vision.ts` and `demoLimits.ts` cross
+  // into the function — they import nothing but each other, which is what makes it safe — and
+  // that is a property to check before adding a seventh to the functions' `include`.
+  //
+  // The walk stops here for every `.ts` in the directory all the same, because it is per-file and
+  // has no way to stop for one of them. That costs nothing: these are plain modules, none of them
+  // needs an Astro or a React compiler setting, and the React components are in
+  // `src/components/Backseat/` and are untouched by this.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"]
+}
