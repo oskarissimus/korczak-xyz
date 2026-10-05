@@ -41,13 +41,15 @@ import {
   secureContext,
   type CameraFailure,
 } from '../utils/backseat/frame';
+import { BACKSEAT, type Flavour } from '../utils/backseat/flavour';
 import {
+  anglesFor,
   isRepeat,
   pickAngle,
   recentTexts,
   sanitizeRemark,
   systemPrompt,
-  USER_PROMPT,
+  userPromptFor,
 } from '../utils/backseat/remarks';
 import { cancelSpeech, primeVoices, speak } from '../utils/backseat/speech';
 import { prepareLive, primeLiveAudio, sessionFits, type LiveSession } from '../utils/backseat/live';
@@ -131,6 +133,8 @@ export function useBackseatRide(
   lang: RemarkLanguage,
   /** The account a ride's rounds are saved under (`rideLog.ts`); null saves nothing. */
   uid: string | null = null,
+  /** Which app: the prompt, the folder the rounds are saved in, the measurement's name. */
+  flavour: Flavour = BACKSEAT,
 ): RideApi {
   const [status, setStatus] = useState<RideStatus>('idle');
   const [remarks, setRemarks] = useState<Remark[]>([]);
@@ -184,6 +188,9 @@ export function useBackseatRide(
 
   const uidRef = useRef(uid);
   uidRef.current = uid;
+
+  const flavourRef = useRef(flavour);
+  flavourRef.current = flavour;
   /** This ride's id and how many rounds it has had, for the saved records. */
   const rideRef = useRef({ id: '', rounds: 0, angle: null as string | null });
 
@@ -263,6 +270,9 @@ export function useBackseatRide(
 
     const settings = configRef.current;
     const startedAt = Date.now();
+    const app = flavourRef.current;
+    const angles = anglesFor(app.id);
+    const USER_PROMPT = userPromptFor(app.id);
 
     const schedule = (delayMs: number) => {
       if (!runningRef.current) return;
@@ -313,11 +323,12 @@ export function useBackseatRide(
       prepared = null;
     }
 
-    const angle = prepared?.angle ?? pickAngle(rideRef.current.angle);
+    const angle = prepared?.angle ?? pickAngle(rideRef.current.angle, Math.random, angles);
     rideRef.current.angle = angle;
     const system =
       prepared?.system ??
       systemPrompt({
+        flavour: app.id,
         angle,
         persona: settings.remarks.persona,
         intensity: settings.remarks.intensity,
@@ -371,10 +382,10 @@ export function useBackseatRide(
     const save = () => {
       trace.done = since();
       setPending(null);
-      saveRound(uidRef.current, record, frame);
+      saveRound(uidRef.current, record, frame, app);
       // The wait from photograph to voice, which is what the passenger's timing lives or dies
       // on: one measurement per round, numbers and categories only — never the remark.
-      recordMeasurement('backseat.round', {
+      recordMeasurement(`${app.id}.round`, {
         outcome: record.outcome,
         provider: record.provider,
         model: record.model,
@@ -534,8 +545,9 @@ export function useBackseatRide(
         save();
 
         // The next session, opened now so the next snapshot does not wait for a handshake.
-        const nextAngle = pickAngle(angle);
+        const nextAngle = pickAngle(angle, Math.random, angles);
         const nextSystem = systemPrompt({
+          flavour: app.id,
           angle: nextAngle,
           persona: settings.remarks.persona,
           intensity: settings.remarks.intensity,

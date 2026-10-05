@@ -43,6 +43,11 @@ describe('appForPath', () => {
     expect(appForPath('/pl/apps/backseat')).toBe('backseat');
   });
 
+  it('recognises the roaster, which is the same island on its own path', () => {
+    expect(appForPath('/apps/roaster')).toBe('roaster');
+    expect(appForPath('/pl/apps/roaster/')).toBe('roaster');
+  });
+
   it('treats everything else as the site', () => {
     expect(appForPath('/')).toBe('site');
     expect(appForPath('/apps')).toBe('site');

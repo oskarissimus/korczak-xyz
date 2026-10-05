@@ -20,7 +20,6 @@ import {
   INTENSITIES,
   MAX_INTERVAL,
   MIN_INTERVAL,
-  PERSONAS,
   REMARK_LANGUAGES,
   canStart,
   missingKeys,
@@ -46,10 +45,11 @@ import type {
   VoiceEngine,
 } from '../../utils/backseat/types';
 import { accountPath } from '../../utils/accountKeys/keys';
+import { FLAVOURS, type FlavourId } from '../../utils/backseat/flavour';
 import { fetchVisionModels } from '../../utils/backseat/vision';
 import { fetchLiveModels, LIVE_VOICES, prepareLive, primeLiveAudio } from '../../utils/backseat/live';
 import { Fieldset, KeyField, Row, Select, Slider } from './fields';
-import { fill, translations, type Translation } from './translations';
+import { fill, forFlavour, type Translation } from './translations';
 
 const PERSONA_LABELS: Record<Persona, keyof Translation> = {
   nervous: 'personaNervous',
@@ -57,6 +57,11 @@ const PERSONA_LABELS: Record<Persona, keyof Translation> = {
   parent: 'personaParent',
   child: 'personaChild',
   codriver: 'personaCodriver',
+  comedian: 'personaComedian',
+  critic: 'personaCritic',
+  grandma: 'personaGrandma',
+  teen: 'personaTeen',
+  narrator: 'personaNarrator',
 };
 
 /* Each language named in itself, as a language picker always is: somebody looking for Polish is
@@ -84,6 +89,8 @@ interface SetupScreenProps {
   onStart: () => void;
   /** Signed in, so every round of a ride is saved to the account (`rideLog.ts`). */
   saving: boolean;
+  /** Which app's personas and test line. */
+  flavour: FlavourId;
   t: Translation;
   lang: 'en' | 'pl';
 }
@@ -94,6 +101,7 @@ export default function SetupScreen({
   reset,
   onStart,
   saving,
+  flavour,
   t,
   lang,
 }: SetupScreenProps) {
@@ -252,12 +260,12 @@ export default function SetupScreen({
         voice: voice.liveVoice,
         system: 'Read the line the user gives you aloud, word for word, and say nothing else.',
       })
-        .ask({ frame: null, user: translations[spoken].voiceTestLine })
+        .ask({ frame: null, user: forFlavour(flavour, spoken).voiceTestLine })
         .catch((e) => setTestError(e instanceof Error ? e.message : String(e)));
       return;
     }
     void speak(configRef.current, {
-      text: translations[spoken].voiceTestLine,
+      text: forFlavour(flavour, spoken).voiceTestLine,
       lang: speechLocale(spoken),
       rate: configRef.current.voice.rate,
     }).catch((e) => setTestError(e instanceof Error ? e.message : String(e)));
@@ -430,7 +438,7 @@ export default function SetupScreen({
             <Select<Persona>
               id={id}
               value={config.remarks.persona}
-              options={PERSONAS.map((persona) => ({
+              options={FLAVOURS[flavour].personas.map((persona) => ({
                 value: persona,
                 label: t[PERSONA_LABELS[persona]],
               }))}

@@ -1,0 +1,63 @@
+<!--
+  Home screen icon for the roaster - "flame on glass".
+
+  Same body, bezel and sunken glass as the others; only the face differs. The passenger's sibling:
+  the road is gone and what is left is the heat. A three-tone flame over a glowing grill line.
+  Keep this comment short: libvips wants <svg> inside the first 1024 bytes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bk-body" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b6bff"/>
+      <stop offset=".5" stop-color="#1220b4"/>
+      <stop offset=".52" stop-color="#000f8c"/>
+      <stop offset="1" stop-color="#00003c"/>
+    </linearGradient>
+    <linearGradient id="bk-bezel" x1="0" y1="64" x2="0" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".22" stop-color="#dcdcdc"/>
+      <stop offset=".75" stop-color="#a8a8a8"/>
+      <stop offset="1" stop-color="#6e6e6e"/>
+    </linearGradient>
+    <linearGradient id="bk-gloss" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".07"/>
+    </linearGradient>
+    <radialGradient id="bk-vig" cx=".5" cy=".45" r=".75">
+      <stop offset=".6" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".38"/>
+    </radialGradient>
+    <clipPath id="bk-screen">
+      <rect x="88" y="88" width="328" height="328" rx="32"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bk-body)"/>
+
+  <rect x="56" y="56" width="400" height="400" rx="52" fill="#000" opacity=".35"/>
+  <rect x="52" y="52" width="400" height="400" rx="52" fill="url(#bk-bezel)"/>
+  <path d="M52 104a52 52 0 0 1 52-52h296a52 52 0 0 1 52 52 40 40 0 0 0-40-32H92a40 40 0 0 0-40 32Z" fill="#fff" opacity=".85"/>
+
+  <rect x="88" y="88" width="328" height="328" rx="32" fill="#040404"/>
+  <path d="M88 128a40 40 0 0 1 40-40h256a40 40 0 0 1 40 40 20 20 0 0 0-20-20H108a20 20 0 0 0-20 20Z" fill="#6a6a6a"/>
+
+  <!-- A flame on the glass, with the same dropped copy behind it the other faces use for lift. -->
+  <g clip-path="url(#bk-screen)">
+    <rect x="88" y="356" width="328" height="60" fill="#3a0a00"/>
+    <path d="M150 372h212" stroke="#ff7a00" stroke-width="10" stroke-linecap="round" opacity=".55"/>
+  </g>
+  <g>
+    <path transform="translate(5 5)" opacity=".45" fill="#000" d="M256 112c14 52 70 84 70 154 0 52-30 92-70 92s-70-40-70-92c0-40 22-62 34-90 6 26 14 38 26 44-4-46 0-78 10-108Z"/>
+    <path fill="#ff3d00" d="M256 112c14 52 70 84 70 154 0 52-30 92-70 92s-70-40-70-92c0-40 22-62 34-90 6 26 14 38 26 44-4-46 0-78 10-108Z"/>
+    <path fill="#ff9a00" d="M258 186c10 34 44 56 44 100 0 36-20 60-46 60s-46-24-46-60c0-26 14-40 22-58 4 16 10 24 18 28-2-28 2-50 8-70Z"/>
+    <path fill="#ffe000" d="M257 252c6 18 24 30 24 54 0 20-11 34-25 34s-25-14-25-34c0-14 8-22 12-32 2 9 5 13 10 16-1-15 1-27 4-38Z"/>
+  </g>
+
+  <!-- Glass sheen across the screen. -->
+  <path d="M88 120a32 32 0 0 1 32-32h264a32 32 0 0 1 32 32v56c-90 44-238 44-328 0Z" fill="#fff" opacity=".12"/>
+  <rect x="88" y="88" width="328" height="328" rx="32" fill="none" stroke="#000" stroke-opacity=".8" stroke-width="6"/>
+
+  <path d="M0 512h512v-72c-80-72-432-72-512 0Z" fill="#fff" opacity=".07"/>
+  <path d="M0 0h512v206c-90 92-422 92-512 0Z" fill="url(#bk-gloss)"/>
+  <rect width="512" height="512" fill="url(#bk-vig)"/>
+</svg>

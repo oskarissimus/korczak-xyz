@@ -74,6 +74,7 @@ describe('precache tiers', () => {
       '/apps/transit', '/apps/transit/alerts', '/pl/apps/transit/raw',
       '/apps/sloper', '/pl/apps/sloper',
       '/apps/backseat', '/pl/apps/backseat',
+      '/apps/roaster', '/pl/apps/roaster',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);
@@ -105,5 +106,6 @@ describe('precache tiers', () => {
     // tunnel rather than /offline.
     expect(byTier.get('backseat')!.test('/apps/backseat')).toBe(true);
     expect(byTier.get('backseat')!.test('/pl/apps/backseat')).toBe(true);
+    expect(byTier.get('roaster')!.test('/apps/roaster')).toBe(true);
   });
 });

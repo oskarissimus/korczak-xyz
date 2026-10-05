@@ -25,7 +25,13 @@ export type ApiKeys = Record<KeyName, string | null>;
  * rather than a free-text box on purpose: the prompt around it is written to be hard to talk out
  * of its shape, and a box somebody types into is a box somebody types "ignore the above" into.
  */
-export type Persona = 'nervous' | 'instructor' | 'parent' | 'child' | 'codriver';
+export type BackseatPersona = 'nervous' | 'instructor' | 'parent' | 'child' | 'codriver';
+
+/** Who is roasting, on `/apps/roaster/` — the same closed list, for the same reason. */
+export type RoasterPersona = 'comedian' | 'critic' | 'grandma' | 'teen' | 'narrator';
+
+/** Either app's persona. Which ones a config may hold is the flavour's list (`flavour.ts`). */
+export type Persona = BackseatPersona | RoasterPersona;
 
 /** How hard the passenger goes. The same persona at three volumes, roughly. */
 export type Intensity = 'mild' | 'normal' | 'relentless';

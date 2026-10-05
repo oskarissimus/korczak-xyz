@@ -68,6 +68,7 @@ const APP_TIERS = {
   transit: /^(\/pl)?\/apps\/transit(\/|$)/,
   sloper: /^(\/pl)?\/apps\/sloper(\/|$)/,
   backseat: /^(\/pl)?\/apps\/backseat(\/|$)/,
+  roaster: /^(\/pl)?\/apps\/roaster(\/|$)/,
   'audio-guide': /^(\/pl)?\/apps\/audio-guide(\/|$)/,
 };
 

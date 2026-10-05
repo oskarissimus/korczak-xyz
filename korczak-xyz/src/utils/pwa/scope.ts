@@ -15,6 +15,7 @@ export type PwaApp =
   | 'transit'
   | 'sloper'
   | 'backseat'
+  | 'roaster'
   | 'audio-guide';
 
 /**
@@ -36,6 +37,7 @@ const SCOPED: ReadonlyArray<{ app: PwaApp; pattern: RegExp }> = [
   { app: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
   { app: 'sloper', pattern: /^(\/pl)?\/apps\/sloper(\/|$)/ },
   { app: 'backseat', pattern: /^(\/pl)?\/apps\/backseat(\/|$)/ },
+  { app: 'roaster', pattern: /^(\/pl)?\/apps\/roaster(\/|$)/ },
   { app: 'audio-guide', pattern: /^(\/pl)?\/apps\/audio-guide(\/|$)/ },
 ];
 

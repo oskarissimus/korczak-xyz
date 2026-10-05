@@ -129,7 +129,7 @@ there; they exist because most of what is in them was learnt by breaking somethi
 | `.claude/rules/songbook.md` | The songbook: chord lines aligned in characters, and the synthetic-bold trap |
 | `.claude/rules/seo.md` | What the site tells crawlers: canonical URLs, hreflang, noindex, the sitemap, the trailing slash |
 | `.claude/rules/sloper.md` | The video generation wizard: the wizard as one island, the four API keys, the streaming scene parser, the canvas pass, the FFmpeg function |
-| `.claude/rules/backseat.md` | The annoying passenger simulator: the ride loop, the prompt that is the app, what a camera frame costs, the two voice engines, and the warning that stays on screen |
+| `.claude/rules/backseat.md` | The annoying passenger simulator and the roaster built on it: the ride loop, the prompt that is the app, what a camera frame costs, the two voice engines, and the warning that stays on screen |
 | `.claude/rules/account-keys.md` | The account page and the one API key store every app reads: the seed from the apps' old copies, what each provider says about spend and balance, where each app's provider choice lives |
 | `.claude/rules/audio-guide.md` | The audio guide: the map and its pins, the Go backend in `audio-guide-function/`, the sources every narration is grounded in, the keys the reader brings, what a tap costs, the iOS audio unlock, the narration language |
 

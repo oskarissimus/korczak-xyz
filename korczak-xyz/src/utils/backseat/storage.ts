@@ -22,9 +22,11 @@
 import { isQuotaError } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import { DEFAULT_CONFIG, normalizeConfig } from './defaults';
+import { BACKSEAT, type Flavour } from './flavour';
 import type { BackseatConfig } from './types';
 
-export const CONFIG_KEY = 'backseat-config';
+/** The passenger's key. Each app has its own (`flavour.configKey`), so neither overwrites the other. */
+export const CONFIG_KEY = BACKSEAT.configKey;
 
 export interface StampedConfig {
   config: BackseatConfig;
@@ -47,18 +49,18 @@ export function withoutKeys(config: BackseatConfig): BackseatConfig {
 }
 
 /** What this browser holds. */
-export function loadConfig(): StampedConfig {
+export function loadConfig(flavour: Flavour = BACKSEAT): StampedConfig {
   if (typeof window === 'undefined') {
-    return { config: normalizeConfig(null), updatedAt: 0, settled: false };
+    return { config: normalizeConfig(null, flavour), updatedAt: 0, settled: false };
   }
 
   try {
-    const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return { config: normalizeConfig(null), updatedAt: 0, settled: false };
+    const raw = localStorage.getItem(flavour.configKey);
+    if (!raw) return { config: normalizeConfig(null, flavour), updatedAt: 0, settled: false };
 
     const parsed = JSON.parse(raw);
     return {
-      config: normalizeConfig(parsed),
+      config: normalizeConfig(parsed, flavour),
       updatedAt: typeof parsed?.updatedAt === 'number' ? parsed.updatedAt : 0,
       settled: parsed?.settled === true,
     };
@@ -66,15 +68,20 @@ export function loadConfig(): StampedConfig {
     // A corrupt value is worth one line: it is the difference between "my settings vanished" and
     // "my settings vanished and nobody can say why".
     log.warn('backseat.config.load.failed', describeError(e));
-    return { config: normalizeConfig(null), updatedAt: 0, settled: false };
+    return { config: normalizeConfig(null, flavour), updatedAt: 0, settled: false };
   }
 }
 
-export function saveConfig(config: BackseatConfig, updatedAt: number, settled: boolean): void {
+export function saveConfig(
+  config: BackseatConfig,
+  updatedAt: number,
+  settled: boolean,
+  flavour: Flavour = BACKSEAT,
+): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...withoutKeys(config), updatedAt, settled }));
+    localStorage.setItem(flavour.configKey, JSON.stringify({ ...withoutKeys(config), updatedAt, settled }));
   } catch (e) {
     // Nothing to evict — this app owns one key and it is already the smallest it can be. The
     // report is the point: a silent failure here is what makes a key "not stick" after a reload.
@@ -85,10 +92,10 @@ export function saveConfig(config: BackseatConfig, updatedAt: number, settled: b
   }
 }
 
-export function clearConfig(): void {
+export function clearConfig(flavour: Flavour = BACKSEAT): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(CONFIG_KEY);
+    localStorage.removeItem(flavour.configKey);
   } catch {
     // Removing a key that cannot be removed leaves the defaults in memory, which is what the
     // caller asked for. Nothing to report and nothing to do.

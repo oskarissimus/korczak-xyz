@@ -25,6 +25,9 @@ import type { PwaApp } from './scope';
  * arm's length, and where a stray link leaving the app kills a live camera stream. See
  * .claude/rules/backseat.md.
  *
+ * `roaster` is the same island with the road taken out (it roasts whatever the camera sees), and is
+ * here for the same reasons: a camera held at arm's length, a live stream a stray link would kill.
+ *
  * The path patterns that decide which app a URL belongs to live in scope.ts, which ships to
  * the browser; this module does not, because it pulls in the whole translation table.
  */
@@ -102,6 +105,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     nameKey: 'Backseat',
     shortNameKey: 'pwa.backseat.short',
     descriptionKey: 'backseat.desc',
+  },
+  roaster: {
+    path: '/apps/roaster',
+    nameKey: 'Roaster',
+    shortNameKey: 'pwa.roaster.short',
+    descriptionKey: 'roaster.desc',
   },
   'audio-guide': {
     path: '/apps/audio-guide',

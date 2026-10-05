@@ -15,6 +15,7 @@
  * 120 because a passenger silent for longer than two minutes is not the joke this app is.
  */
 
+import { BACKSEAT, BACKSEAT_PERSONAS, type Flavour } from './flavour';
 import type {
   ApiKeys,
   BackseatConfig,
@@ -30,13 +31,8 @@ import type {
 
 export const KEY_NAMES: readonly KeyName[] = ['openai', 'google', 'elevenLabs'];
 
-export const PERSONAS: readonly Persona[] = [
-  'nervous',
-  'instructor',
-  'parent',
-  'child',
-  'codriver',
-];
+/** The passenger's personas. The roaster's are `ROASTER_PERSONAS`; see `flavour.ts`. */
+export const PERSONAS: readonly Persona[] = BACKSEAT_PERSONAS;
 
 export const INTENSITIES: readonly Intensity[] = ['mild', 'normal', 'relentless'];
 
@@ -106,6 +102,14 @@ export const DEFAULT_CONFIG: BackseatConfig = {
   camera: { facing: 'environment' },
 };
 
+/** Where a first session of the given app starts: the same, but for whose persona it is. */
+export function defaultConfigFor(flavour: Flavour): BackseatConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    remarks: { ...DEFAULT_CONFIG.remarks, persona: flavour.defaultPersona },
+  };
+}
+
 const VISION_PROVIDERS: readonly VisionProvider[] = ['openai', 'google'];
 const VOICE_ENGINES: readonly VoiceEngine[] = ['device', 'elevenlabs', 'live'];
 const FACINGS: readonly CameraFacing[] = ['environment', 'user'];
@@ -153,7 +157,7 @@ function liveModelFrom(value: unknown): string {
   return model === '' || model === FIRST_LIVE_MODEL ? DEFAULT_LIVE_MODEL : model;
 }
 
-export function normalizeConfig(value: unknown): BackseatConfig {
+export function normalizeConfig(value: unknown, flavour: Flavour = BACKSEAT): BackseatConfig {
   const raw = asRecord(value);
   const vision = asRecord(raw.vision);
   const remarks = asRecord(raw.remarks);
@@ -176,7 +180,7 @@ export function normalizeConfig(value: unknown): BackseatConfig {
         MIN_INTERVAL,
         MAX_INTERVAL,
       ),
-      persona: asOneOf(remarks.persona, PERSONAS, DEFAULT_CONFIG.remarks.persona),
+      persona: asOneOf(remarks.persona, flavour.personas, flavour.defaultPersona),
       intensity: asOneOf(remarks.intensity, INTENSITIES, DEFAULT_CONFIG.remarks.intensity),
       language:
         typeof remarks.language === 'string' &&

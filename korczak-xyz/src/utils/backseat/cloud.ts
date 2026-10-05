@@ -26,23 +26,28 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
 import { normalizeConfig } from './defaults';
+import { BACKSEAT, type Flavour } from './flavour';
 import { withoutKeys, type StampedConfig } from './storage';
 import type { BackseatConfig } from './types';
 
-function configDoc(uid: string) {
-  return doc(getDb()!, 'users', uid, 'backseat', 'config');
+/** `users/{uid}/backseat/config`, or the roaster's `users/{uid}/roaster/config`. */
+function configDoc(uid: string, flavour: Flavour) {
+  return doc(getDb()!, 'users', uid, flavour.folder, 'config');
 }
 
 /** The account's config, or null when there is none yet (or Firebase is switched off). */
-export async function pullConfig(uid: string): Promise<StampedConfig | null> {
+export async function pullConfig(
+  uid: string,
+  flavour: Flavour = BACKSEAT,
+): Promise<StampedConfig | null> {
   if (!getDb()) return null;
 
-  const snap = await runCloud('backseat.config.pull', () => getDoc(configDoc(uid)));
+  const snap = await runCloud(`${flavour.id}.config.pull`, () => getDoc(configDoc(uid, flavour)));
   if (!snap.exists()) return null;
 
   const data = snap.data();
   return {
-    config: normalizeConfig(data),
+    config: normalizeConfig(data, flavour),
     updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
     settled: data.settled === true,
   };
@@ -53,9 +58,10 @@ export async function pushConfig(
   config: BackseatConfig,
   updatedAt: number,
   settled: boolean,
+  flavour: Flavour = BACKSEAT,
 ): Promise<void> {
   if (!getDb()) return;
-  await runCloud('backseat.config.push', () =>
-    setDoc(configDoc(uid), { ...withoutKeys(config), updatedAt, settled }),
+  await runCloud(`${flavour.id}.config.push`, () =>
+    setDoc(configDoc(uid, flavour), { ...withoutKeys(config), updatedAt, settled }),
   );
 }

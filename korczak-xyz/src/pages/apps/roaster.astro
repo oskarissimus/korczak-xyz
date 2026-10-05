@@ -1,0 +1,33 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Backseat from '../../components/Backseat/Backseat';
+import BackseatSkeleton from '../../components/Backseat/BackseatSkeleton.astro';
+import { useTranslations } from '../../i18n';
+import '../../styles/backseat.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Layout
+  title={`${t('Roaster')} | korczak.xyz`}
+  description={t('roaster.desc')}
+  lang={lang}
+  pwa="roaster"
+>
+  <div class="window backseat-window">
+    <div class="title-bar">
+      <span>{t('Roaster')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content backseat-content">
+      <Backseat client:only="react" lang={lang} flavour="roaster">
+        <BackseatSkeleton slot="fallback" lang={lang} flavour="roaster" />
+      </Backseat>
+    </div>
+  </div>
+</Layout>

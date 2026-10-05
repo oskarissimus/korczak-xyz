@@ -27,9 +27,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useBackseatConfig } from '../../hooks/useBackseatConfig';
 import { useBackseatRide } from '../../hooks/useBackseatRide';
 import { remarkLanguage } from '../../utils/backseat/defaults';
+import { FLAVOURS, type FlavourId } from '../../utils/backseat/flavour';
 import RideScreen from './RideScreen';
 import SetupScreen from './SetupScreen';
-import { cameraMessage, translations, type Lang, type Translation } from './translations';
+import { cameraMessage, forFlavour, type Lang, type Translation } from './translations';
 
 /*
  * Spelt out rather than taken from `getLocalizedPath`. That helper lives in `src/i18n/index.ts`
@@ -43,13 +44,24 @@ function loginPath(lang: Lang): string {
 
 interface BackseatProps {
   lang: Lang;
+  /**
+   * Which app this island is: the passenger (`/apps/backseat/`) or the roaster
+   * (`/apps/roaster/`). A string rather than the flavour object, because Astro serialises props.
+   */
+  flavour?: FlavourId;
 }
 
-export default function Backseat({ lang }: BackseatProps) {
-  const t: Translation = translations[lang];
+export default function Backseat({ lang, flavour: flavourId = 'backseat' }: BackseatProps) {
+  const flavour = FLAVOURS[flavourId];
+  const t: Translation = forFlavour(flavourId, lang);
   const auth = useAuth();
-  const { config, ready, sync, update, reset } = useBackseatConfig(auth.user);
-  const ride = useBackseatRide(config, remarkLanguage(config, lang), auth.user?.uid ?? null);
+  const { config, ready, sync, update, reset } = useBackseatConfig(auth.user, flavour);
+  const ride = useBackseatRide(
+    config,
+    remarkLanguage(config, lang),
+    auth.user?.uid ?? null,
+    flavour,
+  );
 
   const riding = ride.status !== 'idle';
 
@@ -145,6 +157,7 @@ export default function Backseat({ lang }: BackseatProps) {
                before that point loses the gesture on iOS — the app is then silent for the whole
                ride with nothing in any log. See `primeVoices`. */
             onStart={ride.start}
+            flavour={flavourId}
             t={t}
             lang={lang}
           />

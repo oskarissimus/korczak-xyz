@@ -8,10 +8,17 @@ paths:
   - "**/hooks/useBackseatRide.ts"
   - "**/styles/backseat.css"
   - "**/pages/**/apps/backseat.astro"
+  - "**/pages/**/apps/roaster.astro"
+  - "**/assets/icons/roaster.svg"
   - "**/assets/icons/backseat.svg"
 ---
 
 ## Annoying Passenger Simulator
+
+> **Two apps run on this code since Oct 2026.** `/apps/roaster/` is the passenger with the car
+> taken out — point the phone at anything and it roasts what it sees. Same island
+> (`<Backseat flavour="roaster">`), same hooks, same engines; see *The roaster* at the end of this
+> file for what differs and why. Everything below about the plumbing applies to both.
 
 At `/apps/backseat/` — the phone looks out of the windscreen every few seconds and says the sort of
 thing a passenger says when they are not the one driving. "Oh, slow down." "Mind that lorry."
@@ -445,3 +452,36 @@ since they were written.
 The icon is the same Win95 device as the others — navy body, raised bezel, sunken black glass — with
 a yellow speech bubble over a green road running to a vanishing point. Three lines of nothing in
 particular inside the bubble: it is always full and never says anything.
+
+### The roaster: the same island, another prompt (Oct 2026)
+
+At the owner's request, a generalisation of the passenger: "just roast what it sees, without the
+road". It is **not a copy**. Every lesson above is about plumbing that does not care what the
+camera points at — the chain of timeouts, the two abort controllers, the iOS unlocks, the 512px
+frame, the Live prewarm — and a second copy of 1,500 lines of that would drift the first time one
+of them was fixed. So `utils/backseat/flavour.ts` names what makes it a different app, and the
+pages pass `flavour="roaster"` to the one island:
+
+- **The prompt** (`remarks.ts`, `roasterPrompt`, `ROAST_ANGLES`, `ROAST_USER_PROMPT`). The rules
+  that are not about driving are kept word for word in spirit (one sentence, no stage directions,
+  something really in the picture, always say something, the recent remarks to avoid). The driving
+  clause is replaced by the one this app can get wrong: **it is pointed at people.** A roast is
+  aimed at what somebody chose — clothes, the shelf, the pose — never at a body, a face, an
+  identity or a guess at who they are. `flavour.test.ts` asserts that clause, for the same reason
+  `remarks.test.ts` asserts the driving one.
+- **Its own personas** (`ROASTER_PERSONAS`: comic, critic, grandma, teenager, documentary
+  narrator), still a closed list. `normalizeConfig(value, flavour)` validates against the
+  flavour's list, so a passenger persona never reaches the roaster's prompt.
+- **Its own settings**: `roaster-config` in localStorage and `users/{uid}/roaster/config`, so
+  choosing a critic here does not change who sits in the car. The keys are the shared store as
+  everywhere. `switchedToGoogle` runs for the passenger only; the roaster has no OpenAI past.
+- **Its rounds** go to `users/{uid}/roaster/rides/` in the passenger's bucket — `storage.rules`
+  is `users/{uid}/**`, so no rule, bucket or Terraform changed. Sentry gets `roaster.round`.
+- **Its strings** (`translations.ts`, `forFlavour`): only those that mention a road, a journey or
+  a passenger are overridden. The disclaimer is replaced, not dropped — no car, but "only roast
+  people who are in on it" — and stays on both screens.
+- **Its own PWA** (`roaster` in `PWA_APPS`, `SCOPED`, both `APP_TIERS`), a flame on the glass for
+  an icon, and a card on the account page beside the passenger's.
+
+A third flavour is a third entry in `FLAVOURS`, a prompt pack and two pages.
+

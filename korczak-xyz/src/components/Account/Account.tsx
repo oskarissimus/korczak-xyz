@@ -36,6 +36,7 @@ import { requiredKeys as backseatKeys } from '../../utils/backseat/defaults';
 import { pullConfig as pullBackseat } from '../../utils/backseat/cloud';
 import { loadConfig as loadBackseat } from '../../utils/backseat/storage';
 import type { BackseatConfig } from '../../utils/backseat/types';
+import { ROASTER } from '../../utils/backseat/flavour';
 import { requiredKeys as sloperKeys } from '../../utils/sloper/defaults';
 import { pullConfig as pullSloper } from '../../utils/sloper/cloud';
 import { loadConfig as loadSloper } from '../../utils/sloper/storage';
@@ -506,6 +507,8 @@ const PROVIDER_NAME: Record<string, string> = {
 interface AppConfigs {
   sloper: SloperConfig;
   backseat: BackseatConfig;
+  /** The roaster is the passenger's island under another prompt, with its own settings. */
+  roaster: BackseatConfig;
 }
 
 /** The two apps' settings, from the account when it answers and from this browser otherwise. */
@@ -513,16 +516,26 @@ function useAppConfigs(uid: string | null): AppConfigs {
   const [configs, setConfigs] = useState<AppConfigs>(() => ({
     sloper: loadSloper().config,
     backseat: loadBackseat().config,
+    roaster: loadBackseat(ROASTER).config,
   }));
 
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
-    const local = { sloper: loadSloper(), backseat: loadBackseat() };
-    void Promise.allSettled([pullSloper(uid), pullBackseat(uid)]).then(([sloper, backseat]) => {
+    const local = {
+      sloper: loadSloper(),
+      backseat: loadBackseat(),
+      roaster: loadBackseat(ROASTER),
+    };
+    void Promise.allSettled([
+      pullSloper(uid),
+      pullBackseat(uid),
+      pullBackseat(uid, ROASTER),
+    ]).then(([sloper, backseat, roaster]) => {
       if (cancelled) return;
       const remoteSloper = sloper.status === 'fulfilled' ? sloper.value : null;
       const remoteBackseat = backseat.status === 'fulfilled' ? backseat.value : null;
+      const remoteRoaster = roaster.status === 'fulfilled' ? roaster.value : null;
       setConfigs({
         sloper:
           remoteSloper && remoteSloper.updatedAt > local.sloper.updatedAt
@@ -532,6 +545,10 @@ function useAppConfigs(uid: string | null): AppConfigs {
           remoteBackseat && remoteBackseat.updatedAt > local.backseat.updatedAt
             ? remoteBackseat.config
             : local.backseat.config,
+        roaster:
+          remoteRoaster && remoteRoaster.updatedAt > local.roaster.updatedAt
+            ? remoteRoaster.config
+            : local.roaster.config,
       });
     });
     return () => {
@@ -547,6 +564,50 @@ function withModel(provider: string, model: string): string {
   return model ? `${name} (${model})` : name;
 }
 
+/** The passenger's card, and the roaster's: one island, two sets of settings. */
+function CameraAppCard({
+  app,
+  name,
+  config,
+  t,
+  lang,
+}: {
+  app: 'backseat' | 'roaster';
+  name: string;
+  config: BackseatConfig;
+  t: Translation;
+  lang: Lang;
+}) {
+  return (
+    <div className="acct-card">
+      <header className="acct-card-head">
+        <h3>
+          <a href={appPath(lang, app)}>{name}</a>
+        </h3>
+      </header>
+      <dl className="acct-numbers">
+        <dt>{t.roleEyes}</dt>
+        <dd>
+          {config.voice.engine === 'live'
+            ? `Gemini Live (${config.voice.liveModel})`
+            : withModel(config.vision.provider, config.vision.model)}
+        </dd>
+        <dt>{t.roleVoice}</dt>
+        <dd>
+          {config.voice.engine === 'elevenlabs'
+            ? 'ElevenLabs'
+            : config.voice.engine === 'live'
+              ? `Gemini Live (${config.voice.liveVoice})`
+              : t.deviceVoice}
+        </dd>
+      </dl>
+      <p className="acct-dim">
+        <a href={appPath(lang, app)}>{t.changeInApp}</a>
+      </p>
+    </div>
+  );
+}
+
 function AppsSection({
   api,
   apps,
@@ -559,7 +620,7 @@ function AppsSection({
   lang: Lang;
 }) {
   const id = useId();
-  const { sloper, backseat } = apps;
+  const { sloper } = apps;
   return (
     <section className="acct-section">
       <h2 className="acct-heading">{t.appsTitle}</h2>
@@ -584,32 +645,8 @@ function AppsSection({
         </p>
       </div>
 
-      <div className="acct-card">
-        <header className="acct-card-head">
-          <h3>
-            <a href={appPath(lang, 'backseat')}>{t.appBackseat}</a>
-          </h3>
-        </header>
-        <dl className="acct-numbers">
-          <dt>{t.roleEyes}</dt>
-          <dd>
-            {backseat.voice.engine === 'live'
-              ? `Gemini Live (${backseat.voice.liveModel})`
-              : withModel(backseat.vision.provider, backseat.vision.model)}
-          </dd>
-          <dt>{t.roleVoice}</dt>
-          <dd>
-            {backseat.voice.engine === 'elevenlabs'
-              ? 'ElevenLabs'
-              : backseat.voice.engine === 'live'
-                ? `Gemini Live (${backseat.voice.liveVoice})`
-                : t.deviceVoice}
-          </dd>
-        </dl>
-        <p className="acct-dim">
-          <a href={appPath(lang, 'backseat')}>{t.changeInApp}</a>
-        </p>
-      </div>
+      <CameraAppCard app="backseat" name={t.appBackseat} config={apps.backseat} t={t} lang={lang} />
+      <CameraAppCard app="roaster" name={t.appRoaster} config={apps.roaster} t={t} lang={lang} />
 
       <div className="acct-card">
         <header className="acct-card-head">
@@ -661,6 +698,7 @@ function usedBy(apps: AppConfigs, writer: 'google' | 'openai', t: Translation): 
   const result: Record<Provider, string[]> = { openai: [], google: [], elevenLabs: [], deepseek: [] };
   for (const key of sloperKeys(apps.sloper)) result[key].push(t.appSloper);
   for (const key of backseatKeys(apps.backseat)) result[key].push(t.appBackseat);
+  for (const key of backseatKeys(apps.roaster)) result[key].push(t.appRoaster);
   result[writer].push(t.appAudioGuide);
   result.elevenLabs.push(t.appAudioGuide);
   return result;

@@ -14,6 +14,7 @@
  *    handed `lang` for.
  */
 
+import type { FlavourId } from '../../utils/backseat/flavour';
 import type { CameraFailure } from '../../utils/backseat/frame';
 
 export { fill, localeOf } from '../BabySleep/translations';
@@ -79,6 +80,12 @@ export const translations = {
     personaParent: 'Your mother',
     personaChild: 'Bored child',
     personaCodriver: 'Rally co-driver',
+    // The roaster's personas (`/apps/roaster/`); only its own sheet lists them.
+    personaComedian: 'Stand-up comic at a roast',
+    personaCritic: 'Snobbish critic',
+    personaGrandma: 'Unimpressed grandma',
+    personaTeen: 'Bored teenager',
+    personaNarrator: 'Nature documentary narrator',
     languageLabel: 'Speaks',
     languageHint: 'The language of the remarks and the voice. The page itself follows the site’s language switch.',
     intensityLabel: 'How much of it',
@@ -222,6 +229,11 @@ export const translations = {
     personaParent: 'Twoja mama',
     personaChild: 'Znudzone dziecko',
     personaCodriver: 'Pilot rajdowy',
+    personaComedian: 'Komik na roaście',
+    personaCritic: 'Snobistyczny krytyk',
+    personaGrandma: 'Niezachwycona babcia',
+    personaTeen: 'Znudzony nastolatek',
+    personaNarrator: 'Narrator filmu przyrodniczego',
     languageLabel: 'Mówi po',
     languageHint: 'Język uwag i głosu. Sama strona zmienia język przełącznikiem w menu serwisu.',
     intensityLabel: 'W jakim natężeniu',
@@ -318,6 +330,84 @@ export const translations = {
  * the same words. Same reasoning, same shape, as sloper's table and the shopping list's.
  */
 export type Translation = { [K in keyof (typeof translations)['en']]: string };
+
+/**
+ * The roaster's own words wherever the passenger's mention a road, a journey or a car. Everything
+ * not named here is shared, because it is the same control doing the same thing.
+ *
+ * The disclaimer is replaced rather than dropped: there is no car to warn about, but there is the
+ * one thing this app can do harm with — being pointed at somebody who did not ask to be roasted.
+ */
+const ROASTER: Record<Lang, Partial<Translation>> = {
+  en: {
+    setupTitle: 'Before the roast',
+    rideTitle: 'Roasting',
+    pitch:
+      'Point the phone at anything — your desk, your fridge, your outfit, your friend who asked ' +
+      'for it. Every few seconds it takes a look and roasts what it sees.',
+    personaTitle: 'The roaster',
+    personaWho: 'Who is roasting',
+    intensityMild: 'Mild — a friendly tease',
+    intensityNormal: 'Normal — a proper roast',
+    intensityRelentless: 'Relentless — no mercy',
+    intervalLabel: 'A roast every {n} seconds',
+    intervalHint:
+      'Each roast is one look and one call on your key. Shorter is chattier and dearer.',
+    voiceTestLine: 'I have seen better taste in a motorway service station.',
+    cameraBack: 'Back — pointed at the victim',
+    cameraFront: 'Front — pointed at you',
+    start: 'Roast it',
+    stop: 'That is enough',
+    hush: 'Mercy',
+    waitingFirst: 'Taking a long, judgemental look…',
+    remarksTitle: 'Roasted so far',
+    needKey: 'Enter the key for the provider you picked before starting.',
+    needModel: 'Pick a model before starting.',
+    disclaimerTitle: 'It is a joke, and it is made up',
+    disclaimerBody:
+      'A model looks at one photo and invents an insult about it. Nothing it says is true or ' +
+      'meant. Point it at people only if they are in on it, and not at anybody who did not agree ' +
+      'to be filmed.',
+    disclaimerShort: 'Made up by a model. Only roast people who are in on it.',
+  },
+  pl: {
+    setupTitle: 'Zanim zaczniemy',
+    rideTitle: 'Na ruszcie',
+    pitch:
+      'Skieruj telefon na cokolwiek — biurko, lodówkę, swój strój, kolegę, który sam się prosił. ' +
+      'Co kilka sekund rzuci okiem i bezlitośnie to obśmieje.',
+    personaTitle: 'Kto roastuje',
+    personaWho: 'Kto komentuje',
+    intensityMild: 'Łagodnie — przyjacielska szpila',
+    intensityNormal: 'Normalnie — porządny roast',
+    intensityRelentless: 'Bez litości — nic nie ujdzie',
+    intervalLabel: 'Roast co {n} sekund',
+    intervalHint:
+      'Każdy roast to jedno spojrzenie i jedno zapytanie na twoim kluczu. Częściej znaczy ' +
+      'gadatliwiej i drożej.',
+    voiceTestLine: 'Widziałem więcej gustu na stacji benzynowej przy autostradzie.',
+    cameraBack: 'Tylna — skierowana na ofiarę',
+    cameraFront: 'Przednia — skierowana na ciebie',
+    start: 'Roastuj',
+    stop: 'Wystarczy',
+    hush: 'Litości',
+    waitingFirst: 'Przyglądam się z wyższością…',
+    remarksTitle: 'Już obśmiane',
+    needKey: 'Wpisz klucz do wybranego dostawcy, zanim zaczniesz.',
+    needModel: 'Wybierz model, zanim zaczniesz.',
+    disclaimerTitle: 'To żart i to zmyślone',
+    disclaimerBody:
+      'Model patrzy na jedno zdjęcie i wymyśla do niego złośliwość. Nic z tego nie jest prawdą ' +
+      'ani nie jest na serio. Kieruj go na ludzi tylko wtedy, gdy wiedzą, o co chodzi, i nie na ' +
+      'nikogo, kto nie zgodził się na nagrywanie.',
+    disclaimerShort: 'Zmyślone przez model. Roastuj tylko tych, którzy wiedzą, o co chodzi.',
+  },
+};
+
+/** The table for one app in one language: the passenger's, with the roaster's words laid over. */
+export function forFlavour(flavour: FlavourId, lang: Lang): Translation {
+  return flavour === 'roaster' ? { ...translations[lang], ...ROASTER[lang] } : translations[lang];
+}
 
 /**
  * Which sentence a camera refusal gets.

@@ -32,7 +32,8 @@
  * thing to the person; this says it to the model.
  */
 
-import type { Intensity, Persona, Remark } from './types';
+import type { FlavourId } from './flavour';
+import type { BackseatPersona, Intensity, Persona, Remark, RoasterPersona } from './types';
 
 /** How many previous remarks are shown to the model, newest last. */
 export const RECENT_WINDOW = 10;
@@ -40,7 +41,7 @@ export const RECENT_WINDOW = 10;
 /** The hard ceiling on a spoken line, in characters. See `sanitizeRemark`. */
 export const MAX_REMARK_CHARS = 140;
 
-const PERSONA_BRIEFS: Record<Persona, string> = {
+const PERSONA_BRIEFS: Record<BackseatPersona, string> = {
   nervous:
     'a nervous passenger who is certain every gap is too small, every speed too high and every ' +
     'lorry too close — and who blames the driver, personally and pettily, for each of these. You ' +
@@ -102,15 +103,86 @@ export const ANGLES: readonly string[] = [
 ];
 
 /** A different angle from the last one, so two rounds in a row never share a shape. */
-export function pickAngle(previous: string | null, random: () => number = Math.random): string {
-  const pool = ANGLES.filter((a) => a !== previous);
-  return pool[Math.floor(random() * pool.length)] ?? ANGLES[0];
+export function pickAngle(
+  previous: string | null,
+  random: () => number = Math.random,
+  angles: readonly string[] = ANGLES,
+): string {
+  const pool = angles.filter((a) => a !== previous);
+  return pool[Math.floor(random() * pool.length)] ?? angles[0];
+}
+
+/*
+ * THE ROASTER (`/apps/roaster/`, Oct 2026): the same machine with the car taken out. Point the
+ * phone at anything and it roasts what it sees. Every rule above that is not about driving holds
+ * here for the same reason — one sentence, no stage directions, never the same line twice, always
+ * something, always about what is really in the frame — and the one about driving is replaced by
+ * the one this app can actually get wrong: it is pointed at people. A roast is aimed at what
+ * somebody chose (the jumper, the shelf, the pose), never at what they did not (a body, a face,
+ * an identity), and never at who they might be.
+ */
+const ROASTER_PERSONA_BRIEFS: Record<RoasterPersona, string> = {
+  comedian:
+    'a stand-up comic at a roast, with a microphone and no mercy. You get one line for whatever ' +
+    'is in front of you, and it has to land.',
+  critic:
+    'a snobbish critic of everything — art, food, design, taste — reviewing whatever is in front ' +
+    'of you as if it were an exhibition that has personally let you down.',
+  grandma:
+    'a grandmother who has seen it all and is impressed by nothing. Every object becomes a remark ' +
+    'about how they live, whether they eat properly, and why the cousin is doing so much better.',
+  teen:
+    'a terminally unimpressed teenager. Everything in front of you is embarrassing, ancient or ' +
+    'both, and your contempt is effortless.',
+  narrator:
+    'a hushed nature-documentary narrator, observing whatever is in front of you as a sad ' +
+    'specimen in its natural habitat.',
+};
+
+const ROASTER_INTENSITY_BRIEFS: Record<Intensity, string> = {
+  mild: 'Keep it a gentle tease: dry, warm underneath, the roast a friend would laugh at.',
+  normal:
+    'Roast it properly: sharp, specific and personal about the taste, habits and life choices the ' +
+    'scene gives away. It should sting and still be funny.',
+  relentless:
+    'Go for the throat: merciless, extravagantly insulting about the taste and the life choices ' +
+    'on show, and delighted with yourself.',
+};
+
+/** The roaster's comic devices, drawn per round exactly as `ANGLES` are. */
+export const ROAST_ANGLES: readonly string[] = [
+  'a backhanded compliment that is really an insult',
+  'a wildly over-the-top conclusion about the owner\'s whole life, drawn from one small detail',
+  'an unflattering comparison to a person, an animal or an object',
+  'a one-star review, as if it were a hotel, a restaurant or a museum',
+  'a guess at the sad story of how this came to be',
+  'a valuation or a price tag, and why even that is too generous',
+  'a rhetorical question that answers itself, insultingly',
+  'a mock-serious diagnosis, as if it were a medical or psychological condition',
+  'a prediction of how this will look in ten years',
+  'a whispered nature-documentary narration',
+  'a breaking-news announcement',
+  'what the thing itself would say about its owner, if it could talk',
+];
+
+export const ROAST_USER_PROMPT = 'Here is what my camera is pointed at right now.';
+
+/** The angles a flavour draws from. */
+export function anglesFor(flavour: FlavourId): readonly string[] {
+  return flavour === 'roaster' ? ROAST_ANGLES : ANGLES;
+}
+
+/** The user-side line that goes with the frame, per flavour. */
+export function userPromptFor(flavour: FlavourId): string {
+  return flavour === 'roaster' ? ROAST_USER_PROMPT : USER_PROMPT;
 }
 
 /** The language the remark is spoken in, which is the language the app is being read in. */
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', pl: 'Polish' };
 
 export interface PromptOptions {
+  /** Which app is asking. The passenger when absent. */
+  flavour?: FlavourId;
   persona: Persona;
   intensity: Intensity;
   lang: string;
@@ -124,11 +196,13 @@ export interface PromptOptions {
  * The system prompt. One string, assembled rather than templated, because every clause in it is
  * load-bearing and a template hides which ones are.
  */
-export function systemPrompt({ persona, intensity, lang, recent, angle }: PromptOptions): string {
+export function systemPrompt(options: PromptOptions): string {
+  if (options.flavour === 'roaster') return roasterPrompt(options);
+  const { persona, intensity, lang, recent, angle } = options;
   const language = LANGUAGE_NAMES[lang] ?? 'English';
 
   const lines = [
-    `You are ${PERSONA_BRIEFS[persona]}`,
+    `You are ${PERSONA_BRIEFS[persona as BackseatPersona] ?? PERSONA_BRIEFS.nervous}`,
     `You are being shown a photograph taken through the windscreen of a moving car, a moment ago.`,
     `React to it out loud, in character, as the passenger.`,
     INTENSITY_BRIEFS[intensity],
@@ -151,16 +225,49 @@ export function systemPrompt({ persona, intensity, lang, recent, angle }: Prompt
     '- If people are visible, do not describe or identify them. Comment on the driving, not on them.',
   ];
 
-  if (recent.length > 0) {
-    lines.push(
-      '',
-      'You have already said the following. Say something different, on a different subject, ' +
-        'in a different shape, and do not reuse their opening words:',
-      ...recent.slice(-RECENT_WINDOW).map((text) => `- ${text}`),
-    );
-  }
-
+  pushRecent(lines, recent);
   return lines.join('\n');
+}
+
+/** The roaster's prompt: the passenger's rules, minus the car, plus the line about people. */
+function roasterPrompt({ persona, intensity, lang, recent, angle }: PromptOptions): string {
+  const language = LANGUAGE_NAMES[lang] ?? 'English';
+
+  const lines = [
+    `You are ${ROASTER_PERSONA_BRIEFS[persona as RoasterPersona] ?? ROASTER_PERSONA_BRIEFS.comedian}`,
+    'You are being shown a photograph somebody has just taken with their phone, of whatever is ' +
+      'in front of them.',
+    'Roast it out loud, in character.',
+    ROASTER_INTENSITY_BRIEFS[intensity],
+    ...(angle ? ['', `This time, make it ${angle}.`] : []),
+    '',
+    'Rules:',
+    `- Answer with ONE spoken sentence in ${language}, at most 18 words.`,
+    '- Output the sentence only. No speaker name, no quotation marks, no asterisks, no emoji, no explanation.',
+    '- Never describe the photograph as a photograph. Talk as if you are standing there, looking at it.',
+    '- Start from something that is really in the picture — an object, a colour, the mess, a ' +
+      'label, the décor, the light, an animal — and then make something of it: the joke is what ' +
+      'you infer from it about whoever owns, made or chose it. Never invent what is not there.',
+    '- Be surprising. Avoid the obvious first joke; prefer the specific detail nobody else would notice.',
+    '- Always say something, even if it is a blank wall or a blurry ceiling. Boring is your favourite subject.',
+    '- If a person is in view, roast only what they chose — clothes, hair, pose, expression, what ' +
+      'they hold, the room around them. Never their body, weight, skin, age, ethnicity, gender or ' +
+      'disability, and never guess who they are.',
+    '- Nothing sexual, no slurs, nothing about real tragedies. Mean is the point; cruel is not.',
+  ];
+
+  pushRecent(lines, recent);
+  return lines.join('\n');
+}
+
+function pushRecent(lines: string[], recent: string[]): void {
+  if (recent.length === 0) return;
+  lines.push(
+    '',
+    'You have already said the following. Say something different, on a different subject, ' +
+      'in a different shape, and do not reuse their opening words:',
+    ...recent.slice(-RECENT_WINDOW).map((text) => `- ${text}`),
+  );
 }
 
 /** The user-side line that goes with the frame. Short: the picture is the message. */
@@ -234,7 +341,7 @@ function isHeading(line: string): boolean {
   const t = line.trim();
   if (/[!?]/.test(t)) return false;
   if (/^#+\s/.test(t) || /^\*\*[^*]+\*\*$/.test(t) || /:$/.test(t)) return true;
-  return t.split(/\s+/).length <= 3 && /passenger|pasażer/i.test(t);
+  return t.split(/\s+/).length <= 3 && /passenger|pasażer|roast/i.test(t);
 }
 
 /** Comparable form: case, punctuation and spacing are not what makes two remarks the same. */

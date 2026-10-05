@@ -20,6 +20,7 @@ import { ref, uploadBytes, uploadString } from 'firebase/storage';
 
 import { getBackseatStorageClient } from '../../lib/firebase';
 import { describeError, log } from '../../lib/logger';
+import { BACKSEAT, type Flavour } from './flavour';
 import type { Frame } from './types';
 
 declare const __COMMIT_HASH__: string;
@@ -99,9 +100,17 @@ export function rideIdFor(startedAt: number): string {
   return new Date(startedAt).toISOString().replace(/[:.]/g, '-');
 }
 
-export function roundPath(uid: string, record: Pick<RoundRecord, 'rideId' | 'n' | 'at'>): string {
+/**
+ * The roaster's rounds go to `users/{uid}/roaster/rides/` in the same bucket: the storage rule is
+ * `users/{uid}/**`, so a second app needed no rule, no bucket and no Terraform.
+ */
+export function roundPath(
+  uid: string,
+  record: Pick<RoundRecord, 'rideId' | 'n' | 'at'>,
+  flavour: Flavour = BACKSEAT,
+): string {
   const n = String(record.n).padStart(4, '0');
-  return `users/${uid}/backseat/rides/${record.rideId}/${n}-${record.at}`;
+  return `users/${uid}/${flavour.folder}/rides/${record.rideId}/${n}-${record.at}`;
 }
 
 function frameBlob(frame: Frame): Blob {
@@ -110,12 +119,17 @@ function frameBlob(frame: Frame): Blob {
 }
 
 /** Writes the round down, and never throws or makes the caller wait. */
-export function saveRound(uid: string | null, record: RoundRecord, frame: Frame): void {
+export function saveRound(
+  uid: string | null,
+  record: RoundRecord,
+  frame: Frame,
+  flavour: Flavour = BACKSEAT,
+): void {
   if (!uid) return;
   const storage = getBackseatStorageClient();
   if (!storage) return;
 
-  const base = roundPath(uid, record);
+  const base = roundPath(uid, record, flavour);
   const metadata = { cacheControl: 'private, max-age=31536000' };
   void Promise.all([
     uploadBytes(ref(storage, `${base}.jpg`), frameBlob(frame), metadata),
@@ -123,5 +137,5 @@ export function saveRound(uid: string | null, record: RoundRecord, frame: Frame)
       ...metadata,
       contentType: 'application/json',
     }),
-  ]).catch((e) => log.warn('backseat.ride.save.failed', describeError(e)));
+  ]).catch((e) => log.warn(`${flavour.id}.ride.save.failed`, describeError(e)));
 }

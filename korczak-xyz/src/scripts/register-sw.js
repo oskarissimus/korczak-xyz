@@ -41,6 +41,7 @@
     { tier: 'transit', pattern: /^(\/pl)?\/apps\/transit(\/|$)/ },
     { tier: 'sloper', pattern: /^(\/pl)?\/apps\/sloper(\/|$)/ },
     { tier: 'backseat', pattern: /^(\/pl)?\/apps\/backseat(\/|$)/ },
+    { tier: 'roaster', pattern: /^(\/pl)?\/apps\/roaster(\/|$)/ },
     { tier: 'audio-guide', pattern: /^(\/pl)?\/apps\/audio-guide(\/|$)/ },
   ];
 
