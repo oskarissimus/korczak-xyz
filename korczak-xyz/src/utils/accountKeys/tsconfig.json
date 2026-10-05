@@ -1,0 +1,28 @@
+{
+  // Why this file exists — the fifth copy of the same lesson, after `src/utils/events/`,
+  // `src/utils/transit/`, `src/utils/sloper/` and `src/utils/backseat/`. `keys.ts` is compiled by
+  // two projects since Oct 2026: Astro for the browser, and `tsc` into the Cloud Functions bundle,
+  // because the demo function reads the key it spends out of the same store the apps write
+  // (`functions/src/demo/handler.ts`, `demoKey`).
+  //
+  // Vite resolves a tsconfig by walking UP from the file it is transforming, and without this the
+  // walk reaches korczak-xyz/tsconfig.json, which `extends: "astro/tsconfigs/strict"` — resolvable
+  // only where the site's node_modules are installed, which the functions' CI runner does not
+  // install. It is put here before a test needs it rather than after a deploy fails for it, which
+  // is how the other four arrived.
+  //
+  // Only `keys.ts` crosses into the function, and that is the property to check before adding a
+  // second: `cloud.ts` and `storage.ts` import `firebase/*` and read localStorage, and `balance.ts`
+  // calls three providers from a browser.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"]
+}

@@ -497,8 +497,10 @@ Everything about it follows from the fact that it is somebody else's key:
   unauthenticated Gemini proxy with the owner's name on the bill, which is a different product from
   a demo of a joke app. The angle comes **back** rather than going out, because the function draws
   it. `demo.test.ts` pins the request's shape for that reason.
-- **The key is read at call time from `users/{keyUid}/keys/config`** — the account's own shared key
-  store (`account-keys.md`) — and is **not** a Secret Manager secret. That buys three things: no
+- **The key is read at call time from `users/{keyUid}/keys/config`** with the site's own
+  `keysFrom` — the store is `{ apiKeys: { google, … } }` and the first version of `demoKey` read
+  one level too shallow, which is a demo answering `no-key` with the key sitting right there — and
+  it is **not** a Secret Manager secret. That buys three things: no
   second copy to rotate, clearing the key on the account page closes the demo, and switching it on
   is a uid in a document rather than a deploy. It costs one Admin SDK read of a document no browser
   could see; the uid is the one the panel wrote, and nothing in a request names it.

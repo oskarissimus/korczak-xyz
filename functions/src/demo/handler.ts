@@ -49,6 +49,7 @@ import {
 } from '../../../korczak-xyz/src/utils/backseat/remarks';
 import { VisionError, askForRemark } from '../../../korczak-xyz/src/utils/backseat/vision';
 import type { Intensity, Persona, RemarkLanguage } from '../../../korczak-xyz/src/utils/backseat/types';
+import { keysFrom } from '../../../korczak-xyz/src/utils/accountKeys/keys';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
@@ -101,6 +102,11 @@ export async function readSettings(): Promise<DemoSettings> {
 /**
  * The owner's Google key, out of the account store it already lives in.
  *
+ * Read with the site's own `keysFrom`, not by reaching for a field name. The store is
+ * `{ apiKeys: { google, openai, … } }` (`utils/accountKeys/keys.ts`) and the first version of this
+ * read `data().google` — one level too shallow, which is a demo that answers `no-key` with the key
+ * sitting right there. Importing the reader every app uses is what stops that happening again.
+ *
  * A missing document, a cleared key or a uid that names nobody all come back as null, which the
  * caller reports as "the demo is not available" — the same sentence the switch being off produces.
  * A demo that explained which document was empty would be telling a stranger about the owner's
@@ -109,8 +115,7 @@ export async function readSettings(): Promise<DemoSettings> {
 async function demoKey(uid: string): Promise<string | null> {
   if (!uid) return null;
   const snap = await db.collection('users').doc(uid).collection('keys').doc('config').get();
-  const key = snap.exists ? (snap.data()?.google as unknown) : null;
-  return typeof key === 'string' && key.trim() !== '' ? key.trim() : null;
+  return snap.exists ? keysFrom(snap.data()).google : null;
 }
 
 function counters(app: DemoApp, day: string, ip: string) {

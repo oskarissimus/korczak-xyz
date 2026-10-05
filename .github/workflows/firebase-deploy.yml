@@ -55,6 +55,10 @@ on:
       # And the tsconfig that stops Vite walking up to the site's Astro one: without it the
       # functions' own test run cannot transform any of the files above. It cost a deploy once.
       - "korczak-xyz/src/utils/backseat/tsconfig.json"
+      # And the shared key store's reader, which is how the demo function finds the key it
+      # spends. Same tsconfig argument, same directory rule.
+      - "korczak-xyz/src/utils/accountKeys/keys.ts"
+      - "korczak-xyz/src/utils/accountKeys/tsconfig.json"
       - "terraform/**"
       - "audio-guide-function/**"
       # The weekly pins build. Terraform base64s these into the Batch job's environment
