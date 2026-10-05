@@ -90,22 +90,3 @@ resource "google_cloud_run_service_iam_member" "assemble_video_public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
-
-/*
- * `roastDemo` is called from a browser with no account at all — that is the entire point of it —
- * so it has to be reachable without a Google identity, like `assembleVideo` above.
- *
- * "Public" is doing more work here than it does there, and the difference is worth stating: that
- * one verifies a Firebase ID token in the handler and refuses without one, and this one cannot,
- * because a demo for strangers has no token to check. What stands in its place is the pair of
- * caps in `functions/src/demo/limits.ts` and the fact that the handler builds its own prompt — so
- * the most an unauthenticated caller can get is one eighteen-word joke about a photograph, a
- * bounded number of times a day. Again: the service name is the function name LOWERCASED.
- */
-resource "google_cloud_run_service_iam_member" "roast_demo_public" {
-  project  = local.project_id
-  location = local.region
-  service  = "roastdemo"
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
