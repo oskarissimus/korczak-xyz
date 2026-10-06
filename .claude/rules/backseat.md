@@ -118,10 +118,23 @@ chain at all. What it costs, and why it is a third engine rather than the defaul
   0.75–1.0 s after the send on a set-up session, 1.2–1.6 s including setup. `thinkingBudget: 0` is
   sent only to `flash-live` models (`wantsThinkingOff`). The model list drops transcribers,
   translators, robotics and extended-thinking models and ranks `flash-live` first.
-- **One answer in about ten is words with no sound** — a transcript and `turnComplete` in one
-  message, no audio chunk. The phone's synthesiser then reads the transcript
-  (`live.deviceFallback`) rather than losing the round. A wholly empty answer is asked again once
-  on a fresh session, then raised in the banner.
+- **One answer in about ten is words with no sound** — a whole transcript, `generationComplete`
+  and `turnComplete` within a millisecond of each other, no audio chunk, and a `usageMetadata`
+  with **no response tokens at all**: Google wrote the sentence and never voiced it. Seen in the
+  4 Oct test and on a real ride (5 Oct 14:54, round 7 of 9; 1 of 23 Live rounds that day). It is
+  not the network and not the phone — the turn arrives complete, just without audio. Until 6 Oct
+  it went straight to the phone's synthesiser, which the owner heard as "sometimes it reads it
+  locally". Since then any answer with no sound, words or not, is **asked again once on a fresh
+  session** (`live.retryReason`: `textOnly` or `empty`, the first try kept in
+  `live.firstAttempt`), which costs about a second and keeps Google's voice; only words with no
+  sound twice reach the synthesiser (`live.deviceFallback`), and nothing twice is raised in the
+  banner. Why Google skips the audio is not known: the one real case was a vicious line about the
+  driver's child, so a silent output filter is the leading guess, not a finding. **Every Live
+  round now saves `live.messages`**: each server message except plain audio chunks, whole, audio
+  data replaced by its length (`elideAudio`), so whatever Google sends beside a soundless
+  transcript is on the record. Read those on the next `textOnly` before guessing again. Sentry's
+  `*.round` measurement carries `liveRetryReason` and `liveDeviceFallback`, so the rate is
+  countable, the demo's rounds (which save nothing) included.
 - **What does not make it faster (measured 4 Oct, flash-live, real prompt, from the container):**
   the server's floor is ~0.75 s from the send to the first audio chunk, and none of the knobs
   move it beyond noise. `mediaResolution` LOW (63 image tokens) / MEDIUM (266) / default (1064):

@@ -448,6 +448,8 @@ export function useBackseatRide(
         doneMs: timings.doneMs,
         livePrepared: record.live?.prepared,
         liveRetried: record.live?.retried,
+        liveRetryReason: record.live?.retryReason,
+        liveDeviceFallback: record.live?.deviceFallback,
         network: record.network,
         chars: record.text?.length,
         frameBytes: Math.round((frame.base64.length * 3) / 4),
@@ -514,6 +516,7 @@ export function useBackseatRide(
               thinkingOff: session.thinkingOff,
               audioChunks: session.audioChunks,
               audioSeconds: Math.round(session.audioSeconds * 100) / 100,
+              messages: [...session.messages],
             };
           }
         };
@@ -534,20 +537,49 @@ export function useBackseatRide(
         try {
           answer = await askOn(prepared?.session ?? freshSession(), Boolean(prepared));
           /*
-           * The first Live ride (3 Oct 2026) spoke once and then answered every prepared session
-           * with nothing, in under a second, no error. Until the saved events say why, an empty
-           * answer from a prepared session is asked again on a fresh one in the same round, and
-           * both are on the record (`live.retry`, `live.retried`).
+           * An answer with no sound is asked again once, on a fresh session, in the same round.
+           * Two shapes of it, recorded apart (`live.retryReason`):
+           *  - `empty`: nothing at all. The first Live ride (3 Oct 2026) got this on every
+           *    prepared session; that was the old model with thinking off, but the retry stays.
+           *  - `textOnly`: a whole transcript, `turnComplete` in the same message, not one audio
+           *    chunk, and a `usageMetadata` with no response tokens at all — Google wrote the
+           *    sentence and never voiced it. About one round in ten (4 Oct test; round 7 of the
+           *    5 Oct 14:54 ride). Until 6 Oct this went straight to the phone's synthesiser,
+           *    which is the "it reads it locally" the owner heard; a fresh session usually
+           *    speaks in its own voice about a second later, which is the better trade.
            */
-          if (!answer.spoke && !answer.text && runningRef.current) {
+          const firstAnswer = answer;
+          const noSound = !answer.spoke && runningRef.current && !speechController.signal.aborted;
+          if (noSound) {
+            const reason = answer.text ? 'textOnly' : 'empty';
             mark('live.retry');
-            events.push([since(), '— retry on a fresh session —']);
-            answer = await askOn(freshSession(), false);
-            record.live = { ...record.live!, retried: true };
+            events.push([since(), `— retry on a fresh session (${reason}) —`]);
+            const firstMessages = record.live?.messages ?? [];
+            const firstUsage = record.live?.usage ?? null;
+            try {
+              answer = await askOn(freshSession(), false);
+            } catch (e) {
+              // A failed retry of a turn that had words is not worth losing the words over.
+              const aborted = e instanceof DOMException && e.name === 'AbortError';
+              if (!firstAnswer.text || aborted) throw e;
+              log.warn('backseat.live.retry.failed', describeError(e));
+              answer = firstAnswer;
+            }
+            record.live = {
+              ...record.live!,
+              retried: true,
+              retryReason: reason,
+              firstAttempt: {
+                text: firstAnswer.text || null,
+                usage: firstUsage,
+                messages: firstMessages,
+              },
+            };
+            // The retry said nothing at all: the first attempt's words are still worth saying.
+            if (!answer.spoke && !answer.text) answer = firstAnswer;
           }
           /*
-           * Words with no sound: the 4 Oct test saw it once in ten on a Live model, a full
-           * transcript and not one audio chunk. The sentence exists, so the phone's own
+           * Words with no sound twice in a row: the sentence exists, so the phone's own
            * synthesiser says it rather than the round being lost.
            */
           if (!answer.spoke && answer.text && runningRef.current) {

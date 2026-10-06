@@ -288,6 +288,40 @@ export function messageKinds(message: Record<string, unknown>): string[] {
   return kinds;
 }
 
+/**
+ * A server message as it can be saved: every field kept, each audio chunk's base64 replaced by its
+ * length. The kinds above name what a message carried; this is what it said, for the turns where
+ * the kinds are not enough — above all the one in ten that comes back as words with no sound
+ * (`backseat.md`, *Words with no sound*), where whatever Google put beside the transcript is the
+ * only clue to why. Strings longer than 2000 characters are cut, so a record stays small.
+ */
+export function elideAudio(message: unknown): unknown {
+  if (typeof message === 'string') {
+    return message.length > 2000 ? `${message.slice(0, 2000)}… (${message.length} chars)` : message;
+  }
+  if (Array.isArray(message)) return message.map(elideAudio);
+  if (!message || typeof message !== 'object') return message;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(message)) {
+    out[key] =
+      key === 'inlineData' && value && typeof value === 'object'
+        ? {
+            ...(value as Record<string, unknown>),
+            data: `<${String((value as { data?: unknown }).data ?? '').length} base64 chars>`,
+          }
+        : elideAudio(value);
+  }
+  return out;
+}
+
+/** Whether a message is nothing but audio chunks — the bulk of a turn, and not worth saving. */
+function audioOnly(kinds: string[]): boolean {
+  return kinds.length > 0 && kinds.every((kind) => kind === 'audio');
+}
+
+/** How many messages a session keeps for the record (`LiveSession.messages`). */
+const MAX_SAVED_MESSAGES = 40;
+
 function closeError(event: CloseEvent): VisionError {
   const reason = event.reason || `Live connection closed (${event.code})`;
   // Google closes with 1007/1008 and the reason in words; a key it rejects says "API key".
@@ -339,6 +373,12 @@ export class LiveSession {
   usage: unknown = null;
   /** Whether `setup` asked for no thinking (`wantsThinkingOff`). */
   thinkingOff = false;
+  /**
+   * Every server message after setup except the plain audio chunks, whole (`elideAudio`), in
+   * arrival order, as [ms since the frame was sent (or since setup, before it), message].
+   */
+  readonly messages: [number, unknown][] = [];
+  private sentAt: number | null = null;
   /** Audio received for the remark: chunks, and seconds of sound. */
   audioChunks = 0;
   audioSeconds = 0;
@@ -418,6 +458,10 @@ export class LiveSession {
             return;
           }
           if ('usageMetadata' in message) this.usage = message.usageMetadata;
+          if (this.messages.length < MAX_SAVED_MESSAGES && !audioOnly(messageKinds(message))) {
+            const from = this.sentAt ?? this.setupAt ?? this.createdAt;
+            this.messages.push([Date.now() - from, elideAudio(message)]);
+          }
           if (this.listener) this.listener(message);
           else if (this.early.length < 20) this.early.push(...messageKinds(message));
         });
@@ -625,6 +669,7 @@ export class LiveSession {
         }
         parts.push({ text: request.user });
         request.onMark?.('live.sent');
+        this.sentAt = Date.now();
         this.socket?.send(
           JSON.stringify({
             clientContent: { turns: [{ role: 'user', parts }], turnComplete: true },

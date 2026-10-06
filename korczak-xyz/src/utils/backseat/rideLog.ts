@@ -80,9 +80,13 @@ export interface RoundRecord {
     early: string[];
     close: { code: number; reason: string; ms: number } | null;
     usage: unknown;
-    /** The prepared session answered with nothing, and a fresh one was asked instead. */
+    /** The first session answered with no sound, and a fresh one was asked instead. */
     retried?: boolean;
-    /** Had words but no sound, and the phone's synthesiser read the transcript. */
+    /** Why: `empty` (nothing at all) or `textOnly` (a transcript and no audio). */
+    retryReason?: 'empty' | 'textOnly';
+    /** The answer that was retried: its transcript, usage and messages, as on the retry below. */
+    firstAttempt?: { text: string | null; usage: unknown; messages: [number, unknown][] };
+    /** Had words but no sound even after the retry, and the phone's synthesiser read them. */
     deviceFallback?: boolean;
     /** How the frame went: `clientContent` (the only channel in which the model sees it). */
     input?: string;
@@ -90,6 +94,11 @@ export interface RoundRecord {
     thinkingOff?: boolean;
     audioChunks?: number;
     audioSeconds?: number;
+    /**
+     * Every server message but the plain audio chunks, whole, with audio data elided
+     * (`LiveSession.messages`): [ms from the frame being sent, message].
+     */
+    messages?: [number, unknown][];
   };
   /** `navigator.connection.effectiveType` where the browser has it. */
   network?: string;

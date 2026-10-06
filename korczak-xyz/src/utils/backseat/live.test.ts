@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterLiveModels, messageKinds, pcmRate, pcmToFloat, wantsThinkingOff } from './live';
+import { elideAudio, filterLiveModels, messageKinds, pcmRate, pcmToFloat, wantsThinkingOff } from './live';
 import { canStart, DEFAULT_CONFIG, normalizeConfig, requiredKeys } from './defaults';
 
 describe('filterLiveModels', () => {
@@ -85,5 +85,34 @@ describe('messageKinds', () => {
     expect(messageKinds({ serverContent: { somethingNew: 1 } })).toEqual([
       'serverContent:somethingNew',
     ]);
+  });
+});
+
+describe('elideAudio', () => {
+  it('keeps every field of a message and replaces audio data with its length', () => {
+    const message = {
+      serverContent: {
+        modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'AAAA' } }] },
+        outputTranscription: { text: 'Oto kierowca' },
+        turnComplete: true,
+      },
+      usageMetadata: { promptTokenCount: 1455 },
+    };
+    expect(elideAudio(message)).toEqual({
+      serverContent: {
+        modelTurn: {
+          parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: '<4 base64 chars>' } }],
+        },
+        outputTranscription: { text: 'Oto kierowca' },
+        turnComplete: true,
+      },
+      usageMetadata: { promptTokenCount: 1455 },
+    });
+  });
+
+  it('cuts a very long string', () => {
+    const out = elideAudio({ text: 'x'.repeat(3000) }) as { text: string };
+    expect(out.text.length).toBeLessThan(2100);
+    expect(out.text).toContain('3000 chars');
   });
 });
