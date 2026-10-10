@@ -42,19 +42,24 @@ function convertToPlaintext(lines) {
   const out = [];
   let firstVerse = true;
 
-  for (const { lyrics, chords } of lines) {
+  for (const { lyrics, chords, blank } of lines) {
+    if (blank) {
+      if (out.length && out[out.length - 1] !== '') out.push('');
+      continue;
+    }
     const isNewVerse = /^\d+\./.test(lyrics);
 
     if (isNewVerse) {
-      if (!firstVerse) out.push('');
+      if (!firstVerse && out[out.length - 1] !== '') out.push('');
       firstVerse = false;
     }
 
     const chordLine = buildChordLine(chords);
     if (chordLine) out.push(chordLine);
-    out.push(lyrics);
+    out.push(lyrics.trimEnd());
   }
 
+  while (out[out.length - 1] === '') out.pop();
   return out.join('\n');
 }
 
@@ -65,9 +70,12 @@ async function extractSongData(page) {
       let text = '';
       for (const child of node.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
-          text += child.textContent;
+          // wywrota pads with &nbsp; — keep the width, drop the character
+          text += child.textContent.replace(/\u00a0/g, ' ');
         } else if (child.nodeName === 'CODE' && child.classList.contains('an')) {
-          chords.push({ pos: currentLen + text.length, chord: child.dataset.chord });
+          // data-local is the chord as the page prints it, in Polish notation (g, d7, B, h);
+          // data-chord is only the root in English notation, without the minor or the seventh
+          chords.push({ pos: currentLen + text.length, chord: child.dataset.local ?? child.dataset.chord });
         } else if (child.nodeType === Node.ELEMENT_NODE) {
           text += processNode(child, chords, currentLen + text.length);
         }
@@ -78,12 +86,24 @@ async function extractSongData(page) {
     const container = document.querySelector('.interpretation-content');
     if (!container) throw new Error('Could not find .interpretation-content');
 
-    const spans = container.querySelectorAll('span.annotated-lyrics');
+    // Lines are annotated spans each closed by a <br>; a <br> with no span before it is the
+    // empty line between stanzas
     const lines = [];
-    for (const span of spans) {
-      const chords = [];
-      const lyrics = processNode(span, chords, 0);
-      lines.push({ lyrics, chords });
+    let afterBr = true;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: n => n.matches('span.annotated-lyrics, br') && !n.parentElement.closest('span.annotated-lyrics')
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+    });
+    for (let el = walker.nextNode(); el; el = walker.nextNode()) {
+      if (el.nodeName === 'BR') {
+        if (afterBr) lines.push({ blank: true });
+        afterBr = true;
+      } else {
+        const chords = [];
+        const lyrics = processNode(el, chords, 0);
+        lines.push({ lyrics, chords });
+        afterBr = false;
+      }
     }
 
     const titleEl = document.querySelector('h1 strong');
@@ -137,7 +157,7 @@ ${plaintext}
 \`\`\`
 `;
 
-  const outPath = join(__dirname, '..', 'korczak-xyz', 'src', 'content', 'songs', 'pl', `${title.toLowerCase()}.md`);
+  const outPath = join(__dirname, '..', 'korczak-xyz', 'src', 'content', 'songs', 'pl', `${slugify(title).replace(/-/g, ' ')}.md`);
   writeFileSync(outPath, markdown, 'utf8');
   console.log(`Written to: ${outPath}`);
   console.log('\n--- Preview ---\n');
