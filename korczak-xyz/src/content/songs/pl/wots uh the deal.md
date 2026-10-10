@@ -7,10 +7,11 @@ language: pl
 dateAdded: 2026-10-10
 ---
 ```plaintext
+[Wstęp]
 G h G7 C c G D7
 
-G               h
-Heaven sent the promised land
+   G               h
+1. Heaven sent the promised land
 G7                  C
 Looks allright from where I stand
       c                  G               D7
@@ -18,30 +19,36 @@ Cause I'm the man on the outside looking in
 Waiting on the first step
 Show me where the key is kept
 Point me down the right line because it's time
+
+Ref.:
 To let me in from the cold
 Turn my lead into gold
 Cause there's a chill wind blowing in my soul
 And I think I'm growing old
 
-Flash the readies wots...uh the deal
+2. Flash the readies wots...uh the deal
 Got to make to the next meal
 Try to keep up with the turning of the wheel.
 Mile after mile after
 Stone after stone
 You turn to speak but you're alone
 A million miles from home you're on your own
+
+Ref.:
 So let me in from the cold
 Turn my lead into gold
 Cause there's a chill wind blowing in my soul
 And I think I'm growing old
 
-Fly bright by candlelight
+3. Fly bright by candlelight
 With her by my side
 And if she prefers we will never stir again
 Someone sent the promised land
 And I grabbed it with both hands
 Now I'm the man on the inside looking out
 Hear me shout 'come on in, what's the news, where you been?'
+
+[Zakończenie]
 Cause there's no wind left in my soul
 And I've grown old
 ```
