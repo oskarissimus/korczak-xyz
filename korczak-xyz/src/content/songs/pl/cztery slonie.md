@@ -5,6 +5,9 @@ author: Piosenki dla dzieci
 published: true
 language: pl
 dateAdded: 2026-10-10
+chords:
+  G7: "3 2 0 0 0 1"
+  d7: "x x 0 2 1 1"
 ---
 ```plaintext
  F                 C
