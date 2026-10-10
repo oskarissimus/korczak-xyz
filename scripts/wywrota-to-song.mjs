@@ -25,8 +25,9 @@ function buildChordLine(chords) {
     if (pos > cursor) {
       result += ' '.repeat(pos - cursor);
       cursor = pos;
-    } else if (pos < cursor) {
-      // Chord overlaps previous one — add a single space separator
+    } else if (cursor > 0) {
+      // Chord overlaps or touches the previous one (a line of chords alone puts each at the
+      // column the last one ended) — add a single space separator
       result += ' ';
       cursor = result.length;
     }
@@ -87,17 +88,27 @@ async function extractSongData(page) {
     if (!container) throw new Error('Could not find .interpretation-content');
 
     // Lines are annotated spans each closed by a <br>; a <br> with no span before it is the
-    // empty line between stanzas
+    // empty line between stanzas. A version with no chords at all has no spans, just bare
+    // text between the <br>s, which is taken as a line with no chords.
     const lines = [];
     let afterBr = true;
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: n => n.matches('span.annotated-lyrics, br') && !n.parentElement.closest('span.annotated-lyrics')
-        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+      acceptNode: n => {
+        if (n.parentElement.closest('span.annotated-lyrics')) return NodeFilter.FILTER_SKIP;
+        if (n.nodeType === Node.TEXT_NODE) {
+          return n.parentElement === container && n.textContent.trim()
+            ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
+        return n.matches('span.annotated-lyrics, br') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      },
     });
     for (let el = walker.nextNode(); el; el = walker.nextNode()) {
       if (el.nodeName === 'BR') {
         if (afterBr) lines.push({ blank: true });
         afterBr = true;
+      } else if (el.nodeType === Node.TEXT_NODE) {
+        lines.push({ lyrics: el.textContent.replace(/\u00a0/g, ' ').trim(), chords: [] });
+        afterBr = false;
       } else {
         const chords = [];
         const lyrics = processNode(el, chords, 0);

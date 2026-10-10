@@ -128,6 +128,8 @@ A7               d
 Hej łatwo obejść ten cały świat
 A7               d
 Gdy obok brata wędruje brat
+Cóż im uczynić może kto
+Gdy zawsze razem są!
 
            F      d       g     C
 Cztery słonie, zielone słonie,
