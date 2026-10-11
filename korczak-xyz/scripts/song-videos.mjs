@@ -3,12 +3,12 @@
  * Moves the songbook's videos off YouTube and into the R2 bucket behind media.korczak.xyz.
  *
  * Runs on a laptop, not in CI: it needs yt-dlp signed in as the channel's owner (or the original
- * files), ffmpeg, and a `wrangler login` with R2 access. Nothing in the build depends on it — the
+ * files), ffmpeg, and a `wrangler login` with R2 access. The bucket and its domain are not made
+ * here — terraform/cloudflare/media.tf declares them and CI applies it. Nothing in the build depends on it — the
  * site only reads src/data/songVideos.json, and a song missing from that file still plays from
  * YouTube (src/components/Video.tsx). So the run can stop anywhere and be started again: the
  * manifest is written after every song, and a song already in it is skipped.
  *
- *   node scripts/song-videos.mjs setup --zone-id <id>   once: bucket + custom domain
  *   node scripts/song-videos.mjs                         every song not yet in the manifest
  *   node scripts/song-videos.mjs --only barka            one song (slug or YouTube id)
  *   node scripts/song-videos.mjs --src ~/Videos/songs    originals named <slug>.* or <youtubeId>.*
@@ -64,19 +64,6 @@ function requireTool(cmd, hint) {
 }
 
 const wrangler = (wranglerArgs) => run('npx', ['wrangler', ...wranglerArgs]);
-
-function setup() {
-  const zoneId = option('zone-id');
-  if (!zoneId) {
-    console.error('setup needs --zone-id: Cloudflare dashboard → korczak.xyz → Overview, right column, "Zone ID".');
-    process.exit(1);
-  }
-  // eeur: the listeners are in Poland. A location hint, not a jurisdiction — it only picks where
-  // the bucket lives; the custom domain is cached at every edge regardless.
-  wrangler(['r2', 'bucket', 'create', BUCKET, '--location', 'eeur']);
-  wrangler(['r2', 'bucket', 'domain', 'add', BUCKET, '--domain', DOMAIN, '--zone-id', zoneId, '--min-tls', '1.2', '--force']);
-  console.log(`\nhttps://${DOMAIN}/ now serves ${BUCKET}. Next: node scripts/song-videos.mjs`);
-}
 
 /** Every song that embeds a video: its slug and the YouTube id the MDX names. */
 function songs() {
@@ -205,5 +192,4 @@ function migrate() {
   if (!dryRun) console.log('\nCommit src/data/songVideos.json and push to switch these songs over.');
 }
 
-if (args[0] === 'setup') setup();
-else migrate();
+migrate();

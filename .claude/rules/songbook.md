@@ -88,7 +88,8 @@ opt-in per song, never part of the `songs` tier.
 **The upload runs on a laptop**, through `korczak-xyz/scripts/song-videos.mjs` — see its
 header. It needs yt-dlp with the channel owner's browser cookies (anonymous yt-dlp from a cloud
 IP is asked to sign in after a couple of dozen videos), or the original files via `--src`;
-ffmpeg; and `wrangler login`. `setup --zone-id` creates the bucket and attaches the domain once.
+ffmpeg; and `wrangler login`. The bucket and `media.korczak.xyz` are **not** the script's: they are
+declared in `terraform/cloudflare/media.tf` and applied by `.github/workflows/cloudflare.yml`.
 It writes the manifest after every song and skips songs already in it, so it can be stopped and
 rerun. Nothing in CI runs it.
 

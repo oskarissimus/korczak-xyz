@@ -50,6 +50,11 @@ and routes the request to the Worker before that matters. The same is true of `w
 target is irrelevant because the Single Redirect returns before any origin is consulted. **Neither
 record is a thing to "fix" if it looks wrong.**
 
+**`terraform/cloudflare/`** is the Cloudflare counterpart of `terraform/`: the songbook's R2 bucket
+and its `media` domain so far, applied by `.github/workflows/cloudflare.yml` with the same
+`CLOUDFLARE_API_TOKEN` wrangler deploys with. The plan to move the zone's DNS and the `www`
+redirect in there too is in its README.
+
 ## Error reporting
 
 **Sentry**, org `oskar-korczak`, EU region (`de.sentry.io`) — a third vendor alongside Cloudflare
