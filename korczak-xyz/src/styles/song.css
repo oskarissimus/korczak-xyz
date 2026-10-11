@@ -584,15 +584,18 @@
     display: none;
 }
 
-/* Offline, the YouTube iframe fails silently and leaves an empty sunken box - which looks
-   like the page is broken rather than like the network is. 29 of the songs embed one, so in
-   the installed songbook this is the common case, not the edge one. The label is put on the
-   element by the page script, which is where the translated string is. */
-.youtube-embed.is-offline iframe {
+/* Offline, the video fails silently and leaves an empty sunken box - which looks like the page
+   is broken rather than like the network is. Most songs carry one, so in the installed songbook
+   this is the common case, not the edge one. That holds for the self-hosted <video> as much as
+   the YouTube iframe: the service worker never touches cross-origin requests, and
+   media.korczak.xyz is one. The label is put on the element by the page script, which is where
+   the translated string is. */
+.video-embed.is-offline iframe,
+.video-embed.is-offline video {
     display: none;
 }
 
-.youtube-embed.is-offline::after {
+.video-embed.is-offline::after {
     content: attr(data-offline-label);
     position: absolute;
     inset: 0;

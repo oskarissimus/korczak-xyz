@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import PageContent from './PageContent.astro';
 import SongListItem from './SongListItem.astro';
 import { useTranslations, type Lang } from '../i18n';
+import { hasSongVideo } from '../utils/songVideo';
 
 interface Props {
   lang: Lang;
@@ -52,7 +53,7 @@ const years = Math.max(1, Math.round((now.getTime() - oldestDate.getTime()) / (3
         author={song.data.author}
         dateAdded={song.data.dateAdded}
         videoUploadDate={song.data.videoUploadDate}
-        hasVideo={song.body?.includes('<Youtube') ?? false}
+        hasVideo={hasSongVideo(song.body)}
         lang={lang}
         data-title={song.data.title.toLowerCase()}
         data-author={song.data.author.toLowerCase()}

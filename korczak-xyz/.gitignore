@@ -29,3 +29,6 @@ pnpm-debug.log*
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# scripts/song-videos.mjs: downloads and transcodes, gigabytes of them
+.song-videos/

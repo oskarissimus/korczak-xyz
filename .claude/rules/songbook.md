@@ -11,6 +11,11 @@ paths:
   - "**/components/Song*"
   - "**/pages/**/songs/**"
   - "**/SongPostPage.astro"
+  - "**/components/Video.tsx"
+  - "**/components/Youtube.tsx"
+  - "**/data/songVideos.json"
+  - "**/scripts/song-videos.mjs"
+  - "**/utils/songVideo.ts"
 ---
 
 ## Songbook
@@ -46,3 +51,47 @@ reason, as the boxed marks in `chordMarks.css` — a glyph's ink may overhang, i
 
 The side layout (`renderSideLayout`) is exempt from all of this: it strips the positioning
 spaces and puts the chords in their own flex column, so `.chord-col` may be bold and is.
+
+## Videos
+
+The songs' videos are Oskar playing them, and they are served from our own R2 bucket,
+`korczak-xyz-media`, at `https://media.korczak.xyz/songs/<slug>.<hash>.mp4` with a `.jpg`
+poster beside it. They were YouTube embeds until Oct 2026.
+
+**Why R2 and not the site's own assets.** The Worker's static assets cap a file at 25 MiB and
+most of these are bigger, and a gigabyte of video in git history is a cost every clone and every
+CI checkout pays. R2 is the same vendor and the same zone, has no egress charge, and its custom
+domain is cached at the edge like the site is. A GCS bucket was weighed and lost: GCS bills
+egress, and HTTPS on our own hostname would have needed a load balancer.
+
+**Why plain MP4 and not HLS.** The clips are one to five minutes of one guitarist. 720p H.264
+with `+faststart` plays natively everywhere, iOS included, with no player script, and seeks by
+Range request. Adaptive bitrate would buy little at that length and cost `hls.js` on every
+browser that is not Safari.
+
+**The MDX names the YouTube id, always.** A song embeds `<Video youtubeId="…" />`.
+`Video.tsx` looks the id up in `src/data/songVideos.json`; with an entry it renders `<video>`,
+without one it renders the old `<Youtube>` iframe. So the migration is per song and reversible
+per song: a song switches in the commit that adds its manifest entry, and deleting the entry
+puts it back on YouTube. The id is also the one key the upload script can read out of the song
+file without a lookup table of its own.
+
+**Files are named by content hash** and served `max-age=31536000, immutable`. A re-encode is a
+new name, and the manifest commit is what points the page at it, so no cache ever has to be
+purged. The old object can be left in the bucket or deleted by hand.
+
+**Offline** the video is as unavailable as the iframe was: the service worker never touches
+cross-origin requests (`src/sw/routing.js`), and `media.korczak.xyz` is one. The
+`.video-embed.is-offline` overlay covers both. Caching a 10–45 MB file per song would be an
+opt-in per song, never part of the `songs` tier.
+
+**The upload runs on a laptop**, through `korczak-xyz/scripts/song-videos.mjs` — see its
+header. It needs yt-dlp with the channel owner's browser cookies (anonymous yt-dlp from a cloud
+IP is asked to sign in after a couple of dozen videos), or the original files via `--src`;
+ffmpeg; and `wrangler login`. `setup --zone-id` creates the bucket and attaches the domain once.
+It writes the manifest after every song and skips songs already in it, so it can be stopped and
+rerun. Nothing in CI runs it.
+
+`hasSongVideo` (`src/utils/songVideo.ts`) is the one test for "this song has a video", used by
+both the page's toggle and the 📺 marker in the list. It accepts `<Youtube` as well, so a song
+added the old way still gets both.

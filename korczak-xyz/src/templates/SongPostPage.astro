@@ -5,6 +5,7 @@ import ChordShapes from '../components/ChordShapes.astro';
 import SongsListContent from '../components/SongsListContent.astro';
 import '../styles/song.css';
 import { type Lang, useTranslations, getLocalizedPath } from '../i18n';
+import { hasSongVideo } from '../utils/songVideo';
 
 interface Props {
   lang: Lang;
@@ -37,9 +38,9 @@ function formatDate(date: Date, locale: string): string {
 const songsListUrl = getLocalizedPath('/songs/', lang);
 
 // The embed lives in the body, not the frontmatter — `videoUploadDate` is optional and some
-// songs carry a `<Youtube>` without one — so the body is what decides whether the toggle
+// songs carry a `<Video>` without one — so the body is what decides whether the toggle
 // has anything to toggle. Same test as the 📺 marker in the songs list.
-const hasVideo = song.body?.includes('<Youtube') ?? false;
+const hasVideo = hasSongVideo(song.body);
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang} pwa="songs">
@@ -865,14 +866,14 @@ const hasVideo = song.body?.includes('<Youtube') ?? false;
     applyChordShapesVisibility();
 
     /*
-     * The YouTube embeds are the one part of a song page that a cached copy cannot supply, so
+     * The video embeds are the one part of a song page that a cached copy cannot supply, so
      * offline they collapse to an empty sunken frame that reads as a broken page. Say what has
      * actually happened instead.
      */
     function applyVideoOfflineState() {
       const label = songPage.dataset.videoOffline || '';
       const offline = !navigator.onLine;
-      songPage.querySelectorAll<HTMLElement>('.youtube-embed').forEach(embed => {
+      songPage.querySelectorAll<HTMLElement>('.video-embed').forEach(embed => {
         embed.dataset.offlineLabel = label;
         embed.classList.toggle('is-offline', offline);
       });

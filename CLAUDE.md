@@ -39,6 +39,7 @@ that file cannot match on hostname. **This is the one piece of the serving path 
 ```
 korczak.xyz      AAAA   100::           proxied   <- Cloudflare-managed, the Worker's custom domain
 www.korczak.xyz  CNAME  korczak.xyz     proxied   <- exists only to be proxied; the redirect fires first
+media            (R2 custom domain)     proxied   <- the songbook's videos, bucket korczak-xyz-media
 dresden          A      34.66.172.112   proxied   <- unrelated to this site
 korczak.xyz      TXT    v=spf1 -all     _dmarc p=reject   <- the domain sends no mail
 ```

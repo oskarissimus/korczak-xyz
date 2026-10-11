@@ -1,6 +1,6 @@
 export default function Youtube({ videoId }: { videoId: string }) {
   return (
-    <div className="youtube-embed" style={{
+    <div className="video-embed" style={{
       position: 'relative',
       width: '100%',
       aspectRatio: '16/9',
