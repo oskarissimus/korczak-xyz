@@ -39,7 +39,10 @@ import type { FeedKind, RawFeedItem, TransitItem } from '../../../korczak-xyz/sr
 const BODY_LIMIT = 4000;
 /** How much of an item's XML the archive keeps. Generous: this exists to be read when things break. */
 const RAW_LIMIT = 20000;
-/** Below this, no HTTP body is a feed. The WAF challenge delivers zero; a stub error page a few hundred. */
+/**
+ * Below this, a body that is not a whole RSS document is not a feed. The WAF challenge delivers
+ * zero; a stub error page a few hundred. A complete but empty channel is shorter still and passes.
+ */
 const MIN_FEED_BYTES = 200;
 
 const ITEM = /<item[\s>]([\s\S]*?)<\/item>/g;
@@ -135,9 +138,20 @@ export function notAFeed(
   const challenged = wafChallenge(status, wafAction);
   if (challenged) return challenged.replace('the page', 'a feed');
   if (!ok) return `HTTP ${status}`;
+  /*
+   * A whole RSS envelope is a feed at any size. With no live disruption WTP serves the channel
+   * header and nothing else — 199 bytes, measured 14 Oct 2026 — and that is the best news this
+   * feed can carry. The size floor below was tripping on it and reporting the feed broken.
+   */
+  if (isWholeFeed(body)) return undefined;
   if (body.length < MIN_FEED_BYTES) return `HTTP ${status} with ${body.length} bytes — not a feed`;
   if (!/<rss[\s>]|<feed[\s>]/i.test(body)) return `HTTP ${status} returned ${body.length} bytes that are not RSS`;
   return undefined;
+}
+
+/** An `<rss>` with its `<channel>` and its closing tag: a complete document, not a stub or a cut-off body. */
+function isWholeFeed(body: string): boolean {
+  return /<rss[\s>]/i.test(body) && /<channel[\s>]/i.test(body) && /<\/rss>\s*$/i.test(body);
 }
 
 /**

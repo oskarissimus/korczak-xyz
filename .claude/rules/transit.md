@@ -361,6 +361,13 @@ checks (the `x-amzn-waf-action` header, a body too small, a body containing no `
 consecutive failures send a push saying the app cannot see. `functions/README.md` has what to do if
 that starts firing; nothing in this repository should learn to solve a WAF challenge.
 
+**The size floor must never catch a whole feed.** On 14 Oct 2026 the impediment feed had no live
+disruption and WTP served the bare channel — `<rss><channel>` with a title, a link, an empty
+description and no `<item>`, **199 bytes** — one under `MIN_FEED_BYTES`. Three runs of that sent
+*"Nie można odczytać komunikatów WTP"* on the quietest afternoon there is. So a complete RSS document
+(`<rss`, a `<channel`, and the closing `</rss>`) is accepted before the floor is consulted; the floor
+is still what catches a stub page or a body cut off mid-way.
+
 Note the consequence for `recordFetch`: unlike Event Watch's `recordHealth`, **zero items is not
 treated as a failure here**. A WTP feed genuinely can hold nothing new, and the failure this source
 actually has is precise and named — adding a vaguer signal beside it would only make the precise one

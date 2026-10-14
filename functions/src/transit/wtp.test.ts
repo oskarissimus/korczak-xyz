@@ -91,6 +91,19 @@ describe('telling a feed from a WAF challenge', () => {
     expect(notAFeed(403, false, 'Request blocked.')).toBe('HTTP 403');
   });
 
+  it('passes an empty channel, which is what a quiet day looks like', () => {
+    const empty =
+      '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0">\n<channel>\n\t<title>Warszawski Transport Publiczny</title>\n' +
+      '\t<link>https://www.wtp.waw.pl</link>\n\t<description></description>\n</channel>\n</rss>\n\n';
+    expect(empty.length).toBeLessThanOrEqual(200);
+    expect(notAFeed(200, true, empty)).toBeUndefined();
+    expect(parseWtpFeed(empty, 'impediment', NOW).items).toEqual([]);
+  });
+
+  it('still refuses a feed cut off before its end', () => {
+    expect(notAFeed(200, true, '<rss version="2.0"><channel><title>W')).toMatch(/not a feed/);
+  });
+
   it('passes a real feed', () => {
     expect(notAFeed(200, true, impediments)).toBeUndefined();
   });
