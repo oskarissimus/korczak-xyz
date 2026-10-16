@@ -93,6 +93,13 @@ declared in `terraform/cloudflare/media.tf` and applied by `.github/workflows/cl
 It writes the manifest after every song and skips songs already in it, so it can be stopped and
 rerun. Nothing in CI runs it.
 
+**The first 36 came from a Google Takeout** of the oskarissimus channel (Oct 2026), through
+`--src`. A YouTube Takeout names each video by its *title* and carries no id or metadata file, so
+the files were renamed to slugs by hand before the run — `--src` matches on `<slug>.*` or
+`<youtubeId>.*` and nothing else. The export is the whole channel (~27 GB) for ~11 GB of songs.
+Enabling R2 on the account was a dashboard step too (a $0 subscription that wants a payment
+method): until then every R2 call, Terraform's included, fails with `10042`.
+
 `hasSongVideo` (`src/utils/songVideo.ts`) is the one test for "this song has a video", used by
 both the page's toggle and the 📺 marker in the list. It accepts `<Youtube` as well, so a song
 added the old way still gets both.
