@@ -20,6 +20,12 @@ const LINES_ABOVE = 3;
 // Visible glyph for the section-ending newline the user types (Enter) to advance.
 const NEWLINE_GLYPH = '↵';
 
+// A verse line's break inside a passage is typed too, so it shows the same glyph before the
+// break itself (.typing-text is pre-wrap, so the '\n' still ends the line).
+function showChar(ch: string): string {
+  return ch === '\n' ? `${NEWLINE_GLYPH}\n` : ch;
+}
+
 export function PassageView({
   passages,
   passageIndex,
@@ -71,7 +77,7 @@ export function PassageView({
       if (typed == null || typed === passage || typed === passage + '\n') {
         nodes.push(
           <p className="typing-text typing-text--done" key={j}>
-            {passage}
+            {passage.replace(/\n/g, `${NEWLINE_GLYPH}\n`)}
             <span className="typing-char typing-char--correct typing-char--newline">{NEWLINE_GLYPH}</span>
           </p>,
         );
@@ -87,7 +93,7 @@ export function PassageView({
               key={i}
               className={`typing-char typing-char--${typed[i] === ch ? 'correct' : 'incorrect'}`}
             >
-              {ch}
+              {showChar(ch)}
             </span>
           ))}
           <span className={`typing-char typing-char--${newlineWrong ? 'incorrect' : 'correct'} typing-char--newline`}>{NEWLINE_GLYPH}</span>
@@ -239,9 +245,9 @@ export function PassageView({
                   <span
                     key={i}
                     ref={status === 'current' ? currentCharRef : undefined}
-                    className={`typing-char typing-char--${status}`}
+                    className={`typing-char typing-char--${status}${ch === '\n' ? ' typing-char--newline' : ''}`}
                   >
-                    {ch}
+                    {showChar(ch)}
                   </span>
                 );
               })}

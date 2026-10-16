@@ -9,6 +9,7 @@ interface ParseOptions {
   id: string;
   title: string;
   author: string;
+  verse?: boolean;
 }
 
 // Strip the Wolne Lektury header (author / title / translator / ISBN) and the
@@ -41,6 +42,37 @@ function normalizeParagraph(paragraph: string): string {
     .trim();
 }
 
+// A stanza keeps its line breaks: each verse line ends in an Enter typed like any other
+// character, the way the poem is read. A stanza is one passage when it fits; a longer one
+// breaks between lines, at the last line that ends a sentence, so no passage starts or ends
+// mid-sentence when the verse allows it. The limit is looser than prose's because a stanza
+// cut in two for being a few characters over reads worse than a slightly long passage.
+const MAX_STANZA_LENGTH = 320;
+const ENDS_SENTENCE = /[.!?…]["'”’)]*$/;
+
+function splitStanza(stanza: string): string[] {
+  const lines = stanza.split('\n').map(normalizeParagraph).filter((l) => l.length > 0);
+  const passages: string[] = [];
+  let current: string[] = [];
+  const length = (ls: string[]) => ls.join('\n').length;
+  for (const line of lines) {
+    if (current.length > 0 && length([...current, line]) > MAX_STANZA_LENGTH) {
+      let cut = current.length;
+      for (let i = current.length - 1; i > 0; i--) {
+        if (ENDS_SENTENCE.test(current[i - 1])) {
+          cut = i;
+          break;
+        }
+      }
+      passages.push(current.slice(0, cut).join('\n'));
+      current = current.slice(cut);
+    }
+    current.push(line);
+  }
+  if (current.length > 0) passages.push(current.join('\n'));
+  return passages;
+}
+
 // Greedily split an over-long paragraph at sentence boundaries.
 function splitLongParagraph(paragraph: string): string[] {
   if (paragraph.length <= MAX_PASSAGE_LENGTH) return [paragraph];
@@ -68,11 +100,13 @@ function splitLongParagraph(paragraph: string): string[] {
 export function parseBook(raw: string, options: ParseOptions): Book {
   const body = extractBody(raw);
 
-  const passages = body
-    .split(/\n\s*\n/) // paragraphs are separated by blank lines
-    .map(normalizeParagraph)
-    .filter((p) => p.length > 0)
-    .flatMap(splitLongParagraph);
+  const paragraphs = body.split(/\n\s*\n/); // paragraphs are separated by blank lines
+  const passages = options.verse
+    ? paragraphs.flatMap(splitStanza)
+    : paragraphs
+        .map(normalizeParagraph)
+        .filter((p) => p.length > 0)
+        .flatMap(splitLongParagraph);
 
   return {
     id: options.id,

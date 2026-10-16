@@ -8,13 +8,16 @@ export interface BookMeta {
   id: string; // e.g. 'krasnoludek'
   title: string;
   author: string;
+  // Poetry: keep each verse line's break as an Enter to type, instead of folding the stanza
+  // into one line of prose.
+  verse?: boolean;
 }
 
 export const BOOK_META: readonly BookMeta[] = [
   { id: 'krasnoludek', title: 'Krasnoludek', author: 'Hans Christian Andersen' },
   { id: 'opowiesc-wigilijna', title: 'Opowieść wigilijna', author: 'Charles Dickens' },
   { id: 'krol-macius-pierwszy', title: 'Król Maciuś Pierwszy', author: 'Janusz Korczak' },
-  { id: 'przygody-pchly-szachrajki', title: 'Przygody Pchły Szachrajki', author: 'Jan Brzechwa' },
+  { id: 'przygody-pchly-szachrajki', title: 'Przygody Pchły Szachrajki', author: 'Jan Brzechwa', verse: true },
 ];
 
 // The one place the picker's option text is composed. The button, the width sizer, the list rows
