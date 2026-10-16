@@ -64,22 +64,56 @@ export interface FetchContext {
   now: number;
   fetch: typeof globalThis.fetch;
   timeoutMs?: number;
+  /** Pause before the one retry a transport failure earns. Tests set it to zero. */
+  retryDelayMs?: number;
 }
 
-/** Both feeds, each reported separately: one being down must not hide the other still working. */
+/*
+ * How long one request may take, and why it is not shorter.
+ *
+ * It was 25s, and on 16 Oct 2026 the impediment feed stopped answering inside that from 11:45 Warsaw
+ * time — a request that connected and then sat, aborted at exactly 25s, run after run, while the
+ * planned-changes feed on the same host answered in about a second. Three runs of that sent the
+ * "cannot read" push. A feed that is slow is not a feed that is gone, and the run has 300s.
+ */
+const FEED_TIMEOUT_MS = 60000;
+const RETRY_DELAY_MS = 5000;
+
+/**
+ * Both feeds, each reported separately: one being down must not hide the other still working.
+ * Concurrently, so a feed that hangs costs the run its own timeout once rather than delaying the other.
+ */
 export async function fetchWtpFeeds(ctx: FetchContext): Promise<FetchOutcome[]> {
-  const out: FetchOutcome[] = [];
-  for (const entry of WTP_FEEDS) out.push(await fetchWtpFeed(ctx, entry.feed, entry.url));
-  return out;
+  return Promise.all(WTP_FEEDS.map((entry) => fetchWtpFeed(ctx, entry.feed, entry.url)));
 }
 
+/**
+ * One feed, with one retry for a request that never got an answer — a timeout, a reset, a DNS
+ * blip. Those are properties of the moment. An answer that is not a feed (a WAF challenge, an HTTP
+ * error, a body that is not RSS) is **not** retried: asking again a few seconds later gets the same
+ * answer and only makes this collector a heavier client of a site that is already refusing it.
+ */
 export async function fetchWtpFeed(
   ctx: FetchContext,
   feed: FeedKind,
   url: string,
 ): Promise<FetchOutcome> {
+  const first = await fetchWtpFeedOnce(ctx, feed, url);
+  if (first.ok || first.status !== undefined) return first;
+  await new Promise((resolve) => setTimeout(resolve, ctx.retryDelayMs ?? RETRY_DELAY_MS));
+  const second = await fetchWtpFeedOnce(ctx, feed, url);
+  if (second.ok || second.status !== undefined) return second;
+  const error = first.error === second.error ? `${second.error} (twice)` : `${first.error}, then ${second.error}`;
+  return { ...second, error };
+}
+
+async function fetchWtpFeedOnce(
+  ctx: FetchContext,
+  feed: FeedKind,
+  url: string,
+): Promise<FetchOutcome> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ctx.timeoutMs ?? 25000);
+  const timer = setTimeout(() => controller.abort(), ctx.timeoutMs ?? FEED_TIMEOUT_MS);
   try {
     const response = await ctx.fetch(url, {
       signal: controller.signal,

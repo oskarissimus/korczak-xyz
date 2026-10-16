@@ -131,10 +131,13 @@ describe('fetchWtpFeed', () => {
   });
 
   it('reports a network failure rather than throwing out of the run', async () => {
+    let calls = 0;
     const outcome = await fetchWtpFeed(
       {
         now: NOW,
+        retryDelayMs: 0,
         fetch: (async () => {
+          calls += 1;
           throw new Error('ECONNRESET');
         }) as unknown as typeof globalThis.fetch,
       },
@@ -142,7 +145,52 @@ describe('fetchWtpFeed', () => {
       'https://example.test/feed',
     );
     expect(outcome.ok).toBe(false);
-    expect(outcome.error).toBe('ECONNRESET');
+    expect(outcome.error).toBe('ECONNRESET (twice)');
+    expect(calls).toBe(2);
+  });
+
+  it('retries a request that timed out, and takes the second answer', async () => {
+    let calls = 0;
+    const outcome = await fetchWtpFeed(
+      {
+        now: NOW,
+        retryDelayMs: 0,
+        timeoutMs: 20,
+        fetch: (async (_url: string, init: RequestInit) => {
+          calls += 1;
+          if (calls === 1) {
+            // Connects and then sits, the way the impediment feed did on 16 Oct 2026.
+            return new Promise((_, reject) =>
+              init.signal!.addEventListener('abort', () => reject(new Error('This operation was aborted'))),
+            );
+          }
+          return new Response(impediments);
+        }) as unknown as typeof globalThis.fetch,
+      },
+      'impediment',
+      'https://example.test/feed',
+    );
+    expect(calls).toBe(2);
+    expect(outcome.ok).toBe(true);
+    expect(outcome.items).toHaveLength(4);
+  });
+
+  it('does not retry an answer that is not a feed', async () => {
+    let calls = 0;
+    const outcome = await fetchWtpFeed(
+      {
+        now: NOW,
+        retryDelayMs: 0,
+        fetch: (async () => {
+          calls += 1;
+          return new Response('', { status: 202, headers: { 'x-amzn-waf-action': 'challenge' } });
+        }) as unknown as typeof globalThis.fetch,
+      },
+      'impediment',
+      'https://example.test/feed',
+    );
+    expect(calls).toBe(1);
+    expect(outcome.ok).toBe(false);
   });
 
   it('parses a good response', async () => {

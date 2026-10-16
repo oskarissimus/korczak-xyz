@@ -368,6 +368,15 @@ description and no `<item>`, **199 bytes** — one under `MIN_FEED_BYTES`. Three
 (`<rss`, a `<channel`, and the closing `</rss>`) is accepted before the floor is consulted; the floor
 is still what catches a stub page or a body cut off mid-way.
 
+**A slow feed is not a missing one.** On 16 Oct 2026, from 11:45 Warsaw time, the impediment feed
+connected and then sat: every request aborted at exactly the 25s the fetch then allowed, run after
+run, while the planned-changes feed on the same host answered in about a second. Three runs later
+the same *"Nie można odczytać"* push went out. So the two feeds are now fetched concurrently (one
+hanging no longer delays the other), a request gets 60s, and a request that got **no answer at all**
+— a timeout, a reset — is asked once more after five seconds. An answer that is not a feed (a
+challenge, an HTTP error, a body that is not RSS) is never retried: asking again gets the same
+answer and makes this collector a heavier client of a site already refusing it.
+
 Note the consequence for `recordFetch`: unlike Event Watch's `recordHealth`, **zero items is not
 treated as a failure here**. A WTP feed genuinely can hold nothing new, and the failure this source
 actually has is precise and named — adding a vaguer signal beside it would only make the precise one
