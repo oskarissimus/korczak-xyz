@@ -14,6 +14,7 @@ export const BOOK_META: readonly BookMeta[] = [
   { id: 'krasnoludek', title: 'Krasnoludek', author: 'Hans Christian Andersen' },
   { id: 'opowiesc-wigilijna', title: 'Opowieść wigilijna', author: 'Charles Dickens' },
   { id: 'krol-macius-pierwszy', title: 'Król Maciuś Pierwszy', author: 'Janusz Korczak' },
+  { id: 'przygody-pchly-szachrajki', title: 'Przygody Pchły Szachrajki', author: 'Jan Brzechwa' },
 ];
 
 // The one place the picker's option text is composed. The button, the width sizer, the list rows
