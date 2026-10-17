@@ -1,0 +1,699 @@
+/*
+ * The RPG's world: one village, three places a quest can send you to, a hunter who walks between
+ * them, and whatever the open quest put at its place. Plain Three.js, no assets — every mesh is a
+ * primitive, so the page loads nothing but code.
+ *
+ * The React side (`Rpg.tsx`) owns the story; this file owns space and time and talks back only
+ * through `SceneCallbacks`. It never decides what a quest says, only where its things are and
+ * whether they have been picked up or killed.
+ */
+
+import * as THREE from 'three';
+import type { LocationId, ObjectiveKind } from '../../utils/rpg/quest';
+
+export interface SceneCallbacks {
+  /** A hint for what E would do here, or null when nothing is in reach. */
+  onPrompt: (prompt: 'talk' | 'pickup' | null) => void;
+  onTalk: () => void;
+  /** One more thing collected or killed. */
+  onProgress: () => void;
+  onHealth: (hp: number) => void;
+  onDeath: () => void;
+  /** Where the current marker is, relative to where the camera looks: radians, and metres. */
+  onCompass: (angle: number | null, distance: number) => void;
+  onLockChange: (locked: boolean) => void;
+}
+
+export const PLACES: Record<LocationId, THREE.Vector3> = {
+  ruins: new THREE.Vector3(0, 0, -75),
+  forest: new THREE.Vector3(-75, 0, 5),
+  lake: new THREE.Vector3(75, 0, 10),
+};
+
+const NPC_POS = new THREE.Vector3(4, 0, -4);
+const SPAWN = new THREE.Vector3(0, 0, 8);
+const WORLD_HALF = 115;
+const WALK = 6;
+const RUN = 12;
+const TALK_RANGE = 3.2;
+const PICKUP_RANGE = 2.2;
+const ATTACK_RANGE = 3;
+const ATTACK_COOLDOWN = 0.55;
+const MAX_HP = 100;
+
+interface Obstacle {
+  x: number;
+  z: number;
+  r: number;
+}
+
+interface Enemy {
+  mesh: THREE.Group;
+  hp: number;
+  home: THREE.Vector3;
+  hitCooldown: number;
+  flash: number;
+}
+
+interface Pickup {
+  mesh: THREE.Mesh;
+  phase: number;
+}
+
+/** A tiny seeded random, so the forest is the same forest on every visit. */
+function rng(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+/** How far (x, z) is from the path running from the village square to (px, pz). */
+function nearSegment(x: number, z: number, px: number, pz: number): number {
+  const t = Math.max(0, Math.min(1, (x * px + z * pz) / (px * px + pz * pz)));
+  return Math.hypot(x - px * t, z - pz * t);
+}
+
+function humanoid(body: number, head: number, height = 1.8): THREE.Group {
+  const group = new THREE.Group();
+  const torso = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.35, height - 1.05, 4, 10),
+    new THREE.MeshStandardMaterial({ color: body, roughness: 0.8 }),
+  );
+  torso.position.y = (height - 0.35) / 2;
+  torso.castShadow = true;
+  const skull = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 12, 10),
+    new THREE.MeshStandardMaterial({ color: head, roughness: 0.7 }),
+  );
+  skull.position.y = height - 0.12;
+  skull.castShadow = true;
+  group.add(torso, skull);
+  return group;
+}
+
+export class RpgScene {
+  private renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(65, 1, 0.1, 400);
+  private clock = new THREE.Clock();
+  private frame = 0;
+  private canvas: HTMLCanvasElement;
+  private cb: SceneCallbacks;
+
+  private player: THREE.Group;
+  private sword: THREE.Mesh;
+  private npc: THREE.Group;
+  private marker: THREE.Mesh;
+  private yaw = 0;
+  private pitch = 0.25;
+  private keys = new Set<string>();
+  private obstacles: Obstacle[] = [];
+  private enemies: Enemy[] = [];
+  private pickups: Pickup[] = [];
+  private markerTarget: THREE.Vector3 | null = null;
+  private hp = MAX_HP;
+  private attackTimer = 0;
+  private swing = 0;
+  private paused = false;
+  private lastPrompt: 'talk' | 'pickup' | null = null;
+  private compassTimer = 0;
+
+  constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
+    this.canvas = canvas;
+    this.cb = callbacks;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    this.scene.background = new THREE.Color(0x9fb8c8);
+    this.scene.fog = new THREE.Fog(0x9fb8c8, 40, 170);
+
+    this.buildLight();
+    this.buildWorld();
+
+    this.player = humanoid(0x3b3b46, 0xe0c2a2);
+    this.sword = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.06, 1.1),
+      new THREE.MeshStandardMaterial({ color: 0xd8dde3, metalness: 0.8, roughness: 0.25 }),
+    );
+    this.sword.position.set(0.45, 1.05, 0.45);
+    this.sword.castShadow = true;
+    this.player.add(this.sword);
+    this.player.position.copy(SPAWN);
+    this.scene.add(this.player);
+
+    this.npc = humanoid(0x7a5230, 0xd9b38c, 1.75);
+    this.npc.position.copy(NPC_POS);
+    this.npc.rotation.y = Math.PI / 4;
+    this.scene.add(this.npc);
+    this.obstacles.push({ x: NPC_POS.x, z: NPC_POS.z, r: 0.6 });
+
+    this.marker = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 60, 12, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd36b,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    this.marker.visible = false;
+    this.scene.add(this.marker);
+
+    this.bindInput();
+  }
+
+  // --- the world --------------------------------------------------------------------------------
+
+  private buildLight() {
+    this.scene.add(new THREE.HemisphereLight(0xdfe9f3, 0x4a5a3a, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
+    sun.position.set(40, 70, 25);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const s = sun.shadow.camera;
+    s.left = -60;
+    s.right = 60;
+    s.top = 60;
+    s.bottom = -60;
+    s.far = 200;
+    this.scene.add(sun, sun.target);
+    // The shadow box follows the player, so the whole map can cast shadows on a modest map size.
+    this.sunLight = sun;
+  }
+
+  private sunLight!: THREE.DirectionalLight;
+
+  private buildWorld() {
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
+      new THREE.MeshStandardMaterial({ color: 0x5f7d3f, roughness: 1 }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // A dirt path from the village to each place, so "east of the village" can be followed.
+    const dirt = new THREE.MeshStandardMaterial({ color: 0x8a7350, roughness: 1 });
+    for (const target of Object.values(PLACES)) {
+      const length = target.length();
+      const path = new THREE.Mesh(new THREE.PlaneGeometry(3, length), dirt);
+      path.rotation.x = -Math.PI / 2;
+      path.rotation.z = Math.atan2(-target.x, -target.z);
+      path.position.set(target.x / 2, 0.01, target.z / 2);
+      path.receiveShadow = true;
+      this.scene.add(path);
+    }
+
+    this.buildVillage();
+    this.buildRuins();
+    this.buildForest();
+    this.buildLake();
+  }
+
+  private buildVillage() {
+    const wall = new THREE.MeshStandardMaterial({ color: 0xcdbb98, roughness: 0.9 });
+    const timber = new THREE.MeshStandardMaterial({ color: 0x5b3f26, roughness: 0.9 });
+    const thatch = new THREE.MeshStandardMaterial({ color: 0x9c7a3c, roughness: 1 });
+    const houses: [number, number, number][] = [
+      [-12, -10, 0.3],
+      [14, -14, -0.4],
+      [-14, 10, 0.2],
+      [15, 12, 0.6],
+      [-10, -22, 0.1],
+    ];
+    for (const [x, z, rot] of houses) {
+      const house = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 5), wall);
+      base.position.y = 2;
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.3, 5.2), timber);
+      beam.position.y = 4;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 3.5, 4), thatch);
+      roof.position.y = 5.7;
+      roof.rotation.y = Math.PI / 4;
+      roof.scale.set(1, 1, 0.8);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.1), timber);
+      door.position.set(0, 1.1, 2.55);
+      for (const m of [base, beam, roof, door]) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+      house.add(base, beam, roof, door);
+      house.position.set(x, 0, z);
+      house.rotation.y = rot;
+      this.scene.add(house);
+      this.obstacles.push({ x, z, r: 4.3 });
+    }
+
+    // A well in the square, the NPC beside it.
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8c8c86, roughness: 1 });
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 1, 14, 1, true), stone);
+    well.position.set(0, 0.5, -3);
+    well.castShadow = true;
+    const water = new THREE.Mesh(
+      new THREE.CircleGeometry(1.1, 14),
+      new THREE.MeshStandardMaterial({ color: 0x1f3a4a }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(0, 0.6, -3);
+    this.scene.add(well, water);
+    this.obstacles.push({ x: 0, z: -3, r: 1.5 });
+
+    // A fence ring around the village, open where the paths leave.
+    const post = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 6);
+    for (let i = 0; i < 72; i++) {
+      const a = (i / 72) * Math.PI * 2;
+      // Open where each path leaves, and to the south where the hunter rode in.
+      const gaps = [0, ...Object.values(PLACES).map((p) => Math.atan2(p.x, p.z))];
+      if (gaps.some((g) => Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))) < 0.1)) continue;
+      const p = new THREE.Mesh(post, timber);
+      p.position.set(Math.sin(a) * 28, 0.6, Math.cos(a) * 28);
+      p.castShadow = true;
+      this.scene.add(p);
+    }
+  }
+
+  private buildRuins() {
+    const at = PLACES.ruins;
+    const stone = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 });
+    const rand = rng(7);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const h = 2 + rand() * 6;
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 1.4), stone);
+      const x = at.x + Math.sin(a) * 11;
+      const z = at.z + Math.cos(a) * 11;
+      pillar.position.set(x, h / 2, z);
+      pillar.rotation.y = rand();
+      pillar.rotation.z = (rand() - 0.5) * 0.15;
+      pillar.castShadow = true;
+      pillar.receiveShadow = true;
+      this.scene.add(pillar);
+      this.obstacles.push({ x, z, r: 1.1 });
+    }
+    for (let i = 0; i < 14; i++) {
+      const rubble = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4 + rand() * 0.6), stone);
+      rubble.position.set(at.x + (rand() - 0.5) * 24, 0.2, at.z + (rand() - 0.5) * 24);
+      rubble.castShadow = true;
+      this.scene.add(rubble);
+    }
+  }
+
+  private tree(x: number, z: number, scale: number) {
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25 * scale, 0.35 * scale, 2 * scale, 6),
+      this.trunkMat,
+    );
+    trunk.position.set(x, scale, z);
+    trunk.castShadow = true;
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(1.8 * scale, 5 * scale, 7), this.leafMat);
+    crown.position.set(x, 2 * scale + 2.2 * scale, z);
+    crown.castShadow = true;
+    this.scene.add(trunk, crown);
+    this.obstacles.push({ x, z, r: 0.5 * scale });
+  }
+
+  private trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d3420, roughness: 1 });
+  private leafMat = new THREE.MeshStandardMaterial({ color: 0x2f4f2a, roughness: 1 });
+
+  private buildForest() {
+    const at = PLACES.forest;
+    const rand = rng(42);
+    for (let i = 0; i < 110; i++) {
+      const a = rand() * Math.PI * 2;
+      const d = 6 + rand() * 26;
+      this.tree(at.x + Math.sin(a) * d, at.z + Math.cos(a) * d, 0.8 + rand() * 0.8);
+    }
+    // And a scatter across the whole map, kept off the village and the paths.
+    for (let i = 0; i < 140; i++) {
+      const x = (rand() - 0.5) * WORLD_HALF * 2;
+      const z = (rand() - 0.5) * WORLD_HALF * 2;
+      if (Math.hypot(x, z) < 32) continue;
+      if (Object.values(PLACES).some((p) => nearSegment(x, z, p.x, p.z) < 4)) continue;
+      if (Object.values(PLACES).some((p) => Math.hypot(x - p.x, z - p.z) < 20)) continue;
+      this.tree(x, z, 0.7 + rand() * 0.9);
+    }
+  }
+
+  private buildLake() {
+    const at = PLACES.lake;
+    const lake = new THREE.Mesh(
+      new THREE.CircleGeometry(16, 40),
+      new THREE.MeshStandardMaterial({
+        color: 0x3d6b80,
+        roughness: 0.15,
+        metalness: 0.3,
+        transparent: true,
+        opacity: 0.88,
+      }),
+    );
+    lake.rotation.x = -Math.PI / 2;
+    lake.position.set(at.x + 8, 0.03, at.z);
+    this.scene.add(lake);
+    const reed = new THREE.MeshStandardMaterial({ color: 0x6b7a3a });
+    const rand = rng(3);
+    for (let i = 0; i < 60; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 1.2 + rand(), 4), reed);
+      r.position.set(at.x + 8 + Math.sin(a) * (15.5 + rand() * 2), 0.6, at.z + Math.cos(a) * (15.5 + rand() * 2));
+      this.scene.add(r);
+    }
+  }
+
+  // --- the quest's things -----------------------------------------------------------------------
+
+  /** Puts the open quest's things at its place, replacing any left from an earlier quest. */
+  spawnObjective(location: LocationId, kind: ObjectiveKind, count: number) {
+    this.clearObjective();
+    const at = PLACES[location];
+    const rand = rng(Math.floor(Math.random() * 1e6) + 1);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rand();
+      const d = 3 + rand() * 6;
+      const pos = new THREE.Vector3(at.x + Math.sin(a) * d, 0, at.z + Math.cos(a) * d);
+      if (kind === 'collect') {
+        const mesh = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.35),
+          new THREE.MeshStandardMaterial({ color: 0x9be36b, emissive: 0x4a8a20, emissiveIntensity: 0.9 }),
+        );
+        mesh.position.copy(pos).setY(0.8);
+        mesh.castShadow = true;
+        this.scene.add(mesh);
+        this.pickups.push({ mesh, phase: rand() * 6 });
+      } else {
+        const mesh = humanoid(0x3f5a4a, 0x6f8f6a, 1.5);
+        const eyes = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.05, 0.05),
+          new THREE.MeshBasicMaterial({ color: 0xff3a2a }),
+        );
+        eyes.position.set(0, 1.42, 0.2);
+        mesh.add(eyes);
+        mesh.position.copy(pos);
+        this.scene.add(mesh);
+        this.enemies.push({ mesh, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 });
+      }
+    }
+  }
+
+  clearObjective() {
+    for (const p of this.pickups) this.scene.remove(p.mesh);
+    for (const e of this.enemies) this.scene.remove(e.mesh);
+    this.pickups = [];
+    this.enemies = [];
+  }
+
+  /** The golden beam the compass points at: a place, the quest giver, or nothing. */
+  setMarker(target: LocationId | 'npc' | null) {
+    this.markerTarget = target === null ? null : target === 'npc' ? NPC_POS.clone() : PLACES[target].clone();
+    this.marker.visible = this.markerTarget !== null;
+    if (this.markerTarget) this.marker.position.set(this.markerTarget.x, 30, this.markerTarget.z);
+    else this.cb.onCompass(null, 0);
+  }
+
+  /** While a dialogue or a menu is open the world stands still and the mouse is the reader's. */
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    this.keys.clear();
+    if (paused && document.pointerLockElement === this.canvas) document.exitPointerLock();
+  }
+
+  requestLock() {
+    if (this.paused) return;
+    // A rejected lock (Safari, an iframe) is not an error worth surfacing: the mouse just will not
+    // turn the camera, and Q/E-style keys are not this game's controls.
+    const result = this.canvas.requestPointerLock?.() as unknown as Promise<void> | undefined;
+    result?.catch?.(() => {});
+  }
+
+  /** For tests and for poking at it from the console. */
+  teleport(where: LocationId | 'npc' | 'spawn') {
+    const p = where === 'npc' ? NPC_POS.clone().add(new THREE.Vector3(0, 0, 2)) : where === 'spawn' ? SPAWN : PLACES[where];
+    this.player.position.set(p.x, 0, p.z);
+  }
+
+  facePosition(where: LocationId | 'npc') {
+    const target = where === 'npc' ? NPC_POS : PLACES[where];
+    const d = target.clone().sub(this.player.position);
+    this.yaw = Math.atan2(-d.x, -d.z);
+    this.player.rotation.y = Math.atan2(d.x, d.z);
+  }
+
+  /** Swings the sword now, as a click would. */
+  attack() {
+    if (this.paused || this.attackTimer > 0) return;
+    this.attackTimer = ATTACK_COOLDOWN;
+    this.swing = 1;
+    const forward = new THREE.Vector3(Math.sin(this.player.rotation.y), 0, Math.cos(this.player.rotation.y));
+    for (const enemy of [...this.enemies]) {
+      const to = enemy.mesh.position.clone().sub(this.player.position);
+      const dist = to.length();
+      if (dist > ATTACK_RANGE) continue;
+      // A wide arc in front, so a swing does not need perfect aim with a mouse.
+      if (dist > 0.8 && to.normalize().dot(forward) < 0.2) continue;
+      enemy.hp -= 1;
+      enemy.flash = 0.15;
+      enemy.mesh.position.add(to.multiplyScalar(1.2));
+      if (enemy.hp <= 0) {
+        this.scene.remove(enemy.mesh);
+        this.enemies = this.enemies.filter((e) => e !== enemy);
+        this.cb.onProgress();
+      }
+    }
+  }
+
+  interact() {
+    if (this.paused) return;
+    if (this.player.position.distanceTo(NPC_POS) < TALK_RANGE) {
+      this.cb.onTalk();
+      return;
+    }
+    const near = this.pickups.find((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE);
+    if (near) {
+      this.scene.remove(near.mesh);
+      this.pickups = this.pickups.filter((p) => p !== near);
+      this.cb.onProgress();
+    }
+  }
+
+  heal() {
+    this.hp = MAX_HP;
+    this.cb.onHealth(this.hp);
+  }
+
+  // --- input ------------------------------------------------------------------------------------
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (this.paused) return;
+    const target = e.target as HTMLElement | null;
+    if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+    const code = e.code;
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
+      e.preventDefault();
+    }
+    if (code === 'KeyE' || code === 'KeyF') this.interact();
+    this.keys.add(code);
+  };
+
+  private onKeyUp = (e: KeyboardEvent) => {
+    this.keys.delete(e.code);
+  };
+
+  private onMouseMove = (e: MouseEvent) => {
+    if (document.pointerLockElement !== this.canvas) return;
+    // Chromium sends one jump as the lock engages (the cursor's leap to the centre), which turned
+    // the camera by a random quarter turn on Start. No hand moves a mouse that far in one event.
+    if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return;
+    this.yaw -= e.movementX * 0.0025;
+    this.pitch = Math.min(1.1, Math.max(-0.35, this.pitch + e.movementY * 0.002));
+  };
+
+  private onMouseDown = (e: MouseEvent) => {
+    if (this.paused || e.button !== 0) return;
+    if (document.pointerLockElement !== this.canvas) {
+      this.requestLock();
+      return;
+    }
+    this.attack();
+  };
+
+  private onLock = () => this.cb.onLockChange(document.pointerLockElement === this.canvas);
+  private onBlur = () => this.keys.clear();
+
+  private bindInput() {
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
+    document.addEventListener('mousemove', this.onMouseMove);
+    document.addEventListener('pointerlockchange', this.onLock);
+    this.canvas.addEventListener('mousedown', this.onMouseDown);
+  }
+
+  // --- the loop ---------------------------------------------------------------------------------
+
+  start() {
+    const tick = () => {
+      this.frame = requestAnimationFrame(tick);
+      const dt = Math.min(this.clock.getDelta(), 0.05);
+      if (!this.paused) this.update(dt);
+      this.updateCamera();
+      this.renderer.render(this.scene, this.camera);
+    };
+    this.clock.start();
+    tick();
+  }
+
+  private collide(pos: THREE.Vector3, radius = 0.45) {
+    for (const o of this.obstacles) {
+      const dx = pos.x - o.x;
+      const dz = pos.z - o.z;
+      const d = Math.hypot(dx, dz);
+      const min = o.r + radius;
+      if (d < min && d > 0.0001) {
+        pos.x = o.x + (dx / d) * min;
+        pos.z = o.z + (dz / d) * min;
+      }
+    }
+    pos.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.x));
+    pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));
+  }
+
+  private update(dt: number) {
+    const k = this.keys;
+    const fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const side = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const moving = fwd !== 0 || side !== 0;
+    if (moving) {
+      const speed = k.has('ShiftLeft') || k.has('ShiftRight') ? RUN : WALK;
+      // Camera-relative: W walks away from the camera, whatever way the hunter was facing.
+      const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      const right = new THREE.Vector3(-forward.z, 0, forward.x);
+      const dir = forward.multiplyScalar(fwd).add(right.multiplyScalar(side)).normalize();
+      this.player.position.addScaledVector(dir, speed * dt);
+      this.collide(this.player.position);
+      const targetRot = Math.atan2(dir.x, dir.z);
+      const diff = Math.atan2(Math.sin(targetRot - this.player.rotation.y), Math.cos(targetRot - this.player.rotation.y));
+      this.player.rotation.y += diff * Math.min(1, dt * 12);
+    }
+    // A little bob while walking, so it reads as walking and not as sliding.
+    const t = this.clock.elapsedTime;
+    this.player.children[0].position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
+
+    // The sword: a quick arc on a swing, at rest otherwise.
+    this.attackTimer = Math.max(0, this.attackTimer - dt);
+    this.swing = Math.max(0, this.swing - dt * 4);
+    this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
+
+    for (const p of this.pickups) {
+      p.mesh.rotation.y += dt * 2;
+      p.mesh.position.y = 0.8 + Math.sin(t * 2 + p.phase) * 0.15;
+    }
+
+    this.updateEnemies(dt);
+    this.npc.lookAt(this.player.position.x, 0, this.player.position.z);
+
+    const prompt =
+      this.player.position.distanceTo(NPC_POS) < TALK_RANGE
+        ? 'talk'
+        : this.pickups.some((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE)
+          ? 'pickup'
+          : null;
+    if (prompt !== this.lastPrompt) {
+      this.lastPrompt = prompt;
+      this.cb.onPrompt(prompt);
+    }
+
+    this.sunLight.position.set(this.player.position.x + 40, 70, this.player.position.z + 25);
+    this.sunLight.target.position.copy(this.player.position);
+
+    this.compassTimer -= dt;
+    if (this.compassTimer <= 0) {
+      this.compassTimer = 0.1;
+      if (this.markerTarget) {
+        const d = this.markerTarget.clone().sub(this.player.position).setY(0);
+        const bearing = Math.atan2(-d.x, -d.z);
+        const angle = Math.atan2(Math.sin(bearing - this.yaw), Math.cos(bearing - this.yaw));
+        this.cb.onCompass(-angle, d.length());
+      } else {
+        this.cb.onCompass(null, 0);
+      }
+    }
+  }
+
+  private updateEnemies(dt: number) {
+    for (const enemy of this.enemies) {
+      const pos = enemy.mesh.position;
+      const toPlayer = this.player.position.clone().sub(pos).setY(0);
+      const dist = toPlayer.length();
+      enemy.hitCooldown = Math.max(0, enemy.hitCooldown - dt);
+      if (dist < 14 && dist > 1.2) {
+        pos.addScaledVector(toPlayer.normalize(), 3.2 * dt);
+      } else if (dist >= 14) {
+        const home = enemy.home.clone().sub(pos).setY(0);
+        if (home.length() > 0.5) pos.addScaledVector(home.normalize(), 2 * dt);
+      }
+      this.collide(pos, 0.4);
+      enemy.mesh.lookAt(this.player.position.x, 0, this.player.position.z);
+      enemy.flash = Math.max(0, enemy.flash - dt);
+      enemy.mesh.scale.setScalar(enemy.flash > 0 ? 1.12 : 1);
+      if (dist <= 1.5 && enemy.hitCooldown === 0) {
+        enemy.hitCooldown = 1.2;
+        this.hp = Math.max(0, this.hp - 12);
+        this.cb.onHealth(this.hp);
+        if (this.hp === 0) {
+          this.player.position.copy(SPAWN);
+          this.hp = MAX_HP;
+          this.cb.onDeath();
+          this.cb.onHealth(this.hp);
+        }
+      }
+    }
+    // Slow regeneration out of combat.
+    if (this.hp < MAX_HP && this.enemies.every((e) => e.hitCooldown === 0 || e.mesh.position.distanceTo(this.player.position) > 6)) {
+      const before = Math.floor(this.hp);
+      this.hp = Math.min(MAX_HP, this.hp + dt * 4);
+      if (Math.floor(this.hp) !== before) this.cb.onHealth(Math.floor(this.hp));
+    }
+  }
+
+  private updateCamera() {
+    const distance = 6.5;
+    const target = this.player.position.clone().add(new THREE.Vector3(0, 1.7, 0));
+    const offset = new THREE.Vector3(
+      Math.sin(this.yaw) * Math.cos(this.pitch),
+      Math.sin(this.pitch),
+      Math.cos(this.yaw) * Math.cos(this.pitch),
+    ).multiplyScalar(distance);
+    this.camera.position.copy(target).add(offset);
+    if (this.camera.position.y < 0.4) this.camera.position.y = 0.4;
+    this.camera.lookAt(target);
+  }
+
+  resize(width: number, height: number) {
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / Math.max(1, height);
+    this.camera.updateProjectionMatrix();
+  }
+
+  dispose() {
+    cancelAnimationFrame(this.frame);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
+    document.removeEventListener('mousemove', this.onMouseMove);
+    document.removeEventListener('pointerlockchange', this.onLock);
+    this.canvas.removeEventListener('mousedown', this.onMouseDown);
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    this.scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      mesh.geometry?.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat?.dispose();
+    });
+    this.renderer.dispose();
+  }
+}

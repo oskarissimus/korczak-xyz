@@ -1,0 +1,254 @@
+/* The RPG at /apps/rpg/: a canvas with the HUD laid over it. Its colours are the game's, not the
+   site's theme: they sit on a 3D scene, which is the same in light and dark mode. */
+
+.rpg-window {
+  margin-bottom: 20px;
+}
+
+.rpg-content {
+  padding: 0;
+  background: #000;
+}
+
+.rpg-container {
+  position: relative;
+  width: 100%;
+  height: min(78vh, 760px);
+  min-height: 460px;
+  overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #f1e6cf;
+  user-select: none;
+}
+
+.rpg-container:fullscreen {
+  height: 100vh;
+}
+
+.rpg-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rpg-journal {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  max-width: 320px;
+  text-align: right;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+
+.rpg-journal-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #ffd36b;
+}
+
+.rpg-journal-objective {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.rpg-hp {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 180px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid #6b5b3e;
+  pointer-events: none;
+}
+
+.rpg-hp-fill {
+  height: 100%;
+  background: linear-gradient(#c43a2f, #7d1e17);
+  transition: width 0.2s;
+}
+
+.rpg-compass {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+
+.rpg-compass-arrow {
+  display: inline-block;
+  font-size: 22px;
+  color: #ffd36b;
+}
+
+.rpg-compass-distance {
+  font-size: 12px;
+}
+
+.rpg-hint,
+.rpg-prompt,
+.rpg-toast {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #6b5b3e;
+  font-size: 14px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.rpg-hint {
+  bottom: 14px;
+  opacity: 0.8;
+}
+
+.rpg-prompt {
+  bottom: 56px;
+}
+
+.rpg-toast {
+  top: 70px;
+  color: #ffd36b;
+}
+
+.rpg-container kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 5px;
+  margin-right: 2px;
+  border: 1px solid #b9a77f;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
+}
+
+.rpg-dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 32px));
+  padding: 14px 18px;
+  background: rgba(12, 10, 8, 0.86);
+  border: 1px solid #6b5b3e;
+}
+
+.rpg-dialogue-speaker {
+  color: #ffd36b;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.rpg-dialogue-text {
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+.rpg-dialogue-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rpg-dialogue-choices button {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: #e6dcc6;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rpg-dialogue-choices button:hover,
+.rpg-dialogue-choices button:focus-visible {
+  color: #fff;
+  background: rgba(255, 211, 107, 0.15);
+  outline: none;
+}
+
+.rpg-choice-n {
+  color: #ffd36b;
+}
+
+.rpg-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(8, 8, 10, 0.72);
+  text-align: center;
+}
+
+.rpg-overlay h2 {
+  margin: 0;
+  font-size: 34px;
+  color: #ffd36b;
+  letter-spacing: 0.04em;
+}
+
+.rpg-overlay p {
+  max-width: 520px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.rpg-overlay a {
+  color: #ffd36b;
+}
+
+.rpg-controls {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.rpg-source {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.rpg-start {
+  margin-top: 8px;
+  padding: 8px 28px;
+  border: 1px solid #b9a77f;
+  background: #3a2c18;
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.rpg-start:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.rpg-fullscreen {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 2px 8px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1e6cf;
+  cursor: pointer;
+}
