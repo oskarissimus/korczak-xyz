@@ -7,7 +7,7 @@ featuredImage: ../../../assets/images/blog/entry-phone/thumbnail.png
 language: en
 ---
 
-import Youtube from "@/components/Youtube"
+import Video from "@/components/Video"
 
 ![internals](../../../assets/images/blog/entry-phone/finished-internals.png "internals")
 
@@ -25,16 +25,16 @@ My plan was to connect an Arduino to features 1 and 4. Later, I discovered it wa
 ## Arduino
 ![loose internals](../../../assets/images/blog/entry-phone/loose-internals.jpg "loose internals")
 I bought a few Arduino boards from a Chinese seller for two dollars each. Using a multimeter and the intercom documentation I found online, I figured out which pins to connect to the Arduino's ADC. Implementing it was fairly straightforward. The only annoying part was uploading code to the Arduino—this is always a hassle with such projects unless you have exceptionally long cables or clever code-upload methods like WiFi. I didn’t have any of that.
-<Youtube videoId="6tuDXU8ow9M" />
+<Video youtubeId="6tuDXU8ow9M" />
 
 
 ## Algorithm
 To open the door, I needed to call my apartment four times at specific intervals. This would trigger a relay in the circuit where the door is usually opened. I had to set broad timing tolerances to make it usable and include a timeout for when the system would reset.
-<Youtube videoId="KKOZTo64eQk" />
+<Video youtubeId="KKOZTo64eQk" />
 
 ## Wifi
 By 2018, everyone had a smartphone, so you might wonder why I didn’t just use that for remotely opening the door after connecting to the intercom line. Simply put, it was too unstable—I didn’t want to rely on it. Remember, this was my only way to access the building when my friend wasn’t home. There were a few times when I had it set up with WiFi using ESP32, and for some unknown reason, it froze and stopped working.
 
 ## Sounds
-<Youtube videoId="lfNpqSJsEVw" />
+<Video youtubeId="lfNpqSJsEVw" />
 Once I had the basic system working, I started thinking about enhancements. It turned out to be quite simple to tap into the line transmitting the intercom audio—an analog signal. I connected a tiny MP3 player board from a Chinese seller, about the size of a micro-SD card. I loaded it with funny sounds, which played whenever the correct "code" (four rings at even intervals) was entered. 

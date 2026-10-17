@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * Moves the songbook's videos off YouTube and into the R2 bucket behind media.korczak.xyz.
+ * Moves our own videos off YouTube and into the R2 bucket behind media.korczak.xyz: every song's,
+ * under songs/<slug>, and every blog post's `<Video>`, under blog/<youtubeId> (a post can carry
+ * several and has no better name for each). A blog `<Youtube>` is somebody else's and is left alone.
  *
  * Runs on a laptop, not in CI: it needs yt-dlp signed in as the channel's owner (or the original
  * files), ffmpeg, and a `wrangler login` with R2 access. The bucket and its domain are not made
  * here — terraform/cloudflare/media.tf declares them and CI applies it. Nothing in the build depends on it — the
- * site only reads src/data/songVideos.json, and a song missing from that file still plays from
+ * site only reads src/data/videos.json, and a video missing from that file still plays from
  * YouTube (src/components/Video.tsx). So the run can stop anywhere and be started again: the
- * manifest is written after every song, and a song already in it is skipped.
+ * manifest is written after every video, and a video already in it is skipped.
  *
- *   node scripts/song-videos.mjs                         every song not yet in the manifest
- *   node scripts/song-videos.mjs --only barka            one song (slug or YouTube id)
+ *   node scripts/song-videos.mjs                         every video not yet in the manifest
+ *   node scripts/song-videos.mjs --only barka            one video (song slug or YouTube id)
  *   node scripts/song-videos.mjs --src ~/Videos/songs    originals named <slug>.* or <youtubeId>.*
  *   node scripts/song-videos.mjs --browser firefox       which browser yt-dlp takes cookies from
- *   node scripts/song-videos.mjs --force                 redo songs already in the manifest
+ *   node scripts/song-videos.mjs --force                 redo videos already in the manifest
  *   node scripts/song-videos.mjs --dry-run               download and transcode, upload nothing
  *
- * Then commit src/data/songVideos.json and push: each entry flips its song over on that deploy.
+ * Then commit src/data/videos.json and push: each entry flips its video over on that deploy.
  *
  * Why it looks like this is in .claude/rules/songbook.md, *Videos*.
  */
@@ -28,7 +30,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SONGS_DIR = join(ROOT, 'src/content/songs/pl');
-const MANIFEST = join(ROOT, 'src/data/songVideos.json');
+const BLOG_DIR = join(ROOT, 'src/content/blog');
+const MANIFEST = join(ROOT, 'src/data/videos.json');
 const WORK = join(ROOT, '.song-videos');
 
 const BUCKET = 'korczak-xyz-media';
@@ -65,17 +68,27 @@ function requireTool(cmd, hint) {
 
 const wrangler = (wranglerArgs) => run('npx', ['wrangler', ...wranglerArgs]);
 
-/** Every song that embeds a video: its slug and the YouTube id the MDX names. */
-function songs() {
-  return readdirSync(SONGS_DIR)
+/**
+ * Every video to self-host: `dir` and `name` make its object key, and `youtubeId` is what the MDX
+ * names. A song is named by its slug; a blog video by its id, once however many locales embed it.
+ */
+function videos() {
+  const songs = readdirSync(SONGS_DIR)
     .filter((name) => name.endsWith('.mdx'))
     .flatMap((name) => {
       const text = readFileSync(join(SONGS_DIR, name), 'utf8');
       const youtubeId = text.match(/<Video youtubeId="([^"]+)"/)?.[1];
       const slug = text.match(/^slug:\s*(\S+)\s*$/m)?.[1];
-      return youtubeId && slug ? [{ slug, youtubeId }] : [];
-    })
-    .sort((a, b) => a.slug.localeCompare(b.slug));
+      return youtubeId && slug ? [{ dir: 'songs', name: slug, youtubeId }] : [];
+    });
+  const blogIds = new Set(
+    readdirSync(BLOG_DIR, { recursive: true })
+      .filter((name) => name.endsWith('.mdx'))
+      .flatMap((name) => [...readFileSync(join(BLOG_DIR, name), 'utf8').matchAll(/<Video youtubeId="([^"]+)"/g)])
+      .map((match) => match[1]),
+  );
+  const blog = [...blogIds].map((youtubeId) => ({ dir: 'blog', name: youtubeId, youtubeId }));
+  return [...songs, ...blog].sort((a, b) => `${a.dir}/${a.name}`.localeCompare(`${b.dir}/${b.name}`));
 }
 
 function readManifest() {
@@ -87,11 +100,11 @@ function writeManifest(manifest) {
   writeFileSync(MANIFEST, `${JSON.stringify(sorted, null, 2)}\n`);
 }
 
-function findOriginal(srcDir, { slug, youtubeId }) {
+function findOriginal(srcDir, { name, youtubeId }) {
   if (!srcDir) return undefined;
-  const match = readdirSync(srcDir).find((name) => {
-    const stem = name.replace(/\.[^.]+$/, '');
-    return stem === slug || stem === youtubeId;
+  const match = readdirSync(srcDir).find((entry) => {
+    const stem = entry.replace(/\.[^.]+$/, '');
+    return stem === name || stem === youtubeId;
   });
   return match && join(srcDir, match);
 }
@@ -156,40 +169,40 @@ function migrate() {
   requireTool('ffmpeg', 'brew install ffmpeg');
 
   const manifest = readManifest();
-  const todo = songs().filter((song) =>
-    (only ? song.slug === only || song.youtubeId === only : true) &&
-    (force || !manifest[song.youtubeId]));
+  const todo = videos().filter((video) =>
+    (only ? video.name === only || video.youtubeId === only : true) &&
+    (force || !manifest[video.youtubeId]));
 
   if (todo.length === 0) {
-    console.log(only ? `Nothing to do for ${only}.` : 'Every song is already in the manifest.');
+    console.log(only ? `Nothing to do for ${only}.` : 'Every video is already in the manifest.');
     return;
   }
 
   const failed = [];
-  for (const [i, song] of todo.entries()) {
-    console.log(`\n[${i + 1}/${todo.length}] ${song.slug} (${song.youtubeId})`);
+  for (const [i, video] of todo.entries()) {
+    console.log(`\n[${i + 1}/${todo.length}] ${video.dir}/${video.name} (${video.youtubeId})`);
     try {
-      const input = findOriginal(srcDir, song) ?? download(song);
-      const { mp4, jpg, width, height } = transcode(input, song.slug);
+      const input = findOriginal(srcDir, video) ?? download(video);
+      const { mp4, jpg, width, height } = transcode(input, video.name);
       const hash = createHash('sha256').update(readFileSync(mp4)).digest('hex').slice(0, 8);
-      const file = `${song.slug}.${hash}`;
+      const file = `${video.dir}/${video.name}.${hash}`;
       if (dryRun) {
-        console.log(`  would upload songs/${file}.mp4 and .jpg (${width}×${height})`);
+        console.log(`  would upload ${file}.mp4 and .jpg (${width}×${height})`);
         continue;
       }
-      upload(mp4, `songs/${file}.mp4`, 'video/mp4');
-      upload(jpg, `songs/${file}.jpg`, 'image/jpeg');
-      manifest[song.youtubeId] = { file, width, height };
+      upload(mp4, `${file}.mp4`, 'video/mp4');
+      upload(jpg, `${file}.jpg`, 'image/jpeg');
+      manifest[video.youtubeId] = { file, width, height };
       writeManifest(manifest);
-      console.log(`  https://${DOMAIN}/songs/${file}.mp4`);
+      console.log(`  https://${DOMAIN}/${file}.mp4`);
     } catch (error) {
       console.error(`  failed: ${error.message}`);
-      failed.push(song.slug);
+      failed.push(video.name);
     }
   }
 
   if (failed.length) console.error(`\nFailed: ${failed.join(', ')} — run again to retry just these.`);
-  if (!dryRun) console.log('\nCommit src/data/songVideos.json and push to switch these songs over.');
+  if (!dryRun) console.log('\nCommit src/data/videos.json and push to switch these videos over.');
 }
 
 migrate();

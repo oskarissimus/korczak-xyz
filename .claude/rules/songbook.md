@@ -13,7 +13,7 @@ paths:
   - "**/SongPostPage.astro"
   - "**/components/Video.tsx"
   - "**/components/Youtube.tsx"
-  - "**/data/songVideos.json"
+  - "**/data/videos.json"
   - "**/scripts/song-videos.mjs"
   - "**/utils/songVideo.ts"
 ---
@@ -70,7 +70,7 @@ Range request. Adaptive bitrate would buy little at that length and cost `hls.js
 browser that is not Safari.
 
 **The MDX names the YouTube id, always.** A song embeds `<Video youtubeId="…" />`.
-`Video.tsx` looks the id up in `src/data/songVideos.json`; with an entry it renders `<video>`,
+`Video.tsx` looks the id up in `src/data/videos.json`; with an entry it renders `<video>`,
 without one it renders the old `<Youtube>` iframe. So the migration is per song and reversible
 per song: a song switches in the commit that adds its manifest entry, and deleting the entry
 puts it back on YouTube. The id is also the one key the upload script can read out of the song
@@ -99,6 +99,14 @@ ffmpeg; and `wrangler login`. The bucket and `media.korczak.xyz` are **not** the
 declared in `terraform/cloudflare/media.tf` and applied by `.github/workflows/cloudflare.yml`.
 It writes the manifest after every song and skips songs already in it, so it can be stopped and
 rerun. Nothing in CI runs it.
+
+**The blog's own videos ride the same path.** `<Video>` in a post means *ours, self-hostable*;
+`<Youtube>` means somebody else's — the four recorded talks, which live on the organisers'
+channels and stay embeds. The script picks up every `<Video>` under `src/content/blog/` once
+however many locales carry it, and keys it `blog/<youtubeId>.<hash>` because a post holds several
+and has no better name for each; the manifest's `file` carries the `songs/` or `blog/` prefix.
+The twelve in `hacked-intercom` and `led-matrix` moved in Oct 2026. One intercom clip is filmed
+upright (406×720), which is why `Video.tsx` caps the frame at `80vh` and lets it letterbox.
 
 **The first 36 came from a Google Takeout** of the oskarissimus channel (Oct 2026), through
 `--src`. A YouTube Takeout names each video by its *title* and carries no id or metadata file, so

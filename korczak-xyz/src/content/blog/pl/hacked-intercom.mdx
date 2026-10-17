@@ -7,7 +7,7 @@ featuredImage: ../../../assets/images/blog/entry-phone/thumbnail.png
 language: pl
 ---
 
-import Youtube from "@/components/Youtube"
+import Video from "@/components/Video"
 
 ![wnętrzności](../../../assets/images/blog/entry-phone/finished-internals.png "wnętrzności")
 
@@ -25,16 +25,16 @@ Miałem zamiar podłączyć arduino do punktów 1. oraz 4. Jak się później ok
 ## Arduino
 ![lużne wnętrzności](../../../assets/images/blog/entry-phone/loose-internals.jpg "lużne wnętrzności")
 Kupiłem od chińczyka kilka sztuk po dwa dolary. Wykorzystałem multimetr i dokumentację domofonu znalezioną w internecie aby rozkminić do których pinów połączyć ADC z Arduino. Następnie Implementacja była już dość prosta. upierdliwe było jedynie wgrywanie kodu na arduino jak to zwykle przy takich projektach, gdzie nie można zbyt szybko iterować. Chyba że ma się piekielnie długie kable lub jakieś sprytne wgrywanie kodu przez wifi itp. ja nie miałem
-<Youtube videoId="6tuDXU8ow9M" />
+<Video youtubeId="6tuDXU8ow9M" />
 
 
 ## Algorytm
 Należało zadzwonic 4 razy (w określonych odstępach czasowych) do mojego mieszkania aby puścić napięcie na obwód z przekaźnikiem który był w miejscu gdzie normalnie otwiera się furtkę. Musiałem dać szerokie widełki czasowe aby dało się z tego korzystać i pewien czas po którym się to resetowało.
-<Youtube videoId="KKOZTo64eQk" />
+<Video youtubeId="KKOZTo64eQk" />
 
 ## Wifi
 W 2018 każdy już miał smartfona więc można się zastanawiać czemu tego nie użyłem w moim projekcie aby po prostu zdalnie otwierać furtkę jak już byłem podłączony do linii domofonu? Któtko mówiąc było to bardzo niestabilne - nie chciałem na tym polegać - przypomnę że była to moja jedyna opcja wejścia na klatkę jak nie było kumpla w domu. I zdarzyło się parę razy że miałem to już skonfigurowane na wifi na ESP32, i nie wiadomo czemu coś się zawiesiło i przestało działać
 
 ## Dźwięki
-<Youtube videoId="lfNpqSJsEVw" />
+<Video youtubeId="lfNpqSJsEVw" />
 Jak już miałem działającą rzecz, dalej się zastanawiałm co można ulepszyć. I okazało się że dość łatwo można podłaczyć się do linii gdzie jest przekazywany dźwięk rozmowy domofonu - sygnał analogowy. Podłączyłem odtwarzacz mp3 od chińczyka który był malutką płytką drukowaną wielkości karty micro-sd. Była tam oczywiście również karta na którą wgrałem śmieszne dźwięki które były odtwarzane po tym jak wprowadziło się prawidłowy kod - cztery dzwonki w równych odstępach.
