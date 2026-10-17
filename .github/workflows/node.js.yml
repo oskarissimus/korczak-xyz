@@ -5,6 +5,9 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  # For song-video-inbox.yml: its push is made with GITHUB_TOKEN, which by GitHub's design starts
+  # no workflow, so it starts this one by hand. Deploys exactly as a push to main would.
+  workflow_dispatch:
 
 jobs:
   build:

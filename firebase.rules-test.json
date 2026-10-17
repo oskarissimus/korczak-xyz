@@ -1,0 +1,8 @@
+{
+  "storage": { "rules": "storage.rules" },
+  "emulators": {
+    "storage": { "host": "127.0.0.1" },
+    "hub": { "host": "127.0.0.1" },
+    "logging": { "host": "127.0.0.1" }
+  }
+}

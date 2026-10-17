@@ -28,6 +28,7 @@ on:
       - "firestore.rules"
       - "firestore.indexes.json"
       - "storage.rules"
+      - "firebase.rules-test.json"
       - "firebase.json"
       - "korczak-xyz/src/utils/events/**"
       - "korczak-xyz/src/utils/transit/**"
@@ -243,6 +244,15 @@ jobs:
         run: |
           npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-rules \
             "npm test --prefix functions -- src/rules.test.ts"
+
+      # And storage.rules, for its one path that is not somebody's own files: the songbook's video
+      # inbox, which whatever lands in gets published by song-video-inbox.yml, so admins only. Its
+      # own config file because the emulator refuses firebase.json's two-bucket array without
+      # deploy targets; why the Firestore lookups are stubbed is at the top of the test.
+      - name: The storage rules contract
+        run: |
+          npx --yes firebase-tools@15 emulators:exec --config firebase.rules-test.json --only storage \
+            --project demo-rules "npm test --prefix functions -- src/storageRules.test.ts"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3

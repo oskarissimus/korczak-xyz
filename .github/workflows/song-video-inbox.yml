@@ -1,0 +1,151 @@
+# Publishes a song recording uploaded from /apps/admin/: transcode, R2, manifest, redeploy.
+#
+# The panel (korczak-xyz/src/components/Auth/AdminVideos.tsx) can only get a file as far as
+# `videoInbox/<slug>/<uploaded-at>-<name>` in the sloper bucket — the site has no server, and
+# neither the Cloudflare token nor the right to push belongs in a browser. This job holds both, and
+# does what a laptop used to: `scripts/song-videos.mjs --src` turns the file into a 720p MP4 and a
+# poster on media.korczak.xyz and writes its entry into src/data/songVideos.json, then it commits
+# that, starts the site's deploy, and deletes the original.
+#
+# WHY A SCHEDULE AND NOT A TRIGGER. Nothing the browser can reach may start a workflow: that takes
+# a GitHub token with `actions: write`, which would have to live in a Cloud Function and be made by
+# hand and renewed. A look every ten minutes needs no new secret at all, costs nothing on a public
+# repository, and finishes in seconds when the inbox is empty — which is nearly always. GitHub runs
+# schedules late under load, so "ten minutes" means "usually within twenty". If that ever matters,
+# a Storage-triggered function dispatching this workflow is the upgrade, and it is the token.
+#
+# Three things are ordered on purpose:
+#   - the originals are deleted only AFTER the push, so a run that dies half way leaves the inbox
+#     as it was and the next run does the whole thing again (the R2 keys are content hashes, so
+#     uploading twice writes the same objects);
+#   - a file the script cannot use is MOVED to videoFailed/, not deleted, so the panel can say so
+#     instead of the upload vanishing — and not left in the inbox, where it would fail every ten
+#     minutes for ever;
+#   - two takes of one song: the newest wins and the older is dropped with it.
+#
+# A push made with GITHUB_TOKEN starts no other workflow, by GitHub's design, so the deploy is
+# started explicitly with `gh workflow run` — workflow_dispatch being the one event that token may
+# still cause. See .claude/rules/songbook.md, *Videos*.
+name: Song video inbox
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: song-video-inbox
+  cancel-in-progress: false
+
+jobs:
+  inbox:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      id-token: write
+    env:
+      INBOX: gs://korczak-xyz-501720-sloper/videoInbox
+      FAILED: gs://korczak-xyz-501720-sloper/videoFailed
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      # The whole run, nearly always: an empty inbox, and nothing after this step runs.
+      - name: Anything waiting?
+        id: look
+        run: |
+          gcloud storage ls "$INBOX/**" 2>/dev/null > "$RUNNER_TEMP/objects.txt" || true
+          if [ -s "$RUNNER_TEMP/objects.txt" ]; then
+            echo "waiting=true" >> "$GITHUB_OUTPUT"
+            cat "$RUNNER_TEMP/objects.txt"
+          else
+            echo "Inbox empty."
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.look.outputs.waiting == 'true'
+
+      - uses: actions/setup-node@v7
+        if: steps.look.outputs.waiting == 'true'
+        with:
+          node-version: 22.x
+          cache: "npm"
+          cache-dependency-path: "korczak-xyz/package-lock.json"
+
+      - name: Install ffmpeg and wrangler
+        if: steps.look.outputs.waiting == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          npm ci
+        working-directory: korczak-xyz
+
+      - name: Transcode and upload
+        id: publish
+        if: steps.look.outputs.waiting == 'true'
+        working-directory: korczak-xyz
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/src"
+          published=()
+          : > "$RUNNER_TEMP/done.txt"
+          for slug in $(sed -E 's#^.*/videoInbox/([^/]+)/[^/]+$#\1#' "$RUNNER_TEMP/objects.txt" | sort -u); do
+            # The time leads every name, so the last in sort order is the newest take.
+            objects=$(grep "/videoInbox/$slug/" "$RUNNER_TEMP/objects.txt" | sort)
+            newest=$(echo "$objects" | tail -1)
+            ext="${newest##*.}"
+            rm -rf "$src" && mkdir -p "$src"
+            echo "::group::$slug ← $newest"
+            gcloud storage cp "$newest" "$src/$slug.${ext,,}"
+            if node scripts/song-videos.mjs --src "$src" --only "$slug" --force; then
+              published+=("$slug")
+              echo "$objects" >> "$RUNNER_TEMP/done.txt"
+            else
+              echo "::warning title=Song video not used::$slug — moved to videoFailed/"
+              gcloud storage mv "$newest" "$FAILED/$slug/${newest##*/}"
+              # Older takes of a song whose newest one failed are not a fallback anybody chose.
+              echo "$objects" | grep -vxF "$newest" >> "$RUNNER_TEMP/done.txt" || true
+            fi
+            echo "::endgroup::"
+          done
+          echo "published=${published[*]:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit the manifest
+        if: steps.publish.outputs.published != ''
+        env:
+          SLUGS: ${{ steps.publish.outputs.published }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add korczak-xyz/src/data/songVideos.json
+          git commit -m "Songbook: a new video for ${SLUGS// /, }" \
+                     -m "Uploaded from /apps/admin/ and published by the song video inbox workflow."
+          # main moves under a long transcode; rebase onto it rather than lose the race.
+          for attempt in 1 2 3 4; do
+            git pull --rebase -q origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1
+
+      - name: Deploy the site
+        if: steps.publish.outputs.published != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run node.js.yml --ref main
+
+      # Last, so everything above has to have worked first. A file in the inbox is a promise
+      # that the next run will publish it; it is kept until that promise is kept.
+      - name: Clear what was handled
+        if: steps.look.outputs.waiting == 'true'
+        run: |
+          if [ -s "$RUNNER_TEMP/done.txt" ]; then
+            gcloud storage rm $(cat "$RUNNER_TEMP/done.txt")
+          fi

@@ -5,7 +5,8 @@ import ChordShapes from '../components/ChordShapes.astro';
 import SongsListContent from '../components/SongsListContent.astro';
 import '../styles/song.css';
 import { type Lang, useTranslations, getLocalizedPath } from '../i18n';
-import { hasSongVideo } from '../utils/songVideo';
+import { hasSongVideo, songVideo } from '../utils/songVideo';
+import { SelfHostedVideo } from '../components/Video';
 
 interface Props {
   lang: Lang;
@@ -37,10 +38,10 @@ function formatDate(date: Date, locale: string): string {
 
 const songsListUrl = getLocalizedPath('/songs/', lang);
 
-// The embed lives in the body, not the frontmatter — `videoUploadDate` is optional and some
-// songs carry a `<Video>` without one — so the body is what decides whether the toggle
-// has anything to toggle. Same test as the 📺 marker in the songs list.
-const hasVideo = hasSongVideo(song.body);
+// The video is drawn from songVideos.json by slug, not embedded in the MDX, so a recording uploaded
+// from /apps/admin/ needs no edit to the song. Same test as the 📺 marker in the songs list.
+const video = songVideo(song.data.slug);
+const hasVideo = hasSongVideo(song.data.slug, song.body);
 ---
 
 <Layout title={`${song.data.title} | korczak.xyz`} lang={lang} pwa="songs">
@@ -118,6 +119,7 @@ const hasVideo = hasSongVideo(song.body);
       <div class="window-content song-content-wrapper">
         {song.data.chords && <ChordShapes chords={song.data.chords} />}
         <section class="blog_post" id="song-content" itemprop="articleBody">
+          {video && <SelfHostedVideo video={video} />}
           <Content />
         </section>
       </div>
@@ -183,6 +185,7 @@ const hasVideo = hasSongVideo(song.body);
       <div class="window-content song-content-wrapper">
         {song.data.chords && <ChordShapes chords={song.data.chords} />}
         <section class="blog_post" id="song-content-desktop" itemprop="articleBody">
+          {video && <SelfHostedVideo video={video} />}
           <Content />
         </section>
       </div>

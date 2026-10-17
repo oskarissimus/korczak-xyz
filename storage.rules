@@ -4,7 +4,8 @@ rules_version = '2';
 // `korczak-xyz-501720-sloper` (the pictures, narrations and finished MP4s of `/apps/sloper/`, under
 // `users/{uid}/sloper/{projectId}/`) and `korczak-xyz-501720-backseat` (every round of a ride on
 // `/apps/backseat/`, under `users/{uid}/backseat/rides/`). Both are firebase.json entries naming
-// this one file; the per-account subtree below is the whole of what either needs.
+// this one file; the per-account subtree below is the whole of what either app needs. The songbook's
+// video inbox at the bottom is the one exception, and it is admins-only.
 //
 // The shape deliberately mirrors `firestore.rules`: a per-account subtree, owner-only, with the
 // path itself carrying the authorization. What it does NOT mirror is the household share — there
@@ -69,6 +70,42 @@ service firebase.storage {
       // denies — and rules are a permissive union, so this second block is what grants it back.
       // Nothing in the app deletes yet; the alternative is a bucket that can only ever grow.
       allow delete: if approved() && request.auth.uid == uid;
+    }
+
+    /*
+     * The songbook's inbox: a recording uploaded from /apps/admin/, waiting for
+     * `.github/workflows/song-video-inbox.yml` to transcode it into R2 and delete it. The one path
+     * outside `users/{uid}/`, and the one an ordinary approved account cannot touch: whatever lands
+     * here is published on the site under a song's name by the next run, so only an admin may put
+     * it there. Same `admins/` row `firestore.rules` checks, reached the same way as `approved()`.
+     *
+     * `videoFailed/` is where the workflow moves a file it could not use (a slug no song has, a
+     * file ffmpeg cannot read), so the panel can say so instead of the upload vanishing.
+     *
+     * The sloper bucket only: both buckets share this file, and the inbox is not the backseat's.
+     */
+    function admin() {
+      return approved()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    // Recursive, because the panel lists `videoInbox/` itself to find the slugs under it, and a
+    // list is matched against the prefix being listed, not against the files beneath it.
+    match /videoInbox/{allPaths=**} {
+      allow read, delete: if bucket == 'korczak-xyz-501720-sloper' && admin();
+    }
+
+    match /videoInbox/{slug}/{file} {
+      // 4 GiB: a phone's own recording of a five-minute song, at whatever it records in, with
+      // room to spare. The cap exists for the same reason as the one above: to be a number.
+      allow create: if bucket == 'korczak-xyz-501720-sloper' && admin()
+        && slug.matches('[a-z0-9-]+')
+        && request.resource.contentType.matches('video/.*')
+        && request.resource.size < 4 * 1024 * 1024 * 1024;
+    }
+
+    match /videoFailed/{allPaths=**} {
+      allow read, delete: if bucket == 'korczak-xyz-501720-sloper' && admin();
     }
   }
 }

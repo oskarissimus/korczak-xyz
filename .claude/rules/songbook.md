@@ -12,6 +12,10 @@ paths:
   - "**/pages/**/songs/**"
   - "**/SongPostPage.astro"
   - "**/components/Video.tsx"
+  - "**/components/Auth/AdminVideos.tsx"
+  - "**/data/songVideos.json"
+  - "**/utils/songVideoInbox.ts"
+  - "**/workflows/song-video-inbox.yml"
   - "**/components/Youtube.tsx"
   - "**/data/videos.json"
   - "**/scripts/song-videos.mjs"
@@ -69,12 +73,16 @@ with `+faststart` plays natively everywhere, iOS included, with no player script
 Range request. Adaptive bitrate would buy little at that length and cost `hls.js` on every
 browser that is not Safari.
 
-**The MDX names the YouTube id, always.** A song embeds `<Video youtubeId="…" />`.
-`Video.tsx` looks the id up in `src/data/videos.json`; with an entry it renders `<video>`,
-without one it renders the old `<Youtube>` iframe. So the migration is per song and reversible
-per song: a song switches in the commit that adds its manifest entry, and deleting the entry
-puts it back on YouTube. The id is also the one key the upload script can read out of the song
-file without a lookup table of its own.
+**A song's video is keyed by its slug, and its MDX does not mention it.** `src/data/songVideos.json`
+maps slug → `{ file, width, height }`, and `SongPostPage` draws `SelfHostedVideo` above the song from
+it. So a new recording is one line in one JSON file and no edit to the song, which is what lets a
+workflow publish it (*Adding a recording* below). Until Oct 2026 each song embedded
+`<Video youtubeId="…" />` and the manifest was keyed by that id — the key both YouTube and R2 had,
+during the migration. With every song moved and new ones never on YouTube, the id was keying a
+video by a site that no longer serves it; the 36 entries were re-keyed by slug and the tags removed.
+
+The blog keeps the old shape: `<Video youtubeId>` in the post, `videos.json` keyed by that id,
+YouTube as the fallback for an id not in it.
 
 **Files are named by content hash** and served `max-age=31536000, immutable`. A re-encode is a
 new name, and the manifest commit is what points the page at it, so no cache ever has to be
@@ -92,19 +100,49 @@ cross-origin requests (`src/sw/routing.js`), and `media.korczak.xyz` is one. The
 `.video-embed.is-offline` overlay covers both. Caching a 10–45 MB file per song would be an
 opt-in per song, never part of the `songs` tier.
 
-**The upload runs on a laptop**, through `korczak-xyz/scripts/song-videos.mjs` — see its
-header. It needs yt-dlp with the channel owner's browser cookies (anonymous yt-dlp from a cloud
-IP is asked to sign in after a couple of dozen videos), or the original files via `--src`;
-ffmpeg; and `wrangler login`. The bucket and `media.korczak.xyz` are **not** the script's: they are
+**Every upload goes through `korczak-xyz/scripts/song-videos.mjs`** — see its header. A song's video
+comes only from `--src`, a file named `<slug>.*`; a blog one may still come from yt-dlp with the
+channel owner's browser cookies (anonymous yt-dlp from a cloud IP is asked to sign in after a
+couple of dozen videos). It needs ffmpeg and a wrangler with R2 access. The bucket and `media.korczak.xyz` are **not** the script's: they are
 declared in `terraform/cloudflare/media.tf` and applied by `.github/workflows/cloudflare.yml`.
-It writes the manifest after every song and skips songs already in it, so it can be stopped and
-rerun. Nothing in CI runs it.
+It writes the manifest after every video and skips ones already in it, so it can be stopped and
+rerun.
+
+### Adding a recording
+
+From `/apps/admin/` (*Song videos*, admins only): pick the song, pick the file, upload. That is the
+whole of it for the owner; what happens next is three pieces, each where it is for a reason.
+
+- **The panel** (`AdminVideos.tsx`) uploads straight to the sloper bucket at
+  `videoInbox/<slug>/<uploaded-at>-<name>` (`songVideoInbox.ts` is the one spelling of that path),
+  resumable, because a phone's recording is hundreds of megabytes. It cannot go to R2 directly: the
+  site has no server to sign an upload with, and neither the Cloudflare token nor the right to push
+  belongs in a browser. Firebase Storage already takes uploads from here with the rules as the gate.
+- **`storage.rules`** opens `videoInbox/` to admins only — the one path outside `users/{uid}/`, and
+  the one an approved account cannot touch, because whatever lands there is published under a
+  song's name. Video content type, a slug-shaped folder, 4 GiB, sloper bucket only.
+  `functions/src/storageRules.test.ts` holds it, with the two Firestore lookups stubbed — the
+  Storage emulator would not resolve them, on the old `users/` paths either.
+- **`.github/workflows/song-video-inbox.yml`** looks every ten minutes, runs the script on the
+  newest take per song, commits `songVideos.json` as `github-actions[bot]`, starts `node.js.yml`
+  with `gh workflow run` (a push made with `GITHUB_TOKEN` starts no workflow by itself), and only
+  then deletes the original. A file it cannot use moves to `videoFailed/`, which the panel lists.
+
+**A schedule rather than a trigger** because anything a browser can reach that starts a workflow
+needs a GitHub token with `actions: write` — made by hand, renewed, kept in a function. The poll
+needs no new secret and costs nothing on a public repository; an empty inbox ends the run after the
+auth step. GitHub runs schedules late under load, so "ten minutes" is usually within twenty. If
+that ever matters, a Storage-triggered function that dispatches the workflow is the upgrade, and
+the token is its price.
+
+A song with a video already gets the new one in its place: a new content hash, a new manifest
+line, and the old object left in the bucket.
 
 **The blog's own videos ride the same path.** `<Video>` in a post means *ours, self-hostable*;
 `<Youtube>` means somebody else's — the four recorded talks, which live on the organisers'
 channels and stay embeds. The script picks up every `<Video>` under `src/content/blog/` once
 however many locales carry it, and keys it `blog/<youtubeId>.<hash>` because a post holds several
-and has no better name for each; the manifest's `file` carries the `songs/` or `blog/` prefix.
+and has no better name for each, in `videos.json`; each manifest's `file` carries its `songs/` or `blog/` prefix.
 The twelve in `hacked-intercom` and `led-matrix` moved in Oct 2026. One intercom clip is filmed
 upright (406×720), which is why `Video.tsx` caps the frame at `80vh` and lets it letterbox.
 
@@ -115,6 +153,6 @@ the files were renamed to slugs by hand before the run — `--src` matches on `<
 Enabling R2 on the account was a dashboard step too (a $0 subscription that wants a payment
 method): until then every R2 call, Terraform's included, fails with `10042`.
 
-`hasSongVideo` (`src/utils/songVideo.ts`) is the one test for "this song has a video", used by
-both the page's toggle and the 📺 marker in the list. It accepts `<Youtube` as well, so a song
-added the old way still gets both.
+`hasSongVideo` (`src/utils/songVideo.ts`) is the one test for "this song has a video", used by the
+page's toggle, the 📺 marker in the list and the panel's song picker. It is the manifest entry, or a
+`<Youtube`/`<Video` left in a song's body by hand.

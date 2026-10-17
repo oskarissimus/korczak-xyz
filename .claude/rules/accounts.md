@@ -145,6 +145,10 @@ because it is the other decision on this site that only the owner may make, it i
 form would be a page nobody remembers the address of. It draws nothing for a non-admin, the
 heading above it having already said so.
 
+**And a third, `AdminVideos`**, also Oct 2026: the songbook's recordings, uploaded into an
+admins-only inbox in the sloper bucket and published by a workflow (`songbook.md`, *Adding a
+recording*). It is the only admin-only path in `storage.rules`.
+
 It is deliberately **not installable**: no manifest, no icon, no precache tier. `apps.ts` says what
 qualifies — "a thing you reach for away from a desk" — and approving an account once a fortnight is
 not it. Making it one is an SVG, `npm run icons`, a `PWA_APPS` entry, a scope pattern and two tier

@@ -3,15 +3,28 @@ import Layout from '../../../layouts/Layout.astro';
 import PageContent from '../../../components/PageContent.astro';
 import AdminDemo from '../../../components/Auth/AdminDemo';
 import AdminAccounts from '../../../components/Auth/AdminAccounts';
+import AdminVideos from '../../../components/Auth/AdminVideos';
+import { getCollection } from 'astro:content';
+import { hasSongVideo } from '../../../utils/songVideo';
 import { useTranslations } from '../../../i18n';
 
 const lang = 'pl';
 const t = useTranslations(lang);
+
+// The songbook is Polish-only, so both locales offer the same list. Built here rather than in the
+// island so the panel ships as plain data and pulls in no content collection.
+const songs = (await getCollection('songs', ({ data }) => data.published && data.language === 'pl'))
+  .map((song) => ({
+    slug: song.data.slug,
+    title: song.data.title,
+    hasVideo: hasSongVideo(song.data.slug, song.body),
+  }));
 ---
 
 <Layout title={`${t('auth.accounts')} | korczak.xyz`} lang={lang}>
   <PageContent title={t('auth.accounts')}>
     <AdminAccounts client:only="react" lang={lang} />
     <AdminDemo client:only="react" lang={lang} />
+    <AdminVideos client:only="react" lang={lang} songs={songs} />
   </PageContent>
 </Layout>
