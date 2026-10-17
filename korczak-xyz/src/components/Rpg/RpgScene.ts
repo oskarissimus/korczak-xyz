@@ -1,6 +1,7 @@
 /*
- * The RPG's world: one village, three places a quest can send you to, a hunter who walks between
- * them, and whatever the open quest put at its place. Plain Three.js, no assets — every mesh is a
+ * The RPG's world: one village, a hunter, and the place the open quest sends him to — built when
+ * the quest is accepted from the model's description (`placeBuilder.ts`), with whatever the quest
+ * put there. Plain Three.js, no assets — every mesh is a
  * primitive, so the page loads nothing but code.
  *
  * The React side (`Rpg.tsx`) owns the story; this file owns space and time and talks back only
@@ -9,7 +10,16 @@
  */
 
 import * as THREE from 'three';
-import type { LocationId, ObjectiveKind } from '../../utils/rpg/quest';
+import { placePosition, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
+import type { ObjectiveKind } from '../../utils/rpg/quest';
+import {
+  PLACE_RADIUS,
+  buildEnemy,
+  buildItem,
+  buildPlace,
+  rng,
+  type Obstacle,
+} from './placeBuilder';
 
 export interface SceneCallbacks {
   /** A hint for what E would do here, or null when nothing is in reach. */
@@ -22,13 +32,9 @@ export interface SceneCallbacks {
   /** Where the current marker is, relative to where the camera looks: radians, and metres. */
   onCompass: (angle: number | null, distance: number) => void;
   onLockChange: (locked: boolean) => void;
+  /** The hunter has walked into the quest's place, once per place. */
+  onArrive: (name: string) => void;
 }
-
-export const PLACES: Record<LocationId, THREE.Vector3> = {
-  ruins: new THREE.Vector3(0, 0, -75),
-  forest: new THREE.Vector3(-75, 0, 5),
-  lake: new THREE.Vector3(75, 0, 10),
-};
 
 const NPC_POS = new THREE.Vector3(4, 0, -4);
 const SPAWN = new THREE.Vector3(0, 0, 8);
@@ -41,14 +47,15 @@ const ATTACK_RANGE = 3;
 const ATTACK_COOLDOWN = 0.55;
 const MAX_HP = 100;
 
-interface Obstacle {
-  x: number;
-  z: number;
-  r: number;
+interface Tree {
+  meshes: THREE.Mesh[];
+  obstacle: Obstacle;
 }
 
 interface Enemy {
   mesh: THREE.Group;
+  /** The look's size, so a hit's flash can grow it from there. */
+  size: number;
   hp: number;
   home: THREE.Vector3;
   hitCooldown: number;
@@ -56,17 +63,8 @@ interface Enemy {
 }
 
 interface Pickup {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   phase: number;
-}
-
-/** A tiny seeded random, so the forest is the same forest on every visit. */
-function rng(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
 }
 
 /** How far (x, z) is from the path running from the village square to (px, pz). */
@@ -119,6 +117,9 @@ export class RpgScene {
   private paused = false;
   private lastPrompt: 'talk' | 'pickup' | null = null;
   private compassTimer = 0;
+  private trees: Tree[] = [];
+  /** The open quest's place: its meshes, its obstacles, the path to it, and where it is. */
+  private place: { spec: PlaceSpec; group: THREE.Group; path: THREE.Mesh; obstacles: Obstacle[]; center: THREE.Vector3; arrived: boolean } | null = null;
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
     this.canvas = canvas;
@@ -197,22 +198,8 @@ export class RpgScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // A dirt path from the village to each place, so "east of the village" can be followed.
-    const dirt = new THREE.MeshStandardMaterial({ color: 0x8a7350, roughness: 1 });
-    for (const target of Object.values(PLACES)) {
-      const length = target.length();
-      const path = new THREE.Mesh(new THREE.PlaneGeometry(3, length), dirt);
-      path.rotation.x = -Math.PI / 2;
-      path.rotation.z = Math.atan2(-target.x, -target.z);
-      path.position.set(target.x / 2, 0.01, target.z / 2);
-      path.receiveShadow = true;
-      this.scene.add(path);
-    }
-
     this.buildVillage();
-    this.buildRuins();
-    this.buildForest();
-    this.buildLake();
+    this.buildTrees();
   }
 
   private buildVillage() {
@@ -263,43 +250,16 @@ export class RpgScene {
     this.scene.add(well, water);
     this.obstacles.push({ x: 0, z: -3, r: 1.5 });
 
-    // A fence ring around the village, open where the paths leave.
+    // A fence ring around the village, open toward each of the eight directions a quest may name.
     const post = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 6);
     for (let i = 0; i < 72; i++) {
       const a = (i / 72) * Math.PI * 2;
-      // Open where each path leaves, and to the south where the hunter rode in.
-      const gaps = [0, ...Object.values(PLACES).map((p) => Math.atan2(p.x, p.z))];
-      if (gaps.some((g) => Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))) < 0.1)) continue;
+      const toGap = a % (Math.PI / 4);
+      if (Math.min(toGap, Math.PI / 4 - toGap) < 0.1) continue;
       const p = new THREE.Mesh(post, timber);
       p.position.set(Math.sin(a) * 28, 0.6, Math.cos(a) * 28);
       p.castShadow = true;
       this.scene.add(p);
-    }
-  }
-
-  private buildRuins() {
-    const at = PLACES.ruins;
-    const stone = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 });
-    const rand = rng(7);
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const h = 2 + rand() * 6;
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 1.4), stone);
-      const x = at.x + Math.sin(a) * 11;
-      const z = at.z + Math.cos(a) * 11;
-      pillar.position.set(x, h / 2, z);
-      pillar.rotation.y = rand();
-      pillar.rotation.z = (rand() - 0.5) * 0.15;
-      pillar.castShadow = true;
-      pillar.receiveShadow = true;
-      this.scene.add(pillar);
-      this.obstacles.push({ x, z, r: 1.1 });
-    }
-    for (let i = 0; i < 14; i++) {
-      const rubble = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4 + rand() * 0.6), stone);
-      rubble.position.set(at.x + (rand() - 0.5) * 24, 0.2, at.z + (rand() - 0.5) * 24);
-      rubble.castShadow = true;
-      this.scene.add(rubble);
     }
   }
 
@@ -314,87 +274,98 @@ export class RpgScene {
     crown.position.set(x, 2 * scale + 2.2 * scale, z);
     crown.castShadow = true;
     this.scene.add(trunk, crown);
-    this.obstacles.push({ x, z, r: 0.5 * scale });
+    const obstacle = { x, z, r: 0.5 * scale };
+    this.obstacles.push(obstacle);
+    this.trees.push({ meshes: [trunk, crown], obstacle });
   }
 
   private trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d3420, roughness: 1 });
   private leafMat = new THREE.MeshStandardMaterial({ color: 0x2f4f2a, roughness: 1 });
 
-  private buildForest() {
-    const at = PLACES.forest;
+  /** Trees across the whole map, kept off the village. A place clears its own patch of them. */
+  private buildTrees() {
     const rand = rng(42);
-    for (let i = 0; i < 110; i++) {
-      const a = rand() * Math.PI * 2;
-      const d = 6 + rand() * 26;
-      this.tree(at.x + Math.sin(a) * d, at.z + Math.cos(a) * d, 0.8 + rand() * 0.8);
-    }
-    // And a scatter across the whole map, kept off the village and the paths.
-    for (let i = 0; i < 140; i++) {
+    for (let i = 0; i < 260; i++) {
       const x = (rand() - 0.5) * WORLD_HALF * 2;
       const z = (rand() - 0.5) * WORLD_HALF * 2;
       if (Math.hypot(x, z) < 32) continue;
-      if (Object.values(PLACES).some((p) => nearSegment(x, z, p.x, p.z) < 4)) continue;
-      if (Object.values(PLACES).some((p) => Math.hypot(x - p.x, z - p.z) < 20)) continue;
       this.tree(x, z, 0.7 + rand() * 0.9);
     }
   }
 
-  private buildLake() {
-    const at = PLACES.lake;
-    const lake = new THREE.Mesh(
-      new THREE.CircleGeometry(16, 40),
-      new THREE.MeshStandardMaterial({
-        color: 0x3d6b80,
-        roughness: 0.15,
-        metalness: 0.3,
-        transparent: true,
-        opacity: 0.88,
-      }),
+  /**
+   * Builds the quest's place where its direction and distance put it, with a dirt path from the
+   * village, clearing the scattered trees that stand on either. Replaces the previous quest's place.
+   */
+  setPlace(spec: PlaceSpec) {
+    this.clearPlace();
+    const { x, z } = placePosition(spec);
+    const center = new THREE.Vector3(x, 0, z);
+    for (const tree of this.trees) {
+      const { x: tx, z: tz } = tree.obstacle;
+      const inPlace = Math.hypot(tx - x, tz - z) < PLACE_RADIUS + 3;
+      if (inPlace || nearSegment(tx, tz, x, z) < 4) {
+        tree.obstacle.off = true;
+        for (const m of tree.meshes) m.visible = false;
+      }
+    }
+
+    const built = buildPlace(spec);
+    built.group.position.copy(center);
+    this.scene.add(built.group);
+    const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
+
+    const length = Math.max(1, center.length() - PLACE_RADIUS);
+    const path = new THREE.Mesh(
+      new THREE.PlaneGeometry(3, length),
+      new THREE.MeshStandardMaterial({ color: 0x8a7350, roughness: 1 }),
     );
-    lake.rotation.x = -Math.PI / 2;
-    lake.position.set(at.x + 8, 0.03, at.z);
-    this.scene.add(lake);
-    const reed = new THREE.MeshStandardMaterial({ color: 0x6b7a3a });
-    const rand = rng(3);
-    for (let i = 0; i < 60; i++) {
-      const a = rand() * Math.PI * 2;
-      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 1.2 + rand(), 4), reed);
-      r.position.set(at.x + 8 + Math.sin(a) * (15.5 + rand() * 2), 0.6, at.z + Math.cos(a) * (15.5 + rand() * 2));
-      this.scene.add(r);
+    path.rotation.x = -Math.PI / 2;
+    path.rotation.z = Math.atan2(-x, -z);
+    const mid = center.clone().setLength(length / 2);
+    path.position.set(mid.x, 0.01, mid.z);
+    path.receiveShadow = true;
+    this.scene.add(path);
+
+    this.place = { spec, group: built.group, path, obstacles, center, arrived: false };
+  }
+
+  clearPlace() {
+    if (!this.place) return;
+    this.scene.remove(this.place.group, this.place.path);
+    this.place.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      mesh.geometry?.dispose();
+      (mesh.material as THREE.Material | undefined)?.dispose?.();
+    });
+    this.place = null;
+    for (const tree of this.trees) {
+      tree.obstacle.off = false;
+      for (const m of tree.meshes) m.visible = true;
     }
   }
 
   // --- the quest's things -----------------------------------------------------------------------
 
-  /** Puts the open quest's things at its place, replacing any left from an earlier quest. */
-  spawnObjective(location: LocationId, kind: ObjectiveKind, count: number) {
+  /** Puts the open quest's things in the middle of its place, replacing any left from before. */
+  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook) {
     this.clearObjective();
-    const at = PLACES[location];
+    const at = this.place?.center ?? SPAWN;
     const rand = rng(Math.floor(Math.random() * 1e6) + 1);
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + rand();
       const d = 3 + rand() * 6;
       const pos = new THREE.Vector3(at.x + Math.sin(a) * d, 0, at.z + Math.cos(a) * d);
       if (kind === 'collect') {
-        const mesh = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.35),
-          new THREE.MeshStandardMaterial({ color: 0x9be36b, emissive: 0x4a8a20, emissiveIntensity: 0.9 }),
-        );
+        const mesh = buildItem(look);
         mesh.position.copy(pos).setY(0.8);
-        mesh.castShadow = true;
         this.scene.add(mesh);
         this.pickups.push({ mesh, phase: rand() * 6 });
       } else {
-        const mesh = humanoid(0x3f5a4a, 0x6f8f6a, 1.5);
-        const eyes = new THREE.Mesh(
-          new THREE.BoxGeometry(0.3, 0.05, 0.05),
-          new THREE.MeshBasicMaterial({ color: 0xff3a2a }),
-        );
-        eyes.position.set(0, 1.42, 0.2);
-        mesh.add(eyes);
+        const mesh = buildEnemy(look);
         mesh.position.copy(pos);
         this.scene.add(mesh);
-        this.enemies.push({ mesh, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 });
+        this.enemies.push({ mesh, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 });
       }
     }
   }
@@ -407,8 +378,9 @@ export class RpgScene {
   }
 
   /** The golden beam the compass points at: a place, the quest giver, or nothing. */
-  setMarker(target: LocationId | 'npc' | null) {
-    this.markerTarget = target === null ? null : target === 'npc' ? NPC_POS.clone() : PLACES[target].clone();
+  setMarker(target: 'place' | 'npc' | null) {
+    this.markerTarget =
+      target === 'npc' ? NPC_POS.clone() : target === 'place' ? (this.place?.center.clone() ?? null) : null;
     this.marker.visible = this.markerTarget !== null;
     if (this.markerTarget) this.marker.position.set(this.markerTarget.x, 30, this.markerTarget.z);
     else this.cb.onCompass(null, 0);
@@ -430,13 +402,18 @@ export class RpgScene {
   }
 
   /** For tests and for poking at it from the console. */
-  teleport(where: LocationId | 'npc' | 'spawn') {
-    const p = where === 'npc' ? NPC_POS.clone().add(new THREE.Vector3(0, 0, 2)) : where === 'spawn' ? SPAWN : PLACES[where];
+  teleport(where: 'place' | 'npc' | 'spawn') {
+    const p =
+      where === 'npc'
+        ? NPC_POS.clone().add(new THREE.Vector3(0, 0, 2))
+        : where === 'place' && this.place
+          ? this.place.center
+          : SPAWN;
     this.player.position.set(p.x, 0, p.z);
   }
 
-  facePosition(where: LocationId | 'npc') {
-    const target = where === 'npc' ? NPC_POS : PLACES[where];
+  facePosition(where: 'place' | 'npc') {
+    const target = where === 'place' && this.place ? this.place.center : NPC_POS;
     const d = target.clone().sub(this.player.position);
     this.yaw = Math.atan2(-d.x, -d.z);
     this.player.rotation.y = Math.atan2(d.x, d.z);
@@ -547,7 +524,8 @@ export class RpgScene {
   }
 
   private collide(pos: THREE.Vector3, radius = 0.45) {
-    for (const o of this.obstacles) {
+    for (const o of this.place ? [...this.obstacles, ...this.place.obstacles] : this.obstacles) {
+      if (o.off) continue;
       const dx = pos.x - o.x;
       const dz = pos.z - o.z;
       const d = Math.hypot(dx, dz);
@@ -595,6 +573,11 @@ export class RpgScene {
     this.updateEnemies(dt);
     this.npc.lookAt(this.player.position.x, 0, this.player.position.z);
 
+    if (this.place && !this.place.arrived && this.player.position.distanceTo(this.place.center) < PLACE_RADIUS) {
+      this.place.arrived = true;
+      this.cb.onArrive(this.place.spec.name);
+    }
+
     const prompt =
       this.player.position.distanceTo(NPC_POS) < TALK_RANGE
         ? 'talk'
@@ -638,7 +621,7 @@ export class RpgScene {
       this.collide(pos, 0.4);
       enemy.mesh.lookAt(this.player.position.x, 0, this.player.position.z);
       enemy.flash = Math.max(0, enemy.flash - dt);
-      enemy.mesh.scale.setScalar(enemy.flash > 0 ? 1.12 : 1);
+      enemy.mesh.scale.setScalar(enemy.size * (enemy.flash > 0 ? 1.12 : 1));
       if (dist <= 1.5 && enemy.hitCooldown === 0) {
         enemy.hitCooldown = 1.2;
         this.hp = Math.max(0, this.hp - 12);

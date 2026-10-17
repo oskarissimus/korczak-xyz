@@ -13,8 +13,9 @@ const good = {
   waitingLine: 'Well?',
   completeLine: 'Thank you.',
   objectiveText: 'Find the relics in the ruins',
-  location: 'ruins',
+  place: { name: 'The Drowned Chapel', direction: 'North-West', distance: 'near', biome: 'graveyard', features: ['graves', 'nonsense'] },
   kind: 'collect',
+  look: { shape: 'skull', color: '#AABBCC', size: 9 },
   targetName: 'relic',
   count: 4,
 };
@@ -22,7 +23,15 @@ const good = {
 describe('parseQuest', () => {
   it('reads a well-formed answer, fenced or not', () => {
     const quest = parseQuest('```json\n' + JSON.stringify(good) + '\n```', 'en');
-    expect(quest?.location).toBe('ruins');
+    expect(quest?.place).toEqual({
+      name: 'The Drowned Chapel',
+      direction: 'northwest',
+      distance: 'near',
+      biome: 'graveyard',
+      features: ['graves'],
+      groundColor: '#4b4a3c',
+    });
+    expect(quest?.look).toEqual({ shape: 'skull', color: '#aabbcc', size: 2 });
     expect(quest?.kind).toBe('collect');
     expect(quest?.count).toBe(4);
     expect(quest?.smallTalk).toEqual([{ label: 'Who are you?', reply: 'A widow.' }]);
@@ -34,7 +43,9 @@ describe('parseQuest', () => {
   });
 
   it('refuses a place the world does not have', () => {
-    expect(parseQuest(JSON.stringify({ ...good, location: 'mountains' }), 'en')).toBeNull();
+    expect(parseQuest(JSON.stringify({ ...good, place: { ...good.place, biome: 'volcano' } }), 'en')).toBeNull();
+    expect(parseQuest(JSON.stringify({ ...good, place: { ...good.place, direction: 'up' } }), 'en')).toBeNull();
+    expect(parseQuest(JSON.stringify({ ...good, place: undefined }), 'en')).toBeNull();
   });
 
   it('refuses an objective the engine cannot play', () => {
@@ -44,8 +55,10 @@ describe('parseQuest', () => {
   });
 
   it('forgives a count written as a string and a capitalised place', () => {
-    const quest = parseQuest(JSON.stringify({ ...good, count: '3', location: 'Ruins ', kind: 'Slay' }), 'en');
-    expect(quest).toMatchObject({ count: 3, location: 'ruins', kind: 'slay' });
+    const quest = parseQuest(JSON.stringify({ ...good, count: '3', kind: 'Slay' }), 'en');
+    expect(quest).toMatchObject({ count: 3, kind: 'slay' });
+    // A skull cannot be slain: the look falls back to a shape the objective can use.
+    expect(quest?.look.shape).toBe('humanoid');
   });
 
   it('clamps the count and fills missing lines from the hand-written quest', () => {
@@ -70,6 +83,8 @@ describe('questPrompt', () => {
   it('names the language and every place', () => {
     const prompt = questPrompt('pl', 'an old debt');
     expect(prompt).toContain('Polish');
-    for (const place of ['ruins', 'forest', 'lake']) expect(prompt).toContain(`"${place}"`);
+    for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast', 'scroll']) {
+      expect(prompt).toContain(`"${word}"`);
+    }
   });
 });

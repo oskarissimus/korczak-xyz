@@ -42,6 +42,7 @@ const en = {
   itsDone: 'It is done.',
   thanksAgain: 'Thank you again, witcher. The village will not forget.',
   fullscreen: 'Fullscreen',
+  arrived: 'You have reached',
 };
 
 const pl: typeof en = {
@@ -86,6 +87,7 @@ const pl: typeof en = {
   itsDone: 'Załatwione.',
   thanksAgain: 'Dziękujemy raz jeszcze, wiedźminie. Wieś tego nie zapomni.',
   fullscreen: 'Pełny ekran',
+  arrived: 'Docierasz do miejsca',
 };
 
 export const translations = { en, pl };

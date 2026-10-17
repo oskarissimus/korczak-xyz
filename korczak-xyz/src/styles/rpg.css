@@ -299,3 +299,10 @@ ul.rpg-source {
   white-space: normal;
   text-align: center;
 }
+
+.rpg-journal-place {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.85;
+  margin-top: 2px;
+}

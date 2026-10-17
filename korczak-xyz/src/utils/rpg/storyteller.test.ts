@@ -8,7 +8,7 @@ const quest = {
   greeting: 'Hunter.',
   pitch: 'The ring is in the ruins.',
   objectiveText: 'Find the relics',
-  location: 'ruins',
+  place: { name: 'Old Keep', direction: 'north', biome: 'ruins' },
   kind: 'collect',
   targetName: 'relic',
   count: 2,

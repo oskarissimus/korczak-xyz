@@ -113,6 +113,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setQuestState('available');
     setProgress(0);
     sceneRef.current?.clearObjective();
+    sceneRef.current?.clearPlace();
     sceneRef.current?.setMarker('npc');
     setGenerating(false);
     // Said on screen, with the provider's own reason: "always the drowners" with no explanation
@@ -144,6 +145,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       onDeath: () => flash(tRef.current.died),
       onCompass: (angle, distance) => setCompass(angle === null ? null : { angle, distance }),
       onLockChange: setLocked,
+      onArrive: (name) => flash(`${tRef.current.arrived}: ${name}`, 4000),
     });
     sceneRef.current = scene;
     scene.setPaused(true);
@@ -209,8 +211,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
                       action: () => {
                         setQuestState('active');
                         setProgress(0);
-                        sceneRef.current?.spawnObjective(q.location, q.kind, q.count);
-                        sceneRef.current?.setMarker(q.location);
+                        sceneRef.current?.setPlace(q.place);
+                        sceneRef.current?.spawnObjective(q.kind, q.count, q.look);
+                        sceneRef.current?.setMarker('place');
                         setDialogue({ line: npc(q.acceptLine), choices: [bye] });
                         flash(`${t.questStarted}: ${q.title}`);
                       },
@@ -332,6 +335,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <div className="rpg-journal">
             {quest && <div className="rpg-journal-title">{quest.title}</div>}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
+            {quest && questState === 'active' && <div className="rpg-journal-place">{quest.place.name}</div>}
             {questState === 'done' && <div className="rpg-journal-objective">✓ {t.completed}</div>}
           </div>
 

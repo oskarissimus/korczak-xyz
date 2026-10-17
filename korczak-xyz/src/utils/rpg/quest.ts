@@ -2,19 +2,30 @@
  * The RPG's story layer: what a quest is, the one written by hand, and how a model's answer becomes
  * one.
  *
- * THE MODEL WRITES WORDS, THE WORLD STAYS FIXED. The map, its places and what can be done in them
- * are the engine's (`RpgScene.ts`); a model only chooses among them — which place, which of the two
- * objectives, how many — and writes the dialogue around that choice. So a quest from the model can
- * never send the player somewhere that does not exist, and a malformed answer degrades to the
- * hand-written quest rather than to a game that cannot be finished. `parseQuest` is that boundary,
- * and it is pure so it can be pinned by a test.
+ * THE MODEL WRITES WORDS AND CHOOSES BLOCKS; THE ENGINE BUILDS. Since Oct 2026 the model invents
+ * the place a quest happens in, but only out of closed vocabularies the scene knows how to build
+ * (`place.ts`: direction, distance, biome, features, a ground colour, and the targets' shape,
+ * colour and size); it picks one of two objectives and how many, and writes the dialogue. So a
+ * quest from the model can never ask for something the scene cannot make, and a malformed answer
+ * degrades to the hand-written quest rather than to a game that cannot be finished. `parseQuest`
+ * is that boundary, and it is pure so it can be pinned by a test.
  */
+
+import {
+  BIOMES,
+  DIRECTIONS,
+  DISTANCES,
+  ENEMY_SHAPES,
+  FEATURES,
+  ITEM_SHAPES,
+  parseLook,
+  parsePlace,
+  type PlaceSpec,
+  type TargetLook,
+} from './place';
 
 export type Lang = 'en' | 'pl';
 
-/** The places the scene builds. A quest may only point at one of these. */
-export const LOCATIONS = ['ruins', 'forest', 'lake'] as const;
-export type LocationId = (typeof LOCATIONS)[number];
 
 /** What can be done at a place: gather things lying there, or kill what lives there. */
 export type ObjectiveKind = 'collect' | 'slay';
@@ -43,7 +54,10 @@ export interface Quest {
   completeLine: string;
   /** One line for the journal while the quest is open. */
   objectiveText: string;
-  location: LocationId;
+  /** Where it happens: invented by the model, built by the scene. See `place.ts`. */
+  place: PlaceSpec;
+  /** What the targets look like. */
+  look: TargetLook;
   kind: ObjectiveKind;
   /** Names one of the things, for the HUD counter: "herb", "drowner". */
   targetName: string;
@@ -79,7 +93,15 @@ export function staticQuest(lang: Lang): Quest {
       waitingLine: 'I jak, panie? Utopce wciąż tam siedzą, słychać je po zmroku.',
       completeLine: 'Ubiłeś je wszystkie? Niech cię bogowie prowadzą, wiedźminie. Oto twoja zapłata.',
       objectiveText: 'Zabij utopce nad jeziorem na wschodzie',
-      location: 'lake',
+      place: {
+        name: 'Jezioro za polem',
+        direction: 'east',
+        distance: 'far',
+        biome: 'lakeshore',
+        features: ['water', 'rocks', 'dead_trees'],
+        groundColor: '#5d7a45',
+      },
+      look: { shape: 'humanoid', color: '#3f5a4a', size: 1 },
       kind: 'slay',
       targetName: 'utopiec',
       count: 3,
@@ -108,33 +130,44 @@ export function staticQuest(lang: Lang): Quest {
     waitingLine: 'Well, sir? The drowners are still there, you can hear them after dark.',
     completeLine: 'You killed them all? May the gods guide you, witcher. Here is your reward.',
     objectiveText: 'Kill the drowners by the lake to the east',
-    location: 'lake',
+    place: {
+      name: 'The Lake Past the Field',
+      direction: 'east',
+      distance: 'far',
+      biome: 'lakeshore',
+      features: ['water', 'rocks', 'dead_trees'],
+      groundColor: '#5d7a45',
+    },
+    look: { shape: 'humanoid', color: '#3f5a4a', size: 1 },
     kind: 'slay',
     targetName: 'drowner',
     count: 3,
   };
 }
 
-const PLACE_HINTS: Record<LocationId, string> = {
-  ruins: 'ruins of an old keep, north of the village',
-  forest: 'a dark pine forest, west of the village',
-  lake: 'a misty lake, east of the village',
-};
+const list = (items: readonly string[]) => items.map((i) => `"${i}"`).join(', ');
 
 /** The prompt that asks for a quest. Everything the model may choose is spelled out in it. */
 export function questPrompt(lang: Lang, seed: string): string {
   const language = lang === 'pl' ? 'Polish' : 'English';
-  const places = LOCATIONS.map((id) => `- "${id}": ${PLACE_HINTS[id]}`).join('\n');
   return [
     'You write side quests for a dark-fantasy RPG in the spirit of The Witcher 3.',
     'The player is a monster hunter who has just arrived in a small village. A villager gives them a job.',
     '',
-    'The world has exactly these places for the job:',
-    places,
+    'Invent the PLACE where the job happens, somewhere outside the village. The game builds it from',
+    'these building blocks, so choose only from them:',
+    `- direction from the village: one of ${list(DIRECTIONS)}`,
+    `- distance: one of ${list(DISTANCES)}`,
+    `- biome: one of ${list(BIOMES)}`,
+    `- features: 1 to 4 of ${list(FEATURES)}`,
+    '- groundColor: a "#rrggbb" colour that suits the mood of the place',
+    'Give the place an evocative name of its own. The villager should tell the player how to find it.',
     '',
     'And exactly two kinds of job:',
     '- "collect": pick up N things lying at the place (herbs, relics, lost items…)',
     '- "slay": kill N monsters at the place (drowners, wolves, ghouls…)',
+    `What the targets look like: shape for "slay" is one of ${list(ENEMY_SHAPES)},`,
+    `for "collect" one of ${list(ITEM_SHAPES)}; a "#rrggbb" colour; size 0.5 to 2.`,
     '',
     `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
     `Make it original, with a small twist or a hint of moral greyness. Inspiration: ${seed}.`,
@@ -146,9 +179,11 @@ export function questPrompt(lang: Lang, seed: string): string {
     '  "smallTalk": [{"label": string, "reply": string}, {"label": string, "reply": string}],',
     '  "acceptLine": string, "declineLine": string, "waitingLine": string, "completeLine": string,',
     '  "objectiveText": string,',
-    `  "location": one of ${LOCATIONS.map((l) => `"${l}"`).join(', ')},`,
+    '  "place": {"name": string, "direction": string, "distance": string, "biome": string,',
+    '            "features": [string], "groundColor": string},',
     '  "kind": "collect" or "slay",',
     '  "targetName": string (singular noun for one of the things),',
+    '  "look": {"shape": string, "color": string, "size": number},',
     `  "count": integer ${MIN_COUNT}-${MAX_COUNT}`,
     '}',
   ].join('\n');
@@ -203,8 +238,8 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
   const r = raw as Record<string, unknown>;
 
   // Case and a stray space are forgiven, and a count written as "3": models do both.
-  const location = typeof r.location === 'string' ? r.location.trim().toLowerCase() : '';
-  if (!(LOCATIONS as readonly string[]).includes(location)) return null;
+  const place = parsePlace(r.place);
+  if (!place) return null;
   const kind = typeof r.kind === 'string' ? r.kind.trim().toLowerCase() : '';
   if (kind !== 'collect' && kind !== 'slay') return null;
   const count = Math.round(Number(r.count));
@@ -242,7 +277,8 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
     waitingLine: text(r.waitingLine) ?? fallback.waitingLine,
     completeLine: text(r.completeLine) ?? fallback.completeLine,
     objectiveText,
-    location: location as LocationId,
+    place,
+    look: parseLook(r.look, kind),
     kind,
     targetName,
     count: Math.min(MAX_COUNT, Math.max(MIN_COUNT, count)),

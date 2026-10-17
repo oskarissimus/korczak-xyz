@@ -15,16 +15,24 @@ look under pointer lock, Shift to run), talk to the one quest giver, accept a qu
 it names, collect or kill N things there, come back, hand it in. Inspired by The Witcher 3. Meant to
 be iterated on.
 
-## The model writes words, the world stays fixed
+## The model writes words and chooses blocks; the engine builds
 
-`RpgScene.ts` owns the map: a village, and three places (`ruins` north, `forest` west, `lake` east)
-joined to it by paths. A model only *chooses* among those places and between two objectives
-(`collect`, `slay`), picks a count, and writes the dialogue. `parseQuest` in `utils/rpg/quest.ts`
-is the boundary: an answer whose place, kind or count the engine cannot play is thrown away rather
-than guessed at, missing lines are filled from the hand-written quest, and the game then plays
-`staticQuest`. So no answer can make the game unfinishable. Widening what a model may ask for
-(a new place, a new objective) means building it in the scene first and adding it to the prompt
-and the parser second.
+Since Oct 2026 the model **invents the place** a quest happens in (owner's choice of the first step
+towards fully generated quests). It still writes no geometry: `utils/rpg/place.ts` is the closed
+vocabulary — a direction (8) and distance (`near` 50 m, `far` 85 m) from the village, a biome (7),
+up to four features (10: pines, dead trees, rocks, pillars, graves, water, campfire, huts,
+mushrooms, standing stones), a ground colour, and for the targets a shape (enemies: humanoid,
+beast, blob; items: crystal, flower, chest, skull, scroll), a colour and a size. The place is built
+when the quest is accepted (`RpgScene.setPlace`, `components/Rpg/placeBuilder.ts`), seeded by its
+name so it is the same place every time; scattered trees on it and on the dirt path to it are
+hidden, not deleted, and come back with the next quest. A toast names it on arrival.
+
+`parseQuest` is still the boundary: a place without a name, a known direction or a known biome
+throws the answer away; unknown features are dropped and the biome's own fill in; a shape that does
+not fit the objective (a skull to slay) falls back to that objective's default. The fixed ruins,
+forest and lake are gone; the hand-written quest's lake is a `lakeshore` place like any other. A
+new block is a word in `place.ts`, a builder in `placeBuilder.ts` and a line in the prompt, in that
+order.
 
 The dialogue is a menu of lines the quest already contains, not a chat: talking costs no request.
 
