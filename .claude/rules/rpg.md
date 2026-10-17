@@ -34,6 +34,13 @@ forest and lake are gone; the hand-written quest's lake is a `lakeshore` place l
 new block is a word in `place.ts`, a builder in `placeBuilder.ts` and a line in the prompt, in that
 order.
 
+**The job is drawn by the game, not chosen by the model** (`pickJob` in `quest.ts`): half slay
+(1–4; one is a single dangerous creature, size 1.5–2), half collect (2–5). The prompt states it as
+given and lists only the shapes that fit it, and `parseQuest` overrides whatever kind and count the
+model writes back. Left to choose from "collect or slay, 1–5", the models wrote "collect 3" almost
+every time (owner, Oct 2026: "every quest is find 3 items"). Anything else the model picks too
+uniformly gets the same treatment: draw it here, tell the model.
+
 The dialogue is a menu of lines the quest already contains, not a chat: talking costs no request.
 
 ## Keys
@@ -50,7 +57,7 @@ usable answer plays the hand-written quest, and **the reason is put on screen** 
 a breadcrumb and the only symptom, reported by the owner, was "always the drowners":
 
 - Sentry Logs, `rpg.quest`: outcome (`generated`, `no-key`, `unusable`, `failed`), provider, model,
-  ms, each try's model and status. Sent signed out too. Never the prompt or the story.
+  ms, each try's model and status, and what came out: kind, count, biome, the targets' shape. Sent signed out too. Never the prompt or the story.
 - For a signed-in account, `gs://korczak-xyz-501720-backseat/users/{uid}/rpg/quests/{at}.json`:
   the prompt, the raw answer, every model tried with its error, the parsed quest, the release. The
   backseat driver's bucket, because its `users/{uid}/**` rule already covers it; a bucket of the

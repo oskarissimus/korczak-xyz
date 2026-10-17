@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractJson, parseQuest, questPrompt, staticQuest } from './quest';
+import { extractJson, parseQuest, pickJob, questPrompt, staticQuest } from './quest';
 
 const good = {
   title: 'The Widow’s Ring',
@@ -81,10 +81,50 @@ describe('parseQuest', () => {
 
 describe('questPrompt', () => {
   it('names the language and every place', () => {
-    const prompt = questPrompt('pl', 'an old debt');
+    const prompt = questPrompt('pl', 'an old debt', { kind: 'slay', count: 2 });
     expect(prompt).toContain('Polish');
-    for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast', 'scroll']) {
+    for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) {
       expect(prompt).toContain(`"${word}"`);
     }
+  });
+
+  it('hands over the job instead of offering a choice', () => {
+    const prompt = questPrompt('en', 'an old debt', { kind: 'collect', count: 5 });
+    expect(prompt).toContain('"kind": "collect"');
+    expect(prompt).toContain('"count": 5');
+    expect(prompt).toContain('"scroll"');
+    expect(prompt).not.toContain('"humanoid"');
+    expect(questPrompt('en', 'x', { kind: 'slay', count: 1 })).toContain('single dangerous creature');
+  });
+});
+
+describe('pickJob', () => {
+  it('draws both kinds and every count in range', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000; i++) {
+      const job = pickJob();
+      seen.add(`${job.kind}${job.count}`);
+      expect(job.count).toBeGreaterThanOrEqual(job.kind === 'slay' ? 1 : 2);
+      expect(job.count).toBeLessThanOrEqual(job.kind === 'slay' ? 4 : 5);
+    }
+    expect([...seen].sort()).toEqual(['collect2', 'collect3', 'collect4', 'collect5', 'slay1', 'slay2', 'slay3', 'slay4']);
+  });
+
+  it('stays in range at the edges of the random number', () => {
+    expect(pickJob(() => 0)).toEqual({ kind: 'slay', count: 1 });
+    expect(pickJob(() => 0.9999999)).toEqual({ kind: 'collect', count: 5 });
+  });
+});
+
+describe('parseQuest with a job', () => {
+  it('keeps the drawn kind and count whatever the model wrote', () => {
+    const quest = parseQuest(JSON.stringify({ ...good, kind: 'collect', count: 3 }), 'en', { kind: 'slay', count: 4 });
+    expect(quest).toMatchObject({ kind: 'slay', count: 4 });
+    expect(['humanoid', 'beast', 'blob']).toContain(quest?.look.shape);
+  });
+
+  it('does not need the model to repeat them', () => {
+    const { kind: _k, count: _c, ...rest } = good;
+    expect(parseQuest(JSON.stringify(rest), 'en', { kind: 'collect', count: 2 })).toMatchObject({ kind: 'collect', count: 2 });
   });
 });

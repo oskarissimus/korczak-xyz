@@ -65,3 +65,12 @@ describe('generateQuest', () => {
     expect(attempt.raw).toContain('"Ring"');
   });
 });
+
+describe('generateQuest job', () => {
+  it('asks for the drawn job and plays it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(answer(JSON.stringify(quest))));
+    const attempt = await generateQuest({ google: 'k', openai: null }, 'en');
+    expect(attempt.prompt).toContain(`"kind": "${attempt.job.kind}"`);
+    expect(attempt.quest).toMatchObject(attempt.job);
+  });
+});

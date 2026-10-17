@@ -15,7 +15,7 @@
  * the hand-written quest, every time.
  */
 
-import { parseQuest, questPrompt, SEEDS, type Lang, type Quest } from './quest';
+import { parseQuest, pickJob, questPrompt, SEEDS, type Job, type Lang, type Quest } from './quest';
 
 export const GOOGLE_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemma-3-27b-it'];
 export const OPENAI_MODEL = 'gpt-4o-mini';
@@ -43,6 +43,8 @@ export interface StoryAttempt {
   /** The model whose answer was used, or the last one tried. */
   model: string | null;
   seed: string;
+  /** What the quest was told to ask for: drawn here, not chosen by the model. */
+  job: Job;
   prompt: string;
   tries: ModelTry[];
   /** What the model sent back, whole. Null when nothing answered. */
@@ -147,13 +149,15 @@ function describe(e: unknown): string {
 export async function generateQuest(keys: StoryKeys, lang: Lang): Promise<StoryAttempt> {
   const started = Date.now();
   const seed = SEEDS[Math.floor(Math.random() * SEEDS.length)];
-  const prompt = questPrompt(lang, seed);
+  const job = pickJob();
+  const prompt = questPrompt(lang, seed, job);
   const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : 'static';
   const attempt: StoryAttempt = {
     outcome: 'no-key',
     provider,
     model: null,
     seed,
+    job,
     prompt,
     tries: [],
     raw: null,
@@ -175,7 +179,7 @@ export async function generateQuest(keys: StoryKeys, lang: Lang): Promise<StoryA
           provider === 'google'
             ? await askGoogle(keys.google!, model, prompt, controller.signal)
             : await askOpenAi(keys.openai!, prompt, controller.signal);
-        attempt.quest = parseQuest(attempt.raw, lang);
+        attempt.quest = parseQuest(attempt.raw, lang, job);
         attempt.tries.push({
           model,
           status: 200,

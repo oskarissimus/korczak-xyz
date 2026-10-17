@@ -5,7 +5,9 @@
  * THE MODEL WRITES WORDS AND CHOOSES BLOCKS; THE ENGINE BUILDS. Since Oct 2026 the model invents
  * the place a quest happens in, but only out of closed vocabularies the scene knows how to build
  * (`place.ts`: direction, distance, biome, features, a ground colour, and the targets' shape,
- * colour and size); it picks one of two objectives and how many, and writes the dialogue. So a
+ * colour and size) and writes the dialogue. The objective and how many it asks for are not the
+model's: left to choose, it wrote "collect 3" nearly every time, so `pickJob` draws them and the
+prompt hands them over as given. So a
  * quest from the model can never ask for something the scene cannot make, and a malformed answer
  * degrades to the hand-written quest rather than to a game that cannot be finished. `parseQuest`
  * is that boundary, and it is pure so it can be pinned by a test.
@@ -66,6 +68,32 @@ export interface Quest {
 
 export const MIN_COUNT = 1;
 export const MAX_COUNT = 5;
+
+/** The job a quest asks for, drawn by the game before the model is asked. */
+export interface Job {
+  kind: ObjectiveKind;
+  count: number;
+}
+
+/**
+ * Half slay, half collect. Slay is 1–4 (one is a single dangerous creature, which the prompt says),
+ * collect 2–5 (one thing to pick up is an errand, not a quest).
+ */
+export function pickJob(random: () => number = Math.random): Job {
+  const kind: ObjectiveKind = random() < 0.5 ? 'slay' : 'collect';
+  const low = kind === 'slay' ? 1 : 2;
+  const high = kind === 'slay' ? 4 : 5;
+  return { kind, count: low + Math.min(high - low, Math.floor(random() * (high - low + 1))) };
+}
+
+function jobLine(job: Job): string {
+  if (job.kind === 'slay') {
+    return job.count === 1
+      ? 'THE JOB IS GIVEN: "slay", count 1 — a single dangerous creature at the place, bigger than a common monster (size 1.5 to 2).'
+      : `THE JOB IS GIVEN: "slay", count ${job.count} — kill ${job.count} monsters at the place (drowners, wolves, ghouls, wraiths… choose one that suits the place).`;
+  }
+  return `THE JOB IS GIVEN: "collect", count ${job.count} — pick up ${job.count} things lying at the place (herbs, relics, bones, lost belongings, letters… choose what suits the story).`;
+}
 
 /** The quest the game plays without a key, or when the model's answer cannot be used. */
 export function staticQuest(lang: Lang): Quest {
@@ -148,7 +176,7 @@ export function staticQuest(lang: Lang): Quest {
 const list = (items: readonly string[]) => items.map((i) => `"${i}"`).join(', ');
 
 /** The prompt that asks for a quest. Everything the model may choose is spelled out in it. */
-export function questPrompt(lang: Lang, seed: string): string {
+export function questPrompt(lang: Lang, seed: string, job: Job): string {
   const language = lang === 'pl' ? 'Polish' : 'English';
   return [
     'You write side quests for a dark-fantasy RPG in the spirit of The Witcher 3.',
@@ -163,11 +191,11 @@ export function questPrompt(lang: Lang, seed: string): string {
     '- groundColor: a "#rrggbb" colour that suits the mood of the place',
     'Give the place an evocative name of its own. The villager should tell the player how to find it.',
     '',
-    'And exactly two kinds of job:',
-    '- "collect": pick up N things lying at the place (herbs, relics, lost items…)',
-    '- "slay": kill N monsters at the place (drowners, wolves, ghouls…)',
-    `What the targets look like: shape for "slay" is one of ${list(ENEMY_SHAPES)},`,
-    `for "collect" one of ${list(ITEM_SHAPES)}; a "#rrggbb" colour; size 0.5 to 2.`,
+    jobLine(job),
+    'Do not change the kind or the count; build the story around them.',
+    job.kind === 'slay'
+      ? `What the targets look like: shape is one of ${list(ENEMY_SHAPES)}; a "#rrggbb" colour; size 0.5 to 2.`
+      : `What the targets look like: shape is one of ${list(ITEM_SHAPES)}; a "#rrggbb" colour; size 0.5 to 2.`,
     '',
     `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
     `Make it original, with a small twist or a hint of moral greyness. Inspiration: ${seed}.`,
@@ -181,10 +209,10 @@ export function questPrompt(lang: Lang, seed: string): string {
     '  "objectiveText": string,',
     '  "place": {"name": string, "direction": string, "distance": string, "biome": string,',
     '            "features": [string], "groundColor": string},',
-    '  "kind": "collect" or "slay",',
+    `  "kind": "${job.kind}",`,
     '  "targetName": string (singular noun for one of the things),',
     '  "look": {"shape": string, "color": string, "size": number},',
-    `  "count": integer ${MIN_COUNT}-${MAX_COUNT}`,
+    `  "count": ${job.count}`,
     '}',
   ].join('\n');
 }
@@ -230,9 +258,10 @@ export function extractJson(reply: string): unknown {
 /**
  * A model's reply as a quest, or null when it cannot be played. Lines the model left out are filled
  * from the hand-written quest; the parts the engine depends on — place, kind, count — are not
- * guessed: a reply that gets those wrong is not used.
+ * guessed: a reply that gets those wrong is not used. Given a `job`, its kind and count win over
+ * whatever the model wrote, so a model that ignores the prompt cannot bring "collect 3" back.
  */
-export function parseQuest(reply: string, lang: Lang): Quest | null {
+export function parseQuest(reply: string, lang: Lang, job?: Job): Quest | null {
   const raw = extractJson(reply);
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -240,10 +269,10 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
   // Case and a stray space are forgiven, and a count written as "3": models do both.
   const place = parsePlace(r.place);
   if (!place) return null;
-  const kind = typeof r.kind === 'string' ? r.kind.trim().toLowerCase() : '';
+  const kind = job?.kind ?? (typeof r.kind === 'string' ? r.kind.trim().toLowerCase() : '');
   if (kind !== 'collect' && kind !== 'slay') return null;
-  const count = Math.round(Number(r.count));
-  if (!Number.isFinite(count) || r.count === null || r.count === '') return null;
+  const count = job?.count ?? Math.round(Number(r.count));
+  if (!Number.isFinite(count) || (!job && (r.count === null || r.count === ''))) return null;
 
   const fallback = staticQuest(lang);
   const smallTalk = Array.isArray(r.smallTalk)
