@@ -75,6 +75,13 @@ order.
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
 
+**Nothing is offered before it has been said.** A character opens with the greeting and one way
+on (ask about it, or goodbye); the decisions and the small-talk questions come only with the
+situation, and the prompt tells the model the greeting must already name the trouble and that
+every person or fact a decision or question mentions must be in the situation. The first version
+put the small talk beside the greeting, and the opening offered "Why did you keep silent so long?"
+and "Where was the girl seen?" after one line that mentioned neither (owner, Oct 2026).
+
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits

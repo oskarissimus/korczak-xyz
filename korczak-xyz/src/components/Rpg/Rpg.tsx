@@ -382,14 +382,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
         }));
 
       if (b.job && progressRef.current < b.job.count) {
-        const root = () => setDialogue({ line: npc(b.waitingLine), choices: [...smallTalk(() => root()), bye] });
+        const root = () => setDialogue({ line: npc(b.waitingLine), choices: [bye] });
         root();
         return;
       }
-      const situation = () =>
+      // Questions about the story come after the story: asked from the greeting, they named a
+      // silence or a girl the hunter had not heard of yet (owner, Oct 2026).
+      const situation = (): void =>
         setDialogue({
           line: npc(b.situation),
-          choices: [...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })), bye],
+          choices: [
+            ...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })),
+            ...smallTalk(() => situation()),
+            bye,
+          ],
         });
       if (!b.greeting) {
         situation();
@@ -398,7 +404,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const root = () =>
         setDialogue({
           line: npc(b.greeting),
-          choices: [{ label: b.index === 0 ? t.askWork : t.askMore, action: situation }, ...smallTalk(() => root()), bye],
+          choices: [{ label: b.index === 0 ? t.askWork : t.askMore, action: situation }, bye],
         });
       root();
     },

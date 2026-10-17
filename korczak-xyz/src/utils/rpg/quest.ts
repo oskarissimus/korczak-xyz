@@ -370,6 +370,8 @@ export function beatPrompt(ctx: BeatContext): string {
     );
   });
   lines.push(
+    'The player hears the greeting, then the situation, and only then the decisions and the questions, so none',
+    'of them may refer to anything the npc has not said yet.',
     'Make them real choices with a cost — mercy or coin, truth or peace, a promise kept or broken — so that each',
     'one leads to a genuinely different story. Never two ways of saying the same thing.',
     '',
@@ -388,8 +390,11 @@ export function beatPrompt(ctx: BeatContext): string {
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "waitingLine": string (what the npc says if talked to before the job is done),'
       : '',
-    '  "greeting": string, "situation": string (what the npc tells the hunter: the dilemma the decisions answer),',
-    '  "smallTalk": [{"label": string, "reply": string}],',
+    '  "greeting": string (the first thing the npc says: one or two sentences that already name the trouble, so',
+    '              that asking about it is the natural reply),',
+    '  "situation": string (what the npc tells when asked: the whole problem and the dilemma the decisions answer;',
+    '               every person, place and fact the decisions or the smallTalk mention must be named here),',
+    '  "smallTalk": [{"label": string (a follow-up question about something said in the situation), "reply": string}],',
     '  "decisions": [{"label": string (what the hunter says or does, first person, short),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed)}]',
     '}',
