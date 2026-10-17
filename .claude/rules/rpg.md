@@ -82,12 +82,19 @@ every person or fact a decision or question mentions must be in the situation. T
 put the small talk beside the greeting, and the opening offered "Why did you keep silent so long?"
 and "Where was the girl seen?" after one line that mentioned neither (owner, Oct 2026).
 
+**Every line is spoken, never narrated.** The prompt says so with a wrong and a right example
+(Flash-Lite wrote "Helena weeps and says her daughter-in-law hanged herself" as Helena's own line,
+owner, Oct 2026), and `narrated` in `quest.ts` throws away a beat whose greeting, situation,
+waiting line or replies open with the character's name as the subject or report their speech
+("mówi, że", "says that") — the next model is asked instead. Decision labels are the hunter's
+spoken line, at most 12 words.
+
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
 them. Google first, OpenAI `gpt-4o-mini` only without a Google key. On Google the models are tried
-in order (`GOOGLE_MODELS` in `storyteller.ts`): `gemini-flash-lite-latest` and
-`gemini-flash-latest` in JSON mode, then `gemma-3-27b-it` (no JSON mode, no `systemInstruction`).
+in order (`GOOGLE_MODELS` in `storyteller.ts`): `gemini-flash-latest`, then
+`gemini-flash-lite-latest` (first until the narration above), both in JSON mode, then `gemma-3-27b-it` (no JSON mode, no `systemInstruction`).
 A 404, a 429 (quotas are per model) or a 400 naming the model moves to the next; so does an answer
 `parseBeat` cannot play. Anything else — a rejected key, a timeout (45s) — ends it. No key or no
 usable answer plays the hand-written quest, and **the reason is put on screen** in a toast.

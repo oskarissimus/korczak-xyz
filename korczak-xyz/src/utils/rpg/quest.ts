@@ -375,7 +375,14 @@ export function beatPrompt(ctx: BeatContext): string {
     'Make them real choices with a cost — mercy or coin, truth or peace, a promise kept or broken — so that each',
     'one leads to a genuinely different story. Never two ways of saying the same thing.',
     '',
-    `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
+    'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "situation", "waitingLine" and every',
+    '"reply" is the npc’s own words to the hunter, in the first person ("I", "my daughter"), addressing them as',
+    '"you". Never narration, never stage directions, never the npc in the third person, never "she says that…".',
+    'Wrong: "Helena weeps and says her daughter-in-law hanged herself." Right: "My Hania hanged herself, witcher.',
+    'On the old willow by the graves."',
+    'Every "label" is the hunter’s own spoken line, short: at most 12 words, one sentence.',
+    `Write everything the player reads in ${language}. Keep each npc line under 280 characters; the situation may`,
+    'take up to 450, in two or three spoken sentences.',
     `Make it original, with a twist or a hint of moral greyness. Inspiration: ${ctx.seed}.`,
     '',
     'Answer with ONE JSON object and nothing else, no markdown fence, with these keys:',
@@ -395,7 +402,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "situation": string (what the npc tells when asked: the whole problem and the dilemma the decisions answer;',
     '               every person, place and fact the decisions or the smallTalk mention must be named here),',
     '  "smallTalk": [{"label": string (a follow-up question about something said in the situation), "reply": string}],',
-    '  "decisions": [{"label": string (what the hunter says or does, first person, short),',
+    '  "decisions": [{"label": string (what the hunter says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed)}]',
     '}',
   );
@@ -442,6 +449,22 @@ export function extractJson(reply: string): unknown {
       return null;
     }
   }
+}
+
+/**
+ * A line that tells about the character instead of being said by them: it opens with their own name
+ * as the subject ("Helena płacze…", not "Helena, listen") or reports speech ("mówi, że", "says
+ * that"). Models fall into this as the story gets long; the owner caught it in the first week.
+ */
+export function narrated(line: string, name: string): boolean {
+  if (!line) return false;
+  const words = name.trim().split(/\s+/);
+  const opens = [name.trim(), words[words.length - 1]].some(
+    (n) => n.length > 1 && line.startsWith(n) && !/^[,!?:]/.test(line.slice(n.length).trimStart()),
+  );
+  // Not \b: in JavaScript it is ASCII-only, and there is no boundary before "że".
+  const reported = /(^|\s)(mówi|powiada|szepcze|błaga|says|whispers|begs|tells you),? (że|that)(?=[\s,.]|$)/i.test(line);
+  return opens || reported;
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -518,6 +541,8 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   const situation = text(r.situation, 700);
   const greeting = text(r.greeting) ?? '';
   if (!title || !situation) return null;
+  // Narration where a line should be spoken breaks the scene and the voice; the next model may do better.
+  if ([greeting, situation, text(r.waitingLine) ?? '', ...decisions.map((d) => d.reply)].some((line) => narrated(line, npc.name))) return null;
 
   const smallTalk = Array.isArray(r.smallTalk)
     ? r.smallTalk

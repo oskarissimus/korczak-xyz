@@ -17,7 +17,9 @@
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
 
-export const GOOGLE_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemma-3-27b-it'];
+// Flash before Flash-Lite since the beats (Oct 2026): Lite slid into third-person narration where
+// a line should be spoken, and a beat is mostly written while the last answer is still being read.
+export const GOOGLE_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemma-3-27b-it'];
 export const OPENAI_MODEL = 'gpt-4o-mini';
 const TIMEOUT_MS = 45_000;
 

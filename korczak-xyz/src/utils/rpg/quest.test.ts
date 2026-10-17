@@ -4,6 +4,7 @@ import {
   MAX_BEATS,
   beatPrompt,
   extractJson,
+  narrated,
   parseBeat,
   pickJob,
   planDecisions,
@@ -104,7 +105,8 @@ describe('beatPrompt', () => {
     const prompt = beatPrompt({ ...ctx, lang: 'pl' });
     expect(prompt).toContain('Polish');
     for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) expect(prompt).toContain(`"${word}"`);
-    expect(prompt).toContain('kill 3 monsters');
+    expect(prompt).toContain("kill 3 monsters");
+    expect(prompt).toContain("IT IS SPOKEN DIALOGUE");
     expect(prompt).toContain('1. leads on to a step of gathering 2 things');
     expect(prompt).toContain('2. ENDS the quest');
     expect(prompt).toContain('The hunter decided: "I will find it."');
@@ -152,5 +154,26 @@ describe('staticBeat', () => {
       expect(lake.job).toMatchObject({ kind: 'slay', count: 3 });
       expect(lake.decisions.every((d) => d.next === null)).toBe(true);
     }
+  });
+});
+
+describe('narrated', () => {
+  it('catches a line told about the character instead of said by them', () => {
+    expect(narrated('Helena płacze, wycierając dłonie w brudny fartuch. Mówi, że jej synowa się powiesiła.', 'Helena')).toBe(true);
+    expect(narrated('Starzec patrzy w ziemię i mówi, że nic nie widział.', 'Stary Tomasz')).toBe(true);
+    expect(narrated('Bogumił wzdycha ciężko.', 'Sołtys Bogumił')).toBe(true);
+    expect(narrated('She whispers that the child is gone.', 'Marta')).toBe(true);
+  });
+
+  it('lets spoken lines through', () => {
+    expect(narrated('Moja Hania się powiesiła, wiedźminie. Na starej wierzbie przy mogiłach.', 'Helena')).toBe(false);
+    expect(narrated('Helena, tak mnie wołają. Słuchaj, wiedźminie.', 'Helena')).toBe(false);
+    expect(narrated('Stary młyn stoi pusty od lat.', 'Stary Tomasz')).toBe(false);
+    expect(narrated('Ludzie mówią różne rzeczy, ale ja wiem, co widziałam.', 'Marta')).toBe(false);
+  });
+
+  it('throws away a beat written as narration', () => {
+    const told = { ...good, situation: 'Old Tomasz says that the ring was sold.' };
+    expect(parseBeat(JSON.stringify(told), ctx)).toBeNull();
   });
 });
