@@ -50,11 +50,15 @@ on Start, not on load, so the choice is what the model is asked for.
 
 ## Voice
 
-The quest giver speaks every line through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`)
-when the store holds an ElevenLabs key; the quest's `npcGender` picks George or Rachel. One audio
-element primed inside the Start click (the iOS unlock, see `backseat.md`), clips cached by text so
-going back through a menu costs nothing, a newer line stops the one playing, and a 🔊 button mutes
-it. A failed clip is a toast and the line stays readable; it never blocks the dialogue.
+Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`)
+when the store holds an ElevenLabs key: the option the hunter picks in Brian's voice, then the
+answer in George's or Rachel's (the quest's `npcGender`). `speakLines` requests every clip at once
+and plays them in order, so the answer is ready when the question ends; a newer choice stops the
+queue. **Each line is spoken once per quest** (`spokenRef`, keyed by voice and text, cleared when a
+new quest loads) — at the owner's request, so going back to a menu does not read its greeting
+again. One audio element primed inside the Start click (the iOS unlock, see `backseat.md`), clips
+cached by text, a 🔊 button to mute. A failed clip is a toast and the line stays readable; it never
+blocks the dialogue.
 
 ## Debugging
 

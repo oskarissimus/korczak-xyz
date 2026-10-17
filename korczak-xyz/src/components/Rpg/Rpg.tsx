@@ -14,7 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { staticQuest, type Lang, type Quest } from '../../utils/rpg/quest';
 import { generateQuest, type QuestSource } from '../../utils/rpg/storyteller';
-import { primeVoice, speakLine, stopVoice } from '../../utils/rpg/voice';
+import { primeVoice, speakLines, stopVoice, type SpokenLine } from '../../utils/rpg/voice';
 import { RpgScene } from './RpgScene';
 import { translations } from './translations';
 
@@ -79,6 +79,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   progressRef.current = progress;
 
   const openTalkRef = useRef<() => void>(() => {});
+  /** Every line already heard in this quest, by voice and text: each one is spoken once. */
+  const spokenRef = useRef(new Set<string>());
+  /** What the hunter just chose, to be said before the answer to it. */
+  const chosenRef = useRef<string | null>(null);
 
   const flash = useCallback((text: string) => {
     setToast(text);
@@ -89,6 +93,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const loadQuest = useCallback(async () => {
     setGenerating(true);
+    spokenRef.current.clear();
     const keys = { google: account.keys.google, openai: account.keys.openai };
     let next: Quest = staticQuest(gameLang);
     let from: QuestSource = 'static';
@@ -241,30 +246,47 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [close, flash, t]);
   openTalkRef.current = openTalk;
 
+  const choose = useCallback((choice: Choice) => {
+    chosenRef.current = choice.label;
+    choice.action();
+  }, []);
+
   // Escape closes a dialogue; number keys pick an option, as in every RPG since the nineties.
   useEffect(() => {
     if (!dialogue) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
       const n = Number(e.key);
-      if (n >= 1 && n <= dialogue.choices.length) dialogue.choices[n - 1].action();
+      if (n >= 1 && n <= dialogue.choices.length) choose(dialogue.choices[n - 1]);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, dialogue]);
+  }, [choose, close, dialogue]);
 
-  // The quest giver speaks every line he says, when there is an ElevenLabs key.
-  const spoken = dialogue?.line.text ?? null;
+  // Both sides speak, when there is an ElevenLabs key: the hunter's choice, then the answer. A line
+  // heard once in this quest is not read again, so going back to a menu is silent.
   useEffect(() => {
-    if (!spoken || !voiceOn || !voiceKey || !quest) {
+    const chosen = chosenRef.current;
+    chosenRef.current = null;
+    if (!voiceOn || !voiceKey || !quest) {
       stopVoice();
       return;
     }
-    speakLine(voiceKey, spoken, quest.npcGender, gameLang).catch((e) => {
+    const wanted: SpokenLine[] = [];
+    if (chosen) wanted.push({ text: chosen, voice: 'player' });
+    if (dialogue) wanted.push({ text: dialogue.line.text, voice: quest.npcGender });
+    const fresh = wanted.filter((line) => !spokenRef.current.has(`${line.voice}:${line.text}`));
+    if (fresh.length === 0) {
+      // Closed with nothing left to say (Esc, walking off): silence. Otherwise let it finish.
+      if (!dialogue) stopVoice();
+      return;
+    }
+    for (const line of fresh) spokenRef.current.add(`${line.voice}:${line.text}`);
+    speakLines(voiceKey, fresh, gameLang).catch((e) => {
       log.warn('rpg.voice.failed', describeError(e));
       flash(tRef.current.voiceFailed);
     });
-  }, [flash, gameLang, quest, spoken, voiceKey, voiceOn]);
+  }, [dialogue, flash, gameLang, quest, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
 
   const begin = () => {
@@ -342,7 +364,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <ol className="rpg-dialogue-choices">
             {dialogue.choices.map((c, i) => (
               <li key={`${i}-${c.label}`}>
-                <button type="button" onClick={c.action}>
+                <button type="button" onClick={() => choose(c)}>
                   <span className="rpg-choice-n">{i + 1}.</span> {c.label}
                 </button>
               </li>
