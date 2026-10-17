@@ -1,5 +1,5 @@
 /*
- * Asks a model for a quest, with the reader's own key from the account store (see
+ * Asks a model for one beat of a quest (`quest.ts`), with the reader's own key from the account store (see
  * `.claude/rules/account-keys.md`), straight from the browser like every other app here.
  *
  * Google first, OpenAI only without a Google key. On Google the models are tried in order
@@ -15,7 +15,7 @@
  * the hand-written quest, every time.
  */
 
-import { parseQuest, pickJob, questPrompt, SEEDS, type Job, type Lang, type Quest } from './quest';
+import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
 
 export const GOOGLE_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemma-3-27b-it'];
 export const OPENAI_MODEL = 'gpt-4o-mini';
@@ -43,15 +43,18 @@ export interface StoryAttempt {
   /** The model whose answer was used, or the last one tried. */
   model: string | null;
   seed: string;
-  /** What the quest was told to ask for: drawn here, not chosen by the model. */
-  job: Job;
+  /** Which beat of the quest; 0 is the opening. */
+  index: number;
+  /** What this beat asks of the hunter, and what each decision leads to: the game's, not the model's. */
+  job: Job | null;
+  plan: (Job | null)[];
   prompt: string;
   tries: ModelTry[];
   /** What the model sent back, whole. Null when nothing answered. */
   raw: string | null;
   error: string | null;
   ms: number;
-  quest: Quest | null;
+  beat: Beat | null;
 }
 
 class ProviderError extends Error {
@@ -146,24 +149,24 @@ function describe(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export async function generateQuest(keys: StoryKeys, lang: Lang): Promise<StoryAttempt> {
+export async function generateBeat(keys: StoryKeys, ctx: BeatContext): Promise<StoryAttempt> {
   const started = Date.now();
-  const seed = SEEDS[Math.floor(Math.random() * SEEDS.length)];
-  const job = pickJob();
-  const prompt = questPrompt(lang, seed, job);
+  const prompt = beatPrompt(ctx);
   const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : 'static';
   const attempt: StoryAttempt = {
     outcome: 'no-key',
     provider,
     model: null,
-    seed,
-    job,
+    seed: ctx.seed,
+    index: ctx.index,
+    job: ctx.job,
+    plan: ctx.plan,
     prompt,
     tries: [],
     raw: null,
     error: null,
     ms: 0,
-    quest: null,
+    beat: null,
   };
   if (provider === 'static') return attempt;
 
@@ -179,17 +182,17 @@ export async function generateQuest(keys: StoryKeys, lang: Lang): Promise<StoryA
           provider === 'google'
             ? await askGoogle(keys.google!, model, prompt, controller.signal)
             : await askOpenAi(keys.openai!, prompt, controller.signal);
-        attempt.quest = parseQuest(attempt.raw, lang, job);
+        attempt.beat = parseBeat(attempt.raw, ctx);
         attempt.tries.push({
           model,
           status: 200,
           ms: Date.now() - t0,
-          error: attempt.quest ? null : 'the answer was not a playable quest',
+          error: attempt.beat ? null : 'the answer was not a playable beat',
         });
-        if (attempt.quest) break;
+        if (attempt.beat) break;
         // An unplayable answer from one model is worth one from the next.
         attempt.outcome = 'unusable';
-        attempt.error = 'the answer was not a playable quest';
+        attempt.error = 'the answer was not a playable beat';
       } catch (e) {
         attempt.tries.push({
           model,
@@ -209,7 +212,7 @@ export async function generateQuest(keys: StoryKeys, lang: Lang): Promise<StoryA
   }
 
   attempt.ms = Date.now() - started;
-  if (attempt.quest) {
+  if (attempt.beat) {
     attempt.outcome = 'generated';
     attempt.error = null;
   }

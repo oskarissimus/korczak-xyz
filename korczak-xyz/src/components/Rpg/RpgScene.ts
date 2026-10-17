@@ -1,7 +1,7 @@
 /*
- * The RPG's world: one village, a hunter, and the place the open quest sends him to — built when
- * the quest is accepted from the model's description (`placeBuilder.ts`), with whatever the quest
- * put there. Plain Three.js, no assets — every mesh is a
+ * The RPG's world: one village, a hunter, the places the open quest has sent him to — each built
+ * from the model's description when a beat names it (`placeBuilder.ts`) and standing until the
+ * quest ends — and the quest's characters, in the village square or at their places. Plain Three.js, no assets — every mesh is a
  * primitive, so the page loads nothing but code.
  *
  * The React side (`Rpg.tsx`) owns the story; this file owns space and time and talks back only
@@ -24,7 +24,8 @@ import {
 export interface SceneCallbacks {
   /** A hint for what E would do here, or null when nothing is in reach. */
   onPrompt: (prompt: 'talk' | 'pickup' | null) => void;
-  onTalk: () => void;
+  /** E beside a character: which one, by name. */
+  onTalk: (name: string) => void;
   /** One more thing collected or killed. */
   onProgress: () => void;
   onHealth: (hp: number) => void;
@@ -32,11 +33,18 @@ export interface SceneCallbacks {
   /** Where the current marker is, relative to where the camera looks: radians, and metres. */
   onCompass: (angle: number | null, distance: number) => void;
   onLockChange: (locked: boolean) => void;
-  /** The hunter has walked into the quest's place, once per place. */
+  /** The hunter has walked into one of the quest's places, once per place. */
   onArrive: (name: string) => void;
 }
 
-const NPC_POS = new THREE.Vector3(4, 0, -4);
+/** Where characters stand in the village, in the order they first appear there. */
+const VILLAGE_SPOTS = [
+  new THREE.Vector3(4, 0, -4),
+  new THREE.Vector3(-5, 0, 3),
+  new THREE.Vector3(6, 0, 5),
+  new THREE.Vector3(-4, 0, -9),
+  new THREE.Vector3(9, 0, -1),
+];
 const SPAWN = new THREE.Vector3(0, 0, 8);
 const WORLD_HALF = 115;
 const WALK = 6;
@@ -66,6 +74,24 @@ interface Pickup {
   mesh: THREE.Object3D;
   phase: number;
 }
+
+interface Npc {
+  group: THREE.Group;
+  obstacle: Obstacle;
+  /** The village spot it holds, if it stands in the village. */
+  spot: number | null;
+}
+
+interface Place {
+  spec: PlaceSpec;
+  group: THREE.Group;
+  path: THREE.Mesh;
+  obstacles: Obstacle[];
+  center: THREE.Vector3;
+  arrived: boolean;
+}
+
+export type MarkerTarget = { npc: string } | { place: string } | null;
 
 /** How far (x, z) is from the path running from the village square to (px, pz). */
 function nearSegment(x: number, z: number, px: number, pz: number): number {
@@ -102,7 +128,7 @@ export class RpgScene {
 
   private player: THREE.Group;
   private sword: THREE.Mesh;
-  private npc: THREE.Group;
+  private npcs = new Map<string, Npc>();
   private marker: THREE.Mesh;
   private yaw = 0;
   private pitch = 0.25;
@@ -118,8 +144,10 @@ export class RpgScene {
   private lastPrompt: 'talk' | 'pickup' | null = null;
   private compassTimer = 0;
   private trees: Tree[] = [];
-  /** The open quest's place: its meshes, its obstacles, the path to it, and where it is. */
-  private place: { spec: PlaceSpec; group: THREE.Group; path: THREE.Mesh; obstacles: Obstacle[]; center: THREE.Vector3; arrived: boolean } | null = null;
+  /** The open quest's places, by name: meshes, obstacles, the path to each, and where it is. */
+  private places = new Map<string, Place>();
+  /** The character the marker points at, for `teleport('npc')`. */
+  private markerNpc: string | null = null;
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
     this.canvas = canvas;
@@ -145,12 +173,6 @@ export class RpgScene {
     this.player.add(this.sword);
     this.player.position.copy(SPAWN);
     this.scene.add(this.player);
-
-    this.npc = humanoid(0x7a5230, 0xd9b38c, 1.75);
-    this.npc.position.copy(NPC_POS);
-    this.npc.rotation.y = Math.PI / 4;
-    this.scene.add(this.npc);
-    this.obstacles.push({ x: NPC_POS.x, z: NPC_POS.z, r: 0.6 });
 
     this.marker = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.5, 60, 12, 1, true),
@@ -294,11 +316,12 @@ export class RpgScene {
   }
 
   /**
-   * Builds the quest's place where its direction and distance put it, with a dirt path from the
-   * village, clearing the scattered trees that stand on either. Replaces the previous quest's place.
+   * Builds a place where its direction and distance put it, with a dirt path from the village,
+   * clearing the scattered trees that stand on either. A place already standing under that name is
+   * left as it is: a beat that returns somewhere returns to the same place.
    */
-  setPlace(spec: PlaceSpec) {
-    this.clearPlace();
+  addPlace(spec: PlaceSpec) {
+    if (this.places.has(spec.name)) return;
     const { x, z } = placePosition(spec);
     const center = new THREE.Vector3(x, 0, z);
     for (const tree of this.trees) {
@@ -327,35 +350,95 @@ export class RpgScene {
     path.receiveShadow = true;
     this.scene.add(path);
 
-    this.place = { spec, group: built.group, path, obstacles, center, arrived: false };
+    this.places.set(spec.name, { spec, group: built.group, path, obstacles, center, arrived: false });
   }
 
-  clearPlace() {
-    if (!this.place) return;
-    this.scene.remove(this.place.group, this.place.path);
-    this.place.group.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      mesh.geometry?.dispose();
-      (mesh.material as THREE.Material | undefined)?.dispose?.();
-    });
-    this.place = null;
+  /** Takes down every place, for a new quest; the trees they cleared grow back. */
+  clearPlaces() {
+    for (const place of this.places.values()) {
+      this.scene.remove(place.group, place.path);
+      place.group.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        mesh.geometry?.dispose();
+        (mesh.material as THREE.Material | undefined)?.dispose?.();
+      });
+    }
+    this.places.clear();
     for (const tree of this.trees) {
       tree.obstacle.off = false;
       for (const m of tree.meshes) m.visible = true;
     }
   }
 
+  // --- the quest's characters -------------------------------------------------------------------
+
+  /**
+   * Puts a character at a place (by name) or, with null, on a free spot in the village square;
+   * one already standing somewhere walks over. Their clothes are `color`.
+   */
+  placeNpc(name: string, color: string, at: string | null) {
+    let npc = this.npcs.get(name);
+    if (!npc) {
+      const group = humanoid(new THREE.Color(color).getHex(), 0xd9b38c, 1.75);
+      const obstacle: Obstacle = { x: 0, z: 0, r: 0.6 };
+      this.obstacles.push(obstacle);
+      this.scene.add(group);
+      npc = { group, obstacle, spot: null };
+      this.npcs.set(name, npc);
+    }
+    const place = at ? this.places.get(at) : undefined;
+    let pos: THREE.Vector3;
+    if (place) {
+      npc.spot = null;
+      // On the village side of the place's middle, where the hunter walks in, clear of the targets.
+      pos = place.center.clone().sub(place.center.clone().setLength(8));
+    } else {
+      if (npc.spot === null) {
+        const used = new Set([...this.npcs.values()].map((n) => n.spot));
+        const free = VILLAGE_SPOTS.findIndex((_, i) => !used.has(i));
+        npc.spot = free >= 0 ? free : 0;
+      }
+      pos = VILLAGE_SPOTS[npc.spot].clone();
+    }
+    npc.group.position.copy(pos);
+    npc.obstacle.x = pos.x;
+    npc.obstacle.z = pos.z;
+  }
+
+  /** Sends every character away, for a new quest. */
+  clearNpcs() {
+    for (const npc of this.npcs.values()) {
+      this.scene.remove(npc.group);
+      npc.obstacle.off = true;
+    }
+    this.obstacles = this.obstacles.filter((o) => !o.off || this.trees.some((t) => t.obstacle === o));
+    this.npcs.clear();
+  }
+
+  private nearestNpc(): string | null {
+    let best: string | null = null;
+    let bestD = TALK_RANGE;
+    for (const [name, npc] of this.npcs) {
+      const d = npc.group.position.distanceTo(this.player.position);
+      if (d < bestD) {
+        bestD = d;
+        best = name;
+      }
+    }
+    return best;
+  }
+
   // --- the quest's things -----------------------------------------------------------------------
 
-  /** Puts the open quest's things in the middle of its place, replacing any left from before. */
-  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook) {
+  /** Puts a beat's things in the middle of its place, replacing any left from before. */
+  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null) {
     this.clearObjective();
-    const at = this.place?.center ?? SPAWN;
+    const center = (at ? this.places.get(at)?.center : null) ?? SPAWN;
     const rand = rng(Math.floor(Math.random() * 1e6) + 1);
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + rand();
       const d = 3 + rand() * 6;
-      const pos = new THREE.Vector3(at.x + Math.sin(a) * d, 0, at.z + Math.cos(a) * d);
+      const pos = new THREE.Vector3(center.x + Math.sin(a) * d, 0, center.z + Math.cos(a) * d);
       if (kind === 'collect') {
         const mesh = buildItem(look);
         mesh.position.copy(pos).setY(0.8);
@@ -377,10 +460,14 @@ export class RpgScene {
     this.enemies = [];
   }
 
-  /** The golden beam the compass points at: a place, the quest giver, or nothing. */
-  setMarker(target: 'place' | 'npc' | null) {
-    this.markerTarget =
-      target === 'npc' ? NPC_POS.clone() : target === 'place' ? (this.place?.center.clone() ?? null) : null;
+  /** The golden beam the compass points at: a character, a place, or nothing. */
+  setMarker(target: MarkerTarget) {
+    this.markerNpc = target && 'npc' in target ? target.npc : null;
+    this.markerTarget = !target
+      ? null
+      : 'npc' in target
+        ? (this.npcs.get(target.npc)?.group.position.clone() ?? null)
+        : (this.places.get(target.place)?.center.clone() ?? null);
     this.marker.visible = this.markerTarget !== null;
     if (this.markerTarget) this.marker.position.set(this.markerTarget.x, 30, this.markerTarget.z);
     else this.cb.onCompass(null, 0);
@@ -401,20 +488,22 @@ export class RpgScene {
     result?.catch?.(() => {});
   }
 
-  /** For tests and for poking at it from the console. */
-  teleport(where: 'place' | 'npc' | 'spawn') {
+  /** For tests and the console: beside the marked character, into the marked place, or home. */
+  teleport(where: 'marker' | 'npc' | 'spawn') {
+    const npc = this.markerNpc ? this.npcs.get(this.markerNpc) : undefined;
     const p =
-      where === 'npc'
-        ? NPC_POS.clone().add(new THREE.Vector3(0, 0, 2))
-        : where === 'place' && this.place
-          ? this.place.center
+      where === 'npc' && npc
+        ? npc.group.position.clone().add(new THREE.Vector3(0, 0, 2))
+        : where === 'marker' && this.markerTarget
+          ? this.markerTarget.clone().add(new THREE.Vector3(0, 0, npc ? 2 : 0))
           : SPAWN;
     this.player.position.set(p.x, 0, p.z);
   }
 
-  facePosition(where: 'place' | 'npc') {
-    const target = where === 'place' && this.place ? this.place.center : NPC_POS;
-    const d = target.clone().sub(this.player.position);
+  /** Turns the hunter and the camera toward the marker. */
+  facePosition() {
+    if (!this.markerTarget) return;
+    const d = this.markerTarget.clone().sub(this.player.position);
     this.yaw = Math.atan2(-d.x, -d.z);
     this.player.rotation.y = Math.atan2(d.x, d.z);
   }
@@ -444,8 +533,9 @@ export class RpgScene {
 
   interact() {
     if (this.paused) return;
-    if (this.player.position.distanceTo(NPC_POS) < TALK_RANGE) {
-      this.cb.onTalk();
+    const npc = this.nearestNpc();
+    if (npc) {
+      this.cb.onTalk(npc);
       return;
     }
     const near = this.pickups.find((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE);
@@ -524,7 +614,8 @@ export class RpgScene {
   }
 
   private collide(pos: THREE.Vector3, radius = 0.45) {
-    for (const o of this.place ? [...this.obstacles, ...this.place.obstacles] : this.obstacles) {
+    const all = [this.obstacles, ...[...this.places.values()].map((p) => p.obstacles)];
+    for (const o of all.flat()) {
       if (o.off) continue;
       const dx = pos.x - o.x;
       const dz = pos.z - o.z;
@@ -571,15 +662,21 @@ export class RpgScene {
     }
 
     this.updateEnemies(dt);
-    this.npc.lookAt(this.player.position.x, 0, this.player.position.z);
+    for (const npc of this.npcs.values()) {
+      if (npc.group.position.distanceTo(this.player.position) < 12) {
+        npc.group.lookAt(this.player.position.x, 0, this.player.position.z);
+      }
+    }
 
-    if (this.place && !this.place.arrived && this.player.position.distanceTo(this.place.center) < PLACE_RADIUS) {
-      this.place.arrived = true;
-      this.cb.onArrive(this.place.spec.name);
+    for (const place of this.places.values()) {
+      if (!place.arrived && this.player.position.distanceTo(place.center) < PLACE_RADIUS) {
+        place.arrived = true;
+        this.cb.onArrive(place.spec.name);
+      }
     }
 
     const prompt =
-      this.player.position.distanceTo(NPC_POS) < TALK_RANGE
+      this.nearestNpc() !== null
         ? 'talk'
         : this.pickups.some((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE)
           ? 'pickup'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DIRECTIONS, parseLook, parsePlace, placePosition } from './place';
+import { DIRECTIONS, PLACE_SPACING, freeSlot, parseLook, parsePlace, placePosition } from './place';
 
 describe('placePosition', () => {
   it('puts north at −z and east at +x, far beyond near', () => {
@@ -44,5 +44,18 @@ describe('parseLook', () => {
   it('defaults sensibly when the model says nothing', () => {
     expect(parseLook(undefined, 'collect')).toEqual({ shape: 'crystal', color: '#9be36b', size: 1 });
     expect(parseLook({ color: 'red' }, 'slay')).toEqual({ shape: 'humanoid', color: '#3f5a4a', size: 1 });
+  });
+});
+
+describe('freeSlot', () => {
+  it('moves a place off one already standing, and leaves a clear one alone', () => {
+    const keep = parsePlace({ name: 'Keep', direction: 'north', distance: 'far', biome: 'ruins' })!;
+    const clash = parsePlace({ name: 'Hill', direction: 'north', distance: 'far', biome: 'graveyard' })!;
+    const moved = freeSlot(clash, [keep]);
+    const a = placePosition(moved);
+    const b = placePosition(keep);
+    expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThanOrEqual(PLACE_SPACING);
+    const south = parsePlace({ name: 'Bog', direction: 'south', biome: 'swamp' })!;
+    expect(freeSlot(south, [keep])).toBe(south);
   });
 });

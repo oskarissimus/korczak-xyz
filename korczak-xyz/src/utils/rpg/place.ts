@@ -126,3 +126,33 @@ export function parseLook(raw: unknown, kind: 'collect' | 'slay'): TargetLook {
     size: Number.isFinite(size) ? Math.min(2, Math.max(0.5, size)) : 1,
   };
 }
+
+/** How far apart two places' centres must be for their builds not to overlap. */
+export const PLACE_SPACING = 50;
+
+/**
+ * The place itself, or the same place moved to the nearest slot (by direction, near before far)
+ * that keeps clear of the places already standing. A quest now has several places at once, and a
+ * model asked for a new one will happily put it on top of the last.
+ */
+export function freeSlot(spec: PlaceSpec, taken: readonly PlaceSpec[]): PlaceSpec {
+  const clear = (p: Pick<PlaceSpec, 'direction' | 'distance'>) => {
+    const a = placePosition(p);
+    return taken.every((t) => {
+      const b = placePosition(t);
+      return Math.hypot(a.x - b.x, a.z - b.z) >= PLACE_SPACING;
+    });
+  };
+  if (clear(spec)) return spec;
+  const start = DIRECTIONS.indexOf(spec.direction);
+  for (let step = 1; step <= DIRECTIONS.length / 2; step++) {
+    for (const turn of [step, -step]) {
+      const direction = DIRECTIONS[(start + turn + DIRECTIONS.length) % DIRECTIONS.length];
+      for (const distance of [spec.distance, spec.distance === 'near' ? 'far' : 'near'] as Distance[]) {
+        if (clear({ direction, distance })) return { ...spec, direction, distance };
+      }
+    }
+  }
+  for (const distance of DISTANCES) if (clear({ direction: spec.direction, distance })) return { ...spec, distance };
+  return spec;
+}

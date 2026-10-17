@@ -1,10 +1,14 @@
 /*
- * The RPG: a village, one quest giver, and a quest a model writes on the reader's own key — or the
- * hand-written one when there is no key or the model's answer cannot be played.
+ * The RPG: a village, the hunter, and a quest a model writes one beat at a time on the reader's own
+ * key — or the hand-written one when there is no key or the opening cannot be played.
  *
- * The story is a small state machine here (`QuestState`); space and time are `RpgScene`'s. The
- * dialogue is a menu built from the quest's lines, not a chat: every option is one the quest
- * already wrote, so talking costs no request and cannot wander off the quest.
+ * A quest is a chain of beats (`utils/rpg/quest.ts`): a character somewhere, maybe a job there
+ * first, then a situation and two or three decisions. Each decision either ends the quest or has
+ * the model write the next beat, with everything decided so far; the next beat is asked for the
+ * moment the hunter decides, so it is mostly written while the answer is still being read. A
+ * finished quest goes into the chronicle (`chronicle.ts`), which every later quest is written
+ * against. Space and time are `RpgScene`'s; the dialogue is a menu of lines the beat already
+ * wrote, so talking costs no request.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,17 +16,29 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
-import { staticQuest, type Lang, type Quest } from '../../utils/rpg/quest';
+import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
+import type { PlaceSpec } from '../../utils/rpg/place';
+import {
+  planDecisions,
+  SEEDS,
+  staticBeat,
+  type Beat,
+  type Character,
+  type ChronicleEntry,
+  type Decision,
+  type Job,
+  type Lang,
+  type StepRecord,
+} from '../../utils/rpg/quest';
 import { recordQuest } from '../../utils/rpg/questLog';
-import { generateQuest, type QuestSource } from '../../utils/rpg/storyteller';
+import { generateBeat, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine } from '../../utils/rpg/voice';
 import { RpgScene } from './RpgScene';
 import { translations } from './translations';
 
-type QuestState = 'available' | 'active' | 'ready' | 'done';
-
 interface DialogueLine {
   speaker: string;
+  voice: Character['gender'];
   text: string;
 }
 
@@ -31,9 +47,31 @@ interface Choice {
   action: () => void;
 }
 
+interface Ending {
+  title: string;
+  speaker: string;
+  text: string;
+  steps: StepRecord[];
+}
+
+interface Written {
+  beat: Beat | null;
+  failure: string | null;
+}
+
 declare global {
   interface Window {
-    rpg?: { scene: RpgScene; state: () => { quest: Quest; questState: QuestState; progress: number } };
+    rpg?: {
+      scene: RpgScene;
+      state: () => {
+        beat: Beat | null;
+        progress: number;
+        history: StepRecord[];
+        ending: Ending | null;
+        chronicle: ChronicleEntry[];
+        busy: boolean;
+      };
+    };
   }
 }
 
@@ -61,9 +99,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<RpgScene | null>(null);
 
-  const [quest, setQuest] = useState<Quest | null>(null);
-  const [questState, setQuestState] = useState<QuestState>('available');
+  const [beat, setBeat] = useState<Beat | null>(null);
   const [progress, setProgress] = useState(0);
+  const [history, setHistory] = useState<StepRecord[]>([]);
+  const [ending, setEnding] = useState<Ending | null>(null);
+  const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
   const [dialogue, setDialogue] = useState<{ line: DialogueLine; choices: Choice[] } | null>(null);
   const [prompt, setPrompt] = useState<'talk' | 'pickup' | null>(null);
   const [hp, setHp] = useState(100);
@@ -71,17 +111,37 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** The opening is being written. */
   const [generating, setGenerating] = useState(false);
+  /** A decision was made and its next beat is not written yet. */
+  const [unfolding, setUnfolding] = useState(false);
 
   // The scene's callbacks are bound once; they read the story through refs.
-  const questRef = useRef<Quest | null>(null);
-  const questStateRef = useRef<QuestState>('available');
+  const beatRef = useRef<Beat | null>(null);
   const progressRef = useRef(0);
-  questRef.current = quest;
-  questStateRef.current = questState;
+  const historyRef = useRef<StepRecord[]>([]);
+  const endingRef = useRef<Ending | null>(null);
+  const chronicleRef = useRef<ChronicleEntry[]>([]);
+  const busyRef = useRef(false);
+  beatRef.current = beat;
   progressRef.current = progress;
+  endingRef.current = ending;
+  chronicleRef.current = chronicle;
+  busyRef.current = generating || unfolding;
 
-  const openTalkRef = useRef<() => void>(() => {});
+  /** This quest's places and characters, which a later beat may return to. */
+  const placesRef = useRef<PlaceSpec[]>([]);
+  const charactersRef = useRef<Character[]>([]);
+  /** What each character last said, for talking to them again after their beat. */
+  const lastLinesRef = useRef(new Map<string, string>());
+  /** The current beat has been decided; its character has nothing more to offer. */
+  const decidedRef = useRef(false);
+  /** The opening could not be written, so the whole quest is the hand-written one. */
+  const staticRef = useRef(false);
+  const seedRef = useRef(SEEDS[0]);
+  const pendingRef = useRef<Promise<Written> | null>(null);
+
+  const openTalkRef = useRef<(name: string) => void>(() => {});
   /** Every line already heard in this quest, by voice and text: each one is spoken once. */
   const spokenRef = useRef(new Set<string>());
   /** What the hunter just chose, to be said before the answer to it. */
@@ -92,34 +152,105 @@ export default function Rpg({ lang }: { lang: Lang }) {
     window.setTimeout(() => setToast((current) => (current === text ? null : current)), ms);
   }, []);
 
-  // --- the quest ----------------------------------------------------------------------------------
+  useEffect(() => setChronicle(loadChronicle(gameLang)), [gameLang]);
 
-  const loadQuest = useCallback(async () => {
+  // --- the story ----------------------------------------------------------------------------------
+
+  /** Asks for beat `index`, which `job` (the decision before it) leads into. */
+  const writeBeat = useCallback(
+    async (index: number, job: Job | null, steps: StepRecord[], title: string | null): Promise<Written> => {
+      if (staticRef.current) return { beat: staticBeat(gameLang, index), failure: null };
+      const keys = { google: account.keys.google, openai: account.keys.openai };
+      try {
+        const attempt = await generateBeat(keys, {
+          lang: gameLang,
+          index,
+          seed: seedRef.current,
+          job,
+          plan: planDecisions(index),
+          title,
+          history: steps,
+          chronicle: chronicleRef.current,
+          places: placesRef.current,
+          characters: charactersRef.current,
+        });
+        recordQuest(uidRef.current, attempt, gameLang);
+        if (attempt.beat) return { beat: attempt.beat, failure: null };
+        return { beat: null, failure: attempt.outcome === 'no-key' ? null : (attempt.error ?? attempt.outcome) };
+      } catch (e) {
+        log.warn('rpg.beat.crashed', describeError(e));
+        return { beat: null, failure: e instanceof Error ? e.message : String(e) };
+      }
+    },
+    [account.keys.google, account.keys.openai, gameLang],
+  );
+
+  /** Puts a beat into the world: its place, its character, its job, and the marker. */
+  const setupBeat = useCallback(
+    (b: Beat) => {
+      const scene = sceneRef.current;
+      if (b.place) {
+        scene?.addPlace(b.place);
+        if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
+      }
+      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null);
+      if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
+      if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
+      else scene?.clearObjective();
+      progressRef.current = 0;
+      setProgress(0);
+      decidedRef.current = false;
+      scene?.setMarker(b.job && b.place ? { place: b.place.name } : { npc: b.npc.name });
+      beatRef.current = b;
+      setBeat(b);
+      if (b.index > 0) flash(`${tRef.current.nextStep}: ${b.objectiveText}`, 4500);
+    },
+    [flash],
+  );
+
+  const startQuest = useCallback(async () => {
     setGenerating(true);
+    setDialogue(null);
+    setEnding(null);
+    setBeat(null);
+    setHistory([]);
+    historyRef.current = [];
+    placesRef.current = [];
+    charactersRef.current = [];
+    lastLinesRef.current.clear();
     spokenRef.current.clear();
-    const keys = { google: account.keys.google, openai: account.keys.openai };
-    let next: Quest = staticQuest(gameLang);
-    let failure: string | null = null;
-    try {
-      const attempt = await generateQuest(keys, gameLang);
-      recordQuest(uidRef.current, attempt, gameLang);
-      if (attempt.quest) next = attempt.quest;
-      else if (attempt.outcome !== 'no-key') failure = attempt.error ?? attempt.outcome;
-    } catch (e) {
-      log.warn('rpg.quest.crashed', describeError(e));
-      failure = e instanceof Error ? e.message : String(e);
-    }
-    setQuest(next);
-    setQuestState('available');
-    setProgress(0);
-    sceneRef.current?.clearObjective();
-    sceneRef.current?.clearPlace();
-    sceneRef.current?.setMarker('npc');
+    staticRef.current = false;
+    pendingRef.current = null;
+    seedRef.current = SEEDS[Math.floor(Math.random() * SEEDS.length)];
+    const scene = sceneRef.current;
+    scene?.clearObjective();
+    scene?.clearPlaces();
+    scene?.clearNpcs();
+    scene?.setMarker(null);
+    scene?.teleport('spawn');
+
+    const { beat: opening, failure } = await writeBeat(0, null, [], null);
+    if (!opening) staticRef.current = true;
+    setupBeat(opening ?? staticBeat(gameLang, 0));
     setGenerating(false);
     // Said on screen, with the provider's own reason: "always the drowners" with no explanation
     // is how the first version failed.
     if (failure) flash(`${tRef.current.storyFailed} (${failure.slice(0, 160)})`, 9000);
-  }, [account.keys.google, account.keys.openai, flash, gameLang]);
+  }, [flash, gameLang, setupBeat, writeBeat]);
+
+  const finish = useCallback(
+    (b: Beat, speaker: string, text: string, steps: StepRecord[]) => {
+      const entry: ChronicleEntry = { title: b.title, at: Date.now(), steps, ending: text };
+      setChronicle(addToChronicle(gameLang, entry));
+      setEnding({ title: b.title, speaker, text, steps });
+      setDialogue(null);
+      const scene = sceneRef.current;
+      scene?.setMarker(null);
+      scene?.clearObjective();
+      scene?.heal();
+    },
+    [gameLang],
+  );
 
   // --- the scene ----------------------------------------------------------------------------------
 
@@ -129,16 +260,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (!canvas || !container) return;
     const scene = new RpgScene(canvas, {
       onPrompt: setPrompt,
-      onTalk: () => openTalkRef.current(),
+      onTalk: (name) => openTalkRef.current(name),
       onProgress: () => {
-        const q = questRef.current;
-        if (!q || questStateRef.current !== 'active') return;
+        const b = beatRef.current;
+        if (!b?.job) return;
         const done = progressRef.current + 1;
         progressRef.current = done;
         setProgress(done);
-        if (done >= q.count) {
-          setQuestState('ready');
-          scene.setMarker('npc');
+        if (done === b.job.count) {
+          scene.setMarker({ npc: b.npc.name });
+          flash(tRef.current.jobDone(b.npc.name), 4000);
         }
       },
       onHealth: setHp,
@@ -149,15 +280,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     });
     sceneRef.current = scene;
     scene.setPaused(true);
-    scene.setMarker('npc');
     scene.resize(container.clientWidth, container.clientHeight);
     scene.start();
     window.rpg = {
       scene,
       state: () => ({
-        quest: questRef.current!,
-        questState: questStateRef.current,
+        beat: beatRef.current,
         progress: progressRef.current,
+        history: historyRef.current,
+        ending: endingRef.current,
+        chronicle: chronicleRef.current,
+        busy: busyRef.current,
       }),
     };
 
@@ -173,8 +306,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // The world stands still whenever something other than walking has the reader's attention.
   useEffect(() => {
-    sceneRef.current?.setPaused(!started || dialogue !== null || generating || questState === 'done');
-  }, [started, dialogue, generating, questState]);
+    sceneRef.current?.setPaused(!started || dialogue !== null || generating || unfolding || ending !== null);
+  }, [started, dialogue, generating, unfolding, ending]);
 
   // --- dialogue -----------------------------------------------------------------------------------
 
@@ -184,72 +317,93 @@ export default function Rpg({ lang }: { lang: Lang }) {
     window.setTimeout(() => sceneRef.current?.requestLock(), 0);
   }, []);
 
-  const openTalk = useCallback(() => {
-    const q = questRef.current;
-    if (!q) return;
-    const npc = (text: string): DialogueLine => ({ speaker: q.npcName, text });
-    const state = questStateRef.current;
+  const proceed = useCallback(
+    async (b: Beat, d: Decision, steps: StepRecord[]) => {
+      close();
+      setUnfolding(true);
+      const { beat: next, failure } = (await pendingRef.current) ?? { beat: null, failure: 'nothing was asked' };
+      pendingRef.current = null;
+      setUnfolding(false);
+      if (next) {
+        setupBeat(next);
+        return;
+      }
+      // A quest that cannot go on still ends on the decision the hunter made, not on an error.
+      flash(`${tRef.current.trailCold} (${(failure ?? '').slice(0, 160)})`, 9000);
+      finish(b, b.npc.name, d.reply, steps);
+    },
+    [close, finish, flash, setupBeat],
+  );
 
-    const smallTalk = (back: () => void): Choice[] =>
-      q.smallTalk.map((o) => ({ label: o.label, action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: back }] }) }));
+  const decide = useCallback(
+    (b: Beat, d: Decision) => {
+      const step: StepRecord = {
+        npcName: b.npc.name,
+        placeName: b.place?.name ?? null,
+        situation: b.situation.slice(0, 300),
+        chose: d.label,
+        consequence: d.consequence,
+      };
+      const steps = [...historyRef.current, step];
+      historyRef.current = steps;
+      setHistory(steps);
+      lastLinesRef.current.set(b.npc.name, d.reply);
+      decidedRef.current = true;
+      const line: DialogueLine = { speaker: b.npc.name, voice: b.npc.gender, text: d.reply };
+      if (!d.next) {
+        setDialogue({ line, choices: [{ label: t.theEnd, action: () => finish(b, b.npc.name, d.reply, steps) }] });
+        return;
+      }
+      // Asked now, so most of it is written while the answer is being read and spoken.
+      pendingRef.current = writeBeat(b.index + 1, d.next, steps, b.title);
+      setDialogue({ line, choices: [{ label: t.onward, action: () => void proceed(b, d, steps) }] });
+    },
+    [finish, proceed, t, writeBeat],
+  );
 
-    const bye: Choice = { label: t.goodbye, action: close };
+  const openTalk = useCallback(
+    (name: string) => {
+      const b = beatRef.current;
+      if (!b || endingRef.current) return;
+      const bye: Choice = { label: t.goodbye, action: close };
+      const who = charactersRef.current.find((c) => c.name === name);
+      if (name !== b.npc.name || decidedRef.current) {
+        setDialogue({
+          line: { speaker: name, voice: who?.gender ?? 'male', text: lastLinesRef.current.get(name) ?? t.nothingMore },
+          choices: [bye],
+        });
+        return;
+      }
+      const npc = (text: string): DialogueLine => ({ speaker: b.npc.name, voice: b.npc.gender, text });
+      const smallTalk = (back: () => void): Choice[] =>
+        b.smallTalk.map((o) => ({
+          label: o.label,
+          action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: back }] }),
+        }));
 
-    if (state === 'available') {
+      if (b.job && progressRef.current < b.job.count) {
+        const root = () => setDialogue({ line: npc(b.waitingLine), choices: [...smallTalk(() => root()), bye] });
+        root();
+        return;
+      }
+      const situation = () =>
+        setDialogue({
+          line: npc(b.situation),
+          choices: [...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })), bye],
+        });
+      if (!b.greeting) {
+        situation();
+        return;
+      }
       const root = () =>
         setDialogue({
-          line: npc(q.greeting),
-          choices: [
-            {
-              label: t.askWork,
-              action: () =>
-                setDialogue({
-                  line: npc(q.pitch),
-                  choices: [
-                    {
-                      label: t.accept,
-                      action: () => {
-                        setQuestState('active');
-                        setProgress(0);
-                        sceneRef.current?.setPlace(q.place);
-                        sceneRef.current?.spawnObjective(q.kind, q.count, q.look);
-                        sceneRef.current?.setMarker('place');
-                        setDialogue({ line: npc(q.acceptLine), choices: [bye] });
-                        flash(`${t.questStarted}: ${q.title}`);
-                      },
-                    },
-                    { label: t.decline, action: () => setDialogue({ line: npc(q.declineLine), choices: [bye] }) },
-                  ],
-                }),
-            },
-            ...smallTalk(() => root()),
-            bye,
-          ],
+          line: npc(b.greeting),
+          choices: [{ label: b.index === 0 ? t.askWork : t.askMore, action: situation }, ...smallTalk(() => root()), bye],
         });
       root();
-    } else if (state === 'active') {
-      const root = () =>
-        setDialogue({ line: npc(q.waitingLine), choices: [...smallTalk(() => root()), bye] });
-      root();
-    } else if (state === 'ready') {
-      setDialogue({
-        line: npc(q.greeting),
-        choices: [
-          {
-            label: t.itsDone,
-            action: () => {
-              setQuestState('done');
-              sceneRef.current?.setMarker(null);
-              sceneRef.current?.heal();
-              setDialogue({ line: npc(q.completeLine), choices: [{ label: t.goodbye, action: () => setDialogue(null) }] });
-            },
-          },
-        ],
-      });
-    } else {
-      setDialogue({ line: npc(t.thanksAgain), choices: [bye] });
-    }
-  }, [close, flash, t]);
+    },
+    [close, decide, t],
+  );
   openTalkRef.current = openTalk;
 
   const choose = useCallback((choice: Choice) => {
@@ -274,13 +428,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     const chosen = chosenRef.current;
     chosenRef.current = null;
-    if (!voiceOn || !voiceKey || !quest) {
+    if (!voiceOn || !voiceKey) {
       stopVoice();
       return;
     }
     const wanted: SpokenLine[] = [];
     if (chosen) wanted.push({ text: chosen, voice: 'player' });
-    if (dialogue) wanted.push({ text: dialogue.line.text, voice: quest.npcGender });
+    if (dialogue) wanted.push({ text: dialogue.line.text, voice: dialogue.line.voice });
     const fresh = wanted.filter((line) => !spokenRef.current.has(`${line.voice}:${line.text}`));
     if (fresh.length === 0) {
       // Closed with nothing left to say (Esc, walking off): silence. Otherwise let it finish.
@@ -292,20 +446,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
       log.warn('rpg.voice.failed', describeError(e));
       flash(tRef.current.voiceFailed);
     });
-  }, [dialogue, flash, gameLang, quest, voiceKey, voiceOn]);
+  }, [dialogue, flash, gameLang, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
 
   const begin = () => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
     primeVoice();
     setStarted(true);
-    void loadQuest();
-  };
-
-  const newQuest = async () => {
-    setDialogue(null);
-    sceneRef.current?.teleport('npc');
-    await loadQuest();
+    void startQuest();
   };
 
   const fullscreen = () => {
@@ -317,14 +465,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // --- render -------------------------------------------------------------------------------------
 
-  const objective =
-    quest && questState === 'active'
-      ? `${quest.objectiveText} (${progress}/${quest.count})`
-      : quest && questState === 'ready'
-        ? t.returnTo(quest.npcName)
-        : quest && questState === 'available'
-          ? t.talkTo(quest.npcName)
-          : null;
+  const jobOpen = beat?.job ? progress < beat.job.count : false;
+  const objective = !beat || ending
+    ? null
+    : jobOpen
+      ? `${beat.objectiveText} (${progress}/${beat.job!.count})`
+      : beat.job || beat.index === 0
+        ? t.talkTo(beat.npc.name)
+        : beat.objectiveText;
 
   return (
     <div className="rpg-container" ref={containerRef}>
@@ -333,17 +481,22 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {started && (
         <>
           <div className="rpg-journal">
-            {quest && <div className="rpg-journal-title">{quest.title}</div>}
+            {beat && <div className="rpg-journal-title">{beat.title}</div>}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
-            {quest && questState === 'active' && <div className="rpg-journal-place">{quest.place.name}</div>}
-            {questState === 'done' && <div className="rpg-journal-objective">✓ {t.completed}</div>}
+            {beat?.place && !ending && <div className="rpg-journal-place">{beat.place.name}</div>}
+            {history.slice(-3).map((step, i) => (
+              <div key={`${i}-${step.chose}`} className="rpg-journal-step">
+                ◇ {step.chose}
+              </div>
+            ))}
+            {ending && <div className="rpg-journal-objective">✓ {t.completed}</div>}
           </div>
 
           <div className="rpg-hp" aria-label={`${t.health} ${hp}`}>
             <div className="rpg-hp-fill" style={{ width: `${hp}%` }} />
           </div>
 
-          {compass && questState !== 'done' && (
+          {compass && !ending && (
             <div className="rpg-compass">
               <span className="rpg-compass-arrow" style={{ transform: `rotate(${compass.angle}rad)` }}>
                 ▲
@@ -352,9 +505,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
             </div>
           )}
 
-          {!locked && !dialogue && questState !== 'done' && <div className="rpg-hint">{t.clickToLook}</div>}
+          {!locked && !dialogue && !ending && <div className="rpg-hint">{t.clickToLook}</div>}
 
-          {prompt && !dialogue && (
+          {prompt && !dialogue && !ending && (
             <div className="rpg-prompt">
               <kbd>E</kbd> {prompt === 'talk' ? t.talk : t.pickUp}
             </div>
@@ -405,6 +558,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
               </button>
             ))}
           </div>
+          {chronicle.length > 0 && (
+            <p className="rpg-chronicle">
+              {t.chronicle(chronicle.length)}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  clearChronicle(gameLang);
+                  setChronicle([]);
+                }}
+              >
+                {t.forget}
+              </button>
+            </p>
+          )}
           {keysReady ? (
             <ul className="rpg-source">
               <li>{storyProvider === 'static' ? t.staticQuest : t.aiQuest(storyProvider)}</li>
@@ -424,19 +591,36 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </div>
       )}
 
-      {started && questState === 'done' && !dialogue && (
-        <div className="rpg-overlay">
+      {started && ending && !generating && (
+        <div className="rpg-overlay rpg-ending">
           <h2>{t.questComplete}</h2>
-          {quest && <p>{quest.title}</p>}
-          <button type="button" className="rpg-start" disabled={generating} onClick={() => void newQuest()}>
-            {generating ? t.writing : t.newQuest}
+          <p className="rpg-ending-title">{ending.title}</p>
+          <blockquote>
+            <p>{ending.text}</p>
+            <footer>{ending.speaker}</footer>
+          </blockquote>
+          {ending.steps.length > 0 && (
+            <>
+              <h3>{t.yourDecisions}</h3>
+              <ol className="rpg-ending-steps">
+                {ending.steps.map((step, i) => (
+                  <li key={`${i}-${step.chose}`}>
+                    <strong>{step.chose}</strong> {step.consequence}
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+          <p className="rpg-ending-note">{t.remembered}</p>
+          <button type="button" className="rpg-start" onClick={() => void startQuest()}>
+            {t.newQuest}
           </button>
         </div>
       )}
 
-      {started && generating && (
+      {started && (generating || unfolding) && (
         <div className="rpg-overlay">
-          <p>{t.writing}</p>
+          <p>{generating ? t.writing : t.fate}</p>
         </div>
       )}
 

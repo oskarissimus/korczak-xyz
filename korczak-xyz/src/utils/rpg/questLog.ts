@@ -1,13 +1,13 @@
 /*
- * Every quest generation, written down, so "it is always the drowners" can be answered from a
+ * Every beat a model was asked for, written down, so "it is always the drowners" can be answered from a
  * record rather than guessed at.
  *
  * Two places, as the backseat driver does it (`utils/backseat/rideLog.ts`):
  *
- * - **Sentry Logs**, one `rpg.quest` measurement per generation: outcome, provider, model, how long,
+ * - **Sentry Logs**, one `rpg.quest` measurement per beat: outcome, provider, model, how long,
  *   the HTTP status of each try. Numbers and categories, never the prompt or the story — and it is
  *   sent signed out too, which is where most failures will be.
- * - **The bucket**, for a signed-in account: `users/{uid}/rpg/quests/{at}.json` in the backseat
+ * - **The bucket**, for a signed-in account: `users/{uid}/rpg/beats/{at}.json` in the backseat
  *   bucket (`korczak-xyz-501720-backseat`), with the prompt, the raw answer, each model tried and its
  *   error. The keys are never in it. That bucket's `storage.rules` already gives every approved
  *   account `users/{uid}/**`, so this needed no rule, bucket or Terraform; the name is the backseat
@@ -36,10 +36,12 @@ export function recordQuest(uid: string | null, attempt: StoryAttempt, lang: Lan
     ms: attempt.ms,
     tries: attempt.tries.map((t) => `${t.model}:${t.status ?? 'x'}`).join(','),
     rawLength: attempt.raw?.length,
-    kind: attempt.quest?.kind ?? attempt.job.kind,
-    count: attempt.quest?.count ?? attempt.job.count,
-    biome: attempt.quest?.place.biome,
-    shape: attempt.quest?.look.shape,
+    beat: attempt.index,
+    kind: attempt.job?.kind ?? 'opening',
+    count: attempt.job?.count,
+    plan: attempt.plan.map((j) => j?.kind ?? 'end').join(','),
+    biome: attempt.beat ? (attempt.beat.place?.biome ?? 'village') : undefined,
+    shape: attempt.beat?.job?.look.shape,
   });
   if (attempt.outcome !== 'generated' && attempt.outcome !== 'no-key') {
     log.warn('rpg.quest.fallback', { outcome: attempt.outcome, error: attempt.error ?? '' });
@@ -51,7 +53,7 @@ export function recordQuest(uid: string | null, attempt: StoryAttempt, lang: Lan
   const at = Date.now();
   const record = { at, release: RELEASE, lang, ...attempt };
   void uploadString(
-    ref(storage, `users/${uid}/rpg/quests/${new Date(at).toISOString().replace(/[:.]/g, '-')}.json`),
+    ref(storage, `users/${uid}/rpg/beats/${new Date(at).toISOString().replace(/[:.]/g, '-')}.json`),
     JSON.stringify(record, null, 2),
     'raw',
     { cacheControl: 'private, max-age=31536000', contentType: 'application/json' },

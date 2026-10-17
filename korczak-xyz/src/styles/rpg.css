@@ -306,3 +306,70 @@ ul.rpg-source {
   opacity: 0.85;
   margin-top: 2px;
 }
+
+.rpg-journal-step {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.rpg-chronicle {
+  font-size: 0.9rem;
+}
+
+.rpg-chronicle button {
+  margin-left: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.rpg-ending {
+  overflow-y: auto;
+  justify-content: safe center;
+}
+
+.rpg-ending-title {
+  font-weight: 600;
+}
+
+.rpg-ending blockquote {
+  max-width: 34rem;
+  margin: 0.5rem auto;
+  font-style: italic;
+}
+
+.rpg-ending blockquote footer {
+  margin-top: 0.3rem;
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.rpg-ending h3 {
+  margin: 0.8rem 0 0.3rem;
+  font-size: 18px;
+  color: #ffd36b;
+}
+
+.rpg-ending-steps {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding-left: 1.2rem;
+  list-style: decimal;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.rpg-ending-steps li {
+  margin-bottom: 0.3rem;
+}
+
+.rpg-ending-note {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

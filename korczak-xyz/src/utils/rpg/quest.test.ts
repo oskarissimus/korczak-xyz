@@ -1,130 +1,156 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractJson, parseQuest, pickJob, questPrompt, staticQuest } from './quest';
+import {
+  MAX_BEATS,
+  beatPrompt,
+  extractJson,
+  parseBeat,
+  pickJob,
+  planDecisions,
+  staticBeat,
+  type BeatContext,
+} from './quest';
 
-const good = {
+const ctx: BeatContext = {
+  lang: 'en',
+  index: 1,
+  seed: 'an old debt',
+  job: { kind: 'slay', count: 3 },
+  plan: [{ kind: 'collect', count: 2 }, null],
   title: 'The Widow’s Ring',
-  npcName: 'Marta',
-  greeting: 'Hunter.',
-  pitch: 'My husband’s ring lies in the ruins.',
-  smallTalk: [{ label: 'Who are you?', reply: 'A widow.' }, { label: 7, reply: 'dropped' }],
-  acceptLine: 'Go.',
-  declineLine: 'Then go away.',
-  waitingLine: 'Well?',
-  completeLine: 'Thank you.',
-  objectiveText: 'Find the relics in the ruins',
-  place: { name: 'The Drowned Chapel', direction: 'North-West', distance: 'near', biome: 'graveyard', features: ['graves', 'nonsense'] },
-  kind: 'collect',
-  look: { shape: 'skull', color: '#AABBCC', size: 9 },
-  targetName: 'relic',
-  count: 4,
+  history: [
+    {
+      npcName: 'Marta',
+      placeName: null,
+      situation: 'Her ring lies in the ruins.',
+      chose: 'I will find it.',
+      consequence: 'The hunter promised Marta her ring.',
+    },
+  ],
+  chronicle: [],
+  places: [],
+  characters: [{ name: 'Marta', gender: 'female', color: '#6b3a4a' }],
 };
 
-describe('parseQuest', () => {
-  it('reads a well-formed answer, fenced or not', () => {
-    const quest = parseQuest('```json\n' + JSON.stringify(good) + '\n```', 'en');
-    expect(quest?.place).toEqual({
-      name: 'The Drowned Chapel',
-      direction: 'northwest',
-      distance: 'near',
-      biome: 'graveyard',
-      features: ['graves'],
-      groundColor: '#4b4a3c',
+const good = {
+  title: 'Something else',
+  npc: { name: 'Old Tomasz', gender: 'male', color: '#334455' },
+  place: { name: 'Gallows Hill', direction: 'north-west', distance: 'near', biome: 'Graveyard', features: ['graves'] },
+  targetName: 'ghoul',
+  look: { shape: 'beast', color: '#8a2f2f', size: 1.4 },
+  objectiveText: 'Kill the ghouls on Gallows Hill',
+  greeting: 'You came.',
+  waitingLine: 'They are still there!',
+  situation: 'The ring was never lost. Marta sold it.',
+  smallTalk: [{ label: 'Who are you?', reply: 'The gravedigger.' }],
+  decisions: [
+    { label: 'Show me where she sold it.', reply: 'To the fence by the mill.', consequence: 'The hunter went after the fence.' },
+    { label: 'Tell Marta I know.', reply: 'She will hate you for it.', consequence: 'The hunter shamed Marta.' },
+  ],
+};
+
+describe('parseBeat', () => {
+  it('plays a good beat, with the job and the plan the game drew', () => {
+    const beat = parseBeat('```json\n' + JSON.stringify(good) + '\n```', ctx);
+    expect(beat).toMatchObject({
+      index: 1,
+      title: 'The Widow’s Ring',
+      npc: { name: 'Old Tomasz', gender: 'male', color: '#334455' },
+      place: { name: 'Gallows Hill', direction: 'northwest', biome: 'graveyard' },
+      job: { kind: 'slay', count: 3, targetName: 'ghoul', look: { shape: 'beast' } },
     });
-    expect(quest?.look).toEqual({ shape: 'skull', color: '#aabbcc', size: 2 });
-    expect(quest?.kind).toBe('collect');
-    expect(quest?.count).toBe(4);
-    expect(quest?.smallTalk).toEqual([{ label: 'Who are you?', reply: 'A widow.' }]);
+    expect(beat?.decisions.map((d) => d.next)).toEqual([{ kind: 'collect', count: 2 }, null]);
   });
 
-  it('reads the quest giver as male unless the model says female', () => {
-    expect(parseQuest(JSON.stringify(good), 'en')?.npcGender).toBe('male');
-    expect(parseQuest(JSON.stringify({ ...good, npcGender: 'female' }), 'en')?.npcGender).toBe('female');
+  it('keeps a returning character as they were', () => {
+    const beat = parseBeat(JSON.stringify({ ...good, npc: { name: 'marta', gender: 'male' } }), ctx);
+    expect(beat?.npc).toEqual(ctx.characters[0]);
   });
 
-  it('refuses a place the world does not have', () => {
-    expect(parseQuest(JSON.stringify({ ...good, place: { ...good.place, biome: 'volcano' } }), 'en')).toBeNull();
-    expect(parseQuest(JSON.stringify({ ...good, place: { ...good.place, direction: 'up' } }), 'en')).toBeNull();
-    expect(parseQuest(JSON.stringify({ ...good, place: undefined }), 'en')).toBeNull();
+  it('returns to an earlier place by name, and moves a new one off it', () => {
+    const keep = { name: 'Old Keep', direction: 'north', distance: 'far', biome: 'ruins', features: ['pillars'], groundColor: '#6f6a55' } as const;
+    const withPlace = { ...ctx, places: [{ ...keep, features: [...keep.features] }] };
+    expect(parseBeat(JSON.stringify({ ...good, place: { name: 'old keep' } }), withPlace)?.place?.name).toBe('Old Keep');
+    const clash = parseBeat(JSON.stringify({ ...good, place: { ...good.place, direction: 'north', distance: 'far' } }), withPlace);
+    expect(clash?.place?.name).toBe('Gallows Hill');
+    expect([clash?.place?.direction, clash?.place?.distance]).not.toEqual(['north', 'far']);
   });
 
-  it('refuses an objective the engine cannot play', () => {
-    expect(parseQuest(JSON.stringify({ ...good, kind: 'escort' }), 'en')).toBeNull();
-    expect(parseQuest(JSON.stringify({ ...good, count: 'three' }), 'en')).toBeNull();
-    expect(parseQuest(JSON.stringify({ ...good, count: null }), 'en')).toBeNull();
+  it('throws away a beat the game cannot play', () => {
+    expect(parseBeat(JSON.stringify({ ...good, npc: undefined }), ctx)).toBeNull();
+    expect(parseBeat(JSON.stringify({ ...good, place: 'village' }), ctx)).toBeNull();
+    expect(parseBeat(JSON.stringify({ ...good, targetName: '' }), ctx)).toBeNull();
+    expect(parseBeat(JSON.stringify({ ...good, decisions: good.decisions.slice(0, 1) }), ctx)).toBeNull();
+    expect(parseBeat(JSON.stringify({ ...good, situation: '' }), ctx)).toBeNull();
+    expect(parseBeat('Sorry, I cannot help with that.', ctx)).toBeNull();
   });
 
-  it('forgives a count written as a string and a capitalised place', () => {
-    const quest = parseQuest(JSON.stringify({ ...good, count: '3', kind: 'Slay' }), 'en');
-    expect(quest).toMatchObject({ count: 3, kind: 'slay' });
-    // A skull cannot be slain: the look falls back to a shape the objective can use.
-    expect(quest?.look.shape).toBe('humanoid');
+  it('lets a meeting happen in the village, and the opening name the quest', () => {
+    const talk = parseBeat(JSON.stringify({ ...good, place: 'village' }), { ...ctx, job: { kind: 'talk', count: 0 } });
+    expect(talk).toMatchObject({ place: null, job: null });
+    const opening = parseBeat(JSON.stringify(good), { ...ctx, index: 0, job: null, title: null });
+    expect(opening).toMatchObject({ title: 'Something else', place: null, job: null });
   });
 
-  it('clamps the count and fills missing lines from the hand-written quest', () => {
-    const { acceptLine: _, ...rest } = good;
-    const quest = parseQuest(JSON.stringify({ ...rest, count: 40 }), 'pl');
-    expect(quest?.count).toBe(5);
-    expect(quest?.acceptLine).toBe(staticQuest('pl').acceptLine);
-  });
-
-  it('repairs a raw line break in a string and a trailing comma', () => {
-    const broken = JSON.stringify(good).replace('lies in the ruins.', 'lies\nin the ruins.').replace(/}$/, ',}');
-    expect(parseQuest(broken, 'en')?.pitch).toBe('My husband’s ring lies in the ruins.');
-  });
-
-  it('answers null to prose', () => {
-    expect(parseQuest('Sorry, I cannot help with that.', 'en')).toBeNull();
-    expect(extractJson('{ not json }')).toBeNull();
+  it('survives a raw line break inside a string', () => {
+    const broken = JSON.stringify(good).replace('Marta sold it.', 'Marta\nsold it.');
+    expect(parseBeat(broken, ctx)?.situation).toBe('The ring was never lost. Marta sold it.');
+    expect(extractJson('{"a": 1,}')).toEqual({ a: 1 });
   });
 });
 
-describe('questPrompt', () => {
-  it('names the language and every place', () => {
-    const prompt = questPrompt('pl', 'an old debt', { kind: 'slay', count: 2 });
+describe('beatPrompt', () => {
+  it('names the language, the blocks and what each decision leads to', () => {
+    const prompt = beatPrompt({ ...ctx, lang: 'pl' });
     expect(prompt).toContain('Polish');
-    for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) {
-      expect(prompt).toContain(`"${word}"`);
-    }
+    for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) expect(prompt).toContain(`"${word}"`);
+    expect(prompt).toContain('kill 3 monsters');
+    expect(prompt).toContain('1. leads on to a step of gathering 2 things');
+    expect(prompt).toContain('2. ENDS the quest');
+    expect(prompt).toContain('The hunter decided: "I will find it."');
   });
 
-  it('hands over the job instead of offering a choice', () => {
-    const prompt = questPrompt('en', 'an old debt', { kind: 'collect', count: 5 });
-    expect(prompt).toContain('"kind": "collect"');
-    expect(prompt).toContain('"count": 5');
-    expect(prompt).toContain('"scroll"');
-    expect(prompt).not.toContain('"humanoid"');
-    expect(questPrompt('en', 'x', { kind: 'slay', count: 1 })).toContain('single dangerous creature');
+  it('tells the story what the world remembers', () => {
+    const prompt = beatPrompt({
+      ...ctx,
+      chronicle: [{ title: 'Drowners', at: 1, ending: 'The widows were paid.', steps: [{ npcName: 'Mirek', placeName: 'Lake', situation: '', chose: 'Give my pay to the widows.', consequence: 'The alderman lost face.' }] }],
+    });
+    expect(prompt).toContain('THE WORLD REMEMBERS');
+    expect(prompt).toContain('"Drowners": chose "Give my pay to the widows." (The alderman lost face.)');
   });
 });
 
-describe('pickJob', () => {
-  it('draws both kinds and every count in range', () => {
+describe('pickJob and planDecisions', () => {
+  it('draws every kind and every count in range', () => {
     const seen = new Set<string>();
-    for (let i = 0; i < 2000; i++) {
+    for (let i = 0; i < 3000; i++) {
       const job = pickJob();
       seen.add(`${job.kind}${job.count}`);
-      expect(job.count).toBeGreaterThanOrEqual(job.kind === 'slay' ? 1 : 2);
-      expect(job.count).toBeLessThanOrEqual(job.kind === 'slay' ? 4 : 5);
     }
-    expect([...seen].sort()).toEqual(['collect2', 'collect3', 'collect4', 'collect5', 'slay1', 'slay2', 'slay3', 'slay4']);
+    expect([...seen].sort()).toEqual(['collect2', 'collect3', 'collect4', 'collect5', 'slay1', 'slay2', 'slay3', 'slay4', 'talk0']);
   });
 
-  it('stays in range at the edges of the random number', () => {
-    expect(pickJob(() => 0)).toEqual({ kind: 'slay', count: 1 });
-    expect(pickJob(() => 0.9999999)).toEqual({ kind: 'collect', count: 5 });
+  it('branches early, never two ways into the same job, and always ends by the last beat', () => {
+    for (let i = 0; i < 300; i++) {
+      const opening = planDecisions(0);
+      expect(opening).toHaveLength(2);
+      expect(opening.every((j) => j !== null)).toBe(true);
+      expect(opening[0]!.kind).not.toBe(opening[1]!.kind);
+      expect(planDecisions(2)).toContain(null);
+      expect(planDecisions(MAX_BEATS - 1).every((j) => j === null)).toBe(true);
+    }
   });
 });
 
-describe('parseQuest with a job', () => {
-  it('keeps the drawn kind and count whatever the model wrote', () => {
-    const quest = parseQuest(JSON.stringify({ ...good, kind: 'collect', count: 3 }), 'en', { kind: 'slay', count: 4 });
-    expect(quest).toMatchObject({ kind: 'slay', count: 4 });
-    expect(['humanoid', 'beast', 'blob']).toContain(quest?.look.shape);
-  });
-
-  it('does not need the model to repeat them', () => {
-    const { kind: _k, count: _c, ...rest } = good;
-    expect(parseQuest(JSON.stringify(rest), 'en', { kind: 'collect', count: 2 })).toMatchObject({ kind: 'collect', count: 2 });
+describe('staticBeat', () => {
+  it('opens in the village and ends at the lake either way', () => {
+    for (const lang of ['en', 'pl'] as const) {
+      const opening = staticBeat(lang, 0);
+      expect(opening.place).toBeNull();
+      expect(opening.decisions.map((d) => d.next?.kind ?? null)).toEqual(['slay', null]);
+      const lake = staticBeat(lang, 1);
+      expect(lake.job).toMatchObject({ kind: 'slay', count: 3 });
+      expect(lake.decisions.every((d) => d.next === null)).toBe(true);
+    }
   });
 });
