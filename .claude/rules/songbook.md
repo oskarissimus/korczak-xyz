@@ -80,6 +80,13 @@ file without a lookup table of its own.
 new name, and the manifest commit is what points the page at it, so no cache ever has to be
 purged. The old object can be left in the bucket or deleted by hand.
 
+**A video reached by a click needs `load()` again.** `ClientRouter` parses the next page in a
+DOMParser document before moving it in, and Chromium starts a `<video src>` loading the moment
+it is parsed — where, with no window, it fails with *Media load rejected by URL safety check*
+and never retries after the move. Every song opened from the list showed a dead player until a
+reload; the iframe never had this. The `astro:after-swap` handler in `Layout.astro` calls
+`load()` on any video carrying an error, which with `preload="none"` downloads nothing.
+
 **Offline** the video is as unavailable as the iframe was: the service worker never touches
 cross-origin requests (`src/sw/routing.js`), and `media.korczak.xyz` is one. The
 `.video-embed.is-offline` overlay covers both. Caching a 10–45 MB file per song would be an

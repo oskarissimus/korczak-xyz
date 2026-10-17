@@ -965,6 +965,18 @@ const recoveryStrings = {
     updateTaskbarVisibility();
   });
 
+  // ClientRouter builds the next page in a DOMParser document and then moves it in. Chromium
+  // starts a <video src>'s load algorithm the moment the element is parsed, and in a document
+  // with no window that fails its URL check ("Media load rejected by URL safety check"); moving
+  // the element into the live page does not try again. So every songbook video reached by a
+  // click was dead until a reload. load() restarts it here, and with preload="none" it fetches
+  // nothing until play is pressed.
+  document.addEventListener('astro:after-swap', () => {
+    document.querySelectorAll('video').forEach(video => {
+      if (video.error) video.load();
+    });
+  });
+
   // Close button functionality
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
