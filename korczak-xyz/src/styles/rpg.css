@@ -252,3 +252,42 @@
   color: #f1e6cf;
   cursor: pointer;
 }
+
+.rpg-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.rpg-lang button {
+  padding: 4px 14px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.4);
+  color: #e6dcc6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpg-lang button.rpg-lang-on {
+  border-color: #ffd36b;
+  color: #ffd36b;
+  background: #3a2c18;
+}
+
+ul.rpg-source {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  line-height: 1.6;
+}
+
+.rpg-voice {
+  position: absolute;
+  bottom: 10px;
+  right: 52px;
+  padding: 2px 8px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}

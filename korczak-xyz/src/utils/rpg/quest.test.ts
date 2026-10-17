@@ -28,6 +28,11 @@ describe('parseQuest', () => {
     expect(quest?.smallTalk).toEqual([{ label: 'Who are you?', reply: 'A widow.' }]);
   });
 
+  it('reads the quest giver as male unless the model says female', () => {
+    expect(parseQuest(JSON.stringify(good), 'en')?.npcGender).toBe('male');
+    expect(parseQuest(JSON.stringify({ ...good, npcGender: 'female' }), 'en')?.npcGender).toBe('female');
+  });
+
   it('refuses a place the world does not have', () => {
     expect(parseQuest(JSON.stringify({ ...good, location: 'mountains' }), 'en')).toBeNull();
   });

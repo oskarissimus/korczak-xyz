@@ -36,6 +36,26 @@ the whole user turn), OpenAI `gpt-4o-mini` only without a Google key. No key, a 
 timeout (25s) or an unusable answer all play the hand-written quest; the intro screen says which
 one you got.
 
+**Nothing decides "no key" before the account has answered.** A signed-in reader's keys may be in
+`users/{uid}/keys/config` and not yet in this browser, so Start stays disabled until `useAuth` has
+resolved and the key sync is `synced` or `error` (signed out: as soon as localStorage is read). The
+first version generated the moment localStorage was read, which on a fresh browser was always the
+hand-written quest.
+
+## Language
+
+Asked on the intro screen (Polski / English), starting from the page's locale. It sets the game's
+UI, the language the quest is written in, and ElevenLabs' `language_code`. The quest is generated
+on Start, not on load, so the choice is what the model is asked for.
+
+## Voice
+
+The quest giver speaks every line through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`)
+when the store holds an ElevenLabs key; the quest's `npcGender` picks George or Rachel. One audio
+element primed inside the Start click (the iOS unlock, see `backseat.md`), clips cached by text so
+going back through a menu costs nothing, a newer line stops the one playing, and a 🔊 button mutes
+it. A failed clip is a toast and the line stays readable; it never blocks the dialogue.
+
 ## Debugging
 
 `window.rpg.scene` (teleport, facePosition, attack, interact) and `window.rpg.state()` exist for

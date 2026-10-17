@@ -14,6 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { staticQuest, type Lang, type Quest } from '../../utils/rpg/quest';
 import { generateQuest, type QuestSource } from '../../utils/rpg/storyteller';
+import { primeVoice, speakLine, stopVoice } from '../../utils/rpg/voice';
 import { RpgScene } from './RpgScene';
 import { translations } from './translations';
 
@@ -36,16 +37,28 @@ declare global {
 }
 
 export default function Rpg({ lang }: { lang: Lang }) {
-  const t = translations[lang];
+  // The game's language is asked on the intro screen; the page's is only where it starts.
+  const [gameLang, setGameLang] = useState<Lang>(lang);
+  const t = translations[gameLang];
+  const tRef = useRef(t);
+  tRef.current = t;
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
+  // A signed-in reader's keys may be in the account and not yet in this browser, so nothing decides
+  // "no key" before the account has answered — or failed to.
+  const keysReady =
+    account.ready &&
+    !auth.loading &&
+    (!auth.user || account.sync === 'synced' || account.sync === 'error');
+  const storyProvider: QuestSource = account.keys.google ? 'google' : account.keys.openai ? 'openai' : 'static';
+  const voiceKey = account.keys.elevenLabs;
+  const [voiceOn, setVoiceOn] = useState(true);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<RpgScene | null>(null);
 
   const [quest, setQuest] = useState<Quest | null>(null);
-  const [source, setSource] = useState<QuestSource>('static');
   const [questState, setQuestState] = useState<QuestState>('available');
   const [progress, setProgress] = useState(0);
   const [dialogue, setDialogue] = useState<{ line: DialogueLine; choices: Choice[] } | null>(null);
@@ -77,10 +90,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const loadQuest = useCallback(async () => {
     setGenerating(true);
     const keys = { google: account.keys.google, openai: account.keys.openai };
-    let next: Quest = staticQuest(lang);
+    let next: Quest = staticQuest(gameLang);
     let from: QuestSource = 'static';
     try {
-      const generated = await generateQuest(keys, lang);
+      const generated = await generateQuest(keys, gameLang);
       if (generated) {
         next = generated.quest;
         from = generated.source;
@@ -91,20 +104,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
       log.warn('rpg.quest.failed', describeError(e));
     }
     setQuest(next);
-    setSource(from);
     setQuestState('available');
     setProgress(0);
     sceneRef.current?.clearObjective();
     sceneRef.current?.setMarker('npc');
     setGenerating(false);
-  }, [account.keys.google, account.keys.openai, lang]);
-
-  const loadedRef = useRef(false);
-  useEffect(() => {
-    if (!account.ready || loadedRef.current) return;
-    loadedRef.current = true;
-    void loadQuest();
-  }, [account.ready, loadQuest]);
+    if (from === 'static' && (keys.google || keys.openai)) flash(tRef.current.storyFailed);
+  }, [account.keys.google, account.keys.openai, flash, gameLang]);
 
   // --- the scene ----------------------------------------------------------------------------------
 
@@ -127,7 +133,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         }
       },
       onHealth: setHp,
-      onDeath: () => flash(translations[lang].died),
+      onDeath: () => flash(tRef.current.died),
       onCompass: (angle, distance) => setCompass(angle === null ? null : { angle, distance }),
       onLockChange: setLocked,
     });
@@ -153,7 +159,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       sceneRef.current = null;
       delete window.rpg;
     };
-  }, [flash, lang]);
+  }, [flash]);
 
   // The world stands still whenever something other than walking has the reader's attention.
   useEffect(() => {
@@ -247,10 +253,25 @@ export default function Rpg({ lang }: { lang: Lang }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [close, dialogue]);
 
+  // The quest giver speaks every line he says, when there is an ElevenLabs key.
+  const spoken = dialogue?.line.text ?? null;
+  useEffect(() => {
+    if (!spoken || !voiceOn || !voiceKey || !quest) {
+      stopVoice();
+      return;
+    }
+    speakLine(voiceKey, spoken, quest.npcGender, gameLang).catch((e) => {
+      log.warn('rpg.voice.failed', describeError(e));
+      flash(tRef.current.voiceFailed);
+    });
+  }, [flash, gameLang, quest, spoken, voiceKey, voiceOn]);
+  useEffect(() => stopVoice, []);
+
   const begin = () => {
+    // Inside the click: iOS lets only an element a gesture touched play audio later.
+    primeVoice();
     setStarted(true);
-    sceneRef.current?.setPaused(false);
-    sceneRef.current?.requestLock();
+    void loadQuest();
   };
 
   const newQuest = async () => {
@@ -341,17 +362,35 @@ export default function Rpg({ lang }: { lang: Lang }) {
             <li><kbd>LMB</kbd> {t.attack}</li>
             <li><kbd>E</kbd> {t.interact}</li>
           </ul>
-          <p className="rpg-source">
-            {generating ? t.writing : source === 'static' ? t.staticQuest : t.aiQuest(source)}
-            {!generating && source === 'static' && (
-              <>
-                {' '}
-                <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{t.addKey}</a>
-              </>
-            )}
-          </p>
-          <button type="button" className="rpg-start" disabled={generating || !quest} onClick={begin}>
-            {generating ? t.wait : t.start}
+          <div className="rpg-lang" role="group" aria-label={t.language}>
+            <span>{t.language}:</span>
+            {(['pl', 'en'] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={l === gameLang ? 'rpg-lang-on' : ''}
+                aria-pressed={l === gameLang}
+                onClick={() => setGameLang(l)}
+              >
+                {l === 'pl' ? 'Polski' : 'English'}
+              </button>
+            ))}
+          </div>
+          {keysReady ? (
+            <ul className="rpg-source">
+              <li>{storyProvider === 'static' ? t.staticQuest : t.aiQuest(storyProvider)}</li>
+              <li>{voiceKey ? t.voiceOn : t.voiceOff}</li>
+              {(storyProvider === 'static' || !voiceKey) && (
+                <li>
+                  <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{t.addKey}</a>
+                </li>
+              )}
+            </ul>
+          ) : (
+            <p className="rpg-source">{t.readingKeys}</p>
+          )}
+          <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
+            {keysReady ? t.start : t.wait}
           </button>
         </div>
       )}
@@ -366,7 +405,23 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </div>
       )}
 
-      {started && generating && <div className="rpg-toast">{t.writing}</div>}
+      {started && generating && (
+        <div className="rpg-overlay">
+          <p>{t.writing}</p>
+        </div>
+      )}
+
+      {started && voiceKey && (
+        <button
+          type="button"
+          className="rpg-voice"
+          onClick={() => setVoiceOn((on) => !on)}
+          title={voiceOn ? t.mute : t.unmute}
+          aria-pressed={voiceOn}
+        >
+          {voiceOn ? '🔊' : '🔇'}
+        </button>
+      )}
 
       <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
         ⛶

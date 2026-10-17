@@ -29,6 +29,8 @@ export interface DialogueOption {
 export interface Quest {
   title: string;
   npcName: string;
+  /** Picks the quest giver's voice. */
+  npcGender: 'male' | 'female';
   greeting: string;
   /** Asked about the work, the NPC says this; the player may then accept or turn it down. */
   pitch: string;
@@ -57,6 +59,7 @@ export function staticQuest(lang: Lang): Quest {
     return {
       title: 'Utopce znad jeziora',
       npcName: 'Sołtys Bogumił',
+      npcGender: 'male',
       greeting: 'Wiedźmin? We wsi? Bogom niech będą dzięki. Mamy kłopot, panie.',
       pitch:
         'Nad jeziorem na wschodzie zalęgły się utopce. Trzy sztuki, może więcej. Dziewki boją się chodzić po wodę. Zapłacę uczciwie, jeśli się z nimi rozprawisz.',
@@ -85,6 +88,7 @@ export function staticQuest(lang: Lang): Quest {
   return {
     title: 'Drowners by the Lake',
     npcName: 'Alderman Bogumil',
+    npcGender: 'male',
     greeting: 'A witcher? In our village? Thank the gods. We have trouble, sir.',
     pitch:
       'Drowners have nested by the lake to the east. Three of them, maybe more. The girls are afraid to fetch water. I will pay honest coin if you deal with them.',
@@ -137,7 +141,8 @@ export function questPrompt(lang: Lang, seed: string): string {
     '',
     'Answer with ONE JSON object and nothing else, no markdown fence, with these keys:',
     '{',
-    '  "title": string, "npcName": string, "greeting": string, "pitch": string,',
+    '  "title": string, "npcName": string, "npcGender": "male" or "female",',
+    '  "greeting": string, "pitch": string,',
     '  "smallTalk": [{"label": string, "reply": string}, {"label": string, "reply": string}],',
     '  "acceptLine": string, "declineLine": string, "waitingLine": string, "completeLine": string,',
     '  "objectiveText": string,',
@@ -219,6 +224,7 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
   return {
     title,
     npcName: text(r.npcName, 60) ?? fallback.npcName,
+    npcGender: r.npcGender === 'female' ? 'female' : 'male',
     greeting: text(r.greeting) ?? fallback.greeting,
     pitch,
     smallTalk,
