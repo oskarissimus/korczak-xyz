@@ -103,6 +103,9 @@
   font-size: 14px;
   pointer-events: none;
   white-space: nowrap;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rpg-hint {
@@ -290,4 +293,9 @@ ul.rpg-source {
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);
   cursor: pointer;
+}
+
+.rpg-toast {
+  white-space: normal;
+  text-align: center;
 }

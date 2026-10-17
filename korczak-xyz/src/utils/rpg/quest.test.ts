@@ -40,6 +40,12 @@ describe('parseQuest', () => {
   it('refuses an objective the engine cannot play', () => {
     expect(parseQuest(JSON.stringify({ ...good, kind: 'escort' }), 'en')).toBeNull();
     expect(parseQuest(JSON.stringify({ ...good, count: 'three' }), 'en')).toBeNull();
+    expect(parseQuest(JSON.stringify({ ...good, count: null }), 'en')).toBeNull();
+  });
+
+  it('forgives a count written as a string and a capitalised place', () => {
+    const quest = parseQuest(JSON.stringify({ ...good, count: '3', location: 'Ruins ', kind: 'Slay' }), 'en');
+    expect(quest).toMatchObject({ count: 3, location: 'ruins', kind: 'slay' });
   });
 
   it('clamps the count and fills missing lines from the hand-written quest', () => {
@@ -47,6 +53,11 @@ describe('parseQuest', () => {
     const quest = parseQuest(JSON.stringify({ ...rest, count: 40 }), 'pl');
     expect(quest?.count).toBe(5);
     expect(quest?.acceptLine).toBe(staticQuest('pl').acceptLine);
+  });
+
+  it('repairs a raw line break in a string and a trailing comma', () => {
+    const broken = JSON.stringify(good).replace('lies in the ruins.', 'lies\nin the ruins.').replace(/}$/, ',}');
+    expect(parseQuest(broken, 'en')?.pitch).toBe('My husband’s ring lies in the ruins.');
   });
 
   it('answers null to prose', () => {

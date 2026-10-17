@@ -178,10 +178,17 @@ export function extractJson(reply: string): unknown {
   const start = reply.indexOf('{');
   const end = reply.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
+  const body = reply.slice(start, end + 1);
   try {
-    return JSON.parse(reply.slice(start, end + 1));
+    return JSON.parse(body);
   } catch {
-    return null;
+    // The two ways a model's JSON is usually broken: a raw line break inside a string (Gemma does
+    // this with long lines), and a trailing comma. Outside strings both repairs are harmless.
+    try {
+      return JSON.parse(body.replace(/[\u0000-\u001f]+/g, ' ').replace(/,\s*([}\]])/g, '$1'));
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -195,11 +202,13 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
 
-  const location = r.location;
-  if (typeof location !== 'string' || !(LOCATIONS as readonly string[]).includes(location)) return null;
-  if (r.kind !== 'collect' && r.kind !== 'slay') return null;
-  const count = typeof r.count === 'number' ? Math.round(r.count) : Number.NaN;
-  if (!Number.isFinite(count)) return null;
+  // Case and a stray space are forgiven, and a count written as "3": models do both.
+  const location = typeof r.location === 'string' ? r.location.trim().toLowerCase() : '';
+  if (!(LOCATIONS as readonly string[]).includes(location)) return null;
+  const kind = typeof r.kind === 'string' ? r.kind.trim().toLowerCase() : '';
+  if (kind !== 'collect' && kind !== 'slay') return null;
+  const count = Math.round(Number(r.count));
+  if (!Number.isFinite(count) || r.count === null || r.count === '') return null;
 
   const fallback = staticQuest(lang);
   const smallTalk = Array.isArray(r.smallTalk)
@@ -234,7 +243,7 @@ export function parseQuest(reply: string, lang: Lang): Quest | null {
     completeLine: text(r.completeLine) ?? fallback.completeLine,
     objectiveText,
     location: location as LocationId,
-    kind: r.kind,
+    kind,
     targetName,
     count: Math.min(MAX_COUNT, Math.max(MIN_COUNT, count)),
   };

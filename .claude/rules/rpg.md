@@ -31,10 +31,22 @@ The dialogue is a menu of lines the quest already contains, not a chat: talking 
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
-them. Google first, on `gemma-3-27b-it` (free on AI Studio; no `systemInstruction`, so the prompt is
-the whole user turn), OpenAI `gpt-4o-mini` only without a Google key. No key, a failed request, a
-timeout (25s) or an unusable answer all play the hand-written quest; the intro screen says which
-one you got.
+them. Google first, OpenAI `gpt-4o-mini` only without a Google key. On Google the models are tried
+in order (`GOOGLE_MODELS` in `storyteller.ts`): `gemini-flash-lite-latest` and
+`gemini-flash-latest` in JSON mode, then `gemma-3-27b-it` (no JSON mode, no `systemInstruction`).
+A 404, a 429 (quotas are per model) or a 400 naming the model moves to the next; so does an answer
+`parseQuest` cannot play. Anything else — a rejected key, a timeout (45s) — ends it. No key or no
+usable answer plays the hand-written quest, and **the reason is put on screen** in a toast.
+
+**Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into
+a breadcrumb and the only symptom, reported by the owner, was "always the drowners":
+
+- Sentry Logs, `rpg.quest`: outcome (`generated`, `no-key`, `unusable`, `failed`), provider, model,
+  ms, each try's model and status. Sent signed out too. Never the prompt or the story.
+- For a signed-in account, `gs://korczak-xyz-501720-backseat/users/{uid}/rpg/quests/{at}.json`:
+  the prompt, the raw answer, every model tried with its error, the parsed quest, the release. The
+  backseat driver's bucket, because its `users/{uid}/**` rule already covers it; a bucket of the
+  RPG's own is a Terraform change for later. Read these before guessing at a bad quest.
 
 **Nothing decides "no key" before the account has answered.** A signed-in reader's keys may be in
 `users/{uid}/keys/config` and not yet in this browser, so Start stays disabled until `useAuth` has

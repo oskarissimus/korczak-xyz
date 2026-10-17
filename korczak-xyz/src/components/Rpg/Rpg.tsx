@@ -13,6 +13,7 @@ import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { staticQuest, type Lang, type Quest } from '../../utils/rpg/quest';
+import { recordQuest } from '../../utils/rpg/questLog';
 import { generateQuest, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine } from '../../utils/rpg/voice';
 import { RpgScene } from './RpgScene';
@@ -44,6 +45,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   tRef.current = t;
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = auth.user?.uid ?? null;
   // A signed-in reader's keys may be in the account and not yet in this browser, so nothing decides
   // "no key" before the account has answered — or failed to.
   const keysReady =
@@ -84,9 +87,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** What the hunter just chose, to be said before the answer to it. */
   const chosenRef = useRef<string | null>(null);
 
-  const flash = useCallback((text: string) => {
+  const flash = useCallback((text: string, ms = 2600) => {
     setToast(text);
-    window.setTimeout(() => setToast((current) => (current === text ? null : current)), 2600);
+    window.setTimeout(() => setToast((current) => (current === text ? null : current)), ms);
   }, []);
 
   // --- the quest ----------------------------------------------------------------------------------
@@ -96,17 +99,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     spokenRef.current.clear();
     const keys = { google: account.keys.google, openai: account.keys.openai };
     let next: Quest = staticQuest(gameLang);
-    let from: QuestSource = 'static';
+    let failure: string | null = null;
     try {
-      const generated = await generateQuest(keys, gameLang);
-      if (generated) {
-        next = generated.quest;
-        from = generated.source;
-      } else if (keys.google || keys.openai) {
-        log.warn('rpg.quest.unusable', {});
-      }
+      const attempt = await generateQuest(keys, gameLang);
+      recordQuest(uidRef.current, attempt, gameLang);
+      if (attempt.quest) next = attempt.quest;
+      else if (attempt.outcome !== 'no-key') failure = attempt.error ?? attempt.outcome;
     } catch (e) {
-      log.warn('rpg.quest.failed', describeError(e));
+      log.warn('rpg.quest.crashed', describeError(e));
+      failure = e instanceof Error ? e.message : String(e);
     }
     setQuest(next);
     setQuestState('available');
@@ -114,7 +115,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     sceneRef.current?.clearObjective();
     sceneRef.current?.setMarker('npc');
     setGenerating(false);
-    if (from === 'static' && (keys.google || keys.openai)) flash(tRef.current.storyFailed);
+    // Said on screen, with the provider's own reason: "always the drowners" with no explanation
+    // is how the first version failed.
+    if (failure) flash(`${tRef.current.storyFailed} (${failure.slice(0, 160)})`, 9000);
   }, [account.keys.google, account.keys.openai, flash, gameLang]);
 
   // --- the scene ----------------------------------------------------------------------------------
