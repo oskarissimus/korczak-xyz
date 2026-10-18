@@ -13,6 +13,11 @@
  * (`devlog.ts`), with its tokens and approximate cost, so a slow beat can be watched being written
  * rather than waited out.
  *
+ * With no key of the reader's own, the demo (`demo.ts`) when it is open: the same Google models,
+ * asked through our function on the owner's key, inside a budget in dollars. Its stream is Google's
+ * own, read by the same code. A demo cap reached moves to the next, cheaper model, which may still
+ * fit what is left; the demo switched off ends the attempt.
+ *
  * Every call comes back as a `StoryAttempt` — the prompt, each model tried, the raw answer, the
  * error — whether it worked or not, so the caller can record it (`questLog.ts`). The first version
  * returned null on any failure and logged a breadcrumb nobody could read, and the only symptom was
@@ -22,6 +27,8 @@
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
 import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
+import { demoRefusal, rpgDemoUrl } from './demo';
+import { DEMO_MODELS, type RpgDemoReason } from './demoLimits';
 
 // The strongest first (owner, Oct 2026: "the better model first, and a fallback; we will move to a
 // cheaper one when we optimise for cost"). Flash-Lite, first until then, wrote briefings and slid
@@ -69,9 +76,11 @@ const MODEL_MS = 180_000;
 export interface StoryKeys {
   google: string | null;
   openai: string | null;
+  /** No key of the reader's own, and the demo is open: write on the owner's, through `demo.ts`. */
+  demo?: boolean;
 }
 
-export type QuestSource = 'google' | 'openai' | 'static';
+export type QuestSource = 'google' | 'openai' | 'demo' | 'static';
 
 export type StoryOutcome = 'generated' | 'no-key' | 'unusable' | 'failed';
 
@@ -105,6 +114,8 @@ export interface StoryAttempt {
   error: string | null;
   ms: number;
   beat: Beat | null;
+  /** Why the demo said no, when it did: a cap for the day or the demo switched off. */
+  refusal: RpgDemoReason | null;
 }
 
 class ProviderError extends Error {
@@ -112,6 +123,7 @@ class ProviderError extends Error {
     message: string,
     readonly status: number | null,
     readonly timedOut = false,
+    readonly refusal: RpgDemoReason | null = null,
   ) {
     super(message);
   }
@@ -242,6 +254,38 @@ async function askGoogle(key: string, model: string, prompt: string, dog: Watchd
     }),
   });
   if (!response.ok) throw new ProviderError(await errorText(response), response.status);
+  return readGoogle(response, dog, entry);
+}
+
+/**
+ * The demo: the context goes to our function, which builds the same prompt and passes Google's
+ * stream back byte for byte. A refusal of its own carries a `reason`; anything else is Google's.
+ */
+async function askDemo(model: string, ctx: BeatContext, dog: Watchdog, entry: DevRequest): Promise<string> {
+  const url = rpgDemoUrl();
+  if (!url) throw new ProviderError('demo: no address', null, false, 'disabled');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: dog.controller.signal,
+    body: JSON.stringify({ kind: 'beat', model, ctx }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      /* not JSON: Google's or a proxy's */
+    }
+    const refusal = demoRefusal(parsed);
+    const message = (parsed as { error?: { message?: string } } | null)?.error?.message || body.slice(0, 500);
+    throw new ProviderError(message, response.status, false, refusal);
+  }
+  return readGoogle(response, dog, entry);
+}
+
+async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest): Promise<string> {
   let text = '';
   let why: string | null = null;
   await readEvents(response, dog, (data) => {
@@ -301,6 +345,8 @@ async function askOpenAi(key: string, prompt: string, dog: Watchdog, entry: DevR
  */
 function tryNext(e: unknown): boolean {
   if (!(e instanceof ProviderError)) return false;
+  // A cap is a dollar amount, and the next model in the chain is cheaper and may still fit it.
+  if (e.refusal) return e.refusal === 'ip-cap' || e.refusal === 'all-cap';
   return (
     e.timedOut ||
     e.status === 404 ||
@@ -315,8 +361,12 @@ function describe(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** The order to ask in: the chosen model first, then the usual order for that provider. */
-export function modelChain(provider: 'google' | 'openai', chosen: string | null): string[] {
+/**
+ * The order to ask in: the chosen model first, then the usual order for that provider. The demo is
+ * Google's list, less anything the function does not offer.
+ */
+export function modelChain(provider: 'google' | 'openai' | 'demo', chosen: string | null): string[] {
+  if (provider === 'demo') return modelChain('google', chosen).filter((m) => (DEMO_MODELS as readonly string[]).includes(m));
   const usual = provider === 'google' ? GOOGLE_MODELS : [OPENAI_MODEL];
   const pick = MODEL_CHOICES.find((m) => m.id === chosen && m.provider === provider);
   return pick ? [pick.id, ...usual.filter((m) => m !== pick.id)] : usual;
@@ -325,7 +375,7 @@ export function modelChain(provider: 'google' | 'openai', chosen: string | null)
 export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: string | null = null): Promise<StoryAttempt> {
   const started = Date.now();
   const prompt = beatPrompt(ctx);
-  const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : 'static';
+  const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : keys.demo ? 'demo' : 'static';
   const attempt: StoryAttempt = {
     outcome: 'no-key',
     provider,
@@ -340,6 +390,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
     error: null,
     ms: 0,
     beat: null,
+    refusal: null,
   };
   if (provider === 'static') return attempt;
 
@@ -355,7 +406,9 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
         attempt.raw =
           provider === 'google'
             ? await askGoogle(keys.google!, model, prompt, dog, entry)
-            : await askOpenAi(keys.openai!, prompt, dog, entry);
+            : provider === 'demo'
+              ? await askDemo(model, ctx, dog, entry)
+              : await askOpenAi(keys.openai!, prompt, dog, entry);
       } catch (e) {
         throw dog.wrap(e);
       } finally {
@@ -372,6 +425,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
     } catch (e) {
       endRequest(entry, describe(e));
       record(e instanceof ProviderError ? e.status : null, describe(e));
+      if (e instanceof ProviderError && e.refusal) attempt.refusal = e.refusal;
       if (attempt.outcome !== 'unusable') {
         attempt.outcome = 'failed';
         attempt.error = describe(e);
@@ -384,6 +438,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
   if (attempt.beat) {
     attempt.outcome = 'generated';
     attempt.error = null;
+    attempt.refusal = null;
   }
   return attempt;
 }

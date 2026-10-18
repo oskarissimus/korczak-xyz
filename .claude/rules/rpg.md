@@ -1,11 +1,12 @@
 ---
 name: rpg
-description: The 3D RPG at /apps/rpg/ (Wanderer / Wędrowiec) - quests written one beat at a time after each decision, the branching the game draws, the chronicle, the blocks places are built from, parseBeat as the boundary, the keys it reads.
+description: The 3D RPG at /apps/rpg/ (Wanderer / Wędrowiec) - quests written one beat at a time after each decision, the branching the game draws, the chronicle, the blocks places are built from, parseBeat as the boundary, the keys it reads, the demo on the owner's keys with its dollar caps.
 paths:
   - "**/components/Rpg/**"
   - "**/utils/rpg/**"
   - "**/pages/**/rpg.astro"
   - "**/styles/rpg.css"
+  - "functions/src/rpg/**"
 ---
 
 # The RPG
@@ -211,6 +212,56 @@ a breadcrumb and the only symptom, reported by the owner, was "always the drowne
 resolved and the key sync is `synced` or `error` (signed out: as soon as localStorage is read). The
 first version generated the moment localStorage was read, which on a fresh browser was always the
 hand-written quest.
+
+## The demo: no key, no account, the owner's keys
+
+Owner, Oct 2026: "a demo, so you can play without your own key and without an account — say at
+most $4 per user per day, and $10 a day across everybody so I do not go broke". A reader with no
+Google or OpenAI key of their own plays on the owner's, through **`rpgDemo`**, the game's one
+server call (`functions/src/rpg/handler.ts`, gen-2 in `europe-central2`, 300s for a streamed Pro
+beat). A key of the reader's own always wins; the demo is never asked for one.
+
+**It is the roaster's demo again** (`backseat.md`, *The demo*), and shares its pieces: the switch
+and the paying account in `demo/config` (`enabled`, `keyUid`; the RPG's own switch is
+`apps.rpg`, on unless `false`), the keys read at call time from that account's
+`users/{uid}/keys/config` and never named in an answer, the Warsaw day (`dayKey`), the day-keyed
+address hash (`ipKey`, the last `x-forwarded-for` hop), `ALLOWED_ORIGINS`, and no
+Firestore rule on `demoUsage` because only the Admin SDK touches it.
+
+**The budget is dollars, not calls** (`utils/rpg/demoLimits.ts`, compiled into both runtimes):
+`rpgPerIpUsd` (default 4, at most 20) per address and `rpgDailyUsd` (default 10, at most 50) for
+everybody, in `demoUsage/rpg-{day}` and its `ips/{hash}`. A Pro beat costs ten Flash-Lite ones and
+a clip costs by its length, so a count would be wrong one way or the other. **Every call reserves
+its worst case in a transaction before it is made** — every prompt character as a token plus the
+whole 16384-token output budget, at the model's price (`beatReservation`; aliases priced as what
+answered them, `PRICED_AS`) — and is **settled** afterwards at what `usageMetadata` says it cost.
+So the caps cannot be passed, only approached. A Google refusal costs nothing; a stream cut
+before its usage arrived keeps the whole reservation, which errs the owner's way.
+
+- **The prompt is built on the server.** The game sends the `BeatContext`, never a prompt;
+  `demoContext` checks it field by field and cuts every string and list to what the game itself
+  sends, and `beatPrompt` builds the prompt from that. The model must be on `DEMO_MODELS` (the
+  picker's Google ids; a test keeps the two equal). The answer is still parsed by `parseBeat` in
+  the browser against the game's own context.
+- **The stream is Google's, byte for byte.** The function pipes `streamGenerateContent?alt=sse`
+  straight through, so `storyteller.ts` reads a demo beat with the code that reads a keyed one
+  (`readGoogle`) and the console and the waiting screen work unchanged.
+- **A refusal is 402 for a cap and 503 for closed**, with `reason` in the body — never 429, which
+  is what Google says about one model's quota. A cap moves the game to the **next, cheaper model**
+  (Pro's worst case is ~$0.20, Flash-Lite's ~$0.04, Gemma's nothing), which may still fit what is
+  left; closed ends the attempt. Google's own errors are passed on with Google's status and move
+  on as they would on a key.
+- **The voice goes through it too**, `{kind:'voice'}`: one line of at most 400 characters in one of
+  the three voices, priced before it is made at the list rate (`clipCost`). `DEMO_VOICE_KEY` in
+  `voice.ts` stands in for an ElevenLabs key. Only a demo quest speaks on the demo; a reader with
+  their own Google key and no ElevenLabs key stays silent.
+- **The intro asks first** (`GET`, `fetchRpgDemoStatus`): whether it is open, whether the paying
+  account can speak, and what is left today, which is printed. Asked again at a quest's end. A
+  quest cut short by a cap ends on the decision made, with the reason on the ending screen
+  (`Ending.cut`) — the toast is under that overlay.
+
+Not written down anywhere else: nothing on the admin panel sets the two dollar caps yet, so the
+defaults apply until `rpgPerIpUsd`/`rpgDailyUsd` are written into `demo/config` by hand.
 
 ## The autosave
 

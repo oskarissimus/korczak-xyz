@@ -22,6 +22,7 @@ import { runTransitCollection } from './transit/collect';
 import { configureWebPush, sendTo } from './push';
 import { handleAssembleVideo } from './sloper/handler';
 import { handleRoastDemo } from './demo/handler';
+import { handleRpgDemo } from './rpg/handler';
 import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
@@ -267,4 +268,19 @@ export const roastDemo = onRequest(
     cors: false,
   },
   handleRoastDemo,
+);
+
+// The RPG's demo: a stranger with no account and no key plays on the owner's keys, inside a budget
+// in dollars (`utils/rpg/demoLimits.ts`). Five minutes because a beat on Pro is streamed through
+// it, and Pro thinks for a minute or two before it writes.
+export const rpgDemo = onRequest(
+  {
+    region: REGION,
+    memory: '256MiB',
+    timeoutSeconds: 300,
+    concurrency: 8,
+    maxInstances: 4,
+    cors: false,
+  },
+  handleRpgDemo,
 );

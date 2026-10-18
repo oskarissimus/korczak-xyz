@@ -30,6 +30,8 @@ import {
   type Lang,
   type StepRecord,
 } from '../../utils/rpg/quest';
+import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
+import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
@@ -66,6 +68,8 @@ interface Ending {
   speaker: string;
   text: string;
   steps: StepRecord[];
+  /** Why the story stopped here rather than ending, when it did: the toast is under this screen. */
+  cut?: string;
 }
 
 interface Written {
@@ -111,8 +115,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     account.ready &&
     !auth.loading &&
     (!auth.user || account.sync === 'synced' || account.sync === 'error');
-  const storyProvider: QuestSource = account.keys.google ? 'google' : account.keys.openai ? 'openai' : 'static';
-  const voiceKey = account.keys.elevenLabs;
+  const ownStory = Boolean(account.keys.google || account.keys.openai);
+  // With no key of the reader's own, the demo on the owner's (`utils/rpg/demo.ts`), while it is open.
+  const [demo, setDemo] = useState<RpgDemoStatus | null>(null);
+  const storyProvider: QuestSource = account.keys.google
+    ? 'google'
+    : account.keys.openai
+      ? 'openai'
+      : demo?.available
+        ? 'demo'
+        : 'static';
+  const voiceKey = account.keys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
   const [voiceOn, setVoiceOn] = useState(true);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,6 +158,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // What the demo has left today, asked on the intro screen and again at a quest's end — never by
+  // a reader with a key of their own, who does not need it.
+  const askDemo = keysReady && !ownStory && (!started || ending !== null);
+  useEffect(() => {
+    if (!askDemo) return;
+    const controller = new AbortController();
+    void fetchRpgDemoStatus(controller.signal).then((status) => {
+      if (!controller.signal.aborted) setDemo(status);
+    });
+    return () => controller.abort();
+  }, [askDemo]);
   /** The opening is being written. */
   const [generating, setGenerating] = useState(false);
   /** A decision was made and its next beat is not written yet. */
@@ -228,7 +252,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const writeBeat = useCallback(
     async (index: number, job: Job | null, steps: StepRecord[], title: string | null): Promise<Written> => {
       if (staticRef.current) return { beat: staticBeat(gameLang, index), failure: null };
-      const keys = { google: account.keys.google, openai: account.keys.openai };
+      const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
       const chosen = chosenModelRef.current;
       const done = watchBeat(index, gameLang, chosen);
       try {
@@ -247,6 +271,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
         if (attempt.beat) return { beat: attempt.beat, failure: null };
+        if (attempt.refusal) return { beat: null, failure: tRef.current.demoClosed(attempt.refusal) };
         return { beat: null, failure: attempt.outcome === 'no-key' ? null : (attempt.error ?? attempt.outcome) };
       } catch (e) {
         log.error('rpg.beat.crashed', describeError(e));
@@ -255,7 +280,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         done();
       }
     },
-    [account.keys.google, account.keys.openai, gameLang],
+    [account.keys.google, account.keys.openai, gameLang, storyProvider],
   );
 
   /** Puts a beat into the world: its place, its character, its job, and the marker. */
@@ -426,8 +451,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
         return;
       }
       // A quest that cannot go on still ends on the decision the hunter made, not on an error.
-      flash(`${tRef.current.trailCold} (${(failure ?? '').slice(0, 160)})`, 9000);
+      const cut = `${tRef.current.trailCold} (${(failure ?? '').slice(0, 160)})`;
+      flash(cut, 9000);
       finish(b, b.npc.name, d.reply, steps);
+      setEnding((e) => (e ? { ...e, cut } : e));
     },
     [close, finish, flash, setupBeat],
   );
@@ -635,7 +662,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
       /* forgotten on reload */
     }
   };
-  const models = MODEL_CHOICES.filter((m) => (m.provider === 'google' ? account.keys.google : !account.keys.google && account.keys.openai));
+  const models = MODEL_CHOICES.filter((m) =>
+    storyProvider === 'demo'
+      ? (DEMO_MODELS as readonly string[]).includes(m.id)
+      : m.provider === 'google'
+        ? account.keys.google
+        : !account.keys.google && account.keys.openai,
+  );
 
   // Both sides speak, when there is an ElevenLabs key: the hunter's choice, then the answer. A line
   // heard once in this quest is not read again, so going back to a menu is silent.
@@ -887,7 +920,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
             <label className="rpg-model">
               {t.model}:{' '}
               <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
-                <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : 'google', null)[0])}</option>
+                <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : storyProvider === 'demo' ? 'demo' : 'google', null)[0])}</option>
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.id}
@@ -898,11 +931,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
           )}
           {keysReady ? (
             <ul className="rpg-source">
-              <li>{storyProvider === 'static' ? t.staticQuest : t.aiQuest(storyProvider)}</li>
-              <li>{voiceKey ? t.voiceOn : t.voiceOff}</li>
-              {(storyProvider === 'static' || !voiceKey) && (
+              <li>
+                {storyProvider === 'static'
+                  ? t.staticQuest
+                  : storyProvider === 'demo' && demo
+                    ? t.demoQuest(Math.min(demo.remaining.ip, demo.remaining.all), demo.perIpUsd)
+                    : t.aiQuest(storyProvider)}
+              </li>
+              {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
+              <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
+              {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
                 <li>
-                  <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{t.addKey}</a>
+                  <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
                 </li>
               )}
             </ul>
@@ -925,6 +965,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         <div className="rpg-overlay rpg-ending">
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
+          {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>

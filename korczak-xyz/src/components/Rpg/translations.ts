@@ -1,4 +1,9 @@
+import type { RpgDemoReason } from '../../utils/rpg/demoLimits';
 import type { QuestSource } from '../../utils/rpg/storyteller';
+
+function usd(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
 
 const en = {
   title: 'Wanderer',
@@ -18,6 +23,16 @@ const en = {
   readingKeys: 'Reading your API keys from the account…',
   voiceOn: 'Voice: ElevenLabs, on your key.',
   voiceOff: 'Voice: none, there is no ElevenLabs key.',
+  demoQuest: (left: number, cap: number) =>
+    `Story: written by Gemini on the demo, no key or account needed. ${usd(left)} of today's ${usd(cap)} left for you.`,
+  demoVoice: 'Voice: ElevenLabs, on the demo.',
+  demoClosed: (reason: RpgDemoReason): string =>
+    reason === 'ip-cap'
+      ? "Today's demo budget for you is spent; it comes back at midnight (Warsaw)."
+      : reason === 'all-cap'
+        ? "Today's demo budget for everybody is spent; it comes back at midnight (Warsaw)."
+        : 'The demo is closed right now.',
+  ownKey: 'With your own key there is no limit: keys are set on your account page.',
   voiceFailed: 'ElevenLabs did not answer, the line is text only.',
   storyFailed: 'The model did not answer usefully, so this is the hand-written quest.',
   language: 'Language',
@@ -89,6 +104,16 @@ const pl: typeof en = {
   readingKeys: 'Pobieram klucze API z konta…',
   voiceOn: 'Głos: ElevenLabs, na Twoim kluczu.',
   voiceOff: 'Głos: brak, nie ma klucza ElevenLabs.',
+  demoQuest: (left, cap) =>
+    `Fabuła: pisze Gemini w trybie demo, bez klucza i bez konta. Zostało Ci ${usd(left)} z dzisiejszych ${usd(cap)}.`,
+  demoVoice: 'Głos: ElevenLabs, w trybie demo.',
+  demoClosed: (reason) =>
+    reason === 'ip-cap'
+      ? 'Twój dzisiejszy budżet demo się skończył; wraca o północy.'
+      : reason === 'all-cap'
+        ? 'Dzisiejszy budżet demo dla wszystkich się skończył; wraca o północy.'
+        : 'Tryb demo jest teraz wyłączony.',
+  ownKey: 'Z własnym kluczem nie ma limitu: klucze ustawiasz na stronie konta.',
   voiceFailed: 'ElevenLabs nie odpowiedział, kwestia jest tylko tekstem.',
   storyFailed: 'Model nie dał użytecznej odpowiedzi, więc to quest napisany ręcznie.',
   language: 'Język',

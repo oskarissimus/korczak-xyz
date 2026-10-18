@@ -1,0 +1,18 @@
+{
+  // The same file as `utils/backseat/tsconfig.json`, for the same reason: `quest.ts`, `place.ts`,
+  // `cost.ts` and `demoLimits.ts` are compiled into the Cloud Functions bundle as well (the RPG's
+  // demo builds its prompt with `beatPrompt`), and without this Vite's tsconfig walk reaches the
+  // site's `astro/tsconfigs/strict`, which the functions' CI runner has no node_modules for. The
+  // rest of this directory talks to the DOM and to Firebase and does not cross over.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"]
+}

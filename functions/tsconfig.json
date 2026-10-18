@@ -25,7 +25,11 @@
     "../korczak-xyz/src/utils/backseat/vision.ts",
     "../korczak-xyz/src/utils/backseat/demoLimits.ts",
     "../korczak-xyz/src/utils/backseat/liveConfig.ts",
-    "../korczak-xyz/src/utils/accountKeys/keys.ts"
+    "../korczak-xyz/src/utils/accountKeys/keys.ts",
+    "../korczak-xyz/src/utils/rpg/quest.ts",
+    "../korczak-xyz/src/utils/rpg/place.ts",
+    "../korczak-xyz/src/utils/rpg/cost.ts",
+    "../korczak-xyz/src/utils/rpg/demoLimits.ts"
   ],
   "exclude": [
     "../korczak-xyz/src/utils/events/*.test.ts",

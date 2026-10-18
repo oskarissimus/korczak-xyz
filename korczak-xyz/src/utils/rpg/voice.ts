@@ -1,5 +1,6 @@
 /*
- * The quest giver's voice: ElevenLabs on the reader's own key from the account store.
+ * The quest giver's voice: ElevenLabs on the reader's own key from the account store, or, with
+ * `DEMO_VOICE_KEY` in its place, through the demo function on the owner's (`demo.ts`).
  *
  * One `<audio>` element for the life of the tab, primed inside the Start click, for the reason
  * `utils/backseat/speech.ts` gives at length: iOS unlocks the element a gesture touched, not the
@@ -7,6 +8,7 @@
  * walking back through a dialogue does not pay for the same line twice.
  */
 
+import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
 import { endRequest, startRequest, voiceCredits } from './devlog';
 import type { Lang } from './quest';
 
@@ -75,19 +77,25 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
   // browser is allowed to read it, else the list rate (`cost.ts`).
   const entry = startRequest('voice', `${VOICE_MODEL} · ${line.voice}`, null, line.text);
   try {
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${VOICES[line.voice]}?output_format=mp3_44100_64`,
-      {
-        method: 'POST',
-        headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: line.text,
-          model_id: VOICE_MODEL,
-          language_code: lang,
-          voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-        }),
-      },
-    );
+    const demo = key === DEMO_VOICE_KEY;
+    const demoUrl = demo ? rpgDemoUrl() : null;
+    if (demo && !demoUrl) throw new Error('demo: no address');
+    const response = demoUrl
+      ? await fetch(demoUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, lang }),
+        })
+      : await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICES[line.voice]}?output_format=mp3_44100_64`, {
+          method: 'POST',
+          headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: line.text,
+            model_id: VOICE_MODEL,
+            language_code: lang,
+            voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+          }),
+        });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);

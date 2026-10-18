@@ -52,6 +52,7 @@ function refusal(status: number, message: string) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.useRealTimers();
   resetDevlog();
 });
@@ -149,5 +150,60 @@ describe('generateBeat', () => {
     expect(modelChain('google', GOOGLE_MODELS[2])).toHaveLength(GOOGLE_MODELS.length);
     expect(modelChain('google', 'gpt-4.1')).toEqual(GOOGLE_MODELS);
     expect(modelChain('google', null)).toEqual(GOOGLE_MODELS);
+  });
+});
+
+describe('the demo', () => {
+  it('sends the context, never a prompt, and reads the stream it passes back', async () => {
+    vi.stubEnv('PUBLIC_RPG_DEMO_URL', 'https://demo.test/rpgDemo');
+    const fetch = vi.fn().mockResolvedValueOnce(answer(JSON.stringify(beat)));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: null, openai: null, demo: true }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    expect(attempt.provider).toBe('demo');
+    expect(fetch.mock.calls[0][0]).toBe('https://demo.test/rpgDemo');
+    const body = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({ kind: 'beat', model: GOOGLE_MODELS[0], ctx: { seed: 'an old debt', index: 1 } });
+    expect(body.prompt).toBeUndefined();
+  });
+
+  it('moves to a cheaper model when a cap is reached, and says so when none fits', async () => {
+    vi.stubEnv('PUBLIC_RPG_DEMO_URL', 'https://demo.test/rpgDemo');
+    const capped = () => new Response(JSON.stringify({ reason: 'ip-cap', error: { message: 'demo: ip-cap' } }), { status: 402 });
+    const fetch = vi.fn().mockImplementation(async () => capped());
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: null, openai: null, demo: true }, ctx);
+    expect(attempt.outcome).toBe('failed');
+    expect(attempt.refusal).toBe('ip-cap');
+    expect(fetch).toHaveBeenCalledTimes(modelChain('demo', null).length);
+  });
+
+  it('stops at once when the demo is switched off', async () => {
+    vi.stubEnv('PUBLIC_RPG_DEMO_URL', 'https://demo.test/rpgDemo');
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ reason: 'disabled' }), { status: 503 }));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: null, openai: null, demo: true }, ctx);
+    expect(attempt.refusal).toBe('disabled');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("still moves on past Google's own 503, passed through", async () => {
+    vi.stubEnv('PUBLIC_RPG_DEMO_URL', 'https://demo.test/rpgDemo');
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(refusal(503, 'The model is overloaded'))
+      .mockResolvedValueOnce(answer(JSON.stringify(beat)));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: null, openai: null, demo: true }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    expect(attempt.refusal).toBeNull();
+  });
+
+  it('a key of the reader\'s own wins over the demo', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(answer(JSON.stringify(beat)));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: 'k', openai: null, demo: true }, ctx);
+    expect(attempt.provider).toBe('google');
+    expect(String(fetch.mock.calls[0][0])).toContain('generativelanguage.googleapis.com');
   });
 });
