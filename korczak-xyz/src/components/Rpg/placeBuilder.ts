@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 
 import type { Feature, PlaceSpec, TargetLook } from '../../utils/rpg/place';
+import { surfaceMat } from './surfaces';
 
 export const PLACE_RADIUS = 24;
 const CLEAR_RADIUS = 10;
@@ -45,6 +46,17 @@ export function hashString(text: string): number {
 const mat = (color: number | string, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...extra });
 
+/**
+ * A colour's hue at full brightness: what a biome's ground colour becomes as a tint over a
+ * scanned texture, which is already as dark as real ground. Multiplying the dark colour itself
+ * in made every place a black disc.
+ */
+export function hueTint(color: string | number): THREE.Color {
+  const c = new THREE.Color(color);
+  const max = Math.max(c.r, c.g, c.b, 0.001);
+  return c.multiplyScalar(1 / max);
+}
+
 function shadowed<T extends THREE.Object3D>(o: T): T {
   o.traverse((c) => {
     c.castShadow = true;
@@ -64,8 +76,8 @@ type Builder = (g: THREE.Group, obstacles: Obstacle[], rand: () => number) => vo
 
 const FEATURE_BUILDERS: Record<Feature, Builder> = {
   pines(g, obstacles, rand) {
-    const trunk = mat(0x4d3420);
-    const leaf = mat(0x2f4f2a);
+    const trunk = surfaceMat('bark', 1, 2);
+    const leaf = surfaceMat('leaves', 2, 2, { color: 0x7d9a6a });
     for (let i = 0; i < 28; i++) {
       const { x, z } = ringSpot(rand);
       const s = 0.8 + rand() * 0.8;
@@ -78,7 +90,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     }
   },
   dead_trees(g, obstacles, rand) {
-    const bark = mat(0x3b3229);
+    const bark = surfaceMat('bark', 1, 2, { color: 0x8a8580 });
     for (let i = 0; i < 12; i++) {
       const { x, z } = ringSpot(rand);
       const h = 3 + rand() * 3;
@@ -101,7 +113,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     }
   },
   rocks(g, obstacles, rand) {
-    const stone = mat(0x8c8a84);
+    const stone = surfaceMat('rock');
     for (let i = 0; i < 14; i++) {
       const { x, z } = ringSpot(rand, 4);
       const s = 0.3 + rand() * 1.2;
@@ -113,7 +125,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     }
   },
   pillars(g, obstacles, rand) {
-    const stone = mat(0x9a968c);
+    const stone = surfaceMat('stone', 1, 3);
     const n = 8 + Math.floor(rand() * 4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
@@ -128,15 +140,17 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     }
   },
   graves(g, obstacles, rand) {
-    const stone = mat(0x7a7a74);
+    const stone = surfaceMat('stone', 0.5, 0.7);
+    const wood = surfaceMat('planks', 0.3, 1, { color: 0xb09a80 });
+    const earth = surfaceMat('dirt', 1, 2, { color: 0x9a8070 });
     for (let i = 0; i < 18; i++) {
       const { x, z, a } = ringSpot(rand, CLEAR_RADIUS - 2);
       const cross = rand() < 0.4;
       const grave = new THREE.Group();
       if (cross) {
-        const v = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.3, 0.15), mat(0x4d3a28));
+        const v = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.3, 0.15), wood);
         v.position.y = 0.65;
-        const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.15, 0.15), mat(0x4d3a28));
+        const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.15, 0.15), wood);
         h.position.y = 0.95;
         grave.add(v, h);
       } else {
@@ -144,7 +158,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
         slab.position.y = 0.5;
         grave.add(slab);
       }
-      const mound = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 1.6), mat(0x4a3d2c));
+      const mound = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 1.6), earth);
       mound.position.set(0, 0.1, 0.9);
       grave.add(mound);
       grave.position.set(x, 0, z);
@@ -177,8 +191,9 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     const x = Math.sin(a) * (CLEAR_RADIUS + 3);
     const z = Math.cos(a) * (CLEAR_RADIUS + 3);
     const fire = new THREE.Group();
+    const stone = surfaceMat('rock', 0.3);
     for (let i = 0; i < 8; i++) {
-      const s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25), mat(0x6c6a64));
+      const s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25), stone);
       s.position.set(Math.sin((i / 8) * Math.PI * 2) * 0.8, 0.15, Math.cos((i / 8) * Math.PI * 2) * 0.8);
       fire.add(s);
     }
@@ -196,8 +211,9 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     obstacles.push({ x, z, r: 1 });
   },
   huts(g, obstacles, rand) {
-    const wall = mat(0x8b7355);
-    const roof = mat(0x5e4a2a);
+    // Weathered: these are somebody's abandoned huts, greyer than the village's.
+    const wall = surfaceMat('planks', 2, 1, { color: 0xc0b8b0 });
+    const roof = surfaceMat('thatch', 2, 1, { color: 0x9a9080 });
     for (let i = 0; i < 3; i++) {
       const { x, z, a } = ringSpot(rand, CLEAR_RADIUS + 4, PLACE_RADIUS - 3);
       const hut = new THREE.Group();
@@ -233,7 +249,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     }
   },
   standing_stones(g, obstacles, rand) {
-    const stone = mat(0x6e6d68);
+    const stone = surfaceMat('rock', 1, 2, { color: 0xb0aca4 });
     const n = 7;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rand() * 0.2;
@@ -255,7 +271,10 @@ export function buildPlace(spec: PlaceSpec): BuiltPlace {
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
 
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(PLACE_RADIUS + 4, 40), mat(spec.groundColor));
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(PLACE_RADIUS + 4, 40),
+    surfaceMat('ground', 7, 7, { color: hueTint(spec.groundColor) }),
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.015;
   ground.receiveShadow = true;

@@ -1,8 +1,9 @@
 /*
  * The RPG's world: one village, a hunter, the places the open quest has sent him to — each built
  * from the model's description when a beat names it (`placeBuilder.ts`) and standing until the
- * quest ends — and the quest's characters, in the village square or at their places. Plain Three.js, no assets — every mesh is a
- * primitive, so the page loads nothing but code.
+ * quest ends — and the quest's characters, in the village square or at their places. The people
+ * are rigged, animated CC0 models (`characters.ts`) and the surfaces scanned CC0 textures
+ * (`surfaces.ts`); the shapes of the world are still Three.js primitives.
  *
  * The React side (`Rpg.tsx`) owns the story; this file owns space and time and talks back only
  * through `SceneCallbacks`. It never decides what a quest says, only where its things are and
@@ -21,6 +22,8 @@ import {
   rng,
   type Obstacle,
 } from './placeBuilder';
+import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
+import { surfaceMat } from './surfaces';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -67,6 +70,8 @@ interface Tree {
 
 interface Enemy {
   mesh: THREE.Group;
+  /** Set once the people's models have loaded, for a humanoid; the others stay primitives. */
+  rig: Rig | null;
   /** The look's size, so a hit's flash can grow it from there. */
   size: number;
   hp: number;
@@ -82,6 +87,9 @@ interface Pickup {
 
 interface Npc {
   group: THREE.Group;
+  rig: Rig | null;
+  /** Their clothes, for the capsule they become if the models never load. */
+  color: number;
   obstacle: Obstacle;
   /** The village spot it holds, if it stands in the village. */
   spot: number | null;
@@ -104,6 +112,38 @@ function nearSegment(x: number, z: number, px: number, pz: number): number {
   return Math.hypot(x - px * t, z - pz * t);
 }
 
+/** What a character looks like, drawn from their name so they look the same every time. */
+function lookFor(name: string, color: string, gender: 'male' | 'female'): Look {
+  const rand = rng(hashString(name));
+  const ranger = rand() < 0.3;
+  const hairColor = HAIR_COLORS[Math.floor(rand() * HAIR_COLORS.length)];
+  const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
+  if (gender === 'female') {
+    return {
+      outfit: ranger ? 'female_ranger' : 'female_peasant',
+      head: 'head_female',
+      // A ranger's hood is up; hair would come through it.
+      hair: ranger ? [] : [pick<Part>(['hair_long', 'hair_buns', 'hair_buzzedfemale'])],
+      hairColor,
+      tint: new THREE.Color(color).getHex(),
+      tintAmount: 0.55,
+      height: 1.68,
+    };
+  }
+  const hair: Part[] = ranger ? [] : [pick<Part>(['hair_simpleparted', 'hair_buzzed', 'hair_long'])];
+  if (rand() < 0.45) hair.push('hair_beard');
+  return {
+    outfit: ranger ? 'male_ranger' : 'male_peasant',
+    head: 'head_male',
+    hair,
+    hairColor,
+    tint: new THREE.Color(color).getHex(),
+    tintAmount: 0.55,
+    height: 1.78,
+  };
+}
+
+/** The pill people, for when the models cannot be loaded: a capsule and a ball. */
 function humanoid(body: number, head: number, height = 1.8): THREE.Group {
   const group = new THREE.Group();
   const torso = new THREE.Mesh(
@@ -133,6 +173,11 @@ export class RpgScene {
 
   private player: THREE.Group;
   private sword: THREE.Mesh;
+  private chars = new Characters();
+  /** Null until the models load, and for good if they fail (the hunter is then a capsule). */
+  private playerRig: Rig | null = null;
+  /** Killed humanoids playing their death before they are taken away, seconds left. */
+  private dying: { mesh: THREE.Group; rig: Rig; left: number }[] = [];
   private npcs = new Map<string, Npc>();
   private marker: THREE.Mesh;
   private yaw = 0;
@@ -170,16 +215,35 @@ export class RpgScene {
     this.buildLight();
     this.buildWorld();
 
-    this.player = humanoid(0x3b3b46, 0xe0c2a2);
+    this.player = new THREE.Group();
     this.sword = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.06, 1.1),
-      new THREE.MeshStandardMaterial({ color: 0xd8dde3, metalness: 0.8, roughness: 0.25 }),
+      new THREE.BoxGeometry(0.03, 0.08, 1.1),
+      // Polished steel would need something to reflect; there is no environment map, so it reads as
+      // pale grey rather than as the black that full metalness renders.
+      new THREE.MeshStandardMaterial({ color: 0xc8ced6, metalness: 0.35, roughness: 0.3 }),
     );
-    this.sword.position.set(0.45, 1.05, 0.45);
     this.sword.castShadow = true;
-    this.player.add(this.sword);
     this.player.position.copy(SPAWN);
     this.scene.add(this.player);
+    this.chars.ready.then(
+      () => {
+        this.playerRig = this.chars.dress(this.player, {
+          outfit: 'male_ranger',
+          head: 'head_male',
+          hair: ['hair_beard'],
+          hairColor: HAIR_COLORS[4],
+          height: 1.85,
+        });
+        this.gripSword(this.playerRig);
+      },
+      () => {
+        // No models (offline, a failed fetch): the game still plays, with the old shapes.
+        this.player.add(humanoid(0x3b3b46, 0xe0c2a2));
+        this.sword.position.set(0.45, 1.05, 0.45);
+        this.player.add(this.sword);
+        for (const npc of this.npcs.values()) npc.group.add(humanoid(npc.color, 0xd9b38c, 1.75));
+      },
+    );
 
     this.marker = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.5, 60, 12, 1, true),
@@ -221,7 +285,7 @@ export class RpgScene {
   private buildWorld() {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
-      new THREE.MeshStandardMaterial({ color: 0x5f7d3f, roughness: 1 }),
+      surfaceMat('grass', 70, 70, { roughness: 1 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -232,9 +296,9 @@ export class RpgScene {
   }
 
   private buildVillage() {
-    const wall = new THREE.MeshStandardMaterial({ color: 0xcdbb98, roughness: 0.9 });
-    const timber = new THREE.MeshStandardMaterial({ color: 0x5b3f26, roughness: 0.9 });
-    const thatch = new THREE.MeshStandardMaterial({ color: 0x9c7a3c, roughness: 1 });
+    const wall = surfaceMat('plaster', 2, 1.2, { color: 0xf0e6d6 });
+    const timber = surfaceMat('planks', 2, 0.3);
+    const thatch = surfaceMat('thatch', 3, 2);
     const houses: [number, number, number][] = [
       [-12, -10, 0.3],
       [14, -14, -0.4],
@@ -266,7 +330,7 @@ export class RpgScene {
     }
 
     // A well in the square, the NPC beside it.
-    const stone = new THREE.MeshStandardMaterial({ color: 0x8c8c86, roughness: 1 });
+    const stone = surfaceMat('stone', 3, 0.5);
     const well = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 1, 14, 1, true), stone);
     well.position.set(0, 0.5, -3);
     well.castShadow = true;
@@ -308,8 +372,8 @@ export class RpgScene {
     this.trees.push({ meshes: [trunk, crown], obstacle });
   }
 
-  private trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d3420, roughness: 1 });
-  private leafMat = new THREE.MeshStandardMaterial({ color: 0x2f4f2a, roughness: 1 });
+  private trunkMat = surfaceMat('bark', 1, 2, { roughness: 1 });
+  private leafMat = surfaceMat('leaves', 2, 2, { color: 0x7d9a6a, roughness: 1 });
 
   /** Trees across the whole map, kept off the village. A place clears its own patch of them. */
   private buildTrees() {
@@ -348,7 +412,7 @@ export class RpgScene {
     const length = Math.max(1, center.length() - PLACE_RADIUS);
     const path = new THREE.Mesh(
       new THREE.PlaneGeometry(3, length),
-      new THREE.MeshStandardMaterial({ color: 0x8a7350, roughness: 1 }),
+      surfaceMat('dirt', 1, Math.round(length / 3), { roughness: 1 }),
     );
     path.rotation.x = -Math.PI / 2;
     path.rotation.z = Math.atan2(-x, -z);
@@ -383,15 +447,22 @@ export class RpgScene {
    * Puts a character at a place (by name) or, with null, on a free spot in the village square;
    * one already standing somewhere walks over. Their clothes are `color`.
    */
-  placeNpc(name: string, color: string, at: string | null, nth = 0) {
+  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male') {
     let npc = this.npcs.get(name);
     if (!npc) {
-      const group = humanoid(new THREE.Color(color).getHex(), 0xd9b38c, 1.75);
+      const group = new THREE.Group();
       const obstacle: Obstacle = { x: 0, z: 0, r: 0.6 };
       this.obstacles.push(obstacle);
       this.scene.add(group);
-      npc = { group, obstacle, spot: null };
-      this.npcs.set(name, npc);
+      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), obstacle, spot: null };
+      npc = created;
+      this.npcs.set(name, created);
+      this.chars.ready.then(
+        () => {
+          if (this.npcs.get(name) === created) created.rig = this.chars.dress(group, lookFor(name, color, gender));
+        },
+        () => group.add(humanoid(created.color, 0xd9b38c, 1.75)),
+      );
     }
     const place = at ? this.places.get(at) : undefined;
     let pos: THREE.Vector3;
@@ -412,6 +483,34 @@ export class RpgScene {
     npc.group.position.copy(pos);
     npc.obstacle.x = pos.x;
     npc.obstacle.z = pos.z;
+  }
+
+  /**
+   * Puts the sword in the hunter's right hand, worked out from the hand's own bones rather than
+   * tuned by eye: the grip is between the wrist and the knuckles, and the blade leaves the fist
+   * on the thumb side, along the line from the little finger's knuckle to the index finger's.
+   */
+  private gripSword(rig: Rig) {
+    const hand = rig.hand;
+    const index = rig.model.getObjectByName('index_01_r');
+    const pinky = rig.model.getObjectByName('pinky_01_r');
+    const middle = rig.model.getObjectByName('middle_01_r');
+    if (!hand || !index || !pinky || !middle) {
+      this.sword.position.set(0.45, 1.05, 0.45);
+      this.player.add(this.sword);
+      return;
+    }
+    rig.model.updateMatrixWorld(true);
+    const local = (o: THREE.Object3D) => hand.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+    const along = local(index).sub(local(pinky)).normalize();
+    const grip = local(middle).multiplyScalar(0.55);
+    // The rig is in centimetres under a 0.01 armature; the sword is in metres.
+    const s = hand.getWorldScale(new THREE.Vector3()).x;
+    hand.add(this.sword);
+    this.sword.scale.setScalar(1 / s);
+    this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
+    // The box is centred; most of its 1.1 m is blade, beyond the fist.
+    this.sword.position.copy(grip).addScaledVector(along, 0.42 / s);
   }
 
   /** Sends every character away, for a new quest. */
@@ -508,19 +607,31 @@ export class RpgScene {
         this.scene.add(mesh);
         this.pickups.push({ mesh, phase: rand() * 6 });
       } else {
-        const mesh = buildEnemy(look);
-        mesh.position.copy(pos);
-        this.scene.add(mesh);
-        this.enemies.push({ mesh, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 });
+        const enemy: Enemy = { mesh: new THREE.Group(), rig: null, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 };
+        enemy.mesh.position.copy(pos);
+        this.scene.add(enemy.mesh);
+        this.enemies.push(enemy);
+        if (look.shape !== 'humanoid') {
+          enemy.mesh.add(buildEnemy({ ...look, size: 1 }));
+          continue;
+        }
+        // Something that was a man once: the bare base body, washed in the target's colour.
+        this.chars.ready.then(
+          () => {
+            if (enemy.hp > 0) enemy.rig = this.chars.dress(enemy.mesh, { outfit: 'body_male', head: undefined, tint: new THREE.Color(look.color).getHex(), tintAmount: 0.8, height: 1.8 });
+          },
+          () => enemy.mesh.add(buildEnemy({ ...look, size: 1 })),
+        );
       }
     }
   }
 
   clearObjective() {
     for (const p of this.pickups) this.scene.remove(p.mesh);
-    for (const e of this.enemies) this.scene.remove(e.mesh);
+    for (const e of [...this.enemies, ...this.dying]) this.scene.remove(e.mesh);
     this.pickups = [];
     this.enemies = [];
+    this.dying = [];
   }
 
   /** The golden beam the compass points at: a character, a place, or nothing. */
@@ -539,6 +650,7 @@ export class RpgScene {
   /** While a dialogue or a menu is open the world stands still and the mouse is the reader's. */
   setPaused(paused: boolean) {
     this.paused = paused;
+    if (!paused) for (const npc of this.npcs.values()) npc.rig?.play('Idle_Loop', { fade: 0.6 });
     this.keys.clear();
     if (paused && document.pointerLockElement === this.canvas) document.exitPointerLock();
   }
@@ -582,6 +694,7 @@ export class RpgScene {
     if (this.paused || this.attackTimer > 0) return;
     this.attackTimer = ATTACK_COOLDOWN;
     this.swing = 1;
+    this.playerRig?.once('Sword_Attack', ATTACK_COOLDOWN);
     const forward = new THREE.Vector3(Math.sin(this.player.rotation.y), 0, Math.cos(this.player.rotation.y));
     for (const enemy of [...this.enemies]) {
       const to = enemy.mesh.position.clone().sub(this.player.position);
@@ -593,9 +706,17 @@ export class RpgScene {
       enemy.flash = 0.15;
       enemy.mesh.position.add(to.multiplyScalar(1.2));
       if (enemy.hp <= 0) {
-        this.scene.remove(enemy.mesh);
         this.enemies = this.enemies.filter((e) => e !== enemy);
+        if (enemy.rig) {
+          // It falls before it goes; it stops being a target at once.
+          enemy.rig.once('Death01', 1.4, { final: true });
+          this.dying.push({ mesh: enemy.mesh, rig: enemy.rig, left: 2.2 });
+        } else {
+          this.scene.remove(enemy.mesh);
+        }
         this.cb.onProgress();
+      } else {
+        enemy.rig?.once('Hit_Chest', 0.3);
       }
     }
   }
@@ -605,6 +726,7 @@ export class RpgScene {
     const thing = this.nearestThing();
     if (!thing) return;
     if ('talk' in thing) {
+      this.npcs.get(thing.talk)?.rig?.play('Idle_Talking_Loop', { fade: 0.4 });
       this.cb.onTalk(thing.talk);
       return;
     }
@@ -678,11 +800,25 @@ export class RpgScene {
       this.frame = requestAnimationFrame(tick);
       const dt = Math.min(this.clock.getDelta(), 0.05);
       if (!this.paused) this.update(dt);
+      // The people move even while a dialogue holds the world: whoever is talking talks.
+      this.animate(dt);
       this.updateCamera();
       this.renderer.render(this.scene, this.camera);
     };
     this.clock.start();
     tick();
+  }
+
+  private animate(dt: number) {
+    this.playerRig?.update(dt);
+    for (const npc of this.npcs.values()) npc.rig?.update(dt);
+    for (const enemy of this.enemies) enemy.rig?.update(dt);
+    for (const d of this.dying) {
+      d.rig.update(dt);
+      d.left -= dt;
+      if (d.left <= 0) this.scene.remove(d.mesh);
+    }
+    this.dying = this.dying.filter((d) => d.left > 0);
   }
 
   private collide(pos: THREE.Vector3, radius = 0.45) {
@@ -719,14 +855,19 @@ export class RpgScene {
       const diff = Math.atan2(Math.sin(targetRot - this.player.rotation.y), Math.cos(targetRot - this.player.rotation.y));
       this.player.rotation.y += diff * Math.min(1, dt * 12);
     }
-    // A little bob while walking, so it reads as walking and not as sliding.
     const t = this.clock.elapsedTime;
-    this.player.children[0].position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
-
-    // The sword: a quick arc on a swing, at rest otherwise.
+    const running = k.has('ShiftLeft') || k.has('ShiftRight');
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.swing = Math.max(0, this.swing - dt * 4);
-    this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
+    if (this.playerRig) {
+      // The hunter covers ground faster than anyone walks, so both paces are the jog, sped up.
+      if (moving) this.playerRig.play('Jog_Fwd_Loop', { speed: running ? 2.1 : 1.4 });
+      else this.playerRig.play('Sword_Idle');
+    } else {
+      // The capsule: a little bob while walking, and the sword's quick arc on a swing.
+      this.player.children[0].position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
+      this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
+    }
 
     for (const mesh of this.clues.values()) mesh.rotation.y += dt * 0.8;
     for (const p of this.pickups) {
@@ -778,18 +919,25 @@ export class RpgScene {
       const toPlayer = this.player.position.clone().sub(pos).setY(0);
       const dist = toPlayer.length();
       enemy.hitCooldown = Math.max(0, enemy.hitCooldown - dt);
+      let gait: 'Idle_Loop' | 'Walk_Loop' | 'Jog_Fwd_Loop' = 'Idle_Loop';
       if (dist < 14 && dist > 1.2) {
         pos.addScaledVector(toPlayer.normalize(), 3.2 * dt);
+        gait = 'Jog_Fwd_Loop';
       } else if (dist >= 14) {
         const home = enemy.home.clone().sub(pos).setY(0);
-        if (home.length() > 0.5) pos.addScaledVector(home.normalize(), 2 * dt);
+        if (home.length() > 0.5) {
+          pos.addScaledVector(home.normalize(), 2 * dt);
+          gait = 'Walk_Loop';
+        }
       }
+      enemy.rig?.play(gait);
       this.collide(pos, 0.4);
       enemy.mesh.lookAt(this.player.position.x, 0, this.player.position.z);
       enemy.flash = Math.max(0, enemy.flash - dt);
       enemy.mesh.scale.setScalar(enemy.size * (enemy.flash > 0 ? 1.12 : 1));
       if (dist <= 1.5 && enemy.hitCooldown === 0) {
         enemy.hitCooldown = 1.2;
+        enemy.rig?.once('Punch_Jab', 0.5);
         this.hp = Math.max(0, this.hp - 12);
         this.cb.onHealth(this.hp);
         if (this.hp === 0) {

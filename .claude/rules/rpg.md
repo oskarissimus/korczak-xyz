@@ -105,6 +105,41 @@ waiting line or replies open with the character's name as the subject or report 
 ("mówi, że", "says that") — the next model is asked instead. Decision labels are the hunter's
 spoken line, at most 12 words.
 
+## What it looks like
+
+Since Oct 2026 the people are not capsules (owner: "people looking like pills is a bit lame"; of
+the options — chasing realism, free assets, AI-generated models, a PS1 filter — he chose free
+assets and scanned textures, and no retro filter). Everything is **CC0**, so nothing needs
+crediting, and is committed under `src/assets/rpg/`, imported with `?url` so it ships
+content-hashed and immutable.
+
+- **People** (`components/Rpg/characters.ts`): Quaternius's *Modular Character Outfits – Fantasy*
+  (male/female ranger and peasant, the free tier), *Universal Base Characters* (heads, hair) and
+  *Universal Animation Library* (the clips). All on one 65-bone skeleton, so `dress` puts an
+  outfit, a head and hair together at run time by rebinding the head's and hair's skinned meshes to
+  the outfit's bones, and one mixer moves the whole person. A character's look is drawn from their
+  name (`lookFor` in `RpgScene.ts`): outfit (30% ranger), hair, beard, hair colour; their gender
+  picks the body; their clothes colour is multiplied into the outfit at 55%, so "a woman in red"
+  still reads as red. The hunter is the male ranger with a beard; the sword sits in the right
+  hand, placed from the hand's own finger bones (`gripSword`), not tuned by eye.
+- **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
+  flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once). Beasts
+  and blobs are still primitives: Quaternius's monster packs were behind a Google Drive quota the
+  day this was done.
+- **Surfaces** (`components/Rpg/surfaces.ts`): ten Poly Haven colour maps at 512 px, tiled per
+  material and cached per tiling (each tiling is its own GPU texture, so taking a place down
+  disposes none). A biome's ground colour becomes a tint at full brightness (`hueTint`), because
+  multiplying the dark colour itself into an already dark scan made every place a black disc.
+- **No environment map**, so anything fully metallic renders black: `dress` caps the outfits'
+  metalness at 0.3 and the sword is 0.35.
+- **The models never block the game.** A character is an empty `THREE.Group` until the files
+  arrive (~5.8 MB in all, once); if they fail, everyone becomes the old capsule and the game plays.
+- The world's shapes (houses, trees, rocks) are still primitives under the new surfaces.
+
+The source packs are ~500 MB of 4K PNGs. `scripts/rpg-characters.mjs` (where to download them,
+what is cut: textures to 1024/512 WebP, the Unreal-only UV sets, bodies cut to head and neck, all
+but the needed clips) and `scripts/rpg-textures.mjs` regenerate the committed files.
+
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits

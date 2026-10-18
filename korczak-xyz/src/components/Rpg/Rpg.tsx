@@ -266,7 +266,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         scene?.addPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
-      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null);
+      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
       if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
       scene?.clearClues();
       b.clues.forEach((clue, i) => scene?.placeClue(`clue-${b.index}-${i}`, clue.look, b.npc.name));
@@ -275,7 +275,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       heardRef.current = false;
       if (b.witness) {
         const w = b.witness;
-        scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1);
+        scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1, w.npc.gender);
         if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
       }
       if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
@@ -702,10 +702,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
         scene?.addPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
-      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null);
+      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
       remember(b.npc);
       if (b.witness) {
-        scene?.placeNpc(b.witness.npc.name, b.witness.npc.color, b.place?.name ?? null, 1);
+        scene?.placeNpc(b.witness.npc.name, b.witness.npc.color, b.place?.name ?? null, 1, b.witness.npc.gender);
         remember(b.witness.npc);
       }
       beatsRef.current = [...beatsRef.current, b];
