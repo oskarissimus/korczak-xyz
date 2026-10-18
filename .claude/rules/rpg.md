@@ -160,6 +160,17 @@ resolved and the key sync is `synced` or `error` (signed out: as soon as localSt
 first version generated the moment localStorage was read, which on a fresh browser was always the
 hand-written quest.
 
+## The autosave
+
+`utils/rpg/save.ts`, localStorage `rpg-save`, one quest at a time (owner, Oct 2026: he went back by
+accident just before a story ended and never learnt how it ended). Written at every step that
+changes the quest: a beat set up, a target killed or picked up, a clue examined, the story heard,
+a decision made. It keeps every beat so far, the decisions, the job's progress, what was examined
+and heard; the world is rebuilt from that (`resume` in `Rpg.tsx`), with the hunter back at the
+village. A decision whose next beat was still being written is saved as made and the beat is asked
+for again on load, since the answer in flight is lost with the page. The intro screen offers
+"Kontynuuj: <title>" in the save's language; a new quest or a finished one clears it.
+
 ## Language
 
 Asked on the intro screen (Polski / English), starting from the page's locale. It sets the game's

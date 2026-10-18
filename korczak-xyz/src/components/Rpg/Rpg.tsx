@@ -32,6 +32,7 @@ import {
 } from '../../utils/rpg/quest';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
+import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamPreview } from './DevConsole';
@@ -96,6 +97,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const t = translations[gameLang];
   const tRef = useRef(t);
   tRef.current = t;
+  const gameLangRef = useRef(gameLang);
+  gameLangRef.current = gameLang;
+  /** The autosaved quest, offered on the intro screen. */
+  const [saved, setSaved] = useState<SavedGame | null>(null);
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
   const uidRef = useRef<string | null>(null);
@@ -174,6 +179,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const staticRef = useRef(false);
   const seedRef = useRef(SEEDS[0]);
   const pendingRef = useRef<Promise<Written> | null>(null);
+  /** Every beat of this quest so far, for the autosave. */
+  const beatsRef = useRef<Beat[]>([]);
+  /** The current beat's decision, by index, once made. */
+  const decisionRef = useRef<number | null>(null);
 
   const openTalkRef = useRef<(name: string) => void>(() => {});
   /** Every line already heard in this quest, by voice and text: each one is spoken once. */
@@ -187,6 +196,31 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, []);
 
   useEffect(() => setChronicle(loadChronicle(gameLang)), [gameLang]);
+
+  // A quest left half way is offered on the intro screen, in its own language.
+  useEffect(() => {
+    const game = loadGame();
+    if (!game) return;
+    setSaved(game);
+    setGameLang(game.lang);
+  }, []);
+
+  /** The autosave, at every step that changes the quest. */
+  const persist = useCallback(() => {
+    if (endingRef.current || beatsRef.current.length === 0) return;
+    saveGame({
+      lang: gameLangRef.current,
+      seed: seedRef.current,
+      static: staticRef.current,
+      beats: beatsRef.current,
+      progress: progressRef.current,
+      history: historyRef.current,
+      lastLines: [...lastLinesRef.current],
+      seen: [...seenRef.current],
+      heard: heardRef.current,
+      decision: decisionRef.current,
+    });
+  }, []);
 
   // --- the story ----------------------------------------------------------------------------------
 
@@ -252,9 +286,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
       scene?.setMarker(b.job && b.place ? { place: b.place.name } : { npc: b.npc.name });
       beatRef.current = b;
       setBeat(b);
+      beatsRef.current = [...beatsRef.current.filter((x) => x.index < b.index), b];
+      decisionRef.current = null;
+      persist();
       if (b.index > 0) flash(`${tRef.current.nextStep}: ${b.objectiveText}`, 4500);
     },
-    [flash],
+    [flash, persist],
   );
 
   const startQuest = useCallback(async () => {
@@ -270,6 +307,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     spokenRef.current.clear();
     askedRef.current.clear();
     resetDevlog();
+    beatsRef.current = [];
+    decisionRef.current = null;
+    clearGame();
+    setSaved(null);
     staticRef.current = false;
     pendingRef.current = null;
     seedRef.current = SEEDS[Math.floor(Math.random() * SEEDS.length)];
@@ -293,6 +334,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     (b: Beat, speaker: string, text: string, steps: StepRecord[]) => {
       const entry: ChronicleEntry = { title: b.title, at: Date.now(), steps, ending: text };
       setChronicle(addToChronicle(gameLang, entry));
+      // Told to the end and in the chronicle: nothing left to continue.
+      clearGame();
+      setSaved(null);
       setEnding({ title: b.title, speaker, text, steps });
       setDialogue(null);
       const scene = sceneRef.current;
@@ -319,6 +363,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         const done = progressRef.current + 1;
         progressRef.current = done;
         setProgress(done);
+        persist();
         if (done === b.job.count) {
           scene.setMarker({ npc: b.npc.name });
           flash(tRef.current.jobDone(b.npc.name), 4000);
@@ -354,7 +399,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       sceneRef.current = null;
       delete window.rpg;
     };
-  }, [flash]);
+  }, [flash, persist]);
 
   // The world stands still whenever something other than walking has the reader's attention.
   useEffect(() => {
@@ -401,6 +446,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setHistory(steps);
       lastLinesRef.current.set(b.npc.name, d.reply);
       decidedRef.current = true;
+      decisionRef.current = b.decisions.indexOf(d);
+      persist();
       const line: DialogueLine = { speaker: b.npc.name, voice: b.npc.gender, text: d.reply };
       if (!d.next) {
         setDialogue({ line, choices: [{ label: t.theEnd, action: () => finish(b, b.npc.name, d.reply, steps) }] });
@@ -410,7 +457,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       pendingRef.current = writeBeat(b.index + 1, d.next, steps, b.title);
       setDialogue({ line, choices: [{ label: t.onward, action: () => void proceed(b, d, steps) }] });
     },
-    [finish, proceed, t, writeBeat],
+    [finish, persist, proceed, t, writeBeat],
   );
 
   const openTalk = useCallback(
@@ -472,7 +519,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
           })),
       ];
       const ending = (): void => {
-        heardRef.current = true;
+        if (!heardRef.current) {
+          heardRef.current = true;
+          persist();
+        }
         setDialogue({
           line: npc(b.story[last].say),
           choices: [
@@ -505,7 +555,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ],
       });
     },
-    [close, decide, t],
+    [close, decide, persist, t],
   );
   openTalkRef.current = openTalk;
 
@@ -518,10 +568,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (!seenRef.current.has(i)) {
         seenRef.current.add(i);
         setSeenCount(seenRef.current.size);
+        persist();
       }
       setDialogue({ line: { speaker: `${t.hunter}: ${clue.name}`, voice: 'player', text: clue.text }, choices: [{ label: t.moveOn, action: close }] });
     },
-    [close, t],
+    [close, persist, t],
   );
   const examineRef = useRef(examine);
   examineRef.current = examine;
@@ -619,6 +670,76 @@ export default function Rpg({ lang }: { lang: Lang }) {
       .finally(release);
   }, [dialogue, flash, gameLang, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
+
+  /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
+  const resume = (game: SavedGame) => {
+    primeVoice();
+    setStarted(true);
+    setEnding(null);
+    setDialogue(null);
+    setGenerating(false);
+    seedRef.current = game.seed;
+    staticRef.current = game.static;
+    placesRef.current = [];
+    charactersRef.current = [];
+    beatsRef.current = [];
+    lastLinesRef.current = new Map(game.lastLines);
+    spokenRef.current.clear();
+    askedRef.current.clear();
+    pendingRef.current = null;
+    resetDevlog();
+    const scene = sceneRef.current;
+    scene?.clearObjective();
+    scene?.clearPlaces();
+    scene?.clearNpcs();
+    scene?.setMarker(null);
+    scene?.teleport('spawn');
+    const remember = (c: Character) => {
+      if (!charactersRef.current.some((x) => x.name === c.name)) charactersRef.current = [...charactersRef.current, c];
+    };
+    for (const b of game.beats.slice(0, -1)) {
+      if (b.place) {
+        scene?.addPlace(b.place);
+        if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
+      }
+      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null);
+      remember(b.npc);
+      if (b.witness) {
+        scene?.placeNpc(b.witness.npc.name, b.witness.npc.color, b.place?.name ?? null, 1);
+        remember(b.witness.npc);
+      }
+      beatsRef.current = [...beatsRef.current, b];
+    }
+    historyRef.current = game.history;
+    setHistory(game.history);
+    const current = game.beats[game.beats.length - 1];
+    setupBeat(current);
+    if (current.job && game.progress > 0) {
+      const left = Math.max(0, current.job.count - game.progress);
+      if (left > 0) scene?.spawnObjective(current.job.kind, left, current.job.look, current.place?.name ?? null);
+      else {
+        scene?.clearObjective();
+        scene?.setMarker({ npc: current.npc.name });
+      }
+      progressRef.current = game.progress;
+      setProgress(game.progress);
+    }
+    seenRef.current = new Set(game.seen);
+    setSeenCount(game.seen.length);
+    heardRef.current = game.heard;
+    const d = game.decision === null ? null : current.decisions[game.decision];
+    decisionRef.current = d ? game.decision : null;
+    persist();
+    if (!d) return;
+    // Decided before the page went: carry it out now.
+    decidedRef.current = true;
+    if (!d.next) {
+      finish(current, current.npc.name, d.reply, game.history);
+      return;
+    }
+    pendingRef.current = writeBeat(current.index + 1, d.next, game.history, current.title);
+    void proceed(current, d, game.history);
+  };
 
   const begin = () => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
@@ -788,8 +909,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
           ) : (
             <p className="rpg-source">{t.readingKeys}</p>
           )}
+          {saved && saved.lang === gameLang && keysReady && (
+            <button type="button" className="rpg-start" onClick={() => resume(saved)}>
+              {t.continueQuest(saved.beats[saved.beats.length - 1].title)}
+            </button>
+          )}
           <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
-            {keysReady ? t.start : t.wait}
+            {keysReady ? (saved && saved.lang === gameLang ? t.newQuest : t.start) : t.wait}
           </button>
           <p className="rpg-dev-hint">{t.devHint}</p>
         </div>
