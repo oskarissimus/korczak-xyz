@@ -109,3 +109,18 @@ resource "google_cloud_run_service_iam_member" "roast_demo_public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+/*
+ * `rpgDemo` is the RPG's demo, and public for `roastDemo`'s reason: a stranger with no account
+ * plays on the owner's keys, so there is no token to check. What stands in its place is a budget in
+ * dollars — every call reserves its worst case in a transaction before it is made, per address and
+ * per day (`korczak-xyz/src/utils/rpg/demoLimits.ts`) — and a prompt the handler builds itself from
+ * a context it checks field by field. Service name lowercased, as above.
+ */
+resource "google_cloud_run_service_iam_member" "rpg_demo_public" {
+  project  = local.project_id
+  location = local.region
+  service  = "rpgdemo"
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
