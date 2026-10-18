@@ -11,6 +11,7 @@ import * as THREE from 'three';
 
 import type { Feature, PlaceSpec, TargetLook } from '../../utils/rpg/place';
 import { surfaceMat } from './surfaces';
+import { DEAD_TREES, ROCKS, TREES, type WorldKit } from './world';
 
 export const PLACE_RADIUS = 24;
 const CLEAR_RADIUS = 10;
@@ -72,10 +73,29 @@ function ringSpot(rand: () => number, inner = CLEAR_RADIUS + 1, outer = PLACE_RA
   return { x: Math.sin(a) * d, z: Math.cos(a) * d, a };
 }
 
-type Builder = (g: THREE.Group, obstacles: Obstacle[], rand: () => number) => void;
+/** The kit, when it has loaded; a feature built before then is made of primitives. */
+type Builder = (g: THREE.Group, obstacles: Obstacle[], rand: () => number, kit: WorldKit | null) => void;
+
+/** A kit piece at (x, z), turned at random and scaled by `s`. */
+function kitPiece(kit: WorldKit, name: string, x: number, z: number, s: number, rand: () => number) {
+  const p = kit.piece(name);
+  p.position.set(x, 0, z);
+  p.rotation.y = rand() * Math.PI * 2;
+  p.scale.setScalar(s);
+  return p;
+}
 
 const FEATURE_BUILDERS: Record<Feature, Builder> = {
-  pines(g, obstacles, rand) {
+  pines(g, obstacles, rand, kit) {
+    if (kit) {
+      for (let i = 0; i < 28; i++) {
+        const { x, z } = ringSpot(rand);
+        const s = 0.8 + rand() * 0.6;
+        g.add(kitPiece(kit, TREES[Math.floor(rand() * 3)], x, z, s, rand));
+        obstacles.push({ x, z, r: 0.5 * s });
+      }
+      return;
+    }
     const trunk = surfaceMat('bark', 1, 2);
     const leaf = surfaceMat('leaves', 2, 2, { color: 0x7d9a6a });
     for (let i = 0; i < 28; i++) {
@@ -89,7 +109,15 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
       obstacles.push({ x, z, r: 0.5 * s });
     }
   },
-  dead_trees(g, obstacles, rand) {
+  dead_trees(g, obstacles, rand, kit) {
+    if (kit) {
+      for (let i = 0; i < 12; i++) {
+        const { x, z } = ringSpot(rand);
+        g.add(kitPiece(kit, DEAD_TREES[Math.floor(rand() * DEAD_TREES.length)], x, z, 0.5 + rand() * 0.3, rand));
+        obstacles.push({ x, z, r: 0.4 });
+      }
+      return;
+    }
     const bark = surfaceMat('bark', 1, 2, { color: 0x8a8580 });
     for (let i = 0; i < 12; i++) {
       const { x, z } = ringSpot(rand);
@@ -112,7 +140,16 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
       obstacles.push({ x, z, r: 0.4 });
     }
   },
-  rocks(g, obstacles, rand) {
+  rocks(g, obstacles, rand, kit) {
+    if (kit) {
+      for (let i = 0; i < 14; i++) {
+        const { x, z } = ringSpot(rand, 4);
+        const s = 0.25 + rand() * 0.6;
+        g.add(kitPiece(kit, ROCKS[Math.floor(rand() * ROCKS.length)], x, z, s, rand));
+        if (s > 0.5) obstacles.push({ x, z, r: s * 1.4 });
+      }
+      return;
+    }
     const stone = surfaceMat('rock');
     for (let i = 0; i < 14; i++) {
       const { x, z } = ringSpot(rand, 4);
@@ -210,7 +247,20 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
     g.add(fire);
     obstacles.push({ x, z, r: 1 });
   },
-  huts(g, obstacles, rand) {
+  huts(g, obstacles, rand, kit) {
+    if (kit) {
+      for (let i = 0; i < 3; i++) {
+        const { x, z, a } = ringSpot(rand, CLEAR_RADIUS + 4, PLACE_RADIUS - 3);
+        const hut = kit.house('small', rand);
+        hut.position.set(x, 0, z);
+        hut.rotation.y = a + Math.PI;
+        // Settled a little: these are somebody's abandoned huts, not the village.
+        hut.rotation.z = (rand() - 0.5) * 0.04;
+        g.add(hut);
+        obstacles.push({ x, z, r: 3.4 });
+      }
+      return;
+    }
     // Weathered: these are somebody's abandoned huts, greyer than the village's.
     const wall = surfaceMat('planks', 2, 1, { color: 0xc0b8b0 });
     const roof = surfaceMat('thatch', 2, 1, { color: 0x9a9080 });
@@ -231,7 +281,14 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
       obstacles.push({ x, z, r: 2.8 });
     }
   },
-  mushrooms(g, _obstacles, rand) {
+  mushrooms(g, _obstacles, rand, kit) {
+    if (kit) {
+      for (let i = 0; i < 26; i++) {
+        const { x, z } = ringSpot(rand, 3);
+        g.add(kitPiece(kit, 'Mushroom_Common', x, z, 0.8 + rand() * 1.2, rand));
+      }
+      return;
+    }
     for (let i = 0; i < 26; i++) {
       const { x, z } = ringSpot(rand, 3);
       const s = 0.2 + rand() * 0.5;
@@ -266,7 +323,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
 };
 
 /** The place, centred on the origin of its group; the caller moves the group and its obstacles. */
-export function buildPlace(spec: PlaceSpec): BuiltPlace {
+export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null): BuiltPlace {
   const rand = rng(hashString(spec.name + spec.biome));
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
@@ -280,7 +337,7 @@ export function buildPlace(spec: PlaceSpec): BuiltPlace {
   ground.receiveShadow = true;
   group.add(ground);
 
-  for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand);
+  for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand, kit);
   shadowed(group);
   ground.castShadow = false;
   return { group, obstacles };

@@ -133,12 +133,29 @@ content-hashed and immutable.
 - **No environment map**, so anything fully metallic renders black: `dress` caps the outfits'
   metalness at 0.3 and the sword is 0.35.
 - **The models never block the game.** A character is an empty `THREE.Group` until the files
-  arrive (~5.8 MB in all, once); if they fail, everyone becomes the old capsule and the game plays.
-- The world's shapes (houses, trees, rocks) are still primitives under the new surfaces.
+  arrive (~5.8 MB for the people, ~4 MB for the world, once); if they fail, everyone becomes the old capsule and the game plays.
+- **The world** (`components/Rpg/world.ts`): Quaternius's *Medieval Village*, *Stylized Nature* and
+  *Fantasy Props* megakits, cut to three files (`village.glb`, `nature.glb`, `props.glb`, ~4 MB)
+  whose top-level nodes are the pieces by source name. Houses are *built*, not loaded: 2 m wall
+  modules (door, wide windows, plaster/timber/brick), corner posts, two gables and a tiled roof,
+  small 4×6 m or large 6×8 m, facing the square. Trees and ground cover (~2,900 grass, fern,
+  bush and flower clumps outside radius 14) are `InstancedMesh` per part; a tree a place clears is
+  hidden by a zero matrix, not removed. Kit meshes are `userData.shared`, so `clearPlaces`
+  disposes none of them. Quest places use the kit's pines, dead trees, rocks and huts when it has
+  loaded and primitives otherwise. The well is still hand-built (inner and outer walls — a single
+  open cylinder had its far side culled and read as a hole), and so are graves and campfires.
+- **The ground hides its tiling** (`breakTiling` in `surfaces.ts`): one 512 px scan repeated 70×
+  read as a chessboard (owner: "you can see how repetitive the texture is"), so the shader samples
+  it at two scales, turned, and lets a very slow sample of the same map choose between them and
+  shade the patch.
+- **Shadow bias** (`-0.0004`, normal bias `0.04`) is what keeps the kit's flat walls free of
+  saw-tooth acne; drop it and every house is striped.
 
-The source packs are ~500 MB of 4K PNGs. `scripts/rpg-characters.mjs` (where to download them,
-what is cut: textures to 1024/512 WebP, the Unreal-only UV sets, bodies cut to head and neck, all
-but the needed clips) and `scripts/rpg-textures.mjs` regenerate the committed files.
+The source packs are ~500 MB of 4K PNGs. `scripts/rpg-characters.mjs` and `scripts/rpg-world.mjs`
+(where to download them, what is cut: textures to 1024/512 WebP, the Unreal-only UV sets, bodies
+cut to head and neck, all but the needed clips and pieces; both read through `scripts/rpg-gltf.mjs`,
+which repairs the packs' misnamed texture URIs) and `scripts/rpg-textures.mjs` regenerate the
+committed files.
 
 ## Keys
 

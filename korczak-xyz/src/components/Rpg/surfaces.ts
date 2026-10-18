@@ -77,3 +77,31 @@ export function surfaceMat(
 ): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ map: surface(name, repeatX, repeatY), roughness: 0.95, ...extra });
 }
+
+/**
+ * Hides a tiled ground's repeat: the map is sampled twice, at its own scale and at a third of it
+ * turned and offset, and a very large, slow sample of the same map decides which shows where and
+ * how light the patch is. Seventy tiles of one 512 px scan read as a chessboard from a hill
+ * (owner, Oct 2026: "the grass makes a strange effect, you can see how repetitive it is").
+ */
+export function breakTiling(material: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#ifdef USE_MAP
+        vec2 uvA = vMapUv;
+        vec2 uvB = mat2(0.8, -0.6, 0.6, 0.8) * vMapUv * 0.37 + vec2(0.31, 0.77);
+        float macro = texture2D(map, vMapUv * 0.031).g;
+        float macro2 = texture2D(map, vMapUv * 0.0071 + vec2(0.5)).r;
+        vec4 a = texture2D(map, uvA);
+        vec4 b = texture2D(map, uvB);
+        float k = smoothstep(0.35, 0.65, macro * 0.6 + macro2 * 0.8 - 0.2);
+        vec4 sampledDiffuseColor = mix(a, b, k);
+        sampledDiffuseColor.rgb *= 0.82 + 0.36 * macro2;
+        diffuseColor *= sampledDiffuseColor;
+      #endif`,
+    );
+  };
+  material.customProgramCacheKey = () => 'break-tiling';
+  return material;
+}

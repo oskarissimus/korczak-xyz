@@ -23,7 +23,8 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { surfaceMat } from './surfaces';
+import { breakTiling, surfaceMat } from './surfaces';
+import { GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, type HouseKind } from './world';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -64,8 +65,27 @@ const ATTACK_COOLDOWN = 0.55;
 const MAX_HP = 100;
 
 interface Tree {
+  /** The cone and trunk it starts as; hidden for good once the kit's trees stand in. */
   meshes: THREE.Mesh[];
   obstacle: Obstacle;
+  /** Its slot in the instanced kit trees, once those are up. */
+  slot?: { meshes: THREE.InstancedMesh[]; index: number; matrices: THREE.Matrix4[] };
+  hidden?: boolean;
+}
+
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+
+/** Shows or hides one of the scattered trees, whichever form it has now. */
+function showTree(tree: Tree, visible: boolean) {
+  tree.hidden = !visible;
+  if (tree.slot) {
+    tree.slot.meshes.forEach((m, j) => {
+      m.setMatrixAt(tree.slot!.index, visible ? tree.slot!.matrices[j] : ZERO);
+      m.instanceMatrix.needsUpdate = true;
+    });
+  } else {
+    for (const m of tree.meshes) m.visible = visible;
+  }
 }
 
 interface Enemy {
@@ -174,6 +194,10 @@ export class RpgScene {
   private player: THREE.Group;
   private sword: THREE.Mesh;
   private chars = new Characters();
+  private kit = new WorldKit();
+  /** The primitive houses, taken down when the kit's are put up. */
+  private stopgapHouses: THREE.Group[] = [];
+  private houseObstacles: Obstacle[] = [];
   /** Null until the models load, and for good if they fail (the hunter is then a capsule). */
   private playerRig: Rig | null = null;
   /** Killed humanoids playing their death before they are taken away, seconds left. */
@@ -269,6 +293,9 @@ export class RpgScene {
     sun.position.set(40, 70, 25);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    // Without these the walls wore saw-toothed bands of their own shadow (owner's screenshot).
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.04;
     const s = sun.shadow.camera;
     s.left = -60;
     s.right = 60;
@@ -285,7 +312,7 @@ export class RpgScene {
   private buildWorld() {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
-      surfaceMat('grass', 70, 70, { roughness: 1 }),
+      breakTiling(surfaceMat('ground', 70, 70, { roughness: 1 })),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -293,20 +320,162 @@ export class RpgScene {
 
     this.buildVillage();
     this.buildTrees();
+    this.kit.ready.then(
+      () => this.furnish(),
+      () => {},
+    );
+  }
+
+  /** Once the kit is here: its houses, fence, props, trees and ground cover over the stopgaps. */
+  private furnish() {
+    // The houses: two large, three small, where the primitive ones stood.
+    const kinds: HouseKind[] = ['large', 'small', 'large', 'small', 'small'];
+    this.stopgapHouses.forEach((old, i) => {
+      const house = this.kit.house(kinds[i], rng(100 + i));
+      house.position.copy(old.position);
+      house.rotation.y = old.rotation.y;
+      this.scene.remove(old);
+      this.scene.add(house);
+      this.houseObstacles[i].r = HOUSE_RADIUS[kinds[i]];
+    });
+
+    // The fence: rails instead of posts, with the same eight gaps.
+    for (const post of this.fencePosts) this.scene.remove(post);
+    const n = 84;
+    for (let i = 0; i < n; i++) {
+      const a = ((i + 0.5) / n) * Math.PI * 2;
+      const toGap = a % (Math.PI / 4);
+      if (Math.min(toGap, Math.PI / 4 - toGap) < 0.1) continue;
+      const rail = this.kit.piece('Prop_WoodenFence_Single');
+      rail.position.set(Math.sin(a) * 28, 0, Math.cos(a) * 28);
+      // A rail runs along its own x; turned by `a`, x is the ring's tangent there.
+      rail.rotation.y = a;
+      this.scene.add(rail);
+    }
+
+    // Life in the square: barrels and crates by the houses, a cart, a bench and a bucket by the well.
+    const place = (name: string, x: number, z: number, rot = 0) => {
+      const p = this.kit.piece(name);
+      p.position.set(x, 0, z);
+      p.rotation.y = rot;
+      this.scene.add(p);
+    };
+    place('Barrel', -8.2, -6.4);
+    place('Barrel', -7.4, -6.9, 1);
+    place('Crate_Wooden', 10.6, -10.2, 0.4);
+    place('Crate_Wooden', 11.3, -9.3, 1.2);
+    place('Barrel', -10.2, 6.8);
+    place('Stall_Cart_Empty', 9.5, 4.2, -2.2);
+    place('Prop_Wagon', -18, -2, 0.5);
+    place('Bench', 3.2, -0.2, 0.15);
+    place('Bucket_Wooden_1', 1.5, -1.6);
+    this.obstacles.push({ x: 9.5, z: 4.2, r: 1.6 }, { x: -18, z: -2, r: 2 });
+
+    this.plantTrees();
+    this.plantGroundCover();
+  }
+
+  /** The scattered trees, as kit trees: one instanced mesh per part per kind, hidden ones scaled to 0. */
+  private plantTrees() {
+    const rand = rng(7);
+    const byKind = new Map<string, Tree[]>();
+    for (const tree of this.trees) {
+      const kind = TREES[Math.floor(rand() * TREES.length)];
+      byKind.set(kind, [...(byKind.get(kind) ?? []), tree]);
+    }
+    for (const [kind, trees] of byKind) {
+      const parts = this.kit.parts(kind);
+      const meshes = parts.map((part) => {
+        const m = new THREE.InstancedMesh(part.geometry, part.material, trees.length);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        m.userData.shared = true;
+        this.scene.add(m);
+        return m;
+      });
+      trees.forEach((tree, i) => {
+        const scale = tree.obstacle.r / 0.5;
+        const base = new THREE.Matrix4().compose(
+          new THREE.Vector3(tree.obstacle.x, 0, tree.obstacle.z),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
+          new THREE.Vector3(scale, scale, scale),
+        );
+        // Each part sits differently inside the tree, so each instanced mesh has its own matrix.
+        tree.slot = { meshes, index: i, matrices: parts.map((p) => base.clone().multiply(p.matrix)) };
+        for (const m of tree.meshes) this.scene.remove(m);
+        showTree(tree, !tree.hidden);
+      });
+      meshes.forEach((m) => {
+        m.instanceMatrix.needsUpdate = true;
+        m.computeBoundingSphere();
+      });
+    }
+  }
+
+  /**
+   * Grass tufts, ferns, bushes and flowers across the open ground, which is what breaks a tiled
+   * floor up best: the eye stops reading the pattern once things stand on it. Kept off the square.
+   */
+  private plantGroundCover() {
+    const rand = rng(11);
+    // How many, and how big against the kit's own size: its tall grass is 1.9 m, made for a
+    // stylised world, and at full size the meadow came up to the hunter's shoulders.
+    const cover: Record<(typeof GROUND_COVER)[number], [number, number, number]> = {
+      Grass_Common_Short: [1400, 0.35, 0.6],
+      Grass_Common_Tall: [600, 0.25, 0.45],
+      Grass_Wispy_Tall: [400, 0.25, 0.45],
+      Fern_1: [200, 0.4, 0.7],
+      Bush_Common: [110, 0.5, 0.9],
+      Bush_Common_Flowers: [50, 0.5, 0.9],
+      Flower_3_Group: [160, 0.3, 0.5],
+    };
+    for (const name of GROUND_COVER) {
+      const parts = this.kit.parts(name);
+      const [n, minS, maxS] = cover[name];
+      const meshes = parts.map((part) => {
+        const m = new THREE.InstancedMesh(part.geometry, part.material, n);
+        m.receiveShadow = true;
+        m.castShadow = name.startsWith('Bush');
+        m.userData.shared = true;
+        this.scene.add(m);
+        return m;
+      });
+      for (let i = 0; i < n; i++) {
+        let x = 0;
+        let z = 0;
+        do {
+          x = (rand() - 0.5) * WORLD_HALF * 2;
+          z = (rand() - 0.5) * WORLD_HALF * 2;
+        } while (Math.hypot(x, z) < 14);
+        const s = minS + rand() * (maxS - minS);
+        const base = new THREE.Matrix4().compose(
+          new THREE.Vector3(x, 0, z),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
+          new THREE.Vector3(s, s, s),
+        );
+        meshes.forEach((m, j) => m.setMatrixAt(i, base.clone().multiply(parts[j].matrix)));
+      }
+      meshes.forEach((m) => {
+        m.instanceMatrix.needsUpdate = true;
+        m.computeBoundingSphere();
+      });
+    }
   }
 
   private buildVillage() {
     const wall = surfaceMat('plaster', 2, 1.2, { color: 0xf0e6d6 });
     const timber = surfaceMat('planks', 2, 0.3);
     const thatch = surfaceMat('thatch', 3, 2);
-    const houses: [number, number, number][] = [
-      [-12, -10, 0.3],
-      [14, -14, -0.4],
-      [-14, 10, 0.2],
-      [15, 12, 0.6],
-      [-10, -22, 0.1],
+    const houses: [number, number][] = [
+      [-12, -10],
+      [14, -14],
+      [-14, 10],
+      [15, 12],
+      [-10, -22],
     ];
-    for (const [x, z, rot] of houses) {
+    for (const [x, z] of houses) {
+      // Every door faces the square.
+      const rot = Math.atan2(-x, -z);
       const house = new THREE.Group();
       const base = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 5), wall);
       base.position.y = 2;
@@ -326,22 +495,13 @@ export class RpgScene {
       house.position.set(x, 0, z);
       house.rotation.y = rot;
       this.scene.add(house);
-      this.obstacles.push({ x, z, r: 4.3 });
+      this.stopgapHouses.push(house);
+      const obstacle = { x, z, r: 4.3 };
+      this.obstacles.push(obstacle);
+      this.houseObstacles.push(obstacle);
     }
 
-    // A well in the square, the NPC beside it.
-    const stone = surfaceMat('stone', 3, 0.5);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 1, 14, 1, true), stone);
-    well.position.set(0, 0.5, -3);
-    well.castShadow = true;
-    const water = new THREE.Mesh(
-      new THREE.CircleGeometry(1.1, 14),
-      new THREE.MeshStandardMaterial({ color: 0x1f3a4a }),
-    );
-    water.rotation.x = -Math.PI / 2;
-    water.position.set(0, 0.6, -3);
-    this.scene.add(well, water);
-    this.obstacles.push({ x: 0, z: -3, r: 1.5 });
+    this.buildWell(0, -3);
 
     // A fence ring around the village, open toward each of the eight directions a quest may name.
     const post = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 6);
@@ -353,7 +513,58 @@ export class RpgScene {
       p.position.set(Math.sin(a) * 28, 0.6, Math.cos(a) * 28);
       p.castShadow = true;
       this.scene.add(p);
+      this.fencePosts.push(p);
     }
+  }
+
+  private fencePosts: THREE.Mesh[] = [];
+
+  /**
+   * The well in the square: a stone ring with a wall to it, inside and out, water a little down,
+   * and a timber frame with a windlass and a small roof. The first one was a single open-ended
+   * cylinder, so its far side was culled and it looked broken (owner, Oct 2026).
+   */
+  private buildWell(x: number, z: number) {
+    const well = new THREE.Group();
+    const stone = surfaceMat('stone', 4, 0.6);
+    const inner = surfaceMat('stone', 3, 0.6, { color: 0x8a8a8a, side: THREE.BackSide });
+    const timber = surfaceMat('planks', 0.3, 1.5);
+    const outside = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.38, 0.95, 24, 1, true), stone);
+    outside.position.y = 0.475;
+    const inside = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 0.95, 24, 1, true), inner);
+    inside.position.y = 0.475;
+    const rim = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.32, 24, 1), surfaceMat('stone', 1, 0.3));
+    rim.rotation.x = -Math.PI / 2;
+    rim.position.y = 0.95;
+    const water = new THREE.Mesh(
+      new THREE.CircleGeometry(1.02, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1b2f3a, roughness: 0.1, metalness: 0.2 }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.45;
+    well.add(outside, inside, rim, water);
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.4, 0.16), timber);
+      post.position.set(side * 1.18, 1.2, 0);
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.05, 1.05), surfaceMat('planks', 1.5, 0.5));
+      plank.position.set(0, 2.62, side * 0.42);
+      plank.rotation.x = side * 0.55;
+      well.add(post, plank);
+    }
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.5, 10), timber);
+    axle.rotation.z = Math.PI / 2;
+    axle.position.y = 1.95;
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.9, 5), new THREE.MeshStandardMaterial({ color: 0x8a7350 }));
+    rope.position.y = 1.5;
+    well.add(axle, rope);
+    well.traverse((o) => {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    water.castShadow = false;
+    well.position.set(x, 0, z);
+    this.scene.add(well);
+    this.obstacles.push({ x, z, r: 1.6 });
   }
 
   private tree(x: number, z: number, scale: number) {
@@ -400,11 +611,11 @@ export class RpgScene {
       const inPlace = Math.hypot(tx - x, tz - z) < PLACE_RADIUS + 3;
       if (inPlace || nearSegment(tx, tz, x, z) < 4) {
         tree.obstacle.off = true;
-        for (const m of tree.meshes) m.visible = false;
+        showTree(tree, false);
       }
     }
 
-    const built = buildPlace(spec);
+    const built = buildPlace(spec, this.kit.loaded ? this.kit : null);
     built.group.position.copy(center);
     this.scene.add(built.group);
     const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
@@ -429,6 +640,8 @@ export class RpgScene {
     for (const place of this.places.values()) {
       this.scene.remove(place.group, place.path);
       place.group.traverse((o) => {
+        // Kit pieces share their geometry and materials with every other copy.
+        if (o.userData.shared) return;
         const mesh = o as THREE.Mesh;
         mesh.geometry?.dispose();
         (mesh.material as THREE.Material | undefined)?.dispose?.();
@@ -437,7 +650,7 @@ export class RpgScene {
     this.places.clear();
     for (const tree of this.trees) {
       tree.obstacle.off = false;
-      for (const m of tree.meshes) m.visible = true;
+      showTree(tree, true);
     }
   }
 
@@ -511,6 +724,21 @@ export class RpgScene {
     this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
     // The box is centred; most of its 1.1 m is blade, beyond the fist.
     this.sword.position.copy(grip).addScaledVector(along, 0.42 / s);
+
+    // The kit's bronze sword, when it comes: its blade is +y, the pommel at the bottom.
+    this.kit.ready.then(
+      () => {
+        const blade = this.kit.piece('Sword_Bronze');
+        const box = new THREE.Box3().setFromObject(blade);
+        blade.scale.setScalar(1 / s);
+        blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
+        // The fist closes round the grip a hand's width above the pommel.
+        blade.position.copy(grip).addScaledVector(along, -(box.min.y + 0.12) / s);
+        hand.remove(this.sword);
+        hand.add(blade);
+      },
+      () => {},
+    );
   }
 
   /** Sends every character away, for a new quest. */
