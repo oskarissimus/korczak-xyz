@@ -42,7 +42,15 @@ const good = {
   objectiveText: 'Kill the ghouls on Gallows Hill',
   greeting: 'You came.',
   waitingLine: 'They are still there!',
-  situation: 'The ring was never lost. Marta sold it.',
+  story: [
+    { ask: 'What happened here?', say: 'They came at dusk. I hid in the crypt.' },
+    { ask: 'And the ring?', say: 'The ring was never lost. Marta sold it.' },
+  ],
+  clues: [
+    { name: 'A pawn ticket', text: 'A pawn ticket, with Marta’s mark on it.', ask: 'Who pawned this?', reply: 'I did. For her.', shape: 'scroll' },
+    { name: 'Nothing', text: '' },
+  ],
+  witness: { name: 'Jagna', gender: 'female', greeting: 'Don’t trust the old man.', talk: [{ label: 'Why?', reply: 'He drinks.' }] },
   smallTalk: [{ label: 'Who are you?', reply: 'The gravedigger.' }],
   decisions: [
     { label: 'Show me where she sold it.', reply: 'To the fence by the mill.', consequence: 'The hunter went after the fence.' },
@@ -61,6 +69,26 @@ describe('parseBeat', () => {
       job: { kind: 'slay', count: 3, targetName: 'ghoul', look: { shape: 'beast' } },
     });
     expect(beat?.decisions.map((d) => d.next)).toEqual([{ kind: 'collect', count: 2 }, null]);
+    expect(beat?.story.map((p) => p.ask)).toEqual(['What happened here?', 'And the ring?']);
+    expect(beat?.situation).toBe('They came at dusk. I hid in the crypt. The ring was never lost. Marta sold it.');
+    expect(beat?.clues).toHaveLength(1);
+    expect(beat?.clues[0]).toMatchObject({ name: 'A pawn ticket', ask: 'Who pawned this?', look: { shape: 'scroll' } });
+    expect(beat?.witness).toMatchObject({ npc: { name: 'Jagna', gender: 'female' }, greeting: 'Don’t trust the old man.' });
+  });
+
+  it('takes a story told in one go, and fills a missing question', () => {
+    const { story: _s, ...rest } = good;
+    const flat = parseBeat(JSON.stringify({ ...rest, situation: 'Marta sold it.' }), ctx);
+    expect(flat?.story).toEqual([{ ask: 'What happened?', say: 'Marta sold it.' }]);
+    const bare = parseBeat(JSON.stringify({ ...good, story: [{ say: 'One.' }, { say: 'Two.' }] }), ctx);
+    expect(bare?.story.map((p) => p.ask)).toEqual(['What happened?', 'Go on.']);
+  });
+
+  it('drops a witness who narrates or is the npc again', () => {
+    const told = { ...good, witness: { ...good.witness, greeting: 'Jagna spits on the ground.' } };
+    expect(parseBeat(JSON.stringify(told), ctx)?.witness).toBeNull();
+    const twice = { ...good, witness: { ...good.witness, name: 'Old Tomasz' } };
+    expect(parseBeat(JSON.stringify(twice), ctx)?.witness).toBeNull();
   });
 
   it('keeps a returning character as they were', () => {
@@ -82,7 +110,7 @@ describe('parseBeat', () => {
     expect(parseBeat(JSON.stringify({ ...good, place: 'village' }), ctx)).toBeNull();
     expect(parseBeat(JSON.stringify({ ...good, targetName: '' }), ctx)).toBeNull();
     expect(parseBeat(JSON.stringify({ ...good, decisions: good.decisions.slice(0, 1) }), ctx)).toBeNull();
-    expect(parseBeat(JSON.stringify({ ...good, situation: '' }), ctx)).toBeNull();
+    expect(parseBeat(JSON.stringify({ ...good, story: [] }), ctx)).toBeNull();
     expect(parseBeat('Sorry, I cannot help with that.', ctx)).toBeNull();
   });
 
@@ -95,7 +123,7 @@ describe('parseBeat', () => {
 
   it('survives a raw line break inside a string', () => {
     const broken = JSON.stringify(good).replace('Marta sold it.', 'Marta\nsold it.');
-    expect(parseBeat(broken, ctx)?.situation).toBe('The ring was never lost. Marta sold it.');
+    expect(parseBeat(broken, ctx)?.story[1].say).toBe('The ring was never lost. Marta sold it.');
     expect(extractJson('{"a": 1,}')).toEqual({ a: 1 });
   });
 });
@@ -107,6 +135,8 @@ describe('beatPrompt', () => {
     for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) expect(prompt).toContain(`"${word}"`);
     expect(prompt).toContain("kill 3 monsters");
     expect(prompt).toContain("IT IS SPOKEN DIALOGUE");
+    expect(prompt).toContain('HOW IT IS TOLD');
+    expect(prompt).toContain('"clues"');
     expect(prompt).toContain('1. leads on to a step of gathering 2 things');
     expect(prompt).toContain('2. ENDS the quest');
     expect(prompt).toContain('The hunter decided: "I will find it."');
@@ -173,7 +203,7 @@ describe('narrated', () => {
   });
 
   it('throws away a beat written as narration', () => {
-    const told = { ...good, situation: 'Old Tomasz says that the ring was sold.' };
+    const told = { ...good, story: [{ ask: 'And?', say: 'Old Tomasz says that the ring was sold.' }] };
     expect(parseBeat(JSON.stringify(told), ctx)).toBeNull();
   });
 });

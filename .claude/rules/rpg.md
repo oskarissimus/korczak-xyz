@@ -75,16 +75,32 @@ order.
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
 
+**A story is told, not summarised** (owner, Oct 2026: the lines "sounded like a condensed
+narrative, not a person telling their story or asking for something"; depth should come from
+parts, from examining things, from other people). A beat's `story` is 2–4 parts, each a question
+the hunter asks and 1–3 spoken sentences back, and the prompt asks for a real person: an opening
+line or two, then what happened, what they fear or are ashamed of, and only at the end what they
+want, with hesitation and concrete detail. Besides that a beat may have up to 2 **clues** —
+things lying near the character, built from the item shapes, that E examines (the hunter's own eye,
+in Brian's voice) and that each open a question for the character, who then admits something more
+— and a **witness**, a second character at the place with their own greeting and one or two
+answers. `situation` is still there, the parts joined, for later prompts and the chronicle; an
+answer with only a `situation` is played as a one-part story.
+
 **Nothing is offered before it has been said.** A character opens with the greeting and one way
-on (ask about it, or goodbye); the decisions and the small-talk questions come only with the
-situation, and the prompt tells the model the greeting must already name the trouble and that
-every person or fact a decision or question mentions must be in the situation. The first version
-put the small talk beside the greeting, and the opening offered "Why did you keep silent so long?"
-and "Where was the girl seen?" after one line that mentioned neither (owner, Oct 2026).
+on (the first part's question, or goodbye); each part offers only the next question; the
+decisions, the small-talk questions and the questions of clues already examined come with the last
+part, and a character asked before the job is done only says the waiting line. Once the story has
+been heard, talking again goes straight back to the last part. The first version put the small
+talk beside the greeting, and the opening offered "Why did you keep silent so long?" and "Where
+was the girl seen?" after one line that mentioned neither (owner, Oct 2026).
+
+**E reaches the nearest thing**, character, clue or thing to pick up (`nearestThing`): with a
+witness and clues at a place, a character standing among the herbs swallowed every press.
 
 **Every line is spoken, never narrated.** The prompt says so with a wrong and a right example
 (Flash-Lite wrote "Helena weeps and says her daughter-in-law hanged herself" as Helena's own line,
-owner, Oct 2026), and `narrated` in `quest.ts` throws away a beat whose greeting, situation,
+owner, Oct 2026), and `narrated` in `quest.ts` throws away a beat whose greeting, story parts,
 waiting line or replies open with the character's name as the subject or report their speech
 ("mówi, że", "says that") — the next model is asked instead. Decision labels are the hunter's
 spoken line, at most 12 words.
@@ -92,11 +108,15 @@ spoken line, at most 12 words.
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
-them. Google first, OpenAI `gpt-4o-mini` only without a Google key. On Google the models are tried
-in order (`GOOGLE_MODELS` in `storyteller.ts`): `gemini-flash-latest`, then
-`gemini-flash-lite-latest` (first until the narration above), both in JSON mode, then `gemma-3-27b-it` (no JSON mode, no `systemInstruction`).
+them. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
+in order (`GOOGLE_MODELS` in `storyteller.ts`), **strongest first** (owner, Oct 2026: "the better
+model first and a fallback; we switch to a cheaper one when we optimise for cost"):
+`gemini-pro-latest`, `gemini-flash-latest`, `gemini-flash-lite-latest`, all in JSON mode, then
+`gemma-3-27b-it` (no JSON mode, no `systemInstruction`). Flash-Lite was first until it wrote
+briefings and narration; Pro thinks before it writes, so the timeout is 90s and the output budget
+16k tokens.
 A 404, a 429 (quotas are per model) or a 400 naming the model moves to the next; so does an answer
-`parseBeat` cannot play. Anything else — a rejected key, a timeout (45s) — ends it. No key or no
+`parseBeat` cannot play. Anything else — a rejected key, a timeout — ends it. No key or no
 usable answer plays the hand-written quest, and **the reason is put on screen** in a toast.
 
 **Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into
@@ -104,8 +124,8 @@ a breadcrumb and the only symptom, reported by the owner, was "always the drowne
 
 - Sentry Logs, `rpg.quest`, one per beat: outcome (`generated`, `no-key`, `unusable`, `failed`),
   provider, model, ms, each try's model and status, which beat, its job (`kind` is `opening` for
-  the first), the plan (`slay,talk,end`), the biome (`village` for the square) and the targets'
-  shape. Sent signed out too. Never the prompt or the story.
+  the first), the plan (`slay,talk,end`), the biome (`village` for the square), the targets'
+  shape, how many story parts and clues, and whether there is a witness. Sent signed out too. Never the prompt or the story.
 - For a signed-in account, `gs://korczak-xyz-501720-backseat/users/{uid}/rpg/beats/{at}.json`
   (before the beats, `rpg/quests/`): the prompt, the raw answer, every model tried with its error,
   the parsed beat, the release. The

@@ -48,6 +48,11 @@ const en = {
   forget: 'Forget the chronicle',
   remembered: 'Written into the chronicle: later quests will remember it.',
   yourDecisions: 'Your decisions',
+  examine: 'Examine',
+  backToIt: 'Back to the matter.',
+  clues: (seen: number, total: number) => `Traces examined: ${seen}/${total}`,
+  hunter: 'You',
+  moveOn: 'Move on.',
   fullscreen: 'Fullscreen',
   arrived: 'You have reached',
 };
@@ -100,6 +105,11 @@ const pl: typeof en = {
   forget: 'Zapomnij kronikę',
   remembered: 'Zapisane w kronice: kolejne questy będą o tym pamiętać.',
   yourDecisions: 'Twoje decyzje',
+  examine: 'Zbadaj',
+  backToIt: 'Wróćmy do rzeczy.',
+  clues: (seen, total) => `Zbadane ślady: ${seen}/${total}`,
+  hunter: 'Ty',
+  moveOn: 'Idę dalej.',
   fullscreen: 'Pełny ekran',
   arrived: 'Docierasz do miejsca',
 };

@@ -32,13 +32,13 @@ import {
 } from '../../utils/rpg/quest';
 import { recordQuest } from '../../utils/rpg/questLog';
 import { generateBeat, type QuestSource } from '../../utils/rpg/storyteller';
-import { primeVoice, speakLines, stopVoice, type SpokenLine } from '../../utils/rpg/voice';
-import { RpgScene } from './RpgScene';
+import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { RpgScene, type Prompt } from './RpgScene';
 import { translations } from './translations';
 
 interface DialogueLine {
   speaker: string;
-  voice: Character['gender'];
+  voice: VoiceName;
   text: string;
 }
 
@@ -105,7 +105,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [ending, setEnding] = useState<Ending | null>(null);
   const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
   const [dialogue, setDialogue] = useState<{ line: DialogueLine; choices: Choice[] } | null>(null);
-  const [prompt, setPrompt] = useState<'talk' | 'pickup' | null>(null);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [hp, setHp] = useState(100);
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
   const [locked, setLocked] = useState(false);
@@ -134,6 +134,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const charactersRef = useRef<Character[]>([]);
   /** What each character last said, for talking to them again after their beat. */
   const lastLinesRef = useRef(new Map<string, string>());
+  /** The current beat's clues the hunter has examined, by index. */
+  const seenRef = useRef(new Set<number>());
+  const [seenCount, setSeenCount] = useState(0);
+  /** The current beat's story has been heard to the end, so talking again goes straight to it. */
+  const heardRef = useRef(false);
   /** The current beat has been decided; its character has nothing more to offer. */
   const decidedRef = useRef(false);
   /** The opening could not be written, so the whole quest is the hand-written one. */
@@ -195,6 +200,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null);
       if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
+      scene?.clearClues();
+      b.clues.forEach((clue, i) => scene?.placeClue(`clue-${b.index}-${i}`, clue.look, b.npc.name));
+      seenRef.current = new Set();
+      setSeenCount(0);
+      heardRef.current = false;
+      if (b.witness) {
+        const w = b.witness;
+        scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1);
+        if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
+      }
       if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
       else scene?.clearObjective();
       progressRef.current = 0;
@@ -261,6 +276,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const scene = new RpgScene(canvas, {
       onPrompt: setPrompt,
       onTalk: (name) => openTalkRef.current(name),
+      onExamine: (id) => examineRef.current(id),
       onProgress: () => {
         const b = beatRef.current;
         if (!b?.job) return;
@@ -367,6 +383,25 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (!b || endingRef.current) return;
       const bye: Choice = { label: t.goodbye, action: close };
       const who = charactersRef.current.find((c) => c.name === name);
+      const w = b.witness;
+      if (w && name === w.npc.name && !decidedRef.current) {
+        // Somebody else at the place, with their own side of it.
+        const line = (text: string): DialogueLine => ({ speaker: w.npc.name, voice: w.npc.gender, text });
+        const root = (): void =>
+          setDialogue({
+            line: line(w.greeting),
+            choices: [
+              ...w.talk.map((o) => ({
+                label: o.label,
+                action: () => setDialogue({ line: line(o.reply), choices: [{ label: t.back, action: root }, bye] }),
+              })),
+              bye,
+            ],
+          });
+        lastLinesRef.current.set(w.npc.name, w.greeting);
+        root();
+        return;
+      }
       if (name !== b.npc.name || decidedRef.current) {
         setDialogue({
           line: { speaker: name, voice: who?.gender ?? 'male', text: lastLinesRef.current.get(name) ?? t.nothingMore },
@@ -375,42 +410,72 @@ export default function Rpg({ lang }: { lang: Lang }) {
         return;
       }
       const npc = (text: string): DialogueLine => ({ speaker: b.npc.name, voice: b.npc.gender, text });
-      const smallTalk = (back: () => void): Choice[] =>
-        b.smallTalk.map((o) => ({
-          label: o.label,
-          action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: back }] }),
-        }));
 
       if (b.job && progressRef.current < b.job.count) {
-        const root = () => setDialogue({ line: npc(b.waitingLine), choices: [bye] });
-        root();
+        setDialogue({ line: npc(b.waitingLine), choices: [bye] });
         return;
       }
-      // Questions about the story come after the story: asked from the greeting, they named a
-      // silence or a girl the hunter had not heard of yet (owner, Oct 2026).
-      const situation = (): void =>
+      // The story comes out in parts, one question at a time; the decisions, the questions and
+      // what the clues opened up come only after the last part. Questions offered beside the
+      // greeting named a silence and a girl the hunter had not heard of yet (owner, Oct 2026), and
+      // a whole story in one line read as a summary, not a person (owner, Oct 2026).
+      const last = b.story.length - 1;
+      const followUps = (): Choice[] => [
+        ...b.smallTalk.map((o) => ({
+          label: o.label,
+          action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }] }),
+        })),
+        ...b.clues
+          .filter((_, i) => seenRef.current.has(i))
+          .map((c) => ({
+            label: c.ask,
+            action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }] }),
+          })),
+      ];
+      const ending = (): void => {
+        heardRef.current = true;
         setDialogue({
-          line: npc(b.situation),
-          choices: [
-            ...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })),
-            ...smallTalk(() => situation()),
-            bye,
-          ],
+          line: npc(b.story[last].say),
+          choices: [...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })), ...followUps(), bye],
         });
+      };
+      const part = (i: number): void => {
+        if (i >= last) {
+          ending();
+          return;
+        }
+        setDialogue({ line: npc(b.story[i].say), choices: [{ label: b.story[i + 1].ask, action: () => part(i + 1) }, bye] });
+      };
       if (!b.greeting) {
-        situation();
+        if (heardRef.current) ending();
+        else part(0);
         return;
       }
-      const root = () =>
-        setDialogue({
-          line: npc(b.greeting),
-          choices: [{ label: b.index === 0 ? t.askWork : t.askMore, action: situation }, bye],
-        });
-      root();
+      setDialogue({
+        line: npc(b.greeting),
+        choices: [heardRef.current ? { label: t.backToIt, action: ending } : { label: b.story[0].ask, action: () => part(0) }, bye],
+      });
     },
     [close, decide, t],
   );
   openTalkRef.current = openTalk;
+
+  const examine = useCallback(
+    (id: string) => {
+      const b = beatRef.current;
+      const i = Number(id.split('-').pop());
+      const clue = b?.clues[i];
+      if (!b || !clue || endingRef.current) return;
+      if (!seenRef.current.has(i)) {
+        seenRef.current.add(i);
+        setSeenCount(seenRef.current.size);
+      }
+      setDialogue({ line: { speaker: `${t.hunter}: ${clue.name}`, voice: 'player', text: clue.text }, choices: [{ label: t.moveOn, action: close }] });
+    },
+    [close, t],
+  );
+  const examineRef = useRef(examine);
+  examineRef.current = examine;
 
   const choose = useCallback((choice: Choice) => {
     chosenRef.current = choice.label;
@@ -490,6 +555,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
             {beat && <div className="rpg-journal-title">{beat.title}</div>}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
             {beat?.place && !ending && <div className="rpg-journal-place">{beat.place.name}</div>}
+            {beat && beat.clues.length > 0 && !ending && (
+              <div className="rpg-journal-step">{t.clues(seenCount, beat.clues.length)}</div>
+            )}
             {history.slice(-3).map((step, i) => (
               <div key={`${i}-${step.chose}`} className="rpg-journal-step">
                 ◇ {step.chose}
@@ -515,7 +583,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {prompt && !dialogue && !ending && (
             <div className="rpg-prompt">
-              <kbd>E</kbd> {prompt === 'talk' ? t.talk : t.pickUp}
+              <kbd>E</kbd> {prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : t.pickUp}
             </div>
           )}
 

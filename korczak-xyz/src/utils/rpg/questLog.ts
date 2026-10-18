@@ -42,6 +42,9 @@ export function recordQuest(uid: string | null, attempt: StoryAttempt, lang: Lan
     plan: attempt.plan.map((j) => j?.kind ?? 'end').join(','),
     biome: attempt.beat ? (attempt.beat.place?.biome ?? 'village') : undefined,
     shape: attempt.beat?.job?.look.shape,
+    parts: attempt.beat?.story.length,
+    clues: attempt.beat?.clues.length,
+    witness: attempt.beat ? attempt.beat.witness !== null : undefined,
   });
   if (attempt.outcome !== 'generated' && attempt.outcome !== 'no-key') {
     log.warn('rpg.quest.fallback', { outcome: attempt.outcome, error: attempt.error ?? '' });

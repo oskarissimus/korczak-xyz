@@ -17,15 +17,20 @@ import {
   buildEnemy,
   buildItem,
   buildPlace,
+  hashString,
   rng,
   type Obstacle,
 } from './placeBuilder';
 
+export type Prompt = 'talk' | 'pickup' | 'examine';
+
 export interface SceneCallbacks {
   /** A hint for what E would do here, or null when nothing is in reach. */
-  onPrompt: (prompt: 'talk' | 'pickup' | null) => void;
+  onPrompt: (prompt: Prompt | null) => void;
   /** E beside a character: which one, by name. */
   onTalk: (name: string) => void;
+  /** E beside a clue: which one, by id. */
+  onExamine: (id: string) => void;
   /** One more thing collected or killed. */
   onProgress: () => void;
   onHealth: (hp: number) => void;
@@ -141,7 +146,9 @@ export class RpgScene {
   private attackTimer = 0;
   private swing = 0;
   private paused = false;
-  private lastPrompt: 'talk' | 'pickup' | null = null;
+  private lastPrompt: Prompt | null = null;
+  /** Things to examine, by id, with a glint so they can be found. */
+  private clues = new Map<string, THREE.Object3D>();
   private compassTimer = 0;
   private trees: Tree[] = [];
   /** The open quest's places, by name: meshes, obstacles, the path to each, and where it is. */
@@ -376,7 +383,7 @@ export class RpgScene {
    * Puts a character at a place (by name) or, with null, on a free spot in the village square;
    * one already standing somewhere walks over. Their clothes are `color`.
    */
-  placeNpc(name: string, color: string, at: string | null) {
+  placeNpc(name: string, color: string, at: string | null, nth = 0) {
     let npc = this.npcs.get(name);
     if (!npc) {
       const group = humanoid(new THREE.Color(color).getHex(), 0xd9b38c, 1.75);
@@ -391,7 +398,9 @@ export class RpgScene {
     if (place) {
       npc.spot = null;
       // On the village side of the place's middle, where the hunter walks in, clear of the targets.
-      pos = place.center.clone().sub(place.center.clone().setLength(8));
+      // A second character stands a little round the middle from the first.
+      const toVillage = place.center.clone().negate().setLength(8).applyAxisAngle(new THREE.Vector3(0, 1, 0), nth * 0.8);
+      pos = place.center.clone().add(toVillage);
     } else {
       if (npc.spot === null) {
         const used = new Set([...this.npcs.values()].map((n) => n.spot));
@@ -413,6 +422,60 @@ export class RpgScene {
     }
     this.obstacles = this.obstacles.filter((o) => !o.off || this.trees.some((t) => t.obstacle === o));
     this.npcs.clear();
+  }
+
+  /**
+   * Puts something to examine near a character (by name): a few metres off, on the ground, with a
+   * slow turn so it catches the eye. Replaces any clue already under that id.
+   */
+  placeClue(id: string, look: TargetLook, near: string) {
+    this.clues.get(id) && this.scene.remove(this.clues.get(id)!);
+    const anchor = this.npcs.get(near)?.group.position ?? SPAWN;
+    const rand = rng(hashString(id + near));
+    const a = rand() * Math.PI * 2;
+    const d = 6 + rand() * 3;
+    const mesh = buildItem(look);
+    mesh.position.set(anchor.x + Math.sin(a) * d, 0.5, anchor.z + Math.cos(a) * d);
+    this.scene.add(mesh);
+    this.clues.set(id, mesh);
+  }
+
+  clearClues() {
+    for (const mesh of this.clues.values()) this.scene.remove(mesh);
+    this.clues.clear();
+  }
+
+  private nearestClue(): string | null {
+    let best: string | null = null;
+    let bestD = PICKUP_RANGE + 0.5;
+    for (const [id, mesh] of this.clues) {
+      const d = mesh.position.clone().setY(0).distanceTo(this.player.position);
+      if (d < bestD) {
+        bestD = d;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Whatever E would reach, the nearest of a character, a clue and a thing to pick up: with a
+   * second character and clues at a place, the first version let a character standing among the
+   * herbs swallow every press.
+   */
+  private nearestThing(): { talk: string } | { examine: string } | { pickup: Pickup } | null {
+    const at = this.player.position;
+    const options: { d: number; thing: { talk: string } | { examine: string } | { pickup: Pickup } }[] = [];
+    const npc = this.nearestNpc();
+    if (npc) options.push({ d: this.npcs.get(npc)!.group.position.distanceTo(at), thing: { talk: npc } });
+    const clue = this.nearestClue();
+    if (clue) options.push({ d: this.clues.get(clue)!.position.clone().setY(0).distanceTo(at), thing: { examine: clue } });
+    for (const p of this.pickups) {
+      const d = p.mesh.position.clone().setY(0).distanceTo(at);
+      if (d < PICKUP_RANGE) options.push({ d, thing: { pickup: p } });
+    }
+    options.sort((a, b) => a.d - b.d);
+    return options[0]?.thing ?? null;
   }
 
   private nearestNpc(): string | null {
@@ -500,6 +563,12 @@ export class RpgScene {
     this.player.position.set(p.x, 0, p.z);
   }
 
+  /** For tests: beside a clue. */
+  teleportToClue(id: string) {
+    const mesh = this.clues.get(id);
+    if (mesh) this.player.position.set(mesh.position.x + 1, 0, mesh.position.z);
+  }
+
   /** Turns the hunter and the camera toward the marker. */
   facePosition() {
     if (!this.markerTarget) return;
@@ -533,17 +602,20 @@ export class RpgScene {
 
   interact() {
     if (this.paused) return;
-    const npc = this.nearestNpc();
-    if (npc) {
-      this.cb.onTalk(npc);
+    const thing = this.nearestThing();
+    if (!thing) return;
+    if ('talk' in thing) {
+      this.cb.onTalk(thing.talk);
       return;
     }
-    const near = this.pickups.find((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE);
-    if (near) {
-      this.scene.remove(near.mesh);
-      this.pickups = this.pickups.filter((p) => p !== near);
-      this.cb.onProgress();
+    if ('examine' in thing) {
+      this.cb.onExamine(thing.examine);
+      return;
     }
+    const near = thing.pickup;
+    this.scene.remove(near.mesh);
+    this.pickups = this.pickups.filter((p) => p !== near);
+    this.cb.onProgress();
   }
 
   heal() {
@@ -656,6 +728,7 @@ export class RpgScene {
     this.swing = Math.max(0, this.swing - dt * 4);
     this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
 
+    for (const mesh of this.clues.values()) mesh.rotation.y += dt * 0.8;
     for (const p of this.pickups) {
       p.mesh.rotation.y += dt * 2;
       p.mesh.position.y = 0.8 + Math.sin(t * 2 + p.phase) * 0.15;
@@ -675,12 +748,8 @@ export class RpgScene {
       }
     }
 
-    const prompt =
-      this.nearestNpc() !== null
-        ? 'talk'
-        : this.pickups.some((p) => p.mesh.position.clone().setY(0).distanceTo(this.player.position) < PICKUP_RANGE)
-          ? 'pickup'
-          : null;
+    const thing = this.nearestThing();
+    const prompt: Prompt | null = !thing ? null : 'talk' in thing ? 'talk' : 'examine' in thing ? 'examine' : 'pickup';
     if (prompt !== this.lastPrompt) {
       this.lastPrompt = prompt;
       this.cb.onPrompt(prompt);

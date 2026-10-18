@@ -80,6 +80,30 @@ export interface BeatJob {
   look: TargetLook;
 }
 
+/** One turn of a character telling their story: what the hunter says to hear it, and what they say. */
+export interface StoryPart {
+  ask: string;
+  say: string;
+}
+
+/** Something at the place the hunter can examine, and what asking the character about it brings. */
+export interface Clue {
+  name: string;
+  /** What the hunter notices, in their own words. */
+  text: string;
+  /** The hunter's question about it, offered once it has been examined. */
+  ask: string;
+  reply: string;
+  look: TargetLook;
+}
+
+/** Somebody else at the place, with their own view of it. */
+export interface Witness {
+  npc: Character;
+  greeting: string;
+  talk: DialogueOption[];
+}
+
 export interface Beat {
   /** 0 is the opening, in the village. */
   index: number;
@@ -93,8 +117,16 @@ export interface Beat {
   objectiveText: string;
   /** Said when the hunter comes to talk with the job done (or there is none). */
   greeting: string;
-  /** The situation, and the dilemma the decisions answer. */
+  /**
+   * The character's story, told in turns: the hunter asks, they say a little more. The decisions
+   * come after the last part.
+   */
+  story: StoryPart[];
+  /** The story in one string, for later prompts and the chronicle. */
   situation: string;
+  /** Things to examine at the place, each opening a question for the character. */
+  clues: Clue[];
+  witness: Witness | null;
   /** Said if talked to before the job is done. */
   waitingLine: string;
   /** Talk that changes nothing: lore, a rumour, a joke. */
@@ -187,6 +219,12 @@ export function planDecisions(index: number, random: () => number = Math.random)
   return [...distinctJobs(1, random), null];
 }
 
+/** A hand-written story in parts, as [what the hunter asks, what they are told]. */
+function told(parts: [string, string][]): Pick<Beat, 'story' | 'situation'> {
+  const story = parts.map(([ask, say]) => ({ ask, say }));
+  return { story, situation: story.map((p) => p.say).join(' ') };
+}
+
 const VILLAGE_STEP: Record<Lang, string> = { en: 'the village square', pl: 'plac we wsi' };
 
 /** The quest the game plays without a key: the drowners, now with two ways to end it. */
@@ -204,9 +242,21 @@ export function staticBeat(lang: Lang, index: number): Beat {
       greeting: pl
         ? 'Wiedźmin? We wsi? Bogom niech będą dzięki. Mamy kłopot, panie.'
         : 'A witcher? In our village? Thank the gods. We have trouble, sir.',
-      situation: pl
-        ? 'Nad jeziorem na wschodzie zalęgły się utopce. Trzy sztuki, może więcej. Dziewki boją się chodzić po wodę. Zapłacę uczciwie, jeśli się z nimi rozprawisz.'
-        : 'Drowners have nested by the lake to the east. Three of them, maybe more. The girls are afraid to fetch water. I will pay honest coin if you deal with them.',
+      ...told(
+        pl
+          ? [
+              ['Co się stało?', 'Jezioro, panie. Na wschodzie, za polem. Coś tam siedzi w trzcinach i wyłazi, jak się ściemni.'],
+              ['Co takiego?', 'Utopce. Trzy, może więcej. Kowalowa widziała je przy kładce, ledwo uciekła. Dziewki boją się chodzić po wodę.'],
+              ['Czego ode mnie chcesz?', 'Ubij je, panie. Wieś się zrzuci. Zapłacę uczciwie, słowo sołtysa.'],
+            ]
+          : [
+              ['What happened?', 'The lake, sir. East, past the field. Something sits in the reeds and comes out when it gets dark.'],
+              ['What kind of something?', 'Drowners. Three, maybe more. The smith’s wife saw them by the footbridge and barely got away. The girls are afraid to fetch water.'],
+              ['What do you want of me?', 'Kill them, sir. The village will pay. Honest coin, on my word as alderman.'],
+            ],
+      ),
+      clues: [],
+      witness: null,
       waitingLine: '',
       smallTalk: [
         {
@@ -251,9 +301,21 @@ export function staticBeat(lang: Lang, index: number): Beat {
     job: { kind: 'slay', count: 3, targetName: pl ? 'utopiec' : 'drowner', look: { shape: 'humanoid', color: '#3f5a4a', size: 1 } },
     objectiveText: pl ? 'Zabij utopce nad jeziorem' : 'Kill the drowners by the lake',
     greeting: pl ? 'Ubiłeś je! Widziałem z łodzi, panie.' : 'You killed them! I saw it from the boat, sir.',
-    situation: pl
-      ? 'Sołtys obiecał ci zapłatę, ale powiem ci coś: te utopce to topielcy z zeszłej wiosny, kiedy sołtys kazał zamknąć śluzę. Ich wdowy nie mają za co żyć.'
-      : 'The alderman promised you coin, but hear this: those drowners were the men drowned last spring, when the alderman had the sluice shut. Their widows have nothing to live on.',
+    ...told(
+      pl
+        ? [
+            ['Wiedziałeś, co tu siedzi?', 'Wiedziałem, kim byli. Tego z blizną na ręku poznałem. Janek, od Wierzbów.'],
+            ['Znałeś ich?', 'Wszyscy znaliśmy. Utopili się zeszłej wiosny, kiedy sołtys kazał zamknąć śluzę, żeby mu młyn szedł. A teraz płaci za ich zabicie drugi raz.'],
+            ['Czego chcesz?', 'Niczego, panie. Tylko… ich wdowy nie mają za co żyć. Pomyśl o tym, zanim weźmiesz jego srebro.'],
+          ]
+        : [
+            ['You knew what was out here?', 'I knew who they were. The one with the scar on his arm, I knew him. Janek, from the willow farm.'],
+            ['You knew them?', 'We all did. They drowned last spring, when the alderman had the sluice shut so his mill would turn. Now he pays to have them killed a second time.'],
+            ['What do you want?', 'Nothing, sir. Only… their widows have nothing to live on. Think on that before you take his silver.'],
+          ],
+    ),
+    clues: [],
+    witness: null,
     waitingLine: pl ? 'Uważaj, panie, wciąż tam są!' : 'Careful, sir, they are still out there!',
     smallTalk: [],
     decisions: [
@@ -370,19 +432,30 @@ export function beatPrompt(ctx: BeatContext): string {
     );
   });
   lines.push(
-    'The player hears the greeting, then the situation, and only then the decisions and the questions, so none',
-    'of them may refer to anything the npc has not said yet.',
     'Make them real choices with a cost — mercy or coin, truth or peace, a promise kept or broken — so that each',
     'one leads to a genuinely different story. Never two ways of saying the same thing.',
     '',
-    'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "situation", "waitingLine" and every',
-    '"reply" is the npc’s own words to the hunter, in the first person ("I", "my daughter"), addressing them as',
-    '"you". Never narration, never stage directions, never the npc in the third person, never "she says that…".',
-    'Wrong: "Helena weeps and says her daughter-in-law hanged herself." Right: "My Hania hanged herself, witcher.',
-    'On the old willow by the graves."',
-    'Every "label" is the hunter’s own spoken line, short: at most 12 words, one sentence.',
-    `Write everything the player reads in ${language}. Keep each npc line under 280 characters; the situation may`,
-    'take up to 450, in two or three spoken sentences.',
+    'HOW IT IS TOLD. This is a conversation with a real person, not a briefing. Nobody pours out the whole story',
+    'and the stakes in their first breath: the npc opens with a line or two the way a real person would (a plea,',
+    'suspicion, fear, a reaction to a witcher at the door), and the story comes out in 2 to 4 parts as the hunter',
+    'asks — what happened, what they saw, what they are afraid of or ashamed of, and only at the end what they want.',
+    'Let them hesitate, hold something back, contradict themselves, get one detail wrong. Concrete details',
+    '(a name, a smell, the time of night), not abstractions. Each part is 1 to 3 spoken sentences.',
+    'More of the truth is found, not told: 1 or 2 "clues" are things lying at the place the hunter can examine',
+    '(claw marks, a torn shawl, a letter, fresh digging), and each one lets the hunter ask the npc about it — and',
+    'the npc then admits something they did not say. A "witness" may stand there too: someone else with their own',
+    'version, a rumour, or a reason to want the opposite of what the npc wants.',
+    'The player hears the greeting and the story parts, and only then the decisions and the questions, so none of',
+    'them may refer to anything not yet said (a clue’s question is offered only after it is examined).',
+    '',
+    'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
+    'everything the witness says is that person’s own words to the hunter, in the first person ("I", "my',
+    'daughter"), addressing them as "you". Never narration, never stage directions, never the speaker in the third',
+    'person, never "she says that…". Wrong: "Helena weeps and says her daughter-in-law hanged herself."',
+    'Right: "My Hania… she hanged herself, witcher. On the old willow, by the graves." A clue’s "text" is the',
+    'hunter’s own eye, first person ("Claw marks, and too high for a wolf.").',
+    'Every "label" and "ask" is the hunter’s own spoken line, short: at most 12 words, one sentence.',
+    `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
     `Make it original, with a twist or a hint of moral greyness. Inspiration: ${ctx.seed}.`,
     '',
     'Answer with ONE JSON object and nothing else, no markdown fence, with these keys:',
@@ -397,11 +470,12 @@ export function beatPrompt(ctx: BeatContext): string {
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "waitingLine": string (what the npc says if talked to before the job is done),'
       : '',
-    '  "greeting": string (the first thing the npc says: one or two sentences that already name the trouble, so',
-    '              that asking about it is the natural reply),',
-    '  "situation": string (what the npc tells when asked: the whole problem and the dilemma the decisions answer;',
-    '               every person, place and fact the decisions or the smallTalk mention must be named here),',
-    '  "smallTalk": [{"label": string (a follow-up question about something said in the situation), "reply": string}],',
+    '  "greeting": string (the first thing the npc says, one or two sentences),',
+    '  "story": [{"ask": string (what the hunter says to hear more), "say": string (the npc’s next part)}],',
+    '  "smallTalk": [{"label": string (a follow-up question about something in the story), "reply": string}],',
+    `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)}}],`,
+    '  "witness": {"name": string, "gender": string, "color": string, "greeting": string,',
+    '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hunter says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed)}]',
     '}',
@@ -465,6 +539,24 @@ export function narrated(line: string, name: string): boolean {
   // Not \b: in JavaScript it is ASCII-only, and there is no boundary before "że".
   const reported = /(^|\s)(mówi|powiada|szepcze|błaga|says|whispers|begs|tells you),? (że|that)(?=[\s,.]|$)/i.test(line);
   return opens || reported;
+}
+
+/** What the hunter says to hear more, when a story part comes without its own question. */
+const MORE: Record<Lang, string[]> = {
+  en: ['What happened?', 'Go on.', 'And then?', 'What do you want of me?'],
+  pl: ['Co się stało?', 'Mów dalej.', 'I co potem?', 'Czego ode mnie chcesz?'],
+};
+
+function options(raw: unknown, max: number): DialogueOption[] {
+  return (Array.isArray(raw) ? raw : [])
+    .map((o) => {
+      const option = o as Record<string, unknown> | null;
+      const label = text(option?.label, 100);
+      const replyText = text(option?.reply);
+      return label && replyText ? { label, reply: replyText } : null;
+    })
+    .filter((o): o is DialogueOption => o !== null)
+    .slice(0, max);
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -538,23 +630,55 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   }
 
   const title = text(r.title, 80) ?? ctx.title;
-  const situation = text(r.situation, 700);
   const greeting = text(r.greeting) ?? '';
-  if (!title || !situation) return null;
-  // Narration where a line should be spoken breaks the scene and the voice; the next model may do better.
-  if ([greeting, situation, text(r.waitingLine) ?? '', ...decisions.map((d) => d.reply)].some((line) => narrated(line, npc.name))) return null;
+  const story: StoryPart[] = (Array.isArray(r.story) ? r.story : [])
+    .map((o, i) => {
+      const part = o as Record<string, unknown> | null;
+      const say = text(part?.say, 500);
+      return say ? { ask: text(part?.ask, 100) ?? MORE[ctx.lang][Math.min(i, MORE[ctx.lang].length - 1)], say } : null;
+    })
+    .filter((p): p is StoryPart => p !== null)
+    .slice(0, 5);
+  // The beat format before the story came in parts, which a model may still fall back to.
+  const flat = text(r.situation, 700);
+  if (story.length === 0 && flat) story.push({ ask: MORE[ctx.lang][0], say: flat });
+  if (!title || story.length === 0) return null;
+  const situation = story.map((p) => p.say).join(' ');
 
-  const smallTalk = Array.isArray(r.smallTalk)
-    ? r.smallTalk
-        .map((o) => {
-          const option = o as Record<string, unknown> | null;
-          const label = text(option?.label, 80);
-          const replyText = text(option?.reply);
-          return label && replyText ? { label, reply: replyText } : null;
-        })
-        .filter((o): o is DialogueOption => o !== null)
-        .slice(0, 2)
-    : [];
+  const smallTalk = options(r.smallTalk, 2);
+  const clues: Clue[] = (Array.isArray(r.clues) ? r.clues : [])
+    .map((o) => {
+      const c = o as Record<string, unknown> | null;
+      const name = text(c?.name, 50);
+      const seen = text(c?.text, 300);
+      const ask = text(c?.ask, 100);
+      const replyText = text(c?.reply);
+      if (!name || !seen || !ask || !replyText) return null;
+      return { name, text: seen, ask, reply: replyText, look: parseLook({ shape: c?.shape, color: '#e8d9a8', size: 0.8 }, 'collect') };
+    })
+    .filter((c): c is Clue => c !== null)
+    .slice(0, 2);
+  let witness: Witness | null = null;
+  const w = r.witness && typeof r.witness === 'object' ? (r.witness as Record<string, unknown>) : null;
+  const wnpc = w ? character(w, ctx.characters) : null;
+  if (w && wnpc && !same(wnpc.name, npc.name)) {
+    const wGreeting = text(w.greeting);
+    const talk = options(w.talk, 2);
+    if (wGreeting && !narrated(wGreeting, wnpc.name) && !talk.some((o) => narrated(o.reply, wnpc.name))) {
+      witness = { npc: wnpc, greeting: wGreeting, talk };
+    }
+  }
+
+  // Narration where a line should be spoken breaks the scene and the voice; the next model may do better.
+  const spoken = [
+    greeting,
+    ...story.map((p) => p.say),
+    text(r.waitingLine) ?? '',
+    ...decisions.map((d) => d.reply),
+    ...smallTalk.map((o) => o.reply),
+    ...clues.map((c) => c.reply),
+  ];
+  if (spoken.some((line) => narrated(line, npc.name))) return null;
 
   return {
     index: ctx.index,
@@ -565,7 +689,10 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     job,
     objectiveText: text(r.objectiveText, 120) ?? `${npc.name} — ${place?.name ?? VILLAGE_STEP[ctx.lang]}`,
     greeting,
+    story,
     situation,
+    clues,
+    witness,
     waitingLine: text(r.waitingLine) ?? greeting,
     smallTalk,
     decisions,

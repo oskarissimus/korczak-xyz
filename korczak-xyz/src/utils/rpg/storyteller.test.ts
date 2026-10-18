@@ -10,7 +10,7 @@ const beat = {
   targetName: 'relic',
   objectiveText: 'Find the relics',
   greeting: 'Hunter.',
-  situation: 'The ring is in the ruins, and so is my husband’s killer.',
+  story: [{ ask: 'Tell me.', say: 'The ring is in the ruins, and so is my husband’s killer.' }],
   decisions: [
     { label: 'I hunt him down.', reply: 'Go.', consequence: 'The hunter went after the killer.' },
     { label: 'I ask the priest.', reply: 'He knows.', consequence: 'The hunter went to the temple.' },
@@ -54,12 +54,13 @@ describe('generateBeat', () => {
       .fn()
       .mockResolvedValueOnce(refusal(404, 'models/x is not found'))
       .mockResolvedValueOnce(refusal(429, 'Resource has been exhausted'))
+      .mockResolvedValueOnce(refusal(404, 'models/y is not found'))
       .mockResolvedValueOnce(answer('```json\n' + JSON.stringify(beat) + '\n```'));
     vi.stubGlobal('fetch', fetch);
     const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
     expect(attempt.outcome).toBe('generated');
-    expect(attempt.model).toBe(GOOGLE_MODELS[2]);
-    expect(attempt.tries.map((t) => t.status)).toEqual([404, 429, 200]);
+    expect(attempt.model).toBe(GOOGLE_MODELS[3]);
+    expect(attempt.tries.map((t) => t.status)).toEqual([404, 429, 404, 200]);
     expect(attempt.beat?.job).toMatchObject({ kind: 'collect', count: 2, targetName: 'relic' });
     expect(attempt.beat?.decisions.map((d) => d.next?.kind)).toEqual(['slay', 'talk']);
   });

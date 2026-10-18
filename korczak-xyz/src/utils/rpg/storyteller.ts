@@ -3,9 +3,9 @@
  * `.claude/rules/account-keys.md`), straight from the browser like every other app here.
  *
  * Google first, OpenAI only without a Google key. On Google the models are tried in order
- * (`GOOGLE_MODELS`): a Flash-Lite alias in JSON mode, because availability is per project (see
- * `backseat.md`, the demo's "no longer available to new users") and an alias follows whatever is
- * current; then Gemma, which has no JSON mode and no `systemInstruction`. A model that is not on
+ * (`GOOGLE_MODELS`): the Pro, Flash and Flash-Lite aliases in JSON mode, strongest first, because
+ * availability is per project (see `backseat.md`, the demo's "no longer available to new users")
+ * and an alias follows whatever is current; then Gemma, which has no JSON mode and no `systemInstruction`. A model that is not on
  * offer (404, a 400 naming the model) or out of quota (429) moves to the next; anything else ends
  * the attempt.
  *
@@ -17,11 +17,13 @@
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
 
-// Flash before Flash-Lite since the beats (Oct 2026): Lite slid into third-person narration where
-// a line should be spoken, and a beat is mostly written while the last answer is still being read.
-export const GOOGLE_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemma-3-27b-it'];
-export const OPENAI_MODEL = 'gpt-4o-mini';
-const TIMEOUT_MS = 45_000;
+// The strongest first (owner, Oct 2026: "the better model first, and a fallback; we will move to a
+// cheaper one when we optimise for cost"). Flash-Lite, first until then, wrote briefings and slid
+// into third-person narration where a line should be spoken.
+export const GOOGLE_MODELS = ['gemini-pro-latest', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemma-3-27b-it'];
+export const OPENAI_MODEL = 'gpt-4.1';
+// Pro thinks before it writes; a beat is mostly written while the last answer is still being read.
+const TIMEOUT_MS = 90_000;
 
 export interface StoryKeys {
   google: string | null;
@@ -93,7 +95,7 @@ async function askGoogle(key: string, model: string, prompt: string, signal: Abo
         temperature: 1,
         // Room for thinking as well as the answer: a thinking model counts both against this,
         // and a quest in Polish is ~1500 tokens on its own.
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
         ...(gemma ? {} : { responseMimeType: 'application/json' }),
       },
     }),
