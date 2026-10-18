@@ -109,14 +109,26 @@ spoken line, at most 12 words.
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
 them. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
-in order (`GOOGLE_MODELS` in `storyteller.ts`), **strongest first** (owner, Oct 2026: "the better
-model first and a fallback; we switch to a cheaper one when we optimise for cost"):
-`gemini-pro-latest`, `gemini-flash-latest`, `gemini-flash-lite-latest`, all in JSON mode, then
-`gemma-3-27b-it` (no JSON mode, no `systemInstruction`). Flash-Lite was first until it wrote
-briefings and narration; Pro thinks before it writes, so the timeout is 90s and the output budget
-16k tokens.
-A 404, a 429 (quotas are per model) or a 400 naming the model moves to the next; so does an answer
-`parseBeat` cannot play. Anything else — a rejected key, a timeout — ends it. No key or no
+in order (`modelChain` in `storyteller.ts`): the one picked on the intro screen (`MODEL_CHOICES`,
+kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **strongest first** (owner, Oct 2026: "the
+better model first and a fallback; we switch to a cheaper one when we optimise for cost"):
+`gemini-3.1-pro-preview`, `gemini-3-flash-preview`, `gemini-flash-latest`,
+`gemini-flash-lite-latest`, all in JSON mode, then `gemma-4-31b-it` (no JSON mode;
+`gemma-3-27b-it` was withdrawn, 404, Oct 2026). Flash-Lite was first until it wrote briefings and
+narration.
+
+**Pro is slow, not broken.** Measured Oct 2026: its first token takes 3–40s even on a one-line
+prompt, and a whole beat can run past a minute. The first version had one 90s limit for the whole
+attempt, and a timeout ended it — no Flash asked, the hand-written quest, after a minute and a
+half of "the fates are deciding" (owner: "it takes terribly long"). Now each model has its own
+limits (`STALL_MS` 60s without a byte, `MODEL_MS` 180s in all) and running out of either moves to
+the next. Every answer is **streamed** (`streamGenerateContent?alt=sse` with
+`thinkingConfig.includeThoughts`, OpenAI `stream: true`), so the wait shows Pro thinking instead of
+nothing. The proxy in the cloud sandbox cuts any upstream request at 30s, so a whole Pro beat
+cannot be tested from there; Flash can.
+
+A 404, a 429 (quotas are per model), a 503, a 400 naming the model or a timeout moves to the next;
+so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it. No key or no
 usable answer plays the hand-written quest, and **the reason is put on screen** in a toast.
 
 **Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into
@@ -125,7 +137,17 @@ a breadcrumb and the only symptom, reported by the owner, was "always the drowne
 - Sentry Logs, `rpg.quest`, one per beat: outcome (`generated`, `no-key`, `unusable`, `failed`),
   provider, model, ms, each try's model and status, which beat, its job (`kind` is `opening` for
   the first), the plan (`slay,talk,end`), the biome (`village` for the square), the targets'
-  shape, how many story parts and clues, and whether there is a witness. Sent signed out too. Never the prompt or the story.
+  shape, how many story parts and clues, whether there is a witness, the model picked (`chosen`),
+  the first byte's wait, the tokens (`inputTokens`, `outputTokens`, `thoughtTokens`) and `costUsd`.
+  Sent signed out too. Never the prompt or the story.
+- A beat still being written when the page is hidden or closed is an `rpg.quest` of its own, outcome
+  `pending` or `abandoned` with how long it had run (`watchBeat`). The owner waited out a slow Pro
+  beat and left, and Sentry had nothing: the only record was made when an answer came.
+- A beat that fails (`failed`, `unusable`) is also a Sentry **error**, `rpg.quest.failed`, with every
+  model's status and error, so it is in Issues and not only in a log query.
+- A production build served anywhere but korczak.xyz reports as environment `preview`
+  (`src/lib/sentry.ts`): the end-to-end runs against `astro preview` with a mocked model had been
+  landing among the real quests as `production`.
 - For a signed-in account, `gs://korczak-xyz-501720-backseat/users/{uid}/rpg/beats/{at}.json`
   (before the beats, `rpg/quests/`): the prompt, the raw answer, every model tried with its error,
   the parsed beat, the release. The
@@ -156,6 +178,38 @@ new quest loads) — at the owner's request, so going back to a menu does not re
 again. One audio element primed inside the Start click (the iOS unlock, see `backseat.md`), clips
 cached by text, a 🔊 button to mute. A failed clip is a toast and the line stays readable; it never
 blocks the dialogue.
+
+**The answer appears when its speaker starts talking** (owner, Oct 2026). While the hunter's chosen
+line is read, the dialogue stays as it was with that option lit and the rest greyed and disabled
+(`held` in `Rpg.tsx`); `speakLines`' `onStart` releases it as the answer's clip begins, and its end
+or failure releases it too. Without a voice, or for a line already spoken, nothing is held.
+
+**Options say what they are**: a decision (`kind: 'plot'`) is bold and amber; a question (`ask`:
+story parts, small talk, clue questions, the witness's) is greyed once asked in this quest, and
+can still be asked; goodbye and back are plain.
+
+## Everything the game waits for is on screen
+
+The game is in active development and the owner wants to watch it work (Oct 2026: "show the
+tokens streaming, show the errors, the cost of the quest, the total time"). So:
+
+- **`~` opens the developer console** (`components/Rpg/DevConsole.tsx`, also the `~` button):
+  every model request of this quest with the model asked and the one that answered
+  (`modelVersion` — the `-latest` aliases resolve, e.g. `gemini-flash-latest` was `gemini-3.8-flash`
+  in Oct 2026), status, time, time to first byte, the last lines of its thoughts and of its answer
+  as they stream, its error, tokens and cost; the ElevenLabs clips behind a checkbox; and the quest's
+  totals along the bottom.
+- **The waiting screens show the stream**: the last few lines of what the model is writing, and the
+  models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
+- **The closing screen says what the quest cost**: the writing time (each beat's generation, added
+  up), tokens and their price, ElevenLabs characters, credits and price, and the total.
+
+The record behind all three is `utils/rpg/devlog.ts`, cleared when a quest starts; prices are in
+`utils/rpg/cost.ts`, list prices as of Oct 2026 and marked approximate. Thinking tokens are billed
+as output. ElevenLabs is credits (`eleven_flash_v2_5` is 0.5 a character, or the response's own
+`character-cost` header when the browser may read it), priced at the Creator plan's rate. A model
+missing from the table shows `?`, never a guess. A new kind of request the game waits on gets a
+`startRequest` too, so this stays the whole picture.
 
 ## Debugging
 

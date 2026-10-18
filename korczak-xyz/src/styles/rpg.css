@@ -373,3 +373,183 @@ ul.rpg-source {
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+/* Dialogue cues (owner, Oct 2026): a decision stands out from a question, a question already asked
+   looks asked but still works, and while the hunter's line is read only that line is lit. */
+.rpg-dialogue-choices button.rpg-choice-plot {
+  font-weight: bold;
+  color: #ffb45e;
+}
+
+.rpg-dialogue-choices button.rpg-choice-asked {
+  color: #8f8674;
+}
+
+.rpg-dialogue-choices button.rpg-choice-muted {
+  opacity: 0.35;
+}
+
+.rpg-dialogue-choices button.rpg-choice-saying {
+  color: #ffd36b;
+  background: rgba(255, 211, 107, 0.14);
+  border-left: 3px solid #ffd36b;
+}
+
+.rpg-dialogue-choices button:disabled {
+  cursor: default;
+}
+
+.rpg-dialogue-held .rpg-dialogue-text {
+  opacity: 0.55;
+}
+
+/* The developer console under `~`, and its preview on the waiting screens. Monospace, because what
+   it shows is a model's raw output. */
+.rpg-dev {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-height: 55%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 8, 6, 0.9);
+  border-bottom: 1px solid #6b5b3e;
+  font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  color: #d8d2c2;
+  z-index: 30;
+  user-select: text;
+}
+
+.rpg-dev-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #3a3326;
+}
+
+.rpg-dev-bar button {
+  margin-left: auto;
+  border: 1px solid #6b5b3e;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rpg-dev-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.rpg-dev-entry {
+  padding: 4px 0;
+  border-bottom: 1px dashed #2c271e;
+}
+
+.rpg-dev-head {
+  color: #9fd38a;
+  overflow-wrap: anywhere;
+}
+
+.rpg-dev-error .rpg-dev-head,
+.rpg-dev-error {
+  color: #ff8a7a;
+}
+
+.rpg-dev-waiting .rpg-dev-head,
+.rpg-dev-streaming .rpg-dev-head {
+  color: #ffd36b;
+}
+
+.rpg-dev pre,
+.rpg-stream pre {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
+.rpg-dev-thoughts {
+  color: #8c95a8;
+  font-style: italic;
+}
+
+.rpg-dev-text {
+  color: #e8e2d2;
+}
+
+.rpg-dev-totals {
+  padding: 4px 8px;
+  border-top: 1px solid #3a3326;
+  color: #ffd36b;
+  overflow-wrap: anywhere;
+}
+
+.rpg-dev-empty {
+  color: #8f8674;
+}
+
+.rpg-stream {
+  width: min(640px, 92%);
+  margin-top: 12px;
+  padding: 6px 8px;
+  max-height: 9.5em;
+  overflow: hidden;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid #3a3326;
+  font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+}
+
+.rpg-devtoggle {
+  position: absolute;
+  bottom: 10px;
+  right: 94px;
+  padding: 2px 8px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1e6cf;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  cursor: pointer;
+  z-index: 31;
+}
+
+.rpg-dev-hint {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.rpg-model select {
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid #6b5b3e;
+  background: #1c160d;
+  color: #e6dcc6;
+  font: inherit;
+}
+
+.rpg-summary {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 14px;
+  margin: 4px 0;
+  text-align: left;
+}
+
+.rpg-summary dt {
+  opacity: 0.75;
+}
+
+.rpg-summary dd {
+  margin: 0;
+}
+
+.rpg-dev pre,
+.rpg-stream pre {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}

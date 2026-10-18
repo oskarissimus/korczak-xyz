@@ -138,7 +138,7 @@ there; they exist because most of what is in them was learnt by breaking somethi
 | `.claude/rules/backseat.md` | The annoying passenger simulator and the roaster built on it: the ride loop, the prompt that is the app, what a camera frame costs, the two voice engines, and the warning that stays on screen |
 | `.claude/rules/account-keys.md` | The account page and the one API key store every app reads: the seed from the apps' old copies, what each provider says about spend and balance, where each app's provider choice lives |
 | `.claude/rules/audio-guide.md` | The audio guide: the map and its pins, the Go backend in `audio-guide-function/`, the sources every narration is grounded in, the keys the reader brings, what a tap costs, the iOS audio unlock, the narration language |
-| `.claude/rules/rpg.md` | The RPG at `/apps/rpg/`: quests written one beat at a time after each decision, the branching the game draws, the chronicle later quests remember, the blocks a model builds places from, `parseBeat` as the boundary |
+| `.claude/rules/rpg.md` | The RPG at `/apps/rpg/`: quests written one beat at a time after each decision, the branching the game draws, the chronicle later quests remember, the blocks a model builds places from, `parseBeat` as the boundary, the developer console under `~` with the stream, errors, tokens and cost |
 
 If you are working somewhere these globs do not reach and something here seems to have a reason
 behind it, read the matching file before assuming there is not one.

@@ -30,9 +30,11 @@ import {
   type Lang,
   type StepRecord,
 } from '../../utils/rpg/quest';
-import { recordQuest } from '../../utils/rpg/questLog';
-import { generateBeat, type QuestSource } from '../../utils/rpg/storyteller';
+import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
+import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
+import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { DevConsole, QuestSummary, StreamPreview } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
 import { translations } from './translations';
 
@@ -45,6 +47,17 @@ interface DialogueLine {
 interface Choice {
   label: string;
   action: () => void;
+  /**
+   * `plot` moves the story (a decision), `ask` only asks something and is greyed once asked; the
+   * rest (goodbye, back) is neither. Owner, Oct 2026: what was asked should look asked, and what
+   * drives the plot should stand out from what is only a question.
+   */
+  kind?: 'plot' | 'ask';
+}
+
+interface Dialogue {
+  line: DialogueLine;
+  choices: Choice[];
 }
 
 interface Ending {
@@ -75,6 +88,8 @@ declare global {
   }
 }
 
+const MODEL_KEY = 'rpg-model';
+
 export default function Rpg({ lang }: { lang: Lang }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
   const [gameLang, setGameLang] = useState<Lang>(lang);
@@ -104,7 +119,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [history, setHistory] = useState<StepRecord[]>([]);
   const [ending, setEnding] = useState<Ending | null>(null);
   const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
-  const [dialogue, setDialogue] = useState<{ line: DialogueLine; choices: Choice[] } | null>(null);
+  const [dialogue, setDialogue] = useState<Dialogue | null>(null);
+  /**
+   * While the hunter's chosen line is being read: the dialogue as it was, with the choice marked
+   * and the rest greyed. The answer shows when its speaker starts talking. `id` keeps a stopped
+   * queue from releasing a newer hold.
+   */
+  const [held, setHeld] = useState<{ dialogue: Dialogue; index: number; id: number } | null>(null);
+  const holdIdRef = useRef(0);
+  /** Every option asked in this quest, by speaker and label. */
+  const askedRef = useRef(new Set<string>());
+  const [devOpen, setDevOpen] = useState(false);
+  /** The model asked first, from the intro screen; null is the usual order. */
+  const [chosenModel, setChosenModel] = useState<string | null>(null);
+  const chosenModelRef = useRef<string | null>(null);
+  chosenModelRef.current = chosenModel;
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [hp, setHp] = useState(100);
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
@@ -166,6 +195,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     async (index: number, job: Job | null, steps: StepRecord[], title: string | null): Promise<Written> => {
       if (staticRef.current) return { beat: staticBeat(gameLang, index), failure: null };
       const keys = { google: account.keys.google, openai: account.keys.openai };
+      const chosen = chosenModelRef.current;
+      const done = watchBeat(index, gameLang, chosen);
       try {
         const attempt = await generateBeat(keys, {
           lang: gameLang,
@@ -178,13 +209,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
           chronicle: chronicleRef.current,
           places: placesRef.current,
           characters: charactersRef.current,
-        });
-        recordQuest(uidRef.current, attempt, gameLang);
+        }, chosen);
+        addGenerationTime(attempt.ms);
+        recordQuest(uidRef.current, attempt, gameLang, chosen);
         if (attempt.beat) return { beat: attempt.beat, failure: null };
         return { beat: null, failure: attempt.outcome === 'no-key' ? null : (attempt.error ?? attempt.outcome) };
       } catch (e) {
-        log.warn('rpg.beat.crashed', describeError(e));
+        log.error('rpg.beat.crashed', describeError(e));
         return { beat: null, failure: e instanceof Error ? e.message : String(e) };
+      } finally {
+        done();
       }
     },
     [account.keys.google, account.keys.openai, gameLang],
@@ -234,6 +268,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     charactersRef.current = [];
     lastLinesRef.current.clear();
     spokenRef.current.clear();
+    askedRef.current.clear();
+    resetDevlog();
     staticRef.current = false;
     pendingRef.current = null;
     seedRef.current = SEEDS[Math.floor(Math.random() * SEEDS.length)];
@@ -322,8 +358,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // The world stands still whenever something other than walking has the reader's attention.
   useEffect(() => {
-    sceneRef.current?.setPaused(!started || dialogue !== null || generating || unfolding || ending !== null);
-  }, [started, dialogue, generating, unfolding, ending]);
+    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || generating || unfolding || ending !== null);
+  }, [started, dialogue, held, generating, unfolding, ending]);
 
   // --- dialogue -----------------------------------------------------------------------------------
 
@@ -393,6 +429,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
             choices: [
               ...w.talk.map((o) => ({
                 label: o.label,
+                kind: 'ask' as const,
                 action: () => setDialogue({ line: line(o.reply), choices: [{ label: t.back, action: root }, bye] }),
               })),
               bye,
@@ -423,12 +460,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const followUps = (): Choice[] => [
         ...b.smallTalk.map((o) => ({
           label: o.label,
+          kind: 'ask' as const,
           action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }] }),
         })),
         ...b.clues
           .filter((_, i) => seenRef.current.has(i))
           .map((c) => ({
             label: c.ask,
+            kind: 'ask' as const,
             action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }] }),
           })),
       ];
@@ -436,7 +475,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
         heardRef.current = true;
         setDialogue({
           line: npc(b.story[last].say),
-          choices: [...b.decisions.map((d) => ({ label: d.label, action: () => decide(b, d) })), ...followUps(), bye],
+          choices: [
+            ...b.decisions.map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
+            ...followUps(),
+            bye,
+          ],
         });
       };
       const part = (i: number): void => {
@@ -444,7 +487,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
           ending();
           return;
         }
-        setDialogue({ line: npc(b.story[i].say), choices: [{ label: b.story[i + 1].ask, action: () => part(i + 1) }, bye] });
+        setDialogue({
+          line: npc(b.story[i].say),
+          choices: [{ label: b.story[i + 1].ask, kind: 'ask', action: () => part(i + 1) }, bye],
+        });
       };
       if (!b.greeting) {
         if (heardRef.current) ending();
@@ -453,7 +499,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       setDialogue({
         line: npc(b.greeting),
-        choices: [heardRef.current ? { label: t.backToIt, action: ending } : { label: b.story[0].ask, action: () => part(0) }, bye],
+        choices: [
+          heardRef.current ? { label: t.backToIt, action: ending } : { label: b.story[0].ask, kind: 'ask', action: () => part(0) },
+          bye,
+        ],
       });
     },
     [close, decide, t],
@@ -477,14 +526,26 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const examineRef = useRef(examine);
   examineRef.current = examine;
 
-  const choose = useCallback((choice: Choice) => {
-    chosenRef.current = choice.label;
-    choice.action();
-  }, []);
+  const choose = useCallback(
+    (choice: Choice) => {
+      if (held) return;
+      const current = dialogue;
+      if (current) askedRef.current.add(`${current.line.speaker}|${choice.label}`);
+      chosenRef.current = choice.label;
+      // With a voice, the hunter's line is read first and the answer waits for its own speaker.
+      if (current && voiceOn && voiceKey && !spokenRef.current.has(`player:${choice.label}`)) {
+        const index = current.choices.indexOf(choice);
+        holdIdRef.current += 1;
+        setHeld({ dialogue: current, index, id: holdIdRef.current });
+      }
+      choice.action();
+    },
+    [dialogue, held, voiceKey, voiceOn],
+  );
 
   // Escape closes a dialogue; number keys pick an option, as in every RPG since the nineties.
   useEffect(() => {
-    if (!dialogue) return;
+    if (!dialogue || held) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
       const n = Number(e.key);
@@ -492,7 +553,38 @@ export default function Rpg({ lang }: { lang: Lang }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [choose, close, dialogue]);
+  }, [choose, close, dialogue, held]);
+
+  // `~` (the key under Escape, whatever the layout prints on it) opens the developer console.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Backquote' && e.key !== '~' && e.key !== '`') return;
+      e.preventDefault();
+      setDevOpen((open) => !open);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // The chosen model survives a reload; one this browser has no key for is not offered.
+  useEffect(() => {
+    try {
+      setChosenModel(localStorage.getItem(MODEL_KEY));
+    } catch {
+      /* no storage, the usual order */
+    }
+  }, []);
+  const pickModel = (id: string) => {
+    const value = id || null;
+    setChosenModel(value);
+    try {
+      if (value) localStorage.setItem(MODEL_KEY, value);
+      else localStorage.removeItem(MODEL_KEY);
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const models = MODEL_CHOICES.filter((m) => (m.provider === 'google' ? account.keys.google : !account.keys.google && account.keys.openai));
 
   // Both sides speak, when there is an ElevenLabs key: the hunter's choice, then the answer. A line
   // heard once in this quest is not read again, so going back to a menu is silent.
@@ -501,6 +593,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     chosenRef.current = null;
     if (!voiceOn || !voiceKey) {
       stopVoice();
+      setHeld(null);
       return;
     }
     const wanted: SpokenLine[] = [];
@@ -510,13 +603,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (fresh.length === 0) {
       // Closed with nothing left to say (Esc, walking off): silence. Otherwise let it finish.
       if (!dialogue) stopVoice();
+      setHeld(null);
       return;
     }
     for (const line of fresh) spokenRef.current.add(`${line.voice}:${line.text}`);
-    speakLines(voiceKey, fresh, gameLang).catch((e) => {
-      log.warn('rpg.voice.failed', describeError(e));
-      flash(tRef.current.voiceFailed);
-    });
+    const holdId = holdIdRef.current;
+    const release = () => setHeld((h) => (h && h.id === holdId ? null : h));
+    speakLines(voiceKey, fresh, gameLang, (line) => {
+      if (line.voice !== 'player') release();
+    })
+      .catch((e) => {
+        log.warn('rpg.voice.failed', describeError(e));
+        flash(tRef.current.voiceFailed);
+      })
+      .finally(release);
   }, [dialogue, flash, gameLang, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
 
@@ -591,21 +691,37 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </>
       )}
 
-      {dialogue && (
-        <div className="rpg-dialogue" role="dialog">
-          <div className="rpg-dialogue-speaker">{dialogue.line.speaker}</div>
-          <p className="rpg-dialogue-text">{dialogue.line.text}</p>
-          <ol className="rpg-dialogue-choices">
-            {dialogue.choices.map((c, i) => (
-              <li key={`${i}-${c.label}`}>
-                <button type="button" onClick={() => choose(c)}>
-                  <span className="rpg-choice-n">{i + 1}.</span> {c.label}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+      {(held?.dialogue ?? dialogue) && (() => {
+        const shown = held?.dialogue ?? dialogue!;
+        return (
+          <div className={`rpg-dialogue${held ? ' rpg-dialogue-held' : ''}`} role="dialog">
+            <div className="rpg-dialogue-speaker">{shown.line.speaker}</div>
+            <p className="rpg-dialogue-text">{shown.line.text}</p>
+            <ol className="rpg-dialogue-choices">
+              {shown.choices.map((c, i) => {
+                const asked = c.kind === 'ask' && askedRef.current.has(`${shown.line.speaker}|${c.label}`);
+                const classes = [
+                  c.kind === 'plot' ? 'rpg-choice-plot' : '',
+                  asked ? 'rpg-choice-asked' : '',
+                  held ? (held.index === i ? 'rpg-choice-saying' : 'rpg-choice-muted') : '',
+                ].filter(Boolean);
+                return (
+                  <li key={`${i}-${c.label}`}>
+                    <button
+                      type="button"
+                      className={classes.join(' ') || undefined}
+                      disabled={held !== null}
+                      onClick={() => choose(c)}
+                    >
+                      <span className="rpg-choice-n">{i + 1}.</span> {c.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        );
+      })()}
 
       {!started && (
         <div className="rpg-overlay">
@@ -646,6 +762,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
               </button>
             </p>
           )}
+          {keysReady && models.length > 0 && (
+            <label className="rpg-model">
+              {t.model}:{' '}
+              <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
+                <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : 'google', null)[0])}</option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {keysReady ? (
             <ul className="rpg-source">
               <li>{storyProvider === 'static' ? t.staticQuest : t.aiQuest(storyProvider)}</li>
@@ -662,6 +791,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
             {keysReady ? t.start : t.wait}
           </button>
+          <p className="rpg-dev-hint">{t.devHint}</p>
         </div>
       )}
 
@@ -686,6 +816,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
             </>
           )}
           <p className="rpg-ending-note">{t.remembered}</p>
+          {storyProvider !== 'static' || voiceKey ? (
+            <>
+              <h3>{t.summary}</h3>
+              <QuestSummary lang={gameLang} />
+              <p className="rpg-ending-note">{t.costNote}</p>
+            </>
+          ) : null}
           <button type="button" className="rpg-start" onClick={() => void startQuest()}>
             {t.newQuest}
           </button>
@@ -695,6 +832,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {started && (generating || unfolding) && (
         <div className="rpg-overlay">
           <p>{generating ? t.writing : t.fate}</p>
+          <StreamPreview />
         </div>
       )}
 
@@ -709,6 +847,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
           {voiceOn ? '🔊' : '🔇'}
         </button>
       )}
+
+      {devOpen && <DevConsole lang={gameLang} onClose={() => setDevOpen(false)} />}
+
+      <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>
+        ~
+      </button>
 
       <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
         ⛶

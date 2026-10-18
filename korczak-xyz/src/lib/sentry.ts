@@ -109,6 +109,14 @@ const DENY_URLS = [
 
 let started = false;
 
+function onSite(): boolean {
+  try {
+    return typeof location === 'undefined' || /(^|\.)korczak\.xyz$/.test(location.hostname);
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Initialise Sentry. Safe to call more than once — the second call is a no-op, which matters
  * because `ClientRouter` re-runs module scripts after every view transition.
@@ -122,7 +130,9 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
     init({
       dsn: DSN,
       release: RELEASE,
-      environment: import.meta.env.DEV ? 'development' : 'production',
+      // A production build served anywhere but the site — `astro preview` under an end-to-end
+      // test, above all — is `preview`, so a mocked model's quests do not land among real ones.
+      environment: import.meta.env.DEV ? 'development' : onSite() ? 'production' : 'preview',
 
       /*
        * Errors only. The default integration list includes the tracing and replay machinery, so
@@ -339,6 +349,18 @@ export function recordMeasurement(
       if (v !== null && v !== undefined && !(typeof v === 'number' && !Number.isFinite(v))) clean[k] = v;
     }
     logger.info(event, clean);
+  } catch {
+    /* telemetry never throws into the caller */
+  }
+}
+
+/**
+ * Sends whatever is buffered now, logs included. The SDK already does this when the page is hidden;
+ * this is for a record made in that same moment, after its flush was queued.
+ */
+export function flushTelemetry(): void {
+  try {
+    void getClient()?.flush(2000);
   } catch {
     /* telemetry never throws into the caller */
   }

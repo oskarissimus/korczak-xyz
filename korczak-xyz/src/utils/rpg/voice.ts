@@ -7,6 +7,7 @@
  * walking back through a dialogue does not pay for the same line twice.
  */
 
+import { endRequest, startRequest, voiceCredits } from './devlog';
 import type { Lang } from './quest';
 
 /** Their low-latency model; it speaks Polish and English with the same voices. */
@@ -70,24 +71,37 @@ export function stopVoice(): void {
 }
 
 async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<string> {
-  const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${VOICES[line.voice]}?output_format=mp3_44100_64`,
-    {
-      method: 'POST',
-      headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: line.text,
-        model_id: VOICE_MODEL,
-        language_code: lang,
-        voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-      }),
-    },
-  );
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);
+  // Into the developer console with what it cost: ElevenLabs' own `character-cost` header where the
+  // browser is allowed to read it, else the list rate (`cost.ts`).
+  const entry = startRequest('voice', `${VOICE_MODEL} · ${line.voice}`, null, line.text);
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${VOICES[line.voice]}?output_format=mp3_44100_64`,
+      {
+        method: 'POST',
+        headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: line.text,
+          model_id: VOICE_MODEL,
+          language_code: lang,
+          voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+        }),
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    endRequest(entry, null, {
+      chars: line.text.length,
+      credits: voiceCredits(line.text.length, response.headers.get('character-cost')),
+    });
+    return url;
+  } catch (e) {
+    endRequest(entry, e instanceof Error ? e.message : String(e));
+    throw e;
   }
-  return URL.createObjectURL(await response.blob());
 }
 
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
@@ -127,18 +141,26 @@ function play(el: HTMLAudioElement, url: string, signal: AbortSignal): Promise<v
 /**
  * Speaks lines one after another — the hunter's choice, then the answer — stopping whatever was
  * speaking. Every clip is requested at once, so the answer is ready when the question ends.
- * Resolves when the last has finished or a newer call replaced this one.
+ * Resolves when the last has finished or a newer call replaced this one. `onStart` is told as each
+ * line begins, which is when the dialogue shows the answer (owner, Oct 2026: the answer should
+ * appear when its speaker starts talking, not while the hunter's line is still being read).
  */
-export async function speakLines(key: string, lines: SpokenLine[], lang: Lang): Promise<void> {
+export async function speakLines(
+  key: string,
+  lines: SpokenLine[],
+  lang: Lang,
+  onStart?: (line: SpokenLine) => void,
+): Promise<void> {
   stopVoice();
   const el = element();
   if (!el || lines.length === 0) return;
   const controller = new AbortController();
   current = controller;
   const pending = lines.map((line) => clipFor(key, line, lang));
-  for (const clip of pending) {
+  for (const [i, clip] of pending.entries()) {
     const url = await clip;
     if (controller.signal.aborted) return;
+    onStart?.(lines[i]);
     await play(el, url, controller.signal);
     if (controller.signal.aborted) return;
   }

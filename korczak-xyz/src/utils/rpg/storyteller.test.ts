@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BeatContext } from './quest';
-import { GOOGLE_MODELS, generateBeat } from './storyteller';
+import { devRequests, questTotals, resetDevlog } from './devlog';
+import { GOOGLE_MODELS, generateBeat, modelChain } from './storyteller';
 
 const beat = {
   title: 'Ring',
@@ -30,15 +31,30 @@ const ctx: BeatContext = {
   characters: [],
 };
 
-function answer(text: string) {
-  return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 });
+/** A streamed answer, the way `streamGenerateContent?alt=sse` sends it: thoughts, then the text in pieces. */
+function answer(text: string, modelVersion = 'gemini-3.1-pro-preview') {
+  const half = Math.floor(text.length / 2);
+  const events = [
+    { candidates: [{ content: { parts: [{ text: 'Thinking about the ring', thought: true }] } }], modelVersion },
+    { candidates: [{ content: { parts: [{ text: text.slice(0, half) }] } }], modelVersion },
+    {
+      candidates: [{ content: { parts: [{ text: text.slice(half) }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 5000, candidatesTokenCount: 1000, thoughtsTokenCount: 500 },
+      modelVersion,
+    },
+  ];
+  return new Response(events.map((e) => `data: ${JSON.stringify(e)}\r\n\r\n`).join(''), { status: 200 });
 }
 
 function refusal(status: number, message: string) {
   return new Response(JSON.stringify({ error: { message } }), { status });
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  resetDevlog();
+});
 
 describe('generateBeat', () => {
   it('asks nobody when there is no key', async () => {
@@ -60,6 +76,7 @@ describe('generateBeat', () => {
     const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
     expect(attempt.outcome).toBe('generated');
     expect(attempt.model).toBe(GOOGLE_MODELS[3]);
+    expect(String(fetch.mock.calls[0][0])).toContain(`${GOOGLE_MODELS[0]}:streamGenerateContent?alt=sse`);
     expect(attempt.tries.map((t) => t.status)).toEqual([404, 429, 404, 200]);
     expect(attempt.beat?.job).toMatchObject({ kind: 'collect', count: 2, targetName: 'relic' });
     expect(attempt.beat?.decisions.map((d) => d.next?.kind)).toEqual(['slay', 'talk']);
@@ -82,5 +99,55 @@ describe('generateBeat', () => {
     const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
     expect(attempt.outcome).toBe('generated');
     expect(attempt.raw).toContain('"Ring"');
+  });
+
+  it('streams into the console with tokens and cost, priced by the model that answered', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(answer(JSON.stringify(beat))));
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    const [entry] = devRequests();
+    expect(entry).toMatchObject({ kind: 'model', status: 'ok', servedBy: 'gemini-3.1-pro-preview', beat: 1 });
+    expect(entry.thoughts).toContain('Thinking about the ring');
+    expect(entry.text).toBe(JSON.stringify(beat));
+    // 5000 in at $2/M, 1500 out (thinking included) at $12/M.
+    expect(entry.cost).toBeCloseTo(0.01 + 0.018, 6);
+    expect(attempt.tries[0].usage).toEqual({ input: 5000, output: 1000, thoughts: 500 });
+    expect(questTotals().modelCost).toBeCloseTo(0.028, 6);
+  });
+
+  it('gives up on a model that goes quiet and asks the next', async () => {
+    vi.useFakeTimers();
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_, reject) =>
+            init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+          ),
+      )
+      .mockResolvedValueOnce(answer(JSON.stringify(beat), 'gemini-3-flash-preview'));
+    vi.stubGlobal('fetch', fetch);
+    const pending = generateBeat({ google: 'k', openai: null }, ctx);
+    await vi.advanceTimersByTimeAsync(61_000);
+    const attempt = await pending;
+    expect(attempt.outcome).toBe('generated');
+    expect(attempt.tries[0]).toMatchObject({ model: GOOGLE_MODELS[0], status: null });
+    expect(attempt.tries[0].error).toContain('no answer for 60s');
+    expect(attempt.model).toBe(GOOGLE_MODELS[1]);
+  });
+
+  it('reads an answer that came back whole rather than streamed', async () => {
+    const whole = new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(beat) }] } }] }), { status: 200 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(whole));
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('generated');
+  });
+
+  it('asks the chosen model first, then the usual order', () => {
+    expect(modelChain('google', 'gemini-3.8-flash')).toEqual(['gemini-3.8-flash', ...GOOGLE_MODELS]);
+    expect(modelChain('google', GOOGLE_MODELS[2])[0]).toBe(GOOGLE_MODELS[2]);
+    expect(modelChain('google', GOOGLE_MODELS[2])).toHaveLength(GOOGLE_MODELS.length);
+    expect(modelChain('google', 'gpt-4.1')).toEqual(GOOGLE_MODELS);
+    expect(modelChain('google', null)).toEqual(GOOGLE_MODELS);
   });
 });
