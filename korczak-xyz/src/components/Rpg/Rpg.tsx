@@ -263,6 +263,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
    */
   const questTokenRef = useRef(0);
 
+  /**
+   * A beat that could not be written, waiting on the reader (owner, Oct 2026: "I would like to be
+   * able to retry", under a quest ended by "Load failed"): try again, or settle for what it would
+   * have been before — the hand-written quest for an opening, the end here for a later step.
+   */
+  const [stalled, setStalled] = useState<{ failure: string; opening: boolean; retry: () => void; giveUp: () => void } | null>(
+    null,
+  );
+
   /** Today's numbers for the intro screen, read again whenever it shows. */
   const [todayStats, setTodayStats] = useState<DayStats | null>(null);
   /** Time played on this quest; `flushPlay` moves what has not been counted yet into today's. */
@@ -343,6 +352,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     [account.keys.google, account.keys.openai, gameLang, storyProvider],
   );
 
+  const writeBeatRef = useRef(writeBeat);
+  writeBeatRef.current = writeBeat;
+
   /** Puts a beat into the world: its place, its character, its job, and the marker. */
   const setupBeat = useCallback(
     (b: Beat, announce = true) => {
@@ -384,6 +396,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const startQuest = useCallback(async () => {
     const token = ++questTokenRef.current;
+    setStalled(null);
     flushPlay();
     playMsRef.current = 0;
     playSinceRef.current = playSinceRef.current === null ? null : Date.now();
@@ -416,14 +429,40 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.teleport('spawn');
 
     flash(tRef.current.writingBackground, 5000);
-    const { beat: opening, failure } = await writeBeat(0, null, [], null);
-    if (token !== questTokenRef.current) return;
-    if (!opening) staticRef.current = true;
-    setupBeat(opening ?? staticBeat(gameLang, 0));
-    setGenerating(false);
-    // Said on screen, with the provider's own reason: "always the drowners" with no explanation
-    // is how the first version failed.
-    if (failure) flash(`${tRef.current.storyFailed} (${failure.slice(0, 160)})`, 9000);
+    const writeOpening = async (): Promise<void> => {
+      setGenerating(true);
+      const { beat: opening, failure } = await writeBeat(0, null, [], null);
+      if (token !== questTokenRef.current) return;
+      setGenerating(false);
+      if (opening) {
+        setupBeat(opening);
+        return;
+      }
+      const playStatic = () => {
+        staticRef.current = true;
+        setupBeat(staticBeat(gameLang, 0));
+      };
+      // No key is not a failure: the hand-written quest is what there is.
+      if (!failure) {
+        playStatic();
+        return;
+      }
+      // Said on screen, with the provider's own reason: "always the drowners" with no explanation
+      // is how the first version failed.
+      setStalled({
+        failure: failure.slice(0, 160),
+        opening: true,
+        retry: () => {
+          setStalled(null);
+          void writeOpening();
+        },
+        giveUp: () => {
+          setStalled(null);
+          playStatic();
+        },
+      });
+    };
+    await writeOpening();
   }, [flash, flushPlay, gameLang, setupBeat, writeBeat]);
 
   const finish = useCallback(
@@ -511,8 +550,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // The world stands still whenever something other than walking has the reader's attention. A
   // beat being written is not such a thing: the hunter walks while it is (owner, Oct 2026).
   useEffect(() => {
-    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null);
-  }, [started, dialogue, held, ending]);
+    // A stalled beat asks a question, and on a desktop the cursor has to come back to answer it.
+    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null || stalled !== null);
+  }, [started, dialogue, held, ending, stalled]);
 
   // The play clock: from Start or Continue to the ending, talking and reading included, a hidden
   // page not. Measured by the clock rather than counted in ticks, which a main thread busy loading
@@ -573,14 +613,28 @@ export default function Rpg({ lang }: { lang: Lang }) {
         setupBeat(next);
         return;
       }
-      // A quest that cannot go on still ends on the decision the hunter made, not on an error.
-      const cut = `${tRef.current.trailCold} (${(failure ?? '').slice(0, 160)})`;
-      flash(cut, 9000);
-      finish(b, b.npc.name, d.reply, steps);
-      setEnding((e) => (e ? { ...e, cut } : e));
+      // Asked again on the reader's word, or ended on the decision the hunter made, not on an error.
+      const reason = (failure ?? '').slice(0, 160);
+      setStalled({
+        failure: reason,
+        opening: false,
+        retry: () => {
+          setStalled(null);
+          pendingRef.current = writeBeatRef.current(b.index + 1, d.next, steps, b.title);
+          void proceedRef.current(b, d, steps);
+        },
+        giveUp: () => {
+          setStalled(null);
+          const cut = `${tRef.current.trailCold} (${reason})`;
+          finish(b, b.npc.name, d.reply, steps);
+          setEnding((e) => (e ? { ...e, cut } : e));
+        },
+      });
     },
-    [finish, flash, setupBeat],
+    [finish, setupBeat],
   );
+  const proceedRef = useRef(proceed);
+  proceedRef.current = proceed;
 
   const decide = useCallback(
     (b: Beat, d: Decision) => {
@@ -832,6 +886,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
   const resume = (game: SavedGame) => {
     questTokenRef.current += 1;
+    setStalled(null);
     flushPlay();
     playMsRef.current = game.playMs ?? 0;
     playSinceRef.current = playSinceRef.current === null ? null : Date.now();
@@ -917,6 +972,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const leave = () => {
     // A beat still being written is asked for again on Continue, from the save.
     questTokenRef.current += 1;
+    setStalled(null);
     setGenerating(false);
     setUnfolding(false);
     stopVoice();
@@ -1007,7 +1063,22 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {toast && <div className="rpg-toast">{toast}</div>}
 
-          {noticeShown && notice && (
+          {stalled && !dialogue && !ending && (
+            <div className="rpg-stalled" role="alertdialog" aria-label={t.stalledTitle}>
+              <div className="rpg-notice-title">✗ {t.stalledTitle}</div>
+              <p className="rpg-stalled-why">{stalled.failure}</p>
+              <div className="rpg-stalled-actions">
+                <button type="button" className="rpg-start" onClick={stalled.retry}>
+                  ↻ {t.retry}
+                </button>
+                <button type="button" onClick={stalled.giveUp}>
+                  {stalled.opening ? t.playStatic : t.endHere}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {noticeShown && notice && !stalled && (
             <div key={notice.id} className="rpg-notice" role="status">
               <div className="rpg-notice-title">📜 {notice.title}</div>
               <div className="rpg-notice-text">{notice.text}</div>

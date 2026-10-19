@@ -348,6 +348,53 @@ ul.rpg-source {
   font-weight: bold;
 }
 
+.rpg-stalled {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 32px));
+  padding: 12px 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.85);
+  border: 2px solid #ffd36b;
+  z-index: 20;
+}
+
+.rpg-stalled-why {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.rpg-stalled-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.rpg-stalled-actions button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.rpg-stalled-actions button:not(.rpg-start) {
+  padding: 6px 12px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* Nothing written yet and nothing being written: no empty panel in the corner. */
+.rpg-journal:empty {
+  display: none;
+}
+
 .rpg-notice-detail {
   margin-top: 4px;
   font-size: 14px;

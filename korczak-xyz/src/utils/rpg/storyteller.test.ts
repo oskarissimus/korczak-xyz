@@ -83,6 +83,25 @@ describe('generateBeat', () => {
     expect(attempt.beat?.decisions.map((d) => d.next?.kind)).toEqual(['slay', 'talk']);
   });
 
+  it('asks the next model when the connection drops, as Safari says it on LTE', async () => {
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Load failed'))
+      .mockResolvedValueOnce(answer(JSON.stringify(beat)));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    expect(attempt.tries.map((t) => t.error)).toEqual(['Load failed', null]);
+  });
+
+  it('still stops on a TypeError that is a bug, not a network', async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError("Cannot read properties of undefined (reading 'x')"));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('failed');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('stops at a rejected key and says why', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(refusal(400, 'API key not valid. Please pass a valid API key.')));
     const attempt = await generateBeat({ google: 'k', openai: null }, ctx);

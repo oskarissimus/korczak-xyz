@@ -344,6 +344,7 @@ async function askOpenAi(key: string, prompt: string, dog: Watchdog, entry: DevR
  * overloaded (503), or it went quiet or ran too long.
  */
 function tryNext(e: unknown): boolean {
+  if (dropped(e)) return true;
   if (!(e instanceof ProviderError)) return false;
   // A cap is a dollar amount, and the next model in the chain is cheaper and may still fit it.
   if (e.refusal) return e.refusal === 'ip-cap' || e.refusal === 'all-cap';
@@ -354,6 +355,29 @@ function tryNext(e: unknown): boolean {
     e.status === 503 ||
     (e.status === 400 && /model|not (found|supported|available)/i.test(e.message))
   );
+}
+
+/**
+ * The connection itself went: Safari's "Load failed", Chrome's "Failed to fetch", a stream cut off
+ * mid-answer. On a phone that is a lost signal or a locked screen, not the model refusing, so it is
+ * worth the next model (owner, Oct 2026: a Pro beat on LTE ended the quest with "Load failed" and
+ * no second try). A TypeError with any other message is a bug and still ends it.
+ */
+export function dropped(e: unknown): boolean {
+  return e instanceof TypeError && /load failed|failed to fetch|network|connection|terminated/i.test(e.message);
+}
+
+/** Resolves once the page is in view: iOS cuts a hidden page's requests, so asking then is wasted. */
+function whenVisible(): Promise<void> {
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return Promise.resolve();
+  return new Promise((resolve) => {
+    const seen = () => {
+      if (document.visibilityState === 'hidden') return;
+      document.removeEventListener('visibilitychange', seen);
+      resolve();
+    };
+    document.addEventListener('visibilitychange', seen);
+  });
 }
 
 function describe(e: unknown): string {
@@ -431,6 +455,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
         attempt.error = describe(e);
       }
       if (!tryNext(e)) break;
+      if (dropped(e)) await whenVisible();
     }
   }
 

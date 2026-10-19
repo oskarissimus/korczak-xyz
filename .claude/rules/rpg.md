@@ -63,9 +63,14 @@ the last 8. The last 5 go into every beat's prompt as "the world remembers", wit
 let them show and refer to one. Shown on the intro screen with a button to forget it. Not on the
 account yet; following the reader between devices is a Firestore document for later.
 
-A generated opening that fails plays the hand-written quest (two beats: the alderman, then the
-fisherman at the lake with two endings). A later beat that fails ends the quest on the decision
-just made, with the reason in a toast, and it still goes into the chronicle.
+**A beat that fails waits for the reader** (owner, Oct 2026: "I would like to be able to retry",
+under a quest ended by Safari's "Load failed"). A panel says why, with `↻ Spróbuj ponownie`, which
+asks the whole model chain again, and the old outcome as the other button: the hand-written quest
+(two beats: the alderman, then the fisherman at the lake with two endings) for an opening, or the
+end of the quest on the decision just made, still into the chronicle, for a later step. The world
+pauses under it, so a desktop gets its cursor back. No key is not a failure and plays the
+hand-written quest at once. Leaving to the intro with the panel up loses nothing: the decision is
+saved and Continue asks again.
 
 ## The model writes words and chooses blocks; the engine builds
 
@@ -194,9 +199,12 @@ the next. Every answer is **streamed** (`streamGenerateContent?alt=sse` with
 nothing. The proxy in the cloud sandbox cuts any upstream request at 30s, so a whole Pro beat
 cannot be tested from there; Flash can.
 
-A 404, a 429 (quotas are per model), a 503, a 400 naming the model or a timeout moves to the next;
-so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it. No key or no
-usable answer plays the hand-written quest, and **the reason is put on screen** in a toast.
+A 404, a 429 (quotas are per model), a 503, a 400 naming the model, a timeout or **a dropped
+connection** (`dropped` in `storyteller.ts`: a TypeError saying load failed / failed to fetch /
+network — a phone losing signal or locking during a minute-long Pro stream, which ended a quest on
+its first try until Oct 2026; the next model waits until the page is visible again) moves to the next;
+so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it. No key plays the
+hand-written quest; no usable answer puts up the retry panel above, with **the reason on screen**.
 
 **Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into
 a breadcrumb and the only symptom, reported by the owner, was "always the drowners":
