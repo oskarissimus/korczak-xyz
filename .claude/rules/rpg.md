@@ -115,6 +115,23 @@ been heard, talking again goes straight back to the last part. The first version
 talk beside the greeting, and the opening offered "Why did you keep silent so long?" and "Where
 was the girl seen?" after one line that mentioned neither (owner, Oct 2026).
 
+**A decision is an intention, not a conclusion, and it knows only what was heard.** Two cases in
+one week (owner, Oct 2026):
+- "Pay the brother's debts to the innkeeper" was offered when only the optional witness had
+  mentioned the innkeeper, and nobody had mentioned the debts at all.
+- "I'll search the burnt barn and find proof the blacksmith did it" was offered when nobody had
+  named the blacksmith. He: it should be "I'll search the barn", and the rest should come out
+  while searching.
+
+So it is fixed twice over:
+- The prompt says a label is what the hunter will do, never what it will uncover. The consequence
+  too is what the hunter set out to do, since the next beat is where the truth is found.
+- A decision that needs the witness or a clue carries `after` (`"witness"` or a clue's number).
+  `openTalk` offers it only once the witness has been talked to (`witnessHeard`, in the autosave)
+  or the clue examined.
+- At least one decision must need neither. `parseBeat` drops a gate on a witness or clue the beat
+  lacks, and drops every gate if all of them wait, so a beat can always be finished.
+
 **E reaches the nearest thing**, character, clue or thing to pick up (`nearestThing`): with a
 witness and clues at a place, a character standing among the herbs swallowed every press.
 

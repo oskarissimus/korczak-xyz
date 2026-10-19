@@ -59,6 +59,16 @@ const good = {
 };
 
 describe('parseBeat', () => {
+  it('keeps a decision waiting for the witness or a clue, and never all of them', () => {
+    const gated = (after: unknown[]) =>
+      parseBeat(JSON.stringify({ ...good, decisions: good.decisions.map((d, i) => ({ ...d, after: after[i] })) }), ctx)?.decisions.map((d) => d.after);
+    expect(gated(['witness', undefined])).toEqual(['witness', undefined]);
+    expect(gated(['clue 1', null])).toEqual([0, undefined]);
+    // The second clue was unplayable, so there is nothing to wait for.
+    expect(gated([2, undefined])).toEqual([undefined, undefined]);
+    expect(gated(['witness', 1])).toEqual([undefined, undefined]);
+  });
+
   it('plays a good beat, with the job and the plan the game drew', () => {
     const beat = parseBeat('```json\n' + JSON.stringify(good) + '\n```', ctx);
     expect(beat).toMatchObject({

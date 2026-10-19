@@ -35,6 +35,8 @@ export interface SavedGame {
   /** The current beat's examined clues, by index. */
   seen: number[];
   heard: boolean;
+  /** The current beat's witness has been talked to; absent in older saves. */
+  witnessHeard?: boolean;
   /** The current beat's decision, by index, once made. */
   decision: number | null;
   /** Time played on this quest so far; absent in saves from before it was kept. */

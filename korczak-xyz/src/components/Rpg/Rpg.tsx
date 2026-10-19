@@ -225,6 +225,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [seenCount, setSeenCount] = useState(0);
   /** The current beat's story has been heard to the end, so talking again goes straight to it. */
   const heardRef = useRef(false);
+  /** Whether the current beat's witness has been talked to, which a decision may wait for. */
+  const witnessHeardRef = useRef(false);
   /** The current beat has been decided; its character has nothing more to offer. */
   const decidedRef = useRef(false);
   /** The opening could not be written, so the whole quest is the hand-written one. */
@@ -315,6 +317,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       lastLines: [...lastLinesRef.current],
       seen: [...seenRef.current],
       heard: heardRef.current,
+      witnessHeard: witnessHeardRef.current,
       decision: decisionRef.current,
       playMs: playedNow(),
       transcript: [...transcript()],
@@ -376,6 +379,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       seenRef.current = new Set();
       setSeenCount(0);
       heardRef.current = false;
+      witnessHeardRef.current = false;
       if (b.witness) {
         const w = b.witness;
         scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1, w.npc.gender);
@@ -697,6 +701,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
             ],
           });
         lastLinesRef.current.set(w.npc.name, w.greeting);
+        if (!witnessHeardRef.current) {
+          witnessHeardRef.current = true;
+          persist();
+        }
         root();
         return;
       }
@@ -740,7 +748,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
         setDialogue({
           line: npc(b.story[last].say),
           choices: [
-            ...b.decisions.map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
+            ...b.decisions
+              .filter((d) => (d.after === 'witness' ? witnessHeardRef.current : d.after === undefined || seenRef.current.has(d.after)))
+              .map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
             ...followUps(),
             bye,
           ],
@@ -970,6 +980,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     seenRef.current = new Set(game.seen);
     setSeenCount(game.seen.length);
     heardRef.current = game.heard;
+    witnessHeardRef.current = game.witnessHeard ?? false;
     const d = game.decision === null ? null : current.decisions[game.decision];
     decisionRef.current = d ? game.decision : null;
     persist();

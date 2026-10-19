@@ -70,6 +70,12 @@ export interface Decision {
   consequence: string;
   /** What the next beat asks of the hunter; null ends the quest here. Drawn by the game. */
   next: Job | null;
+  /**
+   * What the hunter must have heard before this is offered: the witness, or a clue by index. A
+   * decision that rests on something optional waits for it (owner, Oct 2026: a choice named the
+   * innkeeper whom only the witness had mentioned). Absent: the character's own story is enough.
+   */
+  after?: 'witness' | number;
 }
 
 export interface BeatJob {
@@ -427,7 +433,7 @@ export function beatPrompt(ctx: BeatContext): string {
   ctx.plan.forEach((next, i) => {
     lines.push(
       next
-        ? `${i + 1}. leads on to a step of ${jobWords(next)}: write it as a course of action the hunter takes.`
+        ? `${i + 1}. leads on to a step of ${jobWords(next)}: write it as a course of action the hunter takes, not what it will turn up.`
         : `${i + 1}. ENDS the quest: its "reply" is the epilogue, how it ends for everyone involved.`,
     );
   });
@@ -447,6 +453,16 @@ export function beatPrompt(ctx: BeatContext): string {
     'version, a rumour, or a reason to want the opposite of what the npc wants.',
     'The player hears the greeting and the story parts, and only then the decisions and the questions, so none of',
     'them may refer to anything not yet said (a clue’s question is offered only after it is examined).',
+    'A DECISION IS AN INTENTION, NOT A CONCLUSION. Its "label" says what the hunter will do ("I will search the',
+    'burnt barn.", "I will track the beast by the pen tonight."), never what doing it will prove or uncover: no',
+    'culprit, no hidden motive, no fact the hunter has not been told. Wrong: "I will search the ashes and find',
+    'proof the blacksmith did it." when nobody has named the blacksmith. The truth comes out in the NEXT step,',
+    'while the hunter does what they chose, so the "consequence" also says only what the hunter set out to do;',
+    'what is found is for the next step to write. A decision that ends the quest may name only who and what the',
+    'player has already heard of.',
+    'Each decision rests on the npc’s greeting and story parts by default. A decision that only makes sense',
+    'after the witness or a clue sets "after": "witness" or "after": the clue’s number (1 or 2), and the game',
+    'offers it only once that has been heard; at least one decision must need neither.',
     '',
     'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
     'everything the witness says is that person’s own words to the hunter, in the first person ("I", "my',
@@ -477,7 +493,8 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "witness": {"name": string, "gender": string, "color": string, "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hunter says, first person, at most 12 words),',
-    '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed)}]',
+    '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
+    '                 "after": "witness" or 1 or 2, only when it needs them}]',
     '}',
   );
   return lines.filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n');
@@ -559,6 +576,13 @@ function options(raw: unknown, max: number): DialogueOption[] {
     .slice(0, max);
 }
 
+/** A decision's `after`: "witness", or a clue's number from 1 (a model's "clue 2" too), as an index. */
+function rawAfter(raw: unknown): 'witness' | number | undefined {
+  if (typeof raw === 'string' && /witness|świadek/i.test(raw)) return 'witness';
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.match(/\d+/)?.[0]) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 2 ? n - 1 : undefined;
+}
+
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const CLOTHES = ['#7a5230', '#4a5d6b', '#6b3a4a', '#3f5a3a', '#5b4a7a', '#8a6a3a', '#3a4a5b'];
@@ -626,7 +650,8 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     const label = text(d?.label, 120);
     const replyText = text(d?.reply, 600);
     if (!label || !replyText) return null;
-    decisions.push({ label, reply: replyText, consequence: text(d?.consequence, 200) ?? label, next });
+    const after = rawAfter(d?.after);
+    decisions.push({ label, reply: replyText, consequence: text(d?.consequence, 200) ?? label, next, ...(after !== undefined && { after }) });
   }
 
   const title = text(r.title, 80) ?? ctx.title;
@@ -668,6 +693,14 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
       witness = { npc: wnpc, greeting: wGreeting, talk };
     }
   }
+
+  // A gate on something the beat does not have is no gate; and if every decision waits, the
+  // character's story was not enough to decide on, which the prompt forbids. Better a beat that can
+  // be finished than one that cannot: then nothing waits.
+  for (const d of decisions) {
+    if (d.after === 'witness' ? !witness : typeof d.after === 'number' && !clues[d.after]) delete d.after;
+  }
+  if (decisions.every((d) => d.after !== undefined)) for (const d of decisions) delete d.after;
 
   // Narration where a line should be spoken breaks the scene and the voice; the next model may do better.
   const spoken = [
