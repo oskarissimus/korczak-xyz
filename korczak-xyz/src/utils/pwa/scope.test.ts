@@ -48,6 +48,12 @@ describe('appForPath', () => {
     expect(appForPath('/pl/apps/roaster/')).toBe('roaster');
   });
 
+  it('recognises the RPG, one page per locale', () => {
+    expect(appForPath('/apps/rpg')).toBe('rpg');
+    expect(appForPath('/pl/apps/rpg/')).toBe('rpg');
+    expect(appForPath('/apps/rpgs')).toBe('site');
+  });
+
   it('treats everything else as the site', () => {
     expect(appForPath('/')).toBe('site');
     expect(appForPath('/apps')).toBe('site');

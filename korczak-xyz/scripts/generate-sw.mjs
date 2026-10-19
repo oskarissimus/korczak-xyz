@@ -58,6 +58,14 @@ const SHELL_ROUTES = ['/', '/pl', '/apps/tuner', '/pl/apps/tuner', '/songs', '/p
  * vision call — but the app is opened in a car, which is where a network is least reliable, and
  * what opens first is the setup sheet backed by localStorage. Without the tier the home screen
  * icon leads to /offline in exactly the tunnel where somebody wants to check which key is set.
+ *
+ * `rpg` is the one whose tier buys a whole app. Its code is in the tier like any other, and the
+ * hand-written quest needs no model, so with the 3D files cached the game plays on a dead network.
+ * Those files (~10 MB of GLB and WebP) are deliberately not in the tier: the collector takes code,
+ * not content, and they are content-hashed `_astro/` assets the worker caches on first use anyway.
+ * The runtime cache is named per build and the worker keeps one build back, so an install played
+ * online since the last deploy or two plays offline; one that has not gets the capsules, which is
+ * what the game does whenever the models fail to load.
  */
 const APP_TIERS = {
   songs: /^(\/pl)?\/songs\/.+/,
@@ -70,6 +78,7 @@ const APP_TIERS = {
   backseat: /^(\/pl)?\/apps\/backseat(\/|$)/,
   roaster: /^(\/pl)?\/apps\/roaster(\/|$)/,
   'audio-guide': /^(\/pl)?\/apps\/audio-guide(\/|$)/,
+  rpg: /^(\/pl)?\/apps\/rpg(\/|$)/,
 };
 
 /**

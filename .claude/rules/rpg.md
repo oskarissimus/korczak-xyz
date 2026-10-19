@@ -325,6 +325,13 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   buttons (🔊, `~`) move to the top, the bottom corners being the thumbs'. Landscape (375 px tall)
   shrinks the stick and buttons and hides the journal's history lines.
 
+**It installs** (owner, Oct 2026: "it should be a PWA too"): `pwa="rpg"` on both pages, scope
+`/apps/rpg`, *Wanderer* / *Wędrowiec* under a sword-on-glass icon, a precache tier of its code
+(see `pwa.md`). Installed, Safari's bars are gone and immersive mode really is the whole screen;
+every inset is read through the site's `--safe-*` properties, so the notch and home bar can be
+faked from a desktop console. Offline, an install that has been played once runs the
+hand-written quest with every model in place.
+
 Tested in Playwright's `iPhone SE (3rd gen)` profile, both orientations, driving the stick and the
 look with CDP touch events; the swiftshader renderer there is slow, so walking covers less ground
 per second than on a phone.

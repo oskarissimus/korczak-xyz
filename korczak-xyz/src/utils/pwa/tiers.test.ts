@@ -75,6 +75,7 @@ describe('precache tiers', () => {
       '/apps/sloper', '/pl/apps/sloper',
       '/apps/backseat', '/pl/apps/backseat',
       '/apps/roaster', '/pl/apps/roaster',
+      '/apps/rpg', '/pl/apps/rpg/', '/apps/rpgx',
     ];
     for (const path of paths) {
       const asked = tiers.filter((t) => t.pattern.test(path)).map((t) => t.tier);
@@ -107,5 +108,6 @@ describe('precache tiers', () => {
     expect(byTier.get('backseat')!.test('/apps/backseat')).toBe(true);
     expect(byTier.get('backseat')!.test('/pl/apps/backseat')).toBe(true);
     expect(byTier.get('roaster')!.test('/apps/roaster')).toBe(true);
+    expect(byTier.get('rpg')!.test('/pl/apps/rpg')).toBe(true);
   });
 });

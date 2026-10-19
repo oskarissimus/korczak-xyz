@@ -43,6 +43,7 @@
     { tier: 'backseat', pattern: /^(\/pl)?\/apps\/backseat(\/|$)/ },
     { tier: 'roaster', pattern: /^(\/pl)?\/apps\/roaster(\/|$)/ },
     { tier: 'audio-guide', pattern: /^(\/pl)?\/apps\/audio-guide(\/|$)/ },
+    { tier: 'rpg', pattern: /^(\/pl)?\/apps\/rpg(\/|$)/ },
   ];
 
   /**

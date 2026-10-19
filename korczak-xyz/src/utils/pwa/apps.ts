@@ -28,6 +28,11 @@ import type { PwaApp } from './scope';
  * `roaster` is the same island with the road taken out (it roasts whatever the camera sees), and is
  * here for the same reasons: a camera held at arm's length, a live stream a stray link would kill.
  *
+ * `rpg` is a 3D game played with both thumbs (owner, Oct 2026: "it should be a PWA too"). In a
+ * tab, Safari's bars take a third of an iPhone SE's height off a view the stick and the sword sit
+ * on; installed, the game has the whole screen, which iOS will not give it any other way. See
+ * .claude/rules/rpg.md.
+ *
  * The path patterns that decide which app a URL belongs to live in scope.ts, which ships to
  * the browser; this module does not, because it pulls in the whole translation table.
  */
@@ -117,6 +122,12 @@ export const PWA_APPS: Record<PwaApp, PwaAppDef> = {
     nameKey: 'AudioGuide',
     shortNameKey: 'pwa.audioGuide.short',
     descriptionKey: 'audioGuide.desc',
+  },
+  rpg: {
+    path: '/apps/rpg',
+    nameKey: 'Rpg',
+    shortNameKey: 'pwa.rpg.short',
+    descriptionKey: 'rpg.desc',
   },
 };
 

@@ -25,9 +25,11 @@ used to open with a count, and it went stale exactly the way the icon paragraph'
 the time of writing: the whole site, the guitar tuner (`/apps/tuner`), the songbook (`/songs`),
 the flashcards (`/apps/flashcards`), the baby sleep log (`/apps/baby-sleep`), the shopping list
 (`/apps/shopping`), Event Watch (`/apps/events`), Metro Watch (`/apps/transit`), the video
-generation wizard (`/apps/sloper`), the annoying passenger (`/apps/backseat`), the roaster (`/apps/roaster`) and the audio guide
-(`/apps/audio-guide`). What qualifies is a thing you reach for away from a desk; the
-games that are only fun on a keyboard stay part of `site`.
+generation wizard (`/apps/sloper`), the annoying passenger (`/apps/backseat`), the roaster (`/apps/roaster`), the audio guide
+(`/apps/audio-guide`) and the RPG (`/apps/rpg`). What qualifies is a thing you reach for away from a desk; the
+games that are only fun on a keyboard stay part of `site`. The RPG crossed that line when it got
+thumb controls (Oct 2026), and installing it is what gives it the whole screen on an iPhone, which
+has no Fullscreen API for anything but video.
 
 The wizard is the one that fails that test and is here anyway, so the test is not the whole rule:
 it needs a desk and a network, and its state dies with the tab either way. It is installable for
@@ -78,7 +80,8 @@ the tuner's dial, the songbook's yellow chords over green lyrics, the flashcards
 sleep log's crescent and Zs, the shopping list's green trolley carrying a yellow tick, Metro Watch's
 M over the two line colours, Event Watch's yellow ticket over a green calendar bar, the wizard's
 green play triangle between two yellow-perforated sprocket rails, the audio guide's yellow map pin
-with green sound arcs springing off it, the roaster's three-tone flame over a glowing grill line. Green and yellow throughout,
+with green sound arcs springing off it, the roaster's three-tone flame over a glowing grill line, the RPG's sword over a green hill
+under a yellow quest diamond. Green and yellow throughout,
 the site's own phosphor. (This paragraph used to count them, and the count was a
 release behind more often than not, so it no longer does.)
 The flashcards icon draws **two** frets where the app draws five, on a card front rather than filling
@@ -194,7 +197,7 @@ takes at most two: the shell, and the one named after the app it belongs to.
   checks `display-mode: standalone` and names the tiers it wants.
 - **one tier per app** — `songs` (~1.4 MB gz, the 82 song pages), `flashcards` (~110 kB gz),
   `baby-sleep` (~92 kB gz), `shopping`, `events`, `transit`, `sloper` (~55 kB gz, two documents),
-  `backseat`, `roaster`, `audio-guide`.
+  `backseat`, `roaster`, `audio-guide`, `rpg` (~195 kB gz, three.js most of it).
   Each covers its app's whole subtree, because a tab is a separate document and an uncached tab
   is a dead link on a dead network. The shopping list is the tier that most has to be there: it
   is used in a basement on a dead network, and a list you cannot open is not a list. `sloper` is
@@ -204,7 +207,10 @@ takes at most two: the shell, and the one named after the app it belongs to.
   settings of an app that will not open. `audio-guide` is the extreme case: its map tiles are
   cross-origin and therefore never intercepted, so offline it opens onto grey — the tier buys only
   the difference between that and `/offline`, in the one place somebody most reliably has no
-  signal.
+  signal. `rpg` is the one tier that buys a whole app: the hand-written quest needs no model, and
+  its ~10 MB of GLB and WebP are left out of the tier on purpose (the collector takes code, not
+  content) and cached cache-first the first time the game is played online. Opened offline
+  before that, the people are capsules, which is the game's own fallback for missing models.
 
 The per-app split is what stops the shell growing with the app count. Folding the newest apps into the
 shell instead cost every installed app — including the songbook, which wants none of it — an extra
