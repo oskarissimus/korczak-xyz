@@ -35,6 +35,8 @@ import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
+import { addToday, loadToday, type DayStats } from '../../utils/rpg/stats';
+import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
@@ -69,6 +71,8 @@ interface Ending {
   speaker: string;
   text: string;
   steps: StepRecord[];
+  /** Time played on this quest, the page hidden not counted. */
+  playMs: number;
   /** Why the story stopped here rather than ending, when it did: the toast is under this screen. */
   cut?: string;
 }
@@ -259,6 +263,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
    */
   const questTokenRef = useRef(0);
 
+  /** Today's numbers for the intro screen, read again whenever it shows. */
+  const [todayStats, setTodayStats] = useState<DayStats | null>(null);
+  /** Time played on this quest; `flushPlay` moves what has not been counted yet into today's. */
+  const playMsRef = useRef(0);
+  /** When the stretch of play still running began; null while paused by a hidden page. */
+  const playSinceRef = useRef<number | null>(null);
+  const playFlushedRef = useRef(0);
+  /** Time played on this quest up to now, the stretch still running included. */
+  const playedNow = () => playMsRef.current + (playSinceRef.current === null ? 0 : Date.now() - playSinceRef.current);
+  const flushPlay = useCallback(() => {
+    const now = playedNow();
+    if (now > playFlushedRef.current) addToday({ playMs: now - playFlushedRef.current });
+    playFlushedRef.current = now;
+  }, []);
+
   useEffect(() => setChronicle(loadChronicle(gameLang)), [gameLang]);
 
   // A quest left half way is offered on the intro screen, in its own language.
@@ -283,6 +302,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       seen: [...seenRef.current],
       heard: heardRef.current,
       decision: decisionRef.current,
+      playMs: playedNow(),
     });
   }, []);
 
@@ -364,6 +384,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const startQuest = useCallback(async () => {
     const token = ++questTokenRef.current;
+    flushPlay();
+    playMsRef.current = 0;
+    playSinceRef.current = playSinceRef.current === null ? null : Date.now();
+    playFlushedRef.current = 0;
+    addToday({ launches: 1 });
     setGenerating(true);
     setDialogue(null);
     setEnding(null);
@@ -399,7 +424,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // Said on screen, with the provider's own reason: "always the drowners" with no explanation
     // is how the first version failed.
     if (failure) flash(`${tRef.current.storyFailed} (${failure.slice(0, 160)})`, 9000);
-  }, [flash, gameLang, setupBeat, writeBeat]);
+  }, [flash, flushPlay, gameLang, setupBeat, writeBeat]);
 
   const finish = useCallback(
     (b: Beat, speaker: string, text: string, steps: StepRecord[]) => {
@@ -408,14 +433,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
       // Told to the end and in the chronicle: nothing left to continue.
       clearGame();
       setSaved(null);
-      setEnding({ title: b.title, speaker, text, steps });
+      flushPlay();
+      setEnding({ title: b.title, speaker, text, steps, playMs: playedNow() });
       setDialogue(null);
       const scene = sceneRef.current;
       scene?.setMarker(null);
       scene?.clearObjective();
       scene?.heal();
     },
-    [gameLang],
+    [flushPlay, gameLang],
   );
 
   // --- the scene ----------------------------------------------------------------------------------
@@ -487,6 +513,41 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null);
   }, [started, dialogue, held, ending]);
+
+  // The play clock: from Start or Continue to the ending, talking and reading included, a hidden
+  // page not. Measured by the clock rather than counted in ticks, which a main thread busy loading
+  // the models delays; moved into today's figure at the end, on leaving, or when the page goes.
+  const playing = started && ending === null;
+  useEffect(() => {
+    if (!playing) return;
+    const stop = () => {
+      if (playSinceRef.current !== null) playMsRef.current += Date.now() - playSinceRef.current;
+      playSinceRef.current = null;
+    };
+    const go = () => {
+      if (document.visibilityState === 'visible' && playSinceRef.current === null) playSinceRef.current = Date.now();
+    };
+    const change = () => {
+      if (document.visibilityState === 'hidden') {
+        stop();
+        flushPlay();
+        persist();
+      } else go();
+    };
+    go();
+    document.addEventListener('visibilitychange', change);
+    window.addEventListener('pagehide', change);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', change);
+      window.removeEventListener('pagehide', change);
+      flushPlay();
+    };
+  }, [playing, flushPlay, persist]);
+
+  useEffect(() => {
+    if (!started) setTodayStats(loadToday());
+  }, [started]);
 
   // --- dialogue -----------------------------------------------------------------------------------
 
@@ -771,6 +832,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
   const resume = (game: SavedGame) => {
     questTokenRef.current += 1;
+    flushPlay();
+    playMsRef.current = game.playMs ?? 0;
+    playSinceRef.current = playSinceRef.current === null ? null : Date.now();
+    playFlushedRef.current = playMsRef.current;
+    addToday({ launches: 1 });
     primeVoice();
     setStarted(true);
     setEnding(null);
@@ -1082,6 +1148,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
           ) : (
             <p className="rpg-source">{t.readingKeys}</p>
           )}
+          {todayStats && (todayStats.launches > 0 || todayStats.usd > 0) && (
+            <p className="rpg-today">
+              {t.todayStats(
+                todayStats.launches,
+                `${formatUsd(todayStats.usd)}${todayStats.unpriced ? '+?' : ''}`,
+                formatMs(todayStats.generationMs),
+                formatMs(todayStats.playMs),
+              )}
+            </p>
+          )}
           {!touch && startButtons}
           {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
         </div>
@@ -1109,6 +1185,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
             </>
           )}
           <p className="rpg-ending-note">{t.remembered}</p>
+          <p className="rpg-ending-play">
+            {t.playTime}: {formatMs(ending.playMs)}
+          </p>
           {storyProvider !== 'static' || voiceKey ? (
             <>
               <h3>{t.summary}</h3>

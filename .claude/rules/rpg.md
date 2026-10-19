@@ -368,8 +368,15 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   totals along the bottom.
 - **The waiting screens show the stream**: the last few lines of what the model is writing, and the
   models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
-- **The closing screen says what the quest cost**: the writing time (each beat's generation, added
-  up), tokens and their price, ElevenLabs characters, credits and price, and the total.
+- **The closing screen says what the quest cost**: the time played (Start or Continue to the
+  ending, a hidden page not counted, kept in the autosave), the writing time (each beat's
+  generation, added up), tokens and their price, ElevenLabs characters, credits and price, and the
+  total.
+- **The intro says what today cost** (owner, Oct 2026), from `utils/rpg/stats.ts`, localStorage
+  `rpg-stats`, one local calendar day: quests started or continued, dollars on models and voice
+  (`endRequest` adds each priced request; `+?` when one had no price), writing time, time played.
+  This browser only, on purpose: a reader's own keys are spent from here and nowhere else knows.
+  What the demo spends across everybody is `demoUsage/rpg-{day}`, which no screen shows yet.
 
 The record behind all three is `utils/rpg/devlog.ts`, cleared when a quest starts; prices are in
 `utils/rpg/cost.ts`, list prices as of Oct 2026 and marked approximate. Thinking tokens are billed

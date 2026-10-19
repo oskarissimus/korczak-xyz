@@ -77,6 +77,9 @@ const en = {
   devEmpty: 'Nothing asked yet in this quest.',
   devHint: 'Press ~ for the developer console.',
   genTime: 'Writing time',
+  playTime: 'Time played',
+  todayStats: (launches: number, usd: string, writing: string, played: string) =>
+    `Today on this device: ${launches} ${launches === 1 ? 'quest' : 'quests'} started, ${usd} on writing and voice (${writing} of writing), ${played} played.`,
   tokensLine: 'Tokens',
   chars: 'chars',
   total: 'Total',
@@ -166,6 +169,9 @@ const pl: typeof en = {
   devEmpty: 'W tym queście nie było jeszcze zapytań.',
   devHint: 'Wciśnij ~, by otworzyć konsolę deweloperską.',
   genTime: 'Czas generowania',
+  playTime: 'Czas gry',
+  todayStats: (launches, usd, writing, played) =>
+    `Dziś na tym urządzeniu: uruchomienia: ${launches}, na pisanie i głos poszło ${usd} (${writing} generowania), grano ${played}.`,
   tokensLine: 'Tokeny',
   chars: 'znaków',
   total: 'Razem',

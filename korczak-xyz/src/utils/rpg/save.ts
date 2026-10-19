@@ -36,6 +36,8 @@ export interface SavedGame {
   heard: boolean;
   /** The current beat's decision, by index, once made. */
   decision: number | null;
+  /** Time played on this quest so far; absent in saves from before it was kept. */
+  playMs?: number;
 }
 
 export function loadGame(): SavedGame | null {
