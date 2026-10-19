@@ -897,7 +897,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
       {started && (
         <>
-          <div key={noticeShown ? notice!.id : 0} className={`rpg-journal${noticeShown ? ' rpg-journal-fresh' : ''}`}>
+          <div className={`rpg-journal${noticeShown ? ' rpg-journal-fresh' : ''}`}>
             {beat && <div className="rpg-journal-title">{beat.title}</div>}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
             {(generating || unfolding) && (
@@ -906,8 +906,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
                 <StreamLine />
               </>
             )}
-            {beat?.place && !ending && <div className="rpg-journal-place">{beat.place.name}</div>}
-            {beat && beat.clues.length > 0 && !ending && (
+            {beat?.place && !ending && !unfolding && <div className="rpg-journal-place">{beat.place.name}</div>}
+            {beat && beat.clues.length > 0 && !ending && !unfolding && (
               <div className="rpg-journal-step">{t.clues(seenCount, beat.clues.length)}</div>
             )}
             {history.slice(-3).map((step, i) => (

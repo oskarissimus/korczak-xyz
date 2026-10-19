@@ -334,6 +334,11 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   top left goes back to the intro, the quest autosaved and offered as Continue.
 - **The intro** sits under the site's navbar in a box as tall as the screen leaves, scrolling
   inside, with Start first rather than last. The keyboard help becomes three lines about thumbs.
+- **The journal is a panel**, not bare shadowed text: on iOS Safari bare text over the WebGL
+  canvas left ghosts of its old lines when it changed (owner's screenshot, Oct 2026: "Losy się
+  ważą" over "Porozmawiaj", two clue counts stacked). Its own background and `translateZ(0)` are
+  the fix; do not take either off to make it look lighter. The `✕`, `🔊` and `~` are one style,
+  square, brown-bordered.
 - **Small screens** (`max-width` or `max-height` 480 px): the dialogue is a sheet along the bottom,
   full width, scrolling, with 44 px rows; the journal, HP bar and headings shrink; the small
   buttons (🔊, `~`) move to the top, the bottom corners being the thumbs'. Landscape (375 px tall)

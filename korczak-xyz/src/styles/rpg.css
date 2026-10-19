@@ -36,8 +36,16 @@
   top: 12px;
   right: 14px;
   max-width: 320px;
+  padding: 4px 8px;
   text-align: right;
   text-shadow: 0 1px 3px #000;
+  /* A panel of its own, and a layer of its own. Bare shadowed text over the WebGL canvas left
+     ghosts of its old lines on iOS Safari whenever it changed (owner, Oct 2026, a screenshot of
+     "Losy się ważą" written over "Porozmawiaj" and two clue counts on top of each other): the
+     panel repaints its whole box, and the layer keeps the canvas from compositing under it. */
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid transparent;
+  transform: translateZ(0);
   pointer-events: none;
 }
 
@@ -357,7 +365,7 @@ ul.rpg-source {
 }
 
 @keyframes rpg-journal-fresh {
-  50% { text-shadow: 0 0 10px #ffd36b, 0 1px 3px #000; }
+  50% { border-color: #ffd36b; background-color: rgba(60, 45, 10, 0.75); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -739,12 +747,13 @@ ul.rpg-source {
   top: calc(8px + var(--safe-top, 0px));
   left: calc(8px + var(--safe-left, 0px));
   width: 36px;
-  height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1e6cf;
   font-size: 16px;
+  line-height: 1;
   z-index: 6;
 }
 
@@ -763,7 +772,10 @@ ul.rpg-source {
 .rpg-touch .rpg-devtoggle {
   top: calc(44px + var(--safe-top, 0px));
   bottom: auto;
-  padding: 6px 10px;
+  height: 32px;
+  min-width: 36px;
+  padding: 0 8px;
+  line-height: 1;
 }
 
 .rpg-touch .rpg-voice {
@@ -804,7 +816,8 @@ ul.rpg-source {
   }
 
   .rpg-journal {
-    max-width: 58%;
+    /* Clear of the HP bar, which ends 164 px in. */
+    max-width: calc(100% - 176px - var(--safe-left, 0px) - var(--safe-right, 0px));
   }
 
   .rpg-journal-title {
