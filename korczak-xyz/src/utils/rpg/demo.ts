@@ -22,6 +22,8 @@ export interface RpgDemoStatus {
   remaining: { ip: number; all: number };
   perIpUsd: number;
   dailyUsd: number;
+  /** Today across the whole site (`stats.ts`), or null from a function older than it. */
+  today: { launches: number; playMs: number; usd: number } | null;
 }
 
 export function rpgDemoUrl(): string | null {
@@ -45,6 +47,7 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
     if (!response.ok) return null;
     const raw = (await response.json()) as Record<string, unknown>;
     const remaining = (raw.remaining ?? {}) as Record<string, unknown>;
+    const today = raw.today && typeof raw.today === 'object' ? (raw.today as Record<string, unknown>) : null;
     return {
       available: raw.available === true,
       reason: typeof raw.reason === 'string' ? (raw.reason as RpgDemoReason) : null,
@@ -52,6 +55,7 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
       remaining: { ip: num(remaining.ip), all: num(remaining.all) },
       perIpUsd: num(raw.perIpUsd),
       dailyUsd: num(raw.dailyUsd),
+      today: today ? { launches: num(today.launches), playMs: num(today.playMs), usd: num(today.usd) } : null,
     };
   } catch {
     return null;

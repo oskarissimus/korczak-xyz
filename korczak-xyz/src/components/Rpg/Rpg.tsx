@@ -35,7 +35,7 @@ import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
-import { addToday, loadToday, type DayStats } from '../../utils/rpg/stats';
+import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
@@ -64,6 +64,12 @@ interface Choice {
 interface Dialogue {
   line: DialogueLine;
   choices: Choice[];
+}
+
+/** A day's play across the site runs to hours, which `formatMs` would say in minutes. */
+function hoursMinutes(ms: number): string {
+  if (ms < 3_600_000) return formatMs(ms);
+  return `${Math.floor(ms / 3_600_000)} h ${Math.round((ms % 3_600_000) / 60_000)} min`;
 }
 
 interface Ending {
@@ -179,9 +185,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [toast, setToast] = useState<string | null>(null);
   /** The quest-log banner: a new quest, a new step, an objective changed. */
   const [notice, setNotice] = useState<{ id: number; title: string; text: string; detail?: string } | null>(null);
-  // What the demo has left today, asked on the intro screen and again at a quest's end — never by
-  // a reader with a key of their own, who does not need it.
-  const askDemo = keysReady && !ownStory && (!started || ending !== null);
+  // What the demo has left today, and the whole site's day (`stats.ts`), asked on the intro screen
+  // and again at a quest's end.
+  const askDemo = keysReady && (!started || ending !== null);
   useEffect(() => {
     if (!askDemo) return;
     const controller = new AbortController();
@@ -272,8 +278,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
     null,
   );
 
-  /** Today's numbers for the intro screen, read again whenever it shows. */
-  const [todayStats, setTodayStats] = useState<DayStats | null>(null);
   /** Time played on this quest; `flushPlay` moves what has not been counted yet into today's. */
   const playMsRef = useRef(0);
   /** When the stretch of play still running began; null while paused by a hidden page. */
@@ -283,7 +287,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const playedNow = () => playMsRef.current + (playSinceRef.current === null ? 0 : Date.now() - playSinceRef.current);
   const flushPlay = useCallback(() => {
     const now = playedNow();
-    if (now > playFlushedRef.current) addToday({ playMs: now - playFlushedRef.current });
+    if (now > playFlushedRef.current) reportPlay(now - playFlushedRef.current);
     playFlushedRef.current = now;
   }, []);
 
@@ -401,7 +405,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     playMsRef.current = 0;
     playSinceRef.current = playSinceRef.current === null ? null : Date.now();
     playFlushedRef.current = 0;
-    addToday({ launches: 1 });
+    reportLaunch();
     setGenerating(true);
     setDialogue(null);
     setEnding(null);
@@ -571,6 +575,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (document.visibilityState === 'hidden') {
         stop();
         flushPlay();
+        flushStats(true);
         persist();
       } else go();
     };
@@ -585,9 +590,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     };
   }, [playing, flushPlay, persist]);
 
-  useEffect(() => {
-    if (!started) setTodayStats(loadToday());
-  }, [started]);
+  // The demo's spend is counted by the function; only a reader's own keys are reported from here.
+  useEffect(() => countSpend(storyProvider !== 'demo'), [storyProvider]);
 
   // --- dialogue -----------------------------------------------------------------------------------
 
@@ -891,7 +895,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     playMsRef.current = game.playMs ?? 0;
     playSinceRef.current = playSinceRef.current === null ? null : Date.now();
     playFlushedRef.current = playMsRef.current;
-    addToday({ launches: 1 });
+    reportLaunch();
     primeVoice();
     setStarted(true);
     setEnding(null);
@@ -1219,14 +1223,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
           ) : (
             <p className="rpg-source">{t.readingKeys}</p>
           )}
-          {todayStats && (todayStats.launches > 0 || todayStats.usd > 0) && (
+          {demo?.today && (
             <p className="rpg-today">
-              {t.todayStats(
-                todayStats.launches,
-                `${formatUsd(todayStats.usd)}${todayStats.unpriced ? '+?' : ''}`,
-                formatMs(todayStats.generationMs),
-                formatMs(todayStats.playMs),
-              )}
+              {t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}
             </p>
           )}
           {!touch && startButtons}

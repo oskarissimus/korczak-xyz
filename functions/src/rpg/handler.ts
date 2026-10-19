@@ -16,6 +16,13 @@
  * - **A clip is spoken here** too: one line, at most `MAX_CLIP_CHARS`, in one of the game's three
  *   voices, priced by its length before it is made.
  *
+ * It also keeps **the day's numbers for the whole site** (owner, Oct 2026: "the stats are to be
+ * general, from the whole site: how much money went today, how long was played and how many
+ * times"): `{kind:'stats'}` adds a launch, some time played and what a reader's own keys cost to
+ * `rpgStats/{day}`, and the GET answers with those plus what the demo itself spent. They are
+ * reported by the browser and so can be inflated by anybody who wants to; each report is capped
+ * so that takes effort, and nothing but a number on the intro screen ever reads them.
+ *
  * The keys are read at call time from the paying account's own store, as the roaster's demo reads
  * them; nothing in a request names that account, and no answer says whose it is. Nothing about the
  * caller is stored but a day-keyed hash of the address holding a number of dollars.
@@ -128,10 +135,48 @@ async function settle(day: string, ip: string, reserved: number, actual: number)
 
 class BadRequest extends Error {}
 
+/** The most one report may add: a game reports every 30s and on leaving, so these are generous. */
+export const STATS_CAPS = { playMs: 30 * 60_000, usd: 1 } as const;
+
+function statsDoc(day: string) {
+  return db.collection('rpgStats').doc(day);
+}
+
+/** Today across everybody: launches and time played as reported, dollars reported plus the demo's. */
+async function readToday(day: string, demoSpent: number): Promise<{ launches: number; playMs: number; usd: number }> {
+  const snap = await statsDoc(day).get();
+  const data = snap.exists ? snap.data() ?? {} : {};
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+  return { launches: num(data.launches), playMs: num(data.playMs), usd: num(data.usd) + demoSpent };
+}
+
+async function stats(res: Response, body: Record<string, unknown>): Promise<void> {
+  const clamp = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, v)) : 0);
+  const launches = body.launches === 1 ? 1 : 0;
+  const playMs = Math.round(clamp(body.playMs, STATS_CAPS.playMs));
+  const usd = clamp(body.usd, STATS_CAPS.usd);
+  if (launches || playMs || usd) {
+    const day = dayKey();
+    await statsDoc(day).set(
+      {
+        launches: FieldValue.increment(launches),
+        playMs: FieldValue.increment(playMs),
+        usd: FieldValue.increment(usd),
+        day,
+        at: Date.now(),
+      },
+      { merge: true },
+    );
+  }
+  res.status(204).send('');
+}
+
 async function status(req: Request, res: Response): Promise<void> {
   const settings = await readSettings();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
-  const [spent, keys] = await Promise.all([readSpent(dayKey(), ip), demoKeys(settings.keyUid)]);
+  const day = dayKey();
+  const [spent, keys] = await Promise.all([readSpent(day, ip), demoKeys(settings.keyUid)]);
+  const today = await readToday(day, spent.all);
   // Available while a cent is left; a beat whose worst case no longer fits is refused on its own.
   const verdict = keys.google ? checkRpgDemo(settings, spent, 0.01) : ({ ok: false, reason: 'no-key' } as const);
   res.status(200).json({
@@ -142,6 +187,7 @@ async function status(req: Request, res: Response): Promise<void> {
     remaining: remainingUsd(settings, spent),
     perIpUsd: settings.perIpUsd,
     dailyUsd: settings.dailyUsd,
+    today,
   });
 }
 
@@ -298,6 +344,23 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   }
 }
 
+/**
+ * JSON, or JSON sent as text: the stats go out by `sendBeacon` as `text/plain`, which needs no CORS
+ * preflight and survives the page closing.
+ */
+function parseBody(raw: unknown): Record<string, unknown> {
+  let value = raw;
+  if (Buffer.isBuffer(value)) value = value.toString('utf8');
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
 export async function handleRpgDemo(req: Request, res: Response): Promise<void> {
   const allowed = cors(req, res);
   if (req.method === 'OPTIONS') {
@@ -317,8 +380,9 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
       res.status(405).json({ reason: 'method' });
       return;
     }
-    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
-    if (body.kind === 'beat') await beat(req, res, body);
+    const body = parseBody(req.body);
+    if (body.kind === 'stats') await stats(res, body);
+    else if (body.kind === 'beat') await beat(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {

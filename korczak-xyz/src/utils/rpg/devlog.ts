@@ -10,7 +10,7 @@
  */
 
 import { tokenCost, voiceCost, VOICE_CREDITS_PER_CHAR, type Usage } from './cost';
-import { addToday } from './stats';
+import { reportSpend } from './stats';
 
 export type DevStatus = 'waiting' | 'streaming' | 'ok' | 'error';
 
@@ -136,11 +136,8 @@ export function appendText(entry: DevRequest, text: string, thought: boolean): v
 
 export function endRequest(entry: DevRequest, error: string | null, patch: Partial<DevRequest> = {}): void {
   updateRequest(entry, { ...patch, ms: Date.now() - entry.startedAt, status: error ? 'error' : 'ok', error });
-  // Today's spend on the intro screen (`stats.ts`). A model answer without usage cost nothing that
-  // is known; one with usage and no price makes the day's figure a floor.
-  if (entry.kind === 'voice' ? entry.status === 'ok' : entry.usage !== null) {
-    addToday({ usd: entry.cost ?? 0, unpriced: entry.cost === null });
-  }
+  // Today's spend for the whole site (`stats.ts`). An unpriced model counts as nothing, a floor.
+  if (entry.kind === 'voice' ? entry.status === 'ok' : entry.usage !== null) reportSpend(entry.cost ?? 0);
 }
 
 /** A clip's credits: ElevenLabs' own count where its response says, else the list rate. */
@@ -151,7 +148,6 @@ export function voiceCredits(chars: number, header: string | null): number {
 
 export function addGenerationTime(ms: number): void {
   generationMs += ms;
-  addToday({ generationMs: ms });
   changed();
 }
 

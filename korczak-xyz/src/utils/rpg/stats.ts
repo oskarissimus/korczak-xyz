@@ -1,70 +1,73 @@
 /*
- * Today's numbers for this browser (owner, Oct 2026: "how many launches today and how much went
- * on generating today, on the first screen"): quests started or continued, what the models and
- * the voice cost, how long the story took to write, and how long was played. localStorage
- * `rpg-stats`, one day at a time; a new day starts from zero.
+ * Today's numbers for the whole site (owner, Oct 2026: "the stats are to be general, from the whole
+ * site: how much money went today, how long was played and how many times"). The browser reports;
+ * `rpgDemo` adds it up in `rpgStats/{day}` (Warsaw day) and its GET answers with the totals, the
+ * demo's own spend added on the server, where it is already counted.
  *
- * This browser only, deliberately: the reader's own keys are spent from here and nowhere else
- * knows about them. What the demo spends across everybody is `demoUsage/rpg-{day}` on the server.
+ * What is reported: a launch (Start or Continue), time played, and what a reader's own keys cost as
+ * each priced request ends. Not the demo's requests (`countSpend(false)`), which the function
+ * charged itself. Launches go at once; the rest is gathered and sent every 30 s and, by
+ * `sendBeacon`, when the page is hidden or closed. Lost if the network is: a statistic, not money.
  */
 
-const KEY = 'rpg-stats';
+import { rpgDemoUrl } from './demo';
 
-export interface DayStats {
-  day: string;
+export interface SiteToday {
   launches: number;
-  /** Dollars, models and voice together, at the list prices in `cost.ts`. */
-  usd: number;
-  /** Some request today had no price, so `usd` is a floor. */
-  unpriced: boolean;
-  generationMs: number;
   playMs: number;
+  /** Dollars, models and voice, the readers' own keys and the demo together. */
+  usd: number;
 }
 
-/** The local calendar day, as YYYY-MM-DD. */
-export function today(at = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+const FLUSH_MS = 30_000;
+
+let pending = { launches: 0, playMs: 0, usd: 0 };
+let spendCounts = true;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+/** Off while a quest plays on the demo: the function already counted what it spent. */
+export function countSpend(on: boolean): void {
+  spendCounts = on;
 }
 
-function empty(day: string): DayStats {
-  return { day, launches: 0, usd: 0, unpriced: false, generationMs: 0, playMs: 0 };
+export function reportLaunch(): void {
+  pending.launches += 1;
+  flushStats();
 }
 
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+export function reportPlay(ms: number): void {
+  if (ms > 0) pending.playMs += ms;
+  schedule();
+}
 
-export function loadToday(day = today()): DayStats {
+export function reportSpend(usd: number): void {
+  if (!spendCounts || !(usd > 0)) return;
+  pending.usd += usd;
+  schedule();
+}
+
+function schedule(): void {
+  if (timer !== null || typeof window === 'undefined') return;
+  timer = setTimeout(() => flushStats(), FLUSH_MS);
+}
+
+/** Sends what is gathered. `beacon` for a page going away, where a fetch would be cut. */
+export function flushStats(beacon = false): void {
+  if (timer !== null) clearTimeout(timer);
+  timer = null;
+  const url = rpgDemoUrl();
+  const { launches, playMs, usd } = pending;
+  if (!url || (!launches && playMs < 1000 && !usd)) return;
+  pending = { launches: 0, playMs: 0, usd: 0 };
+  // One launch per report, which is what the function accepts; a second waits for the next.
+  if (launches > 1) pending.launches = launches - 1;
+  const body = JSON.stringify({ kind: 'stats', launches: launches > 0 ? 1 : 0, playMs: Math.round(playMs), usd });
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<DayStats> | null;
-    if (!raw || raw.day !== day) return empty(day);
-    return {
-      day,
-      launches: num(raw.launches),
-      usd: num(raw.usd),
-      unpriced: raw.unpriced === true,
-      generationMs: num(raw.generationMs),
-      playMs: num(raw.playMs),
-    };
+    // text/plain: no CORS preflight, so a beacon can carry it.
+    if (beacon && navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain' }))) return;
+    void fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'text/plain' }, keepalive: true }).catch(() => {});
   } catch {
-    return empty(day);
+    // A statistic; never the game's problem.
   }
-}
-
-/** Adds to today's counters; a stored day other than today is replaced, not added to. */
-export function addToday(patch: Partial<Omit<DayStats, 'day'>>): DayStats {
-  const current = loadToday();
-  const next: DayStats = {
-    day: current.day,
-    launches: current.launches + num(patch.launches),
-    usd: current.usd + num(patch.usd),
-    unpriced: current.unpriced || patch.unpriced === true,
-    generationMs: current.generationMs + num(patch.generationMs),
-    playMs: current.playMs + num(patch.playMs),
-  };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    // Full or blocked storage: the numbers are a convenience, the game goes on.
-  }
-  return next;
+  if (pending.launches > 0) flushStats(beacon);
 }

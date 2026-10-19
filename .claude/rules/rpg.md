@@ -380,11 +380,15 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   ending, a hidden page not counted, kept in the autosave), the writing time (each beat's
   generation, added up), tokens and their price, ElevenLabs characters, credits and price, and the
   total.
-- **The intro says what today cost** (owner, Oct 2026), from `utils/rpg/stats.ts`, localStorage
-  `rpg-stats`, one local calendar day: quests started or continued, dollars on models and voice
-  (`endRequest` adds each priced request; `+?` when one had no price), writing time, time played.
-  This browser only, on purpose: a reader's own keys are spent from here and nowhere else knows.
-  What the demo spends across everybody is `demoUsage/rpg-{day}`, which no screen shows yet.
+- **The intro says what today cost, across the whole site** (owner, Oct 2026: "general, from the
+  whole site: how much money went today, how long was played and how many times"). The browser
+  reports (`utils/rpg/stats.ts`): a launch at Start or Continue, time played, and each priced
+  request on a reader's own keys as it ends — not the demo's, which `rpgDemo` charged itself
+  (`countSpend`). Launches go at once, the rest every 30 s and by `sendBeacon` (`text/plain`, no
+  preflight) when the page hides. `rpgDemo`'s `{kind:'stats'}` adds them to `rpgStats/{day}`
+  (Warsaw day, Admin SDK only, no rule), each report clamped (one launch, 30 min, $1), and its GET
+  answers `today` with those plus `demoUsage/rpg-{day}`. Browser-reported, so inflatable by
+  anybody determined; nothing but that line reads it.
 
 The record behind all three is `utils/rpg/devlog.ts`, cleared when a quest starts; prices are in
 `utils/rpg/cost.ts`, list prices as of Oct 2026 and marked approximate. Thinking tokens are billed

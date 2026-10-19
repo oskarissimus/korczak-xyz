@@ -22,6 +22,7 @@ function doc(path: string): any {
     path,
     collection: (name: string) => collection(`${path}/${name}`),
     get: async () => ({ exists: store.has(path), data: () => store.get(path) }),
+    set: async (data: Record<string, unknown>) => apply(path, data),
   };
 }
 
@@ -239,6 +240,25 @@ describe('rpgDemo', () => {
     const long = response();
     await handleRpgDemo(request('POST', { kind: 'voice', text: 'x'.repeat(401), voice: 'female', lang: 'pl' }), long);
     expect(long.statusCode).toBe(400);
+  });
+
+  it('adds reported numbers to the day, capped, and gives them back with the demo spend', async () => {
+    const { dayKey } = await import('../demo/limits');
+    const day = dayKey();
+    store.set(`demoUsage/rpg-${day}`, { usd: 0.5 });
+    await handleRpgDemo(request('POST', JSON.stringify({ kind: 'stats', launches: 1 })), response());
+    await handleRpgDemo(request('POST', { kind: 'stats', playMs: 90_000, usd: 0.25 }), response());
+    // Past the caps, and nonsense: clamped and ignored rather than refused.
+    const big = response();
+    await handleRpgDemo(request('POST', { kind: 'stats', launches: 50, playMs: 1e12, usd: 1e6 }), big);
+    expect(big.statusCode).toBe(204);
+    await handleRpgDemo(request('POST', { kind: 'stats', playMs: 'x', usd: -3 }), response());
+    expect(store.get(`rpgStats/${day}`)).toMatchObject({ launches: 1, playMs: 90_000 + 30 * 60_000 });
+    expect(store.get(`rpgStats/${day}`)!.usd).toBeCloseTo(1.25, 9);
+    const status = response();
+    await handleRpgDemo(request('GET'), status);
+    expect(status.body.today.launches).toBe(1);
+    expect(status.body.today.usd).toBeCloseTo(1.75, 9);
   });
 
   it('answers only the site', async () => {
