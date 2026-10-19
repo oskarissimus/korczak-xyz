@@ -23,8 +23,22 @@ is up to `MAX_BEATS` (4) **beats** (`utils/rpg/quest.ts`): a character somewhere
 square, or a place of the beat's own), maybe a job there first, then a situation and two or three
 **decisions**. A decision either ends the quest (its reply is the epilogue) or makes the model
 write the next beat, with every earlier beat and decision in the prompt. The next beat is asked for
-the moment the hunter decides, so it is mostly written while the answer is read and spoken; what
-is left shows as "Losy się ważą…".
+the moment the hunter decides, so it is mostly written while the answer is read and spoken.
+
+**Nothing waits for the model** (owner, Oct 2026: "generating a quest should happen in the
+background"). Start drops the hunter into the village at once and the opening is written while
+they walk; a decision's next beat is waited for the same way, "Ruszam." only closing the dialogue.
+The journal says what is being written (`⏳ Bajarz pisze questa…` / `⏳ Losy się ważą…`) with one
+line of the stream under it (`StreamLine`), and the world never pauses for it. `questTokenRef` is
+what keeps that safe: a new quest, a resumed one or leaving to the intro bumps it, and an answer
+for an older token is dropped rather than put into a world it no longer belongs to.
+
+**A changed journal announces itself** (owner, the same day: "the player could get a notification
+that the objective or next steps are updated"). The quest arriving, a new step and a job done each
+put a banner in the middle of the view (`📜` and a heading, `notify` in `Rpg.tsx`) and pulse the
+journal; it waits for an open dialogue to close before its six seconds start, so a step that lands
+while the reply is being read is not missed. A resumed save is not announced. `navigator.vibrate`
+buzzes where it exists, which is not iOS.
 
 **The branching's shape is the game's, not the model's** (`planDecisions`): the opening always
 forks two ways into jobs of different kinds; beat 2 forks two ways, sometimes with a third that

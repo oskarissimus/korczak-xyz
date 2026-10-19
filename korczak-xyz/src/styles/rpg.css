@@ -300,6 +300,73 @@ ul.rpg-source {
   text-align: center;
 }
 
+/* A beat being written while the hunter walks: one line of what the model is on, under the log. */
+.rpg-journal-stream {
+  margin-top: 2px;
+  font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The journal changed: the banner in the middle of the view, and the journal itself pulses. The
+   scroll glyph and the border say it as much as the colour does. */
+.rpg-notice {
+  position: absolute;
+  top: 32%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(460px, calc(100% - 32px));
+  padding: 10px 18px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.78);
+  border: 2px solid #ffd36b;
+  pointer-events: none;
+  animation: rpg-notice 6s ease forwards;
+}
+
+.rpg-notice-title {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffd36b;
+}
+
+.rpg-notice-text {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.rpg-notice-detail {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+@keyframes rpg-notice {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  6% { opacity: 1; transform: translate(-50%, 0); }
+  88% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.rpg-journal-fresh {
+  animation: rpg-journal-fresh 1s ease 3;
+}
+
+@keyframes rpg-journal-fresh {
+  50% { text-shadow: 0 0 10px #ffd36b, 0 1px 3px #000; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-notice,
+  .rpg-journal-fresh {
+    animation: none;
+  }
+}
+
 .rpg-journal-place {
   font-size: 13px;
   font-style: italic;
@@ -463,8 +530,7 @@ ul.rpg-source {
   color: #ffd36b;
 }
 
-.rpg-dev pre,
-.rpg-stream pre {
+.rpg-dev pre {
   margin: 2px 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -491,17 +557,6 @@ ul.rpg-source {
   color: #8f8674;
 }
 
-.rpg-stream {
-  width: min(640px, 92%);
-  margin-top: 12px;
-  padding: 6px 8px;
-  max-height: 9.5em;
-  overflow: hidden;
-  text-align: left;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid #3a3326;
-  font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
-}
 
 .rpg-devtoggle {
   position: absolute;
@@ -546,8 +601,7 @@ ul.rpg-source {
   margin: 0;
 }
 
-.rpg-dev pre,
-.rpg-stream pre {
+.rpg-dev pre {
   padding: 0;
   border: 0;
   background: none;
@@ -789,9 +843,6 @@ ul.rpg-source {
     font-size: 13px;
   }
 
-  .rpg-stream {
-    max-height: 7em;
-  }
 }
 
 /* Landscape on a small phone: 375 px is not tall enough for the stick, the buttons and a journal,

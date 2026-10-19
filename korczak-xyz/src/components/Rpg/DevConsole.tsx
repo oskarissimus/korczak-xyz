@@ -99,25 +99,21 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
   );
 }
 
-/** The few last lines of the model request still running, for the waiting screens. */
-export function StreamPreview() {
+/**
+ * One line about the model request still running, under the journal while a beat is written in
+ * the background: which model, how long so far, and the last line it wrote or thought.
+ */
+export function StreamLine() {
   const requests = useDevlog();
   const current = [...requests].reverse().find((r) => r.kind === 'model');
   const running = current?.status === 'waiting' || current?.status === 'streaming';
-  useTick(running);
-  if (!current) return null;
-  const failed = requests.filter((r) => r.kind === 'model' && r.status === 'error' && r.beat === current.beat && r.id !== current.id);
-  const body = current.text ? tail(current.text, 4) : tail(current.thoughts, 4);
+  useTick(running, 500);
+  if (!current || !running) return null;
+  const last = tail(current.text || current.thoughts, 1).trim();
   return (
-    <div className="rpg-stream">
-      {failed.map((r) => (
-        <div key={r.id} className="rpg-dev-error">
-          ✗ {r.model}: {r.error}
-        </div>
-      ))}
-      <div className="rpg-dev-head">{headline(current)}</div>
-      {body && <pre className={current.text ? 'rpg-dev-text' : 'rpg-dev-thoughts'}>{body}</pre>}
-      {current.error && <div className="rpg-dev-error">✗ {current.error}</div>}
+    <div className="rpg-journal-stream">
+      {current.servedBy ?? current.model} · {formatMs(elapsed(current))}
+      {last ? ` · ${last}` : ''}
     </div>
   );
 }

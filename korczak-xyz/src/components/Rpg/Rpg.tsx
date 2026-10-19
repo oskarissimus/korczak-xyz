@@ -37,7 +37,7 @@ import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DevConsole, QuestSummary, StreamPreview } from './DevConsole';
+import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
 import { translations } from './translations';
@@ -173,6 +173,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     };
   }, [immersive]);
   const [toast, setToast] = useState<string | null>(null);
+  /** The quest-log banner: a new quest, a new step, an objective changed. */
+  const [notice, setNotice] = useState<{ id: number; title: string; text: string; detail?: string } | null>(null);
   // What the demo has left today, asked on the intro screen and again at a quest's end — never by
   // a reader with a key of their own, who does not need it.
   const askDemo = keysReady && !ownStory && (!started || ending !== null);
@@ -233,6 +235,29 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setToast(text);
     window.setTimeout(() => setToast((current) => (current === text ? null : current)), ms);
   }, []);
+
+  /**
+   * Says the journal changed (owner, Oct 2026: "the player could get a notification that the
+   * objective or the next steps are updated"). Since the quest is written while the hunter walks,
+   * a new step arrives at a moment nobody chose, so it is a banner in the middle of the view with
+   * the journal pulsing, and a buzz where the phone allows one (not iOS).
+   */
+  const notify = useCallback((title: string, text: string, detail?: string) => {
+    const id = Date.now();
+    setNotice({ id, title, text, detail });
+    try {
+      navigator.vibrate?.(120);
+    } catch {
+      // Not allowed without a gesture in some browsers; the banner is the notification.
+    }
+  }, []);
+
+  /**
+   * Bumped whenever the quest on screen stops being the one a request was made for (a new quest,
+   * a resumed one, leaving to the intro), so an answer that arrives afterwards is dropped.
+   * Needed since the hunter plays while a beat is written: before, an overlay made that impossible.
+   */
+  const questTokenRef = useRef(0);
 
   useEffect(() => setChronicle(loadChronicle(gameLang)), [gameLang]);
 
@@ -300,7 +325,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** Puts a beat into the world: its place, its character, its job, and the marker. */
   const setupBeat = useCallback(
-    (b: Beat) => {
+    (b: Beat, announce = true) => {
       const scene = sceneRef.current;
       if (b.place) {
         scene?.addPlace(b.place);
@@ -329,12 +354,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
       beatsRef.current = [...beatsRef.current.filter((x) => x.index < b.index), b];
       decisionRef.current = null;
       persist();
-      if (b.index > 0) flash(`${tRef.current.nextStep}: ${b.objectiveText}`, 4500);
+      if (!announce) return;
+      const tt = tRef.current;
+      if (b.index === 0) notify(tt.noticeQuest, b.title, b.job ? b.objectiveText : tt.talkTo(b.npc.name));
+      else notify(tt.nextStep, b.objectiveText);
     },
-    [flash, persist],
+    [notify, persist],
   );
 
   const startQuest = useCallback(async () => {
+    const token = ++questTokenRef.current;
     setGenerating(true);
     setDialogue(null);
     setEnding(null);
@@ -361,7 +390,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.setMarker(null);
     scene?.teleport('spawn');
 
+    flash(tRef.current.writingBackground, 5000);
     const { beat: opening, failure } = await writeBeat(0, null, [], null);
+    if (token !== questTokenRef.current) return;
     if (!opening) staticRef.current = true;
     setupBeat(opening ?? staticBeat(gameLang, 0));
     setGenerating(false);
@@ -406,7 +437,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         persist();
         if (done === b.job.count) {
           scene.setMarker({ npc: b.npc.name });
-          flash(tRef.current.jobDone(b.npc.name), 4000);
+          notify(tRef.current.noticeObjective, tRef.current.jobDone(b.npc.name));
         }
       },
       onHealth: setHp,
@@ -439,12 +470,23 @@ export default function Rpg({ lang }: { lang: Lang }) {
       sceneRef.current = null;
       delete window.rpg;
     };
-  }, [flash, persist]);
+  }, [flash, notify, persist]);
 
-  // The world stands still whenever something other than walking has the reader's attention.
+  // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
+  // that lands while the reply is still being read must not expire unseen.
+  const noticeShown = notice !== null && dialogue === null && ending === null;
   useEffect(() => {
-    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || generating || unfolding || ending !== null);
-  }, [started, dialogue, held, generating, unfolding, ending]);
+    if (!noticeShown || !notice) return;
+    const id = notice.id;
+    const timer = window.setTimeout(() => setNotice((n) => (n?.id === id ? null : n)), 6000);
+    return () => window.clearTimeout(timer);
+  }, [noticeShown, notice]);
+
+  // The world stands still whenever something other than walking has the reader's attention. A
+  // beat being written is not such a thing: the hunter walks while it is (owner, Oct 2026).
+  useEffect(() => {
+    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null);
+  }, [started, dialogue, held, ending]);
 
   // --- dialogue -----------------------------------------------------------------------------------
 
@@ -454,11 +496,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
     window.setTimeout(() => sceneRef.current?.requestLock(), 0);
   }, []);
 
+  /**
+   * Waits for the beat after decision `d`, in the background: the reply can be read and the world
+   * walked meanwhile, and the new step announces itself when it lands.
+   */
   const proceed = useCallback(
     async (b: Beat, d: Decision, steps: StepRecord[]) => {
-      close();
+      const token = questTokenRef.current;
       setUnfolding(true);
       const { beat: next, failure } = (await pendingRef.current) ?? { beat: null, failure: 'nothing was asked' };
+      if (token !== questTokenRef.current) return;
       pendingRef.current = null;
       setUnfolding(false);
       if (next) {
@@ -471,7 +518,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       finish(b, b.npc.name, d.reply, steps);
       setEnding((e) => (e ? { ...e, cut } : e));
     },
-    [close, finish, flash, setupBeat],
+    [finish, flash, setupBeat],
   );
 
   const decide = useCallback(
@@ -496,10 +543,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
         return;
       }
       // Asked now, so most of it is written while the answer is being read and spoken.
+      // Asked now, and waited for in the background: "Onward" only goes back to the world.
       pendingRef.current = writeBeat(b.index + 1, d.next, steps, b.title);
-      setDialogue({ line, choices: [{ label: t.onward, action: () => void proceed(b, d, steps) }] });
+      void proceed(b, d, steps);
+      setDialogue({ line, choices: [{ label: t.onward, action: close }] });
     },
-    [finish, persist, proceed, t, writeBeat],
+    [close, finish, persist, proceed, t, writeBeat],
   );
 
   const openTalk = useCallback(
@@ -721,11 +770,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
   const resume = (game: SavedGame) => {
+    questTokenRef.current += 1;
     primeVoice();
     setStarted(true);
     setEnding(null);
     setDialogue(null);
     setGenerating(false);
+    setUnfolding(false);
     seedRef.current = game.seed;
     staticRef.current = game.static;
     placesRef.current = [];
@@ -761,7 +812,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     historyRef.current = game.history;
     setHistory(game.history);
     const current = game.beats[game.beats.length - 1];
-    setupBeat(current);
+    setupBeat(current, false);
     if (current.job && game.progress > 0) {
       const left = Math.max(0, current.job.count - game.progress);
       if (left > 0) scene?.spawnObjective(current.job.kind, left, current.job.look, current.place?.name ?? null);
@@ -798,6 +849,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** Back to the intro screen on a phone, which has no Esc and no page around the game. */
   const leave = () => {
+    // A beat still being written is asked for again on Continue, from the save.
+    questTokenRef.current += 1;
+    setGenerating(false);
+    setUnfolding(false);
     stopVoice();
     setDialogue(null);
     setHeld(null);
@@ -815,7 +870,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // --- render -------------------------------------------------------------------------------------
 
   const jobOpen = beat?.job ? progress < beat.job.count : false;
-  const objective = !beat || ending
+  const objective = !beat || ending || unfolding
     ? null
     : jobOpen
       ? `${beat.objectiveText} (${progress}/${beat.job!.count})`
@@ -842,9 +897,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
       {started && (
         <>
-          <div className="rpg-journal">
+          <div key={noticeShown ? notice!.id : 0} className={`rpg-journal${noticeShown ? ' rpg-journal-fresh' : ''}`}>
             {beat && <div className="rpg-journal-title">{beat.title}</div>}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
+            {(generating || unfolding) && (
+              <>
+                <div className="rpg-journal-objective">⏳ {generating ? t.writing : t.fate}</div>
+                <StreamLine />
+              </>
+            )}
             {beat?.place && !ending && <div className="rpg-journal-place">{beat.place.name}</div>}
             {beat && beat.clues.length > 0 && !ending && (
               <div className="rpg-journal-step">{t.clues(seenCount, beat.clues.length)}</div>
@@ -880,7 +941,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {toast && <div className="rpg-toast">{toast}</div>}
 
-          {touch && !dialogue && !held && !ending && !generating && !unfolding && (
+          {noticeShown && notice && (
+            <div key={notice.id} className="rpg-notice" role="status">
+              <div className="rpg-notice-title">📜 {notice.title}</div>
+              <div className="rpg-notice-text">{notice.text}</div>
+              {notice.detail && <div className="rpg-notice-detail">◆ {notice.detail}</div>}
+            </div>
+          )}
+
+          {touch && !dialogue && !held && !ending && (
             <TouchControls
               prompt={prompt}
               promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}
@@ -891,7 +960,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
             />
           )}
 
-          {immersive && !generating && (
+          {immersive && (
             <button type="button" className="rpg-leave" onClick={leave} aria-label={t.leave}>
               ✕
             </button>
@@ -1050,13 +1119,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <button type="button" className="rpg-start" onClick={() => void startQuest()}>
             {t.newQuest}
           </button>
-        </div>
-      )}
-
-      {started && (generating || unfolding) && (
-        <div className="rpg-overlay">
-          <p>{generating ? t.writing : t.fate}</p>
-          <StreamPreview />
         </div>
       )}
 
