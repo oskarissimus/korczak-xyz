@@ -38,6 +38,7 @@ import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/s
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
+import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
@@ -316,6 +317,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       heard: heardRef.current,
       decision: decisionRef.current,
       playMs: playedNow(),
+      transcript: [...transcript()],
     });
   }, []);
 
@@ -389,6 +391,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setBeat(b);
       beatsRef.current = [...beatsRef.current.filter((x) => x.index < b.index), b];
       decisionRef.current = null;
+      recordLine({ kind: 'beat', beat: b.index, speaker: b.title, text: b.objectiveText });
       persist();
       if (!announce) return;
       const tt = tRef.current;
@@ -418,6 +421,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     spokenRef.current.clear();
     askedRef.current.clear();
     resetDevlog();
+    resetTranscript();
     beatsRef.current = [];
     decisionRef.current = null;
     clearGame();
@@ -793,6 +797,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const current = dialogue;
       if (current) askedRef.current.add(`${current.line.speaker}|${choice.label}`);
       chosenRef.current = choice.label;
+      // What the hunter says, not the way out of a menu ("Back", "Goodbye").
+      const said = beatRef.current;
+      if (choice.kind && said) {
+        const kind = choice.kind === 'plot' ? 'decision' : 'ask';
+        recordLine({ kind, beat: said.index, speaker: tRef.current.hunter, text: choice.label });
+      }
       // With a voice, the hunter's line is read first and the answer waits for its own speaker.
       if (current && voiceOn && voiceKey && !spokenRef.current.has(`player:${choice.label}`)) {
         const index = current.choices.indexOf(choice);
@@ -803,6 +813,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
     },
     [dialogue, held, voiceKey, voiceOn],
   );
+
+  // Every line shown goes in the console's transcript: a clue's reading or a character's line.
+  useEffect(() => {
+    const b = beatRef.current;
+    if (!dialogue || !b) return;
+    const { line } = dialogue;
+    recordLine({ kind: line.voice === 'player' ? 'clue' : 'npc', beat: b.index, speaker: line.speaker, text: line.text });
+  }, [dialogue]);
 
   // Escape closes a dialogue; number keys pick an option, as in every RPG since the nineties.
   useEffect(() => {
@@ -912,6 +930,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     askedRef.current.clear();
     pendingRef.current = null;
     resetDevlog();
+    resetTranscript(game.transcript);
     const scene = sceneRef.current;
     scene?.clearObjective();
     scene?.clearPlaces();

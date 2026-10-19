@@ -9,11 +9,17 @@ import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, questTotals, subscribeDevlog, type DevRequest } from '../../utils/rpg/devlog';
 import type { Lang } from '../../utils/rpg/quest';
+import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { translations } from './translations';
 
 function useDevlog(): readonly DevRequest[] {
   useSyncExternalStore(subscribeDevlog, devlogVersion, devlogVersion);
   return devRequests();
+}
+
+function useTranscript(): readonly TranscriptLine[] {
+  useSyncExternalStore(subscribeTranscript, transcriptVersion, transcriptVersion);
+  return transcript();
 }
 
 /** Re-renders every `ms` while `on`, for the clocks of requests still running. */
@@ -58,6 +64,8 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
   const totals = questTotals();
   const listRef = useRef<HTMLDivElement>(null);
   const [showVoice, setShowVoice] = useState(false);
+  const [tab, setTab] = useState<'requests' | 'lines'>('requests');
+  const lines = useTranscript();
   const shown = showVoice ? requests : requests.filter((r) => r.kind === 'model');
 
   // Follows the newest output, unless the reader has scrolled up to read something.
@@ -70,24 +78,52 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
     <div className="rpg-dev" role="log" aria-label={t.devConsole}>
       <div className="rpg-dev-bar">
         <strong>~ {t.devConsole}</strong>
-        <label>
-          <input type="checkbox" checked={showVoice} onChange={(e) => setShowVoice(e.target.checked)} /> ElevenLabs
-        </label>
-        <button type="button" onClick={onClose} aria-label={t.close}>
+        <div className="rpg-dev-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'requests'} onClick={() => setTab('requests')}>
+            {t.devRequests}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'lines'} onClick={() => setTab('lines')}>
+            {t.devLines}
+          </button>
+        </div>
+        {tab === 'requests' && (
+          <label>
+            <input type="checkbox" checked={showVoice} onChange={(e) => setShowVoice(e.target.checked)} /> ElevenLabs
+          </label>
+        )}
+        <button type="button" className="rpg-dev-close" onClick={onClose} aria-label={t.close}>
           ×
         </button>
       </div>
-      <div className="rpg-dev-list" ref={listRef}>
-        {shown.length === 0 && <div className="rpg-dev-empty">{t.devEmpty}</div>}
-        {shown.map((r) => (
-          <div key={r.id} className={`rpg-dev-entry rpg-dev-${r.status}`}>
-            <div className="rpg-dev-head">{headline(r)}</div>
-            {r.kind === 'model' && r.thoughts && <pre className="rpg-dev-thoughts">{tail(r.thoughts, 4)}</pre>}
-            {r.text && <pre className="rpg-dev-text">{r.kind === 'model' ? tail(r.text, 8) : r.text}</pre>}
-            {r.error && <div className="rpg-dev-error">✗ {r.error}</div>}
-          </div>
-        ))}
-      </div>
+      {tab === 'lines' ? (
+        <div className="rpg-dev-list rpg-dev-lines" ref={listRef}>
+          {lines.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}
+          {lines.map((l, i) =>
+            l.kind === 'beat' ? (
+              <div key={i} className="rpg-dev-beat">
+                {t.devBeat(l.beat + 1)} · {l.speaker}
+                <span>{l.text}</span>
+              </div>
+            ) : (
+              <div key={i} className={`rpg-dev-line rpg-dev-line-${l.kind}`}>
+                <b>{l.kind === 'decision' ? `${l.speaker} ⚑` : l.speaker}:</b> {l.text}
+              </div>
+            ),
+          )}
+        </div>
+      ) : (
+        <div className="rpg-dev-list" ref={listRef}>
+          {shown.length === 0 && <div className="rpg-dev-empty">{t.devEmpty}</div>}
+          {shown.map((r) => (
+            <div key={r.id} className={`rpg-dev-entry rpg-dev-${r.status}`}>
+              <div className="rpg-dev-head">{headline(r)}</div>
+              {r.kind === 'model' && r.thoughts && <pre className="rpg-dev-thoughts">{tail(r.thoughts, 4)}</pre>}
+              {r.text && <pre className="rpg-dev-text">{r.kind === 'model' ? tail(r.text, 8) : r.text}</pre>}
+              {r.error && <div className="rpg-dev-error">✗ {r.error}</div>}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="rpg-dev-totals">
         {t.genTime}: {formatMs(totals.generationMs)} · {t.tokensLine}: in {tokens(totals.tokens.input)} out{' '}
         {tokens(totals.tokens.output)} think {tokens(totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}

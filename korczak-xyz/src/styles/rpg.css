@@ -561,11 +561,63 @@ ul.rpg-source {
 }
 
 .rpg-dev-bar button {
-  margin-left: auto;
   border: 1px solid #6b5b3e;
   background: none;
   color: inherit;
   cursor: pointer;
+}
+
+.rpg-dev-close {
+  margin-left: auto;
+}
+
+.rpg-dev-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.rpg-dev-tabs button[aria-selected='true'] {
+  background: #6b5b3e;
+  color: #fff6e0;
+}
+
+/* The transcript reads as a script: who says it in bold, the hunter's lines in the journal's gold. */
+.rpg-dev-lines {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+}
+
+.rpg-dev-beat {
+  margin: 8px 0 4px;
+  padding-top: 4px;
+  border-top: 1px solid #6b5b3e;
+  color: #9fd38a;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.rpg-dev-beat span {
+  display: block;
+  color: #8f8674;
+}
+
+.rpg-dev-line {
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.rpg-dev-line-ask,
+.rpg-dev-line-decision {
+  color: #ffd36b;
+}
+
+.rpg-dev-line-decision b {
+  text-decoration: underline;
+}
+
+.rpg-dev-line-clue {
+  color: #a9b8c9;
+  font-style: italic;
 }
 
 .rpg-dev-list {

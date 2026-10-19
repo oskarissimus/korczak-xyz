@@ -373,7 +373,12 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   (`modelVersion` — the `-latest` aliases resolve, e.g. `gemini-flash-latest` was `gemini-3.8-flash`
   in Oct 2026), status, time, time to first byte, the last lines of its thoughts and of its answer
   as they stream, its error, tokens and cost; the ElevenLabs clips behind a checkbox; and the quest's
-  totals along the bottom.
+  totals along the bottom. Its **Dialogi** tab is the quest as a script (owner, Oct 2026: "the
+  whole history of spoken lines, I'm working out whether the narration and dialogue hold
+  together"): each step's title and objective, every character's line, the hunter's questions and
+  decisions (⚑), and the clues read, in order. `utils/rpg/transcript.ts` records it — choices with
+  a `kind` only, so "Back" and "Goodbye" stay out, and a line shown again in the same beat once.
+  It rides in the autosave, so Continue keeps it; a new quest clears it.
 - **The waiting screens show the stream**: the last few lines of what the model is writing, and the
   models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
 - **The closing screen says what the quest cost**: the time played (Start or Continue to the

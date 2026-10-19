@@ -14,6 +14,7 @@
  */
 
 import type { Beat, Lang, StepRecord } from './quest';
+import type { TranscriptLine } from './transcript';
 
 const KEY = 'rpg-save';
 const VERSION = 1;
@@ -38,6 +39,8 @@ export interface SavedGame {
   decision: number | null;
   /** Time played on this quest so far; absent in saves from before it was kept. */
   playMs?: number;
+  /** Every line said so far, for the developer console; absent in older saves. */
+  transcript?: TranscriptLine[];
 }
 
 export function loadGame(): SavedGame | null {
