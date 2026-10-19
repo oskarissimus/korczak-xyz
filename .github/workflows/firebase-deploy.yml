@@ -61,9 +61,11 @@ on:
       # spends. Same tsconfig argument, same directory rule.
       - "korczak-xyz/src/utils/accountKeys/keys.ts"
       - "korczak-xyz/src/utils/accountKeys/tsconfig.json"
-      # The RPG demo's four: the prompt the function builds, the place grammar it validates, the
-      # prices it reserves at and the limits it keeps. The rest of `utils/rpg/` is the browser's.
+      # The RPG demo's five: the prompts the function builds (a beat's, a world's), the place grammar
+      # it validates, the prices it reserves at and the limits it keeps. The rest of `utils/rpg/` is
+      # the browser's.
       - "korczak-xyz/src/utils/rpg/quest.ts"
+      - "korczak-xyz/src/utils/rpg/genesis.ts"
       - "korczak-xyz/src/utils/rpg/place.ts"
       - "korczak-xyz/src/utils/rpg/cost.ts"
       - "korczak-xyz/src/utils/rpg/demoLimits.ts"

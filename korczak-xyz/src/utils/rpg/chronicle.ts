@@ -3,18 +3,19 @@
  * is written against (`beatPrompt`'s "the world remembers"). This is what makes a decision outlive
  * its quest.
  *
- * Kept in this browser's localStorage, one list per game language (a Polish chronicle quoted into
- * an English prompt would leak Polish into the story), capped at `KEEP` quests so the prompt stays
- * short. Not synced to the account yet; a chronicle that follows the reader between devices is a
+ * Kept in this browser's localStorage, one list per world (`genesis.ts`): a world is in one language,
+ * so a Polish chronicle is never quoted into an English prompt, and one world's deeds never into
+ * another's. The classic world's id is its language, which is what every chronicle was kept under
+ * before there were worlds. Capped at `KEEP` quests so the prompt stays short. Not synced to the account yet; a chronicle that follows the reader between devices is a
  * Firestore document for later.
  */
 
-import type { ChronicleEntry, Lang } from './quest';
+import type { ChronicleEntry } from './quest';
 
 const KEY = 'rpg-chronicle';
 export const KEEP = 8;
 
-type Stored = Partial<Record<Lang, ChronicleEntry[]>>;
+type Stored = Record<string, ChronicleEntry[]>;
 
 function read(): Stored {
   try {
@@ -33,20 +34,20 @@ function write(stored: Stored) {
   }
 }
 
-export function loadChronicle(lang: Lang): ChronicleEntry[] {
-  const entries = read()[lang];
+export function loadChronicle(worldId: string): ChronicleEntry[] {
+  const entries = read()[worldId];
   return Array.isArray(entries) ? entries.filter((e) => e && typeof e.title === 'string' && Array.isArray(e.steps)) : [];
 }
 
-export function addToChronicle(lang: Lang, entry: ChronicleEntry): ChronicleEntry[] {
+export function addToChronicle(worldId: string, entry: ChronicleEntry): ChronicleEntry[] {
   const stored = read();
-  const next = [...loadChronicle(lang), entry].slice(-KEEP);
-  write({ ...stored, [lang]: next });
+  const next = [...loadChronicle(worldId), entry].slice(-KEEP);
+  write({ ...stored, [worldId]: next });
   return next;
 }
 
-export function clearChronicle(lang: Lang) {
+export function clearChronicle(worldId: string) {
   const stored = read();
-  delete stored[lang];
+  delete stored[worldId];
   write(stored);
 }

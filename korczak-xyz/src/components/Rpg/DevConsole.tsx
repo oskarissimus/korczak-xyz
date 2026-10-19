@@ -48,6 +48,7 @@ function tail(text: string, lines: number): string {
 function headline(r: DevRequest): string {
   const parts = [r.servedBy && r.servedBy !== r.model ? `${r.model} → ${r.servedBy}` : r.model];
   if (r.beat !== null) parts.unshift(`beat ${r.beat + 1}`);
+  else if (r.kind === 'model') parts.unshift('world');
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);
   if (r.firstMs !== null && r.kind === 'model') parts.push(`1st byte ${formatMs(r.firstMs)}`);
   if (r.usage) parts.push(`in ${tokens(r.usage.input)} out ${tokens(r.usage.output)} think ${tokens(r.usage.thoughts)}`);

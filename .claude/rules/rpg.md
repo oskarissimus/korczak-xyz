@@ -15,6 +15,49 @@ Started Oct 2026 as the smallest thing that plays end to end: walk around a vill
 look under pointer lock, Shift to run), talk to a villager, go where the quest sends you, kill or
 gather things there, decide. Inspired by The Witcher 3. Meant to be iterated on.
 
+## Every new game is a new world
+
+Since Oct 2026 (owner: "a truly random world, unlimited: maybe a futuristic techno-utopia, maybe a
+water world, maybe a space one; no catalogue to draw from but a method on the LLM and temperature,
+more exotic than typical medieval DnD fantasy; no franchise, only its feel"). The Witcher village is
+now one world among endless ones: **Kraina Wierzb / The Willowlands** (`classicWorld`), which plays
+when there is no key, offline, and as the way out of a failed genesis; its id is the language, so
+old chronicles stay where they were.
+
+**How a world is drawn** (`utils/rpg/genesis.ts`, `seedWords.ts`). A model asked for "a random
+world" at any temperature writes the same four worlds. So the randomness comes from outside: three
+**seeds**, two words from ~400 unrelated things, processes and feelings and one random Wikipedia
+title (`drawSeeds`, a word instead when Wikipedia does not answer in 2.5 s), which the prompt says to
+transform, never use literally. The model writes **four candidates** at `GENESIS_TEMPERATURE` 1.35
+(OpenAI caps at 1.2), each with its own `typicality` 0–100, told to make them differ from each other
+and from the worlds this browser already had (`pastWorlds`, the last 8, as "avoid"). The game, not
+the model, picks: one of the two least typical (`pickWorld`). Names from a franchise list
+(`franchised`, Polish inflections included) disqualify a candidate. Measured on Flash: ~12 s,
+~2k tokens, worlds like a vertical shaft of steam with people living in rock bubbles.
+
+**The world bible** (`WorldBible`): name, pitch, tone, tech, climate, people, architecture,
+threats, who the player is and how they are addressed, the hub settlement, a few words people use,
+and the **look**. It goes into every beat's prompt (`worldLines`): the player is "the hero" and is
+whoever the bible says, quests start in the hub, and everything is told to belong to this world.
+Kept in localStorage `rpg-worlds` per language (`worldSave.ts`); the chronicle and the autosave are
+keyed by its id. **Start** continues the current world with a new quest; **🎲 New world** makes
+another. The genesis waits on screen (`.rpg-genesis`, the seeds and the stream), because nothing can
+be drawn or written before the world exists. A failure is the retry panel, with the Willowlands as
+the other button. The demo has `{kind:'world'}` too, with the prompt built on the server from
+`demoGenesis`; `genesis.ts` is compiled into the function, so it is in `firebase-deploy.yml`'s
+paths. Each genesis is `rpg.world` in Sentry Logs (`rpg.world.failed` an error) and a JSON under
+`users/{uid}/rpg/worlds/` like the beats.
+
+**The look** (`WorldLook`, `components/Rpg/atmosphere.ts`) is how one village of Quaternius pieces
+becomes any world with no new model: sky, fog, sun, ground, foliage, wall, roof and accent colours;
+time of day (sun height and strength, stars at night); haze (fog distance); weather (rain, snow,
+ash, spores, sparks — one `Points` box that wraps around the player); water (`flooded` is a water
+plane with the village on a disc of land); growth (how much ground cover); flora (the kit's pines,
+broadleaf or dead trees, or primitive fungi and spires, or none). The kit's textures are
+**recoloured in the shader, not tinted**: their lightness is painted in the world's colour
+(`recolor`), because multiplying purple into green leaves made mud. `parseLook` lifts every colour
+to a floor of brightness (`lift`), since the models do paint worlds in #000000.
+
 ## A quest is written one beat at a time, after each decision
 
 Since Oct 2026 (owner: "a generative feel, like a text RPG with an LLM: branching, our decisions

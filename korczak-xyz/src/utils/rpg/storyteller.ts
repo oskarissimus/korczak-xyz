@@ -25,6 +25,7 @@
  */
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
+import { genesisPrompt, GENESIS_TEMPERATURE, parseWorlds, pickWorld, type GenesisContext, type WorldBible } from './genesis';
 import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
@@ -232,7 +233,7 @@ function handleLine(line: string, onData: (data: any) => void): boolean {
   return true;
 }
 
-async function askGoogle(key: string, model: string, prompt: string, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askGoogle(key: string, model: string, prompt: string, temperature: number, dog: Watchdog, entry: DevRequest): Promise<string> {
   const gemma = model.startsWith('gemma');
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}` +
@@ -244,7 +245,7 @@ async function askGoogle(key: string, model: string, prompt: string, dog: Watchd
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 1,
+        temperature,
         // Room for thinking as well as the answer: a thinking model counts both against this,
         // and a quest in Polish is ~1500 tokens on its own.
         maxOutputTokens: 16384,
@@ -261,14 +262,14 @@ async function askGoogle(key: string, model: string, prompt: string, dog: Watchd
  * The demo: the context goes to our function, which builds the same prompt and passes Google's
  * stream back byte for byte. A refusal of its own carries a `reason`; anything else is Google's.
  */
-async function askDemo(model: string, ctx: BeatContext, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askDemo(model: string, body: DemoAsk, dog: Watchdog, entry: DevRequest): Promise<string> {
   const url = rpgDemoUrl();
   if (!url) throw new ProviderError('demo: no address', null, false, 'disabled');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: dog.controller.signal,
-    body: JSON.stringify({ kind: 'beat', model, ctx }),
+    body: JSON.stringify({ ...body, model }),
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -309,14 +310,15 @@ async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest):
   return text;
 }
 
-async function askOpenAi(key: string, prompt: string, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askOpenAi(key: string, prompt: string, temperature: number, dog: Watchdog, entry: DevRequest): Promise<string> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     signal: dog.controller.signal,
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      temperature: 1,
+      // OpenAI's scale is the same 0–2, but it turns to noise sooner than Gemini's.
+      temperature: Math.min(temperature, 1.2),
       response_format: { type: 'json_object' },
       stream: true,
       stream_options: { include_usage: true },
@@ -396,74 +398,144 @@ export function modelChain(provider: 'google' | 'openai' | 'demo', chosen: strin
   return pick ? [pick.id, ...usual.filter((m) => m !== pick.id)] : usual;
 }
 
-export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: string | null = null): Promise<StoryAttempt> {
+/** What the demo's function is asked for: a beat or a world, by the context it builds the prompt from. */
+type DemoAsk = { kind: 'beat'; ctx: BeatContext } | { kind: 'world'; ctx: GenesisContext };
+
+interface Ask<T> {
+  prompt: string;
+  temperature: number;
+  demo: DemoAsk;
+  /** The answer as the game can use it, or null when it cannot. */
+  parse: (raw: string) => T | null;
+  /** Which beat, for the console; null for a world. */
+  beat: number | null;
+}
+
+interface Asked<T> {
+  outcome: StoryOutcome;
+  provider: QuestSource;
+  model: string | null;
+  tries: ModelTry[];
+  raw: string | null;
+  error: string | null;
+  ms: number;
+  value: T | null;
+  refusal: RpgDemoReason | null;
+}
+
+/**
+ * Asks the chain of models, in order, until one answers with something `parse` can use. Every model
+ * tried is recorded with its status and error; see the top of the file for what moves on and what
+ * ends the attempt.
+ */
+async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>): Promise<Asked<T>> {
   const started = Date.now();
-  const prompt = beatPrompt(ctx);
   const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : keys.demo ? 'demo' : 'static';
-  const attempt: StoryAttempt = {
-    outcome: 'no-key',
-    provider,
-    model: null,
-    seed: ctx.seed,
-    index: ctx.index,
-    job: ctx.job,
-    plan: ctx.plan,
-    prompt,
-    tries: [],
-    raw: null,
-    error: null,
-    ms: 0,
-    beat: null,
-    refusal: null,
-  };
-  if (provider === 'static') return attempt;
+  const run: Asked<T> = { outcome: 'no-key', provider, model: null, tries: [], raw: null, error: null, ms: 0, value: null, refusal: null };
+  if (provider === 'static') return run;
 
   for (const model of modelChain(provider, chosen)) {
     const t0 = Date.now();
-    attempt.model = model;
-    const entry = startRequest('model', model, ctx.index);
+    run.model = model;
+    const entry = startRequest('model', model, ask.beat);
     const dog = new Watchdog();
     const record = (status: number | null, error: string | null) =>
-      attempt.tries.push({ model, status, ms: Date.now() - t0, firstMs: entry.firstMs, error, usage: entry.usage, cost: entry.cost });
+      run.tries.push({ model, status, ms: Date.now() - t0, firstMs: entry.firstMs, error, usage: entry.usage, cost: entry.cost });
     try {
       try {
-        attempt.raw =
+        run.raw =
           provider === 'google'
-            ? await askGoogle(keys.google!, model, prompt, dog, entry)
+            ? await askGoogle(keys.google!, model, ask.prompt, ask.temperature, dog, entry)
             : provider === 'demo'
-              ? await askDemo(model, ctx, dog, entry)
-              : await askOpenAi(keys.openai!, prompt, dog, entry);
+              ? await askDemo(model, ask.demo, dog, entry)
+              : await askOpenAi(keys.openai!, ask.prompt, ask.temperature, dog, entry);
       } catch (e) {
         throw dog.wrap(e);
       } finally {
         dog.done();
       }
-      attempt.beat = parseBeat(attempt.raw, ctx);
-      const unplayable = attempt.beat ? null : 'the answer was not a playable beat';
+      run.value = ask.parse(run.raw);
+      const unplayable = run.value ? null : `the answer was not a playable ${ask.beat === null ? 'world' : 'beat'}`;
       endRequest(entry, unplayable);
       record(200, unplayable);
-      if (attempt.beat) break;
+      if (run.value) break;
       // An unplayable answer from one model is worth one from the next.
-      attempt.outcome = 'unusable';
-      attempt.error = unplayable;
+      run.outcome = 'unusable';
+      run.error = unplayable;
     } catch (e) {
       endRequest(entry, describe(e));
       record(e instanceof ProviderError ? e.status : null, describe(e));
-      if (e instanceof ProviderError && e.refusal) attempt.refusal = e.refusal;
-      if (attempt.outcome !== 'unusable') {
-        attempt.outcome = 'failed';
-        attempt.error = describe(e);
+      if (e instanceof ProviderError && e.refusal) run.refusal = e.refusal;
+      if (run.outcome !== 'unusable') {
+        run.outcome = 'failed';
+        run.error = describe(e);
       }
       if (!tryNext(e)) break;
       if (dropped(e)) await whenVisible();
     }
   }
 
-  attempt.ms = Date.now() - started;
-  if (attempt.beat) {
-    attempt.outcome = 'generated';
-    attempt.error = null;
-    attempt.refusal = null;
+  run.ms = Date.now() - started;
+  if (run.value) {
+    run.outcome = 'generated';
+    run.error = null;
+    run.refusal = null;
   }
-  return attempt;
+  return run;
+}
+
+export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: string | null = null): Promise<StoryAttempt> {
+  const prompt = beatPrompt(ctx);
+  const run = await askChain(keys, chosen, {
+    prompt,
+    temperature: 1,
+    demo: { kind: 'beat', ctx },
+    parse: (raw) => parseBeat(raw, ctx),
+    beat: ctx.index,
+  });
+  return {
+    outcome: run.outcome,
+    provider: run.provider,
+    model: run.model,
+    seed: ctx.seed,
+    index: ctx.index,
+    job: ctx.job,
+    plan: ctx.plan,
+    prompt,
+    tries: run.tries,
+    raw: run.raw,
+    error: run.error,
+    ms: run.ms,
+    beat: run.value,
+    refusal: run.refusal,
+  };
+}
+
+export interface WorldAttempt extends Omit<Asked<WorldBible>, 'value'> {
+  prompt: string;
+  seeds: string[];
+  /** Every playable candidate, the chosen one among them. */
+  candidates: WorldBible[];
+  world: WorldBible | null;
+}
+
+/**
+ * A new world (`genesis.ts`): four candidates from one answer, one of the two least typical chosen
+ * by the game. Asked at `GENESIS_TEMPERATURE`, through the same chain of models as a beat.
+ */
+export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen: string | null = null): Promise<WorldAttempt> {
+  const prompt = genesisPrompt(ctx);
+  let candidates: WorldBible[] = [];
+  const run = await askChain(keys, chosen, {
+    prompt,
+    temperature: GENESIS_TEMPERATURE,
+    demo: { kind: 'world', ctx },
+    parse: (raw) => {
+      candidates = parseWorlds(raw, ctx);
+      return pickWorld(candidates);
+    },
+    beat: null,
+  });
+  const { value, ...rest } = run;
+  return { ...rest, prompt, seeds: ctx.seeds, candidates, world: value };
 }

@@ -8,7 +8,7 @@ function usd(n: number): string {
 const en = {
   title: 'Wanderer',
   intro:
-    'A small village, a hunter passing through, and somebody who needs help. A model writes the quest one step at a time, after each of your decisions, and later quests remember how you chose.',
+    'A world nobody has seen before, invented by a model from three random seeds, and somebody in it who needs help. The quest is written one step at a time, after each of your decisions; the world keeps what happened in it, and later quests remember how you chose.',
   move: 'walk',
   run: 'run',
   mouse: 'Mouse: look around (click the view to capture it, Esc to let go)',
@@ -41,7 +41,7 @@ const en = {
   talk: 'Talk',
   pickUp: 'Pick up',
   health: 'Health',
-  died: 'You fell… and woke in the village.',
+  died: 'You fell… and woke where you started.',
   questStarted: 'Quest started',
   completed: 'Quest completed',
   questComplete: 'Quest complete',
@@ -102,12 +102,21 @@ const en = {
   touchLook: 'Drag anywhere else to look around',
   touchAct: '⚔ strikes; the second button talks, examines or picks up what is in reach',
   arrived: 'You have reached',
+  worldLabel: 'World',
+  newWorld: '🎲 New world',
+  newWorldHint: 'A new world starts over: its places, people and chronicle are its own.',
+  creatingWorld: 'A world is being born…',
+  worldSeeds: (seeds: string) => `Seeds: ${seeds}`,
+  worldFailedTitle: 'No world came of it',
+  playClassic: 'Play in the Willowlands',
+  worldBorn: (name: string) => `World: ${name}`,
+  worldYou: (player: string) => `You are ${player}.`,
 };
 
 const pl: typeof en = {
   title: 'Wędrowiec',
   intro:
-    'Mała wieś, wędrowny łowca potworów i ktoś, kto potrzebuje pomocy. Model pisze questa krok po kroku, po każdej Twojej decyzji, a kolejne questy pamiętają, jak wybrałeś.',
+    'Świat, którego nikt wcześniej nie widział, wymyślony przez model z trzech losowych ziaren, i ktoś w nim, kto potrzebuje pomocy. Quest powstaje krok po kroku, po każdej Twojej decyzji; świat zachowuje to, co się w nim wydarzyło, a kolejne questy pamiętają, jak wybrałeś.',
   move: 'chodzenie',
   run: 'bieg',
   mouse: 'Mysz: rozglądanie się (kliknij w widok, żeby ją przechwycić, Esc puszcza)',
@@ -140,7 +149,7 @@ const pl: typeof en = {
   talk: 'Rozmawiaj',
   pickUp: 'Podnieś',
   health: 'Zdrowie',
-  died: 'Padłeś… i ocknąłeś się we wsi.',
+  died: 'Padłeś… i ocknąłeś się tam, skąd wyruszyłeś.',
   questStarted: 'Nowy quest',
   completed: 'Quest ukończony',
   questComplete: 'Quest ukończony',
@@ -201,6 +210,15 @@ const pl: typeof en = {
   touchLook: 'Przeciągnij palcem gdziekolwiek indziej, żeby się rozejrzeć',
   touchAct: '⚔ to cios; drugi przycisk rozmawia, bada albo podnosi to, co w zasięgu',
   arrived: 'Docierasz do miejsca',
+  worldLabel: 'Świat',
+  newWorld: '🎲 Nowy świat',
+  newWorldHint: 'Nowy świat zaczyna od zera: jego miejsca, ludzie i kronika są tylko jego.',
+  creatingWorld: 'Rodzi się świat…',
+  worldSeeds: (seeds) => `Ziarna: ${seeds}`,
+  worldFailedTitle: 'Nie urodził się żaden świat',
+  playClassic: 'Zagraj w Krainie Wierzb',
+  worldBorn: (name) => `Świat: ${name}`,
+  worldYou: (player) => `Jesteś: ${player}.`,
 };
 
 export const translations = { en, pl };

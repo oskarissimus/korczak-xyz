@@ -24,7 +24,9 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
-import { GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, type HouseKind } from './world';
+import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, type HouseKind } from './world';
+import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
+import { DAYLIGHT, HAZE, recolor, stars, Weather } from './atmosphere';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -68,6 +70,8 @@ interface Tree {
   /** The cone and trunk it starts as; hidden for good once the kit's trees stand in. */
   meshes: THREE.Mesh[];
   obstacle: Obstacle;
+  /** Its obstacle's radius as planted; a world with no flora walks through where it stood. */
+  r: number;
   /** Its slot in the instanced kit trees, once those are up. */
   slot?: { meshes: THREE.InstancedMesh[]; index: number; matrices: THREE.Matrix4[] };
   hidden?: boolean;
@@ -294,7 +298,8 @@ export class RpgScene {
   // --- the world --------------------------------------------------------------------------------
 
   private buildLight() {
-    this.scene.add(new THREE.HemisphereLight(0xdfe9f3, 0x4a5a3a, 0.9));
+    this.hemi = new THREE.HemisphereLight(0xdfe9f3, 0x4a5a3a, 0.9);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
     sun.position.set(40, 70, 25);
     sun.castShadow = true;
@@ -314,6 +319,9 @@ export class RpgScene {
   }
 
   private sunLight!: THREE.DirectionalLight;
+  private hemi!: THREE.HemisphereLight;
+  /** Where the sun stands from the player: the world's time of day. */
+  private sunOffset = new THREE.Vector3(40, 70, 25);
 
   private buildWorld() {
     const ground = new THREE.Mesh(
@@ -323,6 +331,7 @@ export class RpgScene {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
+    this.ground = ground;
 
     this.buildVillage();
     this.buildTrees();
@@ -344,6 +353,7 @@ export class RpgScene {
       this.scene.add(house);
       this.houseObstacles[i].r = HOUSE_RADIUS[kinds[i]];
     });
+    this.stopgapHouses = [];
 
     // The fence: rails instead of posts, with the same eight gaps.
     for (const post of this.fencePosts) this.scene.remove(post);
@@ -377,30 +387,53 @@ export class RpgScene {
     place('Bucket_Wooden_1', 1.5, -1.6);
     this.obstacles.push({ x: 9.5, z: 4.2, r: 1.6 }, { x: -18, z: -2, r: 2 });
 
-    this.plantTrees();
     this.plantGroundCover();
+    // The world's colours, its trees and how much grows: the kit is what they are drawn on.
+    this.dressWorld();
   }
 
-  /** The scattered trees, as kit trees: one instanced mesh per part per kind, hidden ones scaled to 0. */
+  /**
+   * The scattered trees in the world's flora (`WorldLook.flora`): the kit's pines, broadleaf or dead
+   * trees, or shapes of the world's own (giant mushrooms, spires), one instanced mesh per part per
+   * kind, hidden ones scaled to 0. Planted again when a world changes it; with no flora at all the
+   * trees are gone and so are the obstacles they were.
+   */
   private plantTrees() {
+    for (const m of this.treeMeshes) {
+      this.scene.remove(m);
+      m.dispose();
+    }
+    this.treeMeshes = [];
+    const flora = this.look.flora;
+    const classic = this.isClassic();
+    const kinds: readonly string[] | null =
+      classic ? TREES : flora === 'pines' ? TREES.slice(0, 3) : flora === 'broadleaf' ? TREES.slice(3) : flora === 'dead' ? DEAD_TREES : null;
+    if (kinds && !this.kit.loaded) return;
+    for (const tree of this.trees) {
+      for (const m of tree.meshes) this.scene.remove(m);
+      tree.slot = undefined;
+      tree.obstacle.r = flora === 'none' && !classic ? 0 : tree.r;
+    }
+    if (!classic && flora === 'none') return;
     const rand = rng(7);
     const byKind = new Map<string, Tree[]>();
     for (const tree of this.trees) {
-      const kind = TREES[Math.floor(rand() * TREES.length)];
+      const kind = kinds ? kinds[Math.floor(rand() * kinds.length)] : flora;
       byKind.set(kind, [...(byKind.get(kind) ?? []), tree]);
     }
     for (const [kind, trees] of byKind) {
-      const parts = this.kit.parts(kind);
+      const parts = kinds ? this.kit.parts(kind) : this.floraParts();
       const meshes = parts.map((part) => {
         const m = new THREE.InstancedMesh(part.geometry, part.material, trees.length);
         m.castShadow = true;
         m.receiveShadow = true;
         m.userData.shared = true;
         this.scene.add(m);
+        this.treeMeshes.push(m);
         return m;
       });
       trees.forEach((tree, i) => {
-        const scale = tree.obstacle.r / 0.5;
+        const scale = tree.r / 0.5;
         const base = new THREE.Matrix4().compose(
           new THREE.Vector3(tree.obstacle.x, 0, tree.obstacle.z),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
@@ -408,7 +441,6 @@ export class RpgScene {
         );
         // Each part sits differently inside the tree, so each instanced mesh has its own matrix.
         tree.slot = { meshes, index: i, matrices: parts.map((p) => base.clone().multiply(p.matrix)) };
-        for (const m of tree.meshes) this.scene.remove(m);
         showTree(tree, !tree.hidden);
       });
       meshes.forEach((m) => {
@@ -416,6 +448,58 @@ export class RpgScene {
         m.computeBoundingSphere();
       });
     }
+  }
+
+  private treeMeshes: THREE.InstancedMesh[] = [];
+  /** The world's own flora's geometry and materials, made once per world. */
+  private floraCache: { flora: string; parts: { geometry: THREE.BufferGeometry; material: THREE.Material; matrix: THREE.Matrix4 }[] } | null = null;
+
+  /** A giant mushroom or a spire, in the world's colours, as parts to instance like a kit tree's. */
+  private floraParts() {
+    const look = this.look;
+    if (this.floraCache?.flora === look.flora) return this.floraCache.parts;
+    for (const p of this.floraCache?.parts ?? []) {
+      p.geometry.dispose();
+      p.material.dispose();
+    }
+    const at = (x: number, y: number, z: number, rx = 0, rz = 0) =>
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(x, y, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, 0, rz)),
+        new THREE.Vector3(1, 1, 1),
+      );
+    const glow = (color: string, k: number) =>
+      new THREE.MeshStandardMaterial({ color, roughness: 0.55, emissive: new THREE.Color(look.accent), emissiveIntensity: k });
+    let parts;
+    if (look.flora === 'fungi') {
+      const stalk = new THREE.MeshStandardMaterial({ color: new THREE.Color(look.foliage).lerp(new THREE.Color(0xffffff), 0.65), roughness: 0.9 });
+      parts = [
+        { geometry: new THREE.CylinderGeometry(0.28, 0.42, 3.6, 8), material: stalk, matrix: at(0, 1.8, 0) },
+        {
+          geometry: new THREE.SphereGeometry(1.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.2),
+          material: glow(look.foliage, look.time === 'night' || look.time === 'dusk' ? 0.25 : 0.05),
+          matrix: at(0, 3.2, 0),
+        },
+        { geometry: new THREE.CylinderGeometry(0.14, 0.2, 1.4, 6), material: stalk, matrix: at(0.9, 0.7, 0.5) },
+        { geometry: new THREE.SphereGeometry(0.7, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), material: glow(look.foliage, 0.1), matrix: at(0.9, 1.3, 0.5) },
+      ];
+    } else {
+      const shard = new THREE.MeshStandardMaterial({
+        color: look.foliage,
+        roughness: 0.3,
+        metalness: 0.25,
+        emissive: new THREE.Color(look.accent),
+        emissiveIntensity: look.time === 'night' || look.time === 'dusk' ? 0.35 : 0.08,
+        flatShading: true,
+      });
+      parts = [
+        { geometry: new THREE.ConeGeometry(0.7, 7, 5), material: shard, matrix: at(0, 3.5, 0) },
+        { geometry: new THREE.ConeGeometry(0.4, 3.6, 5), material: shard, matrix: at(0.8, 1.6, 0.3, 0.2, -0.35) },
+        { geometry: new THREE.ConeGeometry(0.35, 2.6, 5), material: shard, matrix: at(-0.7, 1.1, -0.4, -0.25, 0.4) },
+      ];
+    }
+    this.floraCache = { flora: look.flora, parts };
+    return parts;
   }
 
   /**
@@ -444,6 +528,7 @@ export class RpgScene {
         m.castShadow = name.startsWith('Bush');
         m.userData.shared = true;
         this.scene.add(m);
+        this.cover.push({ mesh: m, n });
         return m;
       });
       for (let i = 0; i < n; i++) {
@@ -472,6 +557,8 @@ export class RpgScene {
     const wall = surfaceMat('plaster', 2, 1.2, { color: 0xf0e6d6 });
     const timber = surfaceMat('planks', 2, 0.3);
     const thatch = surfaceMat('thatch', 3, 2);
+    this.stopgapWall = wall;
+    this.stopgapRoof = thatch;
     const houses: [number, number][] = [
       [-12, -10],
       [14, -14],
@@ -524,6 +611,126 @@ export class RpgScene {
   }
 
   private fencePosts: THREE.Mesh[] = [];
+  private cover: { mesh: THREE.InstancedMesh; n: number }[] = [];
+  private ground!: THREE.Mesh;
+  private stopgapWall!: THREE.MeshStandardMaterial;
+  private stopgapRoof!: THREE.MeshStandardMaterial;
+
+  // --- the world's look -------------------------------------------------------------------------
+
+  /** The world being played (`utils/rpg/genesis.ts`); the classic one until a world is entered. */
+  private look: WorldLook = CLASSIC_LOOK;
+  private weather: Weather | null = null;
+  private starDome: THREE.Points | null = null;
+  /** A flooded world: the sea that replaces the ground, and the land the village stands on. */
+  private flood: { water: THREE.Mesh; land: THREE.Mesh } | null = null;
+
+  private isClassic(): boolean {
+    return this.look === CLASSIC_LOOK || JSON.stringify(this.look) === JSON.stringify(CLASSIC_LOOK);
+  }
+
+  /**
+   * Draws the world from its look: sky, fog and light, the time of day, the weather, what grows and
+   * how much of it, the colour of the ground, the leaves, the walls and the roofs, and water over
+   * everything for a flooded one. The classic look is the scene exactly as it was before worlds.
+   */
+  applyWorld(look: WorldLook) {
+    this.look = look;
+    const classic = this.isClassic();
+    const day = DAYLIGHT[look.time];
+    this.scene.background = new THREE.Color(look.sky);
+    const [near, far] = HAZE[look.haze];
+    this.scene.fog = new THREE.Fog(look.fog, near, far);
+    if (classic) {
+      this.hemi.color.set(0xdfe9f3);
+      this.hemi.groundColor.set(0x4a5a3a);
+    } else {
+      this.hemi.color.set(look.sky).lerp(new THREE.Color(0xffffff), 0.45);
+      this.hemi.groundColor.set(look.ground);
+    }
+    this.hemi.intensity = day.sky;
+    this.sunLight.color.set(look.sun);
+    this.sunLight.intensity = day.sun;
+    this.sunOffset.set(Math.cos(day.elevation) * 47, Math.sin(day.elevation) * 82, Math.cos(day.elevation) * 30);
+    if (classic) this.sunOffset.set(40, 70, 25);
+
+    if (this.starDome) this.scene.remove(this.starDome);
+    this.starDome = null;
+    if (look.time === 'night' && !classic) {
+      this.starDome = stars();
+      this.scene.add(this.starDome);
+    }
+    if (this.weather) {
+      this.scene.remove(this.weather.points);
+      this.weather.dispose();
+      this.weather = null;
+    }
+    if (look.weather !== 'none') {
+      const color =
+        look.weather === 'rain' ? 0xa9b9d6 : look.weather === 'snow' ? 0xffffff : look.weather === 'ash' ? 0x8f8a84 : look.accent;
+      this.weather = new Weather(look.weather, color);
+      this.scene.add(this.weather.points);
+    }
+
+    recolor(this.ground.material as THREE.Material, look.ground, classic ? 0 : 0.8);
+    recolor(this.stopgapWall, look.wall, classic ? 0 : 0.65);
+    recolor(this.stopgapRoof, look.roof, classic ? 0 : 0.7);
+    this.leafMat.color.set(classic ? 0x7d9a6a : look.foliage);
+
+    if (this.flood) {
+      this.scene.remove(this.flood.water, this.flood.land);
+      this.flood.water.geometry.dispose();
+      this.flood.land.geometry.dispose();
+      this.flood = null;
+    }
+    this.ground.visible = true;
+    if (look.water === 'flooded' && !classic) {
+      // The sea is the floor, and the village and every place are islands on it (`placeBuilder`'s
+      // ground discs stand a little higher), joined by their paths.
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(look.sky).lerp(new THREE.Color(look.ground), 0.55).multiplyScalar(0.7),
+          roughness: 0.12,
+          metalness: 0.15,
+        }),
+      );
+      water.rotation.x = -Math.PI / 2;
+      water.receiveShadow = true;
+      const land = new THREE.Mesh(new THREE.CircleGeometry(34, 48), this.ground.material as THREE.Material);
+      land.rotation.x = -Math.PI / 2;
+      land.position.y = 0.012;
+      land.receiveShadow = true;
+      this.ground.visible = false;
+      this.flood = { water, land };
+      this.scene.add(water, land);
+    }
+
+    if (this.kit.loaded) this.dressWorld();
+    else if (!classic && (look.flora === 'fungi' || look.flora === 'spires' || look.flora === 'none')) this.plantTrees();
+  }
+
+  /** What needs the kit: its leaves, walls and roofs recoloured, its trees replanted, its ground cover thinned. */
+  private dressWorld() {
+    const look = this.look;
+    const classic = this.isClassic();
+    for (const name of ['Leaves_Pine', 'Leaves_NormalTree', 'Leaves_TwistedTree', 'Leaves', 'Grass', 'Flowers']) {
+      const m = this.kit.material(name);
+      if (m) recolor(m, look.foliage, classic ? 0 : 0.7);
+    }
+    for (const name of ['MI_Plaster', 'MI_Brick', 'MI_UnevenBrick']) {
+      const m = this.kit.material(name);
+      if (m) recolor(m, look.wall, classic ? 0 : 0.65);
+    }
+    for (const name of ['MI_RoundTiles', 'MI_WoodTrim']) {
+      const m = this.kit.material(name);
+      if (m) recolor(m, look.roof, classic ? 0 : name === 'MI_WoodTrim' ? 0.35 : 0.75);
+    }
+    this.plantTrees();
+    // Bare ground, a little, or all of it; under a flood the only cover is the reeds of the places.
+    const share = classic ? 1 : look.water === 'flooded' ? 0 : look.growth === 'barren' ? 0 : look.growth === 'sparse' ? 0.3 : 1;
+    for (const { mesh, n } of this.cover) mesh.count = Math.floor(n * share);
+  }
 
   /**
    * The well in the square: a stone ring with a wall to it, inside and out, water a little down,
@@ -586,7 +793,7 @@ export class RpgScene {
     this.scene.add(trunk, crown);
     const obstacle = { x, z, r: 0.5 * scale };
     this.obstacles.push(obstacle);
-    this.trees.push({ meshes: [trunk, crown], obstacle });
+    this.trees.push({ meshes: [trunk, crown], obstacle, r: obstacle.r });
   }
 
   private trunkMat = surfaceMat('bark', 1, 2, { roughness: 1 });
@@ -1082,6 +1289,7 @@ export class RpgScene {
   }
 
   private animate(dt: number) {
+    this.weather?.update(dt, this.player.position);
     this.playerRig?.update(dt);
     for (const npc of this.npcs.values()) npc.rig?.update(dt);
     for (const enemy of this.enemies) enemy.rig?.update(dt);
@@ -1175,7 +1383,7 @@ export class RpgScene {
       this.cb.onPrompt(prompt);
     }
 
-    this.sunLight.position.set(this.player.position.x + 40, 70, this.player.position.z + 25);
+    this.sunLight.position.copy(this.player.position).add(this.sunOffset);
     this.sunLight.target.position.copy(this.player.position);
 
     this.compassTimer -= dt;

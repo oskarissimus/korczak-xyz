@@ -57,6 +57,23 @@ export class WorldKit {
     });
   }
 
+  /** One of the kits' materials by name (`Leaves_Pine`, `MI_Plaster`), for a world to recolour. */
+  material(name: string): THREE.Material | null {
+    if (!this.materials) {
+      this.materials = new Map();
+      for (const piece of this.pieces.values()) {
+        piece.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) this.materials!.set(m.name, m);
+        });
+      }
+    }
+    return this.materials.get(name) ?? null;
+  }
+
+  private materials: Map<string, THREE.Material> | null = null;
+
   has(name: string): boolean {
     return this.pieces.has(name);
   }

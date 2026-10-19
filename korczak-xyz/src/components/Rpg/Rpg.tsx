@@ -33,11 +33,14 @@ import {
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
-import { recordQuest, watchBeat } from '../../utils/rpg/questLog';
+import { classicWorld, type WorldBible } from '../../utils/rpg/genesis';
+import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
-import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
+import { drawSeeds } from '../../utils/rpg/seedWords';
+import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
+import { loadWorld, pastWorlds, saveWorld } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
@@ -117,6 +120,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
   gameLangRef.current = gameLang;
   /** The autosaved quest, offered on the intro screen. */
   const [saved, setSaved] = useState<SavedGame | null>(null);
+  /**
+   * The world being played (`utils/rpg/genesis.ts`), per game language; null before the first one is
+   * invented. Every beat is written in it and the scene is drawn from its look.
+   */
+  const [world, setWorld] = useState<WorldBible | null>(null);
+  const worldRef = useRef<WorldBible | null>(null);
+  worldRef.current = world;
+  /** A world is being invented, from these seeds (empty while they are drawn). */
+  const [creating, setCreating] = useState<string[] | null>(null);
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
   const uidRef = useRef<string | null>(null);
@@ -279,9 +291,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * able to retry", under a quest ended by "Load failed"): try again, or settle for what it would
    * have been before — the hand-written quest for an opening, the end here for a later step.
    */
-  const [stalled, setStalled] = useState<{ failure: string; opening: boolean; retry: () => void; giveUp: () => void } | null>(
-    null,
-  );
+  const [stalled, setStalled] = useState<{
+    failure: string;
+    opening: boolean;
+    /** It is the world that could not be invented, not a beat. */
+    world?: boolean;
+    retry: () => void;
+    giveUp: () => void;
+  } | null>(null);
 
   /** Time played on this quest; `flushPlay` moves what has not been counted yet into today's. */
   const playMsRef = useRef(0);
@@ -296,7 +313,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     playFlushedRef.current = now;
   }, []);
 
-  useEffect(() => setChronicle(loadChronicle(gameLang)), [gameLang]);
+  useEffect(() => setWorld(loadWorld(gameLang)), [gameLang]);
+  const worldId = world?.id ?? gameLang;
+  useEffect(() => setChronicle(loadChronicle(worldId)), [worldId]);
 
   // A quest left half way is offered on the intro screen, in its own language.
   useEffect(() => {
@@ -324,6 +343,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       decision: decisionRef.current,
       playMs: playedNow(),
       transcript: [...transcript()],
+      worldId: worldRef.current?.id ?? gameLangRef.current,
     });
   }, []);
 
@@ -348,6 +368,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           chronicle: chronicleRef.current,
           places: placesRef.current,
           characters: charactersRef.current,
+          world: worldRef.current ?? undefined,
         }, chosen);
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
@@ -409,7 +430,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
     [notify, persist],
   );
 
-  const startQuest = useCallback(async () => {
+  /** Makes `w` the world being played: the beats are written in it and the scene drawn from it. */
+  const enterWorld = useCallback((w: WorldBible) => {
+    worldRef.current = w;
+    setWorld(w);
+    sceneRef.current?.applyWorld(w.look);
+  }, []);
+
+  const startQuest = useCallback(async (keepLog = false) => {
     const token = ++questTokenRef.current;
     setStalled(null);
     flushPlay();
@@ -428,7 +456,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     lastLinesRef.current.clear();
     spokenRef.current.clear();
     askedRef.current.clear();
-    resetDevlog();
+    // A world invented just before this quest stays in the console with it.
+    if (!keepLog) resetDevlog();
     resetTranscript();
     beatsRef.current = [];
     decisionRef.current = null;
@@ -456,6 +485,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       const playStatic = () => {
         staticRef.current = true;
+        // The hand-written quest belongs to the classic world, wherever the reader was.
+        if (worldRef.current && worldRef.current.id !== gameLang) enterWorld(classicWorld(gameLang));
         setupBeat(staticBeat(gameLang, 0));
       };
       // No key is not a failure: the hand-written quest is what there is.
@@ -479,12 +510,74 @@ export default function Rpg({ lang }: { lang: Lang }) {
       });
     };
     await writeOpening();
-  }, [flash, flushPlay, gameLang, setupBeat, writeBeat]);
+  }, [enterWorld, flash, flushPlay, gameLang, setupBeat, writeBeat]);
+
+  /**
+   * Invents a world and starts its first quest in it. The reader waits for this one: the village
+   * cannot be drawn, nor the opening written, before there is a world to draw and write it in.
+   */
+  const createWorld = useCallback(async (): Promise<void> => {
+    const token = ++questTokenRef.current;
+    setStalled(null);
+    setDialogue(null);
+    setEnding(null);
+    setBeat(null);
+    resetDevlog();
+    setCreating([]);
+    const seeds = await drawSeeds();
+    if (token !== questTokenRef.current) return;
+    setCreating(seeds);
+    const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
+    const chosen = chosenModelRef.current;
+    let attempt;
+    try {
+      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds() }, chosen);
+    } catch (e) {
+      log.error('rpg.world.crashed', describeError(e));
+      attempt = null;
+    }
+    if (token !== questTokenRef.current) return;
+    setCreating(null);
+    if (attempt) {
+      addGenerationTime(attempt.ms);
+      recordWorld(uidRef.current, attempt, gameLang, chosen);
+    }
+    const born = attempt?.world ?? null;
+    if (born) {
+      // A new world is a new game: the quest left half way belonged to the old one.
+      saveWorld(born);
+      clearGame();
+      setSaved(null);
+      enterWorld(born);
+      flash(tRef.current.worldBorn(born.name), 5000);
+      await startQuest(true);
+      return;
+    }
+    const failure = attempt?.refusal
+      ? tRef.current.demoClosed(attempt.refusal)
+      : (attempt?.error ?? attempt?.outcome ?? 'crashed');
+    setStalled({
+      failure: failure.slice(0, 160),
+      opening: true,
+      world: true,
+      retry: () => {
+        setStalled(null);
+        void createWorldRef.current();
+      },
+      giveUp: () => {
+        setStalled(null);
+        enterWorld(classicWorld(gameLang));
+        void startQuest(true);
+      },
+    });
+  }, [account.keys.google, account.keys.openai, enterWorld, flash, gameLang, startQuest, storyProvider]);
+  const createWorldRef = useRef(createWorld);
+  createWorldRef.current = createWorld;
 
   const finish = useCallback(
     (b: Beat, speaker: string, text: string, steps: StepRecord[]) => {
       const entry: ChronicleEntry = { title: b.title, at: Date.now(), steps, ending: text };
-      setChronicle(addToChronicle(gameLang, entry));
+      setChronicle(addToChronicle(worldRef.current?.id ?? gameLang, entry));
       // Told to the end and in the chronicle: nothing left to continue.
       clearGame();
       setSaved(null);
@@ -949,6 +1042,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setUnfolding(false);
     seedRef.current = game.seed;
     staticRef.current = game.static;
+    // The world it was played in: the current one if it still is, the classic one for a save from
+    // before there were worlds.
+    const kept = loadWorld(game.lang);
+    enterWorld(kept && kept.id === game.worldId ? kept : classicWorld(game.lang));
     placesRef.current = [];
     charactersRef.current = [];
     beatsRef.current = [];
@@ -1013,10 +1110,22 @@ export default function Rpg({ lang }: { lang: Lang }) {
     void proceed(current, d, game.history);
   };
 
-  const begin = () => {
+  /** Start, New quest or New world: a world first when there is none yet, or a new one is asked for. */
+  const begin = (fresh = false) => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
     primeVoice();
     setStarted(true);
+    if (storyProvider === 'static') {
+      // Nothing to invent a world with: the hand-written quest, in the world it was written for.
+      enterWorld(classicWorld(gameLang));
+      void startQuest();
+      return;
+    }
+    if (fresh || !worldRef.current) {
+      void createWorld();
+      return;
+    }
+    enterWorld(worldRef.current);
     void startQuest();
   };
 
@@ -1027,6 +1136,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setStalled(null);
     setGenerating(false);
     setUnfolding(false);
+    setCreating(null);
     stopVoice();
     setDialogue(null);
     setHeld(null);
@@ -1059,10 +1169,26 @@ export default function Rpg({ lang }: { lang: Lang }) {
           {t.continueQuest(saved.beats[saved.beats.length - 1].title)}
         </button>
       )}
-      <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
-        {keysReady ? (saved && saved.lang === gameLang ? t.newQuest : t.start) : t.wait}
+      <button type="button" className="rpg-start" disabled={!keysReady} onClick={() => begin()}>
+        {keysReady ? ((saved && saved.lang === gameLang) || (world && storyProvider !== 'static') ? t.newQuest : t.start) : t.wait}
       </button>
+      {keysReady && world && storyProvider !== 'static' && (
+        <button type="button" className="rpg-start" onClick={() => begin(true)} title={t.newWorldHint}>
+          {t.newWorld}
+        </button>
+      )}
     </>
+  );
+
+  // The world the next quest is played in, on the intro screen: what it is and who you are there.
+  const worldCard = world && storyProvider !== 'static' && (
+    <div className="rpg-world">
+      <div className="rpg-world-name">
+        {t.worldLabel}: <strong>{world.name}</strong>
+      </div>
+      <p>{world.pitch}</p>
+      <p className="rpg-world-you">{t.worldYou(world.player)}</p>
+    </div>
   );
 
   return (
@@ -1115,16 +1241,24 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {toast && <div className="rpg-toast">{toast}</div>}
 
+          {creating && (
+            <div className="rpg-overlay rpg-genesis" role="status">
+              <h2>{t.creatingWorld}</h2>
+              {creating.length > 0 && <p className="rpg-genesis-seeds">{t.worldSeeds(creating.join(' · '))}</p>}
+              <StreamLine />
+            </div>
+          )}
+
           {stalled && !dialogue && !ending && (
-            <div className="rpg-stalled" role="alertdialog" aria-label={t.stalledTitle}>
-              <div className="rpg-notice-title">✗ {t.stalledTitle}</div>
+            <div className="rpg-stalled" role="alertdialog" aria-label={stalled.world ? t.worldFailedTitle : t.stalledTitle}>
+              <div className="rpg-notice-title">✗ {stalled.world ? t.worldFailedTitle : t.stalledTitle}</div>
               <p className="rpg-stalled-why">{stalled.failure}</p>
               <div className="rpg-stalled-actions">
                 <button type="button" className="rpg-start" onClick={stalled.retry}>
                   ↻ {t.retry}
                 </button>
                 <button type="button" onClick={stalled.giveUp}>
-                  {stalled.opening ? t.playStatic : t.endHere}
+                  {stalled.world ? t.playClassic : stalled.opening ? t.playStatic : t.endHere}
                 </button>
               </div>
             </div>
@@ -1193,6 +1327,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         <div className="rpg-overlay">
           <h2>{t.title}</h2>
           <p>{t.intro}</p>
+          {worldCard}
           {/* On a phone the intro scrolls inside a short box, so Start comes first, not last. */}
           {touch && startButtons}
           {touch ? (
@@ -1230,7 +1365,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
               <button
                 type="button"
                 onClick={() => {
-                  clearChronicle(gameLang);
+                  clearChronicle(worldId);
                   setChronicle([]);
                 }}
               >
@@ -1316,6 +1451,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <button type="button" className="rpg-start" onClick={() => void startQuest()}>
             {t.newQuest}
           </button>
+          {storyProvider !== 'static' && (
+            <button type="button" className="rpg-start" onClick={() => void createWorld()} title={t.newWorldHint}>
+              {t.newWorld}
+            </button>
+          )}
         </div>
       )}
 

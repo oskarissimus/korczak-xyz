@@ -145,13 +145,38 @@ describe('beatPrompt', () => {
     const prompt = beatPrompt({ ...ctx, lang: 'pl' });
     expect(prompt).toContain('Polish');
     for (const word of ['northwest', 'graveyard', 'standing_stones', 'beast']) expect(prompt).toContain(`"${word}"`);
-    expect(prompt).toContain("kill 3 monsters");
+    expect(prompt).toContain("defeat 3 hostile foes");
     expect(prompt).toContain("IT IS SPOKEN DIALOGUE");
     expect(prompt).toContain('HOW IT IS TOLD');
     expect(prompt).toContain('"clues"');
     expect(prompt).toContain('1. leads on to a step of gathering 2 things');
     expect(prompt).toContain('2. ENDS the quest');
-    expect(prompt).toContain('The hunter decided: "I will find it."');
+    expect(prompt).toContain('The hero decided: "I will find it."');
+  });
+
+  it('is written in the world it is given, and in no franchise', () => {
+    const world = {
+      name: 'Sól i Szkło',
+      pitch: 'A salt flat under a glass sky.',
+      tone: 'quiet',
+      tech: 'lenses and wind engines',
+      climate: 'dry heat',
+      people: 'salt rakers in white veils',
+      architecture: 'domes of fused sand',
+      threats: 'glass wasps',
+      player: 'a lens-grinder for hire',
+      address: 'szlifierzu',
+      hub: 'Biała Misa',
+      words: ['kryza'],
+    };
+    const prompt = beatPrompt({ ...ctx, index: 0, job: null, world });
+    expect(prompt).toContain('THE WORLD: "Sól i Szkło"');
+    expect(prompt).toContain('a lens-grinder for hire');
+    expect(prompt).toContain('"szlifierzu"');
+    expect(prompt).toContain('in Biała Misa');
+    expect(prompt).not.toMatch(/witcher|monster hunter|village square/i);
+    // Without a world, the classic one: still no franchise named.
+    expect(beatPrompt(ctx)).not.toMatch(/witcher/i);
   });
 
   it('tells the story what the world remembers', () => {

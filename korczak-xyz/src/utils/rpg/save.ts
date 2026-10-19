@@ -45,6 +45,8 @@ export interface SavedGame {
   playMs?: number;
   /** Every line said so far, for the developer console; absent in older saves. */
   transcript?: TranscriptLine[];
+  /** The world it is played in (`genesis.ts`); absent in saves from before there were worlds. */
+  worldId?: string;
 }
 
 export function loadGame(): SavedGame | null {

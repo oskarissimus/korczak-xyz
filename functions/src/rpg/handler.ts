@@ -1,5 +1,5 @@
 /*
- * The RPG's demo: a beat of a quest, or one spoken line, for somebody with no account and no key,
+ * The RPG's demo: a world, a beat of a quest, or one spoken line, for somebody with no account and no key,
  * on the owner's keys (`.claude/rules/rpg.md`, *The demo*). The game is otherwise entirely in the
  * browser on the reader's own keys; this is its one server call.
  *
@@ -51,6 +51,7 @@ import {
   type RpgDemoSettings,
 } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { beatPrompt } from '../../../korczak-xyz/src/utils/rpg/quest';
+import { demoGenesis, genesisPrompt, GENESIS_TEMPERATURE } from '../../../korczak-xyz/src/utils/rpg/genesis';
 import { callerIp, dayKey, ipKey } from '../demo/limits';
 import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
@@ -191,7 +192,7 @@ async function status(req: Request, res: Response): Promise<void> {
   });
 }
 
-/** Reads Google's event stream for the usage and the model that answered, passing every byte on. */
+/** A beat of a quest: the prompt built here from the game's checked context. */
 async function beat(req: Request, res: Response, body: Record<string, unknown>): Promise<void> {
   const model = DEMO_MODELS.find((m) => m === body.model);
   if (!model) throw new BadRequest('Unknown model');
@@ -201,7 +202,20 @@ async function beat(req: Request, res: Response, body: Record<string, unknown>):
   } catch (e) {
     throw new BadRequest(e instanceof BadContext ? e.message : 'Bad context');
   }
-  const prompt = beatPrompt(ctx);
+  await generate(req, res, model, beatPrompt(ctx), 1);
+}
+
+/** A new world (`genesis.ts`), at the genesis temperature, from three seeds and the worlds to avoid. */
+async function world(req: Request, res: Response, body: Record<string, unknown>): Promise<void> {
+  const model = DEMO_MODELS.find((m) => m === body.model);
+  if (!model) throw new BadRequest('Unknown model');
+  const ctx = demoGenesis(body.ctx);
+  if (ctx.seeds.length === 0) throw new BadRequest('No seeds');
+  await generate(req, res, model, genesisPrompt(ctx), GENESIS_TEMPERATURE);
+}
+
+/** Reads Google's event stream for the usage and the model that answered, passing every byte on. */
+async function generate(req: Request, res: Response, model: string, prompt: string, temperature: number): Promise<void> {
   const reservation = beatReservation(model, prompt.length);
   if (reservation === null) throw new BadRequest('Model has no price');
 
@@ -231,7 +245,7 @@ async function beat(req: Request, res: Response, body: Record<string, unknown>):
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 1,
+            temperature,
             maxOutputTokens: MAX_OUTPUT_TOKENS,
             ...(gemma ? {} : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true } }),
           },
@@ -383,6 +397,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     const body = parseBody(req.body);
     if (body.kind === 'stats') await stats(res, body);
     else if (body.kind === 'beat') await beat(req, res, body);
+    else if (body.kind === 'world') await world(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {

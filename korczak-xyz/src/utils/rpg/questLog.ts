@@ -28,7 +28,7 @@ import { getBackseatStorageClient } from '../../lib/firebase';
 import { describeError, log } from '../../lib/logger';
 import { flushTelemetry, recordMeasurement } from '../../lib/sentry';
 import type { Lang } from './quest';
-import type { StoryAttempt } from './storyteller';
+import type { StoryAttempt, WorldAttempt } from './storyteller';
 
 declare const __COMMIT_HASH__: string;
 const RELEASE = typeof __COMMIT_HASH__ === 'string' ? __COMMIT_HASH__ : 'dev';
@@ -125,4 +125,48 @@ export function recordQuest(uid: string | null, attempt: StoryAttempt, lang: Lan
     'raw',
     { cacheControl: 'private, max-age=31536000', contentType: 'application/json' },
   ).catch((e) => log.warn('rpg.quest.save.failed', describeError(e)));
+}
+
+/**
+ * A world asked for (`genesis.ts`): `rpg.world` in Sentry Logs with the outcome, the models tried,
+ * the tokens and the cost, how ordinary the chosen one rated itself and how many candidates could be
+ * played; the whole attempt — the seeds, the prompt, every candidate — in the bucket beside the
+ * beats, for a signed-in account.
+ */
+export function recordWorld(uid: string | null, attempt: WorldAttempt, lang: Lang, chosen: string | null = null): void {
+  recordMeasurement('rpg.world', {
+    outcome: attempt.outcome,
+    provider: attempt.provider,
+    model: attempt.model,
+    chosen: chosen ?? 'default',
+    lang,
+    ms: attempt.ms,
+    tries: attempt.tries.map((t) => `${t.model}:${t.status ?? 'x'}`).join(','),
+    firstMs: attempt.tries.at(-1)?.firstMs ?? undefined,
+    inputTokens: attempt.tries.reduce((n, t) => n + (t.usage?.input ?? 0), 0),
+    outputTokens: attempt.tries.reduce((n, t) => n + (t.usage?.output ?? 0), 0),
+    thoughtTokens: attempt.tries.reduce((n, t) => n + (t.usage?.thoughts ?? 0), 0),
+    costUsd: attempt.tries.reduce((total, t) => total + (t.cost ?? 0), 0),
+    candidates: attempt.candidates.length,
+    typicality: attempt.world?.typicality,
+    flora: attempt.world?.look.flora,
+    weather: attempt.world?.look.weather,
+  });
+  if (attempt.outcome !== 'generated' && attempt.outcome !== 'no-key') {
+    log.error('rpg.world.failed', {
+      outcome: attempt.outcome,
+      error: attempt.error ?? '',
+      tries: attempt.tries.map((t) => `${t.model}:${t.status ?? 'x'} ${t.error ?? ''}`.trim()).join(' | '),
+    });
+  }
+  if (!uid) return;
+  const storage = getBackseatStorageClient();
+  if (!storage) return;
+  const at = Date.now();
+  void uploadString(
+    ref(storage, `users/${uid}/rpg/worlds/${new Date(at).toISOString().replace(/[:.]/g, '-')}.json`),
+    JSON.stringify({ at, release: RELEASE, lang, chosen, ...attempt }, null, 2),
+    'raw',
+    { cacheControl: 'private, max-age=31536000', contentType: 'application/json' },
+  ).catch((e) => log.warn('rpg.world.save.failed', describeError(e)));
 }

@@ -5,8 +5,8 @@
  *
  * COMPILED TWICE, like `utils/backseat/demoLimits.ts` and for the same reason: the function
  * (`functions/src/rpg/handler.ts`) decides from these, and the game reads the same numbers. Nothing
- * here may import the DOM, Firebase or React — only `quest.ts`, `place.ts` and `cost.ts`, which
- * import nothing else either.
+ * here may import the DOM, Firebase or React — only `quest.ts`, `place.ts`, `genesis.ts` and
+ * `cost.ts`, which import nothing else either.
  *
  * DOLLARS, NOT CALLS. A beat on Pro costs ten times one on Flash-Lite, and a clip costs by its
  * length, so a count of calls would be either too strict for one or too loose for the other. Each
@@ -23,6 +23,7 @@
  */
 
 import { tokenPrice, VOICE_CREDITS_PER_CHAR, USD_PER_VOICE_CREDIT } from './cost';
+import { demoWorld } from './genesis';
 import { parsePlace } from './place';
 import type { BeatContext, Character, ChronicleEntry, Job, Lang, StepRecord } from './quest';
 
@@ -215,5 +216,6 @@ export function demoContext(value: unknown): BeatContext {
     chronicle,
     places: list(r.places, 6, parsePlace).filter((p): p is NonNullable<typeof p> => p !== null),
     characters,
+    world: demoWorld(r.world),
   };
 }

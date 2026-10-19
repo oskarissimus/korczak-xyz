@@ -32,6 +32,7 @@ import {
   type PlaceSpec,
   type TargetLook,
 } from './place';
+import { classicWorld, worldLines, type WorldBrief } from './genesis';
 
 export type Lang = 'en' | 'pl';
 
@@ -174,6 +175,8 @@ export interface BeatContext {
   places: PlaceSpec[];
   /** This quest's characters so far, who may come back. */
   characters: Character[];
+  /** Where it all happens (`genesis.ts`); absent is the classic world of the hand-written quest. */
+  world?: WorldBrief;
 }
 
 export const MAX_BEATS = 4;
@@ -352,21 +355,21 @@ const list = (items: readonly string[]) => items.map((i) => `"${i}"`).join(', ')
 
 function jobWords(job: Job): string {
   if (job.kind === 'talk') return 'going somewhere to meet and talk with someone (no fight, nothing to gather)';
-  if (job.kind === 'slay') return job.count === 1 ? 'killing a single dangerous creature' : `killing ${job.count} monsters`;
+  if (job.kind === 'slay') return job.count === 1 ? 'defeating a single dangerous foe' : `defeating ${job.count} hostile foes`;
   return `gathering ${job.count} things`;
 }
 
-function thisStep(ctx: BeatContext): string[] {
+function thisStep(ctx: BeatContext, hub: string): string[] {
   const job = ctx.job;
   if (!job) {
     return [
-      'THIS STEP IS THE OPENING. The hunter meets a villager (the "npc") in the village square, who presents a problem.',
-      'Set "place" to "village".',
+      `THIS STEP IS THE OPENING. The hero meets someone (the "npc") in ${hub}, who presents a problem.`,
+      `Set "place" to "village" (that is ${hub}).`,
     ];
   }
   const where = [
     'Where it happens ("place"): either a NEW place, built from these blocks, so choose only from them:',
-    `- direction from the village: one of ${list(DIRECTIONS)}`,
+    `- direction from ${hub}: one of ${list(DIRECTIONS)}`,
     `- distance: one of ${list(DISTANCES)}`,
     `- biome: one of ${list(BIOMES)}`,
     `- features: 1 to 4 of ${list(FEATURES)}`,
@@ -375,19 +378,19 @@ function thisStep(ctx: BeatContext): string[] {
     ctx.places.length
       ? `or a place this quest has already been to, given as {"name": "<its exact name>"}: ${list(ctx.places.map((p) => p.name))}.`
       : '',
-    job.kind === 'talk' ? 'or "village" to have the meeting in the village square.' : '',
+    job.kind === 'talk' ? `or "village" to have the meeting in ${hub}.` : '',
   ].filter(Boolean);
-  const npc = 'The "npc" is the person the hunter talks to there: a new character, or one met earlier in this quest (same exact name).';
+  const npc = 'The "npc" is the person the hero talks to there: a new character, or one met earlier in this quest (same exact name).';
   if (job.kind === 'talk') {
-    return [`THIS STEP: the hunter goes to meet someone and talk (given by the last decision).`, ...where, npc];
+    return [`THIS STEP: the hero goes to meet someone and talk (given by the last decision).`, ...where, npc];
   }
   const shapes = job.kind === 'slay' ? ENEMY_SHAPES : ITEM_SHAPES;
   return [
     job.kind === 'slay'
       ? job.count === 1
-        ? 'THIS STEP: the hunter must kill a single dangerous creature at the place, bigger than a common monster (size 1.5 to 2). Count 1, given.'
-        : `THIS STEP: the hunter must kill ${job.count} monsters at the place. Count ${job.count}, given; choose a monster that suits the place and the story.`
-      : `THIS STEP: the hunter must gather ${job.count} things lying at the place. Count ${job.count}, given; choose what suits the story (herbs, relics, letters, bones…).`,
+        ? 'THIS STEP: the hero must defeat a single dangerous foe at the place — a creature, machine, spirit, whatever this world fears — bigger than a common one (size 1.5 to 2). Count 1, given.'
+        : `THIS STEP: the hero must defeat ${job.count} hostile foes at the place. Count ${job.count}, given; choose foes that belong to this world, the place and the story.`
+      : `THIS STEP: the hero must gather ${job.count} things lying at the place. Count ${job.count}, given; choose what suits this world and the story.`,
     ...where,
     `${npc} They are at the place and speak once the job is done.`,
     `What the targets look like ("look"): shape is one of ${list(shapes)}; a "#rrggbb" colour; size 0.5 to 2.`,
@@ -398,14 +401,16 @@ function thisStep(ctx: BeatContext): string[] {
 export function beatPrompt(ctx: BeatContext): string {
   const language = ctx.lang === 'pl' ? 'Polish' : 'English';
   const chronicle = ctx.chronicle.slice(-5);
+  const world = ctx.world ?? classicWorld(ctx.lang);
   const lines: string[] = [
-    'You are the storyteller of a dark-fantasy RPG in the spirit of The Witcher 3, played like a branching text adventure:',
-    'the quest is written one step at a time, and the hunter’s decisions decide what comes next.',
-    'The player is a monster hunter in and around a small village.',
+    'You are the storyteller of an RPG played like a branching text adventure: the quest is written one step at a',
+    'time, and the hero’s decisions decide what comes next.',
+    '',
+    ...worldLines(world),
     '',
   ];
   if (chronicle.length) {
-    lines.push('THE WORLD REMEMBERS the hunter’s earlier quests:');
+    lines.push('THE WORLD REMEMBERS the hero’s earlier quests:');
     for (const q of chronicle) {
       const chose = q.steps.map((s) => `chose "${s.chose}" (${s.consequence})`).join('; then ');
       lines.push(`- "${q.title}": ${chose}. Ending: ${q.ending}`);
@@ -420,8 +425,8 @@ export function beatPrompt(ctx: BeatContext): string {
     lines.push(`THIS QUEST SO FAR ("${ctx.title ?? ''}"):`);
     ctx.history.forEach((s, i) => {
       lines.push(
-        `${i + 1}. At ${s.placeName ?? 'the village'}, ${s.npcName}: ${s.situation}`,
-        `   The hunter decided: "${s.chose}" — ${s.consequence}`,
+        `${i + 1}. At ${s.placeName ?? world.hub}, ${s.npcName}: ${s.situation}`,
+        `   The hero decided: "${s.chose}" — ${s.consequence}`,
       );
     });
     lines.push(
@@ -429,12 +434,12 @@ export function beatPrompt(ctx: BeatContext): string {
       '',
     );
   }
-  lines.push(...thisStep(ctx), '');
+  lines.push(...thisStep(ctx, world.hub), '');
   lines.push(`THE DECISIONS that end this step: exactly ${ctx.plan.length}, in this order. Each one is given:`);
   ctx.plan.forEach((next, i) => {
     lines.push(
       next
-        ? `${i + 1}. leads on to a step of ${jobWords(next)}: write it as a course of action the hunter takes, not what it will turn up.`
+        ? `${i + 1}. leads on to a step of ${jobWords(next)}: write it as a course of action the hero takes, not what it will turn up.`
         : `${i + 1}. ENDS the quest: its "reply" is the epilogue, how it ends for everyone involved.`,
     );
   });
@@ -444,36 +449,36 @@ export function beatPrompt(ctx: BeatContext): string {
     '',
     'HOW IT IS TOLD. This is a conversation with a real person, not a briefing. Nobody pours out the whole story',
     'and the stakes in their first breath: the npc opens with a line or two the way a real person would (a plea,',
-    'suspicion, fear, a reaction to a witcher at the door), and the story comes out in 2 to 4 parts as the hunter',
+    'suspicion, fear, a reaction to the hero at the door), and the story comes out in 2 to 4 parts as the hero',
     'asks — what happened, what they saw, what they are afraid of or ashamed of, and only at the end what they want.',
     'Let them hesitate, hold something back, contradict themselves, get one detail wrong. Concrete details',
     '(a name, a smell, the time of night), not abstractions. Each part is 1 to 3 spoken sentences.',
-    'More of the truth is found, not told: 1 or 2 "clues" are things lying at the place the hunter can examine',
-    '(claw marks, a torn shawl, a letter, fresh digging), and each one lets the hunter ask the npc about it — and',
+    'More of the truth is found, not told: 1 or 2 "clues" are things lying at the place the hero can examine',
+    '(claw marks, a torn shawl, a letter, fresh digging), and each one lets the hero ask the npc about it — and',
     'the npc then admits something they did not say. A "witness" may stand there too: someone else with their own',
     'version, a rumour, or a reason to want the opposite of what the npc wants.',
     'The player hears the greeting and the story parts, and only then the decisions and the questions, so none of',
     'them may refer to anything not yet said (a clue’s question is offered only after it is examined).',
-    'A DECISION IS AN INTENTION, NOT A CONCLUSION. Its "label" says what the hunter will do ("I will search the',
+    'A DECISION IS AN INTENTION, NOT A CONCLUSION. Its "label" says what the hero will do ("I will search the',
     'burnt barn.", "I will track the beast by the pen tonight."), never what doing it will prove or uncover: no',
-    'culprit, no hidden motive, no fact the hunter has not been told. Wrong: "I will search the ashes and find',
+    'culprit, no hidden motive, no fact the hero has not been told. Wrong: "I will search the ashes and find',
     'proof the blacksmith did it." when nobody has named the blacksmith. The truth comes out in the NEXT step,',
-    'while the hunter does what they chose, so the "consequence" also says only what the hunter set out to do;',
+    'while the hero does what they chose, so the "consequence" also says only what the hero set out to do;',
     'what is found is for the next step to write. A decision that ends the quest may name only who and what the',
     'player has already heard of.',
     'Each decision rests on the npc’s greeting and story parts by default. A decision that only makes sense',
     'after something optional — the witness, a clue, or the answer to a "smallTalk" question — sets "after":',
     '"witness", "clue 1", "clue 2", "question 1" or "question 2" (smallTalk in order), and the game offers it only',
-    'once the hunter has heard that; at least one decision must need none of them. If a smallTalk answer names',
+    'once the hero has heard that; at least one decision must need none of them. If a smallTalk answer names',
     'someone or something, a decision that uses it waits for that question.',
     '',
     'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
-    'everything the witness says is that person’s own words to the hunter, in the first person ("I", "my',
+    'everything the witness says is that person’s own words to the hero, in the first person ("I", "my',
     'daughter"), addressing them as "you". Never narration, never stage directions, never the speaker in the third',
     'person, never "she says that…". Wrong: "Helena weeps and says her daughter-in-law hanged herself."',
-    'Right: "My Hania… she hanged herself, witcher. On the old willow, by the graves." A clue’s "text" is the',
-    'hunter’s own eye, first person ("Claw marks, and too high for a wolf.").',
-    'Every "label" and "ask" is the hunter’s own spoken line, short: at most 12 words, one sentence.',
+    'Right: "My Hania… she hanged herself. On the old willow, by the graves." A clue’s "text" is the',
+    'hero’s own eye, first person ("Claw marks, and too high for a wolf.").',
+    'Every "label" and "ask" is the hero’s own spoken line, short: at most 12 words, one sentence.',
     `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
     `Make it original, with a twist or a hint of moral greyness. Inspiration: ${ctx.seed}.`,
     '',
@@ -490,12 +495,12 @@ export function beatPrompt(ctx: BeatContext): string {
       ? '  "waitingLine": string (what the npc says if talked to before the job is done),'
       : '',
     '  "greeting": string (the first thing the npc says, one or two sentences),',
-    '  "story": [{"ask": string (what the hunter says to hear more), "say": string (the npc’s next part)}],',
+    '  "story": [{"ask": string (what the hero says to hear more), "say": string (the npc’s next part)}],',
     '  "smallTalk": [{"label": string (a follow-up question about something in the story), "reply": string}],',
     `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)}}],`,
     '  "witness": {"name": string, "gender": string, "color": string, "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
-    '  "decisions": [{"label": string (what the hunter says, first person, at most 12 words),',
+    '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
     '                 "after": "witness", "clue 1", "clue 2", "question 1" or "question 2", only when needed}]',
     '}',
@@ -507,16 +512,16 @@ export function beatPrompt(ctx: BeatContext): string {
 export const SEEDS = [
   'a grieving widow',
   'a greedy merchant',
-  'a superstitious priest',
+  'a superstitious elder',
   'a child who saw something',
   'a curse nobody admits to',
   'an old debt',
   'a missing brother',
   'a forbidden love',
-  'a deserter hiding from his lord',
-  'a witch the village needs and fears',
+  'a deserter hiding from those they served',
+  'an outcast the settlement needs and fears',
   'a feud between two families',
-  'a relic the temple wants back',
+  'a relic someone powerful wants back',
 ];
 
 function text(value: unknown, max = 400): string | null {
