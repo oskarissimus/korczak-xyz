@@ -27,6 +27,9 @@ import {
   FEATURES,
   ITEM_SHAPES,
   freeSlot,
+  MAX_PARTS,
+  PART_MATERIALS,
+  PART_SHAPES,
   parseLook,
   parsePlace,
   type PlaceSpec,
@@ -171,9 +174,9 @@ export interface BeatContext {
   title: string | null;
   history: StepRecord[];
   chronicle: ChronicleEntry[];
-  /** This quest's places so far, which a beat may return to and a new one must keep clear of. */
+  /** The world's places so far (its atlas and this quest's), which a beat may return to and a new one must keep clear of. */
   places: PlaceSpec[];
-  /** This quest's characters so far, who may come back. */
+  /** The world's people so far, who may come back. */
   characters: Character[];
   /** Where it all happens (`genesis.ts`); absent is the classic world of the hand-written quest. */
   world?: WorldBrief;
@@ -359,28 +362,59 @@ function jobWords(job: Job): string {
   return `gathering ${job.count} things`;
 }
 
+/**
+ * How a model builds a landmark from blocks (`place.ts`, `Landmark`). The example is a windmill
+ * because it uses everything at once: a body, a roof, a door, sails that turn.
+ */
+const LANDMARK_LINES = [
+  '- landmark: the building or thing that makes the place what it is (a mill if it is a mill, a',
+  '  wreck, a shrine, a pump station, a giant skeleton…), built from up to ' + MAX_PARTS + ' simple parts like toy blocks.',
+  '  Make its shape say what it is: proportions, a roof, a door, a chimney, a mast. Each part:',
+  `  {"shape": one of ${list(PART_SHAPES)} (wedge = a gable-roof prism, ridge along z),`,
+  '   "size": [width x, height y, depth z] in metres, "at": [x, y, z] where its BASE centre stands,',
+  '   "turn": degrees about the vertical, "tilt": [degrees about x, degrees about z],',
+  `   "material": one of ${list(PART_MATERIALS)} (wall/roof are this world's own), "color": optional "#rrggbb",`,
+  '   "spin": optional "x", "y" or "z" for a part that turns about its middle (sails, a wheel); for a',
+  '   spinning part "at" is its MIDDLE, so parts that turn together share one "at"}.',
+  '  Metres, the landmark\'s own centre at 0,0, ground at y 0, its front facing +z (toward the hero);',
+  '  everything within 9 m of the centre and under 24 m high; a person is 1.8 m, a door 2 m tall.',
+  '  Stack parts: a roof\'s "at" y is the top of the walls under it. Example, a windmill:',
+  '  {"name": "the old mill", "parts": [{"shape": "cylinder", "size": [5, 7, 5], "at": [0, 0, 0], "material": "wall"},',
+  '   {"shape": "cone", "size": [6, 3, 6], "at": [0, 7, 0], "material": "roof"},',
+  '   {"shape": "box", "size": [1.2, 2, 0.3], "at": [0, 0, 2.45], "material": "dark"},',
+  '   {"shape": "box", "size": [0.6, 11, 0.2], "at": [0, 6, 2.8], "material": "wood", "spin": "z"},',
+  '   {"shape": "box", "size": [11, 0.6, 0.2], "at": [0, 6, 2.8], "material": "wood", "spin": "z"}]}',
+  '  (the two sails share their middle, so they turn together as one cross). Leave it out only for a place that',
+  '  is truly nothing but nature.',
+  '  A new place is {"name", "direction", "distance", "biome", "features", "groundColor", "landmark"};',
+];
+
 function thisStep(ctx: BeatContext, hub: string): string[] {
   const job = ctx.job;
   if (!job) {
     return [
       `THIS STEP IS THE OPENING. The hero meets someone (the "npc") in ${hub}, who presents a problem.`,
+      ...(ctx.characters.length
+        ? ['Usually someone the hero has not met yet: the world grows with every quest. One of the people already here may come back instead when the chronicle gives them a reason.']
+        : []),
       `Set "place" to "village" (that is ${hub}).`,
     ];
   }
   const where = [
     'Where it happens ("place"): either a NEW place, built from these blocks, so choose only from them:',
+    '- name: an evocative name of its own (required; the landmark has a name of its own besides)',
     `- direction from ${hub}: one of ${list(DIRECTIONS)}`,
     `- distance: one of ${list(DISTANCES)}`,
     `- biome: one of ${list(BIOMES)}`,
     `- features: 1 to 4 of ${list(FEATURES)}`,
     '- groundColor: a "#rrggbb" colour that suits the mood of the place',
-    '  and give it an evocative name of its own;',
+    ...LANDMARK_LINES,
     ctx.places.length
-      ? `or a place this quest has already been to, given as {"name": "<its exact name>"}: ${list(ctx.places.map((p) => p.name))}.`
+      ? `or a place already standing in this world, given as {"name": "<its exact name>"}: ${list(ctx.places.map((p) => p.name))}. Mostly build new places, in directions and distances nothing stands at yet (the world grows outward), and return to an old one when the story calls for it.`
       : '',
     job.kind === 'talk' ? `or "village" to have the meeting in ${hub}.` : '',
   ].filter(Boolean);
-  const npc = 'The "npc" is the person the hero talks to there: a new character, or one met earlier in this quest (same exact name).';
+  const npc = 'The "npc" is the person the hero talks to there: a new character, or one already met (same exact name).';
   if (job.kind === 'talk') {
     return [`THIS STEP: the hero goes to meet someone and talk (given by the last decision).`, ...where, npc];
   }
@@ -418,6 +452,12 @@ export function beatPrompt(ctx: BeatContext): string {
     lines.push(
       'Let it show: people who were helped or wronged remember, rumours travel, debts come due. Characters from',
       'those quests may come back. Refer to at least one of those deeds somewhere in this step.',
+      '',
+    );
+  }
+  if (ctx.characters.length) {
+    lines.push(
+      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits): ${list(ctx.characters.map((c) => c.name))}.`,
       '',
     );
   }

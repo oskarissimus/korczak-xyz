@@ -58,6 +58,21 @@ broadleaf or dead trees, or primitive fungi and spires, or none). The kit's text
 (`recolor`), because multiplying purple into green leaves made mud. `parseLook` lifts every colour
 to a floor of brightness (`lift`), since the models do paint worlds in #000000.
 
+## The world grows
+
+Owner, Oct 2026: "after the first quest the characters and locations stay, only someone new appears
+with a quest; we can walk the old places a bit, but mostly new ones, in new places". Every place a
+quest built and every person met — where they stand and the last thing they said — goes into the
+world's **atlas** (`worldSave.ts`, localStorage `rpg-atlas`, keyed by world id, re-parsed on load),
+written with the autosave and at the ending. A new quest, or a resumed one, starts with the atlas
+standing (`restoreAtlas` in `Rpg.tsx`): the places rebuilt, the people back on their spots and
+saying their last line. The prompt lists them all (`ctx.places`, `ctx.characters`, and
+`PEOPLE ALREADY IN THIS WORLD`), asks for a new quest giver usually and for new places mostly, in
+directions and distances nothing stands at yet. Room for it: a third ring at 125 m, the map grown
+to ±160 m (ground cover kept on the old ±115 m, for phones), `ATLAS_PLACES` 16 and `ATLAS_PEOPLE` 24,
+the newest kept; the demo accepts as many. A new world starts an empty atlas, and only the worlds
+still being played keep theirs.
+
 ## A quest is written one beat at a time, after each decision
 
 Since Oct 2026 (owner: "a generative feel, like a text RPG with an LLM: branching, our decisions
@@ -92,8 +107,8 @@ to choose from "collect or slay, 1–5", the models wrote "collect 3" almost eve
 2026: "every quest is find 3 items"), and a model left to decide when a story ends does not end
 it. Anything the model picks too uniformly gets the same treatment: draw it here, tell the model.
 
-**Places and characters accumulate for the quest.** Every place a beat names stays standing
-(`RpgScene.addPlace`) until the next quest; a beat may return to one by name, or a talk beat may be
+**Places and characters accumulate, for the quest and then for the world** (see *The world grows*
+below). Every place a beat names stays standing (`RpgScene.addPlace`); a beat may return to one by name, or a talk beat may be
 in the village. A new place that would overlap one already standing is moved to the nearest clear
 slot (`freeSlot` in `place.ts`, centres ≥ 50 m apart). Characters stand on spots in the square or
 just inside their place, stay put after their beat, and say their last line if talked to again; a
@@ -119,7 +134,7 @@ saved and Continue asks again.
 
 The model **invents the places** (owner's choice of the first step towards fully generated
 quests, Oct 2026). It still writes no geometry: `utils/rpg/place.ts` is the closed
-vocabulary — a direction (8) and distance (`near` 50 m, `far` 85 m) from the village, a biome (7),
+vocabulary — a direction (8) and distance (`near` 50 m, `far` 85 m, `distant` 125 m) from the village, a biome (7),
 up to four features (10: pines, dead trees, rocks, pillars, graves, water, campfire, huts,
 mushrooms, standing stones), a ground colour, and for the targets a shape (enemies: humanoid,
 beast, blob; items: crystal, flower, chest, skull, scroll), a colour and a size. The place is built
@@ -135,7 +150,21 @@ forest and lake are gone; the hand-written quest's lake is a `lakeshore` place l
 new block is a word in `place.ts`, a builder in `placeBuilder.ts` and a line in the prompt, in that
 order.
 
-The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
+**A place has a landmark** (owner, Oct 2026: "we have a mill, but it is only a round patch with
+trees; if there is a mill, something that looks like a mill should be built"; low-poly is fine). The
+model builds it like toy blocks: up to `MAX_PARTS` (36) parts, each a shape (box, cylinder, cone,
+sphere, dome, pyramid, torus, wedge = a gable prism), a size in metres, where its base stands, a turn
+and a lean, a material from the world's palette (`wall`/`roof` are the world's own, `glow` its
+accent lit from inside, and wood, stone, metal, glass, cloth, water, plant, dark), an optional
+colour, and an optional `spin` axis — a spinning part's `at` is its middle, so a mill's two sails
+share one and turn as a cross. `parseLandmark` clamps it all to 9 m around its centre and 24 m up.
+The prompt's example is a windmill; Flash writes water mills with wheels and lighthouses with a lit
+lantern from it. `components/Rpg/landmark.ts` builds it 15 m behind the place's middle, away from
+the village (`LANDMARK_SETBACK`), front toward the hero; the place's features give way inside its
+footprint, the targets are moved out of it (`keepOut`), and ground-level parts block walking as a
+row of circles along their long side.
+
+ talking costs no request;
 deciding costs one.
 
 **A story is told, not summarised** (owner, Oct 2026: the lines "sounded like a condensed

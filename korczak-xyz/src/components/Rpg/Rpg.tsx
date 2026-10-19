@@ -40,7 +40,7 @@ import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rp
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
-import { loadWorld, pastWorlds, saveWorld } from '../../utils/rpg/worldSave';
+import { addToAtlas, loadAtlas, loadWorld, pastWorlds, saveWorld } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
@@ -232,6 +232,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const charactersRef = useRef<Character[]>([]);
   /** What each character last said, for talking to them again after their beat. */
   const lastLinesRef = useRef(new Map<string, string>());
+  /** Where each character stands: a place's name, or null for the hub. Kept in the world's atlas. */
+  const whereRef = useRef(new Map<string, string | null>());
   /** The current beat's clues the hunter has examined, by index. */
   const seenRef = useRef(new Set<number>());
   const [seenCount, setSeenCount] = useState(0);
@@ -326,7 +328,46 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, []);
 
   /** The autosave, at every step that changes the quest. */
+  /** Writes this quest's places and people into the world's atlas, so the next quest finds them. */
+  const rememberWorld = useCallback(() => {
+    if (beatsRef.current.length === 0) return;
+    addToAtlas(worldRef.current?.id ?? gameLangRef.current, {
+      places: placesRef.current,
+      people: charactersRef.current.map((character) => ({
+        character,
+        at: whereRef.current.get(character.name) ?? null,
+        line: lastLinesRef.current.get(character.name) ?? '',
+      })),
+    });
+  }, []);
+
+  /**
+   * Puts the world's atlas into the scene and the quest's memory: every place built so far and
+   * everyone met, standing where they were left (`worldSave.ts`). A new quest starts in a world
+   * that already has a history.
+   */
+  const restoreAtlas = useCallback(() => {
+    const scene = sceneRef.current;
+    const atlas = loadAtlas(worldRef.current?.id ?? gameLangRef.current);
+    for (const place of atlas.places) {
+      scene?.addPlace(place);
+      if (!placesRef.current.some((p) => p.name === place.name)) placesRef.current = [...placesRef.current, place];
+    }
+    const crowd = new Map<string, number>();
+    for (const { character, at, line } of atlas.people) {
+      const where = at && placesRef.current.some((p) => p.name === at) ? at : null;
+      // Spots 0 and 1 at a place are its beat's character and witness.
+      const nth = where ? (crowd.get(where) ?? 2) : 0;
+      if (where) crowd.set(where, nth + 1);
+      scene?.placeNpc(character.name, character.color, where, nth, character.gender);
+      whereRef.current.set(character.name, where);
+      if (!charactersRef.current.some((c) => c.name === character.name)) charactersRef.current = [...charactersRef.current, character];
+      if (line && !lastLinesRef.current.has(character.name)) lastLinesRef.current.set(character.name, line);
+    }
+  }, []);
+
   const persist = useCallback(() => {
+    rememberWorld();
     if (endingRef.current || beatsRef.current.length === 0) return;
     saveGame({
       lang: gameLangRef.current,
@@ -397,6 +438,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
       scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
+      whereRef.current.set(b.npc.name, b.place?.name ?? null);
       if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
       scene?.clearClues();
       b.clues.forEach((clue, i) => scene?.placeClue(`clue-${b.index}-${i}`, clue.look, b.npc.name));
@@ -408,6 +450,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (b.witness) {
         const w = b.witness;
         scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1, w.npc.gender);
+        whereRef.current.set(w.npc.name, b.place?.name ?? null);
         if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
       }
       if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
@@ -454,6 +497,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     placesRef.current = [];
     charactersRef.current = [];
     lastLinesRef.current.clear();
+    whereRef.current.clear();
     spokenRef.current.clear();
     askedRef.current.clear();
     // A world invented just before this quest stays in the console with it.
@@ -472,6 +516,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.clearNpcs();
     scene?.setMarker(null);
     scene?.teleport('spawn');
+    restoreAtlas();
 
     flash(tRef.current.writingBackground, 5000);
     const writeOpening = async (): Promise<void> => {
@@ -578,6 +623,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     (b: Beat, speaker: string, text: string, steps: StepRecord[]) => {
       const entry: ChronicleEntry = { title: b.title, at: Date.now(), steps, ending: text };
       setChronicle(addToChronicle(worldRef.current?.id ?? gameLang, entry));
+      rememberWorld();
       // Told to the end and in the chronicle: nothing left to continue.
       clearGame();
       setSaved(null);
@@ -1050,6 +1096,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     charactersRef.current = [];
     beatsRef.current = [];
     lastLinesRef.current = new Map(game.lastLines);
+    whereRef.current.clear();
     spokenRef.current.clear();
     askedRef.current.clear();
     pendingRef.current = null;
@@ -1061,6 +1108,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.clearNpcs();
     scene?.setMarker(null);
     scene?.teleport('spawn');
+    restoreAtlas();
     const remember = (c: Character) => {
       if (!charactersRef.current.some((x) => x.name === c.name)) charactersRef.current = [...charactersRef.current, c];
     };

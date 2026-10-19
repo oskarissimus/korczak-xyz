@@ -24,6 +24,7 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
+import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, type HouseKind } from './world';
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
 import { DAYLIGHT, HAZE, recolor, stars, Weather } from './atmosphere';
@@ -56,8 +57,21 @@ const VILLAGE_SPOTS = [
   new THREE.Vector3(-4, 0, -9),
   new THREE.Vector3(9, 0, -1),
 ];
+/** Spot `i` in the square: the five above, then a ring inside the houses for a world that has met many. */
+function villageSpot(i: number): THREE.Vector3 {
+  if (i < VILLAGE_SPOTS.length) return VILLAGE_SPOTS[i].clone();
+  const k = i - VILLAGE_SPOTS.length;
+  const a = k * 2.39996; // the golden angle, so no two stand in line
+  // Inside the houses (their walls start ~11 m out) and outside the well.
+  const r = 7 + (k % 3) * 1.2;
+  return new THREE.Vector3(Math.sin(a) * r, 0, Math.cos(a) * r);
+}
 const SPAWN = new THREE.Vector3(0, 0, 8);
-const WORLD_HALF = 115;
+// Room for the third ring of places (`distant`, 125 m) and its build: the world grows across
+// quests (`.claude/rules/rpg.md`, *The world grows*).
+const WORLD_HALF = 160;
+/** Ground cover stays on the old square: covering the new one would double its instances on a phone. */
+const COVER_HALF = 115;
 const WALK = 6;
 const RUN = 12;
 const TALK_RANGE = 3.2;
@@ -126,6 +140,9 @@ interface Place {
   obstacles: Obstacle[];
   center: THREE.Vector3;
   arrived: boolean;
+  spinners: Spinner[];
+  /** The landmark's ground, in world coordinates. */
+  keepOut: { x: number; z: number; r: number } | null;
 }
 
 export type MarkerTarget = { npc: string } | { place: string } | null;
@@ -326,7 +343,7 @@ export class RpgScene {
   private buildWorld() {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
-      breakTiling(surfaceMat('ground', 70, 70, { roughness: 1 })),
+      breakTiling(surfaceMat('ground', 96, 96, { roughness: 1 })),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -535,8 +552,8 @@ export class RpgScene {
         let x = 0;
         let z = 0;
         do {
-          x = (rand() - 0.5) * WORLD_HALF * 2;
-          z = (rand() - 0.5) * WORLD_HALF * 2;
+          x = (rand() - 0.5) * COVER_HALF * 2;
+          z = (rand() - 0.5) * COVER_HALF * 2;
         } while (Math.hypot(x, z) < 14);
         const s = minS + rand() * (maxS - minS);
         const base = new THREE.Matrix4().compose(
@@ -716,7 +733,7 @@ export class RpgScene {
     const classic = this.isClassic();
     for (const name of ['Leaves_Pine', 'Leaves_NormalTree', 'Leaves_TwistedTree', 'Leaves', 'Grass', 'Flowers']) {
       const m = this.kit.material(name);
-      if (m) recolor(m, look.foliage, classic ? 0 : 0.7);
+      if (m) recolor(m, look.foliage, classic ? 0 : 0.7, 3.2);
     }
     for (const name of ['MI_Plaster', 'MI_Brick', 'MI_UnevenBrick']) {
       const m = this.kit.material(name);
@@ -802,7 +819,7 @@ export class RpgScene {
   /** Trees across the whole map, kept off the village. A place clears its own patch of them. */
   private buildTrees() {
     const rand = rng(42);
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 420; i++) {
       const x = (rand() - 0.5) * WORLD_HALF * 2;
       const z = (rand() - 0.5) * WORLD_HALF * 2;
       if (Math.hypot(x, z) < 32) continue;
@@ -828,7 +845,7 @@ export class RpgScene {
       }
     }
 
-    const built = buildPlace(spec, this.kit.loaded ? this.kit : null);
+    const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look);
     built.group.position.copy(center);
     this.scene.add(built.group);
     const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
@@ -845,7 +862,8 @@ export class RpgScene {
     path.receiveShadow = true;
     this.scene.add(path);
 
-    this.places.set(spec.name, { spec, group: built.group, path, obstacles, center, arrived: false });
+    const keepOut = built.keepOut ? { x: built.keepOut.x + x, z: built.keepOut.z + z, r: built.keepOut.r } : null;
+    this.places.set(spec.name, { spec, group: built.group, path, obstacles, center, arrived: false, spinners: built.spinners, keepOut });
   }
 
   /** Takes down every place, for a new quest; the trees they cleared grow back. */
@@ -901,10 +919,11 @@ export class RpgScene {
     } else {
       if (npc.spot === null) {
         const used = new Set([...this.npcs.values()].map((n) => n.spot));
-        const free = VILLAGE_SPOTS.findIndex((_, i) => !used.has(i));
-        npc.spot = free >= 0 ? free : 0;
+        let free = 0;
+        while (used.has(free)) free++;
+        npc.spot = free;
       }
-      pos = VILLAGE_SPOTS[npc.spot].clone();
+      pos = villageSpot(npc.spot);
     }
     npc.group.position.copy(pos);
     npc.obstacle.x = pos.x;
@@ -1036,12 +1055,21 @@ export class RpgScene {
   /** Puts a beat's things in the middle of its place, replacing any left from before. */
   spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null) {
     this.clearObjective();
-    const center = (at ? this.places.get(at)?.center : null) ?? SPAWN;
+    const place = at ? this.places.get(at) : undefined;
+    const center = place?.center ?? SPAWN;
     const rand = rng(Math.floor(Math.random() * 1e6) + 1);
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + rand();
       const d = 3 + rand() * 6;
       const pos = new THREE.Vector3(center.x + Math.sin(a) * d, 0, center.z + Math.cos(a) * d);
+      const keep = place?.keepOut;
+      if (keep && Math.hypot(pos.x - keep.x, pos.z - keep.z) < keep.r + 1.5) {
+        // Not inside the landmark's walls: out to its edge, on the side of the place's middle.
+        const away = new THREE.Vector3(pos.x - keep.x, 0, pos.z - keep.z);
+        if (away.lengthSq() < 0.01) away.set(center.x - keep.x, 0, center.z - keep.z);
+        away.setLength(keep.r + 1.5);
+        pos.set(keep.x + away.x, 0, keep.z + away.z);
+      }
       if (kind === 'collect') {
         const mesh = buildItem(look);
         mesh.position.copy(pos).setY(0.8);
@@ -1370,6 +1398,7 @@ export class RpgScene {
     }
 
     for (const place of this.places.values()) {
+      for (const s of place.spinners) s.object.rotation[s.axis] += s.speed * dt;
       if (!place.arrived && this.player.position.distanceTo(place.center) < PLACE_RADIUS) {
         place.arrived = true;
         this.cb.onArrive(place.spec.name);

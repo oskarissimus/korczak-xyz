@@ -17,6 +17,7 @@ import type { WorldLook } from '../../utils/rpg/genesis';
 interface Recolor {
   tint: { value: THREE.Color };
   amount: { value: number };
+  gain: { value: number };
 }
 
 /**
@@ -24,11 +25,11 @@ interface Recolor {
  * already does to its map (`breakTiling` replaces the map's own sampling), by hooking the colour
  * stage that follows it.
  */
-export function recolor(material: THREE.Material, color: THREE.ColorRepresentation, amount: number): void {
+export function recolor(material: THREE.Material, color: THREE.ColorRepresentation, amount: number, gain = 2): void {
   const m = material as THREE.MeshStandardMaterial;
   let u = m.userData.recolor as Recolor | undefined;
   if (!u) {
-    const uniforms: Recolor = { tint: { value: new THREE.Color(1, 1, 1) }, amount: { value: 0 } };
+    const uniforms: Recolor = { tint: { value: new THREE.Color(1, 1, 1) }, amount: { value: 0 }, gain: { value: 2 } };
     u = uniforms;
     m.userData.recolor = uniforms;
     const before = m.onBeforeCompile;
@@ -37,14 +38,15 @@ export function recolor(material: THREE.Material, color: THREE.ColorRepresentati
       before?.call(m, shader, renderer);
       shader.uniforms.recolorTint = uniforms.tint;
       shader.uniforms.recolorAmount = uniforms.amount;
+      shader.uniforms.recolorGain = uniforms.gain;
       shader.fragmentShader =
-        'uniform vec3 recolorTint;\nuniform float recolorAmount;\n' +
+        'uniform vec3 recolorTint;\nuniform float recolorAmount;\nuniform float recolorGain;\n' +
         shader.fragmentShader.replace(
           '#include <color_fragment>',
           `#include <color_fragment>
           {
             float lightness = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-            diffuseColor.rgb = mix(diffuseColor.rgb, recolorTint * min(1.0, lightness * 2.0), recolorAmount);
+            diffuseColor.rgb = mix(diffuseColor.rgb, recolorTint * min(1.0, lightness * recolorGain), recolorAmount);
           }`,
         );
     };
@@ -53,6 +55,9 @@ export function recolor(material: THREE.Material, color: THREE.ColorRepresentati
   }
   u.tint.value.set(color);
   u.amount.value = amount;
+  // How far the texture's lightness is lifted before the colour: the leaves are a dark scan, and
+  // at the walls' gain a purple forest came out black.
+  u.gain.value = gain;
 }
 
 /** How far the fog reaches, near and far, for a world's haze. */

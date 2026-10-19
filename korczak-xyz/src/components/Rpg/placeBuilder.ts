@@ -9,7 +9,9 @@
 
 import * as THREE from 'three';
 
-import type { Feature, PlaceSpec, TargetLook } from '../../utils/rpg/place';
+import type { WorldLook } from '../../utils/rpg/genesis';
+import { placePosition, type Feature, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
+import { buildLandmark, type Spinner } from './landmark';
 import { surfaceMat } from './surfaces';
 import { DEAD_TREES, ROCKS, TREES, type WorldKit } from './world';
 
@@ -27,7 +29,18 @@ export interface Obstacle {
 export interface BuiltPlace {
   group: THREE.Group;
   obstacles: Obstacle[];
+  /** The landmark's turning parts, for the scene to turn. */
+  spinners: Spinner[];
+  /** Where the landmark stands, in the place's coordinates: targets are kept out of it. */
+  keepOut: { x: number; z: number; r: number } | null;
 }
+
+/**
+ * How far behind the place's middle the landmark stands, away from the village: the middle stays
+ * open for the targets and the character stands on the village side, so the landmark is what you
+ * walk toward and see behind them.
+ */
+export const LANDMARK_SETBACK = 15;
 
 /** A tiny seeded random, so a place is the same place every time it is built. */
 export function rng(seed: number) {
@@ -323,7 +336,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
 };
 
 /** The place, centred on the origin of its group; the caller moves the group and its obstacles. */
-export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null): BuiltPlace {
+export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: WorldLook): BuiltPlace {
   const rand = rng(hashString(spec.name + spec.biome));
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
@@ -340,7 +353,42 @@ export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null): BuiltP
   for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand, kit);
   shadowed(group);
   ground.castShadow = false;
-  return { group, obstacles };
+
+  let spinners: Spinner[] = [];
+  let keepOut: BuiltPlace['keepOut'] = null;
+  if (spec.landmark) {
+    const built = buildLandmark(spec.landmark, look);
+    const { x: px, z: pz } = placePosition(spec);
+    const out = Math.hypot(px, pz) || 1;
+    const dx = px / out;
+    const dz = pz / out;
+    const lx = dx * LANDMARK_SETBACK;
+    const lz = dz * LANDMARK_SETBACK;
+    // Its front (+z, as the prompt says) faces the village.
+    const turn = Math.atan2(-dx, -dz);
+    built.group.position.set(lx, 0, lz);
+    built.group.rotation.y = turn;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const place = (o: { x: number; z: number }) => ({ x: lx + o.x * cos + o.z * sin, z: lz - o.x * sin + o.z * cos });
+    keepOut = { ...place(built.footprint), r: built.footprint.r };
+    // The features give way: nothing of theirs stands inside the landmark.
+    const inside = (x: number, z: number) => Math.hypot(x - keepOut!.x, z - keepOut!.z) < keepOut!.r;
+    for (const child of [...group.children]) {
+      if (child === ground || !inside(child.position.x, child.position.z)) continue;
+      group.remove(child);
+      child.traverse((o) => {
+        if (o.userData.shared) return;
+        (o as THREE.Mesh).geometry?.dispose();
+      });
+    }
+    const kept = obstacles.filter((o) => !inside(o.x, o.z));
+    obstacles.length = 0;
+    obstacles.push(...kept, ...built.obstacles.map((o) => ({ ...o, ...place(o) })));
+    group.add(built.group);
+    spinners = built.spinners;
+  }
+  return { group, obstacles, spinners, keepOut };
 }
 
 /** One of the quest's monsters, standing on y = 0 and facing +z. */

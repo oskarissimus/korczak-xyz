@@ -14,7 +14,7 @@
 export const DIRECTIONS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'] as const;
 export type Direction = (typeof DIRECTIONS)[number];
 
-export const DISTANCES = ['near', 'far'] as const;
+export const DISTANCES = ['near', 'far', 'distant'] as const;
 export type Distance = (typeof DISTANCES)[number];
 
 export const BIOMES = ['forest', 'swamp', 'ruins', 'graveyard', 'meadow', 'lakeshore', 'rocky_hills'] as const;
@@ -39,6 +39,51 @@ export const ITEM_SHAPES = ['crystal', 'flower', 'chest', 'skull', 'scroll'] as 
 export type EnemyShape = (typeof ENEMY_SHAPES)[number];
 export type ItemShape = (typeof ITEM_SHAPES)[number];
 
+/*
+ * THE LANDMARK: what makes a mill a mill (owner, Oct 2026: "we have a mill, but it is only a round
+ * patch of the map with trees; if there is a mill, something that looks like a mill should be
+ * built"). The model writes it as up to `MAX_PARTS` primitives — a box, a cylinder, a cone… — each
+ * with a size, a position, a turn and a material from the world's palette, the way a child builds
+ * a mill from blocks. Low-poly by design (the owner: "low-poly buildings are fine"); it is the
+ * silhouette that tells a mill from a tower, and a model can write a silhouette.
+ *
+ * In metres, centred on the landmark's own spot, y up from the ground. Everything is clamped here,
+ * so whatever the model writes stays a thing of house-to-tower size beside the place's middle.
+ */
+export const PART_SHAPES = ['box', 'cylinder', 'cone', 'sphere', 'dome', 'pyramid', 'torus', 'wedge'] as const;
+export type PartShape = (typeof PART_SHAPES)[number];
+
+export const PART_MATERIALS = ['wall', 'roof', 'wood', 'stone', 'metal', 'glass', 'cloth', 'glow', 'water', 'plant', 'dark'] as const;
+export type PartMaterial = (typeof PART_MATERIALS)[number];
+
+export const MAX_PARTS = 36;
+/** How far from the landmark's own centre a part may stand, and how high anything may reach. */
+export const LANDMARK_REACH = 9;
+export const LANDMARK_HEIGHT = 24;
+
+export interface LandmarkPart {
+  shape: PartShape;
+  /** Width (x), height (y), depth (z), metres. A cylinder's or cone's diameter is the width. */
+  size: [number, number, number];
+  /** The centre of the part's base, or of the part itself when it spins: x, y above the ground, z. */
+  at: [number, number, number];
+  /** Degrees about the vertical. */
+  turn: number;
+  /** Degrees of lean about x and z: a sail, a fallen column, a slanted roof. */
+  tilt: [number, number];
+  material: PartMaterial;
+  /** `#rrggbb` over the material's own colour, or none. */
+  color: string | null;
+  /** Turns slowly about its own centre on this axis: sails, wheels, a beacon. */
+  spin: 'x' | 'y' | 'z' | null;
+}
+
+export interface Landmark {
+  /** What it is, in a few words: "the old water mill". */
+  name: string;
+  parts: LandmarkPart[];
+}
+
 export interface PlaceSpec {
   /** Shown in the journal and as a toast on arrival. */
   name: string;
@@ -48,6 +93,8 @@ export interface PlaceSpec {
   features: Feature[];
   /** `#rrggbb`. The biome's own when the model gives none. */
   groundColor: string;
+  /** The building or thing that makes the place what it is, when it has one. */
+  landmark?: Landmark | null;
 }
 
 export interface TargetLook {
@@ -69,7 +116,7 @@ export const BIOME_DEFAULTS: Record<Biome, { features: Feature[]; groundColor: s
   rocky_hills: { features: ['rocks', 'standing_stones'], groundColor: '#77705f' },
 };
 
-const DISTANCE_M: Record<Distance, number> = { near: 50, far: 85 };
+const DISTANCE_M: Record<Distance, number> = { near: 50, far: 85, distant: 125 };
 
 /** Where a place stands, in the scene's metres: north is −z, east is +x. */
 export function placePosition(place: Pick<PlaceSpec, 'direction' | 'distance'>): { x: number; z: number } {
@@ -88,6 +135,51 @@ function oneOf<T extends string>(value: unknown, list: readonly T[]): T | null {
 
 function hex(value: unknown): string | null {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim().toLowerCase() : null;
+}
+
+function num(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+function triple(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function part(raw: unknown): LandmarkPart | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const shape = oneOf(r.shape, PART_SHAPES);
+  if (!shape) return null;
+  const size = triple(r.size);
+  const at = triple(r.at);
+  const tilt = triple(r.tilt);
+  const w = num(size[0], 0.1, 2 * LANDMARK_REACH, 1);
+  const h = num(size[1], 0.05, LANDMARK_HEIGHT, 1);
+  const d = num(size[2] ?? size[0], 0.1, 2 * LANDMARK_REACH, w);
+  const y = num(at[1], 0, LANDMARK_HEIGHT - 0.05, 0);
+  const spin = typeof r.spin === 'string' && /^[xyz]$/i.test(r.spin.trim()) ? (r.spin.trim().toLowerCase() as 'x' | 'y' | 'z') : null;
+  return {
+    shape,
+    size: [w, Math.min(h, LANDMARK_HEIGHT - y), d],
+    at: [num(at[0], -LANDMARK_REACH, LANDMARK_REACH, 0), y, num(at[2], -LANDMARK_REACH, LANDMARK_REACH, 0)],
+    turn: num(r.turn, -360, 360, 0),
+    tilt: [num(tilt[0], -90, 90, 0), num(tilt[1], -90, 90, 0)],
+    material: oneOf(r.material, PART_MATERIALS) ?? 'wall',
+    color: hex(r.color),
+    spin,
+  };
+}
+
+/** A model's landmark, or null when it has no usable part. */
+export function parseLandmark(raw: unknown): Landmark | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const parts = Array.isArray(r.parts)
+    ? r.parts.slice(0, MAX_PARTS).map(part).filter((p): p is LandmarkPart => p !== null)
+    : [];
+  if (parts.length === 0) return null;
+  return { name: typeof r.name === 'string' ? r.name.trim().slice(0, 60) : '', parts };
 }
 
 /**
@@ -111,6 +203,7 @@ export function parsePlace(raw: unknown): PlaceSpec | null {
     biome,
     features: features.length ? features : BIOME_DEFAULTS[biome].features,
     groundColor: hex(r.groundColor) ?? BIOME_DEFAULTS[biome].groundColor,
+    landmark: parseLandmark(r.landmark),
   };
 }
 
@@ -148,7 +241,9 @@ export function freeSlot(spec: PlaceSpec, taken: readonly PlaceSpec[]): PlaceSpe
   for (let step = 1; step <= DIRECTIONS.length / 2; step++) {
     for (const turn of [step, -step]) {
       const direction = DIRECTIONS[(start + turn + DIRECTIONS.length) % DIRECTIONS.length];
-      for (const distance of [spec.distance, spec.distance === 'near' ? 'far' : 'near'] as Distance[]) {
+      // The asked-for ring first, then the rings by how close they are to it.
+      const rings = [...DISTANCES].sort((a, b) => Math.abs(DISTANCE_M[a] - DISTANCE_M[spec.distance]) - Math.abs(DISTANCE_M[b] - DISTANCE_M[spec.distance]));
+      for (const distance of rings) {
         if (clear({ direction, distance })) return { ...spec, direction, distance };
       }
     }

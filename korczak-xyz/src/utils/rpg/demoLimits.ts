@@ -184,7 +184,7 @@ function list<T>(value: unknown, max: number, each: (v: unknown) => T): T[] {
 /**
  * A stranger's JSON, turned into a context `beatPrompt` can be given: closed values checked, every
  * string cut to what the game itself sends (`decide` cuts a situation to 300), every list to the
- * size the game keeps (four beats, the chronicle's last five).
+ * size the game keeps (four beats, the chronicle's last five, the atlas's sixteen places).
  */
 export function demoContext(value: unknown): BeatContext {
   const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
@@ -197,7 +197,7 @@ export function demoContext(value: unknown): BeatContext {
     const e = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
     return { title: text(e.title, 120), at: 0, steps: list(e.steps, 4, step), ending: text(e.ending, 400) };
   });
-  const characters: Character[] = list(r.characters, 12, (v): Character => {
+  const characters: Character[] = list(r.characters, 30, (v): Character => {
     const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
     return {
       name: text(c.name, 60),
@@ -214,7 +214,7 @@ export function demoContext(value: unknown): BeatContext {
     title: typeof r.title === 'string' ? r.title.slice(0, 120) : null,
     history: list(r.history, 4, step),
     chronicle,
-    places: list(r.places, 6, parsePlace).filter((p): p is NonNullable<typeof p> => p !== null),
+    places: list(r.places, 16, parsePlace).filter((p): p is NonNullable<typeof p> => p !== null),
     characters,
     world: demoWorld(r.world),
   };
