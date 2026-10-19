@@ -126,9 +126,13 @@ one week (owner, Oct 2026):
 So it is fixed twice over:
 - The prompt says a label is what the hunter will do, never what it will uncover. The consequence
   too is what the hunter set out to do, since the next beat is where the truth is found.
-- A decision that needs the witness or a clue carries `after` (`"witness"` or a clue's number).
-  `openTalk` offers it only once the witness has been talked to (`witnessHeard`, in the autosave)
-  or the clue examined.
+- A decision that needs the witness, a clue or a small-talk answer carries `after` (`"witness"`, a
+  clue's index, or `{ ask }` for a small-talk question; the model writes "clue 1", "question 2").
+  `openTalk` offers it only once that has been heard: the witness talked to (`witnessHeard`), the
+  clue examined, the question asked (`askedTalk`), all in the autosave. This is how RPGs do it
+  (The Witcher 3, Mass Effect): an option exists only once the knowledge behind it does. The
+  blacksmith came from a follow-up question that sat beside the decisions, so gating only the
+  witness and the clues was not enough.
 - At least one decision must need neither. `parseBeat` drops a gate on a witness or clue the beat
   lacks, and drops every gate if all of them wait, so a beat can always be finished.
 

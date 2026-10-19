@@ -71,11 +71,12 @@ export interface Decision {
   /** What the next beat asks of the hunter; null ends the quest here. Drawn by the game. */
   next: Job | null;
   /**
-   * What the hunter must have heard before this is offered: the witness, or a clue by index. A
-   * decision that rests on something optional waits for it (owner, Oct 2026: a choice named the
-   * innkeeper whom only the witness had mentioned). Absent: the character's own story is enough.
+   * What the hunter must have heard before this is offered: the witness, a clue by index, or a
+   * small-talk question by index (`{ ask }`). A decision that rests on something optional waits for
+   * it (owner, Oct 2026: a choice named the innkeeper whom only the witness had mentioned, and one
+   * accused the blacksmith whom only a follow-up question had). Absent: the story is enough.
    */
-  after?: 'witness' | number;
+  after?: 'witness' | number | { ask: number };
 }
 
 export interface BeatJob {
@@ -461,8 +462,10 @@ export function beatPrompt(ctx: BeatContext): string {
     'what is found is for the next step to write. A decision that ends the quest may name only who and what the',
     'player has already heard of.',
     'Each decision rests on the npc’s greeting and story parts by default. A decision that only makes sense',
-    'after the witness or a clue sets "after": "witness" or "after": the clue’s number (1 or 2), and the game',
-    'offers it only once that has been heard; at least one decision must need neither.',
+    'after something optional — the witness, a clue, or the answer to a "smallTalk" question — sets "after":',
+    '"witness", "clue 1", "clue 2", "question 1" or "question 2" (smallTalk in order), and the game offers it only',
+    'once the hunter has heard that; at least one decision must need none of them. If a smallTalk answer names',
+    'someone or something, a decision that uses it waits for that question.',
     '',
     'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
     'everything the witness says is that person’s own words to the hunter, in the first person ("I", "my',
@@ -494,7 +497,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hunter says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
-    '                 "after": "witness" or 1 or 2, only when it needs them}]',
+    '                 "after": "witness", "clue 1", "clue 2", "question 1" or "question 2", only when needed}]',
     '}',
   );
   return lines.filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n');
@@ -576,11 +579,15 @@ function options(raw: unknown, max: number): DialogueOption[] {
     .slice(0, max);
 }
 
-/** A decision's `after`: "witness", or a clue's number from 1 (a model's "clue 2" too), as an index. */
-function rawAfter(raw: unknown): 'witness' | number | undefined {
+/**
+ * A decision's `after`: "witness", "clue 2" (or a bare 2) as clue index 1, "question 1" as small-talk
+ * index 0.
+ */
+function rawAfter(raw: unknown): Decision['after'] {
   if (typeof raw === 'string' && /witness|świadek/i.test(raw)) return 'witness';
   const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.match(/\d+/)?.[0]) : NaN;
-  return Number.isInteger(n) && n >= 1 && n <= 2 ? n - 1 : undefined;
+  if (!Number.isInteger(n) || n < 1 || n > 2) return undefined;
+  return typeof raw === 'string' && /question|pytanie|smalltalk/i.test(raw) ? { ask: n - 1 } : n - 1;
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -698,7 +705,8 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   // character's story was not enough to decide on, which the prompt forbids. Better a beat that can
   // be finished than one that cannot: then nothing waits.
   for (const d of decisions) {
-    if (d.after === 'witness' ? !witness : typeof d.after === 'number' && !clues[d.after]) delete d.after;
+    const a = d.after;
+    if (a === 'witness' ? !witness : typeof a === 'number' ? !clues[a] : a && !smallTalk[a.ask]) delete d.after;
   }
   if (decisions.every((d) => d.after !== undefined)) for (const d of decisions) delete d.after;
 

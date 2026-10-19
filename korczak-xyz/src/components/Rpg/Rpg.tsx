@@ -227,6 +227,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const heardRef = useRef(false);
   /** Whether the current beat's witness has been talked to, which a decision may wait for. */
   const witnessHeardRef = useRef(false);
+  /** The current beat's small-talk questions asked, by index, which a decision may wait for. */
+  const askedTalkRef = useRef(new Set<number>());
   /** The current beat has been decided; its character has nothing more to offer. */
   const decidedRef = useRef(false);
   /** The opening could not be written, so the whole quest is the hand-written one. */
@@ -318,6 +320,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       seen: [...seenRef.current],
       heard: heardRef.current,
       witnessHeard: witnessHeardRef.current,
+      askedTalk: [...askedTalkRef.current],
       decision: decisionRef.current,
       playMs: playedNow(),
       transcript: [...transcript()],
@@ -380,6 +383,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setSeenCount(0);
       heardRef.current = false;
       witnessHeardRef.current = false;
+      askedTalkRef.current = new Set();
       if (b.witness) {
         const w = b.witness;
         scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1, w.npc.gender);
@@ -727,10 +731,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
       // a whole story in one line read as a summary, not a person (owner, Oct 2026).
       const last = b.story.length - 1;
       const followUps = (): Choice[] => [
-        ...b.smallTalk.map((o) => ({
+        ...b.smallTalk.map((o, i) => ({
           label: o.label,
           kind: 'ask' as const,
-          action: () => setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }] }),
+          action: () => {
+            if (!askedTalkRef.current.has(i)) {
+              askedTalkRef.current.add(i);
+              persist();
+            }
+            setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }] });
+          },
         })),
         ...b.clues
           .filter((_, i) => seenRef.current.has(i))
@@ -740,6 +750,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
             action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }] }),
           })),
       ];
+      const heardFor = (after: Decision['after']): boolean =>
+        after === undefined ||
+        (after === 'witness'
+          ? witnessHeardRef.current
+          : typeof after === 'number'
+            ? seenRef.current.has(after)
+            : askedTalkRef.current.has(after.ask));
       const ending = (): void => {
         if (!heardRef.current) {
           heardRef.current = true;
@@ -749,7 +766,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           line: npc(b.story[last].say),
           choices: [
             ...b.decisions
-              .filter((d) => (d.after === 'witness' ? witnessHeardRef.current : d.after === undefined || seenRef.current.has(d.after)))
+              .filter((d) => heardFor(d.after))
               .map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
             ...followUps(),
             bye,
@@ -981,6 +998,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setSeenCount(game.seen.length);
     heardRef.current = game.heard;
     witnessHeardRef.current = game.witnessHeard ?? false;
+    askedTalkRef.current = new Set(game.askedTalk ?? []);
     const d = game.decision === null ? null : current.decisions[game.decision];
     decisionRef.current = d ? game.decision : null;
     persist();

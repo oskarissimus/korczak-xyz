@@ -66,6 +66,8 @@ describe('parseBeat', () => {
     expect(gated(['clue 1', null])).toEqual([0, undefined]);
     // The second clue was unplayable, so there is nothing to wait for.
     expect(gated([2, undefined])).toEqual([undefined, undefined]);
+    expect(gated(['question 1', undefined])).toEqual([{ ask: 0 }, undefined]);
+    expect(gated(['question 2', undefined])).toEqual([undefined, undefined]);
     expect(gated(['witness', 1])).toEqual([undefined, undefined]);
   });
 
