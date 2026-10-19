@@ -83,6 +83,11 @@ const en = {
   summary: 'What this quest cost',
   costNote: 'Approximate list prices; ElevenLabs at the Creator plan rate.',
   fullscreen: 'Fullscreen',
+  strike: 'Strike',
+  leave: 'Back to the menu (the quest is saved)',
+  touchMove: 'Left thumb on the circle: walk; push it to the edge to run',
+  touchLook: 'Drag anywhere else to look around',
+  touchAct: '⚔ strikes; the second button talks, examines or picks up what is in reach',
   arrived: 'You have reached',
 };
 
@@ -164,6 +169,11 @@ const pl: typeof en = {
   summary: 'Ile kosztował ten quest',
   costNote: 'Ceny przybliżone, z cenników; ElevenLabs według planu Creator.',
   fullscreen: 'Pełny ekran',
+  strike: 'Cios',
+  leave: 'Wróć do menu (quest jest zapisany)',
+  touchMove: 'Lewy kciuk na kółku: chodzenie; dociśnij do krawędzi, żeby biec',
+  touchLook: 'Przeciągnij palcem gdziekolwiek indziej, żeby się rozejrzeć',
+  touchAct: '⚔ to cios; drugi przycisk rozmawia, bada albo podnosi to, co w zasięgu',
   arrived: 'Docierasz do miejsca',
 };
 

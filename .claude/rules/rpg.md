@@ -298,9 +298,36 @@ line is read, the dialogue stays as it was with that option lit and the rest gre
 (`held` in `Rpg.tsx`); `speakLines`' `onStart` releases it as the answer's clip begins, and its end
 or failure releases it too. Without a voice, or for a line already spoken, nothing is held.
 
-**Options say what they are**: a decision (`kind: 'plot'`) is bold and amber; a question (`ask`:
-story parts, small talk, clue questions, the witness's) is greyed once asked in this quest, and
-can still be asked; goodbye and back are plain.
+**Options say what they are**: a decision (`kind: 'plot'`) is bold and amber with a `➤` before
+it; a question (`ask`: story parts, small talk, clue questions, the witness's) is greyed and
+italic with a `✓` after it once asked in this quest, and can still be asked; goodbye and back are
+plain. The glyphs are there because the owner plays on a phone set to black and white: **nothing
+in this game may be told apart by colour alone.**
+
+## On a phone
+
+Owner, Oct 2026: "make it play well on a smartphone, an iPhone SE 3 above all — a small screen,
+and I have a black-and-white display set". Decided once per page, by a coarse primary pointer
+(`touch` in `Rpg.tsx`), not by width: a narrow desktop window keeps the keys and the mouse.
+
+- **The controls** (`TouchControls.tsx`): a stick under the left thumb (camera-relative like WASD,
+  `RpgScene.setStick`; pushed to its rim it runs, as Shift does), a finger dragged anywhere else on
+  the canvas turns the camera (pointer events on the canvas, `touch-action: none`), and under the
+  right thumb `⚔ Cios` and, only while something is in reach, a larger light button saying what E
+  would do (talk, examine, pick up). Pointer lock is never asked for on a phone.
+- **The whole screen while playing** (`rpg-immersive`: fixed, `100dvh`, the page's scroll locked).
+  iOS has no Fullscreen API for anything but video, so the ⛶ button is hidden there; a `✕` at the
+  top left goes back to the intro, the quest autosaved and offered as Continue.
+- **The intro** sits under the site's navbar in a box as tall as the screen leaves, scrolling
+  inside, with Start first rather than last. The keyboard help becomes three lines about thumbs.
+- **Small screens** (`max-width` or `max-height` 480 px): the dialogue is a sheet along the bottom,
+  full width, scrolling, with 44 px rows; the journal, HP bar and headings shrink; the small
+  buttons (🔊, `~`) move to the top, the bottom corners being the thumbs'. Landscape (375 px tall)
+  shrinks the stick and buttons and hides the journal's history lines.
+
+Tested in Playwright's `iPhone SE (3rd gen)` profile, both orientations, driving the stick and the
+look with CDP touch events; the swiftshader renderer there is slow, so walking covers less ground
+per second than on a phone.
 
 ## Everything the game waits for is on screen
 

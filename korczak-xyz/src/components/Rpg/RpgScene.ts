@@ -207,6 +207,12 @@ export class RpgScene {
   private yaw = 0;
   private pitch = 0.25;
   private keys = new Set<string>();
+  /**
+   * The touch controls (`TouchControls.tsx`): the stick's position, -1..1 each way with y down, and
+   * the finger dragging the view. A phone has no keys, no mouse and no pointer lock.
+   */
+  private stick = { x: 0, y: 0 };
+  private lookTouch: { id: number; x: number; y: number } | null = null;
   private obstacles: Obstacle[] = [];
   private enemies: Enemy[] = [];
   private pickups: Pickup[] = [];
@@ -880,11 +886,18 @@ export class RpgScene {
     this.paused = paused;
     if (!paused) for (const npc of this.npcs.values()) npc.rig?.play('Idle_Loop', { fade: 0.6 });
     this.keys.clear();
+    this.stick = { x: 0, y: 0 };
+    this.lookTouch = null;
     if (paused && document.pointerLockElement === this.canvas) document.exitPointerLock();
   }
 
+  /** The touch stick: walks toward where it points, camera-relative like WASD; runs near its rim. */
+  setStick(x: number, y: number) {
+    this.stick = this.paused ? { x: 0, y: 0 } : { x, y };
+  }
+
   requestLock() {
-    if (this.paused) return;
+    if (this.paused || this.lookTouch || matchMedia('(pointer: coarse)').matches) return;
     // A rejected lock (Safari, an iframe) is not an error worth surfacing: the mouse just will not
     // turn the camera, and Q/E-style keys are not this game's controls.
     const result = this.canvas.requestPointerLock?.() as unknown as Promise<void> | undefined;
@@ -1009,6 +1022,33 @@ export class RpgScene {
     this.attack();
   };
 
+  /*
+   * A finger on the canvas turns the camera, as the mouse does under pointer lock. One finger at a
+   * time: the other thumb is on the stick, which is an element of its own and never reaches here.
+   * `touch-action: none` on the canvas keeps the page from scrolling under the drag.
+   */
+  private onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || this.paused || this.lookTouch) return;
+    e.preventDefault();
+    this.lookTouch = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    this.canvas.setPointerCapture?.(e.pointerId);
+  };
+
+  private onPointerMove = (e: PointerEvent) => {
+    const touch = this.lookTouch;
+    if (!touch || e.pointerId !== touch.id) return;
+    const dx = e.clientX - touch.x;
+    const dy = e.clientY - touch.y;
+    touch.x = e.clientX;
+    touch.y = e.clientY;
+    this.yaw -= dx * 0.008;
+    this.pitch = Math.min(1.1, Math.max(-0.35, this.pitch + dy * 0.006));
+  };
+
+  private onPointerUp = (e: PointerEvent) => {
+    if (this.lookTouch?.id === e.pointerId) this.lookTouch = null;
+  };
+
   private onLock = () => this.cb.onLockChange(document.pointerLockElement === this.canvas);
   private onBlur = () => this.keys.clear();
 
@@ -1019,6 +1059,10 @@ export class RpgScene {
     document.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('pointerlockchange', this.onLock);
     this.canvas.addEventListener('mousedown', this.onMouseDown);
+    this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.canvas.addEventListener('pointermove', this.onPointerMove);
+    this.canvas.addEventListener('pointerup', this.onPointerUp);
+    this.canvas.addEventListener('pointercancel', this.onPointerUp);
   }
 
   // --- the loop ---------------------------------------------------------------------------------
@@ -1068,11 +1112,19 @@ export class RpgScene {
 
   private update(dt: number) {
     const k = this.keys;
-    const fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
-    const side = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const stick = Math.hypot(this.stick.x, this.stick.y);
+    const onStick = stick > 0.18;
+    const fwd = onStick
+      ? -this.stick.y
+      : (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const side = onStick
+      ? this.stick.x
+      : (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
     const moving = fwd !== 0 || side !== 0;
+    // The stick pushed to its rim is Shift: there is no third thumb for a run button.
+    const running = k.has('ShiftLeft') || k.has('ShiftRight') || stick > 0.85;
     if (moving) {
-      const speed = k.has('ShiftLeft') || k.has('ShiftRight') ? RUN : WALK;
+      const speed = running ? RUN : WALK;
       // Camera-relative: W walks away from the camera, whatever way the hunter was facing.
       const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
       const right = new THREE.Vector3(-forward.z, 0, forward.x);
@@ -1084,7 +1136,6 @@ export class RpgScene {
       this.player.rotation.y += diff * Math.min(1, dt * 12);
     }
     const t = this.clock.elapsedTime;
-    const running = k.has('ShiftLeft') || k.has('ShiftRight');
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.swing = Math.max(0, this.swing - dt * 4);
     if (this.playerRig) {
@@ -1211,6 +1262,10 @@ export class RpgScene {
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('pointerlockchange', this.onLock);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.canvas.removeEventListener('pointermove', this.onPointerMove);
+    this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas.removeEventListener('pointercancel', this.onPointerUp);
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;

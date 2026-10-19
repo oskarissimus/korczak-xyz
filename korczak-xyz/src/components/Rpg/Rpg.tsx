@@ -39,6 +39,7 @@ import { generateBeat, MODEL_CHOICES, modelChain, type QuestSource } from '../..
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamPreview } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
+import { TouchControls } from './TouchControls';
 import { translations } from './translations';
 
 interface DialogueLine {
@@ -157,6 +158,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
+  // A phone: a stick and buttons instead of keys and a mouse, and the whole screen while playing
+  // (owner, Oct 2026: an iPhone SE 3 above all). Decided once: a primary pointer that is a finger.
+  const [touch] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches);
+  const immersive = touch && started;
+  useEffect(() => {
+    if (!immersive) return;
+    // The page under the game must not scroll or bounce while a thumb is on the stick.
+    const root = document.documentElement;
+    const before = root.style.overflow;
+    root.style.overflow = 'hidden';
+    return () => {
+      root.style.overflow = before;
+    };
+  }, [immersive]);
   const [toast, setToast] = useState<string | null>(null);
   // What the demo has left today, asked on the intro screen and again at a quest's end — never by
   // a reader with a key of their own, who does not need it.
@@ -781,6 +796,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     void startQuest();
   };
 
+  /** Back to the intro screen on a phone, which has no Esc and no page around the game. */
+  const leave = () => {
+    stopVoice();
+    setDialogue(null);
+    setHeld(null);
+    setStarted(false);
+    setSaved(loadGame());
+  };
+
   const fullscreen = () => {
     const el = containerRef.current;
     if (!el) return;
@@ -799,8 +823,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ? t.talkTo(beat.npc.name)
         : beat.objectiveText;
 
+  const startButtons = (
+    <>
+      {saved && saved.lang === gameLang && keysReady && (
+        <button type="button" className="rpg-start" onClick={() => resume(saved)}>
+          {t.continueQuest(saved.beats[saved.beats.length - 1].title)}
+        </button>
+      )}
+      <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
+        {keysReady ? (saved && saved.lang === gameLang ? t.newQuest : t.start) : t.wait}
+      </button>
+    </>
+  );
+
   return (
-    <div className="rpg-container" ref={containerRef}>
+    <div className={`rpg-container${touch ? ' rpg-touch' : ''}${immersive ? ' rpg-immersive' : ''}`} ref={containerRef}>
       <canvas ref={canvasRef} className="rpg-canvas" />
 
       {started && (
@@ -833,15 +870,32 @@ export default function Rpg({ lang }: { lang: Lang }) {
             </div>
           )}
 
-          {!locked && !dialogue && !ending && <div className="rpg-hint">{t.clickToLook}</div>}
+          {!touch && !locked && !dialogue && !ending && <div className="rpg-hint">{t.clickToLook}</div>}
 
-          {prompt && !dialogue && !ending && (
+          {!touch && prompt && !dialogue && !ending && (
             <div className="rpg-prompt">
               <kbd>E</kbd> {prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : t.pickUp}
             </div>
           )}
 
           {toast && <div className="rpg-toast">{toast}</div>}
+
+          {touch && !dialogue && !held && !ending && !generating && !unfolding && (
+            <TouchControls
+              prompt={prompt}
+              promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}
+              attackLabel={t.strike}
+              onStick={(x, y) => sceneRef.current?.setStick(x, y)}
+              onAttack={() => sceneRef.current?.attack()}
+              onAct={() => sceneRef.current?.interact()}
+            />
+          )}
+
+          {immersive && !generating && (
+            <button type="button" className="rpg-leave" onClick={leave} aria-label={t.leave}>
+              ✕
+            </button>
+          )}
         </>
       )}
 
@@ -881,13 +935,23 @@ export default function Rpg({ lang }: { lang: Lang }) {
         <div className="rpg-overlay">
           <h2>{t.title}</h2>
           <p>{t.intro}</p>
-          <ul className="rpg-controls">
-            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t.move}</li>
-            <li><kbd>Shift</kbd> {t.run}</li>
-            <li>{t.mouse}</li>
-            <li><kbd>LMB</kbd> {t.attack}</li>
-            <li><kbd>E</kbd> {t.interact}</li>
-          </ul>
+          {/* On a phone the intro scrolls inside a short box, so Start comes first, not last. */}
+          {touch && startButtons}
+          {touch ? (
+            <ul className="rpg-controls">
+              <li>{t.touchMove}</li>
+              <li>{t.touchLook}</li>
+              <li>{t.touchAct}</li>
+            </ul>
+          ) : (
+            <ul className="rpg-controls">
+              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t.move}</li>
+              <li><kbd>Shift</kbd> {t.run}</li>
+              <li>{t.mouse}</li>
+              <li><kbd>LMB</kbd> {t.attack}</li>
+              <li><kbd>E</kbd> {t.interact}</li>
+            </ul>
+          )}
           <div className="rpg-lang" role="group" aria-label={t.language}>
             <span>{t.language}:</span>
             {(['pl', 'en'] as const).map((l) => (
@@ -949,15 +1013,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
           ) : (
             <p className="rpg-source">{t.readingKeys}</p>
           )}
-          {saved && saved.lang === gameLang && keysReady && (
-            <button type="button" className="rpg-start" onClick={() => resume(saved)}>
-              {t.continueQuest(saved.beats[saved.beats.length - 1].title)}
-            </button>
-          )}
-          <button type="button" className="rpg-start" disabled={!keysReady} onClick={begin}>
-            {keysReady ? (saved && saved.lang === gameLang ? t.newQuest : t.start) : t.wait}
-          </button>
-          <p className="rpg-dev-hint">{t.devHint}</p>
+          {!touch && startButtons}
+          {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
         </div>
       )}
 
@@ -1017,13 +1074,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
       {devOpen && <DevConsole lang={gameLang} onClose={() => setDevOpen(false)} />}
 
-      <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>
-        ~
-      </button>
+      {(!touch || started) && (
+        <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>
+          ~
+        </button>
+      )}
 
-      <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
-        ⛶
-      </button>
+      {!immersive && (
+        <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
+          ⛶
+        </button>
+      )}
     </div>
   );
 }
