@@ -384,8 +384,10 @@ before its usage arrived keeps the whole reservation, which errs the owner's way
   (Pro's worst case is ~$0.20, Flash-Lite's ~$0.04, Gemma's nothing), which may still fit what is
   left; closed ends the attempt. Google's own errors are passed on with Google's status and move
   on as they would on a key.
-- **The voice goes through it too**, `{kind:'voice'}`: one line of at most 400 characters in one of
-  the three voices, priced before it is made at the list rate (`clipCost`). `DEMO_VOICE_KEY` in
+- **The voice goes through it too**, `{kind:'voice'}`: one line of at most 400 characters, with
+  the speaker (`who`: name, gender, age) for a character's library voice or one of the three
+  premade voices, priced before it is made at the list rate (`clipCost`); `x-demo-voice` says
+  which was used. `DEMO_VOICE_KEY` in
   `voice.ts` stands in for an ElevenLabs key. Only a demo quest speaks on the demo; a reader with
   their own Google key and no ElevenLabs key stays silent.
 - **The intro asks first** (`GET`, `fetchRpgDemoStatus`): whether it is open, whether the paying
@@ -417,8 +419,27 @@ on Start, not on load, so the choice is what the model is asked for.
 
 Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`)
 when the store holds an ElevenLabs key: the option the hunter picks in Brian's voice, then the
-answer in George's or Rachel's, by the speaking character's gender. `speakLines` requests every clip at once
-and plays them in order, so the answer is ready when the question ends; a newer choice stops the
+answer in **the character's own voice**.
+
+**Every character has a voice of their own** (owner, Oct 2026: "ElevenLabs has far more ready
+voices; pick by characteristics or tags, else at random"). The model writes each character's
+`age` (`young`, `middle_aged`, `old`) beside their gender, and `utils/rpg/voicePick.ts` searches
+the Voice Library (`/v1/shared-voices`, the 30 most used) for that gender and age in the game's
+language, falling back to gender alone; the character's name hashes to one of them, so a
+character keeps their voice across lines, quests and reloads. Only voices at the ordinary rate are
+taken (`rate` 1, no `fiat_rate`), because the cost console and the demo's reservations price every
+clip at it. Searches are cached a day in the browser (`rpg-voice-lists`) and six hours in the
+function. A key that may not use the library (401/402/403 — a free plan cannot through the API)
+falls back to the premade George or Rachel for the rest of the session; any other refusal falls
+back for that line. Compiled into the demo function too, so the demo picks the same voices.
+
+**The premade voices end on 31 Dec 2026** (ElevenLabs, *What are Default voices?*: they expire
+and are only available to accounts created before March 2026). That is the fallback and the
+hunter's Brian; the replacements ElevenLabs suggests are library voices (Brian → *Sawyer -
+Midnight Storyteller*, George → *Eldrin - Crisp British Baritone*), so before then the hunter
+needs a library voice id and the fallback becomes silence or another library pick.
+
+`speakLines` requests every clip at once and plays them in order, so the answer is ready when the question ends; a newer choice stops the
 queue. **Each line is
 spoken once per quest** (`spokenRef`, keyed by voice and text, cleared when a
 new quest loads) — at the owner's request, so going back to a menu does not read its greeting

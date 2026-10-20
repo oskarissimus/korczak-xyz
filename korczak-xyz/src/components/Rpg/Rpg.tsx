@@ -62,6 +62,8 @@ interface DialogueLine {
   speaker: string;
   voice: VoiceName;
   text: string;
+  /** A character speaking, whose own voice is looked up; absent for the hunter. */
+  who?: Character;
 }
 
 interface Choice {
@@ -834,7 +836,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       decidedRef.current = true;
       decisionRef.current = b.decisions.indexOf(d);
       persist();
-      const line: DialogueLine = { speaker: b.npc.name, voice: b.npc.gender, text: d.reply };
+      const line: DialogueLine = { speaker: b.npc.name, voice: b.npc.gender, text: d.reply, who: b.npc };
       if (!d.next) {
         setDialogue({ line, choices: [{ label: t.theEnd, action: () => finish(b, b.npc.name, d.reply, steps) }] });
         return;
@@ -857,7 +859,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const w = b.witness;
       if (w && name === w.npc.name && !decidedRef.current) {
         // Somebody else at the place, with their own side of it.
-        const line = (text: string): DialogueLine => ({ speaker: w.npc.name, voice: w.npc.gender, text });
+        const line = (text: string): DialogueLine => ({ speaker: w.npc.name, voice: w.npc.gender, text, who: w.npc });
         const root = (): void =>
           setDialogue({
             line: line(w.greeting),
@@ -880,12 +882,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       if (name !== b.npc.name || decidedRef.current) {
         setDialogue({
-          line: { speaker: name, voice: who?.gender ?? 'male', text: lastLinesRef.current.get(name) ?? t.nothingMore },
+          line: { speaker: name, voice: who?.gender ?? 'male', text: lastLinesRef.current.get(name) ?? t.nothingMore, who },
           choices: [bye],
         });
         return;
       }
-      const npc = (text: string): DialogueLine => ({ speaker: b.npc.name, voice: b.npc.gender, text });
+      const npc = (text: string): DialogueLine => ({ speaker: b.npc.name, voice: b.npc.gender, text, who: b.npc });
 
       if (b.job && progressRef.current < b.job.count) {
         setDialogue({ line: npc(b.waitingLine), choices: [bye] });
@@ -1086,7 +1088,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     }
     const wanted: SpokenLine[] = [];
     if (chosen) wanted.push({ text: chosen, voice: 'player' });
-    if (dialogue) wanted.push({ text: dialogue.line.text, voice: dialogue.line.voice });
+    if (dialogue) wanted.push({ text: dialogue.line.text, voice: dialogue.line.voice, who: dialogue.line.who });
     const fresh = wanted.filter((line) => !spokenRef.current.has(`${line.voice}:${line.text}`));
     if (fresh.length === 0) {
       // Closed with nothing left to say (Esc, walking off): silence. Otherwise let it finish.

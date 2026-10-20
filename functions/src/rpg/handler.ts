@@ -52,6 +52,13 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { beatPrompt } from '../../../korczak-xyz/src/utils/rpg/quest';
 import { demoGenesis, genesisPrompt, genesisTemperature } from '../../../korczak-xyz/src/utils/rpg/genesis';
+import {
+  asAge,
+  findVoice,
+  sharedVoicesOf,
+  type SharedVoice,
+  type VoiceWho,
+} from '../../../korczak-xyz/src/utils/rpg/voicePick';
 import { callerIp, dayKey, ipKey } from '../demo/limits';
 import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
@@ -304,6 +311,44 @@ async function generate(req: Request, res: Response, model: string, prompt: stri
   }
 }
 
+/** The library searches this instance has made, kept six hours: they are the same for every caller. */
+const VOICE_LISTS = new Map<string, { at: number; voices: Promise<SharedVoice[]> }>();
+const VOICE_LISTS_MS = 6 * 3600_000;
+
+function listVoices(key: string, url: string): Promise<SharedVoice[]> {
+  const cached = VOICE_LISTS.get(url);
+  if (cached && Date.now() - cached.at < VOICE_LISTS_MS) return cached.voices;
+  const voices = fetch(url, { headers: { 'xi-api-key': key } }).then(async (r) => {
+    if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
+    return sharedVoicesOf(await r.json());
+  });
+  VOICE_LISTS.set(url, { at: Date.now(), voices });
+  voices.catch(() => VOICE_LISTS.delete(url));
+  return voices;
+}
+
+/** Who is speaking, from a stranger's JSON: a name and a gender, and an age when it is one of ours. */
+function speaker(raw: unknown): VoiceWho | null {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const name = typeof r.name === 'string' ? r.name.trim().slice(0, 60) : '';
+  if (!name) return null;
+  const age = asAge(r.age);
+  return { name, gender: r.gender === 'female' ? 'female' : 'male', ...(age && { age }) };
+}
+
+function speak(key: string, voiceId: string, text: string, lang: 'pl' | 'en'): Promise<globalThis.Response> {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_64`, {
+    method: 'POST',
+    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text,
+      model_id: VOICE_MODEL,
+      language_code: lang,
+      voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+    }),
+  });
+}
+
 async function clip(req: Request, res: Response, body: Record<string, unknown>): Promise<void> {
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text || text.length > MAX_CLIP_CHARS) throw new BadRequest('Bad text');
@@ -328,19 +373,24 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
       res.status(503).json({ reason: 'no-voice', detail: { message: 'demo: no-voice' } });
       return;
     }
-    const upstream = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${DEMO_VOICES[voice]}?output_format=mp3_44100_64`,
-      {
-        method: 'POST',
-        headers: { 'xi-api-key': elevenLabs, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          model_id: VOICE_MODEL,
-          language_code: lang,
-          voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-        }),
-      },
-    );
+    // A character's own library voice (`voicePick.ts`), at the ordinary rate, so `cost` holds; the
+    // premade voice when the library has none or will not speak it.
+    const who = voice === 'player' ? null : speaker(body.who);
+    const library = who
+      ? await findVoice(who, lang, VOICE_MODEL, (url) => listVoices(elevenLabs, url), Object.values(DEMO_VOICES)).catch(
+          (e) => {
+            reportError('rpgDemo.voices', e);
+            return null;
+          },
+        )
+      : null;
+    let upstream = library ? await speak(elevenLabs, library, text, lang) : null;
+    if (upstream && !upstream.ok && upstream.status !== 429 && upstream.status < 500) {
+      reportError('rpgDemo.libraryVoice', new Error(`ElevenLabs ${upstream.status}`), { status: upstream.status, voice: library });
+      upstream = null;
+    }
+    const spoken = upstream ? 'library' : 'premade';
+    upstream ??= await speak(elevenLabs, DEMO_VOICES[voice], text, lang);
     if (!upstream.ok) {
       spent = 0;
       reportError('rpgDemo.voice', new Error(`ElevenLabs ${upstream.status}`), { status: upstream.status });
@@ -351,6 +401,7 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     res.status(200);
     res.set('Content-Type', 'audio/mpeg');
     res.set('x-demo-cost', String(cost));
+    res.set('x-demo-voice', spoken);
     res.set('x-demo-remaining', JSON.stringify(remainingUsd(settings, claimed.spent)));
     res.send(audio);
   } finally {

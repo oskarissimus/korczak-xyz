@@ -36,6 +36,7 @@ import {
   type TargetLook,
 } from './place';
 import { classicWorld, worldLines, type WorldBrief } from './genesis';
+import { asAge, type VoiceAge } from './voicePick';
 
 export type Lang = 'en' | 'pl';
 
@@ -59,8 +60,10 @@ export interface DialogueOption {
 
 export interface Character {
   name: string;
-  /** Picks the voice. */
+  /** Picks the voice, with `age`. */
   gender: 'male' | 'female';
+  /** How old they sound, for the voice (`voicePick.ts`); absent in beats from before it was asked. */
+  age?: VoiceAge;
   /** `#rrggbb`, their clothes. */
   color: string;
 }
@@ -525,7 +528,8 @@ export function beatPrompt(ctx: BeatContext): string {
     'Answer with ONE JSON object and nothing else, no markdown fence, with these keys:',
     '{',
     '  "title": string (the quest’s title),',
-    '  "npc": {"name": string, "gender": "male" or "female", "color": "#rrggbb" for their clothes},',
+    '  "npc": {"name": string, "gender": "male" or "female", "age": "young", "middle_aged" or "old" (picks their voice),',
+    '          "color": "#rrggbb" for their clothes},',
     ctx.job ? '  "place": {...} or {"name": string}' + (ctx.job.kind === 'talk' ? ' or "village",' : ',') : '  "place": "village",',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "targetName": string (singular noun for one of the things), "look": {"shape": string, "color": string, "size": number},'
@@ -538,7 +542,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "story": [{"ask": string (what the hero says to hear more), "say": string (the npc’s next part)}],',
     '  "smallTalk": [{"label": string (a follow-up question about something in the story), "reply": string}],',
     `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)}}],`,
-    '  "witness": {"name": string, "gender": string, "color": string, "greeting": string,',
+    '  "witness": {"name": string, "gender": string, "age": string, "color": string, "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
@@ -648,7 +652,8 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
   const color = typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color.trim()) ? r.color.trim().toLowerCase() : null;
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return { name, gender: r.gender === 'female' ? 'female' : 'male', color: color ?? CLOTHES[h % CLOTHES.length] };
+  const age = asAge(r.age);
+  return { name, gender: r.gender === 'female' ? 'female' : 'male', color: color ?? CLOTHES[h % CLOTHES.length], ...(age && { age }) };
 }
 
 function beatPlace(raw: unknown, ctx: BeatContext, job: Job): PlaceSpec | null | undefined {

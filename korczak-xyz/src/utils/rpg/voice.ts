@@ -9,6 +9,7 @@
  */
 
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
+import { findVoice, sharedVoicesOf, type SharedVoice, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, voiceCredits } from './devlog';
 import type { Lang } from './quest';
 
@@ -29,7 +30,78 @@ export type VoiceName = keyof typeof VOICES;
 
 export interface SpokenLine {
   text: string;
+  /** The premade voice, and the fallback when the library has none for `who`. */
   voice: VoiceName;
+  /** A character's line: their own voice from the Voice Library (`voicePick.ts`). */
+  who?: VoiceWho;
+}
+
+/**
+ * The library searches this browser has made, kept a day: every character of a gender and age
+ * picks from the same search, so a quest asks it a handful of times at most.
+ */
+const LISTS_KEY = 'rpg-voice-lists';
+const LISTS_MS = 24 * 3600_000;
+const lists = new Map<string, Promise<SharedVoice[]>>();
+/** The key cannot use the library (a free plan cannot through the API): premade voices only. */
+let libraryOff = false;
+
+function storedLists(): Record<string, { at: number; voices: SharedVoice[] }> {
+  try {
+    return JSON.parse(localStorage.getItem(LISTS_KEY) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function listVoices(key: string, url: string): Promise<SharedVoice[]> {
+  let found = lists.get(url);
+  if (found) return found;
+  found = (async () => {
+    const stored = storedLists()[url];
+    if (stored && Date.now() - stored.at < LISTS_MS) return stored.voices;
+    const response = await fetch(url, { headers: { 'xi-api-key': key } });
+    if (response.status === 401 || response.status === 403) libraryOff = true;
+    if (!response.ok) throw new Error(`ElevenLabs ${response.status}`);
+    const voices = sharedVoicesOf(await response.json()).map(({ voice_id, rate, fiat_rate, verified_languages }) => ({
+      voice_id,
+      rate,
+      fiat_rate,
+      verified_languages: (verified_languages ?? []).map(({ language, model_id }) => ({ language, model_id })),
+    }));
+    try {
+      localStorage.setItem(LISTS_KEY, JSON.stringify({ ...storedLists(), [url]: { at: Date.now(), voices } }));
+    } catch {
+      /* asked again next time */
+    }
+    return voices;
+  })();
+  lists.set(url, found);
+  found.catch(() => lists.delete(url));
+  return found;
+}
+
+/** The character's library voice, or null for the premade one. */
+async function libraryVoice(key: string, line: SpokenLine, lang: Lang): Promise<string | null> {
+  if (!line.who || libraryOff) return null;
+  try {
+    return await findVoice(line.who, lang, VOICE_MODEL, (url) => listVoices(key, url), Object.values(VOICES));
+  } catch {
+    return null;
+  }
+}
+
+function speak(key: string, voiceId: string, text: string, lang: Lang): Promise<Response> {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_64`, {
+    method: 'POST',
+    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text,
+      model_id: VOICE_MODEL,
+      language_code: lang,
+      voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+    }),
+  });
 }
 
 /** 50ms of silence, the same clip the backseat driver primes with. */
@@ -75,7 +147,7 @@ export function stopVoice(): void {
 async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   // Into the developer console with what it cost: ElevenLabs' own `character-cost` header where the
   // browser is allowed to read it, else the list rate (`cost.ts`).
-  const entry = startRequest('voice', `${VOICE_MODEL} · ${line.voice}`, null, line.text);
+  const entry = startRequest('voice', `${VOICE_MODEL} · ${line.who?.name ?? line.voice}`, null, line.text);
   try {
     const demo = key === DEMO_VOICE_KEY;
     const demoUrl = demo ? rpgDemoUrl() : null;
@@ -84,18 +156,9 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
       ? await fetch(demoUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, lang }),
+          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang }),
         })
-      : await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICES[line.voice]}?output_format=mp3_44100_64`, {
-          method: 'POST',
-          headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: line.text,
-            model_id: VOICE_MODEL,
-            language_code: lang,
-            voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-          }),
-        });
+      : await ownClip(key, line, lang);
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);
@@ -112,8 +175,23 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
   }
 }
 
+/**
+ * On the reader's key: the character's library voice, and the premade one if the library has none
+ * or will not speak it (a plan that may not use library voices through the API says so here).
+ */
+async function ownClip(key: string, line: SpokenLine, lang: Lang): Promise<Response> {
+  const library = await libraryVoice(key, line, lang);
+  if (library) {
+    const response = await speak(key, library, line.text, lang);
+    if (response.ok || response.status === 429 || response.status >= 500) return response;
+    // Not allowed to use library voices: none again this session. Anything else: this line only.
+    if ([401, 402, 403].includes(response.status)) libraryOff = true;
+  }
+  return speak(key, VOICES[line.voice], line.text, lang);
+}
+
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
-  const cacheKey = `${line.voice}:${lang}:${line.text}`;
+  const cacheKey = `${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
   let clip = clips.get(cacheKey);
   if (!clip) {
     clip = fetchClip(key, line, lang);
