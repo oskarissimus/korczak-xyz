@@ -1218,7 +1218,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </button>
       )}
       <button type="button" className="rpg-start" disabled={!keysReady} onClick={() => begin()}>
-        {keysReady ? ((saved && saved.lang === gameLang) || (world && storyProvider !== 'static') ? t.newQuest : t.start) : t.wait}
+        {/* Without a world yet, starting is inventing one, and the button says so: a save from
+            before worlds existed made it read "New quest", and nobody saw a world was coming. */}
+        {!keysReady
+          ? t.wait
+          : storyProvider !== 'static' && !world
+            ? t.newWorld
+            : (saved && saved.lang === gameLang) || world
+              ? t.newQuest
+              : t.start}
       </button>
       {keysReady && world && storyProvider !== 'static' && (
         <button type="button" className="rpg-start" onClick={() => begin(true)} title={t.newWorldHint}>
