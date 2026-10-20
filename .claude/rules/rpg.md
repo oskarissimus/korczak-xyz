@@ -305,8 +305,16 @@ cannot be tested from there; Flash can.
 A 404, a 429 (quotas are per model), a 503, a 400 naming the model, a timeout or **a dropped
 connection** (`dropped` in `storyteller.ts`: a TypeError saying load failed / failed to fetch /
 network — a phone losing signal or locking during a minute-long Pro stream, which ended a quest on
-its first try until Oct 2026; the next model waits until the page is visible again) moves to the next;
-so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it. No key plays the
+its first try until Oct 2026) moves to the next;
+so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it.
+**The background is not a failure** (owner, Oct 2026: a new world asked for on the phone, the app
+put away, and on return no world). Nothing is asked while the page is hidden (`whenVisible` before
+every try), and a cut or a timeout during a try the page spent partly hidden asks the **same**
+model again once it is back, up to `BACKGROUND_RETRIES` (3), instead of burning down the chain.
+And because iOS often reloads a backgrounded page outright, an installed app above all, a genesis
+in flight is written down (`savePendingGenesis`, localStorage `rpg-genesis`, its seeds and slider,
+for 30 minutes): after a reload the intro's first button is *🎲 Dokończ rodzący się świat*, which
+asks for that same world again rather than rolling new dice. No key plays the
 hand-written quest; no usable answer puts up the retry panel above, with **the reason on screen**.
 
 **Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into

@@ -40,7 +40,17 @@ import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rp
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
-import { addToAtlas, loadAtlas, loadWorld, pastWorlds, saveWorld } from '../../utils/rpg/worldSave';
+import {
+  addToAtlas,
+  clearPendingGenesis,
+  loadAtlas,
+  loadPendingGenesis,
+  loadWorld,
+  pastWorlds,
+  savePendingGenesis,
+  saveWorld,
+  type PendingGenesis,
+} from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
@@ -567,7 +577,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * Invents a world and starts its first quest in it. The reader waits for this one: the village
    * cannot be drawn, nor the opening written, before there is a world to draw and write it in.
    */
-  const createWorld = useCallback(async (): Promise<void> => {
+  /** Invents a world and starts its first quest; `again` finishes one a reload interrupted. */
+  const createWorld = useCallback(async (again: PendingGenesis | null = null): Promise<void> => {
     const token = ++questTokenRef.current;
     setStalled(null);
     setDialogue(null);
@@ -575,20 +586,25 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setBeat(null);
     resetDevlog();
     setCreating([]);
-    const seeds = await drawSeeds();
+    setPendingGenesis(null);
+    const seeds = again?.seeds ?? (await drawSeeds());
+    const exoticNow = again?.exotic ?? exoticRef.current;
     if (token !== questTokenRef.current) return;
     setCreating(seeds);
+    savePendingGenesis({ lang: gameLang, seeds, exotic: exoticNow, at: Date.now() });
     const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
     let attempt;
     try {
-      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticRef.current }, chosen);
+      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticNow }, chosen);
     } catch (e) {
       log.error('rpg.world.crashed', describeError(e));
       attempt = null;
     }
     if (token !== questTokenRef.current) return;
     setCreating(null);
+    // Answered, one way or the other: a reload now has nothing to finish.
+    clearPendingGenesis();
     if (attempt) {
       addGenerationTime(attempt.ms);
       recordWorld(uidRef.current, attempt, gameLang, chosen);
@@ -613,7 +629,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       world: true,
       retry: () => {
         setStalled(null);
-        void createWorldRef.current();
+        void createWorldRef.current({ lang: gameLang, seeds, exotic: exoticNow, at: Date.now() });
       },
       giveUp: () => {
         setStalled(null);
@@ -622,6 +638,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
       },
     });
   }, [account.keys.google, account.keys.openai, enterWorld, flash, gameLang, startQuest, storyProvider]);
+  // A genesis a reload interrupted, offered on the intro to finish with the same seeds.
+  const [pendingGenesis, setPendingGenesis] = useState<PendingGenesis | null>(null);
+  useEffect(() => {
+    setPendingGenesis(loadPendingGenesis(gameLang));
+  }, [gameLang]);
   const createWorldRef = useRef(createWorld);
   createWorldRef.current = createWorld;
 
@@ -1175,6 +1196,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
   };
 
   /** Start, New quest or New world: a world first when there is none yet, or a new one is asked for. */
+  const finishGenesis = (pending: PendingGenesis) => {
+    primeVoice();
+    setStarted(true);
+    void createWorld(pending);
+  };
+
   const begin = (fresh = false) => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
     primeVoice();
@@ -1249,6 +1276,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const startButtons = (
     <>
+      {pendingGenesis && keysReady && storyProvider !== 'static' && (
+        <button type="button" className="rpg-start" onClick={() => finishGenesis(pendingGenesis)}>
+          {t.finishWorld(pendingGenesis.seeds.join(', '))}
+        </button>
+      )}
       {saved && saved.lang === gameLang && keysReady && (
         <button type="button" className="rpg-start" onClick={() => resume(saved)}>
           {t.continueQuest(saved.beats[saved.beats.length - 1].title)}

@@ -136,3 +136,49 @@ export function addToAtlas(worldId: string, add: Atlas): Atlas {
   }
   return atlas;
 }
+
+/*
+ * A GENESIS IN FLIGHT, so a page the phone threw away while it ran does not lose it (owner, Oct
+ * 2026: "on the phone I tap new world, the app goes to the background, and when I come back there
+ * is no world and I have to start again"). iOS reloads a backgrounded page, an installed app above
+ * all, and the answer in flight goes with it. What survives is what it was asked with — the seeds
+ * and the slider — so the intro offers to finish that same world rather than roll new dice.
+ */
+
+const PENDING_KEY = 'rpg-genesis';
+/** Older than this, the reader has moved on and the intro offers nothing. */
+const PENDING_MS = 30 * 60 * 1000;
+
+export interface PendingGenesis {
+  lang: Lang;
+  seeds: string[];
+  exotic: number;
+  at: number;
+}
+
+export function savePendingGenesis(pending: PendingGenesis): void {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    /* without storage a reload loses it, as before */
+  }
+}
+
+export function loadPendingGenesis(lang: Lang, now = Date.now()): PendingGenesis | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null');
+    if (!p || p.lang !== lang || !Array.isArray(p.seeds) || p.seeds.length === 0) return null;
+    if (typeof p.at !== 'number' || now - p.at > PENDING_MS) return null;
+    return { lang, seeds: p.seeds.filter((s: unknown) => typeof s === 'string').slice(0, 4), exotic: Number(p.exotic) || 0, at: p.at };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingGenesis(): void {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}

@@ -369,6 +369,9 @@ export function dropped(e: unknown): boolean {
   return e instanceof TypeError && /load failed|failed to fetch|network|connection|terminated/i.test(e.message);
 }
 
+/** How many times an attempt asks a model again after the background cut it, before moving on. */
+const BACKGROUND_RETRIES = 3;
+
 /** Resolves once the page is in view: iOS cuts a hidden page's requests, so asking then is wasted. */
 function whenVisible(): Promise<void> {
   if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return Promise.resolve();
@@ -434,7 +437,22 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
   const run: Asked<T> = { outcome: 'no-key', provider, model: null, tries: [], raw: null, error: null, ms: 0, value: null, refusal: null };
   if (provider === 'static') return run;
 
-  for (const model of modelChain(provider, chosen)) {
+  // A request the page's going to the background killed is not the model's fault: it is asked
+  // again, the same model, once the page is back (owner, Oct 2026: on a phone, a new world asked for
+  // and the app put in the background was simply gone on return). `hidden` notes that the page was
+  // hidden at some point during the try, which is what makes a timeout or a cut one of those.
+  let hidden = false;
+  const onHide = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') hidden = true;
+  };
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onHide);
+  const models = modelChain(provider, chosen);
+  let again = 0;
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    // Nothing is asked while the page is hidden: iOS cuts it, so it would only be wasted.
+    await whenVisible();
+    hidden = false;
     const t0 = Date.now();
     run.model = model;
     const entry = startRequest('model', model, ask.beat);
@@ -470,10 +488,16 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
         run.outcome = 'failed';
         run.error = describe(e);
       }
+      const background = hidden && (dropped(e) || (e instanceof ProviderError && e.timedOut));
+      if (background && again < BACKGROUND_RETRIES) {
+        again += 1;
+        i -= 1;
+        continue;
+      }
       if (!tryNext(e)) break;
-      if (dropped(e)) await whenVisible();
     }
   }
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onHide);
 
   run.ms = Date.now() - started;
   if (run.value) {

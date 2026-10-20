@@ -94,6 +94,33 @@ describe('generateBeat', () => {
     expect(attempt.tries.map((t) => t.error)).toEqual(['Load failed', null]);
   });
 
+  it('asks the same model again once the page is back when the background cut it', async () => {
+    // A stand-in document: hidden while the first request runs, visible again after.
+    const listeners = new Set<() => void>();
+    const doc = {
+      visibilityState: 'visible',
+      addEventListener: (_: string, f: () => void) => listeners.add(f),
+      removeEventListener: (_: string, f: () => void) => listeners.delete(f),
+    };
+    vi.stubGlobal('document', doc);
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        doc.visibilityState = 'hidden';
+        listeners.forEach((f) => f());
+        setTimeout(() => {
+          doc.visibilityState = 'visible';
+          listeners.forEach((f) => f());
+        }, 5);
+        throw new TypeError('Load failed');
+      })
+      .mockResolvedValueOnce(answer(JSON.stringify(beat)));
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    expect(attempt.tries.map((t) => t.model)).toEqual([GOOGLE_MODELS[0], GOOGLE_MODELS[0]]);
+  });
+
   it('still stops on a TypeError that is a bug, not a network', async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError("Cannot read properties of undefined (reading 'x')"));
     vi.stubGlobal('fetch', fetch);
