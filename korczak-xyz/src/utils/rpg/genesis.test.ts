@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { CLASSIC_LOOK, demoGenesis, demoWorld, franchised, genesisPrompt, lift, parseLook, parseWorlds, pickWorld } from './genesis';
+import {
+  CLASSIC_LOOK,
+  clampExotic,
+  DEFAULT_EXOTIC,
+  demoGenesis,
+  demoWorld,
+  franchised,
+  genesisPrompt,
+  genesisTemperature,
+  lift,
+  parseLook,
+  parseWorlds,
+  pickWorld,
+  typicalityTarget,
+} from './genesis';
 
-const ctx = { lang: 'pl' as const, seeds: ['lighthouse', 'fermentation', 'Battle of Lützen (1632)'], avoid: ['Kraina Mgieł: a foggy marsh'] };
+const ctx = { lang: 'pl' as const, seeds: ['lighthouse', 'fermentation', 'Battle of Lützen (1632)'], avoid: ['Kraina Mgieł: a foggy marsh'], exotic: 100 };
 
 const candidate = (name: string, typicality: number, extra: Record<string, unknown> = {}) => ({
   name,
@@ -57,9 +71,35 @@ describe('parseWorlds', () => {
 describe('pickWorld', () => {
   it('picks one of the two least typical, by the dice', () => {
     const worlds = parseWorlds(JSON.stringify({ worlds: [candidate('A', 70), candidate('B', 10), candidate('C', 40), candidate('D', 95)] }), ctx);
-    expect(pickWorld(worlds, () => 0)?.name).toBe('B');
-    expect(pickWorld(worlds, () => 0.99)?.name).toBe('C');
+    expect(pickWorld(worlds, 0, () => 0)?.name).toBe('B');
+    expect(pickWorld(worlds, 0, () => 0.99)?.name).toBe('C');
     expect(pickWorld([])).toBeNull();
+  });
+
+  it('picks near the slider’s target', () => {
+    const worlds = parseWorlds(JSON.stringify({ worlds: [candidate('A', 70), candidate('B', 10), candidate('C', 40), candidate('D', 95)] }), ctx);
+    expect(pickWorld(worlds, typicalityTarget(0), () => 0)?.name).toBe('D');
+    expect(pickWorld(worlds, typicalityTarget(0), () => 0.99)?.name).toBe('A');
+  });
+});
+
+describe('the exotic slider', () => {
+  it('turns the prompt, the target and the temperature from familiar to anything', () => {
+    const familiar = genesisPrompt({ ...ctx, exotic: 0 });
+    const twisted = genesisPrompt({ ...ctx, exotic: 50 });
+    const exotic = genesisPrompt({ ...ctx, exotic: 100 });
+    expect(familiar).toMatch(/classic RPGs/);
+    expect(familiar).toMatch(/elves, dwarves/);
+    expect(familiar).not.toMatch(/Stay away from the clichés/);
+    expect(twisted).toMatch(/ONE strong unusual twist/);
+    expect(exotic).toMatch(/Stay away from the clichés/);
+    expect(familiar).toMatch(/Aim them around 85/);
+    expect(exotic).toMatch(/Aim them around 5\b/);
+    expect(genesisTemperature(0)).toBe(0.9);
+    expect(genesisTemperature(100)).toBe(1.35);
+    expect(clampExotic('nope')).toBe(DEFAULT_EXOTIC);
+    expect(clampExotic(250)).toBe(100);
+    expect(demoGenesis({ seeds: ['a'], exotic: 12.4 }).exotic).toBe(12);
   });
 });
 

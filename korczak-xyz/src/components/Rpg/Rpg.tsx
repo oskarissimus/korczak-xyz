@@ -33,7 +33,7 @@ import {
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
-import { classicWorld, type WorldBible } from '../../utils/rpg/genesis';
+import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
@@ -109,6 +109,8 @@ declare global {
 }
 
 const MODEL_KEY = 'rpg-model';
+/** The exotic slider's last position (`GenesisContext.exotic`). */
+const EXOTIC_KEY = 'rpg-exotic';
 
 export default function Rpg({ lang }: { lang: Lang }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
@@ -176,6 +178,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [chosenModel, setChosenModel] = useState<string | null>(null);
   const chosenModelRef = useRef<string | null>(null);
   chosenModelRef.current = chosenModel;
+  /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
+  const [exotic, setExotic] = useState(DEFAULT_EXOTIC);
+  const exoticRef = useRef(DEFAULT_EXOTIC);
+  exoticRef.current = exotic;
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [hp, setHp] = useState(100);
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
@@ -576,7 +582,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const chosen = chosenModelRef.current;
     let attempt;
     try {
-      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds() }, chosen);
+      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticRef.current }, chosen);
     } catch (e) {
       log.error('rpg.world.crashed', describeError(e));
       attempt = null;
@@ -1015,10 +1021,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
+      const kept = localStorage.getItem(EXOTIC_KEY);
+      if (kept !== null) setExotic(clampExotic(kept));
     } catch {
       /* no storage, the usual order */
     }
   }, []);
+  const pickExotic = (value: number) => {
+    setExotic(clampExotic(value));
+    try {
+      localStorage.setItem(EXOTIC_KEY, String(clampExotic(value)));
+    } catch {
+      /* forgotten on reload */
+    }
+  };
   const pickModel = (id: string) => {
     const value = id || null;
     setChosenModel(value);
@@ -1210,6 +1226,27 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ? t.talkTo(beat.npc.name)
         : beat.objectiveText;
 
+  // How far from a classic RPG setting the next world may go. Words at both ends, and the value in
+  // words too, since the owner's phone is black and white and a slider's fill says nothing there.
+  const exoticSlider = (
+    <label className="rpg-exotic">
+      <span className="rpg-exotic-title">{t.exoticLabel(t.exoticBand(exotic))}</span>
+      <span className="rpg-exotic-row">
+        <span>{t.exoticLeft}</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={exotic}
+          onChange={(e) => pickExotic(Number(e.target.value))}
+          aria-valuetext={t.exoticBand(exotic)}
+        />
+        <span>{t.exoticRight}</span>
+      </span>
+    </label>
+  );
+
   const startButtons = (
     <>
       {saved && saved.lang === gameLang && keysReady && (
@@ -1233,6 +1270,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           {t.newWorld}
         </button>
       )}
+      {keysReady && storyProvider !== 'static' && exoticSlider}
     </>
   );
 

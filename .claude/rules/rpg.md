@@ -31,9 +31,19 @@ title (`drawSeeds`, a word instead when Wikipedia does not answer in 2.5 s), whi
 transform, never use literally. The model writes **four candidates** at `GENESIS_TEMPERATURE` 1.35
 (OpenAI caps at 1.2), each with its own `typicality` 0–100, told to make them differ from each other
 and from the worlds this browser already had (`pastWorlds`, the last 8, as "avoid"). The game, not
-the model, picks: one of the two least typical (`pickWorld`). Names from a franchise list
+the model, picks: one of the two nearest the slider's target (`pickWorld`). Names from a franchise list
 (`franchised`, Polish inflections included) disqualify a candidate. Measured on Flash: ~12 s,
 ~2k tokens, worlds like a vertical shaft of steam with people living in rock bubbles.
+
+**A slider from classic to exotic** (owner, Oct 2026, a day later: "we overdid it, it is too
+exotic; a slider, typical RPG worlds on the left, the exotic ones on the right"). Under the start
+buttons, 0–100, kept in localStorage `rpg-exotic`, starting at 35 (`DEFAULT_EXOTIC`), its band said
+in words because the owner's phone is black and white. It goes in as `GenesisContext.exotic` and
+picks one of three prompts — under 34 a classic RPG setting (elves, knights, dragons welcome) with
+the seeds as mere flavour, under 67 a familiar genre with one twist built from the seeds, above
+that the anything-goes prompt — plus the typicality the candidates aim at and the pick lands near
+(`typicalityTarget`, 85 down to 5) and the temperature (`genesisTemperature`, 0.9 up to 1.35). The
+demo takes it too.
 
 **The world bible** (`WorldBible`): name, pitch, tone, tech, climate, people, architecture,
 threats, who the player is and how they are addressed, the hub settlement, a few words people use,
@@ -164,7 +174,7 @@ the village (`LANDMARK_SETBACK`), front toward the hero; the place's features gi
 footprint, the targets are moved out of it (`keepOut`), and ground-level parts block walking as a
 row of circles along their long side.
 
- talking costs no request;
+The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
 
 **A story is told, not summarised** (owner, Oct 2026: the lines "sounded like a condensed

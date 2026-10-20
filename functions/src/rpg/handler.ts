@@ -51,7 +51,7 @@ import {
   type RpgDemoSettings,
 } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { beatPrompt } from '../../../korczak-xyz/src/utils/rpg/quest';
-import { demoGenesis, genesisPrompt, GENESIS_TEMPERATURE } from '../../../korczak-xyz/src/utils/rpg/genesis';
+import { demoGenesis, genesisPrompt, genesisTemperature } from '../../../korczak-xyz/src/utils/rpg/genesis';
 import { callerIp, dayKey, ipKey } from '../demo/limits';
 import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
@@ -211,7 +211,7 @@ async function world(req: Request, res: Response, body: Record<string, unknown>)
   if (!model) throw new BadRequest('Unknown model');
   const ctx = demoGenesis(body.ctx);
   if (ctx.seeds.length === 0) throw new BadRequest('No seeds');
-  await generate(req, res, model, genesisPrompt(ctx), GENESIS_TEMPERATURE);
+  await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic));
 }
 
 /** Reads Google's event stream for the usage and the model that answered, passing every byte on. */

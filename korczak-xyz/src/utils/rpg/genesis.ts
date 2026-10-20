@@ -14,10 +14,14 @@
  *   fermentation, a battle of 1632" is not a setting anybody wrote down.
  * - **Four candidates in one answer**, as different from one another as the model can make them,
  *   each with its own honest `typicality`. The game, not the model, picks one of the two least
- *   typical (`pickWorld`). A model asked for a spread reaches further than one asked for an answer.
+ *   typical — since the slider, the two nearest the slider's target (`pickWorld`). A model asked
+ *   for a spread reaches further than one asked for an answer.
+ * - **A slider from familiar to exotic** (`exotic`, 0–100): three prompts — a classic RPG setting
+ *   with the seeds as flavour, a familiar genre twisted by the seeds, or anything at all — a
+ *   typicality to aim the candidates and the pick at, and a temperature from 0.9 to 1.35.
  * - **What the reader has already been given** goes in as worlds to be unlike, and the usual
  *   clichés as things to stay away from.
- * - **A higher temperature for this call only** (`GENESIS_TEMPERATURE`); the quests are asked at the
+ * - **A higher temperature for this call only** (`genesisTemperature`); the quests are asked at the
  *   usual one, where coherence matters more than surprise.
  *
  * What comes back is the world's **bible**: its name and feel, who lives there and what they build
@@ -107,10 +111,35 @@ export interface GenesisContext {
   seeds: string[];
   /** Worlds this reader has already been given, to be unlike: "name: pitch". */
   avoid: string[];
+  /**
+   * How exotic, 0–100, from the slider on the intro screen: 0 is a world any RPG player knows at
+   * once, 100 is one nobody has seen. Owner, Oct 2026, a day after the worlds became wholly
+   * exotic: "we overdid it, it is too exotic; a slider, typical RPG worlds on the left, the exotic
+   * ones on the right".
+   */
+  exotic: number;
 }
 
-/** For this call only: the quests are asked at 1. Gemini allows up to 2. */
+/** Where the slider starts: closer to the familiar, since all the way right was too much. */
+export const DEFAULT_EXOTIC = 35;
+
+export function clampExotic(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : DEFAULT_EXOTIC;
+}
+
+/** The most exotic call's temperature: the quests are asked at 1. Gemini allows up to 2. */
 export const GENESIS_TEMPERATURE = 1.35;
+
+/** Hotter the further right: a familiar world wants coherence more than surprise. */
+export function genesisTemperature(exotic: number): number {
+  return Math.round((0.9 + (GENESIS_TEMPERATURE - 0.9) * (clampExotic(exotic) / 100)) * 100) / 100;
+}
+
+/** The typicality the game picks closest to: 85 at the far left, 5 at the far right. */
+export function typicalityTarget(exotic: number): number {
+  return Math.round(85 - 0.8 * clampExotic(exotic));
+}
 
 /** The look of the world the game had before there were worlds, and of the hand-written quest. */
 export const CLASSIC_LOOK: WorldLook = {
@@ -212,7 +241,52 @@ export function franchised(text: string): boolean {
 /** The prompt for a new world. Everything the model may choose, and everything it may not, is in it. */
 export function genesisPrompt(ctx: GenesisContext): string {
   const language = ctx.lang === 'pl' ? 'Polish' : 'English';
-  const lines = [
+  const exotic = clampExotic(ctx.exotic);
+  const lines = exotic < 34 ? familiarLines(ctx) : exotic < 67 ? twistedLines(ctx) : exoticLines(ctx);
+  return finish(lines, ctx, language, typicalityTarget(exotic));
+}
+
+/** The left of the slider: a setting players know and love, made fresh by its details. */
+function familiarLines(ctx: GenesisContext): string[] {
+  return [
+    'You invent the setting of a role-playing game: one whole world, in the spirit of the classic RPGs.',
+    '',
+    'Make it a world any RPG player feels at home in at once: high fantasy, dark fantasy, sword and sorcery,',
+    'a low-magic medieval land, or another well-loved genre setting (a pirate archipelago, a desert of',
+    'sultanates and djinn, a northern saga of fjords and longhouses, a gothic land of vampires, a mythic',
+    'antiquity, a wuxia mountain realm). The genre’s staples are welcome: knights, mages, elves, dwarves,',
+    'orcs, dragons, the undead, ruined castles, taverns, monsters in the woods. It is fresh through its',
+    'details — its people, customs, places and troubles — not through a strange premise.',
+    '',
+    `SEEDS, drawn at random by dice: ${list(ctx.seeds)}. Use them only as small flavour — a custom, a trade, a`,
+    'landmark, a local superstition — never as the premise, and never literally if one names a real person,',
+    'place or event.',
+    '',
+    'It is not a franchise: no names, places, creatures, factions or terms from existing books, films, games',
+    'or comics (no Hogwarts, no witchers, no hobbits, no Jedi). A feel is welcome; a borrowed name is not.',
+  ];
+}
+
+/** The middle: a familiar genre with one strong turn. */
+function twistedLines(ctx: GenesisContext): string[] {
+  return [
+    'You invent the setting of a role-playing game: one whole world.',
+    '',
+    'At its heart it is a genre players know — fantasy, science fiction, historical, mythic, gothic,',
+    'post-apocalyptic — but with ONE strong unusual twist that makes it its own: something about its land,',
+    'its magic or technology, or how its people live, that no stock setting has.',
+    '',
+    `SEEDS, drawn at random by dice: ${list(ctx.seeds)}. Build the twist from them, transformed and combined,`,
+    'never literal: a seed that names a real person, place or event is only an image or an idea to take from.',
+    '',
+    'It is not a franchise: no names, places, creatures, factions or terms from existing books, films, games',
+    'or comics (no Hogwarts, no witchers, no hobbits, no Jedi). A feel is welcome; a borrowed name is not.',
+  ];
+}
+
+/** The right of the slider: anything at all, as far from a stock setting as the seeds can carry it. */
+function exoticLines(ctx: GenesisContext): string[] {
+  return [
     'You invent the setting of a role-playing game: one whole world, from nothing.',
     '',
     `SEEDS, drawn at random by dice: ${list(ctx.seeds)}.`,
@@ -229,6 +303,9 @@ export function genesisPrompt(ctx: GenesisContext): string {
     'problem, elves, dwarves, orcs, dragons, mana, crystals of power, a dark lord, a chosen one, steampunk',
     'airships, floating islands, a generic cyberpunk megacorporation, a post-apocalyptic wasteland.',
   ];
+}
+
+function finish(lines: string[], ctx: GenesisContext, language: string, target: number): string {
   if (ctx.avoid.length) {
     lines.push('', 'The player has ALREADY BEEN to these worlds; every candidate must be unlike all of them:');
     for (const w of ctx.avoid) lines.push(`- ${w}`);
@@ -237,7 +314,7 @@ export function genesisPrompt(ctx: GenesisContext): string {
     '',
     'Write 4 CANDIDATE worlds, as different from one another as you can make them. For each, rate honestly how',
     '"typical" it is, 0 to 100: how close it comes to what an average fantasy or science-fiction game offers',
-    '(0: nobody has seen anything like it; 100: a stock setting).',
+    `(0: nobody has seen anything like it; 100: a stock setting). Aim them around ${target}.`,
     '',
     'Every world must be PLAYABLE as this game: the player walks a landscape, talks to people, fights what is',
     'dangerous and gathers things. So it has a settlement where the player starts ("hub"), people who talk and',
@@ -409,10 +486,13 @@ export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()
   return worlds;
 }
 
-/** One of the two least typical, by the game's dice rather than the model's taste. */
-export function pickWorld(worlds: readonly WorldBible[], random: () => number = Math.random): WorldBible | null {
+/**
+ * One of the two whose typicality is closest to `target` (`typicalityTarget`), by the game's dice
+ * rather than the model's taste. At the slider's far right that is the two least typical.
+ */
+export function pickWorld(worlds: readonly WorldBible[], target = 0, random: () => number = Math.random): WorldBible | null {
   if (worlds.length === 0) return null;
-  const sorted = [...worlds].sort((a, b) => a.typicality - b.typicality);
+  const sorted = [...worlds].sort((a, b) => Math.abs(a.typicality - target) - Math.abs(b.typicality - target));
   const pool = sorted.slice(0, Math.min(2, sorted.length));
   return pool[Math.floor(random() * pool.length)] ?? pool[0];
 }
@@ -464,7 +544,7 @@ export function demoWorld(value: unknown): WorldBrief | undefined {
   return brief.name && brief.player && brief.hub ? brief : undefined;
 }
 
-/** A genesis context from a stranger: three short seeds, a few short worlds to avoid. */
+/** A genesis context from a stranger: three short seeds, a few short worlds to avoid, the slider. */
 export function demoGenesis(value: unknown): GenesisContext {
   const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const strings = (v: unknown, n: number, max: number) =>
@@ -473,5 +553,6 @@ export function demoGenesis(value: unknown): GenesisContext {
     lang: r.lang === 'pl' ? 'pl' : 'en',
     seeds: strings(r.seeds, 4, 80),
     avoid: strings(r.avoid, 8, 200),
+    exotic: clampExotic(r.exotic),
   };
 }

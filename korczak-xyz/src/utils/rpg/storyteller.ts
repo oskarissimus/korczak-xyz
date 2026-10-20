@@ -25,7 +25,7 @@
  */
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
-import { genesisPrompt, GENESIS_TEMPERATURE, parseWorlds, pickWorld, type GenesisContext, type WorldBible } from './genesis';
+import { genesisPrompt, genesisTemperature, parseWorlds, pickWorld, typicalityTarget, type GenesisContext, type WorldBible } from './genesis';
 import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
@@ -521,18 +521,18 @@ export interface WorldAttempt extends Omit<Asked<WorldBible>, 'value'> {
 
 /**
  * A new world (`genesis.ts`): four candidates from one answer, one of the two least typical chosen
- * by the game. Asked at `GENESIS_TEMPERATURE`, through the same chain of models as a beat.
+ * by the game. Asked at `genesisTemperature`, through the same chain of models as a beat.
  */
 export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen: string | null = null): Promise<WorldAttempt> {
   const prompt = genesisPrompt(ctx);
   let candidates: WorldBible[] = [];
   const run = await askChain(keys, chosen, {
     prompt,
-    temperature: GENESIS_TEMPERATURE,
+    temperature: genesisTemperature(ctx.exotic),
     demo: { kind: 'world', ctx },
     parse: (raw) => {
       candidates = parseWorlds(raw, ctx);
-      return pickWorld(candidates);
+      return pickWorld(candidates, typicalityTarget(ctx.exotic));
     },
     beat: null,
   });
