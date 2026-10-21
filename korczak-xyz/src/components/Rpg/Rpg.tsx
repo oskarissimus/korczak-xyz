@@ -52,7 +52,7 @@ import {
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
-import { prefetchVoices, primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { prefetchVoices, primeVoice, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
@@ -170,6 +170,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (voiceOn && voiceKey && voiceKey !== DEMO_VOICE_KEY) prefetchVoices(gameLang);
   }, [gameLang, voiceKey, voiceOn]);
+  const voiceRef = useRef<string | null>(null);
+  voiceRef.current = voiceOn ? voiceKey : null;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -476,6 +478,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
         whereRef.current.set(w.npc.name, b.place?.name ?? null);
         if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
       }
+      // Each character's voice speaks once before they do (`voice.ts`, `warmVoices`).
+      if (voiceRef.current) warmVoices(voiceRef.current, b.witness ? [b.npc, b.witness.npc] : [b.npc], gameLangRef.current);
       if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
       else scene?.clearObjective();
       progressRef.current = 0;

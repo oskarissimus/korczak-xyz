@@ -247,6 +247,45 @@ function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   return clip;
 }
 
+/**
+ * ElevenLabs is slow the first time an account speaks with a library voice: 11 to 17 seconds for
+ * that clip, then about one second for every later one, whatever the text (measured on the demo, Oct
+ * 2026; a voice used the day before was still quick). So each character's voice speaks a single
+ * character as soon as the beat that brings them in arrives, while the hunter walks over, and
+ * their first real line comes at the ordinary speed. Kept by name (`rpg-voice-warm`): the name
+ * picks the voice, and a voice once warm has stayed warm.
+ */
+const WARM_KEY = 'rpg-voice-warm';
+const warming = new Set<string>();
+
+function warmNames(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(WARM_KEY) ?? '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): void {
+  const warm = warmNames();
+  for (const w of who) {
+    const id = `${lang}:${w.name}`;
+    if (warm.includes(id) || warming.has(id)) continue;
+    warming.add(id);
+    fetchClip(key, { text: '.', voice: w.gender, who: w }, lang)
+      .then((url) => {
+        URL.revokeObjectURL(url);
+        try {
+          localStorage.setItem(WARM_KEY, JSON.stringify([...warmNames().filter((n) => n !== id), id].slice(-500)));
+        } catch {
+          /* warmed again next time */
+        }
+      })
+      .catch(() => warming.delete(id));
+  }
+}
+
 /** Plays one clip to its end, or until `signal` aborts. */
 function play(el: HTMLAudioElement, url: string, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {

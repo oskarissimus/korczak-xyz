@@ -452,6 +452,15 @@ cut to the usable ids. The game asks for them when voice is on with the reader's
 what they did not cover. The demo voice picks on the function's side from the same cache. A search
 costs no credits, and the week bounds how often the owner's key makes eight of them.
 
+**Nor for a cold voice.** The search was half of it. ElevenLabs is also slow the first time an
+account speaks with a library voice: 11–17 s for that clip, then ~1 s for every later one whatever
+the text, and a voice used the day before was still quick (measured on the demo, Oct 2026). So
+`setupBeat` calls `warmVoices` for the giver and the witness: each speaks one character (`.`, a
+fraction of a credit, logged in the console like any clip) while the hunter walks over, and their
+first real line comes at the ordinary speed. The names warmed are kept in `rpg-voice-warm`.
+Library voices take no custom voice slots (ElevenLabs, *How many voice slots*), so warming adds
+nothing the account can run out of.
+
 **The premade voices end on 31 Dec 2026** (ElevenLabs, *What are Default voices?*: they expire
 and are only available to accounts created before March 2026). That is the fallback and the
 hunter's Brian; the replacements ElevenLabs suggests are library voices (Brian → *Sawyer -
