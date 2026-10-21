@@ -11,6 +11,7 @@
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
 import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, voiceCredits } from './devlog';
+import { DesignRefused, DESIGN_MODEL, designVoice, findDesigned, previewText, type DesignWho } from './voiceDesign';
 import type { Lang } from './quest';
 
 /** Their low-latency model; it speaks Polish and English with the same voices. */
@@ -126,6 +127,90 @@ function listVoices(key: string, url: string): Promise<SharedVoice[]> {
   return found;
 }
 
+/*
+ * Designed voices (`voiceDesign.ts`): each character the model described gets one, made the first
+ * time they are needed (when their beat arrives, by `warmVoices`) and found again by name after
+ * that. Cached here by world and name; a refusal that will not change this session (the plan, the
+ * month's voice operations) turns designing off and every character falls back to the library.
+ */
+const DESIGNED_KEY = 'rpg-designed-voices';
+const designed = new Map<string, Promise<string | null>>();
+let designOff = false;
+let voiceWorld = 'world';
+
+/** The world whose characters are speaking: a name is a different person in another world. */
+export function setVoiceWorld(id: string): void {
+  voiceWorld = id;
+}
+
+function storedDesigns(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(DESIGNED_KEY) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function storeDesign(id: string, voiceId: string | null): void {
+  try {
+    const all = storedDesigns();
+    if (voiceId) all[id] = voiceId;
+    else delete all[id];
+    localStorage.setItem(DESIGNED_KEY, JSON.stringify(all));
+  } catch {
+    /* found again by name */
+  }
+}
+
+function designedVoice(key: string, who: DesignWho, lang: Lang): Promise<string | null> {
+  const id = `${voiceWorld}|${who.name}`;
+  let found = designed.get(id);
+  if (found) return found;
+  found = (async () => {
+    const stored = storedDesigns()[id];
+    if (stored) return stored;
+    const existing = await findDesigned(fetch, key, voiceWorld, who.name).catch(() => null);
+    if (existing) {
+      storeDesign(id, existing);
+      return existing;
+    }
+    // Into the console like a clip: a design is charged for its preview text, about a credit a character.
+    const sample = previewText(who, lang);
+    const entry = startRequest('voice', `${DESIGN_MODEL} · ${who.name}`, null, who.voice);
+    try {
+      const voiceId = await designVoice(fetch, key, voiceWorld, who, lang);
+      endRequest(entry, null, { chars: sample.length, credits: sample.length });
+      storeDesign(id, voiceId);
+      return voiceId;
+    } catch (e) {
+      if (e instanceof DesignRefused) designOff = true;
+      endRequest(entry, e instanceof Error ? e.message : String(e));
+      return null;
+    }
+  })();
+  designed.set(id, found);
+  return found;
+}
+
+/** A designed voice that ElevenLabs no longer has (rotated out elsewhere): made again next time. */
+function forgetDesigned(who: VoiceWho): void {
+  const id = `${voiceWorld}|${who.name}`;
+  designed.delete(id);
+  storeDesign(id, null);
+}
+
+/** The character's own voice: designed when the model described one, else from the library. */
+async function characterVoice(key: string, line: SpokenLine, lang: Lang): Promise<{ id: string; designed: boolean } | null> {
+  const who = line.who;
+  if (!who) return null;
+  if (who.voice && !designOff) {
+    const id = await designedVoice(key, { name: who.name, gender: who.gender, voice: who.voice, sample: who.sample }, lang);
+    if (id) return { id, designed: true };
+  }
+  const library = await libraryVoice(key, line, lang);
+  return library ? { id: library, designed: false } : null;
+}
+
 /** The character's library voice, or null for the premade one. */
 async function libraryVoice(key: string, line: SpokenLine, lang: Lang): Promise<string | null> {
   if (!line.who || libraryOff) return null;
@@ -225,12 +310,16 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
  * or will not speak it (a plan that may not use library voices through the API says so here).
  */
 async function ownClip(key: string, line: SpokenLine, lang: Lang): Promise<Response> {
-  const library = await libraryVoice(key, line, lang);
-  if (library) {
-    const response = await speak(key, library, line.text, lang);
+  const own = await characterVoice(key, line, lang);
+  if (own) {
+    const response = await speak(key, own.id, line.text, lang);
     if (response.ok || response.status === 429 || response.status >= 500) return response;
-    // Not allowed to use library voices: none again this session. Anything else: this line only.
-    if ([401, 402, 403].includes(response.status)) libraryOff = true;
+    if (own.designed) {
+      if ([400, 404].includes(response.status) && line.who) forgetDesigned(line.who);
+    } else if ([401, 402, 403].includes(response.status)) {
+      // Not allowed to use library voices: none again this session. Anything else: this line only.
+      libraryOff = true;
+    }
   }
   return speak(key, VOICES[line.voice], line.text, lang);
 }
@@ -270,7 +359,8 @@ function warmNames(): string[] {
 export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): void {
   const warm = warmNames();
   for (const w of who) {
-    const id = `${lang}:${w.name}`;
+    // A described voice is a new voice, whatever was warmed under the name before.
+    const id = `${voiceWorld}|${lang}:${w.name}${w.voice ? '|designed' : ''}`;
     if (warm.includes(id) || warming.has(id)) continue;
     warming.add(id);
     fetchClip(key, { text: '.', voice: w.gender, who: w }, lang)

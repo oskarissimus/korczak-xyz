@@ -203,6 +203,8 @@ export function demoContext(value: unknown): BeatContext {
       name: text(c.name, 60),
       gender: c.gender === 'female' ? 'female' : 'male',
       color: typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#666666',
+      // Told back to the model so someone who returns keeps their manner (`quest.ts`).
+      ...(text(c.voice, 300) && { voice: text(c.voice, 300) }),
     };
   }).filter((c) => c.name);
   return {

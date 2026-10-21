@@ -52,7 +52,7 @@ import {
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
-import { prefetchVoices, primeVoice, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, FpsBadge, QuestSummary, StreamLine } from './DevConsole';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
@@ -346,6 +346,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   useEffect(() => setWorld(loadWorld(gameLang)), [gameLang]);
   const worldId = world?.id ?? gameLang;
+  useEffect(() => setVoiceWorld(worldId), [worldId]);
   useEffect(() => setChronicle(loadChronicle(worldId)), [worldId]);
 
   // A quest left half way is offered on the intro screen, in its own language.
@@ -483,7 +484,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
         if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
       }
       // Each character's voice speaks once before they do (`voice.ts`, `warmVoices`).
-      if (voiceRef.current) warmVoices(voiceRef.current, b.witness ? [b.npc, b.witness.npc] : [b.npc], gameLangRef.current);
+      if (voiceRef.current) {
+        // With what each of them says first, which a designed voice is made speaking.
+        const who = [{ ...b.npc, sample: [b.greeting, ...b.story.map((p) => p.say)].join(' ') }];
+        if (b.witness) who.push({ ...b.witness.npc, sample: [b.witness.greeting, ...b.witness.talk.map((t) => t.reply)].join(' ') });
+        setVoiceWorld(worldRef.current?.id ?? gameLangRef.current);
+        warmVoices(voiceRef.current, who, gameLangRef.current);
+      }
       if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
       else scene?.clearObjective();
       progressRef.current = 0;

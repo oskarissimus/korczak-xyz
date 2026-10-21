@@ -22,6 +22,10 @@ export interface VoiceWho {
   name: string;
   gender: 'male' | 'female';
   age?: VoiceAge;
+  /** The model's description of their voice, for a designed one (`voiceDesign.ts`). */
+  voice?: string;
+  /** Their first lines, which the design is made speaking. */
+  sample?: string;
 }
 
 /** The fields of a `/v1/shared-voices` entry that the pick reads. */

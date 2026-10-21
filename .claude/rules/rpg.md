@@ -441,7 +441,31 @@ Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `el
 when the store holds an ElevenLabs key: the option the hunter picks in Brian's voice, then the
 answer in **the character's own voice**.
 
-**Every character has a voice of their own** (owner, Oct 2026: "ElevenLabs has far more ready
+**A voice made for each character** (owner, 21 Oct 2026: "the randomly picked voices aren't good
+enough; generated voices to fit each character… don't worry about the 30 slots, rotate the oldest").
+The model writes each npc's and witness's `voice`: English, in the shape ElevenLabs' Voice Design
+guide asks for ("Native Polish. Male, early 20s. Persona: … Emotion: …", then timbre and pace).
+On the reader's own key `utils/rpg/voiceDesign.ts` designs it (`/v1/text-to-voice/design`,
+`eleven_multilingual_ttv_v2`, previewing the character's own first lines) and saves the first
+preview as `rpg · <world id> · <name>` (`/v1/text-to-voice`), when the beat that brings them in
+arrives (`warmVoices`), so the hunter's walk covers the wait. **The account is the registry**: the
+voice is found again by that name from any browser; `rpg-designed-voices` only caches ids. Before a
+save, the game's own voices beyond `KEEP` (24) are deleted oldest first, and a save refused as full
+deletes one more; nothing not named `rpg · ` is touched. A design is charged for its preview text
+(about a credit a character; logged in the console as a voice request) and a save is one of the
+month's voice operations (95 on Creator). A refusal that will hold all session (401/402/403, quota,
+operations spent) turns design off and every character falls back to the library pick below; a
+designed voice that TTS no longer finds (rotated out) is designed again. **The demo stays on library
+voices**: designing there would spend the owner's slots and monthly operations on strangers.
+Untested against the live API at the time of writing — the shapes are from ElevenLabs' reference;
+the console shows the design request and its error if one comes.
+
+The same `voice` is the manner the lines are written in (*THEY ARE CHARACTERS, NOT NARRATORS* in
+the prompt: like people in a play or a film, not a book's narrator: half-sentences, dodging,
+lying, their own sayings, the npc and the witness never alike), and it is told back to the model
+with each returning character's name so they keep it (`demoLimits.ts` passes it through too).
+
+**The library pick, the fallback** (owner, Oct 2026: "ElevenLabs has far more ready
 voices; pick by characteristics or tags, else at random"). The model writes each character's
 `age` (`young`, `middle_aged`, `old`) beside their gender, and `utils/rpg/voicePick.ts` searches
 the Voice Library (`/v1/shared-voices`, the 30 most used) for that gender and age in the game's

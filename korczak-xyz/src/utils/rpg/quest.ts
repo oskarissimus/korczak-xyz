@@ -65,6 +65,12 @@ export interface Character {
   gender: 'male' | 'female';
   /** How old they sound, for the voice (`voicePick.ts`); absent in beats from before it was asked. */
   age?: VoiceAge;
+  /**
+   * Who they are as a voice, in English, for ElevenLabs' Voice Design (`voiceDesign.ts`): language,
+   * gender, age, persona, emotion, timbre and pace. Also the manner their lines are written in, and
+   * what the model is reminded of when they come back. Absent in beats from before it was asked.
+   */
+  voice?: string;
   /** `#rrggbb`, their clothes. */
   color: string;
 }
@@ -462,7 +468,9 @@ export function beatPrompt(ctx: BeatContext): string {
   }
   if (ctx.characters.length) {
     lines.push(
-      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits): ${list(ctx.characters.map((c) => c.name))}.`,
+      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits, in the same voice and manner): ${ctx.characters
+        .map((c) => (c.voice ? `"${c.name}" (${c.voice})` : `"${c.name}"`))
+        .join(', ')}.`,
       '',
     );
   }
@@ -517,6 +525,16 @@ export function beatPrompt(ctx: BeatContext): string {
     'once the hero has heard that; at least one decision must need none of them. If a smallTalk answer names',
     'someone or something, a decision that uses it waits for that question.',
     '',
+    'THEY ARE CHARACTERS, NOT NARRATORS (owner: "like people in a theatre or a film, not the narrator of a book").',
+    'Every person has a temperament and a way of talking, which their "voice" describes, and every line of theirs',
+    'sounds like it: a gruff smith in clipped half-sentences, a frightened girl who rambles and backtracks, a liar',
+    'smooth and a little too eager, a proud elder who answers a question with a question. Nobody explains everything',
+    'in order or puts the truth in the clearest words: they trail off (…), interrupt themselves, dodge, answer a',
+    'different question, exaggerate, lie, joke, snap, use this world’s sayings and curses. Half-sentences are fine.',
+    'What matters most to them comes out sideways, and some of it only when the hero presses. The npc and the',
+    'witness never sound alike. The player must still be able to follow: the facts a decision needs are said',
+    'somewhere, just not tidily.',
+    '',
     'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
     'everything the witness says is that person’s own words to the hero, in the first person ("I", "my',
     'daughter"), addressing them as "you". Never narration, never stage directions, never the speaker in the third',
@@ -531,7 +549,8 @@ export function beatPrompt(ctx: BeatContext): string {
     '{',
     '  "title": string (the quest’s title),',
     '  "npc": {"name": string, "gender": "male" or "female", "age": "young", "middle_aged" or "old" (picks their voice),',
-    '          "color": "#rrggbb" for their clothes},',
+    '          "color": "#rrggbb" for their clothes,',
+    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk; for someone already met, what you were told)},`,
     ctx.job ? '  "place": {...} or {"name": string}' + (ctx.job.kind === 'talk' ? ' or "village",' : ',') : '  "place": "village",',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "targetName": string (singular noun for one of the things), "look": {"shape": string, "color": string, "size": number},'
@@ -544,7 +563,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "story": [{"ask": string (what the hero says to hear more), "say": string (the npc’s next part)}],',
     '  "smallTalk": [{"label": string (a follow-up question about something in the story), "reply": string}],',
     `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)}}],`,
-    '  "witness": {"name": string, "gender": string, "age": string, "color": string, "greeting": string,',
+    '  "witness": {"name": string, "gender": string, "age": string, "color": string, "voice": string, "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
@@ -649,13 +668,21 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const name = text(r.name, 60);
   if (!name) return null;
+  const voice = text(r.voice, 400);
   const met = known.find((c) => same(c.name, name));
-  if (met) return met;
+  // Someone met before voices were described keeps everything else, and gets one now.
+  if (met) return met.voice || !voice ? met : { ...met, voice };
   const color = typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color.trim()) ? r.color.trim().toLowerCase() : null;
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const age = asAge(r.age);
-  return { name, gender: r.gender === 'female' ? 'female' : 'male', color: color ?? CLOTHES[h % CLOTHES.length], ...(age && { age }) };
+  return {
+    name,
+    gender: r.gender === 'female' ? 'female' : 'male',
+    color: color ?? CLOTHES[h % CLOTHES.length],
+    ...(age && { age }),
+    ...(voice && { voice }),
+  };
 }
 
 function beatPlace(raw: unknown, ctx: BeatContext, job: Job): PlaceSpec | null | undefined {
