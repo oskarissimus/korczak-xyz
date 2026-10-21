@@ -163,7 +163,7 @@ order.
 **A place has a landmark** (owner, Oct 2026: "we have a mill, but it is only a round patch with
 trees; if there is a mill, something that looks like a mill should be built"; low-poly is fine). The
 model builds it like toy blocks: up to `MAX_PARTS` (36) parts, each a shape (box, cylinder, cone,
-sphere, dome, pyramid, torus, wedge = a gable prism), a size in metres, where its base stands, a turn
+sphere, dome, pyramid, torus, wedge = a gable prism), a size in metres, where its middle is, a turn
 and a lean, a material from the world's palette (`wall`/`roof` are the world's own, `glow` its
 accent lit from inside, and wood, stone, metal, glass, cloth, water, plant, dark), an optional
 colour, and an optional `spin` axis — a spinning part's `at` is its middle, so a mill's two sails
@@ -173,6 +173,15 @@ lantern from it. `components/Rpg/landmark.ts` builds it 15 m behind the place's 
 the village (`LANDMARK_SETBACK`), front toward the hero; the place's features give way inside its
 footprint, the targets are moved out of it (`keepOut`), and ground-level parts block walking as a
 row of circles along their long side.
+
+**The model writes middles; the game keeps bases.** The prompt asked for each part's base and the
+model sometimes wrote middles anyway, consistently, so a hut on stilts stood 1.5 m up with its
+walls floating over the platform (owner's screenshot, Oct 2026). Models place a block by its
+middle unprompted, and the example mixed both (the sails were middles). So the prompt now says
+middles for every part, and `placeFromMiddles` (`place.ts`) moves each non-spinning part down by
+half its height along its own up, once, when the model's answer is read in `beatPlace`. Stored
+worlds, the demo's context and `landmark.ts` all still mean the base, so nothing saved needed a
+migration — do not call it anywhere else, or a part sinks by half its height.
 
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.

@@ -65,7 +65,10 @@ export interface LandmarkPart {
   shape: PartShape;
   /** Width (x), height (y), depth (z), metres. A cylinder's or cone's diameter is the width. */
   size: [number, number, number];
-  /** The centre of the part's base, or of the part itself when it spins: x, y above the ground, z. */
+  /**
+   * The centre of the part's base, or of the part itself when it spins: x, y above the ground, z.
+   * A model writes every part by its middle; `placeFromMiddles` turns that into this.
+   */
   at: [number, number, number];
   /** Degrees about the vertical. */
   turn: number;
@@ -169,6 +172,42 @@ function part(raw: unknown): LandmarkPart | null {
     color: hex(r.color),
     spin,
   };
+}
+
+/**
+ * A model's place with its landmark's parts moved from their middles to their bases. The prompt
+ * asks for middles (owner, Oct 2026, after a hut on stilts floated: the model had written
+ * middles where the prompt asked for bases, and only a spinning part was a middle then, so it
+ * had both conventions in one example); models place a block by its middle without being told,
+ * as three.js does. What is stored, built and sent back stays a base, so a saved world needs no
+ * migration and nothing but a model's own answer goes through this. A spinning part keeps its
+ * middle, which is what it turns about. The base is the middle less half the height along the
+ * part's own up, after its turn and lean (three.js's `YXZ` order, as `landmark.ts` builds it).
+ */
+export function placeFromMiddles(raw: unknown): unknown {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  const landmark = r?.landmark && typeof r.landmark === 'object' ? (r.landmark as Record<string, unknown>) : null;
+  if (!r || !landmark || !Array.isArray(landmark.parts)) return raw;
+  const parts = landmark.parts.map((p) => {
+    const part = p && typeof p === 'object' ? (p as Record<string, unknown>) : null;
+    if (!part || (typeof part.spin === 'string' && /^[xyz]$/i.test(part.spin.trim()))) return p;
+    const at = triple(part.at).map(Number);
+    const h = Number(triple(part.size)[1]);
+    if (at.length < 3 || !at.every(Number.isFinite) || !Number.isFinite(h)) return p;
+    const tilt = triple(part.tilt).map(Number);
+    const tx = (Number.isFinite(tilt[0]) ? tilt[0] : 0) * (Math.PI / 180);
+    const tz = (Number.isFinite(tilt[1]) ? tilt[1] : 0) * (Math.PI / 180);
+    const ty = (Number.isFinite(Number(part.turn)) ? Number(part.turn) : 0) * (Math.PI / 180);
+    // Up (0, 1, 0) turned by Rz, then Rx, then Ry.
+    const ux0 = -Math.sin(tz);
+    const uy = Math.cos(tz) * Math.cos(tx);
+    const uz0 = Math.cos(tz) * Math.sin(tx);
+    const ux = ux0 * Math.cos(ty) + uz0 * Math.sin(ty);
+    const uz = -ux0 * Math.sin(ty) + uz0 * Math.cos(ty);
+    const half = Math.max(0, h) / 2;
+    return { ...part, at: [at[0] - ux * half, at[1] - uy * half, at[2] - uz * half] };
+  });
+  return { ...r, landmark: { ...landmark, parts } };
 }
 
 /** A model's landmark, or null when it has no usable part. */

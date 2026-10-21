@@ -32,6 +32,7 @@ import {
   PART_SHAPES,
   parseLook,
   parsePlace,
+  placeFromMiddles,
   type PlaceSpec,
   type TargetLook,
 } from './place';
@@ -374,17 +375,18 @@ const LANDMARK_LINES = [
   '  wreck, a shrine, a pump station, a giant skeleton…), built from up to ' + MAX_PARTS + ' simple parts like toy blocks.',
   '  Make its shape say what it is: proportions, a roof, a door, a chimney, a mast. Each part:',
   `  {"shape": one of ${list(PART_SHAPES)} (wedge = a gable-roof prism, ridge along z),`,
-  '   "size": [width x, height y, depth z] in metres, "at": [x, y, z] where its BASE centre stands,',
+  '   "size": [width x, height y, depth z] in metres, "at": [x, y, z] where its MIDDLE is,',
   '   "turn": degrees about the vertical, "tilt": [degrees about x, degrees about z],',
   `   "material": one of ${list(PART_MATERIALS)} (wall/roof are this world's own), "color": optional "#rrggbb",`,
-  '   "spin": optional "x", "y" or "z" for a part that turns about its middle (sails, a wheel); for a',
-  '   spinning part "at" is its MIDDLE, so parts that turn together share one "at"}.',
+  '   "spin": optional "x", "y" or "z" for a part that turns about its middle (sails, a wheel), so parts',
+  '   that turn together share one "at"}.',
   '  Metres, the landmark\'s own centre at 0,0, ground at y 0, its front facing +z (toward the hero);',
   '  everything within 9 m of the centre and under 24 m high; a person is 1.8 m, a door 2 m tall.',
-  '  Stack parts: a roof\'s "at" y is the top of the walls under it. Example, a windmill:',
-  '  {"name": "the old mill", "parts": [{"shape": "cylinder", "size": [5, 7, 5], "at": [0, 0, 0], "material": "wall"},',
-  '   {"shape": "cone", "size": [6, 3, 6], "at": [0, 7, 0], "material": "roof"},',
-  '   {"shape": "box", "size": [1.2, 2, 0.3], "at": [0, 0, 2.45], "material": "dark"},',
+  '  Every "at" is the part\'s middle: a part on the ground has y = half its height, and a part resting on',
+  '  another has y = the top of that one + half its own height. Example, a windmill:',
+  '  {"name": "the old mill", "parts": [{"shape": "cylinder", "size": [5, 7, 5], "at": [0, 3.5, 0], "material": "wall"},',
+  '   {"shape": "cone", "size": [6, 3, 6], "at": [0, 8.5, 0], "material": "roof"},',
+  '   {"shape": "box", "size": [1.2, 2, 0.3], "at": [0, 1, 2.45], "material": "dark"},',
   '   {"shape": "box", "size": [0.6, 11, 0.2], "at": [0, 6, 2.8], "material": "wood", "spin": "z"},',
   '   {"shape": "box", "size": [11, 0.6, 0.2], "at": [0, 6, 2.8], "material": "wood", "spin": "z"}]}',
   '  (the two sails share their middle, so they turn together as one cross). Leave it out only for a place that',
@@ -662,7 +664,8 @@ function beatPlace(raw: unknown, ctx: BeatContext, job: Job): PlaceSpec | null |
   const name = typeof r?.name === 'string' ? r.name : '';
   const earlier = ctx.places.find((p) => same(p.name, name));
   if (earlier) return earlier;
-  const fresh = parsePlace(raw);
+  // The model writes every part by its middle; the game keeps them by their base (`place.ts`).
+  const fresh = parsePlace(placeFromMiddles(raw));
   if (fresh) return freeSlot(fresh, ctx.places);
   // A meeting needs nowhere special; a fight or a search does.
   return job.kind === 'talk' ? null : undefined;

@@ -10,6 +10,7 @@ import {
   parseLandmark,
   parseLook,
   parsePlace,
+  placeFromMiddles,
   placePosition,
 } from './place';
 
@@ -108,5 +109,36 @@ describe('parseLandmark', () => {
     const l = parseLandmark({ parts })!;
     expect(l.parts).toHaveLength(MAX_PARTS);
     expect(l.parts[0].at[1] + l.parts[0].size[1]).toBeLessThanOrEqual(LANDMARK_HEIGHT);
+  });
+});
+
+describe('placeFromMiddles', () => {
+  const hut = {
+    name: 'Mszary',
+    direction: 'south',
+    biome: 'swamp',
+    landmark: {
+      name: 'chatka na palach',
+      parts: [
+        { shape: 'cylinder', size: [0.4, 3, 0.4], at: [-2, 1.5, -2], material: 'wood' },
+        { shape: 'box', size: [5, 0.3, 5], at: [0, 3.15, 0], material: 'wood' },
+        { shape: 'box', size: [4.6, 3, 4.6], at: [0, 4.8, 0], material: 'wall' },
+        { shape: 'box', size: [11, 0.6, 0.2], at: [0, 6, 2.8], material: 'wood', spin: 'z' },
+        { shape: 'box', size: [2, 4, 1], at: [0, 2, 0], tilt: [0, 90], material: 'stone' },
+      ],
+    },
+  };
+
+  it('stands the hut on its stilts: each part from its middle to its base, a spinning one kept', () => {
+    const parts = parsePlace(placeFromMiddles(hut))!.landmark!.parts;
+    expect(parts.map((p) => p.at[1])).toEqual([0, 3, 3.3, 6, expect.any(Number)]);
+    // Laid on its side about z: the base is half the height along x, not below.
+    expect(parts[4].at[0]).toBeCloseTo(2);
+    expect(parts[4].at[1]).toBeCloseTo(2);
+  });
+
+  it('leaves a place without a landmark alone', () => {
+    const meadow = { name: 'Łąka', direction: 'north', biome: 'meadow' };
+    expect(placeFromMiddles(meadow)).toBe(meadow);
   });
 });
