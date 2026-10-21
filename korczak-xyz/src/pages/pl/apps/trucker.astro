@@ -1,0 +1,25 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Trucker from '../../../components/Trucker/Trucker';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/trucker.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Trucker')} | korczak.xyz`} description={t('trucker.desc')} lang={lang}>
+  <div class="window trucker-window">
+    <div class="title-bar">
+      <span>{t('Trucker')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content trucker-content">
+      <Trucker client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>

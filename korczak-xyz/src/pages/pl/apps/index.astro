@@ -165,6 +165,15 @@ const t = useTranslations(lang);
           </span>
         </a>
       </li>
+      <li>
+        <a href="/pl/apps/trucker/" class="app-link">
+          <span class="app-icon">{'\u{1F69B}'}</span>
+          <span class="app-info">
+            <span class="app-title">{t('Trucker')}</span>
+            <span class="app-desc">{t('trucker.desc')}</span>
+          </span>
+        </a>
+      </li>
       <AdminAppCard client:only="react" lang={lang} />
     </ul>
   </PageContent>
