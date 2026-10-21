@@ -56,7 +56,10 @@ import {
   asAge,
   findVoice,
   sharedVoicesOf,
-  type SharedVoice,
+  usableIds,
+  voiceListsOf,
+  voiceQueries,
+  type VoiceLists,
   type VoiceWho,
 } from '../../../korczak-xyz/src/utils/rpg/voicePick';
 import { callerIp, dayKey, ipKey } from '../demo/limits';
@@ -311,20 +314,63 @@ async function generate(req: Request, res: Response, model: string, prompt: stri
   }
 }
 
-/** The library searches this instance has made, kept six hours: they are the same for every caller. */
-const VOICE_LISTS = new Map<string, { at: number; voices: Promise<SharedVoice[]> }>();
-const VOICE_LISTS_MS = 6 * 3600_000;
+/**
+ * Every library search a character can need, for one language (`voiceQueries`): kept a week in
+ * `rpgVoices/{lang}` (Admin SDK only, no rule, like `demoUsage`) and an hour in this instance. A
+ * search takes 8 to 14 seconds, so they are all asked at once, and only when the week is up; a
+ * stale copy is still served if asking again fails.
+ */
+const VOICE_LISTS_MS = 7 * 24 * 3600_000;
+const voiceMemory = new Map<'pl' | 'en', { at: number; lists: Promise<VoiceLists> }>();
 
-function listVoices(key: string, url: string): Promise<SharedVoice[]> {
-  const cached = VOICE_LISTS.get(url);
-  if (cached && Date.now() - cached.at < VOICE_LISTS_MS) return cached.voices;
-  const voices = fetch(url, { headers: { 'xi-api-key': key } }).then(async (r) => {
-    if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
-    return sharedVoicesOf(await r.json());
-  });
-  VOICE_LISTS.set(url, { at: Date.now(), voices });
-  voices.catch(() => VOICE_LISTS.delete(url));
-  return voices;
+async function readVoiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
+  const doc = db.collection('rpgVoices').doc(lang);
+  const snap = await doc.get();
+  const stored = snap.exists ? snap.data() : null;
+  const at = typeof stored?.at === 'number' ? stored.at : 0;
+  // Kept as a JSON string: the search URLs are the keys, and they are not field names.
+  let parsed: unknown = null;
+  try {
+    parsed = typeof stored?.lists === 'string' ? JSON.parse(stored.lists) : null;
+  } catch {
+    /* asked again */
+  }
+  const lists = voiceListsOf(parsed, lang);
+  if (Date.now() - at < VOICE_LISTS_MS && Object.keys(lists).length > 0) return lists;
+  const key = await elevenLabs();
+  if (!key) return lists;
+  try {
+    const fresh: VoiceLists = {};
+    await Promise.all(
+      voiceQueries(lang).map(async (url) => {
+        const r = await fetch(url, { headers: { 'xi-api-key': key } });
+        if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
+        fresh[url] = usableIds(sharedVoicesOf(await r.json()), lang, VOICE_MODEL);
+      }),
+    );
+    await doc.set({ at: Date.now(), lists: JSON.stringify(fresh) });
+    return fresh;
+  } catch (e) {
+    reportError('rpgDemo.voiceLists', e);
+    return lists;
+  }
+}
+
+function voiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
+  const cached = voiceMemory.get(lang);
+  if (cached && Date.now() - cached.at < 3600_000) return cached.lists;
+  const lists = readVoiceLists(lang, elevenLabs);
+  voiceMemory.set(lang, { at: Date.now(), lists });
+  lists.catch(() => voiceMemory.delete(lang));
+  return lists;
+}
+
+/** The library's voices for every kind of character, handed to the game when a quest starts. */
+async function voices(res: Response, body: Record<string, unknown>): Promise<void> {
+  const lang = body.lang === 'pl' ? 'pl' : 'en';
+  const lists = await voiceLists(lang, async () => (await demoKeys((await readSettings()).keyUid)).elevenLabs);
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ lang, lists });
 }
 
 /** Who is speaking, from a stranger's JSON: a name and a gender, and an age when it is one of ours. */
@@ -377,7 +423,13 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     // premade voice when the library has none or will not speak it.
     const who = voice === 'player' ? null : speaker(body.who);
     const library = who
-      ? await findVoice(who, lang, VOICE_MODEL, (url) => listVoices(elevenLabs, url), Object.values(DEMO_VOICES)).catch(
+      ? await findVoice(
+          who,
+          lang,
+          VOICE_MODEL,
+          async (url) => (await voiceLists(lang, async () => elevenLabs))[url] ?? [],
+          Object.values(DEMO_VOICES),
+        ).catch(
           (e) => {
             reportError('rpgDemo.voices', e);
             return null;
@@ -450,6 +502,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     else if (body.kind === 'beat') await beat(req, res, body);
     else if (body.kind === 'world') await world(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);
+    else if (body.kind === 'voices') await voices(res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {
     if (e instanceof BadRequest) {

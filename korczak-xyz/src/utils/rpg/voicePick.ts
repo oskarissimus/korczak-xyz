@@ -93,6 +93,36 @@ export async function findVoice(
   return pickVoice(await list(sharedVoicesUrl(lang, who.gender)), who, lang, model, avoid);
 }
 
+/**
+ * Every search a character can need in `lang`: each gender with each age, and each gender alone.
+ * The library answers a filtered search in 8 to 14 seconds (measured Oct 2026, against about one
+ * second for the clip itself), which made a character's first line wait that long. So the demo
+ * function asks all of them at once, keeps the answers in Firestore for a week, and hands them to
+ * the game when a quest starts (`{kind: 'voices'}`); a line never waits for a search again.
+ */
+export function voiceQueries(lang: Lang): string[] {
+  const genders = ['male', 'female'] as const;
+  return genders.flatMap((g) => [...VOICE_AGES.map((a) => sharedVoicesUrl(lang, g, a)), sharedVoicesUrl(lang, g)]);
+}
+
+/** The searches' answers, by search URL, cut to the usable voices' ids. */
+export type VoiceLists = Record<string, SharedVoice[]>;
+
+export function usableIds(list: readonly SharedVoice[], lang: Lang, model: string): SharedVoice[] {
+  return list.filter((v) => usableVoice(v, lang, model)).map((v) => ({ voice_id: v.voice_id }));
+}
+
+/** A `VoiceLists` from a stranger's JSON: only search URLs of `lang`, only well-formed ids. */
+export function voiceListsOf(raw: unknown, lang: Lang): VoiceLists {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out: VoiceLists = {};
+  for (const url of voiceQueries(lang)) {
+    const list = r[url];
+    if (Array.isArray(list)) out[url] = list.filter((v) => usableVoice(v as SharedVoice, lang, '')).map((v) => ({ voice_id: (v as SharedVoice).voice_id }));
+  }
+  return out;
+}
+
 /** The voices in a `/v1/shared-voices` answer, whatever else it holds. */
 export function sharedVoicesOf(body: unknown): SharedVoice[] {
   const voices = (body as { voices?: unknown } | null)?.voices;

@@ -52,7 +52,7 @@ import {
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
-import { primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { prefetchVoices, primeVoice, speakLines, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
 import { RpgScene, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
@@ -165,6 +165,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
         : 'static';
   const voiceKey = account.keys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
   const [voiceOn, setVoiceOn] = useState(true);
+  // The library searches for the reader's own key, so no character's first line waits on one
+  // (`voice.ts`); the demo voice picks on the function's side and needs nothing here.
+  useEffect(() => {
+    if (voiceOn && voiceKey && voiceKey !== DEMO_VOICE_KEY) prefetchVoices(gameLang);
+  }, [gameLang, voiceKey, voiceOn]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

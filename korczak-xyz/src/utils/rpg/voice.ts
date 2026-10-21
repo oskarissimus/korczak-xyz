@@ -9,7 +9,7 @@
  */
 
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
-import { findVoice, sharedVoicesOf, type SharedVoice, type VoiceWho } from './voicePick';
+import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, voiceCredits } from './devlog';
 import type { Lang } from './quest';
 
@@ -54,12 +54,61 @@ function storedLists(): Record<string, { at: number; voices: SharedVoice[] }> {
   }
 }
 
+function storeList(url: string, voices: SharedVoice[]): void {
+  try {
+    localStorage.setItem(LISTS_KEY, JSON.stringify({ ...storedLists(), [url]: { at: Date.now(), voices } }));
+  } catch {
+    /* asked again next time */
+  }
+}
+
+/**
+ * A filtered library search takes 8 to 14 seconds (a clip about one), so a character's first line
+ * used to wait that long. The demo function keeps every search of a language for a week and hands
+ * them all over in one request (`voicePick.ts`, `voiceQueries`); the game asks for them when a
+ * quest starts, and searches with the reader's own key only for what they did not cover.
+ */
+const served = new Map<Lang, Promise<VoiceLists>>();
+
+export function prefetchVoices(lang: Lang): void {
+  if (served.has(lang)) return;
+  const url = rpgDemoUrl();
+  if (!url) return;
+  const lists = (async () => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'voices', lang }),
+    });
+    if (!response.ok) throw new Error(`voices ${response.status}`);
+    const got = voiceListsOf((await response.json())?.lists, lang);
+    for (const [u, voices] of Object.entries(got)) if (voices.length > 0) storeList(u, voices);
+    return got;
+  })();
+  served.set(lang, lists);
+  lists.catch(() => served.delete(lang));
+}
+
+async function servedList(url: string): Promise<SharedVoice[] | null> {
+  const lang: Lang = new URL(url).searchParams.get('language') === 'pl' ? 'pl' : 'en';
+  const lists = served.get(lang);
+  if (!lists) return null;
+  try {
+    const list = (await lists)[url];
+    return list && list.length > 0 ? list : null;
+  } catch {
+    return null;
+  }
+}
+
 function listVoices(key: string, url: string): Promise<SharedVoice[]> {
   let found = lists.get(url);
   if (found) return found;
   found = (async () => {
     const stored = storedLists()[url];
     if (stored && Date.now() - stored.at < LISTS_MS) return stored.voices;
+    const handed = await servedList(url);
+    if (handed) return handed;
     const response = await fetch(url, { headers: { 'xi-api-key': key } });
     if (response.status === 401 || response.status === 403) libraryOff = true;
     if (!response.ok) throw new Error(`ElevenLabs ${response.status}`);
@@ -69,11 +118,7 @@ function listVoices(key: string, url: string): Promise<SharedVoice[]> {
       fiat_rate,
       verified_languages: (verified_languages ?? []).map(({ language, model_id }) => ({ language, model_id })),
     }));
-    try {
-      localStorage.setItem(LISTS_KEY, JSON.stringify({ ...storedLists(), [url]: { at: Date.now(), voices } }));
-    } catch {
-      /* asked again next time */
-    }
+    storeList(url, voices);
     return voices;
   })();
   lists.set(url, found);

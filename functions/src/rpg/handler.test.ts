@@ -242,6 +242,27 @@ describe('rpgDemo', () => {
     expect(long.statusCode).toBe(400);
   });
 
+  it('hands over every voice search of a language at once, and asks the library only once a week', async () => {
+    const usable = { voice_id: 'abcdefghij', rate: 1, fiat_rate: null, verified_languages: [{ language: 'pl', model_id: 'eleven_flash_v2_5' }] };
+    const pricey = { voice_id: 'klmnopqrst', rate: 2, fiat_rate: null };
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ voices: [usable, pricey] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const res = response();
+    await handleRpgDemo(request('POST', { kind: 'voices', lang: 'pl' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(8);
+    expect((fetch.mock.calls[0] as any)[1].headers['xi-api-key']).toBe('sk_owner-0000000000');
+    const lists = res.body.lists as Record<string, { voice_id: string }[]>;
+    expect(Object.keys(lists)).toHaveLength(8);
+    expect(Object.values(lists).every((l) => l.length === 1 && l[0].voice_id === 'abcdefghij')).toBe(true);
+    expect(store.get('rpgVoices/pl')).toMatchObject({ at: expect.any(Number) });
+
+    const again = response();
+    await handleRpgDemo(request('POST', { kind: 'voices', lang: 'pl' }), again);
+    expect(again.body.lists).toEqual(lists);
+    expect(fetch).toHaveBeenCalledTimes(8);
+  });
+
   it('adds reported numbers to the day, capped, and gives them back with the demo spend', async () => {
     const { dayKey } = await import('../demo/limits');
     const day = dayKey();

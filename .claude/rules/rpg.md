@@ -437,10 +437,20 @@ the Voice Library (`/v1/shared-voices`, the 30 most used) for that gender and ag
 language, falling back to gender alone; the character's name hashes to one of them, so a
 character keeps their voice across lines, quests and reloads. Only voices at the ordinary rate are
 taken (`rate` 1, no `fiat_rate`), because the cost console and the demo's reservations price every
-clip at it. Searches are cached a day in the browser (`rpg-voice-lists`) and six hours in the
-function. A key that may not use the library (401/402/403 — a free plan cannot through the API)
+clip at it. A key that may not use the library (401/402/403 — a free plan cannot through the API)
 falls back to the premade George or Rachel for the rest of the session; any other refusal falls
 back for that line. Compiled into the demo function too, so the demo picks the same voices.
+
+**No line waits for a search.** A filtered `/v1/shared-voices` search takes 8–14 s; the clip itself
+about 1 s (measured on the demo, Oct 2026: a character's first line 13.7 s and 9.0 s, the next one
+of the same gender and age 1.2 s). Searching on a character's first line made every new kind of
+voice open with that wait. So the function runs all eight searches of a language at once
+(`voiceQueries`: each gender with each age, and each gender alone), keeps them in Firestore
+`rpgVoices/{lang}` for a week (an hour in memory), and answers `{kind: 'voices', lang}` with them,
+cut to the usable ids. The game asks for them when voice is on with the reader's own key
+(`prefetchVoices`), stores them in `rpg-voice-lists` (a day), and searches with that key only for
+what they did not cover. The demo voice picks on the function's side from the same cache. A search
+costs no credits, and the week bounds how often the owner's key makes eight of them.
 
 **The premade voices end on 31 Dec 2026** (ElevenLabs, *What are Default voices?*: they expire
 and are only available to accounts created before March 2026). That is the fallback and the
