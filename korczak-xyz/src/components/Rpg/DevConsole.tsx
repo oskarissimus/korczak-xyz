@@ -10,6 +10,8 @@ import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, questTotals, subscribeDevlog, type DevRequest } from '../../utils/rpg/devlog';
 import type { Lang } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
+import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
+import type { RpgScene } from './RpgScene';
 import { translations } from './translations';
 
 function useDevlog(): readonly DevRequest[] {
@@ -57,7 +59,93 @@ function headline(r: DevRequest): string {
   return parts.join(' · ');
 }
 
-export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void }) {
+function thousands(n: number): string {
+  return n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+}
+
+/** The badge's one line: what a frame is now. */
+export function frameLine(f: FrameStats): string {
+  return `${Math.round(f.fps)} fps · ${f.frameMs.toFixed(0)}/${f.slowMs.toFixed(0)} ms · ${f.calls} dc · ${thousands(f.triangles)} △`;
+}
+
+/** The FPS counter over the game, refreshed twice a second. */
+export function FpsBadge({ scene }: { scene: RpgScene | null }) {
+  useTick(true, 500);
+  if (!scene) return null;
+  return <div className="rpg-fps">{frameLine(scene.frameStats())}</div>;
+}
+
+function PerfTab({ lang, scene, badge, onBadge }: { lang: Lang; scene: RpgScene | null; badge: boolean; onBadge: (on: boolean) => void }) {
+  const t = translations[lang];
+  useTick(true, 500);
+  const [, setVersion] = useState(0);
+  if (!scene) return <div className="rpg-dev-list" />;
+  const f = scene.frameStats();
+  const q = scene.getQuality();
+  const set = (patch: Partial<typeof q>) => {
+    const next = { ...q, ...patch };
+    scene.setQuality(next);
+    saveQuality(next);
+    setVersion((n) => n + 1);
+  };
+  const device = Math.min(window.devicePixelRatio, 2);
+  const rows: [string, string][] = [
+    ['FPS', Math.round(f.fps).toString()],
+    [t.perfFrame, `${f.frameMs.toFixed(1)} · ${f.slowMs.toFixed(1)}`],
+    [t.perfScript, f.cpuMs.toFixed(1)],
+    ['draw calls', String(f.calls)],
+    ['△', thousands(f.triangles)],
+    ['points', thousands(f.points)],
+    ['px', `${f.width}×${f.height} @ ${f.pixelRatio}×`],
+    [t.perfPlaces, String(scene.placeCount())],
+  ];
+  return (
+    <div className="rpg-dev-list rpg-dev-perf">
+      <dl>
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+      <label>
+        <input type="checkbox" checked={badge} onChange={(e) => onBadge(e.target.checked)} /> {t.perfBadge}
+      </label>
+      <label>
+        <input type="checkbox" checked={q.shadows} onChange={(e) => set({ shadows: e.target.checked })} /> {t.perfShadows}
+      </label>
+      <label>
+        <input type="checkbox" checked={q.weather} onChange={(e) => set({ weather: e.target.checked })} /> {t.perfWeather}
+      </label>
+      <label>
+        {t.perfResolution}{' '}
+        <select value={String(q.pixelRatio)} onChange={(e) => set({ pixelRatio: e.target.value === 'null' ? null : Number(e.target.value) })}>
+          {PIXEL_RATIOS.map((r) => (
+            <option key={String(r)} value={String(r)}>
+              {r === null ? t.perfDevice(device) : `${r}×`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="rpg-dev-empty">{t.perfHint}</p>
+    </div>
+  );
+}
+
+export function DevConsole({
+  lang,
+  onClose,
+  scene = null,
+  badge = false,
+  onBadge = () => {},
+}: {
+  lang: Lang;
+  onClose: () => void;
+  scene?: RpgScene | null;
+  badge?: boolean;
+  onBadge?: (on: boolean) => void;
+}) {
   const t = translations[lang];
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
@@ -65,7 +153,7 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
   const totals = questTotals();
   const listRef = useRef<HTMLDivElement>(null);
   const [showVoice, setShowVoice] = useState(false);
-  const [tab, setTab] = useState<'requests' | 'lines'>('requests');
+  const [tab, setTab] = useState<'requests' | 'lines' | 'perf'>('requests');
   const lines = useTranscript();
   const shown = showVoice ? requests : requests.filter((r) => r.kind === 'model');
 
@@ -86,6 +174,9 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
           <button type="button" role="tab" aria-selected={tab === 'lines'} onClick={() => setTab('lines')}>
             {t.devLines}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'perf'} onClick={() => setTab('perf')}>
+            {t.devPerf}
+          </button>
         </div>
         {tab === 'requests' && (
           <label>
@@ -96,7 +187,9 @@ export function DevConsole({ lang, onClose }: { lang: Lang; onClose: () => void 
           ×
         </button>
       </div>
-      {tab === 'lines' ? (
+      {tab === 'perf' ? (
+        <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} />
+      ) : tab === 'lines' ? (
         <div className="rpg-dev-list rpg-dev-lines" ref={listRef}>
           {lines.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}
           {lines.map((l, i) =>

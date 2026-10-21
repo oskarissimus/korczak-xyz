@@ -523,6 +523,37 @@ Tested in Playwright's `iPhone SE (3rd gen)` profile, both orientations, driving
 look with CDP touch events; the swiftshader renderer there is slow, so walking covers less ground
 per second than on a phone.
 
+## What a frame costs
+
+Owner, Oct 2026: "I have the feeling the fps dropped; an fps counter so I can measure what it
+seems, logs to diagnose it". Three things, all in `components/Rpg/frames.ts`:
+
+- **The console's Performance tab** (`~`): fps, the median and 95th-percentile frame, the script's
+  share of it (the rest is the GPU), draw calls, triangles (both include the shadow pass), the
+  canvas in device pixels, and how many places the world holds. Its switches turn off the shadow,
+  the weather or lower the resolution, so which of them a frame is spending on is found on the
+  phone itself; kept in `rpg-quality`. **The FPS badge** is the same in one line over the game
+  (`rpg-fps-badge`).
+- **`rpg.frames` to Sentry** (`recordMeasurement`, Sentry Logs, project `korczak-xyz`): one record
+  per minute of play, with the share of frames under 30 and under 20 fps, the worst frame, draw
+  calls, triangles, places, resolution and the switches. Numbers only.
+
+**What was found** (measured in the frame loop, Oct 2026): 3 M triangles a frame standing in the
+village, whichever way the camera looked. The scattered trees and ground cover were one instanced
+mesh per kind over the whole map, and three culls an instanced mesh as one thing, so all 400 trees
+and 3,000 tufts were drawn every frame, and the trees again for the shadow. Now each kind is
+planted per 48 m square (`CELL` in `RpgScene.ts`), so the camera and the shadow camera skip what
+they cannot see, and `cullFar` switches off squares and earlier quests' places beyond the fog:
+0.55–0.9 M triangles, in the village and in a world of seven places. The five houses were ~250 kit
+pieces, each a draw and another for the shadow; `mergeStatic` (`world.ts`) makes them 7 meshes,
+one per material (the kit's positions are quantised integers: convert to floats *before* moving
+them, or every piece collapses into its own little box, which is what the first attempt did).
+Draw calls ended about where they were (110–180 a frame in the village).
+
+What is still expensive, for the next time: the places' own props are separate meshes with the
+kit's heavy trees (a forest place 140 k triangles, a swamp 100 k); a 2048 PCF-soft shadow map; and
+the device's pixel ratio up to 2 with antialiasing, which on a phone is most of the pixels drawn.
+
 ## Everything the game waits for is on screen
 
 The game is in active development and the owner wants to watch it work (Oct 2026: "show the

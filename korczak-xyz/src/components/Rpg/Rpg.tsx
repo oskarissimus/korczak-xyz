@@ -53,7 +53,9 @@ import {
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { prefetchVoices, primeVoice, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DevConsole, QuestSummary, StreamLine } from './DevConsole';
+import { DevConsole, FpsBadge, QuestSummary, StreamLine } from './DevConsole';
+import { loadBadge, loadQuality, saveBadge } from './frames';
+import { recordMeasurement } from '../../lib/sentry';
 import { RpgScene, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
 import { translations } from './translations';
@@ -193,6 +195,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** Every option asked in this quest, by speaker and label. */
   const askedRef = useRef(new Set<string>());
   const [devOpen, setDevOpen] = useState(false);
+  const [fpsBadge, setFpsBadge] = useState(false);
+  useEffect(() => setFpsBadge(loadBadge()), []);
   /** The model asked first, from the intro screen; null is the usual order. */
   const [chosenModel, setChosenModel] = useState<string | null>(null);
   const chosenModelRef = useRef<string | null>(null);
@@ -707,7 +711,26 @@ export default function Rpg({ lang }: { lang: Lang }) {
     sceneRef.current = scene;
     scene.setPaused(true);
     scene.resize(container.clientWidth, container.clientHeight);
+    scene.setQuality(loadQuality());
     scene.start();
+    // A minute of play at a time, to Sentry (`frames.ts`): how the frames went on whatever device
+    // this is, and what the scene held while they did. Numbers only.
+    const frameLog = window.setInterval(() => {
+      const w = scene.takeFrameWindow();
+      if (!w) return;
+      const f = scene.frameStats();
+      const q = scene.getQuality();
+      recordMeasurement('rpg.frames', {
+        ...w,
+        places: scene.placeCount(),
+        width: f.width,
+        height: f.height,
+        pixelRatio: f.pixelRatio,
+        devicePixelRatio: window.devicePixelRatio,
+        shadows: q.shadows,
+        weather: q.weather,
+      });
+    }, 60_000);
     window.rpg = {
       scene,
       state: () => ({
@@ -724,6 +747,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     observer.observe(container);
     return () => {
       observer.disconnect();
+      window.clearInterval(frameLog);
       scene.dispose();
       sceneRef.current = null;
       delete window.rpg;
@@ -1608,7 +1632,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </button>
       )}
 
-      {devOpen && <DevConsole lang={gameLang} onClose={() => setDevOpen(false)} />}
+      {devOpen && (
+        <DevConsole
+          lang={gameLang}
+          onClose={() => setDevOpen(false)}
+          scene={sceneRef.current}
+          badge={fpsBadge}
+          onBadge={(on) => {
+            setFpsBadge(on);
+            saveBadge(on);
+          }}
+        />
+      )}
+      {fpsBadge && started && <FpsBadge scene={sceneRef.current} />}
 
       {(!touch || started) && (
         <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>

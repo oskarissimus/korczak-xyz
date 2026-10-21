@@ -11,7 +11,7 @@
  */
 
 import * as THREE from 'three';
-import { placePosition, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
+import { LANDMARK_REACH, placePosition, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
 import type { ObjectiveKind } from '../../utils/rpg/quest';
 import {
   PLACE_RADIUS,
@@ -25,9 +25,10 @@ import {
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
 import type { Spinner } from './landmark';
-import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, type HouseKind } from './world';
+import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
 import { DAYLIGHT, HAZE, recolor, stars, Weather } from './atmosphere';
+import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -92,6 +93,38 @@ interface Tree {
 }
 
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+
+/*
+ * The scattered trees and the ground cover are instanced, and an instanced mesh is culled as one
+ * thing: planted over the whole map, its bounds were the whole map, so every tree and every tuft
+ * was drawn in every frame, and again for the shadow, whether it was behind the camera or past the
+ * fog (measured Oct 2026: 3 M triangles a frame standing in the village). So each kind is planted
+ * once per square of the map, which the camera and the sun's shadow can skip, and a square past
+ * the fog is not drawn at all. 48 m, measured: 80 m squares drew a few dozen fewer calls and
+ * 400 k more triangles, and 96 m for the grass alone the same trade.
+ */
+const CELL = 48;
+
+function cellKey(x: number, z: number): string {
+  return `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+}
+
+/** A square's meshes, and where the square is. */
+interface Cell {
+  meshes: THREE.Object3D[];
+  x: number;
+  z: number;
+  /** From the centre to the farthest thing in it. */
+  r: number;
+}
+
+function cellOf(meshes: THREE.Object3D[], at: { x: number; z: number }[]): Cell {
+  const x = at.reduce((a, p) => a + p.x, 0) / at.length;
+  const z = at.reduce((a, p) => a + p.z, 0) / at.length;
+  // Plus a tree's own reach, so a crown at the edge is not cut off a step early.
+  const r = Math.max(...at.map((p) => Math.hypot(p.x - x, p.z - z))) + 6;
+  return { meshes, x, z, r };
+}
 
 /** Shows or hides one of the scattered trees, whichever form it has now. */
 function showTree(tree: Tree, visible: boolean) {
@@ -209,6 +242,8 @@ export class RpgScene {
   private camera = new THREE.PerspectiveCamera(65, 1, 0.1, 400);
   private clock = new THREE.Clock();
   private frame = 0;
+  private frames = new FrameRecorder();
+  private quality: Quality = DEFAULT_QUALITY;
   private canvas: HTMLCanvasElement;
   private cb: SceneCallbacks;
 
@@ -361,29 +396,47 @@ export class RpgScene {
   /** Once the kit is here: its houses, fence, props, trees and ground cover over the stopgaps. */
   private furnish() {
     // The houses: two large, three small, where the primitive ones stood.
+    // All five as one mesh per material (`mergeStatic`): they are built from the same kit.
     const kinds: HouseKind[] = ['large', 'small', 'large', 'small', 'small'];
+    const village = new THREE.Group();
     this.stopgapHouses.forEach((old, i) => {
       const house = this.kit.house(kinds[i], rng(100 + i));
       house.position.copy(old.position);
       house.rotation.y = old.rotation.y;
       this.scene.remove(old);
-      this.scene.add(house);
+      village.add(house);
       this.houseObstacles[i].r = HOUSE_RADIUS[kinds[i]];
     });
+    this.scene.add(mergeStatic(village));
     this.stopgapHouses = [];
 
     // The fence: rails instead of posts, with the same eight gaps.
     for (const post of this.fencePosts) this.scene.remove(post);
+    // One instanced mesh per part rather than a mesh per rail: seventy rails were seventy draws, and
+    // as many again for the shadow.
     const n = 84;
+    const rails: THREE.Matrix4[] = [];
     for (let i = 0; i < n; i++) {
       const a = ((i + 0.5) / n) * Math.PI * 2;
       const toGap = a % (Math.PI / 4);
       if (Math.min(toGap, Math.PI / 4 - toGap) < 0.1) continue;
-      const rail = this.kit.piece('Prop_WoodenFence_Single');
-      rail.position.set(Math.sin(a) * 28, 0, Math.cos(a) * 28);
       // A rail runs along its own x; turned by `a`, x is the ring's tangent there.
-      rail.rotation.y = a;
-      this.scene.add(rail);
+      rails.push(
+        new THREE.Matrix4().compose(
+          new THREE.Vector3(Math.sin(a) * 28, 0, Math.cos(a) * 28),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a),
+          new THREE.Vector3(1, 1, 1),
+        ),
+      );
+    }
+    for (const part of this.kit.parts('Prop_WoodenFence_Single')) {
+      const m = new THREE.InstancedMesh(part.geometry, part.material, rails.length);
+      rails.forEach((r, i) => m.setMatrixAt(i, r.clone().multiply(part.matrix)));
+      m.castShadow = true;
+      m.receiveShadow = true;
+      m.userData.shared = true;
+      m.computeBoundingSphere();
+      this.scene.add(m);
     }
 
     // Life in the square: barrels and crates by the houses, a cart, a bench and a bucket by the well.
@@ -421,6 +474,7 @@ export class RpgScene {
       m.dispose();
     }
     this.treeMeshes = [];
+    this.treeCells = [];
     const flora = this.look.flora;
     const classic = this.isClassic();
     const kinds: readonly string[] | null =
@@ -436,9 +490,11 @@ export class RpgScene {
     const byKind = new Map<string, Tree[]>();
     for (const tree of this.trees) {
       const kind = kinds ? kinds[Math.floor(rand() * kinds.length)] : flora;
-      byKind.set(kind, [...(byKind.get(kind) ?? []), tree]);
+      const key = `${kind}|${cellKey(tree.obstacle.x, tree.obstacle.z)}`;
+      byKind.set(key, [...(byKind.get(key) ?? []), tree]);
     }
-    for (const [kind, trees] of byKind) {
+    for (const [key, trees] of byKind) {
+      const kind = key.split('|')[0];
       const parts = kinds ? this.kit.parts(kind) : this.floraParts();
       const meshes = parts.map((part) => {
         const m = new THREE.InstancedMesh(part.geometry, part.material, trees.length);
@@ -464,10 +520,13 @@ export class RpgScene {
         m.instanceMatrix.needsUpdate = true;
         m.computeBoundingSphere();
       });
+      this.treeCells.push(cellOf(meshes, trees.map((t) => t.obstacle)));
     }
   }
 
   private treeMeshes: THREE.InstancedMesh[] = [];
+  private treeCells: Cell[] = [];
+  private coverCells: Cell[] = [];
   /** The world's own flora's geometry and materials, made once per world. */
   private floraCache: { flora: string; parts: { geometry: THREE.BufferGeometry; material: THREE.Material; matrix: THREE.Matrix4 }[] } | null = null;
 
@@ -539,15 +598,7 @@ export class RpgScene {
     for (const name of GROUND_COVER) {
       const parts = this.kit.parts(name);
       const [n, minS, maxS] = cover[name];
-      const meshes = parts.map((part) => {
-        const m = new THREE.InstancedMesh(part.geometry, part.material, n);
-        m.receiveShadow = true;
-        m.castShadow = name.startsWith('Bush');
-        m.userData.shared = true;
-        this.scene.add(m);
-        this.cover.push({ mesh: m, n });
-        return m;
-      });
+      const byCell = new Map<string, { x: number; z: number; base: THREE.Matrix4 }[]>();
       for (let i = 0; i < n; i++) {
         let x = 0;
         let z = 0;
@@ -561,12 +612,24 @@ export class RpgScene {
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
           new THREE.Vector3(s, s, s),
         );
-        meshes.forEach((m, j) => m.setMatrixAt(i, base.clone().multiply(parts[j].matrix)));
+        const key = cellKey(x, z);
+        byCell.set(key, [...(byCell.get(key) ?? []), { x, z, base }]);
       }
-      meshes.forEach((m) => {
-        m.instanceMatrix.needsUpdate = true;
-        m.computeBoundingSphere();
-      });
+      for (const tufts of byCell.values()) {
+        const meshes = parts.map((part, j) => {
+          const m = new THREE.InstancedMesh(part.geometry, part.material, tufts.length);
+          m.receiveShadow = true;
+          m.castShadow = name.startsWith('Bush');
+          m.userData.shared = true;
+          tufts.forEach((t, i) => m.setMatrixAt(i, t.base.clone().multiply(parts[j].matrix)));
+          m.instanceMatrix.needsUpdate = true;
+          m.computeBoundingSphere();
+          this.scene.add(m);
+          this.cover.push({ mesh: m, n: tufts.length });
+          return m;
+        });
+        this.coverCells.push(cellOf(meshes, tufts));
+      }
     }
   }
 
@@ -687,6 +750,7 @@ export class RpgScene {
         look.weather === 'rain' ? 0xa9b9d6 : look.weather === 'snow' ? 0xffffff : look.weather === 'ash' ? 0x8f8a84 : look.accent;
       this.weather = new Weather(look.weather, color);
       this.scene.add(this.weather.points);
+      this.weather.points.visible = this.quality.weather;
     }
 
     recolor(this.ground.material as THREE.Material, look.ground, classic ? 0 : 0.8);
@@ -1305,12 +1369,15 @@ export class RpgScene {
   start() {
     const tick = () => {
       this.frame = requestAnimationFrame(tick);
+      const started = this.frames.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
       if (!this.paused) this.update(dt);
       // The people move even while a dialogue holds the world: whoever is talking talks.
       this.animate(dt);
       this.updateCamera();
+      this.cullFar();
       this.renderer.render(this.scene, this.camera);
+      this.frames.end(started, this.renderer.info.render, !this.paused);
     };
     this.clock.start();
     tick();
@@ -1483,6 +1550,56 @@ export class RpgScene {
     this.camera.position.copy(target).add(offset);
     if (this.camera.position.y < 0.4) this.camera.position.y = 0.4;
     this.camera.lookAt(target);
+  }
+
+  /**
+   * Past the fog nothing can be seen, but three still draws it: the squares of trees and cover and
+   * the places of earlier quests that stand beyond it are switched off until the camera nears.
+   */
+  private cullFar() {
+    const fog = this.scene.fog as THREE.Fog | null;
+    if (!fog) return;
+    const far = fog.far;
+    const { x, z } = this.camera.position;
+    const set = (cell: Cell) => {
+      const on = Math.hypot(cell.x - x, cell.z - z) - cell.r < far;
+      if (cell.meshes[0]?.visible !== on) for (const m of cell.meshes) m.visible = on;
+    };
+    for (const cell of this.treeCells) set(cell);
+    for (const cell of this.coverCells) set(cell);
+    for (const place of this.places.values()) {
+      place.group.visible = Math.hypot(place.center.x - x, place.center.z - z) - PLACE_RADIUS - LANDMARK_REACH < far;
+    }
+  }
+
+  /** The last two seconds of frames (`frames.ts`). */
+  frameStats(): FrameStats {
+    return this.frames.stats(this.canvas, this.renderer.getPixelRatio());
+  }
+
+  /** The play since the last call, for the minute's record. */
+  takeFrameWindow(): FrameWindow | null {
+    return this.frames.takeWindow();
+  }
+
+  /** How many places stand in the scene: a world keeps every place of every quest. */
+  placeCount(): number {
+    return this.places.size;
+  }
+
+  getQuality(): Quality {
+    return this.quality;
+  }
+
+  /** The console's switches, to find out on the phone itself what a frame is spending. */
+  setQuality(q: Quality) {
+    this.quality = q;
+    this.renderer.setPixelRatio(q.pixelRatio ?? Math.min(window.devicePixelRatio, 2));
+    const size = this.renderer.getSize(new THREE.Vector2());
+    this.renderer.setSize(size.x, size.y, false);
+    // The light's switch rather than the renderer's: three rebuilds the programs that read it.
+    this.sunLight.castShadow = q.shadows;
+    if (this.weather) this.weather.points.visible = q.weather;
   }
 
   resize(width: number, height: number) {

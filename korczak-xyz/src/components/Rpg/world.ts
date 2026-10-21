@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import natureUrl from '../../assets/rpg/nature.glb?url';
 import propsUrl from '../../assets/rpg/props.glb?url';
 import villageUrl from '../../assets/rpg/village.glb?url';
@@ -174,4 +175,77 @@ export class WorldKit {
     glass.rotation.y = rot;
     g.add(glass);
   }
+}
+
+/**
+ * The same thing as one mesh per material: a house is a few hundred kit pieces, and each was a draw
+ * of its own and another for the shadow (Oct 2026: most of a frame's draws standing in the village).
+ * Recolouring still works, the materials being the kit's own. Anything that will not merge (a
+ * material array, attributes that differ) stays as it was.
+ */
+function plain(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): THREE.BufferAttribute {
+  const out = new Float32Array(a.count * a.itemSize);
+  for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = a.getComponent(i, k);
+  return new THREE.BufferAttribute(out, a.itemSize);
+}
+
+export function mergeStatic(group: THREE.Object3D): THREE.Group {
+  group.updateMatrixWorld(true);
+  const inv = group.matrixWorld.clone().invert();
+  const byMaterial = new Map<THREE.Material, { geometry: THREE.BufferGeometry; cast: boolean }[]>();
+  const kept: THREE.Mesh[] = [];
+  group.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    if (Array.isArray(mesh.material)) {
+      kept.push(mesh);
+      return;
+    }
+    // To plain floats before moving it: the kit's positions are quantised integers, and a house
+    // placed in them is clipped to the piece's own little box.
+    const geometry = new THREE.BufferGeometry();
+    for (const [n, a] of Object.entries(mesh.geometry.attributes)) geometry.setAttribute(n, plain(a));
+    if (mesh.geometry.index) geometry.setIndex(mesh.geometry.index.clone());
+    geometry.applyMatrix4(inv.clone().multiply(mesh.matrixWorld));
+    const list = byMaterial.get(mesh.material) ?? [];
+    list.push({ geometry, cast: mesh.castShadow });
+    byMaterial.set(mesh.material, list);
+  });
+  const out = new THREE.Group();
+  out.position.copy(group.position);
+  out.quaternion.copy(group.quaternion);
+  out.scale.copy(group.scale);
+  for (const [material, list] of byMaterial) {
+    const names = Object.keys(list[0].geometry.attributes).filter((n) => list.every((g) => n in g.geometry.attributes));
+    const indexed = list.every((g) => g.geometry.index);
+    const ready = list.map(({ geometry }) => {
+      const g = indexed ? geometry : geometry.index ? geometry.toNonIndexed() : geometry;
+      for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
+      return g;
+    });
+    const merged = mergeGeometries(ready, false);
+    if (!merged) {
+      for (const g of ready) {
+        const m = new THREE.Mesh(g, material);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        out.add(m);
+      }
+      continue;
+    }
+    ready.forEach((g) => g.dispose());
+    const m = new THREE.Mesh(merged, material);
+    m.castShadow = list.some((g) => g.cast);
+    m.receiveShadow = true;
+    out.add(m);
+  }
+  for (const mesh of kept) {
+    const copy = mesh.clone();
+    copy.position.set(0, 0, 0);
+    copy.quaternion.identity();
+    copy.scale.set(1, 1, 1);
+    copy.applyMatrix4(inv.clone().multiply(mesh.matrixWorld));
+    out.add(copy);
+  }
+  return out;
 }
