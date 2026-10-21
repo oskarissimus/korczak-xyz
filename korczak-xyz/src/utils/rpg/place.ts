@@ -210,6 +210,118 @@ export function placeFromMiddles(raw: unknown): unknown {
   return { ...r, landmark: { ...landmark, parts } };
 }
 
+/*
+ * A part that touches nothing falls until it does (owner, Oct 2026, a long house's burnt roof tilted
+ * 20° in the air over its pillars: "it came out strange, and I thought we had solved this"). Middles
+ * fixed the parts a model stacks straight; a leant part is beyond it, because where a tilted slab's
+ * lowest edge ends up is trigonometry the model does not do. So the engine does it: each part is an
+ * oriented box, and one whose box meets no other part's and stands off the ground is lowered until
+ * it meets the first thing under it, or the ground. Bottom-up, so what holds a part settles first.
+ *
+ * Only what touches nothing moves: a banner on its pole, a chimney in its roof and a roof on its
+ * walls all touch, and stay where the model put them. A spinning part keeps its place (sails need
+ * not touch the mill), and so does a glowing one (a beacon's flame, a floating crystal).
+ * Applied when a landmark is built, so places already in a saved world are settled too.
+ */
+
+type Vec = [number, number, number];
+
+interface Box {
+  c: Vec;
+  /** Its own axes, in the landmark's coordinates. */
+  u: [Vec, Vec, Vec];
+  e: Vec;
+}
+
+function dot(a: Vec, b: Vec): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+/** Ry · Rx · Rz, three.js's `YXZ`, as columns. */
+function axes(p: LandmarkPart): [Vec, Vec, Vec] {
+  const [a, b, c] = [p.turn * (Math.PI / 180), p.tilt[0] * (Math.PI / 180), p.tilt[1] * (Math.PI / 180)];
+  const [ca, sa, cb, sb, cc, sc] = [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b), Math.cos(c), Math.sin(c)];
+  const rx = (v: Vec): Vec => [v[0], cb * v[1] - sb * v[2], sb * v[1] + cb * v[2]];
+  const ry = (v: Vec): Vec => [ca * v[0] + sa * v[2], v[1], -sa * v[0] + ca * v[2]];
+  const r = (v: Vec): Vec => ry(rx([cc * v[0] - sc * v[1], sc * v[0] + cc * v[1], v[2]]));
+  return [r([1, 0, 0]), r([0, 1, 0]), r([0, 0, 1])];
+}
+
+function box(p: LandmarkPart): Box {
+  const u = axes(p);
+  const e: Vec = [Math.max(0.01, p.size[0] / 2), Math.max(0.01, p.size[1] / 2), Math.max(0.01, p.size[2] / 2)];
+  // `at` is the base: the middle is half the height up the part's own axis.
+  const c: Vec = [p.at[0] + u[1][0] * e[1], p.at[1] + u[1][1] * e[1], p.at[2] + u[1][2] * e[1]];
+  return { c, u, e };
+}
+
+function lowest(b: Box): number {
+  return b.c[1] - b.e[0] * Math.abs(b.u[0][1]) - b.e[1] * Math.abs(b.u[1][1]) - b.e[2] * Math.abs(b.u[2][1]);
+}
+
+/** Whether two boxes meet, within `eps` (separating axes, Ericson's *Real-Time Collision Detection*). */
+function meets(a: Box, b: Box, eps: number): boolean {
+  const R: number[][] = [];
+  const A: number[][] = [];
+  for (let i = 0; i < 3; i++) {
+    R.push([]);
+    A.push([]);
+    for (let j = 0; j < 3; j++) {
+      R[i][j] = dot(a.u[i], b.u[j]);
+      A[i][j] = Math.abs(R[i][j]) + 1e-6;
+    }
+  }
+  const d: Vec = [b.c[0] - a.c[0], b.c[1] - a.c[1], b.c[2] - a.c[2]];
+  const t: Vec = [dot(d, a.u[0]), dot(d, a.u[1]), dot(d, a.u[2])];
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(t[i]) > a.e[i] + b.e[0] * A[i][0] + b.e[1] * A[i][1] + b.e[2] * A[i][2] + eps) return false;
+  }
+  for (let j = 0; j < 3; j++) {
+    const ra = a.e[0] * A[0][j] + a.e[1] * A[1][j] + a.e[2] * A[2][j];
+    if (Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]) > ra + b.e[j] + eps) return false;
+  }
+  for (let i = 0; i < 3; i++) {
+    const [i1, i2] = [(i + 1) % 3, (i + 2) % 3];
+    for (let j = 0; j < 3; j++) {
+      const [j1, j2] = [(j + 1) % 3, (j + 2) % 3];
+      const ra = a.e[i1] * A[i2][j] + a.e[i2] * A[i1][j];
+      const rb = b.e[j1] * A[i][j2] + b.e[j2] * A[i][j1];
+      if (Math.abs(t[i2] * R[i1][j] - t[i1] * R[i2][j]) > ra + rb + eps) return false;
+    }
+  }
+  return true;
+}
+
+const TOUCH = 0.03;
+const STEP = 0.05;
+
+export function settleParts(parts: readonly LandmarkPart[]): LandmarkPart[] {
+  const out = parts.map((p) => ({ ...p, at: [...p.at] as Vec }));
+  const boxes = out.map(box);
+  const solid = out.map((p) => p.spin === null);
+  const order = out
+    .map((p, i) => i)
+    .filter((i) => out[i].spin === null && out[i].material !== 'glow')
+    .sort((a, b) => lowest(boxes[a]) - lowest(boxes[b]));
+  const touching = (i: number, b: Box) => boxes.some((other, j) => j !== i && solid[j] && meets(b, other, TOUCH));
+  for (const i of order) {
+    const floor = lowest(boxes[i]);
+    if (floor <= TOUCH || touching(i, boxes[i])) continue;
+    // Down a step at a time to the first thing it meets; the ground if nothing.
+    let drop = floor;
+    for (let d = STEP; d < floor; d += STEP) {
+      const b = boxes[i];
+      if (touching(i, { ...b, c: [b.c[0], b.c[1] - d, b.c[2]] })) {
+        drop = d;
+        break;
+      }
+    }
+    out[i].at[1] -= drop;
+    boxes[i] = box(out[i]);
+  }
+  return out;
+}
+
 /** A model's landmark, or null when it has no usable part. */
 export function parseLandmark(raw: unknown): Landmark | null {
   if (!raw || typeof raw !== 'object') return null;

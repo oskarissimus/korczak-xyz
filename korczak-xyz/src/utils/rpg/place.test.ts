@@ -12,6 +12,8 @@ import {
   parsePlace,
   placeFromMiddles,
   placePosition,
+  settleParts,
+  type LandmarkPart,
 } from './place';
 
 describe('placePosition', () => {
@@ -140,5 +142,58 @@ describe('placeFromMiddles', () => {
   it('leaves a place without a landmark alone', () => {
     const meadow = { name: 'Łąka', direction: 'north', biome: 'meadow' };
     expect(placeFromMiddles(meadow)).toBe(meadow);
+  });
+});
+
+describe('settleParts', () => {
+  const part = (p: Partial<LandmarkPart>): LandmarkPart => ({
+    shape: 'box',
+    size: [1, 1, 1],
+    at: [0, 0, 0],
+    turn: 0,
+    tilt: [0, 0],
+    material: 'wood',
+    color: null,
+    spin: null,
+    ...p,
+  });
+
+  it("lowers the long house's tilted roof until it lands on what is under it (owner's screenshot)", () => {
+    // As stored from the model's answer on 21 Oct 2026, `placeFromMiddles` already applied.
+    const parts = [
+      part({ size: [12, 0.5, 12], at: [0, 0, 0], material: 'dark' }),
+      part({ size: [0.6, 4, 0.6], at: [-4, 0.25, -2] }),
+      part({ size: [0.6, 4, 0.6], at: [4, 0.25, -2] }),
+      part({ shape: 'wedge', size: [10, 3, 10], at: [0, 3.5904610688211376, 1.486969785011497], tilt: [20, 0], material: 'roof' }),
+    ];
+    const settled = settleParts(parts);
+    expect(settled.slice(0, 3)).toEqual(parts.slice(0, 3));
+    const drop = parts[3].at[1] - settled[3].at[1];
+    // It hung 1.4 m over the floor at its low edge; it comes down onto the pillars or the floor.
+    expect(drop).toBeGreaterThan(0.3);
+    expect(drop).toBeLessThan(1.45);
+  });
+
+  it('leaves alone what already rests on something, or hangs from it', () => {
+    const house = [
+      part({ size: [8, 4, 6], at: [0, 0, 0], material: 'wall' }),
+      part({ shape: 'wedge', size: [9, 3, 7], at: [0, 4, 0], material: 'roof' }),
+      part({ size: [0.8, 2, 0.8], at: [2, 5.5, 0], material: 'stone' }),
+      part({ shape: 'cylinder', size: [0.2, 5, 0.2], at: [6, 0, 0] }),
+      part({ size: [1, 1.5, 0.05], at: [6.6, 2.5, 0], material: 'cloth' }),
+    ];
+    expect(settleParts(house)).toEqual(house);
+  });
+
+  it('drops a block left in the air to the ground, and keeps sails and glow where they are', () => {
+    const parts = [
+      part({ size: [2, 2, 2], at: [0, 3, 0] }),
+      part({ size: [0.6, 11, 0.2], at: [0, 6, 2.8], spin: 'z' }),
+      part({ shape: 'sphere', size: [1, 1, 1], at: [0, 8, 0], material: 'glow' }),
+    ];
+    const settled = settleParts(parts);
+    expect(settled[0].at[1]).toBeCloseTo(0, 5);
+    expect(settled[1]).toEqual(parts[1]);
+    expect(settled[2]).toEqual(parts[2]);
   });
 });

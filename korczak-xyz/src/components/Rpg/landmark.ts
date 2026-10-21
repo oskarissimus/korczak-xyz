@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
-import type { Landmark, LandmarkPart, PartMaterial, PartShape } from '../../utils/rpg/place';
+import { settleParts, type Landmark, type LandmarkPart, type PartMaterial, type PartShape } from '../../utils/rpg/place';
 import { recolor } from './atmosphere';
 import type { Obstacle } from './placeBuilder';
 import { surfaceMat, type Surface } from './surfaces';
@@ -150,7 +150,8 @@ export function buildLandmark(landmark: Landmark, look: WorldLook = CLASSIC_LOOK
   const spinners: Spinner[] = [];
   let footprint = 2;
 
-  for (const p of landmark.parts) {
+  // Nothing the model left hanging in the air stays there (`settleParts`).
+  for (const p of settleParts(landmark.parts)) {
     let geometry = geometries.get(p.shape);
     if (!geometry) {
       geometry = unitGeometry(p.shape);

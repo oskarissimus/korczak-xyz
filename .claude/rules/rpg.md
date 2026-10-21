@@ -183,6 +183,17 @@ half its height along its own up, once, when the model's answer is read in `beat
 worlds, the demo's context and `landmark.ts` all still mean the base, so nothing saved needed a
 migration — do not call it anywhere else, or a part sinks by half its height.
 
+**And whatever touches nothing falls** (`settleParts`, `place.ts`, run by `buildLandmark`). Middles
+fixed the blocks a model stacks straight, not the leant ones: a long house's burnt roof, a 10 m
+wedge tilted 20°, hung with its low edge 1.4 m over the floor and its high edge past the pillar
+tops (owner's screenshot, 21 Oct 2026; the beat's record has the model's exact numbers). Where a
+tilted slab's lowest corner lands is trigonometry the model does not do. So each part is an
+oriented box, and one whose box meets no other part's and stands off the ground is lowered,
+bottom-up, until it meets the first thing below it. Anything touching stays as written — a roof on
+its walls, a chimney in its roof, a banner on its pole — and spinning and glowing parts never move.
+On six fresh landmarks (Oct 2026) it moved two struts 5 cm and one loose sail 0.6 m, and nothing
+else: it corrects mistakes, it does not redesign. At build time, so saved worlds are settled too.
+
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
 
