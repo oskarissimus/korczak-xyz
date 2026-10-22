@@ -1168,3 +1168,86 @@ ul.rpg-source {
   opacity: 0.85;
   font-size: 0.9em;
 }
+
+/* The worlds played before (`WorldLibrary.tsx`), in place of the intro. */
+.rpg-library {
+  width: min(100%, 560px);
+  margin: 0 auto;
+  text-align: left;
+}
+
+.rpg-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rpg-library-head button,
+.rpg-library-actions button:not(.rpg-start) {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid #b9a77f;
+  background: #3a2c18;
+  color: #f1e6cf;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpg-library ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rpg-library > ul > li {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(185, 167, 127, 0.5);
+  background: rgba(20, 14, 6, 0.55);
+}
+
+/* The world being played is marked in words too ("playing now"), not by the border alone. */
+.rpg-library-current {
+  border-color: #c9a45c !important;
+}
+
+.rpg-library-name {
+  font-size: 1.1em;
+  overflow-wrap: anywhere;
+}
+
+.rpg-library-lang,
+.rpg-library-tag,
+.rpg-library-meta,
+.rpg-library-note {
+  opacity: 0.8;
+  font-size: 0.85em;
+}
+
+.rpg-library-pitch {
+  margin: 4px 0;
+}
+
+.rpg-library details ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.rpg-library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rpg-library-actions .rpg-start {
+  margin-top: 0;
+  font-size: 15px;
+  padding: 6px 14px;
+  overflow-wrap: anywhere;
+}
+
+.rpg-library-actions button:disabled {
+  opacity: 0.5;
+}

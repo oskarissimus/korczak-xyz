@@ -437,14 +437,67 @@ defaults apply until `rpgPerIpUsd`/`rpgDailyUsd` are written into `demo/config` 
 
 ## The autosave
 
-`utils/rpg/save.ts`, localStorage `rpg-save`, one quest at a time (owner, Oct 2026: he went back by
-accident just before a story ended and never learnt how it ended). Written at every step that
+`utils/rpg/save.ts`, localStorage `rpg-saves`, one quest at a time **in each world**, by world id
+(owner, Oct 2026: he went back by accident just before a story ended and never learnt how it ended;
+later: "browse the earlier worlds and the games in them, and load such a saved game"). The single
+`rpg-save` of before is read once into the map and removed. A new quest clears only its own world's
+save, and a new world no longer throws the old world's quest away. Written at every step that
 changes the quest: a beat set up, a target killed or picked up, a clue examined, the story heard,
 a decision made. It keeps every beat so far, the decisions, the job's progress, what was examined
 and heard; the world is rebuilt from that (`resume` in `Rpg.tsx`), with the hunter back at the
 village. A decision whose next beat was still being written is saved as made and the beat is asked
 for again on load, since the answer in flight is lost with the page. The intro screen offers
 "Kontynuuj: <title>" in the save's language; a new quest or a finished one clears it.
+
+## On the account, and the library of worlds
+
+Owner, Oct 2026: "games on the phone and the computer don't sync within one account; and I'd like to
+browse the earlier worlds and the games in them and load such a saved game".
+
+**localStorage stays what the game reads and writes; `utils/rpg/cloud.ts` copies it to Firestore and
+back** when somebody is signed in, in three kinds of unit (`sync.ts`), last writer wins by the
+writing browser's clock:
+
+| Unit | Document | Holds |
+|---|---|---|
+| `world:<id>` | `users/{uid}/rpgWorlds/{id}` | the library entry (bible, last played), atlas, chronicle |
+| `save:<id>` | `users/{uid}/rpgSaves/{id}` | the quest in progress, or `data: null` once it ended |
+| `state` | `users/{uid}/rpgState/current` | the current world id per language |
+
+- Every write in `save.ts`, `worldSave.ts` and `chronicle.ts` calls `touch(unit)`. That stamps it
+  in `rpg-sync` and the pusher sends it 2.5 s later, or at once when the page is hidden.
+- A pull runs at sign-in and every time the page comes back to the front. It takes every unit the
+  account has newer and pushes every unit this browser has newer.
+- **It never pushes over a newer account copy**, even one it did not take.
+- A pull while a quest is on screen changes storage but not the screen. The intro is read again on
+  the way back (`stalePullRef`).
+- **Payloads are JSON strings**, because Firestore refuses the save's arrays of arrays
+  (`lastLines`) and its `undefined`s. A save over 900 kB drops its transcript (`saveData`).
+- An ended quest is a null save, not a deleted document, so the end propagates instead of the old
+  save coming back.
+- The `users/{uid}/{document=**}` rule already covers all three paths.
+- **Data from before the syncing** is stamped with when it really changed (`seedStamps`: a world's
+  last play, a chronicle's last quest, a save's own time, and the state with 1). So on the first
+  pull another device's newer choice wins over it.
+
+**The library** (`worldSave.ts`, `library` in `rpg-worlds`, 60 worlds at most):
+- It holds every invented world played here or on the account, newest played first. `saveWorld`
+  and `playedWorld` order it.
+- The intro shows "📚 Moje światy (n)" (`WorldLibrary.tsx`). Each world is shown with its finished
+  quests (its chronicle) and its quest in progress, from here or from the account (`accountSaves`).
+- "Kontynuuj" resumes that save and "Nowy quest w tym świecie" starts one. Either one first makes
+  the world current, switching the game's language if it is the other one (`openingRef` waits for
+  that render).
+- `resume` now finds a save's world in the library rather than falling back to the classic one,
+  because the newest save need not be in the current world.
+
+**Eviction**:
+- This browser keeps the atlas and the save of the classic and current worlds, plus the
+  `LOCAL_WORLDS` (6) played most recently. While signed in it also keeps any unit the account has
+  not got yet (`unsafeToDrop`).
+- Other worlds keep only their bible and chronicle here. A pull brings back their library entry and
+  chronicle but not the rest; `fetchWorld` takes the atlas and save when the world is picked.
+- A push of a world whose atlas is not here merges and never blanks the account's atlas.
 
 ## Language
 

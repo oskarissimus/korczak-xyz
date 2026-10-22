@@ -6,12 +6,20 @@
  * chronicle always had. "New world" replaces the current one and starts over: its chronicle is kept
  * under its own id (`chronicle.ts`), so an old world's deeds never leak into a new one's prompts.
  *
- * In localStorage like the chronicle and the autosave; not on the account yet.
+ * THE LIBRARY: every world ever played here, newest played first (owner, Oct 2026: "browse the
+ * earlier worlds and the games in them, and load such a saved game"). A world that is no longer
+ * current is not gone: its bible stays in `library`, its chronicle under its id, its atlas and its
+ * quest in progress too while there is room (`LOCAL_WORLDS`); picking it again makes it current.
+ *
+ * In localStorage, and on the account when somebody is signed in (`cloud.ts`): every write here is
+ * stamped (`sync.ts`) and the pusher sends it.
  */
 
 import type { WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import type { Character, Lang } from './quest';
+import { dropGameFor } from './save';
+import { forget, saveUnit, STATE_UNIT, touch, unsafeToDrop, worldUnit } from './sync';
 
 const KEY = 'rpg-worlds';
 /** How many earlier worlds the next genesis is told to avoid. */
@@ -21,6 +29,36 @@ interface Stored {
   current?: Partial<Record<Lang, WorldBible>>;
   /** "name: pitch" of earlier worlds, newest last, every language. */
   past?: string[];
+  /** Every world played here, with when it was last played. */
+  library?: Record<string, LibraryEntry>;
+}
+
+export interface LibraryEntry {
+  world: WorldBible;
+  played: number;
+}
+
+/** The worlds whose atlas and quest in progress this browser keeps, besides the current ones. */
+export const LOCAL_WORLDS = 6;
+/** The worlds the library remembers at all. */
+export const LIBRARY_MAX = 60;
+
+function valid(world: WorldBible | undefined | null): world is WorldBible {
+  return Boolean(world && typeof world.id === 'string' && typeof world.name === 'string' && world.look);
+}
+
+function withLibrary(stored: Stored): Record<string, LibraryEntry> {
+  const library = { ...(stored.library ?? {}) };
+  // Worlds from before the library: the current ones are in it from the start.
+  for (const w of Object.values(stored.current ?? {})) {
+    if (valid(w) && !library[w.id]) library[w.id] = { world: w, played: w.createdAt };
+  }
+  return library;
+}
+
+function trimmed(library: Record<string, LibraryEntry>): Record<string, LibraryEntry> {
+  const entries = Object.entries(library).sort(([, a], [, b]) => b.played - a.played);
+  return Object.fromEntries(entries.slice(0, LIBRARY_MAX));
 }
 
 function read(): Stored {
@@ -42,16 +80,96 @@ function write(stored: Stored) {
 
 export function loadWorld(lang: Lang): WorldBible | null {
   const world = read().current?.[lang];
-  return world && typeof world.id === 'string' && typeof world.name === 'string' && world.look ? world : null;
+  return valid(world) ? world : null;
 }
 
-/** Makes `world` the one played in its language; the one it replaces joins the past. */
-export function saveWorld(world: WorldBible): void {
+/**
+ * Makes `world` the one played in its language, and the most recently played in the library; the
+ * one it replaces joins the past.
+ */
+export function saveWorld(world: WorldBible, now = Date.now()): void {
   const stored = read();
   const before = stored.current?.[world.lang];
   const past = [...(stored.past ?? [])];
-  if (before && before.id !== world.id && before.createdAt > 0) past.push(`${before.name}: ${before.pitch}`);
-  write({ current: { ...stored.current, [world.lang]: world }, past: past.slice(-KEEP_PAST) });
+  if (before && before.id !== world.id && before.createdAt > 0) {
+    const line = `${before.name}: ${before.pitch}`;
+    if (!past.includes(line)) past.push(line);
+  }
+  const library = withLibrary(stored);
+  if (world.createdAt > 0) library[world.id] = { world, played: now };
+  write({ ...stored, current: { ...stored.current, [world.lang]: world }, past: past.slice(-KEEP_PAST), library: trimmed(library) });
+  if (world.createdAt > 0) touch(worldUnit(world.id), now);
+  touch(STATE_UNIT, now);
+}
+
+/** Every invented world played in this browser or on the account, the most recently played first. */
+export function libraryWorlds(): LibraryEntry[] {
+  return Object.values(withLibrary(read()))
+    .filter((e) => valid(e.world) && e.world.createdAt > 0)
+    .sort((a, b) => b.played - a.played);
+}
+
+/** The world with this id, from the library or the current ones. */
+export function findWorld(id: string): WorldBible | null {
+  const stored = read();
+  const hit = withLibrary(stored)[id]?.world ?? Object.values(stored.current ?? {}).find((w) => w?.id === id);
+  return valid(hit) ? hit : null;
+}
+
+/** The world being played in each language, by id (the classic one is its language). */
+export function currentIds(): Partial<Record<Lang, string>> {
+  const out: Partial<Record<Lang, string>> = {};
+  for (const [lang, w] of Object.entries(read().current ?? {})) if (valid(w)) out[lang as Lang] = w.id;
+  return out;
+}
+
+/**
+ * For the account copy (`cloud.ts`): makes these the current worlds, each found in the library;
+ * a world this browser does not have yet must be put there first (`writeLibraryEntry`). False when
+ * one of them is not here yet, so the next pull tries again.
+ */
+export function writeCurrent(ids: Partial<Record<Lang, string>>, classic: (lang: Lang) => WorldBible): boolean {
+  const stored = read();
+  const current = { ...stored.current };
+  let all = true;
+  for (const [lang, id] of Object.entries(ids) as [Lang, string][]) {
+    const w = id === lang ? classic(lang) : findWorld(id);
+    if (w) current[lang] = w;
+    else all = false;
+  }
+  write({ ...stored, current });
+  return all;
+}
+
+/** For the account copy: a world's library entry, as the account has it. */
+export function writeLibraryEntry(entry: LibraryEntry): void {
+  if (!valid(entry.world)) return;
+  const stored = read();
+  const library = withLibrary(stored);
+  library[entry.world.id] = entry;
+  const current = { ...stored.current };
+  // The current world's bible is the same object in both places.
+  if (current[entry.world.lang]?.id === entry.world.id) current[entry.world.lang] = entry.world;
+  write({ ...stored, current, library: trimmed(library) });
+}
+
+/** A world played again: first in the library. */
+export function playedWorld(id: string, now = Date.now()): void {
+  const stored = read();
+  const library = withLibrary(stored);
+  if (!library[id]) return;
+  library[id] = { ...library[id], played: now };
+  write({ ...stored, library: trimmed(library) });
+  touch(worldUnit(id), now);
+}
+
+/** Every world with an atlas here. */
+export function atlasIds(): string[] {
+  return Object.keys(readAtlases());
+}
+
+export function libraryEntry(id: string): LibraryEntry | null {
+  return withLibrary(read())[id] ?? null;
 }
 
 /** The worlds to be unlike, the current ones included. */
@@ -100,7 +218,15 @@ function readAtlases(): Record<string, Atlas> {
 }
 
 export function loadAtlas(worldId: string): Atlas {
-  const atlas = readAtlases()[worldId];
+  return cleanAtlas(readAtlases()[worldId]);
+}
+
+/** This browser's atlas of a world as stored, or null, for the account copy. */
+export function rawAtlas(worldId: string): Atlas | null {
+  return readAtlases()[worldId] ?? null;
+}
+
+function cleanAtlas(atlas: Atlas | undefined): Atlas {
   return {
     // Through the parser again: what is stored is the browser's to edit, and an older game's to have
     // written in an older shape.
@@ -124,17 +250,49 @@ export function addToAtlas(worldId: string, add: Atlas): Atlas {
     ...add.people,
   ].slice(-ATLAS_PEOPLE);
   const atlas = { places, people };
-  // Only the worlds still being played keep theirs: the classic ones, and each language's current.
-  const live = new Set<string>(['pl', 'en', ...Object.values(read().current ?? {}).map((w) => w?.id ?? '')]);
-  const kept: Record<string, Atlas> = {};
-  for (const id of live) if (all[id]) kept[id] = all[id];
-  kept[worldId] = atlas;
+  all[worldId] = atlas;
+  writeAtlases(evict(all, worldId));
+  touch(worldUnit(worldId));
+  return atlas;
+}
+
+/** For the account copy: a world's atlas as the account has it. */
+export function writeAtlas(worldId: string, atlas: Atlas | null): void {
+  const all = readAtlases();
+  if (atlas) all[worldId] = atlas;
+  else delete all[worldId];
+  writeAtlases(evict(all, worldId));
+}
+
+function writeAtlases(all: Record<string, Atlas>) {
   try {
-    localStorage.setItem(ATLAS_KEY, JSON.stringify(kept));
+    localStorage.setItem(ATLAS_KEY, JSON.stringify(all));
   } catch {
     /* a full storage forgets the atlas; the world just grows less */
   }
-  return atlas;
+}
+
+/**
+ * Only so many worlds keep their atlas and their quest in progress here: the classic ones, each
+ * language's current one, the `LOCAL_WORLDS` played most recently, and any whose latest change the
+ * account has not got yet. The rest are dropped from this browser and their stamps forgotten, so
+ * picking such a world from the library takes the account's copy back (`cloud.ts`).
+ */
+function evict(all: Record<string, Atlas>, keep?: string): Record<string, Atlas> {
+  const recent = libraryWorlds()
+    .slice(0, LOCAL_WORLDS)
+    .map((e) => e.world.id);
+  const live = new Set<string>(['pl', 'en', ...Object.values(currentIds()), ...recent, ...(keep ? [keep] : [])]);
+  const kept: Record<string, Atlas> = {};
+  for (const [id, atlas] of Object.entries(all)) {
+    if (live.has(id) || unsafeToDrop(worldUnit(id)) || unsafeToDrop(saveUnit(id))) kept[id] = atlas;
+    else {
+      dropGameFor(id);
+      forget(worldUnit(id));
+      forget(saveUnit(id));
+    }
+  }
+  return kept;
 }
 
 /*

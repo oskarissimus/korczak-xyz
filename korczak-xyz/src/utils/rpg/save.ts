@@ -10,13 +10,19 @@
  * A decision whose next beat was still being written is saved as made, and the beat is asked for
  * again on load — the model's answer from before is gone with the page.
  *
- * One quest at a time, cleared when it ends (it is in the chronicle then) or a new one starts.
+ * One quest at a time IN EACH WORLD (owner, Oct 2026: "browse the earlier worlds and the games in
+ * them, and load such a saved game"): `rpg-saves`, by world id, so leaving a world for a new one no
+ * longer throws its quest away. A save is cleared when its quest ends (it is in the chronicle then)
+ * or a new one starts in that world. The single `rpg-save` of before is read once into the map.
+ * Every change is stamped for the account copy (`sync.ts`, `cloud.ts`).
  */
 
 import type { Beat, Lang, StepRecord } from './quest';
+import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
-const KEY = 'rpg-save';
+const OLD_KEY = 'rpg-save';
+const KEY = 'rpg-saves';
 const VERSION = 1;
 
 export interface SavedGame {
@@ -49,28 +55,88 @@ export interface SavedGame {
   worldId?: string;
 }
 
-export function loadGame(): SavedGame | null {
+function valid(saved: unknown): saved is SavedGame {
+  const g = saved as SavedGame | null;
+  return Boolean(g && g.version === VERSION && Array.isArray(g.beats) && g.beats.length > 0);
+}
+
+/** The world a save belongs to: a save from before there were worlds is the classic one's. */
+export function saveWorldId(game: Pick<SavedGame, 'worldId' | 'lang'>): string {
+  return game.worldId ?? game.lang;
+}
+
+function readAll(): Record<string, SavedGame> {
+  let all: Record<string, SavedGame> = {};
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (!saved || saved.version !== VERSION || !Array.isArray(saved.beats) || saved.beats.length === 0) return null;
-    return saved as SavedGame;
+    const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    if (parsed && typeof parsed === 'object') all = parsed;
+    const old = JSON.parse(localStorage.getItem(OLD_KEY) ?? 'null');
+    if (valid(old)) {
+      const id = saveWorldId(old);
+      if (!all[id] || all[id].at < old.at) all[id] = old;
+      localStorage.setItem(KEY, JSON.stringify(all));
+      touch(saveUnit(id));
+    }
+    if (old !== null) localStorage.removeItem(OLD_KEY);
   } catch {
-    return null;
+    /* what could be read */
   }
+  return all;
+}
+
+function writeAll(all: Record<string, SavedGame>): boolean {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(all));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The quest played last, in any world. */
+export function loadGame(): SavedGame | null {
+  const saves = Object.values(readAll()).filter(valid);
+  return saves.sort((a, b) => b.at - a.at)[0] ?? null;
+}
+
+/** The quest in progress in this world, if any. */
+export function loadGameFor(worldId: string): SavedGame | null {
+  const game = readAll()[worldId];
+  return valid(game) ? game : null;
+}
+
+/** Every world's quest in progress, by world id. */
+export function allGames(): Record<string, SavedGame> {
+  const all = readAll();
+  return Object.fromEntries(Object.entries(all).filter(([, g]) => valid(g)));
 }
 
 export function saveGame(game: Omit<SavedGame, 'version' | 'at'>): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...game, version: VERSION, at: Date.now() }));
-  } catch {
-    /* a full or blocked storage keeps no save; the game plays on */
-  }
+  const id = saveWorldId(game);
+  const all = readAll();
+  all[id] = { ...game, version: VERSION, at: Date.now() };
+  // A full storage keeps no save; the game plays on.
+  if (writeAll(all)) touch(saveUnit(id));
 }
 
-export function clearGame(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* nothing to clear */
-  }
+/** The quest in this world is over or abandoned. */
+export function clearGame(worldId: string): void {
+  const all = readAll();
+  if (!(worldId in all)) return;
+  delete all[worldId];
+  writeAll(all);
+  touch(saveUnit(worldId));
+}
+
+/** For the account copy: what this browser holds, and taking the account's (`cloud.ts`). */
+export function writeGameFor(worldId: string, game: SavedGame | null): void {
+  const all = readAll();
+  if (valid(game)) all[worldId] = game;
+  else delete all[worldId];
+  writeAll(all);
+}
+
+/** Frees the storage of a world's save the account already has (`worldSave.ts`'s eviction). */
+export function dropGameFor(worldId: string): void {
+  writeGameFor(worldId, null);
 }

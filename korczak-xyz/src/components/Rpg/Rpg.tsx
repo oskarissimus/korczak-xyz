@@ -35,20 +35,26 @@ import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
-import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/save';
+import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from '../../utils/rpg/save';
+import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
+import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import {
   addToAtlas,
   clearPendingGenesis,
+  currentIds,
+  findWorld,
+  libraryWorlds,
   loadAtlas,
   loadPendingGenesis,
   loadWorld,
   pastWorlds,
+  playedWorld,
   savePendingGenesis,
   saveWorld,
   type PendingGenesis,
@@ -375,6 +381,33 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setGameLang(game.lang);
   }, []);
 
+  /** Bumped whenever the library may have changed, so the intro reads it again. */
+  const [libraryTick, setLibraryTick] = useState(0);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const startedRef = useRef(false);
+  startedRef.current = started;
+  /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
+  const stalePullRef = useRef(false);
+  /** Reads the intro's world, save and chronicle again from this browser's storage. */
+  const reloadIntro = useCallback(() => {
+    const lang = gameLangRef.current;
+    const w = loadWorld(lang);
+    setWorld(w);
+    setChronicle(loadChronicle(w?.id ?? lang));
+    setSaved(loadGame());
+    setLibraryTick((n) => n + 1);
+  }, []);
+  // The account's copy of the game (`cloud.ts`): pulled now and whenever the page comes back to the
+  // front, pushed after every change. A pull never swaps the world under a quest being played.
+  const uid = auth.user?.uid ?? null;
+  useEffect(() => {
+    if (!uid) return;
+    return startSync(uid, () => {
+      if (startedRef.current) stalePullRef.current = true;
+      else reloadIntro();
+    });
+  }, [uid, reloadIntro]);
+
   /** The autosave, at every step that changes the quest. */
   /** Writes this quest's places and people into the world's atlas, so the next quest finds them. */
   const rememberWorld = useCallback(() => {
@@ -561,7 +594,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     resetTranscript();
     beatsRef.current = [];
     decisionRef.current = null;
-    clearGame();
+    // A new quest in this world abandons the one in progress here; other worlds keep theirs.
+    clearGame(worldRef.current?.id ?? gameLangRef.current);
     setSaved(null);
     staticRef.current = false;
     pendingRef.current = null;
@@ -664,7 +698,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (born) {
       // A new world is a new game: the quest left half way belonged to the old one.
       saveWorld(born);
-      clearGame();
       setSaved(null);
       enterWorld(born);
       flash(tRef.current.worldBorn(born.name), 5000);
@@ -703,7 +736,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setChronicle(addToChronicle(worldRef.current?.id ?? gameLang, entry));
       rememberWorld();
       // Told to the end and in the chronicle: nothing left to continue.
-      clearGame();
+      clearGame(worldRef.current?.id ?? gameLang);
       setSaved(null);
       flushPlay();
       setEnding({ title: b.title, speaker, text, steps, playMs: playedNow() });
@@ -1196,10 +1229,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setUnfolding(false);
     seedRef.current = game.seed;
     staticRef.current = game.static;
-    // The world it was played in: the current one if it still is, the classic one for a save from
-    // before there were worlds.
-    const kept = loadWorld(game.lang);
-    enterWorld(kept && kept.id === game.worldId ? kept : classicWorld(game.lang));
+    // The world it was played in, made current again if another one is (`worldSave.ts`'s library),
+    // or the classic one for a save from before there were worlds.
+    const kept = game.worldId ? findWorld(game.worldId) : null;
+    const into = kept ?? classicWorld(game.lang);
+    if (kept && loadWorld(game.lang)?.id !== kept.id) saveWorld(kept);
+    else playedWorld(into.id);
+    enterWorld(into);
     placesRef.current = [];
     charactersRef.current = [];
     beatsRef.current = [];
@@ -1288,8 +1324,50 @@ export default function Rpg({ lang }: { lang: Lang }) {
       return;
     }
     enterWorld(worldRef.current);
+    playedWorld(worldRef.current.id);
     void startQuest();
   };
+
+  /**
+   * A world picked from the library: made the current one of its language, its atlas and save taken
+   * from the account first when this browser no longer keeps them, then its quest continued or a new
+   * one started. A world in the other language switches the game's language first, and the rest
+   * waits for that render (`openingRef`), since the quest is written in the language of the render.
+   */
+  const openingRef = useRef<{ id: string; cont: boolean } | null>(null);
+  const [opening, setOpening] = useState(0);
+  const openWorld = async (id: string, cont: boolean) => {
+    // Inside the tap, for iOS: whatever starts after the fetch has lost the gesture.
+    primeVoice();
+    if (uidRef.current) {
+      try {
+        await fetchWorld(uidRef.current, id);
+      } catch (e) {
+        log.warn('rpg.fetchWorld.failed', describeError(e));
+      }
+    }
+    const w = findWorld(id);
+    if (!w) return;
+    saveWorld(w);
+    openingRef.current = { id, cont };
+    if (w.lang !== gameLangRef.current) setGameLang(w.lang);
+    setOpening((n) => n + 1);
+  };
+  useEffect(() => {
+    const pending = openingRef.current;
+    if (!pending) return;
+    const w = findWorld(pending.id);
+    if (!w || w.lang !== gameLang) return;
+    openingRef.current = null;
+    setLibraryOpen(false);
+    enterWorld(w);
+    setChronicle(loadChronicle(w.id));
+    const game = pending.cont ? loadGameFor(w.id) : null;
+    if (game) resume(game);
+    else begin();
+    // `resume` and `begin` are this render's; nothing else should run this again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opening, gameLang]);
 
   /** Back to the intro screen on a phone, which has no Esc and no page around the game. */
   const leave = () => {
@@ -1303,7 +1381,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setDialogue(null);
     setHeld(null);
     setStarted(false);
-    setSaved(loadGame());
+    if (stalePullRef.current) {
+      stalePullRef.current = false;
+      reloadIntro();
+    } else setSaved(loadGame());
   };
 
   const fullscreen = () => {
@@ -1345,6 +1426,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
     </label>
   );
 
+  // The worlds played before, read again whenever the library may have changed.
+  const libraryRows: LibraryRow[] = React.useMemo(() => {
+    void libraryTick;
+    const quests = questsInProgress();
+    const current = new Set(Object.values(currentIds()));
+    return libraryWorlds().map((entry) => ({
+      entry,
+      chronicle: loadChronicle(entry.world.id),
+      quest: quests[entry.world.id] ?? null,
+      current: current.has(entry.world.id),
+    }));
+  }, [libraryTick, libraryOpen, world, saved]);
+  const canPlay = keysReady && storyProvider !== 'static';
+
   const startButtons = (
     <>
       {pendingGenesis && keysReady && storyProvider !== 'static' && (
@@ -1371,6 +1466,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {keysReady && world && storyProvider !== 'static' && (
         <button type="button" className="rpg-start" onClick={() => begin(true)} title={t.newWorldHint}>
           {t.newWorld}
+        </button>
+      )}
+      {libraryRows.length > 0 && (
+        <button type="button" className="rpg-start" onClick={() => setLibraryOpen(true)}>
+          {t.libraryOpen(libraryRows.length)}
         </button>
       )}
       {keysReady && storyProvider !== 'static' && exoticSlider}
@@ -1522,7 +1622,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
         );
       })()}
 
-      {!started && (
+      {!started && libraryOpen && (
+        <div className="rpg-overlay">
+          <WorldLibrary
+            lang={gameLang}
+            rows={libraryRows}
+            signedIn={Boolean(uid)}
+            canPlay={canPlay}
+            onOpen={(id, cont) => void openWorld(id, cont)}
+            onBack={() => setLibraryOpen(false)}
+          />
+        </div>
+      )}
+
+      {!started && !libraryOpen && (
         <div className="rpg-overlay">
           <h2>{t.title}</h2>
           <p>{t.intro}</p>
