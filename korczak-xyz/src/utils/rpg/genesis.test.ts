@@ -53,6 +53,11 @@ describe('genesisPrompt', () => {
     expect(prompt).not.toContain('drawn at random by dice');
     expect(prompt).not.toContain('never literal');
     expect(prompt).toContain('well-loved version');
+    expect(prompt).toContain('names the genre at once');
+    // Aimed nearer the familiar than dice worlds at the same slider.
+    expect(prompt).toContain(`Aim them around ${typicalityTarget(10, true)}.`);
+    expect(typicalityTarget(35, true)).toBe(69);
+    expect(typicalityTarget(35)).toBe(57);
     expect(prompt).toContain('4 CANDIDATE worlds');
   });
 

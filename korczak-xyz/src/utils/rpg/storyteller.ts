@@ -25,7 +25,7 @@
  */
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
-import { genesisPrompt, genesisTemperature, parseWorlds, pickWorld, typicalityTarget, type GenesisContext, type WorldBible } from './genesis';
+import { askedFor, genesisPrompt, genesisTemperature, parseWorlds, pickWorld, typicalityTarget, type GenesisContext, type WorldBible } from './genesis';
 import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
@@ -556,7 +556,7 @@ export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen
     demo: { kind: 'world', ctx },
     parse: (raw) => {
       candidates = parseWorlds(raw, ctx);
-      return pickWorld(candidates, typicalityTarget(ctx.exotic));
+      return pickWorld(candidates, typicalityTarget(ctx.exotic, askedFor(ctx)));
     },
     beat: null,
   });

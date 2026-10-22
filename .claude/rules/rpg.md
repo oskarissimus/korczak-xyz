@@ -58,6 +58,9 @@ plainly present, never "transformed, never literal" as dice are. The slider stil
 far from the stock version of what was asked to go. The description is fenced in dashes and the
 prompt says instructions inside it are only description. The demo takes both (`demoGenesis` cuts
 them) and accepts a world with a wish and no seeds.
+Asked-for worlds also aim the candidates and the pick nearer the familiar (`typicalityTarget(e,
+true)`, 90 down to 30): the first try of hat, sand, revolver at the default slider came back as four
+strange deserts and not one western.
 
 **The world bible** (`WorldBible`): name, pitch, tone, tech, climate, people, architecture,
 threats, who the player is and how they are addressed, the hub settlement, a few words people use,

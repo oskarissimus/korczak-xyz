@@ -152,9 +152,20 @@ export function genesisTemperature(exotic: number): number {
   return Math.round((0.9 + (GENESIS_TEMPERATURE - 0.9) * (clampExotic(exotic) / 100)) * 100) / 100;
 }
 
-/** The typicality the game picks closest to: 85 at the far left, 5 at the far right. */
-export function typicalityTarget(exotic: number): number {
-  return Math.round(85 - 0.8 * clampExotic(exotic));
+/**
+ * The typicality the game picks closest to: 85 at the far left, 5 at the far right. A world the
+ * player asked for (`asked`) aims nearer the familiar, 90 down to 30: hat, sand and revolver at the
+ * slider's default came back as four strange deserts and no western, the aim pulling every
+ * candidate away from what the words plainly meant.
+ */
+export function typicalityTarget(exotic: number, asked = false): number {
+  const e = clampExotic(exotic);
+  return Math.round(asked ? 90 - 0.6 * e : 85 - 0.8 * e);
+}
+
+/** True when the player, not the dice, said what the world is made of. */
+export function askedFor(ctx: GenesisContext): boolean {
+  return Boolean(ctx.wish || (ctx.chosen && ctx.seeds.length));
 }
 
 /** The look of the world the game had before there were worlds, and of the hand-written quest. */
@@ -259,14 +270,14 @@ export function genesisPrompt(ctx: GenesisContext): string {
   const language = ctx.lang === 'pl' ? 'Polish' : 'English';
   const exotic = clampExotic(ctx.exotic);
   const lines =
-    ctx.wish || ctx.chosen
+    askedFor(ctx)
       ? playerLines(ctx, exotic)
       : exotic < 34
         ? familiarLines(ctx)
         : exotic < 67
           ? twistedLines(ctx)
           : exoticLines(ctx);
-  return finish(lines, ctx, language, typicalityTarget(exotic));
+  return finish(lines, ctx, language, typicalityTarget(exotic, askedFor(ctx)));
 }
 
 /**
@@ -292,8 +303,9 @@ function playerLines(ctx: GenesisContext, exotic: number): string[] {
     lines.push(
       `WORDS THE PLAYER CHOSE: ${list(words)}.`,
       'They are not dice: the player means them. Read them together, as the genre, the place and the feel they',
-      'point at (hat, sand, revolver: a Wild West; snow, wolf, rune: a northern saga), and make each plainly present',
-      'in the world — something people wear, use, fear or live on — not hidden away as flavour.',
+      'point at (hat, sand, revolver: a Wild West of cowboys, saloons and sheriffs; snow, wolf, rune: a northern saga),',
+      'and build THAT world: anyone reading the pitch names the genre at once. Make each word plainly present —',
+      'something people wear, use, fear or live on — not hidden away, transformed or turned into a metaphor.',
       '',
     );
   } else if (ctx.seeds.length) {
@@ -303,7 +315,7 @@ function playerLines(ctx: GenesisContext, exotic: number): string[] {
     exotic < 34
       ? 'Make it the well-loved version of what they ask for, the one a player expects and feels at home in at once; it is fresh through its details — people, customs, places, troubles — not through a strange premise.'
       : exotic < 67
-        ? 'Keep it recognisably what they ask for, with ONE strong unusual twist of your own that no stock version of it has.'
+        ? 'Keep it plainly what they ask for, its genre named at a glance, with ONE unusual twist of your own on top — a detail of its land, magic or customs, never a replacement of the genre.'
         : 'Take what they ask for as far from its stock version as you can while keeping it plainly theirs: a strange, original take nobody has seen.',
     '',
     'It is not a franchise, even if the player names one: no names, places, creatures, factions or terms from',
