@@ -13,7 +13,18 @@ import { PICK_GROUPS } from '../../utils/rpg/seedWords';
 import { addWords, NO_WISH, wished, type Wish } from '../../utils/rpg/wish';
 import { translations } from './translations';
 
-export default function WorldWish({ lang, wish, onChange }: { lang: Lang; wish: Wish; onChange: (wish: Wish) => void }) {
+export default function WorldWish({
+  lang,
+  wish,
+  onChange,
+  open = false,
+}: {
+  lang: Lang;
+  wish: Wish;
+  onChange: (wish: Wish) => void;
+  /** Shown whole, in the menu's own world screen, rather than folded. */
+  open?: boolean;
+}) {
   const t = translations[lang];
   const full = wish.words.length >= CHOSEN_MAX;
   const add = (typed: string) => onChange({ ...wish, words: addWords(wish.words, typed) });
@@ -25,8 +36,8 @@ export default function WorldWish({ lang, wish, onChange }: { lang: Lang; wish: 
   let field: HTMLInputElement | null = null;
 
   return (
-    <details className="rpg-wish" open={wished(wish)}>
-      <summary>{wished(wish) ? t.wishSummary(wish.words, wish.text.trim()) : t.wishClosed}</summary>
+    <details className={`rpg-wish${open ? ' rpg-wish-open' : ''}`} open={open || wished(wish)}>
+      <summary>{open ? t.wishOpenTitle : wished(wish) ? t.wishSummary(wish.words, wish.text.trim()) : t.wishClosed}</summary>
       <div className="rpg-wish-row">
         <select
           aria-label={t.wishPick}

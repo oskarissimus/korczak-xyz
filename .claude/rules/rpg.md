@@ -449,6 +449,20 @@ village. A decision whose next beat was still being written is saved as made and
 for again on load, since the answer in flight is lost with the page. The intro screen offers
 "Kontynuuj: <title>" in the save's language; a new quest or a finished one clears it.
 
+## The intro is a game's menu
+
+Owner, Oct 2026: "less slop, more substance, make it look like a game menu — it cuts the options
+off and the new-world setup can't be seen". The main screen has the title, the world in one line
+(its pitch a tap away) and a column of entries: Continue (the quest title under it), New quest (in
+which world), New world, My worlds, Settings, Controls. Everything else is one level down, each
+sub-screen with its own Back (`menu` in `Rpg.tsx`):
+- New world holds the slider, the word picker and the description, shown whole, and Create.
+- Settings holds the language, the model, who writes and who speaks, the chronicle, today's figures
+  and the console hint.
+- Controls holds the keys or the touch gestures, and the one-paragraph intro.
+
+The overlay scrolls instead of centring past its edges, which is what used to cut the options off.
+
 ## On the account, and the library of worlds
 
 Owner, Oct 2026: "games on the phone and the computer don't sync within one account; and I'd like to

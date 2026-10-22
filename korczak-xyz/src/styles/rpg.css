@@ -1251,3 +1251,136 @@ ul.rpg-source {
 .rpg-library-actions button:disabled {
   opacity: 0.5;
 }
+
+/* The intro as a game's menu: a title, the world in one line, a column of entries, and each
+   sub-screen one level down with its own Back. Scrolls rather than cuts off on a short screen. */
+.rpg-menu-screen {
+  overflow-y: auto;
+  justify-content: safe center;
+  -webkit-overflow-scrolling: touch;
+  gap: 14px;
+}
+
+.rpg-menu-title {
+  font-size: clamp(30px, 7vw, 52px) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.12em !important;
+  text-shadow: 0 2px 0 #000, 0 0 18px rgba(255, 211, 107, 0.35);
+}
+
+.rpg-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 320px);
+}
+
+.rpg-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px 16px;
+  border: 1px solid rgba(185, 167, 127, 0.55);
+  background: rgba(20, 14, 6, 0.7);
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.rpg-menu-item small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+
+.rpg-menu-item:hover:not(:disabled),
+.rpg-menu-item:focus-visible {
+  border-color: #ffd36b;
+  color: #ffd36b;
+  outline: none;
+}
+
+.rpg-menu-primary {
+  border-color: #c9a45c;
+  background: #3a2c18;
+}
+
+.rpg-menu-item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rpg-world {
+  width: min(100%, 520px);
+  box-sizing: border-box;
+}
+
+.rpg-world summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.rpg-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 420px);
+}
+
+.rpg-panel h3 {
+  margin: 0;
+  color: #ffd36b;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpg-panel .rpg-exotic,
+.rpg-panel .rpg-wish {
+  width: 100%;
+}
+
+.rpg-panel-note {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.rpg-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+}
+
+.rpg-panel-actions .rpg-start {
+  margin-top: 0;
+}
+
+.rpg-menu-back {
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 1px solid rgba(185, 167, 127, 0.55);
+  background: transparent;
+  color: #f1e6cf;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpg-wish-open summary {
+  pointer-events: none;
+  list-style: none;
+}
+
+.rpg-wish-open summary::-webkit-details-marker {
+  display: none;
+}

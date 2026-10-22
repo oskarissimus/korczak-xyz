@@ -383,7 +383,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** Bumped whenever the library may have changed, so the intro reads it again. */
   const [libraryTick, setLibraryTick] = useState(0);
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Which screen of the intro's menu is showing. */
+  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls'>('main');
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -1359,7 +1360,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const w = findWorld(pending.id);
     if (!w || w.lang !== gameLang) return;
     openingRef.current = null;
-    setLibraryOpen(false);
+    setMenu('main');
     enterWorld(w);
     setChronicle(loadChronicle(w.id));
     const game = pending.cont ? loadGameFor(w.id) : null;
@@ -1381,6 +1382,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setDialogue(null);
     setHeld(null);
     setStarted(false);
+    setMenu('main');
     if (stalePullRef.current) {
       stalePullRef.current = false;
       reloadIntro();
@@ -1437,56 +1439,174 @@ export default function Rpg({ lang }: { lang: Lang }) {
       quest: quests[entry.world.id] ?? null,
       current: current.has(entry.world.id),
     }));
-  }, [libraryTick, libraryOpen, world, saved]);
+  }, [libraryTick, menu, world, saved]);
   const canPlay = keysReady && storyProvider !== 'static';
 
-  const startButtons = (
-    <>
-      {pendingGenesis && keysReady && storyProvider !== 'static' && (
-        <button type="button" className="rpg-start" onClick={() => finishGenesis(pendingGenesis)}>
-          {t.finishWorld(pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40))}
-        </button>
-      )}
-      {saved && saved.lang === gameLang && keysReady && (
-        <button type="button" className="rpg-start" onClick={() => resume(saved)}>
-          {t.continueQuest(saved.beats[saved.beats.length - 1].title)}
-        </button>
-      )}
-      <button type="button" className="rpg-start" disabled={!keysReady} onClick={() => begin()}>
-        {/* Without a world yet, starting is inventing one, and the button says so: a save from
-            before worlds existed made it read "New quest", and nobody saw a world was coming. */}
-        {!keysReady
-          ? t.wait
-          : storyProvider !== 'static' && !world
-            ? t.newWorld
-            : (saved && saved.lang === gameLang) || world
-              ? t.newQuest
-              : t.start}
-      </button>
-      {keysReady && world && storyProvider !== 'static' && (
-        <button type="button" className="rpg-start" onClick={() => begin(true)} title={t.newWorldHint}>
-          {t.newWorld}
-        </button>
-      )}
-      {libraryRows.length > 0 && (
-        <button type="button" className="rpg-start" onClick={() => setLibraryOpen(true)}>
-          {t.libraryOpen(libraryRows.length)}
-        </button>
-      )}
-      {keysReady && storyProvider !== 'static' && exoticSlider}
-      {keysReady && storyProvider !== 'static' && <WorldWish lang={gameLang} wish={wish} onChange={pickWish} />}
-    </>
+  const creatable = keysReady && storyProvider !== 'static';
+  const ownSave = saved && saved.lang === gameLang ? saved : null;
+  /** One entry of the main menu: a label, and a line under it when there is something to say. */
+  const item = (key: string, label: string, onClick: () => void, opts: { sub?: string; primary?: boolean; disabled?: boolean } = {}) => (
+    <button
+      key={key}
+      type="button"
+      className={`rpg-menu-item${opts.primary ? ' rpg-menu-primary' : ''}`}
+      disabled={opts.disabled}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      {opts.sub && <small>{opts.sub}</small>}
+    </button>
+  );
+  const back = (
+    <button type="button" className="rpg-menu-back" onClick={() => setMenu('main')}>
+      ← {t.menuBack}
+    </button>
   );
 
-  // The world the next quest is played in, on the intro screen: what it is and who you are there.
-  const worldCard = world && storyProvider !== 'static' && (
-    <div className="rpg-world">
-      <div className="rpg-world-name">
-        {t.worldLabel}: <strong>{world.name}</strong>
+  // The intro as a game's menu (owner, Oct 2026: "less slop, more substance, make it look like a game
+  // menu — it cuts the options off and the new-world setup can't be seen"): a short list on the main
+  // screen, and everything else one level down — the world's setup, the library, the settings, the
+  // controls — each with its own Back.
+  const mainMenu = (
+    <nav className="rpg-menu" aria-label={t.title}>
+      {pendingGenesis &&
+        creatable &&
+        item('finish', t.menuFinishWorld, () => finishGenesis(pendingGenesis), {
+          primary: true,
+          sub: pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40),
+        })}
+      {ownSave &&
+        keysReady &&
+        item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title })}
+      {!keysReady && item('wait', t.wait, () => {}, { disabled: true })}
+      {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
+      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: t.menuInWorld(world.name) })}
+      {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave })}
+      {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
+      {item('settings', t.menuSettings, () => setMenu('settings'))}
+      {item('controls', t.menuControls, () => setMenu('controls'))}
+    </nav>
+  );
+
+  const worldMenu = (
+    <div className="rpg-panel">
+      <h3>{t.menuNewWorld}</h3>
+      {exoticSlider}
+      <WorldWish lang={gameLang} wish={wish} onChange={pickWish} open />
+      <div className="rpg-panel-actions">
+        <button type="button" className="rpg-start" disabled={!creatable} onClick={() => begin(true)}>
+          {t.menuCreate}
+        </button>
+        {back}
       </div>
+    </div>
+  );
+
+  const settingsMenu = (
+    <div className="rpg-panel">
+      <h3>{t.menuSettings}</h3>
+      <div className="rpg-lang" role="group" aria-label={t.language}>
+        <span>{t.language}:</span>
+        {(['pl', 'en'] as const).map((l) => (
+          <button
+            key={l}
+            type="button"
+            className={l === gameLang ? 'rpg-lang-on' : ''}
+            aria-pressed={l === gameLang}
+            onClick={() => setGameLang(l)}
+          >
+            {l === 'pl' ? 'Polski' : 'English'}
+          </button>
+        ))}
+      </div>
+      {keysReady && models.length > 0 && (
+        <label className="rpg-model">
+          {t.model}:{' '}
+          <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
+            <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : storyProvider === 'demo' ? 'demo' : 'google', null)[0])}</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {keysReady ? (
+        <ul className="rpg-source">
+          <li>
+            {storyProvider === 'static'
+              ? t.staticQuest
+              : storyProvider === 'demo' && demo
+                ? t.demoQuest(Math.min(demo.remaining.ip, demo.remaining.all), demo.perIpUsd)
+                : t.aiQuest(storyProvider)}
+          </li>
+          {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
+          <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
+          {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
+            <li>
+              <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
+            </li>
+          )}
+        </ul>
+      ) : (
+        <p className="rpg-source">{t.readingKeys}</p>
+      )}
+      {chronicle.length > 0 && (
+        <p className="rpg-chronicle">
+          {t.chronicle(chronicle.length)}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              clearChronicle(worldId);
+              setChronicle([]);
+            }}
+          >
+            {t.forget}
+          </button>
+        </p>
+      )}
+      {demo?.today && (
+        <p className="rpg-today">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</p>
+      )}
+      {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
+      <div className="rpg-panel-actions">{back}</div>
+    </div>
+  );
+
+  const controlsMenu = (
+    <div className="rpg-panel">
+      <h3>{t.menuControls}</h3>
+      {touch ? (
+        <ul className="rpg-controls">
+          <li>{t.touchMove}</li>
+          <li>{t.touchLook}</li>
+          <li>{t.touchAct}</li>
+        </ul>
+      ) : (
+        <ul className="rpg-controls">
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t.move}</li>
+          <li><kbd>Shift</kbd> {t.run}</li>
+          <li>{t.mouse}</li>
+          <li><kbd>LMB</kbd> {t.attack}</li>
+          <li><kbd>E</kbd> {t.interact}</li>
+        </ul>
+      )}
+      <p className="rpg-panel-note">{t.intro}</p>
+      <div className="rpg-panel-actions">{back}</div>
+    </div>
+  );
+
+  // The world the next quest is played in: its name and who you are there, the pitch a tap away.
+  const worldCard = world && storyProvider !== 'static' && (
+    <details className="rpg-world">
+      <summary>
+        <strong>{world.name}</strong>
+        <span className="rpg-world-you"> · {world.player.split(/[;,.]/)[0]}</span>
+      </summary>
       <p>{world.pitch}</p>
       <p className="rpg-world-you">{t.worldYou(world.player)}</p>
-    </div>
+    </details>
   );
 
   return (
@@ -1622,109 +1742,31 @@ export default function Rpg({ lang }: { lang: Lang }) {
         );
       })()}
 
-      {!started && libraryOpen && (
-        <div className="rpg-overlay">
-          <WorldLibrary
-            lang={gameLang}
-            rows={libraryRows}
-            signedIn={Boolean(uid)}
-            canPlay={canPlay}
-            onOpen={(id, cont) => void openWorld(id, cont)}
-            onBack={() => setLibraryOpen(false)}
-          />
-        </div>
-      )}
-
-      {!started && !libraryOpen && (
-        <div className="rpg-overlay">
-          <h2>{t.title}</h2>
-          <p>{t.intro}</p>
-          {worldCard}
-          {/* On a phone the intro scrolls inside a short box, so Start comes first, not last. */}
-          {touch && startButtons}
-          {touch ? (
-            <ul className="rpg-controls">
-              <li>{t.touchMove}</li>
-              <li>{t.touchLook}</li>
-              <li>{t.touchAct}</li>
-            </ul>
+      {!started && (
+        <div className="rpg-overlay rpg-menu-screen">
+          {menu === 'library' ? (
+            <WorldLibrary
+              lang={gameLang}
+              rows={libraryRows}
+              signedIn={Boolean(uid)}
+              canPlay={canPlay}
+              onOpen={(id, cont) => void openWorld(id, cont)}
+              onBack={() => setMenu('main')}
+            />
           ) : (
-            <ul className="rpg-controls">
-              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t.move}</li>
-              <li><kbd>Shift</kbd> {t.run}</li>
-              <li>{t.mouse}</li>
-              <li><kbd>LMB</kbd> {t.attack}</li>
-              <li><kbd>E</kbd> {t.interact}</li>
-            </ul>
-          )}
-          <div className="rpg-lang" role="group" aria-label={t.language}>
-            <span>{t.language}:</span>
-            {(['pl', 'en'] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                className={l === gameLang ? 'rpg-lang-on' : ''}
-                aria-pressed={l === gameLang}
-                onClick={() => setGameLang(l)}
-              >
-                {l === 'pl' ? 'Polski' : 'English'}
-              </button>
-            ))}
-          </div>
-          {chronicle.length > 0 && (
-            <p className="rpg-chronicle">
-              {t.chronicle(chronicle.length)}{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  clearChronicle(worldId);
-                  setChronicle([]);
-                }}
-              >
-                {t.forget}
-              </button>
-            </p>
-          )}
-          {keysReady && models.length > 0 && (
-            <label className="rpg-model">
-              {t.model}:{' '}
-              <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
-                <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : storyProvider === 'demo' ? 'demo' : 'google', null)[0])}</option>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {keysReady ? (
-            <ul className="rpg-source">
-              <li>
-                {storyProvider === 'static'
-                  ? t.staticQuest
-                  : storyProvider === 'demo' && demo
-                    ? t.demoQuest(Math.min(demo.remaining.ip, demo.remaining.all), demo.perIpUsd)
-                    : t.aiQuest(storyProvider)}
-              </li>
-              {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
-              <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
-              {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
-                <li>
-                  <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
-                </li>
+            <>
+              {menu === 'main' && (
+                <>
+                  <h2 className="rpg-menu-title">{t.title}</h2>
+                  {worldCard}
+                  {mainMenu}
+                </>
               )}
-            </ul>
-          ) : (
-            <p className="rpg-source">{t.readingKeys}</p>
+              {menu === 'world' && worldMenu}
+              {menu === 'settings' && settingsMenu}
+              {menu === 'controls' && controlsMenu}
+            </>
           )}
-          {demo?.today && (
-            <p className="rpg-today">
-              {t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}
-            </p>
-          )}
-          {!touch && startButtons}
-          {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
         </div>
       )}
 
