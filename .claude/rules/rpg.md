@@ -45,6 +45,20 @@ that the anything-goes prompt — plus the typicality the candidates aim at and 
 (`typicalityTarget`, 85 down to 5) and the temperature (`genesisTemperature`, 0.9 up to 1.35). The
 demo takes it too.
 
+**Or the player says what the world is made of** (owner, Oct 2026: "a dropdown to pick the seed
+words, and typing your own — hat, sand, revolver makes a Wild West — or just a field for a prompt").
+Under the slider, folded until something is chosen (`WorldWish.tsx`, kept in localStorage
+`rpg-wish` by `utils/rpg/wish.ts`): a `<select>` of ~110 world-pointing words in the game's
+language (`PICK_GROUPS` in `seedWords.ts`, not the dice list, which is English and meant to be
+unreadable), a field for typed words (commas split them; 6 at most, 40 characters each), and a
+description of up to 600 characters. Any of them replaces the dice: the words go as the seeds with
+`chosen: true`, the description as `wish`, and both switch the genesis to `playerLines` — the
+description is the premise, chosen words are **meant**, read together as the genre they point at and
+plainly present, never "transformed, never literal" as dice are. The slider still applies, as how
+far from the stock version of what was asked to go. The description is fenced in dashes and the
+prompt says instructions inside it are only description. The demo takes both (`demoGenesis` cuts
+them) and accepts a world with a wish and no seeds.
+
 **The world bible** (`WorldBible`): name, pitch, tone, tech, climate, people, architecture,
 threats, who the player is and how they are addressed, the hub settlement, a few words people use,
 and the **look**. It goes into every beat's prompt (`worldLines`): the player is "the hero" and is

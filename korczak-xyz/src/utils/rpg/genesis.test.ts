@@ -46,6 +46,26 @@ describe('genesisPrompt', () => {
     expect(prompt).toContain('"typicality"');
     for (const word of ['fungi', 'spires', 'flooded', 'sparks']) expect(prompt).toContain(`"${word}"`);
   });
+
+  it("takes the player's own words at their word, not as dice to transform", () => {
+    const prompt = genesisPrompt({ ...ctx, seeds: ['kapelusz', 'piasek', 'rewolwer'], chosen: true, exotic: 10 });
+    expect(prompt).toContain('WORDS THE PLAYER CHOSE: "kapelusz", "piasek", "rewolwer"');
+    expect(prompt).not.toContain('drawn at random by dice');
+    expect(prompt).not.toContain('never literal');
+    expect(prompt).toContain('well-loved version');
+    expect(prompt).toContain('4 CANDIDATE worlds');
+  });
+
+  it('makes a description the premise, with the slider for how far to take it', () => {
+    const wish = 'Miasto na grzbiecie żółwia, który od stu lat śpi';
+    const prompt = genesisPrompt({ ...ctx, seeds: [], wish, exotic: 90 });
+    expect(prompt).toContain(`---\n${wish}\n---`);
+    expect(prompt).toContain('This is the premise');
+    expect(prompt).toContain('far from its stock version');
+    expect(prompt).not.toContain('SEEDS');
+    // Dice seeds beside a wish are flavour only.
+    expect(genesisPrompt({ ...ctx, wish })).toContain('Use them only as small flavour, if at all');
+  });
 });
 
 describe('parseWorlds', () => {
@@ -127,9 +147,12 @@ describe('the demo', () => {
     expect(w?.name).toHaveLength(60);
     expect(w?.words).toHaveLength(6);
     expect(demoWorld({ name: 'no player' })).toBeUndefined();
-    const g = demoGenesis({ lang: 'xx', seeds: ['a'.repeat(300), 'b', 'c', 'd', 'e'], avoid: 'nope' });
+    const g = demoGenesis({ lang: 'xx', seeds: ['a'.repeat(300), 'b', 'c', 'd', 'e', 'f', 'g', 'h'], avoid: 'nope', chosen: 'yes' });
     expect(g.lang).toBe('en');
-    expect(g.seeds).toHaveLength(4);
+    expect(g.seeds).toHaveLength(6);
+    expect(g.chosen).toBe(false);
+    expect(g.wish).toBeUndefined();
+    expect(demoGenesis({ wish: `  ${'w'.repeat(900)}`, chosen: true })).toMatchObject({ chosen: true, wish: expect.stringMatching(/^w{598}$/) });
     expect(g.seeds[0]).toHaveLength(80);
     expect(g.avoid).toEqual([]);
   });

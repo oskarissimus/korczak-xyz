@@ -1087,3 +1087,84 @@ ul.rpg-source {
   min-height: 32px;
   accent-color: #c9a45c;
 }
+
+/* What the next world is made of (`WorldWish.tsx`): folded under the slider until something is chosen. */
+.rpg-wish {
+  margin: 8px auto 0;
+  width: min(100%, 360px);
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.rpg-wish summary {
+  cursor: pointer;
+  text-align: center;
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.rpg-wish-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rpg-wish select,
+.rpg-wish input,
+.rpg-wish textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid #b9a77f;
+  background: #1f170d;
+  color: #f1e6cf;
+  /* 16px or iOS zooms the page in on focus. */
+  font: inherit;
+  font-size: 16px;
+}
+
+.rpg-wish textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.rpg-wish button {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid #b9a77f;
+  background: #3a2c18;
+  color: #f1e6cf;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpg-wish button:disabled {
+  opacity: 0.5;
+}
+
+.rpg-wish-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rpg-wish-words button {
+  min-height: 32px;
+  padding: 2px 10px;
+  border-radius: 16px;
+}
+
+.rpg-wish-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  opacity: 0.85;
+  font-size: 0.9em;
+}

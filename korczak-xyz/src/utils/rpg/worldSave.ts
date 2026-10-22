@@ -153,6 +153,10 @@ export interface PendingGenesis {
   lang: Lang;
   seeds: string[];
   exotic: number;
+  /** The seeds are the player's own words (`GenesisContext.chosen`). */
+  chosen?: boolean;
+  /** The player's description of the world (`GenesisContext.wish`). */
+  wish?: string;
   at: number;
 }
 
@@ -167,9 +171,17 @@ export function savePendingGenesis(pending: PendingGenesis): void {
 export function loadPendingGenesis(lang: Lang, now = Date.now()): PendingGenesis | null {
   try {
     const p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null');
-    if (!p || p.lang !== lang || !Array.isArray(p.seeds) || p.seeds.length === 0) return null;
+    const wish = typeof p?.wish === 'string' && p.wish.trim() ? p.wish : undefined;
+    if (!p || p.lang !== lang || !Array.isArray(p.seeds) || (p.seeds.length === 0 && !wish)) return null;
     if (typeof p.at !== 'number' || now - p.at > PENDING_MS) return null;
-    return { lang, seeds: p.seeds.filter((s: unknown) => typeof s === 'string').slice(0, 4), exotic: Number(p.exotic) || 0, at: p.at };
+    return {
+      lang,
+      seeds: p.seeds.filter((s: unknown) => typeof s === 'string').slice(0, 6),
+      exotic: Number(p.exotic) || 0,
+      chosen: p.chosen === true,
+      wish,
+      at: p.at,
+    };
   } catch {
     return null;
   }

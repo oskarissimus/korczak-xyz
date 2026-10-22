@@ -220,7 +220,7 @@ async function world(req: Request, res: Response, body: Record<string, unknown>)
   const model = DEMO_MODELS.find((m) => m === body.model);
   if (!model) throw new BadRequest('Unknown model');
   const ctx = demoGenesis(body.ctx);
-  if (ctx.seeds.length === 0) throw new BadRequest('No seeds');
+  if (ctx.seeds.length === 0 && !ctx.wish) throw new BadRequest('No seeds');
   await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic));
 }
 

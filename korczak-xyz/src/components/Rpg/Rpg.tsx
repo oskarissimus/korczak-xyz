@@ -39,6 +39,8 @@ import { clearGame, loadGame, saveGame, type SavedGame } from '../../utils/rpg/s
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
+import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
+import WorldWish from './WorldWish';
 import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import {
   addToAtlas,
@@ -123,6 +125,11 @@ declare global {
 }
 
 const MODEL_KEY = 'rpg-model';
+/** `text` cut to `n` characters, with an ellipsis when it was longer. */
+function clip(text: string, n: number): string {
+  return text.length > n ? `${text.slice(0, n - 1)}…` : text;
+}
+
 /** The exotic slider's last position (`GenesisContext.exotic`). */
 const EXOTIC_KEY = 'rpg-exotic';
 
@@ -205,6 +212,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [exotic, setExotic] = useState(DEFAULT_EXOTIC);
   const exoticRef = useRef(DEFAULT_EXOTIC);
   exoticRef.current = exotic;
+  /** The words and description the next world is made of (`WorldWish`); empty, the dice decide. */
+  const [wish, setWish] = useState<Wish>(NO_WISH);
+  const wishRef = useRef<Wish>(NO_WISH);
+  wishRef.current = wish;
+  useEffect(() => setWish(loadWish()), []);
+  const pickWish = (next: Wish) => {
+    setWish(next);
+    saveWish(next);
+  };
+  /** The description the world being born is made of, for its waiting screen. */
+  const [creatingWish, setCreatingWish] = useState('');
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [hp, setHp] = useState(100);
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
@@ -609,16 +627,27 @@ export default function Rpg({ lang }: { lang: Lang }) {
     resetDevlog();
     setCreating([]);
     setPendingGenesis(null);
-    const seeds = again?.seeds ?? (await drawSeeds());
+    // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
+    const asked = wishRef.current;
+    const own = !again && wished(asked);
+    const seeds = again?.seeds ?? (own ? asked.words : await drawSeeds());
+    const chosenSeeds = again ? again.chosen === true : own && asked.words.length > 0;
+    const wishText = (again ? again.wish : own ? asked.text.trim() : '') || undefined;
     const exoticNow = again?.exotic ?? exoticRef.current;
     if (token !== questTokenRef.current) return;
     setCreating(seeds);
-    savePendingGenesis({ lang: gameLang, seeds, exotic: exoticNow, at: Date.now() });
+    setCreatingWish(wishText ?? '');
+    const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText };
+    savePendingGenesis({ ...pending, at: Date.now() });
     const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
     let attempt;
     try {
-      attempt = await generateWorld(keys, { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticNow }, chosen);
+      attempt = await generateWorld(
+        keys,
+        { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticNow, chosen: chosenSeeds, wish: wishText },
+        chosen,
+      );
     } catch (e) {
       log.error('rpg.world.crashed', describeError(e));
       attempt = null;
@@ -651,7 +680,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       world: true,
       retry: () => {
         setStalled(null);
-        void createWorldRef.current({ lang: gameLang, seeds, exotic: exoticNow, at: Date.now() });
+        void createWorldRef.current({ ...pending, at: Date.now() });
       },
       giveUp: () => {
         setStalled(null);
@@ -1320,7 +1349,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     <>
       {pendingGenesis && keysReady && storyProvider !== 'static' && (
         <button type="button" className="rpg-start" onClick={() => finishGenesis(pendingGenesis)}>
-          {t.finishWorld(pendingGenesis.seeds.join(', '))}
+          {t.finishWorld(pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40))}
         </button>
       )}
       {saved && saved.lang === gameLang && keysReady && (
@@ -1345,6 +1374,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </button>
       )}
       {keysReady && storyProvider !== 'static' && exoticSlider}
+      {keysReady && storyProvider !== 'static' && <WorldWish lang={gameLang} wish={wish} onChange={pickWish} />}
     </>
   );
 
@@ -1412,6 +1442,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           {creating && (
             <div className="rpg-overlay rpg-genesis" role="status">
               <h2>{t.creatingWorld}</h2>
+              {creatingWish && <p className="rpg-genesis-seeds">{t.worldWish(clip(creatingWish, 160))}</p>}
               {creating.length > 0 && <p className="rpg-genesis-seeds">{t.worldSeeds(creating.join(' · '))}</p>}
               <StreamLine />
             </div>
