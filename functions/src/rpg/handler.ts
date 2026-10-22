@@ -215,7 +215,7 @@ async function beat(req: Request, res: Response, body: Record<string, unknown>):
   await generate(req, res, model, beatPrompt(ctx), 1);
 }
 
-/** A new world (`genesis.ts`), at the genesis temperature, from three seeds and the worlds to avoid. */
+/** A new world (`genesis.ts`), at the genesis temperature: from seeds (dice or the player's words), a description, or both. */
 async function world(req: Request, res: Response, body: Record<string, unknown>): Promise<void> {
   const model = DEMO_MODELS.find((m) => m === body.model);
   if (!model) throw new BadRequest('Unknown model');
