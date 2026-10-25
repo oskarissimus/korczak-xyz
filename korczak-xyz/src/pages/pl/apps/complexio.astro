@@ -1,0 +1,25 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Complexio from '../../../components/Complexio/Complexio';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/complexio.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('Complexio')} | korczak.xyz`} description={t('complexio.desc')} lang={lang}>
+  <div class="window complexio-window">
+    <div class="title-bar">
+      <span>{t('Complexio')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content complexio-content">
+      <Complexio client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>
