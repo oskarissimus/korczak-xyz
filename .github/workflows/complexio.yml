@@ -1,10 +1,10 @@
 # Builds The Act of Complexio's game server and deploys it as the Cloud Run service `complexio`,
 # which /apps/complexio/ embeds for approved accounts.
 #
-# The game's code is not in this repository: it lives in rgryta/the-act-of-complexio, which is
-# private, and is read here with COMPLEXIO_REPO_TOKEN (read access to that one repository). Its
-# own Dockerfile builds the Rust server and the wasm client into one image; nothing of it is
-# committed here.
+# The game's code is not in this repository: it lives in oskarissimus/the-act-of-complexio, a
+# private fork of rgryta/the-act-of-complexio kept current with "Sync fork", and is read here with
+# COMPLEXIO_REPO_TOKEN (read access to that one repository). Its own Dockerfile builds the Rust
+# server and the wasm client into one image; nothing of it is committed here.
 #
 # Manual only for now. It reuses the site's deploy identity (`github-deployer`, through the
 # existing Workload Identity provider), which already holds Artifact Registry and Cloud Run
@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, tag or commit of rgryta/the-act-of-complexio to deploy"
+        description: "Branch, tag or commit of oskarissimus/the-act-of-complexio to deploy"
         default: "main"
         required: true
 
@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          repository: rgryta/the-act-of-complexio
+          repository: oskarissimus/the-act-of-complexio
           ref: ${{ inputs.ref }}
           token: ${{ secrets.COMPLEXIO_REPO_TOKEN }}
           path: game
