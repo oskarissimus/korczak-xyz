@@ -47,7 +47,7 @@ account hook must run before the app hook's own effects.
 
 ## What each provider says
 
-All from the page, with the key, straight to the provider (all four answer korczak.xyz's origin):
+All from the page, with the key, straight to the provider (all of them answer korczak.xyz's origin):
 
 | Provider | Spent | Left |
 |---|---|---|
@@ -55,6 +55,10 @@ All from the page, with the key, straight to the provider (all four answer korcz
 | DeepSeek | **not reported** by any API | `/user/balance` |
 | OpenAI | only with an **admin key** (`/v1/organization/costs`, `api.usage.read`), stored as `openaiAdmin` | **no API**. A balance typed off the billing page (`openaiCredit`, dated) minus costs since that day |
 | Google AI Studio | **no API** | none — free tier has request limits, not money. The key is checked by listing models |
+| fal.ai | **not read** | `rest.alpha.fal.ai/billing/user_balance` answers our origin but needs `billing:usage:read`, which an ordinary key lacks; `/v1/models` answers without a key, so it proves nothing. The card says *saved, not checked* and links the dashboard |
+
+`fal` (Oct 2026) is for the RPG's asset generation; nothing spends it yet, so *Used by* is honest
+in saying nothing. When the RPG starts spending it, add it to `usedBy` in `Account.tsx`.
 
 Where a provider says nothing, the page says so. Do not fill the gap with an estimate dressed as a
 reading.

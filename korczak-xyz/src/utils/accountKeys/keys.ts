@@ -25,14 +25,18 @@
  * Everything in this file is pure, so it can be pinned by a test without a browser.
  */
 
-/** Every key an app on this site can spend. `openaiAdmin` spends nothing: it only reads costs. */
-export type KeyName = 'openai' | 'google' | 'elevenLabs' | 'deepseek' | 'openaiAdmin';
+/**
+ * Every key an app on this site can spend. `openaiAdmin` spends nothing: it only reads costs.
+ * `fal` is fal.ai, for the RPG's asset generation (Oct 2026).
+ */
+export type KeyName = 'openai' | 'google' | 'elevenLabs' | 'deepseek' | 'fal' | 'openaiAdmin';
 
 export const KEY_NAMES: readonly KeyName[] = [
   'openai',
   'google',
   'elevenLabs',
   'deepseek',
+  'fal',
   'openaiAdmin',
 ];
 
@@ -43,6 +47,7 @@ export const NO_KEYS: ApiKeys = {
   google: null,
   elevenLabs: null,
   deepseek: null,
+  fal: null,
   openaiAdmin: null,
 };
 

@@ -57,6 +57,14 @@ const en = {
   deepseekGranted: 'of which granted',
   deepseekEmpty: 'Balance too low to make calls',
 
+  notChecked: 'saved, not checked',
+  falFor: 'For the RPG’s asset generation.',
+  falNoApi:
+    'Not read here: fal.ai reports the balance only to a key with billing permission, so check it ' +
+    'on the dashboard.',
+  falBillingLink: 'Billing on fal.ai',
+  falKeysLink: 'Keys',
+
   openaiNeedsAdmin: 'Needs an admin key (below) — an ordinary key cannot read spend.',
   adminRefused: 'The admin key was refused',
   openaiNoBalanceApi:
@@ -151,6 +159,14 @@ const pl: Translation = {
   deepseekNoSpend: 'DeepSeek podaje saldo, a nie wydatki:',
   deepseekGranted: 'w tym bonus',
   deepseekEmpty: 'Saldo za niskie, żeby wykonywać zapytania',
+
+  notChecked: 'zapisany, niesprawdzony',
+  falFor: 'Do generowania zasobów w RPG.',
+  falNoApi:
+    'Nie odczytuję tego tutaj: fal.ai podaje saldo tylko kluczowi z uprawnieniem do rozliczeń, ' +
+    'więc sprawdź je w panelu.',
+  falBillingLink: 'Rozliczenia w fal.ai',
+  falKeysLink: 'Klucze',
 
   openaiNeedsAdmin: 'Potrzebny klucz admina (niżej) — zwykły klucz nie odczyta wydatków.',
   adminRefused: 'Klucz admina został odrzucony',

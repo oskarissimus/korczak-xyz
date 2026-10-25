@@ -10,6 +10,10 @@ describe('keysFrom', () => {
     });
     expect(keysFrom(null)).toEqual(NO_KEYS);
   });
+
+  it('carries the fal.ai key', () => {
+    expect(keysFrom({ apiKeys: { fal: ' id:secret ' } })).toEqual({ ...NO_KEYS, fal: 'id:secret' });
+  });
 });
 
 describe('normalizeAccountKeys', () => {

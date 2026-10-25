@@ -47,15 +47,16 @@ interface AccountProps {
   lang: Lang;
 }
 
-type Provider = 'openai' | 'google' | 'elevenLabs' | 'deepseek';
+type Provider = 'openai' | 'google' | 'elevenLabs' | 'deepseek' | 'fal';
 
-const PROVIDERS: Provider[] = ['google', 'elevenLabs', 'openai', 'deepseek'];
+const PROVIDERS: Provider[] = ['google', 'elevenLabs', 'openai', 'deepseek', 'fal'];
 
 const PLACEHOLDER: Record<KeyName, string> = {
   openai: 'sk-…',
   google: 'AIza…',
   elevenLabs: 'sk_…',
   deepseek: 'sk-…',
+  fal: '…:…',
   openaiAdmin: 'sk-admin-…',
 };
 
@@ -392,6 +393,43 @@ function DeepSeekCard({ api, usedBy, refresh, t, lang }: CardProps) {
     </section>
   );
 }
+/**
+ * fal.ai: kept for the RPG's asset generation. Not checked: fal's only browser-reachable reading,
+ * the balance, wants a key with `billing:usage:read`, which an ordinary key does not have, and
+ * listing models answers without any key at all, so it would prove nothing.
+ */
+function FalCard({ api, usedBy, t }: CardProps) {
+  return (
+    <section className="acct-card">
+      <header className="acct-card-head">
+        <h3>fal.ai</h3>
+        <span className="acct-chip">{api.keys.fal ? t.notChecked : t.noKey}</span>
+      </header>
+      <UsedBy usedBy={usedBy} t={t} />
+      <p className="acct-dim">{t.falFor}</p>
+      <KeyField
+        label={t.key}
+        value={api.keys.fal}
+        placeholder={PLACEHOLDER.fal}
+        onCommit={(v) => api.setKey('fal', v)}
+        t={t}
+      />
+      <dl className="acct-numbers">
+        <dt>{t.spent}</dt>
+        <dd>{t.falNoApi}</dd>
+      </dl>
+      <p className="acct-dim">
+        <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noopener">
+          {t.falBillingLink}
+        </a>
+        {' · '}
+        <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener">
+          {t.falKeysLink}
+        </a>
+      </p>
+    </section>
+  );
+}
 
 function OpenAiCard({ api, usedBy, refresh, t, lang }: CardProps) {
   const keyReading = useReading(api.keys.openai, checkOpenAi, refresh);
@@ -502,6 +540,7 @@ const PROVIDER_NAME: Record<string, string> = {
   google: 'Google',
   deepseek: 'DeepSeek',
   elevenLabs: 'ElevenLabs',
+  fal: 'fal.ai',
 };
 
 interface AppConfigs {
@@ -695,7 +734,13 @@ function AppsSection({
 
 /** Which apps, as configured right now, spend each provider's key. */
 function usedBy(apps: AppConfigs, writer: 'google' | 'openai', t: Translation): Record<Provider, string[]> {
-  const result: Record<Provider, string[]> = { openai: [], google: [], elevenLabs: [], deepseek: [] };
+  const result: Record<Provider, string[]> = {
+    openai: [],
+    google: [],
+    elevenLabs: [],
+    deepseek: [],
+    fal: [],
+  };
   for (const key of sloperKeys(apps.sloper)) result[key].push(t.appSloper);
   for (const key of backseatKeys(apps.backseat)) result[key].push(t.appBackseat);
   for (const key of backseatKeys(apps.roaster)) result[key].push(t.appRoaster);
@@ -739,6 +784,7 @@ export default function Account({ lang }: AccountProps) {
     elevenLabs: ElevenLabsCard,
     openai: OpenAiCard,
     deepseek: DeepSeekCard,
+    fal: FalCard,
   };
 
   return (

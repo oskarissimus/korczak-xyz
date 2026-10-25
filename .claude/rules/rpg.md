@@ -320,7 +320,8 @@ committed files.
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
-them. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
+them. `account.keys.fal` (fal.ai, pasted on the account page) is there for asset generation and
+not yet spent by anything. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
 in order (`modelChain` in `storyteller.ts`): the one picked on the intro screen (`MODEL_CHOICES`,
 kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **strongest first** (owner, Oct 2026: "the
 better model first and a fallback; we switch to a cheaper one when we optimise for cost"):
