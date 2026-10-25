@@ -1,0 +1,72 @@
+# Builds The Act of Complexio's game server and deploys it as the Cloud Run service `complexio`,
+# which /apps/complexio/ embeds for approved accounts.
+#
+# The game's code is not in this repository: it lives in rgryta/the-act-of-complexio, which is
+# private, and is read here with COMPLEXIO_REPO_TOKEN (read access to that one repository). Its
+# own Dockerfile builds the Rust server and the wasm client into one image; nothing of it is
+# committed here.
+#
+# Manual only for now. It reuses the site's deploy identity (`github-deployer`, through the
+# existing Workload Identity provider), which already holds Artifact Registry and Cloud Run
+# rights, so this workflow needs no IAM of its own.
+name: Complexio
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit of rgryta/the-act-of-complexio to deploy"
+        default: "main"
+        required: true
+
+concurrency:
+  group: complexio-deploy
+  cancel-in-progress: false
+
+env:
+  REGION: europe-central2
+  PROJECT: korczak-xyz-501720
+  IMAGE: europe-central2-docker.pkg.dev/korczak-xyz-501720/complexio/server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: rgryta/the-act-of-complexio
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.COMPLEXIO_REPO_TOKEN }}
+          path: game
+
+      - id: rev
+        working-directory: game
+        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Build and push
+        working-directory: game
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker buildx build --push \
+            --tag "${IMAGE}:${{ steps.rev.outputs.sha }}" \
+            --tag "${IMAGE}:latest" .
+
+      # One instance, because every player has to be in the same in-memory world; an hour's
+      # timeout, because each player holds one WebSocket for as long as they play.
+      - name: Deploy
+        run: |
+          gcloud run deploy complexio \
+            --project="${PROJECT}" --region="${REGION}" \
+            --image="${IMAGE}:${{ steps.rev.outputs.sha }}" \
+            --allow-unauthenticated \
+            --max-instances=1 --timeout=3600 --memory=1Gi \
+            --port=8080
