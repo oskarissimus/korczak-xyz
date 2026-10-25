@@ -3,11 +3,17 @@
  *
  * The game is not part of this build: it is a Rust server (physics, bots, rooms, a WebSocket per
  * player) that also serves its own wasm client, running as the `complexio` Cloud Run service in
- * this project. This page is only the door to it, so the gate here is the same browser-side gate
- * every other app has — the run.app URL itself answers anyone who has it.
+ * this project. The server is the gate: started with AUTH_FIREBASE_PROJECT, it lets a WebSocket
+ * in only with a Firebase ID token whose account row says `approved`. This page hands the signed-in
+ * account's token over in the URL fragment, which no server sees, and posts a fresh one into the
+ * frame before the hour-long token runs out.
  */
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { auth as firebaseAuth } from '../../lib/firebase';
+
+/** Firebase ID tokens last an hour; a fresh one goes into the frame well before that. */
+const REFRESH_MS = 45 * 60 * 1000;
 
 export const GAME_URL = 'https://complexio-1068962621574.europe-central2.run.app/';
 
@@ -38,6 +44,25 @@ export default function Complexio({ lang }: { lang: Lang }) {
   const t = strings[lang];
   const auth = useAuth();
   const frame = useRef<HTMLIFrameElement>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const uid = auth.user?.uid ?? null;
+
+  useEffect(() => {
+    if (!uid) return;
+    let live = true;
+    const send = async (first: boolean) => {
+      const fresh = await firebaseAuth?.currentUser?.getIdToken(!first).catch(() => null);
+      if (!live || !fresh) return;
+      if (first) setToken(fresh);
+      else frame.current?.contentWindow?.postMessage({ complexioToken: fresh }, new URL(GAME_URL).origin);
+    };
+    send(true);
+    const timer = setInterval(() => send(false), REFRESH_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [uid]);
 
   if (!auth.enabled) return <p className="complexio-note">{t.unavailable}</p>;
   if (auth.loading) return <div className="complexio-stage" />;
@@ -58,13 +83,16 @@ export default function Complexio({ lang }: { lang: Lang }) {
     );
   }
 
+  if (!token) return <div className="complexio-stage" />;
+  const src = `${GAME_URL}#token=${encodeURIComponent(token)}`;
+
   return (
     <>
       <div className="complexio-stage">
         <iframe
           ref={frame}
           className="complexio-frame"
-          src={GAME_URL}
+          src={src}
           title={t.title}
           allow="fullscreen; autoplay; screen-wake-lock"
           allowFullScreen
@@ -74,7 +102,7 @@ export default function Complexio({ lang }: { lang: Lang }) {
         <button type="button" className="complexio-action" onClick={() => frame.current?.requestFullscreen?.()}>
           {t.fullscreen}
         </button>
-        <a className="complexio-action" href={GAME_URL} target="_blank" rel="noopener">
+        <a className="complexio-action" href={src} target="_blank" rel="noopener">
           {t.newTab}
         </a>
       </div>
