@@ -34,6 +34,7 @@ import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../ut
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
+import { ensureLandmark } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
@@ -57,6 +58,7 @@ import {
   playedWorld,
   savePendingGenesis,
   saveWorld,
+  setWorldLandmark,
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
@@ -823,6 +825,29 @@ export default function Rpg({ lang }: { lang: Lang }) {
       delete window.rpg;
     };
   }, [flash, notify, persist]);
+
+  // The hub's landmark (`utils/rpg/landmark3d.ts`): an invented world's own, from fal.ai, made once
+  // and kept on the world; the well until it exists, and in the classic world or without a key.
+  const falKey = keysReady ? account.keys.fal : null;
+  const landmarkUrl = world?.landmarkModel?.glb ?? null;
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !world) return;
+    const show = (url: string | null) =>
+      void scene.setHubLandmark(url).catch((e) => log.warn('rpg.landmark.load.failed', describeError(e)));
+    show(landmarkUrl);
+    if (landmarkUrl || !falKey || world.createdAt === 0) return;
+    const made = ensureLandmark(falKey, world);
+    if (!made) return;
+    made.then(
+      (model) => {
+        setWorldLandmark(world.id, model);
+        if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, landmarkModel: model };
+        setWorld((now) => (now?.id === world.id ? { ...now, landmarkModel: model } : now));
+      },
+      (e) => log.warn('rpg.landmark.failed', describeError(e)),
+    );
+  }, [world, landmarkUrl, falKey]);
 
   // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
   // that lands while the reply is still being read must not expire unseen.

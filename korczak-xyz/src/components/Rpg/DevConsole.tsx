@@ -51,6 +51,7 @@ function headline(r: DevRequest): string {
   const parts = [r.servedBy && r.servedBy !== r.model ? `${r.model} → ${r.servedBy}` : r.model];
   if (r.beat !== null) parts.unshift(`beat ${r.beat + 1}`);
   else if (r.kind === 'model') parts.unshift('world');
+  else if (r.kind === 'fal') parts.unshift('landmark');
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);
   if (r.firstMs !== null && r.kind === 'model') parts.push(`1st byte ${formatMs(r.firstMs)}`);
   if (r.usage) parts.push(`in ${tokens(r.usage.input)} out ${tokens(r.usage.output)} think ${tokens(r.usage.thoughts)}`);
@@ -155,7 +156,7 @@ export function DevConsole({
   const [showVoice, setShowVoice] = useState(false);
   const [tab, setTab] = useState<'requests' | 'lines' | 'perf'>('requests');
   const lines = useTranscript();
-  const shown = showVoice ? requests : requests.filter((r) => r.kind === 'model');
+  const shown = showVoice ? requests : requests.filter((r) => r.kind !== 'voice');
 
   // Follows the newest output, unless the reader has scrolled up to read something.
   useEffect(() => {
@@ -222,7 +223,8 @@ export function DevConsole({
         {t.genTime}: {formatMs(totals.generationMs)} · {t.tokensLine}: in {tokens(totals.tokens.input)} out{' '}
         {tokens(totals.tokens.output)} think {tokens(totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}
         {totals.unpriced ? '+?' : ''} · ElevenLabs: {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈{' '}
-        {formatUsd(totals.voiceCost)} · {t.total} ≈ {formatUsd(totals.modelCost + totals.voiceCost)}
+        {formatUsd(totals.voiceCost)} · fal.ai ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
+        {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}
         {totals.errors > 0 && <span className="rpg-dev-error"> · {t.errors(totals.errors)}</span>}
       </div>
     </div>
@@ -266,8 +268,14 @@ export function QuestSummary({ lang }: { lang: Lang }) {
       <dd>
         {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈ {formatUsd(totals.voiceCost)}
       </dd>
+      {totals.falCost > 0 && (
+        <>
+          <dt>fal.ai</dt>
+          <dd>≈ {formatUsd(totals.falCost)}</dd>
+        </>
+      )}
       <dt>{t.total}</dt>
-      <dd>≈ {formatUsd(totals.modelCost + totals.voiceCost)}</dd>
+      <dd>≈ {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}</dd>
     </dl>
   );
 }

@@ -24,6 +24,7 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
+import { disposeHubLandmark, loadHubLandmark } from './hubLandmark';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
@@ -858,7 +859,46 @@ export class RpgScene {
     water.castShadow = false;
     well.position.set(x, 0, z);
     this.scene.add(well);
-    this.obstacles.push({ x, z, r: 1.6 });
+    this.well = well;
+    this.wellObstacle = { x, z, r: 1.6 };
+    this.obstacles.push(this.wellObstacle);
+  }
+
+  private well: THREE.Group | null = null;
+  private wellObstacle: Obstacle | null = null;
+  private hubLandmark: { url: string; group: THREE.Group } | null = null;
+  private hubLandmarkToken = 0;
+
+  /**
+   * The world's own landmark in place of the well (`hubLandmark.ts`), or the well back with `null`.
+   * The well stays until the model has arrived; a model that fails to load leaves it there.
+   */
+  async setHubLandmark(url: string | null): Promise<void> {
+    if ((this.hubLandmark?.url ?? null) === url) return;
+    const token = ++this.hubLandmarkToken;
+    const clear = () => {
+      if (!this.hubLandmark) return;
+      this.scene.remove(this.hubLandmark.group);
+      disposeHubLandmark(this.hubLandmark.group);
+      this.hubLandmark = null;
+    };
+    if (!url) {
+      clear();
+      if (this.well) this.well.visible = true;
+      if (this.wellObstacle) this.wellObstacle.r = 1.6;
+      return;
+    }
+    const built = await loadHubLandmark(url);
+    if (token !== this.hubLandmarkToken || !this.well) {
+      disposeHubLandmark(built.group);
+      return;
+    }
+    clear();
+    built.group.position.copy(this.well.position);
+    this.scene.add(built.group);
+    this.hubLandmark = { url, group: built.group };
+    this.well.visible = false;
+    if (this.wellObstacle) this.wellObstacle.r = built.radius;
   }
 
   private tree(x: number, z: number, scale: number) {

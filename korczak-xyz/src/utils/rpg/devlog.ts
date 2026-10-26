@@ -1,6 +1,6 @@
 /*
  * The developer console's record (`~` in the game): every request this quest made — each model asked
- * for a beat and each ElevenLabs clip — with what streamed back so far, its error, its tokens and
+ * for a beat, each ElevenLabs clip and each fal.ai step of the hub's landmark (`landmark3d.ts`) — with what streamed back so far, its error, its tokens and
  * what it cost. The game is in active development and the owner wants to watch it work (Oct 2026:
  * "show the tokens streaming, show the errors, the cost of the quest, and the total time it took").
  *
@@ -16,8 +16,8 @@ export type DevStatus = 'waiting' | 'streaming' | 'ok' | 'error';
 
 export interface DevRequest {
   id: number;
-  kind: 'model' | 'voice';
-  /** The model asked for, or the voice. */
+  kind: 'model' | 'voice' | 'fal';
+  /** The model asked for, or the voice, or the fal.ai endpoint. */
   model: string;
   /** The model that answered, when the provider says (`modelVersion`); what is priced. */
   servedBy: string | null;
@@ -51,6 +51,8 @@ export interface QuestTotals {
   voiceChars: number;
   voiceCredits: number;
   voiceCost: number;
+  /** fal.ai, at its list prices: the landmark's picture and its 3D model. */
+  falCost: number;
   requests: number;
   errors: number;
 }
@@ -137,7 +139,7 @@ export function appendText(entry: DevRequest, text: string, thought: boolean): v
 export function endRequest(entry: DevRequest, error: string | null, patch: Partial<DevRequest> = {}): void {
   updateRequest(entry, { ...patch, ms: Date.now() - entry.startedAt, status: error ? 'error' : 'ok', error });
   // Today's spend for the whole site (`stats.ts`). An unpriced model counts as nothing, a floor.
-  if (entry.kind === 'voice' ? entry.status === 'ok' : entry.usage !== null) reportSpend(entry.cost ?? 0);
+  if (entry.kind === 'model' ? entry.usage !== null : entry.status === 'ok') reportSpend(entry.cost ?? 0);
 }
 
 /** A clip's credits: ElevenLabs' own count where its response says, else the list rate. */
@@ -151,9 +153,12 @@ export function addGenerationTime(ms: number): void {
   changed();
 }
 
-/** A new quest: the console starts empty and the totals at zero. */
+/**
+ * A new quest: the console starts empty and the totals at zero — but for a fal.ai step still
+ * running, which belongs to the world rather than to any quest and would otherwise vanish mid-way.
+ */
 export function resetDevlog(): void {
-  requests = [];
+  requests = requests.filter((r) => r.kind === 'fal' && (r.status === 'waiting' || r.status === 'streaming'));
   generationMs = 0;
   changed();
 }
@@ -167,6 +172,7 @@ export function questTotals(): QuestTotals {
     voiceChars: 0,
     voiceCredits: 0,
     voiceCost: 0,
+    falCost: 0,
     requests: requests.length,
     errors: 0,
   };
@@ -176,6 +182,10 @@ export function questTotals(): QuestTotals {
       totals.voiceChars += r.chars;
       totals.voiceCredits += r.credits;
       totals.voiceCost += r.cost ?? 0;
+      continue;
+    }
+    if (r.kind === 'fal') {
+      totals.falCost += r.cost ?? 0;
       continue;
     }
     if (r.usage) {

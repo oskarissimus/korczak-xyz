@@ -211,6 +211,33 @@ its walls, a chimney in its roof, a banner on its pole — and spinning and glow
 On six fresh landmarks (Oct 2026) it moved two struts 5 cm and one loose sail 0.6 m, and nothing
 else: it corrects mistakes, it does not redesign. At build time, so saved worlds are settled too.
 
+**The hub's landmark is a real model, from fal.ai** (owner, Oct 2026: "something in the starting
+location that sets the mood of the generated world — as cheaply as possible; quality may suffer").
+`utils/rpg/landmark3d.ts`: FLUX.1 [schnell] draws it alone on white at 512² (~1 s, $0.003 — fal
+bills by the megapixel rounded up), TRELLIS makes that picture a textured GLB through fal's queue
+(25–55 s, $0.02; 512 px texture, `mesh_simplify` 0.95, ~10–17k triangles, ~700 KB). About **$0.023
+a world**, against ~$0.60 on Meshy. Both are called from the browser on the reader's own key; fal's
+CORS answers korczak.xyz. The prompt is the world's `landmark`, a line genesis writes **in English
+whatever the world's language** (an image model reads Polish badly); a world from before it is
+described from its hub and architecture. The world's colours go in as hex.
+
+- **Made once per world, never again.** The result is kept on the bible (`landmarkModel`,
+  `setWorldLandmark` in `worldSave.ts`), so it syncs with the world and no device asks twice.
+  Every request asks fal to keep its outputs (`X-Fal-Object-Lifecycle-Preference`, no expiry), since
+  the URL is the cache; the GLB's bytes are also in the Cache API (`rpg-landmarks`). One generation
+  per world at a time, and a world whose generation failed is not asked again until a reload — a
+  refused key or an empty balance would otherwise be asked again on every visit.
+- **The well until it exists** (`setHubLandmark` in `RpgScene.ts`, `components/Rpg/hubLandmark.ts`):
+  the model replaces the well on its spot, 6.5 m tall or 5 m wide at most, facing +Z (the spawn),
+  with the well's obstacle widened to its footprint. The classic world, a reader without a fal key,
+  and a model that fails to load all keep the well.
+- **TRELLIS writes no metallic factor**, which glTF means as fully metallic, and with no environment
+  map that renders black; `hubLandmark.ts` sets metalness to 0.
+- **In the console** as two `landmark` rows (kind `fal`), with the prompt, the picture and the GLB's
+  URL, time, error and price, and **fal.ai** has its own total beside the tokens and ElevenLabs
+  (`falCost`). A step still running survives the console's reset at a new quest. Sentry Logs:
+  `rpg.landmark`, outcome, ms, `costUsd`.
+
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
 
@@ -320,8 +347,8 @@ committed files.
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
-them. `account.keys.fal` (fal.ai, pasted on the account page) is there for asset generation and
-not yet spent by anything. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
+them. `account.keys.fal` (fal.ai, pasted on the account page) makes the hub's landmark (*The hub's
+landmark*, below) and nothing else. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
 in order (`modelChain` in `storyteller.ts`): the one picked on the intro screen (`MODEL_CHOICES`,
 kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **strongest first** (owner, Oct 2026: "the
 better model first and a fallback; we switch to a cheaper one when we optimise for cost"):

@@ -15,7 +15,7 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import type { WorldBible } from './genesis';
+import type { LandmarkModel, WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import type { Character, Lang } from './quest';
 import { dropGameFor } from './save';
@@ -100,6 +100,24 @@ export function saveWorld(world: WorldBible, now = Date.now()): void {
   write({ ...stored, current: { ...stored.current, [world.lang]: world }, past: past.slice(-KEEP_PAST), library: trimmed(library) });
   if (world.createdAt > 0) touch(worldUnit(world.id), now);
   touch(STATE_UNIT, now);
+}
+
+/**
+ * Keeps the hub's landmark model on the world wherever this browser holds it (the library, and the
+ * current world of its language), without changing which world is current or when it was played,
+ * and marks the world for the account, so no other device makes it again (`landmark3d.ts`).
+ */
+export function setWorldLandmark(id: string, model: LandmarkModel, now = Date.now()): void {
+  const stored = read();
+  const library = withLibrary(stored);
+  const entry = library[id];
+  if (entry) library[id] = { ...entry, world: { ...entry.world, landmarkModel: model } };
+  const current = { ...stored.current };
+  for (const [lang, w] of Object.entries(current) as [Lang, WorldBible | undefined][]) {
+    if (w?.id === id) current[lang] = { ...w, landmarkModel: model };
+  }
+  write({ ...stored, current, library });
+  touch(worldUnit(id), now);
 }
 
 /** Every invented world played in this browser or on the account, the most recently played first. */

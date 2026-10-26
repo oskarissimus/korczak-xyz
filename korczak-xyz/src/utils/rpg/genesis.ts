@@ -108,6 +108,28 @@ export interface WorldBible extends WorldBrief {
   /** 0–100, the model's own estimate of how ordinary it is. */
   typicality: number;
   look: WorldLook;
+  /**
+   * What stands in the middle of the hub, in ENGLISH whatever the world's language: one object,
+   * described for an image model (`landmark3d.ts`). Worlds from before Oct 2026 have none.
+   */
+  landmark?: string;
+  /** That landmark made into a 3D model by fal.ai, once; kept so it is never made again. */
+  landmarkModel?: LandmarkModel;
+}
+
+/**
+ * The hub's landmark as fal.ai made it (`landmark3d.ts`). Declared here rather than there because
+ * this file is compiled into the functions too, and that one talks to the DOM.
+ */
+export interface LandmarkModel {
+  /** The GLB on fal's CDN. */
+  glb: string;
+  /** The picture it was made from. */
+  image: string;
+  prompt: string;
+  costUsd: number;
+  ms: number;
+  at: number;
 }
 
 /** Everything the genesis prompt is built from. */
@@ -417,6 +439,9 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "player": string (who the player is here and why they help),',
     '  "address": string (how people address the player, one or two words, as said to them),',
     '  "hub": string (the name of the settlement where the player starts),',
+    '  "landmark": string (IN ENGLISH, whatever the language above: the ONE structure, monument, shrine or',
+    '    machine standing in the middle of the hub that says "this world" at a glance — its shape, materials',
+    '    and colours, for an image model; a single object about 6 m tall, not a scene, no people),',
     '  "words": [up to 6 words or short phrases people here use],',
     '  "look": {',
     '    "sky", "fog", "sun", "ground", "foliage", "wall", "roof", "accent": each a "#rrggbb" colour',
@@ -559,6 +584,7 @@ export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()
       seeds: ctx.seeds,
       typicality: Number.isFinite(typicality) ? Math.min(100, Math.max(0, Math.round(typicality))) : 50,
       look: parseLook(r.look),
+      ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
     });
   }
   return worlds;
