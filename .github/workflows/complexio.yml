@@ -82,6 +82,9 @@ jobs:
 
       # One instance, because every player has to be in the same in-memory world; an hour's
       # timeout, because each player holds one WebSocket for as long as they play.
+      # AUTH_FIREBASE_PROJECT switches on the server's sign-in gate: /ws and /status then answer
+      # only a Firebase ID token of an approved korczak.xyz account, which the page passes in.
+      # The service stays --allow-unauthenticated because the gate is the game's, not Cloud Run's.
       - name: Deploy
         if: steps.check.outputs.skip != 'true'
         run: |
@@ -89,5 +92,6 @@ jobs:
             --project="${PROJECT}" --region="${REGION}" \
             --image="${IMAGE}:${{ steps.rev.outputs.sha }}" \
             --allow-unauthenticated \
+            --set-env-vars="AUTH_FIREBASE_PROJECT=${PROJECT}" \
             --max-instances=1 --timeout=3600 --memory=1Gi \
             --port=8080
