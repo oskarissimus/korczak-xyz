@@ -29,7 +29,7 @@ import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
 import { HUB_SLOTS, type HubSlot } from '../../utils/rpg/landmark3d';
-import { DAYLIGHT, HAZE, recolor, stars, Weather } from './atmosphere';
+import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
@@ -308,6 +308,8 @@ export class RpgScene {
 
     this.scene.background = new THREE.Color(0x9fb8c8);
     this.scene.fog = new THREE.Fog(0x9fb8c8, 40, 170);
+    this.scene.add(this.sky.mesh);
+    this.sky.set(this.look, this.sunOffset);
 
     this.buildLight();
     this.buildWorld();
@@ -714,6 +716,7 @@ export class RpgScene {
   private look: WorldLook = CLASSIC_LOOK;
   private weather: Weather | null = null;
   private starDome: THREE.Points | null = null;
+  private sky = new Sky();
   /** A flooded world: the sea that replaces the ground, and the land the village stands on. */
   private flood: { water: THREE.Mesh; land: THREE.Mesh } | null = null;
 
@@ -745,6 +748,7 @@ export class RpgScene {
     this.sunLight.intensity = day.sun;
     this.sunOffset.set(Math.cos(day.elevation) * 47, Math.sin(day.elevation) * 82, Math.cos(day.elevation) * 30);
     if (classic) this.sunOffset.set(40, 70, 25);
+    this.sky.set(look, this.sunOffset);
 
     if (this.starDome) this.scene.remove(this.starDome);
     this.starDome = null;
@@ -1516,6 +1520,7 @@ export class RpgScene {
       // The people move even while a dialogue holds the world: whoever is talking talks.
       this.animate(dt);
       this.updateCamera();
+      this.sky.update(dt, this.camera.position);
       this.cullFar();
       this.renderer.render(this.scene, this.camera);
       this.frames.end(started, this.renderer.info.render, !this.paused);

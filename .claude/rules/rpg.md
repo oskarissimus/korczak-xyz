@@ -77,7 +77,7 @@ paths. Each genesis is `rpg.world` in Sentry Logs (`rpg.world.failed` an error) 
 
 **The look** (`WorldLook`, `components/Rpg/atmosphere.ts`) is how one village of Quaternius pieces
 becomes any world with no new model: sky, fog, sun, ground, foliage, wall, roof and accent colours;
-time of day (sun height and strength, stars at night); haze (fog distance); weather (rain, snow,
+time of day (sun height and strength, stars at night); the sky (`Sky`, a dome that follows the camera, painted in the shader from those colours rather than from a picture: the horizon is the fog's colour so the land meets it with no seam, the zenith a deeper sky colour, the sun or moon a disc with its glow where `sunOffset` puts the light, and drifting fbm clouds, more of them in thicker haze and in rain, snow or ash — no request and no download per world); haze (fog distance); weather (rain, snow,
 ash, spores, sparks — one `Points` box that wraps around the player); water (`flooded` is a water
 plane with the village on a disc of land); growth (how much ground cover); flora (the kit's pines,
 broadleaf or dead trees, or primitive fungi and spires, or none). The kit's textures are

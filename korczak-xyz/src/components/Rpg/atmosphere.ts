@@ -182,3 +182,169 @@ export function stars(): THREE.Points {
   points.frustumCulled = false;
   return points;
 }
+
+/** How much of the sky is cloud, for a world's haze; weather that falls from clouds adds more. */
+const COVER: Record<WorldLook['haze'], number> = { clear: 0.32, light: 0.48, thick: 0.62 };
+const OVERCAST: Record<WorldLook['weather'], number> = { none: 0, rain: 0.35, snow: 0.3, ash: 0.3, spores: 0.1, sparks: 0.05 };
+
+const SKY_RADIUS = 300;
+
+const SKY_VERTEX = /* glsl */ `
+varying vec3 vDir;
+void main() {
+  vDir = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const SKY_FRAGMENT = /* glsl */ `
+uniform vec3 zenith;
+uniform vec3 horizon;
+uniform vec3 sunColor;
+uniform vec3 sunDir;
+uniform vec3 cloudLit;
+uniform vec3 cloudShade;
+uniform float cover;
+uniform float night;
+uniform float time;
+varying vec3 vDir;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += a * noise(p);
+    p = p * 2.03 + vec2(17.1, 9.2);
+    a *= 0.5;
+  }
+  return v;
+}
+
+void main() {
+  vec3 dir = normalize(vDir);
+  float up = dir.y;
+
+  // The horizon is the fog's colour, so the land fades into the sky with no seam.
+  float t = pow(clamp(up, 0.0, 1.0), 0.45);
+  vec3 col = mix(horizon, zenith, t);
+
+  float facing = max(dot(dir, sunDir), 0.0);
+  float disc = smoothstep(mix(0.9993, 0.9997, night), mix(0.9996, 0.99985, night), facing);
+  vec3 glow = sunColor * (pow(facing, 6.0) * 0.25 + pow(facing, 64.0) * 0.45) * (1.0 - night * 0.7);
+  col += glow;
+
+  // Clouds on a ceiling above the world: the direction meets a plane, so they shrink toward the
+  // horizon as real ones do, and drift with the wind.
+  float cloud = 0.0;
+  if (up > 0.0) {
+    vec2 p = dir.xz / (up + 0.12) * 1.15 + vec2(time * 0.012, time * 0.004);
+    float n = fbm(p);
+    float edge = 1.0 - cover;
+    cloud = smoothstep(edge - 0.08, edge + 0.22, n) * smoothstep(0.0, 0.25, up);
+    // The side toward the sun is lit, the rest in its own shade.
+    float lit = clamp(0.35 + 0.65 * (n - fbm(p + sunDir.xz * 0.08)) * 4.0 + facing * 0.4, 0.0, 1.0);
+    vec3 cloudCol = mix(cloudShade, cloudLit, lit);
+    col = mix(col, cloudCol, cloud * 0.92);
+  }
+
+  col += sunColor * disc * (1.0 - cloud) * mix(2.0, 1.1, night);
+  gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
+/**
+ * The sky: a dome that follows the camera, painted in the shader from the world's colours rather
+ * than from a picture, so every invented world has its own without a request or a download. The
+ * horizon is the fog's colour (the land meets it with no seam), the zenith a deeper version of the
+ * world's sky, the sun (or at night the moon) a disc with its glow where the light actually comes
+ * from, and clouds that drift, more of them in thicker haze and in weather that falls.
+ */
+export class Sky {
+  readonly mesh: THREE.Mesh;
+  private uniforms: {
+    zenith: { value: THREE.Color };
+    horizon: { value: THREE.Color };
+    sunColor: { value: THREE.Color };
+    sunDir: { value: THREE.Vector3 };
+    cloudLit: { value: THREE.Color };
+    cloudShade: { value: THREE.Color };
+    cover: { value: number };
+    night: { value: number };
+    time: { value: number };
+  };
+
+  constructor() {
+    this.uniforms = {
+      zenith: { value: new THREE.Color() },
+      horizon: { value: new THREE.Color() },
+      sunColor: { value: new THREE.Color() },
+      sunDir: { value: new THREE.Vector3(0, 1, 0) },
+      cloudLit: { value: new THREE.Color() },
+      cloudShade: { value: new THREE.Color() },
+      cover: { value: 0.4 },
+      night: { value: 0 },
+      time: { value: Math.random() * 1000 },
+    };
+    const material = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      vertexShader: SKY_VERTEX,
+      fragmentShader: SKY_FRAGMENT,
+      side: THREE.BackSide,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+    });
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 32, 16), material);
+    // Drawn before anything, behind everything, wherever the camera is.
+    this.mesh.renderOrder = -1000;
+    this.mesh.frustumCulled = false;
+  }
+
+  /** Paints the sky for `look`, with the sun where `sunOffset` (from the player to the light) puts it. */
+  set(look: WorldLook, sunOffset: THREE.Vector3): void {
+    const u = this.uniforms;
+    const isNight = look.time === 'night';
+    u.horizon.value.set(look.fog);
+    const zenith = new THREE.Color(look.sky);
+    const hsl = { h: 0, s: 0, l: 0 };
+    zenith.getHSL(hsl);
+    // The sky overhead is deeper and more itself than at the horizon, where the haze washes it out.
+    zenith.setHSL(hsl.h, Math.min(1, hsl.s * 1.35 + 0.08), hsl.l * (isNight ? 0.6 : 0.78));
+    u.zenith.value.copy(zenith);
+    u.sunColor.value.set(isNight ? 0xdfe8ff : look.sun);
+    u.sunDir.value.copy(sunOffset).normalize();
+    u.night.value = isNight ? 1 : 0;
+    u.cover.value = Math.min(0.92, COVER[look.haze] + OVERCAST[look.weather]);
+    const sun = new THREE.Color(look.sun);
+    const fog = new THREE.Color(look.fog);
+    if (isNight) {
+      u.cloudLit.value.copy(zenith).lerp(new THREE.Color(0x8890a8), 0.35);
+      u.cloudShade.value.copy(zenith).multiplyScalar(0.7);
+    } else {
+      const grey = look.weather === 'rain' || look.weather === 'ash' ? 0.45 : 0;
+      u.cloudLit.value.copy(sun).lerp(new THREE.Color(0xffffff), 0.5).lerp(fog, 0.15 + grey * 0.6);
+      u.cloudShade.value.copy(fog).lerp(zenith, 0.3).multiplyScalar(0.82 - grey * 0.3);
+    }
+  }
+
+  /** Moves the dome with the camera and the clouds with the wind. */
+  update(dt: number, camera: THREE.Vector3): void {
+    this.uniforms.time.value += dt;
+    this.mesh.position.copy(camera);
+  }
+}
