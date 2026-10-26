@@ -865,12 +865,35 @@ ul.rpg-source {
 
 .rpg-container.rpg-immersive {
   position: fixed;
-  inset: 0;
+  top: var(--rpg-top);
+  left: 0;
   z-index: 1000;
   width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  height: calc(100vh - var(--rpg-top));
+  height: calc(100dvh - var(--rpg-top));
   min-height: 0;
+  /* Everything inside is already clear of the status bar, so nothing in here adds it again. */
+  --safe-top: 0px;
+}
+
+/* The game starts under the status bar, not behind it (owner, Oct 2026, a screenshot: the
+   console's tabs and the dialogue's top lines under the clock). iOS Safari draws its own blurred
+   gradient over whatever sits under the status bar and keeps the taps there for itself, so
+   anything up there could be seen badly and pressed not at all. Read on the parent: the container
+   zeroes `--safe-top` for its children, and a var() on the same element would read that zero. */
+.rpg-content {
+  --rpg-top: var(--safe-top, 0px);
+}
+
+/* And what the strip shows while playing is black, not the desktop's navy: Safari tints that blur
+   from the page's background and from a fixed band at the top, so both go black with the game. */
+html:has(.rpg-immersive),
+body:has(.rpg-immersive) {
+  background: #000;
+}
+
+body:has(.rpg-immersive)::before {
+  background: #000;
 }
 
 .rpg-touch .rpg-overlay {
@@ -1003,7 +1026,22 @@ ul.rpg-source {
   min-height: 44px;
 }
 
+/* With the console open the dialogue scrolls in what the console leaves, rather than running up
+   underneath it: the console is on top, so a choice behind it could not be pressed. */
+.rpg-dev-open .rpg-dialogue {
+  max-height: calc(45% - 18px);
+  overflow-y: auto;
+}
+
 @media (max-width: 480px), (max-height: 480px) {
+  .rpg-dev {
+    max-height: 40%;
+  }
+
+  .rpg-dev-open .rpg-dialogue {
+    max-height: 60%;
+  }
+
   .rpg-container {
     min-height: 420px;
   }

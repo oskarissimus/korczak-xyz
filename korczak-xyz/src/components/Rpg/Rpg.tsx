@@ -1700,7 +1700,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   );
 
   return (
-    <div className={`rpg-container${touch ? ' rpg-touch' : ''}${immersive ? ' rpg-immersive' : ''}`} ref={containerRef}>
+    <div className={`rpg-container${touch ? ' rpg-touch' : ''}${immersive ? ' rpg-immersive' : ''}${devOpen ? ' rpg-dev-open' : ''}`} ref={containerRef}>
       <canvas ref={canvasRef} className="rpg-canvas" />
 
       {started && (
