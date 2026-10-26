@@ -121,8 +121,8 @@ export interface WorldBible extends WorldBrief {
    * 26 Oct 2026 have none and are described from their bible.
    */
   kit?: Partial<Record<HubPiece, string>>;
-  /** Those pieces made into 3D models by fal.ai, each once, as they arrive. */
-  kitModels?: Partial<Record<HubPiece, LandmarkModel>>;
+  /** Those pieces made into 3D models by fal.ai, each once, as they arrive, and the forest's other trees. */
+  kitModels?: Partial<Record<HubPiece | ForestVariant, LandmarkModel>>;
   /**
    * How big the landmark and each piece really are, in metres, by the model that described them
    * (`hubSizes`). A fixed size per slot drew a caravan world's "house", a covered truck, as tall as a
@@ -205,6 +205,14 @@ export function parseHubSizes(reply: string): HubSizes | null {
   const raw = extract(reply) as Record<string, unknown> | null;
   return parseSizes(raw?.sizes ?? raw);
 }
+
+/**
+ * Two more of the world's tree, a young one and an old one, made after the hub so the trees across
+ * the map are not one tree repeated four hundred times (`RpgScene.setForest`). They stand nowhere
+ * in the hub, and are described from the `tree` line, so genesis writes nothing for them.
+ */
+export const FOREST_VARIANTS = ['tree2', 'tree3'] as const;
+export type ForestVariant = (typeof FOREST_VARIANTS)[number];
 
 /**
  * The hub's landmark, or one of its pieces, as fal.ai made it (`landmark3d.ts`). Declared here rather than there because

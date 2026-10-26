@@ -15,7 +15,7 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import type { HubPiece, HubSizes, LandmarkModel, WorldBible } from './genesis';
+import type { ForestVariant, HubPiece, HubSizes, LandmarkModel, WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import type { Character, Lang } from './quest';
 import { dropGameFor } from './save';
@@ -103,7 +103,7 @@ export function saveWorld(world: WorldBible, now = Date.now()): void {
 }
 
 /** The world with one of its hub's models in place. */
-export function withModel(world: WorldBible, slot: 'landmark' | HubPiece, model: LandmarkModel): WorldBible {
+export function withModel(world: WorldBible, slot: 'landmark' | HubPiece | ForestVariant, model: LandmarkModel): WorldBible {
   return slot === 'landmark' ? { ...world, landmarkModel: model } : { ...world, kitModels: { ...world.kitModels, [slot]: model } };
 }
 
@@ -112,7 +112,7 @@ export function withModel(world: WorldBible, slot: 'landmark' | HubPiece, model:
  * current world of its language), without changing which world is current or when it was played,
  * and marks the world for the account, so no other device makes it again (`landmark3d.ts`).
  */
-export function setWorldModel(id: string, slot: 'landmark' | HubPiece, model: LandmarkModel, now = Date.now()): void {
+export function setWorldModel(id: string, slot: 'landmark' | HubPiece | ForestVariant, model: LandmarkModel, now = Date.now()): void {
   putWorld(id, (w) => withModel(w, slot, model), now);
 }
 

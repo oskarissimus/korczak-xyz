@@ -20,6 +20,12 @@
  * for the square (`HUB_PIECES`, placed by `RpgScene.setHubModels`). Eight models, about **$0.18 a
  * world**, made four at a time in ~1–1.5 min while the kit's village stands in for them.
  *
+ * AND THE FOREST (owner, 26 Oct 2026: "generate the world's trees — they are static assets now").
+ * The hub's tree is also every tree across the map, with two more of its kind made after the hub,
+ * a young one and an old one (`FOREST_VARIANTS`), so the forest is three trees and not one: two
+ * more models, **$0.046 a world**. The scene simplifies each to ~2,500 triangles before planting
+ * it four hundred times (`hubModels.ts`, `loadForestTree`).
+ *
  * GENERATED ONCE PER WORLD. The result is kept on the world's bible (`landmarkModel`, `kitModels`), which the
  * library and the account already sync (`worldSave.ts`, `cloud.ts`), so neither this browser nor
  * another device asks again. fal's files would otherwise expire on fal's schedule, so every request
@@ -32,7 +38,7 @@
 
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest } from './devlog';
-import { HUB_PIECES, type HubPiece, type LandmarkModel, type WorldBible } from './genesis';
+import { FOREST_VARIANTS, HUB_PIECES, type ForestVariant, type HubPiece, type LandmarkModel, type WorldBible } from './genesis';
 
 export type { LandmarkModel };
 
@@ -48,9 +54,16 @@ export function imageCost(width = IMAGE_SIZE, height = IMAGE_SIZE): number {
   return Math.ceil((width * height) / 1_000_000) * FAL_PRICES.imagePerMegapixel;
 }
 
-export type HubSlot = 'landmark' | HubPiece;
-export const HUB_SLOTS: readonly HubSlot[] = ['landmark', ...HUB_PIECES];
-/** Everything fal.ai is asked to make: the hub's pieces, and a quest's clues (`ensureClueModel`). */
+/** Everything fal.ai makes for a world, in the order it is made: the hub, then the forest's other trees. */
+export type HubSlot = 'landmark' | HubPiece | ForestVariant;
+export const HUB_SLOTS: readonly HubSlot[] = ['landmark', ...HUB_PIECES, ...FOREST_VARIANTS];
+/** The forest's trees, the hub's own first: what `RpgScene.setForest` plants across the map. */
+export const FOREST_SLOTS: readonly HubSlot[] = ['tree', ...FOREST_VARIANTS];
+
+export function isForestVariant(slot: HubSlot): slot is ForestVariant {
+  return (FOREST_VARIANTS as readonly string[]).includes(slot);
+}
+/** Everything fal.ai is asked to make: the hub's pieces, the forest, and a quest's clues (`ensureClueModel`). */
 export type FalSlot = HubSlot | 'clue';
 
 /**
@@ -58,7 +71,25 @@ export type FalSlot = HubSlot | 'clue';
  * triangles, five of them more than the whole village; at 0.98 it was 12k, a lamp 3k, a tree ~15k.
  * The landmark keeps 0.95, being one and the thing looked at.
  */
-const SIMPLIFY: Record<FalSlot, number> = { clue: 0.98, landmark: 0.95, house: 0.98, hall: 0.98, tree: 0.98, stall: 0.98, cart: 0.98, lamp: 0.98, goods: 0.98 };
+const SIMPLIFY: Record<FalSlot, number> = {
+  clue: 0.98,
+  landmark: 0.95,
+  house: 0.98,
+  hall: 0.98,
+  tree: 0.98,
+  stall: 0.98,
+  cart: 0.98,
+  lamp: 0.98,
+  goods: 0.98,
+  tree2: 0.98,
+  tree3: 0.98,
+};
+
+/** How each of the forest's other trees differs from the hub's, appended to its line. */
+const VARIANT: Record<ForestVariant, string> = {
+  tree2: 'a young one of the same kind, smaller and lighter, with fewer branches',
+  tree3: 'an old one of the same kind, larger, wider and more gnarled',
+};
 
 /** What a tree is in a world that wrote no `kit`, from its flora; `none` grows nothing to make. */
 const FLORA_SUBJECT: Record<WorldBible['look']['flora'], string | null> = {
@@ -93,16 +124,24 @@ function fallbackSubject(world: PromptWorld, piece: HubPiece): string | null {
   }
 }
 
-/** The slots this world has something to make for: all of them, but a tree where nothing grows. */
+/** What the world's tree is, from its `kit` line or else its flora; null where nothing grows. */
+function treeSubject(world: PromptWorld): string | null {
+  return world.kit?.tree?.trim() || FLORA_SUBJECT[world.look.flora];
+}
+
+/** The slots this world has something to make for: all of them, but no tree where nothing grows. */
 export function hubSlots(world: PromptWorld): HubSlot[] {
-  return HUB_SLOTS.filter((s) => s !== 'tree' || world.kit?.tree || FLORA_SUBJECT[world.look.flora]);
+  return HUB_SLOTS.filter((s) => (s !== 'tree' && !isForestVariant(s)) || treeSubject(world));
 }
 
 /**
  * The picture a 3D model is made from: one object, whole, on white, so TRELLIS sees all of it.
  * Buildings face the camera with their door, since TRELLIS keeps the picture's front as the model's
  * +Z and the game turns +Z to the square. Thin parts are asked away: a lamp on a slender pole came
- * back as its lantern and a hook, the pole gone (Oct 2026).
+ * back as its lantern and a hook, the pole gone (Oct 2026). A tree is asked for a solid silhouette
+ * on top of that: FLUX draws dead trees with a hundred bare twigs whatever "chunky" says, and from
+ * those TRELLIS built a flat card with the picture on it, twice in three (26 Oct 2026); with "a few
+ * thick limbs … no twigs" four trees of four kinds all came back as trees.
  */
 export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): string {
   const { look } = world;
@@ -117,17 +156,21 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
       'isolated on a plain white background, no ground, no people, no text, soft even light.',
     ].join(' ');
   }
-  const subject = world.kit?.[slot]?.trim() || fallbackSubject(world, slot) || slot;
+  const subject = isForestVariant(slot)
+    ? `${(treeSubject(world) ?? 'a tree').replace(/[.\s]+$/, '')}, ${VARIANT[slot]}`
+    : world.kit?.[slot]?.trim() || fallbackSubject(world, slot) || slot;
   const building = slot === 'house' || slot === 'hall' || slot === 'stall';
+  const tree = slot === 'tree' || isForestVariant(slot);
   return [
     `A single stylised low-poly game asset: ${subject.replace(/[.\s]+$/, '')}.`,
-    slot === 'tree'
+    tree
       ? `Colours: foliage ${look.foliage}, glowing accents ${look.accent}.`
       : `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.`,
     building
       ? 'Seen from the front and slightly above, its entrance facing the viewer, the whole of it in view.'
       : 'The whole object in view, three-quarter view from slightly above.',
     'Chunky, thick proportions with no thin or spindly parts,',
+    ...(tree ? ['a few thick limbs and one solid, compact silhouette, no twigs, simple faceted shapes like a mobile game asset,'] : []),
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
   ].join(' ');
 }
@@ -268,7 +311,7 @@ export function hubModel(world: WorldBible, slot: HubSlot): LandmarkModel | unde
   return slot === 'landmark' ? world.landmarkModel : world.kitModels?.[slot];
 }
 
-/** How many pieces fal.ai makes at once: all eight took 55–80 s four at a time, and the queue holds the rest. */
+/** How many pieces fal.ai makes at once: the hub's eight took 55–80 s four at a time, and the queue holds the rest. */
 const PARALLEL = 4;
 let running = 0;
 const waiting: (() => void)[] = [];

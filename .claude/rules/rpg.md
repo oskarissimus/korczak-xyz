@@ -246,6 +246,26 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   before the world's state has it (`made` — the effect ran between a model's arrival and its
   `setWorld` and asked for three pieces twice, Oct 2026), a slot that failed is not asked again
   until a reload, and a 401/402/403 stops the world's remaining slots before they spend anything.
+- **And the forest** (owner, 26 Oct 2026: "generate the world's trees — now they are static
+  assets"). The ~400 trees across the map were the kit's, in the world's flora; now they are the
+  hub's `tree` model and two more of its kind made after the hub, `tree2` a young one and `tree3`
+  an old one (`FOREST_VARIANTS` in `genesis.ts`, described from the `tree` line, so genesis writes
+  nothing more): **$0.046 more a world**, and the first is already paid for. `RpgScene.setForest`
+  plants them mixed as the kit's three were, each as it arrives, at the size the world gives its
+  tree (`sizes.tree`, else the kit's 7.4 m) times 0.7–1.6, and places' pines and dead trees
+  take them too; until then, and in the classic world, the kit's. A world whose flora is `none`
+  makes none of the three.
+  - **Simplified in the browser** (`loadForestTree`, `hubModels.ts`, meshoptimizer): TRELLIS's
+    0.98 still leaves 4–30k triangles a tree, and ~60 stand in view, drawn again for the shadow. Each
+    is taken to 2,500 (`FOREST_TRIANGLES`) in 25–200 ms, once a session. It needs `Permissive`:
+    TRELLIS cuts its texture into hundreds of islands, and a simplifier that keeps every island's edge
+    stopped a leafy crown at 9–16k whatever error it was allowed. In a dead-tree world the frame went
+    from 1.65 M to 1.06 M triangles with the forest in.
+  - **A tree is asked for a solid silhouette** (`hubModelPrompt`: "a few thick limbs and one solid,
+    compact silhouette, no twigs"): FLUX draws dead trees with a hundred bare twigs whatever "chunky"
+    says, and TRELLIS made two of three such pictures into a flat card or a cylinder with the picture
+    on it — planted four hundred times. With the line, four kinds of tree all came back as trees.
+    Nothing checks a model's shape after the fact, so a world that did get a card keeps it.
 - **The kit's village until then** (`RpgScene.setHubModels`, `components/Rpg/hubModels.ts`,
   `HUB_FIT` for each piece's height and width): what a model replaces is hidden, not removed, and
   shows again for a world without it; the kit's houses are merged per kind (`mergeStatic`) so a

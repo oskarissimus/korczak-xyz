@@ -24,11 +24,11 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
-import { disposeHubModel, hubFit, loadHubModel } from './hubModels';
+import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
-import { CLASSIC_LOOK, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
-import { HUB_SLOTS, type HubSlot } from '../../utils/rpg/landmark3d';
+import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
+import { HUB_SLOTS, isForestVariant, type HubSlot } from '../../utils/rpg/landmark3d';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
@@ -520,10 +520,11 @@ export class RpgScene {
   }
 
   /**
-   * The scattered trees in the world's flora (`WorldLook.flora`): the kit's pines, broadleaf or dead
-   * trees, or shapes of the world's own (giant mushrooms, spires), one instanced mesh per part per
-   * kind, hidden ones scaled to 0. Planted again when a world changes it; with no flora at all the
-   * trees are gone and so are the obstacles they were.
+   * The scattered trees: the world's own from fal.ai once they have come (`setForest`), until then
+   * its flora (`WorldLook.flora`) — the kit's pines, broadleaf or dead trees, or shapes of the
+   * world's own (giant mushrooms, spires) — one instanced mesh per part per kind, hidden ones scaled
+   * to 0. Planted again when a world changes it; with no flora at all the trees are gone and so are
+   * the obstacles they were.
    */
   private plantTrees() {
     for (const m of this.treeMeshes) {
@@ -534,9 +535,19 @@ export class RpgScene {
     this.treeCells = [];
     const flora = this.look.flora;
     const classic = this.isClassic();
-    const kinds: readonly string[] | null =
-      classic ? TREES : flora === 'pines' ? TREES.slice(0, 3) : flora === 'broadleaf' ? TREES.slice(3) : flora === 'dead' ? DEAD_TREES : null;
-    if (kinds && !this.kit.loaded) return;
+    const forest = classic ? [] : this.forest;
+    const kinds: readonly string[] | null = forest.length
+      ? forest.map((_, i) => `forest${i}`)
+      : classic
+        ? TREES
+        : flora === 'pines'
+          ? TREES.slice(0, 3)
+          : flora === 'broadleaf'
+            ? TREES.slice(3)
+            : flora === 'dead'
+              ? DEAD_TREES
+              : null;
+    if (kinds && !forest.length && !this.kit.loaded) return;
     for (const tree of this.trees) {
       for (const m of tree.meshes) this.scene.remove(m);
       tree.slot = undefined;
@@ -552,7 +563,7 @@ export class RpgScene {
     }
     for (const [key, trees] of byKind) {
       const kind = key.split('|')[0];
-      const parts = kinds ? this.kit.parts(kind) : this.floraParts();
+      const parts = forest.length ? forest[Number(kind.slice(6))] : kinds ? this.kit.parts(kind) : this.floraParts();
       const meshes = parts.map((part) => {
         const m = new THREE.InstancedMesh(part.geometry, part.material, trees.length);
         m.castShadow = true;
@@ -583,6 +594,67 @@ export class RpgScene {
 
   private treeMeshes: THREE.InstancedMesh[] = [];
   private treeCells: Cell[] = [];
+
+  // --- the world's own trees, from fal.ai (`hubModels.ts`, `utils/rpg/landmark3d.ts`) ---------------
+
+  /** The world's trees, each as parts to instance; empty until one has loaded, and in the classic world. */
+  private forest: TreePart[][] = [];
+  /** The urls the forest was last asked for, loaded or still loading. */
+  private forestWanted = '';
+  private forestToken = 0;
+
+  /**
+   * The world's own trees across the map in place of the kit's (owner, 26 Oct 2026: "generate the
+   * world's trees — now they are static assets"): the hub's tree and its young and old ones, mixed as
+   * the kit's three were. Planted as each arrives, so the first is the whole forest for a minute;
+   * none (a new world, the classic one, no key) puts the kit's back. Places' pines and dead trees
+   * take them too, from the next place built.
+   */
+  async setForest(urls: string[], size: HubSize | undefined, onError: (url: string, e: unknown) => void = () => {}): Promise<void> {
+    const fit = size ?? FOREST_FIT;
+    const key = `${urls.join(' ')} ${fit.height}×${fit.width}`;
+    if (key === this.forestWanted) return;
+    this.forestWanted = key;
+    const token = ++this.forestToken;
+    // Whatever stands now and is still wanted, at the same size, stays while the rest loads.
+    const resized = fit.height !== this.forestFit.height || fit.width !== this.forestFit.width;
+    this.forestFit = fit;
+    const kept = resized ? [] : this.forest.filter((parts) => urls.includes(this.forestUrls.get(parts) ?? ''));
+    const gone = this.forest.filter((parts) => !kept.includes(parts));
+    if (gone.length) {
+      this.forest = kept;
+      this.plantTrees();
+      for (const parts of gone) {
+        this.forestUrls.delete(parts);
+        disposeTreeParts(parts);
+      }
+    }
+    const have = new Set(kept.map((parts) => this.forestUrls.get(parts)));
+    await Promise.all(
+      urls
+        .filter((url) => !have.has(url))
+        .map(async (url) => {
+          let parts: TreePart[];
+          try {
+            parts = await loadForestTree(url, fit);
+          } catch (e) {
+            onError(url, e);
+            return;
+          }
+          if (token !== this.forestToken) {
+            disposeTreeParts(parts);
+            return;
+          }
+          this.forestUrls.set(parts, url);
+          // In the order asked for, so the trees are mixed the same way whichever loaded first.
+          this.forest = [...this.forest, parts].sort((a, b) => urls.indexOf(this.forestUrls.get(a)!) - urls.indexOf(this.forestUrls.get(b)!));
+          this.plantTrees();
+        }),
+    );
+  }
+
+  private forestUrls = new Map<TreePart[], string>();
+  private forestFit: HubSize = FOREST_FIT;
   private coverCells: Cell[] = [];
   /** The world's own flora's geometry and materials, made once per world. */
   private floraCache: { flora: string; parts: { geometry: THREE.BufferGeometry; material: THREE.Material; matrix: THREE.Matrix4 }[] } | null = null;
@@ -964,6 +1036,9 @@ export class RpgScene {
       cart: [spot(-18, -2)],
       lamp: lamps.map(([x, z]) => spot(x, z)),
       goods: [spot(-7.8, -6.6), spot(11, -9.7), spot(-10.2, 6.8)],
+      // The forest's other trees stand nowhere in the hub (`setForest`).
+      tree2: [],
+      tree3: [],
     };
     this.kitPieces.landmark = [this.well!];
     this.kitPieces.house = this.stopgapHouses.filter((_, i) => HOUSE_KINDS[i] === 'small');
@@ -998,7 +1073,7 @@ export class RpgScene {
     onError: (slot: HubSlot, e: unknown) => void = () => {},
   ): Promise<void> {
     await Promise.all(
-      HUB_SLOTS.map((slot) => this.setHubModel(slot, urls[slot] ?? null, hubFit(slot, sizes)).catch((e) => onError(slot, e))),
+      HUB_SLOTS.filter((slot) => !isForestVariant(slot)).map((slot) => this.setHubModel(slot, urls[slot] ?? null, hubFit(slot, sizes)).catch((e) => onError(slot, e))),
     );
   }
 
@@ -1099,7 +1174,7 @@ export class RpgScene {
       }
     }
 
-    const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look);
+    const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look, this.isClassic() ? [] : this.forest);
     built.group.position.copy(center);
     this.scene.add(built.group);
     const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
@@ -1876,6 +1951,8 @@ export class RpgScene {
   dispose() {
     cancelAnimationFrame(this.frame);
     this.senses.dispose();
+    // A forest tree still loading is not planted in a scene that is gone.
+    this.forestToken++;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);

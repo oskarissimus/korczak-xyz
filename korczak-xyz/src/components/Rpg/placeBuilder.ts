@@ -11,6 +11,7 @@ import * as THREE from 'three';
 
 import type { WorldLook } from '../../utils/rpg/genesis';
 import { placePosition, type Feature, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
+import type { TreePart } from './hubModels';
 import { buildLandmark, type Spinner } from './landmark';
 import { surfaceMat } from './surfaces';
 import { DEAD_TREES, ROCKS, TREES, type WorldKit } from './world';
@@ -86,8 +87,11 @@ function ringSpot(rand: () => number, inner = CLEAR_RADIUS + 1, outer = PLACE_RA
   return { x: Math.sin(a) * d, z: Math.cos(a) * d, a };
 }
 
-/** The kit, when it has loaded; a feature built before then is made of primitives. */
-type Builder = (g: THREE.Group, obstacles: Obstacle[], rand: () => number, kit: WorldKit | null) => void;
+/**
+ * The kit, when it has loaded; a feature built before then is made of primitives. And the world's own
+ * trees from fal.ai, once they have come (`RpgScene.setForest`), which stand in for the kit's.
+ */
+type Builder = (g: THREE.Group, obstacles: Obstacle[], rand: () => number, kit: WorldKit | null, forest: TreePart[][]) => void;
 
 /** A kit piece at (x, z), turned at random and scaled by `s`. */
 function kitPiece(kit: WorldKit, name: string, x: number, z: number, s: number, rand: () => number) {
@@ -98,8 +102,35 @@ function kitPiece(kit: WorldKit, name: string, x: number, z: number, s: number, 
   return p;
 }
 
+/**
+ * One of the world's own trees at (x, z), turned at random and scaled by `s`. Its meshes share their
+ * geometry and materials with the forest's, so taking the place down disposes none of them.
+ */
+function forestTree(parts: TreePart[], x: number, z: number, s: number, rand: () => number) {
+  const tree = new THREE.Group();
+  for (const part of parts) {
+    const mesh = new THREE.Mesh(part.geometry, part.material);
+    mesh.applyMatrix4(part.matrix);
+    mesh.userData.shared = true;
+    tree.add(mesh);
+  }
+  tree.position.set(x, 0, z);
+  tree.rotation.y = rand() * Math.PI * 2;
+  tree.scale.setScalar(s);
+  return tree;
+}
+
 const FEATURE_BUILDERS: Record<Feature, Builder> = {
-  pines(g, obstacles, rand, kit) {
+  pines(g, obstacles, rand, kit, forest) {
+    if (forest.length) {
+      for (let i = 0; i < 28; i++) {
+        const { x, z } = ringSpot(rand);
+        const s = 0.8 + rand() * 0.6;
+        g.add(forestTree(forest[Math.floor(rand() * forest.length)], x, z, s, rand));
+        obstacles.push({ x, z, r: 0.5 * s });
+      }
+      return;
+    }
     if (kit) {
       for (let i = 0; i < 28; i++) {
         const { x, z } = ringSpot(rand);
@@ -122,7 +153,15 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
       obstacles.push({ x, z, r: 0.5 * s });
     }
   },
-  dead_trees(g, obstacles, rand, kit) {
+  dead_trees(g, obstacles, rand, kit, forest) {
+    if (forest.length) {
+      for (let i = 0; i < 12; i++) {
+        const { x, z } = ringSpot(rand);
+        g.add(forestTree(forest[Math.floor(rand() * forest.length)], x, z, 0.6 + rand() * 0.3, rand));
+        obstacles.push({ x, z, r: 0.4 });
+      }
+      return;
+    }
     if (kit) {
       for (let i = 0; i < 12; i++) {
         const { x, z } = ringSpot(rand);
@@ -336,7 +375,7 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
 };
 
 /** The place, centred on the origin of its group; the caller moves the group and its obstacles. */
-export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: WorldLook): BuiltPlace {
+export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: WorldLook, forest: TreePart[][] = []): BuiltPlace {
   const rand = rng(hashString(spec.name + spec.biome));
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
@@ -350,7 +389,7 @@ export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: 
   ground.receiveShadow = true;
   group.add(ground);
 
-  for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand, kit);
+  for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand, kit, forest);
   shadowed(group);
   ground.castShadow = false;
 

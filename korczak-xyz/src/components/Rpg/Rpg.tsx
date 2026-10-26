@@ -34,7 +34,7 @@ import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../ut
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
-import { cluePrompt, ensureClueModel, ensureHubModels, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
+import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
@@ -832,8 +832,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [flash, notify, persist]);
 
   // The hub (`utils/rpg/landmark3d.ts`): an invented world's own landmark, houses, tree and the
-  // things in its square, from fal.ai, each made once and kept on the world; the kit's village
-  // until they exist, and in the classic world or without a key.
+  // things in its square, from fal.ai, each made once and kept on the world, and the forest's trees
+  // across the map; the kit's village until they exist, and in the classic world or without a key.
   const falKey = keysReady ? account.keys.fal : null;
   const sizesAskedRef = useRef(new Set<string>());
   useEffect(() => {
@@ -845,6 +845,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (glb) urls[slot] = glb;
     }
     void scene.setHubModels(urls, world.sizes, (slot, e) => log.warn('rpg.landmark.load.failed', { slot, ...describeError(e) }));
+    // The same tree, and its young and old ones, across the whole map, as big as the world says its tree is.
+    const forest = FOREST_SLOTS.flatMap((slot) => (urls[slot] ? [urls[slot]] : []));
+    void scene.setForest(forest, world.sizes?.tree, (url, e) => log.warn('rpg.forest.load.failed', { url, ...describeError(e) }));
     // A world described before genesis gave sizes asks for them once, so its pieces stand as big as
     // what they are rather than as big as their slot (`hubFit`).
     if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {

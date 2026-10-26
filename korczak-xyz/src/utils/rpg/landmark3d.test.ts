@@ -8,6 +8,7 @@ import {
   ensureHubModels,
   FAL_IMAGE_MODEL,
   FAL_MESH_MODEL,
+  FOREST_SLOTS,
   generateHubModel,
   generateLandmark,
   HUB_SLOTS,
@@ -120,6 +121,18 @@ describe('landmark3d', () => {
     const bare = world({ look: { ...classicWorld('en').look, flora: 'none' } });
     expect(hubSlots(bare)).not.toContain('tree');
     expect(hubSlots(bare)).toContain('lamp');
+  });
+
+  it('grows the forest from the world’s tree, a young and an old one after the hub, and none where nothing grows', () => {
+    const w = world({ kit: { tree: 'a black pine whose needles glow faintly at the tips.' } });
+    expect(hubSlots(w).slice(-3)).toEqual(['goods', 'tree2', 'tree3']);
+    expect(FOREST_SLOTS).toEqual(['tree', 'tree2', 'tree3']);
+    expect(hubModelPrompt(w, 'tree2')).toContain('a black pine whose needles glow faintly at the tips, a young one of the same kind');
+    expect(hubModelPrompt(w, 'tree3')).toContain('an old one of the same kind');
+    expect(hubModelPrompt(w, 'tree3')).toContain('foliage');
+    const bare = world({ look: { ...classicWorld('en').look, flora: 'none' } });
+    expect(hubSlots(bare)).not.toContain('tree2');
+    expect(hubSlots(bare)).not.toContain('tree3');
   });
 
   it('simplifies a piece further than the landmark', async () => {
