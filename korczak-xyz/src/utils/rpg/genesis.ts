@@ -115,10 +115,26 @@ export interface WorldBible extends WorldBrief {
   landmark?: string;
   /** That landmark made into a 3D model by fal.ai, once; kept so it is never made again. */
   landmarkModel?: LandmarkModel;
+  /**
+   * The rest of the hub, in ENGLISH like the landmark: its houses, what grows in it and what stands
+   * about its square, one line each for an image model (`landmark3d.ts`). Worlds from before
+   * 26 Oct 2026 have none and are described from their bible.
+   */
+  kit?: Partial<Record<HubPiece, string>>;
+  /** Those pieces made into 3D models by fal.ai, each once, as they arrive. */
+  kitModels?: Partial<Record<HubPiece, LandmarkModel>>;
 }
 
 /**
- * The hub's landmark as fal.ai made it (`landmark3d.ts`). Declared here rather than there because
+ * The pieces of the hub fal.ai makes for an invented world besides its landmark, in the order they
+ * are made: what the eye meets first goes first (owner, Oct 2026: "now the whole starting location
+ * from the assets"). Each replaces the kit's own (`RpgScene.setHubModels`).
+ */
+export const HUB_PIECES = ['house', 'hall', 'tree', 'stall', 'cart', 'lamp', 'goods'] as const;
+export type HubPiece = (typeof HUB_PIECES)[number];
+
+/**
+ * The hub's landmark, or one of its pieces, as fal.ai made it (`landmark3d.ts`). Declared here rather than there because
  * this file is compiled into the functions too, and that one talks to the DOM.
  */
 export interface LandmarkModel {
@@ -442,6 +458,10 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "landmark": string (IN ENGLISH, whatever the language above: the ONE structure, monument, shrine or',
     '    machine standing in the middle of the hub that says "this world" at a glance — its shape, materials',
     '    and colours, for an image model; a single object about 6 m tall, not a scene, no people),',
+    '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
+    '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
+    '    "tree" (what grows here, as "flora" below says), "stall" (a market stall or workbench), "cart" (how',
+    '    goods are moved here), "lamp" (a light post, beacon or totem), "goods" (a small pile of goods)},',
     '  "words": [up to 6 words or short phrases people here use],',
     '  "look": {',
     '    "sky", "fog", "sun", "ground", "foliage", "wall", "roof", "accent": each a "#rrggbb" colour',
@@ -545,6 +565,17 @@ export function parseBrief(raw: unknown): WorldBrief | null {
   };
 }
 
+/** The hub's pieces a candidate described, each a line for the image model; none when it wrote none. */
+function parseKit(value: unknown): { kit?: Partial<Record<HubPiece, string>> } {
+  if (!value || typeof value !== 'object') return {};
+  const kit: Partial<Record<HubPiece, string>> = {};
+  for (const piece of HUB_PIECES) {
+    const line = text((value as Record<string, unknown>)[piece], 200);
+    if (line) kit[piece] = line;
+  }
+  return Object.keys(kit).length ? { kit } : {};
+}
+
 /** The first `{…}` in a reply, which tolerates a fence or a sentence around it. */
 function extract(reply: string): unknown {
   const start = reply.indexOf('{');
@@ -585,6 +616,7 @@ export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()
       typicality: Number.isFinite(typicality) ? Math.min(100, Math.max(0, Math.round(typicality))) : 50,
       look: parseLook(r.look),
       ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
+      ...parseKit(r.kit),
     });
   }
   return worlds;

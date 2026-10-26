@@ -211,32 +211,55 @@ its walls, a chimney in its roof, a banner on its pole — and spinning and glow
 On six fresh landmarks (Oct 2026) it moved two struts 5 cm and one loose sail 0.6 m, and nothing
 else: it corrects mistakes, it does not redesign. At build time, so saved worlds are settled too.
 
-**The hub's landmark is a real model, from fal.ai** (owner, Oct 2026: "something in the starting
-location that sets the mood of the generated world — as cheaply as possible; quality may suffer").
-`utils/rpg/landmark3d.ts`: FLUX.1 [schnell] draws it alone on white at 512² (~1 s, $0.003 — fal
-bills by the megapixel rounded up), TRELLIS makes that picture a textured GLB through fal's queue
-(25–55 s, $0.02; 512 px texture, `mesh_simplify` 0.95, ~10–17k triangles, ~700 KB). About **$0.023
-a world**, against ~$0.60 on Meshy. Both are called from the browser on the reader's own key; fal's
-CORS answers korczak.xyz. The prompt is the world's `landmark`, a line genesis writes **in English
-whatever the world's language** (an image model reads Polish badly); a world from before it is
-described from its hub and architecture. The world's colours go in as hex.
+**The hub is built from real models, from fal.ai** (owner, Oct 2026: "something in the starting
+location that sets the mood of the generated world — as cheaply as possible; quality may suffer";
+then, 26 Oct, once the landmark worked: "now the whole starting location from the assets").
+`utils/rpg/landmark3d.ts`: FLUX.1 [schnell] draws each piece alone on white at 512² (~1–10 s,
+$0.003 — fal bills by the megapixel rounded up), TRELLIS makes that picture a textured GLB through
+fal's queue (25–80 s, $0.02; 512 px texture). About **$0.023 a model**, against ~$0.60 on Meshy.
+Both are called from the browser on the reader's own key; fal's CORS answers korczak.xyz.
 
-- **Made once per world, never again.** The result is kept on the bible (`landmarkModel`,
-  `setWorldLandmark` in `worldSave.ts`), so it syncs with the world and no device asks twice.
-  Every request asks fal to keep its outputs (`X-Fal-Object-Lifecycle-Preference`, no expiry), since
-  the URL is the cache; the GLB's bytes are also in the Cache API (`rpg-landmarks`). One generation
-  per world at a time, and a world whose generation failed is not asked again until a reload — a
-  refused key or an empty balance would otherwise be asked again on every visit.
-- **The well until it exists** (`setHubLandmark` in `RpgScene.ts`, `components/Rpg/hubLandmark.ts`):
-  the model replaces the well on its spot, 6.5 m tall or 5 m wide at most, facing +Z (the spawn),
-  with the well's obstacle widened to its footprint. The classic world, a reader without a fal key,
-  and a model that fails to load all keep the well.
+- **Eight models a world, ~$0.18, once** (`HUB_SLOTS`): the `landmark` in place of the well, a
+  `house` on the three small plots and a `hall` on the two large ones (one model each, cloned —
+  the clones share geometry, so five houses are two uploads), five `tree`s inside the fence where
+  the houses leave room, the `stall` and the `cart` where the kit's stall and wagon stand, four
+  `lamp`s around the square between the paths in, and `goods` where its barrels and crates are.
+  A world whose flora is `none` makes no tree. Made four at a time (`PARALLEL`), all eight in
+  ~1–1.5 min, the landmark first; each replaces what stood there the moment it has loaded, so the
+  village changes a piece at a time. Fence, bench and ground cover stay the kit's.
+- **The prompts are English**: genesis writes the `landmark` and a `kit` line per piece (at most
+  18 words each) in English whatever the world's language, since an image model reads Polish badly.
+  A world from before them is described from its hub, architecture, tech and flora
+  (`fallbackSubject`). The world's colours go in as hex. Buildings are drawn front-on with their
+  entrance toward the viewer, because TRELLIS keeps the picture's front as +Z and the scene turns
+  +Z to the square; every piece is asked for chunky, with no thin parts — a lamp on a slender pole
+  came back as a lantern and a hook, the pole gone — and with no shadow, which TRELLIS made into
+  a dark slab under a pile of crates.
+- **Triangles**: the landmark keeps `mesh_simplify` 0.95 (~10–17k triangles, ~700 KB); every other
+  piece 0.98, the most TRELLIS allows — a house was 36k triangles at 0.96 and 12k at 0.98, a lamp
+  3k, a tree ~15k. The whole hub is ~150k triangles, against the 0.55–0.9 M a frame already draws.
+- **Made once per world, never again.** Each result is kept on the bible (`landmarkModel`,
+  `kitModels`, `setWorldModel` in `worldSave.ts`), so it syncs with the world and no device asks
+  twice. Every request asks fal to keep its outputs (`X-Fal-Object-Lifecycle-Preference`, no
+  expiry), since the URL is the cache; the GLBs' bytes are also in the Cache API (`rpg-landmarks`).
+  One generation per world and slot at a time, a slot made this session is never asked again even
+  before the world's state has it (`made` — the effect ran between a model's arrival and its
+  `setWorld` and asked for three pieces twice, Oct 2026), a slot that failed is not asked again
+  until a reload, and a 401/402/403 stops the world's remaining slots before they spend anything.
+- **The kit's village until then** (`RpgScene.setHubModels`, `components/Rpg/hubModels.ts`,
+  `HUB_FIT` for each piece's height and width): what a model replaces is hidden, not removed, and
+  shows again for a world without it; the kit's houses are merged per kind (`mergeStatic`) so a
+  house can stand in for the small ones alone. A load already on its way to the same URL is left to
+  finish (`hubWanted`): the world changes with every arrival and asks for all eight again, and
+  restarting the loads each time kept the first models off screen for a minute. The classic world, a
+  reader without a fal key, and a model that fails to load all keep the kit.
 - **TRELLIS writes no metallic factor**, which glTF means as fully metallic, and with no environment
-  map that renders black; `hubLandmark.ts` sets metalness to 0.
-- **In the console** as two `landmark` rows (kind `fal`), with the prompt, the picture and the GLB's
-  URL, time, error and price, and **fal.ai** has its own total beside the tokens and ElevenLabs
-  (`falCost`). A step still running survives the console's reset at a new quest. Sentry Logs:
-  `rpg.landmark`, outcome, ms, `costUsd`.
+  map that renders black; `hubModels.ts` sets metalness to 0.
+- **In the console** as two rows per piece (kind `fal`, labelled `landmark`, `house`, `tree`…), with
+  the prompt, the picture and the GLB's URL, time, error and price, and **fal.ai** has its own
+  total beside the tokens and ElevenLabs, with how many 3D models it made (`falCost`, `falModels`).
+  A step still running survives the console's reset at a new quest. Sentry Logs: `rpg.landmark`,
+  `piece`, outcome, ms, `costUsd`.
 
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
 deciding costs one.
@@ -347,8 +370,8 @@ committed files.
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
-them. `account.keys.fal` (fal.ai, pasted on the account page) makes the hub's landmark (*The hub's
-landmark*, below) and nothing else. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
+them. `account.keys.fal` (fal.ai, pasted on the account page) makes the hub's models (*The hub is
+built from real models*, above) and nothing else. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
 in order (`modelChain` in `storyteller.ts`): the one picked on the intro screen (`MODEL_CHOICES`,
 kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **strongest first** (owner, Oct 2026: "the
 better model first and a fallback; we switch to a cheaper one when we optimise for cost"):

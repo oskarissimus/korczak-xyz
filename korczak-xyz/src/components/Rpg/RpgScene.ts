@@ -24,10 +24,11 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
-import { disposeHubLandmark, loadHubLandmark } from './hubLandmark';
+import { disposeHubModel, HUB_FIT, loadHubModel } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
+import { HUB_SLOTS, type HubSlot } from '../../utils/rpg/landmark3d';
 import { DAYLIGHT, HAZE, recolor, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 
@@ -69,6 +70,15 @@ function villageSpot(i: number): THREE.Vector3 {
   return new THREE.Vector3(Math.sin(a) * r, 0, Math.cos(a) * r);
 }
 const SPAWN = new THREE.Vector3(0, 0, 8);
+/** The five houses around the square, and which kit house stands on each plot. */
+const HOUSES: [number, number][] = [
+  [-12, -10],
+  [14, -14],
+  [-14, 10],
+  [15, 12],
+  [-10, -22],
+];
+const HOUSE_KINDS: HouseKind[] = ['large', 'small', 'large', 'small', 'small'];
 // Room for the third ring of places (`distant`, 125 m) and its build: the world grows across
 // quests (`.claude/rules/rpg.md`, *The world grows*).
 const WORLD_HALF = 160;
@@ -397,18 +407,21 @@ export class RpgScene {
   /** Once the kit is here: its houses, fence, props, trees and ground cover over the stopgaps. */
   private furnish() {
     // The houses: two large, three small, where the primitive ones stood.
-    // All five as one mesh per material (`mergeStatic`): they are built from the same kit.
-    const kinds: HouseKind[] = ['large', 'small', 'large', 'small', 'small'];
-    const village = new THREE.Group();
+    // One mesh per material (`mergeStatic`), they being built from the same kit; per kind, so a
+    // world's own house or hall (`setHubModels`) can stand in for one kind.
+    const village = { large: new THREE.Group(), small: new THREE.Group() };
     this.stopgapHouses.forEach((old, i) => {
-      const house = this.kit.house(kinds[i], rng(100 + i));
+      const house = this.kit.house(HOUSE_KINDS[i], rng(100 + i));
       house.position.copy(old.position);
       house.rotation.y = old.rotation.y;
       this.scene.remove(old);
-      village.add(house);
-      this.houseObstacles[i].r = HOUSE_RADIUS[kinds[i]];
+      village[HOUSE_KINDS[i]].add(house);
+      this.houseBase[i] = HOUSE_RADIUS[HOUSE_KINDS[i]];
     });
-    this.scene.add(mergeStatic(village));
+    const merged = { large: mergeStatic(village.large), small: mergeStatic(village.small) };
+    this.scene.add(merged.large, merged.small);
+    this.kitPieces.hall = [merged.large];
+    this.kitPieces.house = [merged.small];
     this.stopgapHouses = [];
 
     // The fence: rails instead of posts, with the same eight gaps.
@@ -441,22 +454,25 @@ export class RpgScene {
     }
 
     // Life in the square: barrels and crates by the houses, a cart, a bench and a bucket by the well.
-    const place = (name: string, x: number, z: number, rot = 0) => {
+    // Each kept under the piece of a world's own hub that replaces it (`setHubModels`).
+    const place = (name: string, x: number, z: number, rot = 0, slot?: HubSlot) => {
       const p = this.kit.piece(name);
       p.position.set(x, 0, z);
       p.rotation.y = rot;
       this.scene.add(p);
+      if (slot) (this.kitPieces[slot] ??= []).push(p);
     };
-    place('Barrel', -8.2, -6.4);
-    place('Barrel', -7.4, -6.9, 1);
-    place('Crate_Wooden', 10.6, -10.2, 0.4);
-    place('Crate_Wooden', 11.3, -9.3, 1.2);
-    place('Barrel', -10.2, 6.8);
-    place('Stall_Cart_Empty', 9.5, 4.2, -2.2);
-    place('Prop_Wagon', -18, -2, 0.5);
+    place('Barrel', -8.2, -6.4, 0, 'goods');
+    place('Barrel', -7.4, -6.9, 1, 'goods');
+    place('Crate_Wooden', 10.6, -10.2, 0.4, 'goods');
+    place('Crate_Wooden', 11.3, -9.3, 1.2, 'goods');
+    place('Barrel', -10.2, 6.8, 0, 'goods');
+    place('Stall_Cart_Empty', 9.5, 4.2, -2.2, 'stall');
+    place('Prop_Wagon', -18, -2, 0.5, 'cart');
     place('Bench', 3.2, -0.2, 0.15);
-    place('Bucket_Wooden_1', 1.5, -1.6);
+    place('Bucket_Wooden_1', 1.5, -1.6, 0, 'landmark');
     this.obstacles.push({ x: 9.5, z: 4.2, r: 1.6 }, { x: -18, z: -2, r: 2 });
+    this.refreshHub();
 
     this.plantGroundCover();
     // The world's colours, its trees and how much grows: the kit is what they are drawn on.
@@ -640,14 +656,7 @@ export class RpgScene {
     const thatch = surfaceMat('thatch', 3, 2);
     this.stopgapWall = wall;
     this.stopgapRoof = thatch;
-    const houses: [number, number][] = [
-      [-12, -10],
-      [14, -14],
-      [-14, 10],
-      [15, 12],
-      [-10, -22],
-    ];
-    for (const [x, z] of houses) {
+    for (const [x, z] of HOUSES) {
       // Every door faces the square.
       const rot = Math.atan2(-x, -z);
       const house = new THREE.Group();
@@ -673,9 +682,11 @@ export class RpgScene {
       const obstacle = { x, z, r: 4.3 };
       this.obstacles.push(obstacle);
       this.houseObstacles.push(obstacle);
+      this.houseBase.push(obstacle.r);
     }
 
     this.buildWell(0, -3);
+    this.planHub();
 
     // A fence ring around the village, open toward each of the eight directions a quest may name.
     const post = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 6);
@@ -866,39 +877,129 @@ export class RpgScene {
 
   private well: THREE.Group | null = null;
   private wellObstacle: Obstacle | null = null;
-  private hubLandmark: { url: string; group: THREE.Group } | null = null;
-  private hubLandmarkToken = 0;
+
+  // --- the world's own hub, from fal.ai (`hubModels.ts`, `utils/rpg/landmark3d.ts`) ---------------
+
+  /** Where each of the hub's models stands: one spot per copy, facing the square. */
+  private hubSpots = {} as Record<HubSlot, { x: number; z: number; rot: number; obstacle: Obstacle }[]>;
+  /** What each model replaces until it comes: stopgaps first, then the kit's pieces. */
+  private kitPieces: Partial<Record<HubSlot, THREE.Object3D[]>> = {};
+  /** The houses' obstacles without a model: the stopgap's, then the kit house's. */
+  private houseBase: number[] = [];
+  private hubModels = new Map<HubSlot, { url: string; group: THREE.Group; template: THREE.Group; radius: number }>();
+  private hubTokens: Partial<Record<HubSlot, number>> = {};
+  /** The url each slot was last asked for, loaded or still loading. */
+  private hubWanted: Partial<Record<HubSlot, string | null>> = {};
 
   /**
-   * The world's own landmark in place of the well (`hubLandmark.ts`), or the well back with `null`.
-   * The well stays until the model has arrived; a model that fails to load leaves it there.
+   * The spots, once: the landmark on the well, a house on each small plot and a hall on each large
+   * one, the stall and the cart where the kit's stand, the goods where its barrels and crates are,
+   * four lamps around the square between the paths in, and trees inside the fence wherever the
+   * houses leave room. Spots that are new to the village block nothing until their model stands.
    */
-  async setHubLandmark(url: string | null): Promise<void> {
-    if ((this.hubLandmark?.url ?? null) === url) return;
-    const token = ++this.hubLandmarkToken;
+  private planHub() {
+    const facing = (x: number, z: number) => Math.atan2(-x, -z);
+    const spot = (x: number, z: number, obstacle?: Obstacle) => {
+      const o = obstacle ?? { x, z, r: 0, off: true };
+      if (!obstacle) this.obstacles.push(o);
+      return { x, z, rot: facing(x, z), obstacle: o };
+    };
+    const houses = (kind: HouseKind) =>
+      this.stopgapHouses.flatMap((h, i) => (HOUSE_KINDS[i] === kind ? [{ ...spot(h.position.x, h.position.z, this.houseObstacles[i]), rot: h.rotation.y }] : []));
+    const ring = (r: number, offset: number, n: number) =>
+      Array.from({ length: n }, (_, k) => [Math.sin(offset + (k * Math.PI * 2) / n) * r, Math.cos(offset + (k * Math.PI * 2) / n) * r]);
+    const lamps = ring(10.8, Math.PI / 8, 4);
+    // Between the paths in, and clear of the houses, the cart and the stall by a few metres.
+    const taken = [...HOUSES.map(([x, z]) => [x, z, 7.5]), [-18, -2, 4.5], [9.5, 4.2, 4]];
+    const trees = ring(22, Math.PI / 8, 8).filter(([x, z]) => taken.every(([tx, tz, r]) => Math.hypot(x - tx, z - tz) > r));
+    const well = this.well!.position;
+    this.hubSpots = {
+      landmark: [spot(well.x, well.z, this.wellObstacle!)].map((s) => ({ ...s, rot: 0 })),
+      house: houses('small'),
+      hall: houses('large'),
+      tree: trees.map(([x, z]) => spot(x, z)),
+      stall: [spot(9.5, 4.2)],
+      cart: [spot(-18, -2)],
+      lamp: lamps.map(([x, z]) => spot(x, z)),
+      goods: [spot(-7.8, -6.6), spot(11, -9.7), spot(-10.2, 6.8)],
+    };
+    this.kitPieces.landmark = [this.well!];
+    this.kitPieces.house = this.stopgapHouses.filter((_, i) => HOUSE_KINDS[i] === 'small');
+    this.kitPieces.hall = this.stopgapHouses.filter((_, i) => HOUSE_KINDS[i] === 'large');
+  }
+
+  /** Each model shown, or what it replaces, and the obstacles to match. */
+  private refreshHub() {
+    for (const slot of HUB_SLOTS) {
+      const model = this.hubModels.get(slot);
+      for (const o of this.kitPieces[slot] ?? []) o.visible = !model;
+      for (const s of this.hubSpots[slot] ?? []) {
+        const i = this.houseObstacles.indexOf(s.obstacle);
+        if (model) {
+          s.obstacle.r = model.radius;
+          s.obstacle.off = false;
+        } else if (i >= 0) s.obstacle.r = this.houseBase[i];
+        else if (slot === 'landmark') s.obstacle.r = 1.6;
+        else s.obstacle.off = true;
+      }
+    }
+  }
+
+  /**
+   * The world's own hub in place of the kit's, a model per slot, or the kit back for a slot with
+   * no url. What a model replaces stays until it has arrived; one that fails to load leaves it
+   * there, and the others still come.
+   */
+  async setHubModels(urls: Partial<Record<HubSlot, string>>, onError: (slot: HubSlot, e: unknown) => void = () => {}): Promise<void> {
+    await Promise.all(
+      HUB_SLOTS.map((slot) => this.setHubModel(slot, urls[slot] ?? null).catch((e) => onError(slot, e))),
+    );
+  }
+
+  private async setHubModel(slot: HubSlot, url: string | null): Promise<void> {
+    // The world changes with every model that arrives, and asks for all of them again each time: a
+    // load already on its way to the same url is left to finish, not started over.
+    if ((this.hubWanted[slot] ?? null) === url) return;
+    this.hubWanted[slot] = url;
+    const token = (this.hubTokens[slot] = (this.hubTokens[slot] ?? 0) + 1);
     const clear = () => {
-      if (!this.hubLandmark) return;
-      this.scene.remove(this.hubLandmark.group);
-      disposeHubLandmark(this.hubLandmark.group);
-      this.hubLandmark = null;
+      const now = this.hubModels.get(slot);
+      if (!now) return;
+      this.scene.remove(now.group);
+      disposeHubModel(now.template);
+      this.hubModels.delete(slot);
     };
     if (!url) {
       clear();
-      if (this.well) this.well.visible = true;
-      if (this.wellObstacle) this.wellObstacle.r = 1.6;
+      this.refreshHub();
       return;
     }
-    const built = await loadHubLandmark(url);
-    if (token !== this.hubLandmarkToken || !this.well) {
-      disposeHubLandmark(built.group);
+    let built;
+    try {
+      built = await loadHubModel(url, HUB_FIT[slot]);
+    } catch (e) {
+      // Not wanted any more, so a later call may try the same url again.
+      if (token === this.hubTokens[slot]) delete this.hubWanted[slot];
+      throw e;
+    }
+    if (token !== this.hubTokens[slot]) {
+      disposeHubModel(built.group);
       return;
     }
     clear();
-    built.group.position.copy(this.well.position);
-    this.scene.add(built.group);
-    this.hubLandmark = { url, group: built.group };
-    this.well.visible = false;
-    if (this.wellObstacle) this.wellObstacle.r = built.radius;
+    const group = new THREE.Group();
+    group.name = `hub-${slot}`;
+    for (const s of this.hubSpots[slot]) {
+      // The clones share the template's geometry and materials, so a house is drawn five times
+      // from one upload.
+      const copy = built.group.clone();
+      copy.position.set(s.x, 0, s.z);
+      copy.rotation.y = s.rot;
+      group.add(copy);
+    }
+    this.scene.add(group);
+    this.hubModels.set(slot, { url, group, template: built.group, radius: built.radius });
+    this.refreshHub();
   }
 
   private tree(x: number, z: number, scale: number) {

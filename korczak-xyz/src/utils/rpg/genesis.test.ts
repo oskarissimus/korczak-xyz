@@ -87,6 +87,16 @@ describe('parseWorlds', () => {
     expect(new Set(worlds.map((w) => w.id)).size).toBe(2);
   });
 
+  it('keeps the hub’s pieces the model described for the image model, and nothing it made up', () => {
+    const reply = JSON.stringify({
+      worlds: [candidate('Kit', 40, { kit: { house: ' a cork hut ', lamp: 'a lens on a stone stump', roof: 'x', cart: 7 } }), candidate('Bare', 40)],
+    });
+    const [kit, bare] = parseWorlds(reply, ctx, 1000);
+    expect(kit.kit).toEqual({ house: 'a cork hut', lamp: 'a lens on a stone stump' });
+    expect(bare.kit).toBeUndefined();
+    expect(genesisPrompt(ctx)).toContain('"kit"');
+  });
+
   it('tolerates a fence and a single world without the list', () => {
     expect(parseWorlds('```json\n' + JSON.stringify(candidate('Sam', 30)) + '\n```', ctx)).toHaveLength(1);
     expect(parseWorlds('no json here', ctx)).toEqual([]);

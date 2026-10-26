@@ -51,7 +51,7 @@ function headline(r: DevRequest): string {
   const parts = [r.servedBy && r.servedBy !== r.model ? `${r.model} → ${r.servedBy}` : r.model];
   if (r.beat !== null) parts.unshift(`beat ${r.beat + 1}`);
   else if (r.kind === 'model') parts.unshift('world');
-  else if (r.kind === 'fal') parts.unshift('landmark');
+  else if (r.kind === 'fal') parts.unshift(r.label ?? 'landmark');
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);
   if (r.firstMs !== null && r.kind === 'model') parts.push(`1st byte ${formatMs(r.firstMs)}`);
   if (r.usage) parts.push(`in ${tokens(r.usage.input)} out ${tokens(r.usage.output)} think ${tokens(r.usage.thoughts)}`);
@@ -223,7 +223,7 @@ export function DevConsole({
         {t.genTime}: {formatMs(totals.generationMs)} · {t.tokensLine}: in {tokens(totals.tokens.input)} out{' '}
         {tokens(totals.tokens.output)} think {tokens(totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}
         {totals.unpriced ? '+?' : ''} · ElevenLabs: {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈{' '}
-        {formatUsd(totals.voiceCost)} · fal.ai ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
+        {formatUsd(totals.voiceCost)} · fal.ai: {totals.falModels}× 3D ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
         {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}
         {totals.errors > 0 && <span className="rpg-dev-error"> · {t.errors(totals.errors)}</span>}
       </div>
@@ -271,7 +271,9 @@ export function QuestSummary({ lang }: { lang: Lang }) {
       {totals.falCost > 0 && (
         <>
           <dt>fal.ai</dt>
-          <dd>≈ {formatUsd(totals.falCost)}</dd>
+          <dd>
+            {totals.falModels}× 3D ≈ {formatUsd(totals.falCost)}
+          </dd>
         </>
       )}
       <dt>{t.total}</dt>

@@ -1,6 +1,6 @@
 /*
  * The developer console's record (`~` in the game): every request this quest made — each model asked
- * for a beat, each ElevenLabs clip and each fal.ai step of the hub's landmark (`landmark3d.ts`) — with what streamed back so far, its error, its tokens and
+ * for a beat, each ElevenLabs clip and each fal.ai step of the hub's models (`landmark3d.ts`) — with what streamed back so far, its error, its tokens and
  * what it cost. The game is in active development and the owner wants to watch it work (Oct 2026:
  * "show the tokens streaming, show the errors, the cost of the quest, and the total time it took").
  *
@@ -23,6 +23,8 @@ export interface DevRequest {
   servedBy: string | null;
   /** Which beat, for a model request. */
   beat: number | null;
+  /** What a fal.ai step is making: `landmark`, `house`, `tree`… (`landmark3d.ts`). */
+  label?: string;
   startedAt: number;
   /** When the first byte of the answer came, ms after the start. */
   firstMs: number | null;
@@ -51,8 +53,10 @@ export interface QuestTotals {
   voiceChars: number;
   voiceCredits: number;
   voiceCost: number;
-  /** fal.ai, at its list prices: the landmark's picture and its 3D model. */
+  /** fal.ai, at its list prices: each hub model's picture and its 3D model. */
   falCost: number;
+  /** 3D models fal.ai finished. */
+  falModels: number;
   requests: number;
   errors: number;
 }
@@ -93,13 +97,14 @@ export function devRequests(): readonly DevRequest[] {
 /** Keeps the console from growing without end over a long session of quests. */
 const KEEP = 400;
 
-export function startRequest(kind: DevRequest['kind'], model: string, beat: number | null, text = ''): DevRequest {
+export function startRequest(kind: DevRequest['kind'], model: string, beat: number | null, text = '', label?: string): DevRequest {
   const entry: DevRequest = {
     id: nextId++,
     kind,
     model,
     servedBy: null,
     beat,
+    ...(label ? { label } : {}),
     startedAt: Date.now(),
     firstMs: null,
     ms: null,
@@ -173,6 +178,7 @@ export function questTotals(): QuestTotals {
     voiceCredits: 0,
     voiceCost: 0,
     falCost: 0,
+    falModels: 0,
     requests: requests.length,
     errors: 0,
   };
@@ -186,6 +192,7 @@ export function questTotals(): QuestTotals {
     }
     if (r.kind === 'fal') {
       totals.falCost += r.cost ?? 0;
+      if (r.status === 'ok' && r.model.includes('trellis')) totals.falModels += 1;
       continue;
     }
     if (r.usage) {

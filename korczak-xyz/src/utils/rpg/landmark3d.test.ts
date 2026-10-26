@@ -4,7 +4,20 @@ vi.mock('../../lib/sentry', () => ({ recordMeasurement: vi.fn() }));
 
 import { devRequests, questTotals, resetDevlog } from './devlog';
 import { classicWorld, type WorldBible } from './genesis';
-import { ensureLandmark, FAL_IMAGE_MODEL, FAL_MESH_MODEL, generateLandmark, imageCost, landmarkPrompt } from './landmark3d';
+import {
+  ensureHubModels,
+  FAL_IMAGE_MODEL,
+  FAL_MESH_MODEL,
+  generateHubModel,
+  generateLandmark,
+  HUB_SLOTS,
+  hubModelPrompt,
+  hubSlots,
+  imageCost,
+  landmarkPrompt,
+  type HubSlot,
+  type LandmarkModel,
+} from './landmark3d';
 
 const world = (over: Partial<WorldBible> = {}): WorldBible => ({
   ...classicWorld('en'),
@@ -65,29 +78,61 @@ describe('landmark3d', () => {
     expect(totals.modelCost).toBe(0);
   });
 
-  it('puts a refused step in the console as an error, and does not ask again this session', async () => {
+  it('puts a refused step in the console as an error, stops the world’s other pieces, and does not ask again this session', async () => {
     const calls: string[] = [];
     const fetchImpl = falFetch(calls, { url: 'https://fal.run/', status: 403 }) as typeof fetch;
     const w = world({ id: 'w-refused' });
-    await expect(ensureLandmark('k', w, { ...now, fetchImpl })).rejects.toThrow('403');
-    expect(devRequests()[0]).toMatchObject({ kind: 'fal', status: 'error' });
+    const errors: HubSlot[] = [];
+    const started = ensureHubModels('k', w, () => {}, (slot) => errors.push(slot), { ...now, fetchImpl });
+    expect(started).toEqual(HUB_SLOTS);
+    await vi.waitFor(() => expect(errors).toHaveLength(HUB_SLOTS.length));
+    // Four went at once before the first refusal came back; the rest never asked.
+    expect(calls.length).toBeLessThanOrEqual(4);
+    expect(devRequests()[0]).toMatchObject({ kind: 'fal', status: 'error', label: 'landmark' });
     expect(questTotals().falCost).toBe(0);
-    expect(ensureLandmark('k', w, { ...now, fetchImpl })).toBeNull();
-    expect(calls).toHaveLength(1);
+    expect(ensureHubModels('k', w, () => {}, () => {}, { ...now, fetchImpl })).toEqual([]);
   });
 
-  it('never makes a landmark the world already has, and makes one at a time', async () => {
+  it('makes only what the world lacks, each piece once, and hands each over as it arrives', async () => {
     const calls: string[] = [];
     const fetchImpl = falFetch(calls) as typeof fetch;
-    const kept = { glb: 'g', image: 'i', prompt: 'p', costUsd: 0.023, ms: 1, at: 1 };
-    await expect(ensureLandmark('k', world({ landmarkModel: kept }), { fetchImpl })).resolves.toBe(kept);
-    expect(calls).toHaveLength(0);
-    const w = world({ id: 'w-twice' });
-    const a = ensureLandmark('k', w, { ...now, fetchImpl });
-    const b = ensureLandmark('k', w, { ...now, fetchImpl });
-    expect(a).toBe(b);
-    await a;
-    expect(calls.filter((c) => c.endsWith(FAL_MESH_MODEL))).toHaveLength(1);
+    const kept: LandmarkModel = { glb: 'g', image: 'i', prompt: 'p', costUsd: 0.023, ms: 1, at: 1 };
+    const w = world({ id: 'w-twice', landmarkModel: kept, kitModels: { house: kept } });
+    const got: HubSlot[] = [];
+    const first = ensureHubModels('k', w, (slot) => got.push(slot), undefined, { ...now, fetchImpl });
+    expect(first).toEqual(HUB_SLOTS.filter((s) => s !== 'landmark' && s !== 'house'));
+    expect(ensureHubModels('k', w, () => {}, undefined, { ...now, fetchImpl })).toEqual([]);
+    await vi.waitFor(() => expect(got).toHaveLength(first.length));
+    // Asked again with the world as it was, before its state took the models: nothing is made twice.
+    expect(ensureHubModels('k', w, () => {}, undefined, { ...now, fetchImpl })).toEqual([]);
+    expect(calls.filter((c) => c.endsWith(FAL_MESH_MODEL))).toHaveLength(first.length);
+    expect(questTotals().falModels).toBe(first.length);
+    expect(questTotals().falCost).toBeCloseTo(0.023 * first.length);
+  });
+
+  it('describes every piece for the image model from the world’s kit, or from its bible without one', () => {
+    const w = world({ kit: { house: 'a hut of whale ribs under a sailcloth roof' } });
+    expect(hubModelPrompt(w, 'house')).toContain('whale ribs');
+    expect(hubModelPrompt(w, 'house')).toContain('entrance facing the viewer');
+    expect(hubModelPrompt(w, 'hall')).toContain(classicWorld('en').hub);
+    expect(hubModelPrompt(w, 'lamp')).toContain('no thin or spindly parts');
+    expect(hubModelPrompt(w, 'tree')).toContain('foliage');
+    const bare = world({ look: { ...classicWorld('en').look, flora: 'none' } });
+    expect(hubSlots(bare)).not.toContain('tree');
+    expect(hubSlots(bare)).toContain('lamp');
+  });
+
+  it('simplifies a piece further than the landmark', async () => {
+    const bodies: string[] = [];
+    const inner = falFetch([]);
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith(FAL_MESH_MODEL)) bodies.push(String(init?.body));
+      return inner(input);
+    }) as typeof fetch;
+    await generateHubModel('k', world(), 'goods', { ...now, fetchImpl });
+    await generateLandmark('k', world(), { ...now, fetchImpl });
+    expect(bodies.map((b) => JSON.parse(b).mesh_simplify)).toEqual([0.98, 0.95]);
+    expect(devRequests().map((r) => r.label)).toEqual(['goods', 'goods', 'landmark', 'landmark']);
   });
 
   it('keeps a step still running when a new quest clears the console', async () => {
