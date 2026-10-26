@@ -34,7 +34,7 @@ import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../ut
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
-import { ensureHubModels, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
+import { cluePrompt, ensureClueModel, ensureHubModels, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
@@ -234,6 +234,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** The description the world being born is made of, for its waiting screen. */
   const [creatingWish, setCreatingWish] = useState('');
   const [prompt, setPrompt] = useState<Prompt | null>(null);
+  /** The witcher's senses are on (`senses.ts`): the screen's edge darkens and 👁 stays pressed. */
+  const [senses, setSenses] = useState(false);
   const [hp, setHp] = useState(100);
   const [compass, setCompass] = useState<{ angle: number; distance: number } | null>(null);
   const [locked, setLocked] = useState(false);
@@ -781,6 +783,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       onCompass: (angle, distance) => setCompass(angle === null ? null : { angle, distance }),
       onLockChange: setLocked,
       onArrive: (name) => flash(`${tRef.current.arrived}: ${name}`, 4000),
+      onSenses: setSenses,
     });
     sceneRef.current = scene;
     scene.setPaused(true);
@@ -868,6 +871,43 @@ export default function Rpg({ lang }: { lang: Lang }) {
       (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
     );
   }, [world, falKey, keysReady]);
+
+  // A beat's clues as real things (owner, 26 Oct 2026: "generated assets to examine"): each made
+  // once by fal.ai from the English `prop` the beat wrote for it, on the reader's own key, while the
+  // block stands in for it. Kept on the beat, so the autosave has it and Continue loads it.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !beat) return;
+    beat.clues.forEach((clue, i) => {
+      const id = `clue-${beat.index}-${i}`;
+      const load = (glb: string) =>
+        scene.setClueModel(id, glb).catch((e) => log.warn('rpg.clue.load.failed', describeError(e)));
+      if (clue.model) {
+        void load(clue.model.glb);
+        return;
+      }
+      if (!falKey || !clue.prop) return;
+      const token = questTokenRef.current;
+      const world = worldRef.current;
+      ensureClueModel(
+        falKey,
+        `${world?.id ?? gameLangRef.current}/${seedRef.current}/${beat.index}/${i}/${clue.name}`,
+        cluePrompt(clue.prop, world?.look),
+        (model) => {
+          if (questTokenRef.current !== token) return;
+          const keep = (b: Beat): Beat =>
+            b.index === beat.index && b.title === beat.title
+              ? { ...b, clues: b.clues.map((c, j) => (j === i ? { ...c, model } : c)) }
+              : b;
+          beatsRef.current = beatsRef.current.map(keep);
+          if (beatRef.current) beatRef.current = keep(beatRef.current);
+          persist();
+          void load(model.glb);
+        },
+        (e) => log.warn('rpg.clue.failed', describeError(e)),
+      );
+    });
+  }, [beat, falKey, persist]);
 
   // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
   // that lands while the reply is still being read must not expire unseen.
@@ -1627,6 +1667,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li>{t.touchMove}</li>
           <li>{t.touchLook}</li>
           <li>{t.touchAct}</li>
+          <li>{t.touchSenses}</li>
         </ul>
       ) : (
         <ul className="rpg-controls">
@@ -1635,6 +1676,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li>{t.mouse}</li>
           <li><kbd>LMB</kbd> {t.attack}</li>
           <li><kbd>E</kbd> {t.interact}</li>
+          <li><kbd>Q</kbd> {t.sensesHelp}</li>
         </ul>
       )}
       <p className="rpg-panel-note">{t.intro}</p>
@@ -1696,6 +1738,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {!touch && !locked && !dialogue && !ending && <div className="rpg-hint">{t.clickToLook}</div>}
 
+          {senses && !dialogue && !ending && <div className="rpg-senses" aria-hidden="true" />}
+
+          {!touch && !dialogue && !ending && (
+            <button
+              type="button"
+              className={`rpg-senses-key${senses ? ' rpg-senses-key-on' : ''}`}
+              aria-pressed={senses}
+              onClick={() => sceneRef.current?.toggleSenses()}
+            >
+              <kbd>Q</kbd> 👁 {t.senses}
+            </button>
+          )}
+
           {!touch && prompt && !dialogue && !ending && (
             <div className="rpg-prompt">
               <kbd>E</kbd> {prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : t.pickUp}
@@ -1741,6 +1796,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
               prompt={prompt}
               promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}
               attackLabel={t.strike}
+              sensesLabel={t.senses}
+              sensesOn={senses}
+              onSenses={() => sceneRef.current?.toggleSenses()}
               onStick={(x, y) => sceneRef.current?.setStick(x, y)}
               onAttack={() => sceneRef.current?.attack()}
               onAct={() => sceneRef.current?.interact()}

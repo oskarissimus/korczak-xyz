@@ -20,12 +20,16 @@ interface Props {
   prompt: Prompt | null;
   promptLabel: string | null;
   attackLabel: string;
+  /** The witcher's senses (`senses.ts`): the eye, pressed while they last. */
+  sensesLabel: string;
+  sensesOn: boolean;
+  onSenses: () => void;
   onStick: (x: number, y: number) => void;
   onAttack: () => void;
   onAct: () => void;
 }
 
-export function TouchControls({ prompt, promptLabel, attackLabel, onStick, onAttack, onAct }: Props) {
+export function TouchControls({ prompt, promptLabel, attackLabel, sensesLabel, sensesOn, onSenses, onStick, onAttack, onAct }: Props) {
   const base = useRef<HTMLDivElement>(null);
   const finger = useRef<number | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -84,6 +88,18 @@ export function TouchControls({ prompt, promptLabel, attackLabel, onStick, onAtt
             {promptLabel}
           </button>
         )}
+        <button
+          type="button"
+          className={`rpg-act rpg-act-senses${sensesOn ? ' rpg-act-on' : ''}`}
+          aria-pressed={sensesOn}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onSenses();
+          }}
+        >
+          <span aria-hidden="true">👁</span>
+          {sensesLabel}
+        </button>
         <button
           type="button"
           className="rpg-act rpg-act-attack"

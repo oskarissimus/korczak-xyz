@@ -50,13 +50,15 @@ export function imageCost(width = IMAGE_SIZE, height = IMAGE_SIZE): number {
 
 export type HubSlot = 'landmark' | HubPiece;
 export const HUB_SLOTS: readonly HubSlot[] = ['landmark', ...HUB_PIECES];
+/** Everything fal.ai is asked to make: the hub's pieces, and a quest's clues (`ensureClueModel`). */
+export type FalSlot = HubSlot | 'clue';
 
 /**
  * Each piece's mesh is simplified as far as TRELLIS goes (0.98): at 0.96 one house was 36k
  * triangles, five of them more than the whole village; at 0.98 it was 12k, a lamp 3k, a tree ~15k.
  * The landmark keeps 0.95, being one and the thing looked at.
  */
-const SIMPLIFY: Record<HubSlot, number> = { landmark: 0.95, house: 0.98, hall: 0.98, tree: 0.98, stall: 0.98, cart: 0.98, lamp: 0.98, goods: 0.98 };
+const SIMPLIFY: Record<FalSlot, number> = { clue: 0.98, landmark: 0.95, house: 0.98, hall: 0.98, tree: 0.98, stall: 0.98, cart: 0.98, lamp: 0.98, goods: 0.98 };
 
 /** What a tree is in a world that wrote no `kit`, from its flora; `none` grows nothing to make. */
 const FLORA_SUBJECT: Record<WorldBible['look']['flora'], string | null> = {
@@ -164,7 +166,7 @@ async function failure(res: Response): Promise<Error> {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Step 1: the picture. */
-async function drawImage(key: string, prompt: string, label: HubSlot, o: FalOptions): Promise<string> {
+async function drawImage(key: string, prompt: string, label: FalSlot, o: FalOptions): Promise<string> {
   const f = o.fetchImpl ?? fetch;
   const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, label);
   try {
@@ -193,7 +195,7 @@ async function drawImage(key: string, prompt: string, label: HubSlot, o: FalOpti
 }
 
 /** Step 2: the model, through the queue, since it takes longer than a request should stay open. */
-async function buildMesh(key: string, image: string, label: HubSlot, o: FalOptions): Promise<string> {
+async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptions): Promise<string> {
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', FAL_MESH_MODEL, null, `← ${image}`, label);
@@ -337,6 +339,67 @@ export function ensureHubModels(
     );
   }
   return started;
+}
+
+/**
+ * A clue's picture (owner, 26 Oct 2026: "generated assets to examine, and a witcher-senses button
+ * to light them up"): the thing the model described in English (`Clue.prop`), small and whole, in
+ * the world's colours where it has any, lying as it would be found.
+ */
+export function cluePrompt(prop: string, look?: Pick<WorldBible['look'], 'accent'>): string {
+  return [
+    `A single stylised low-poly game asset, a small object lying on the ground: ${prop.trim().replace(/[.\s]+$/, '')}.`,
+    look ? `A touch of ${look.accent} somewhere on it.` : '',
+    'The whole object in view, three-quarter view from slightly above.',
+    'Chunky, thick proportions with no thin or spindly parts,',
+    'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * A clue's model, made once per clue: the same queue as the hub's (`inTurn`), and the same rule
+ * that a refused key stops asking. `id` is whatever names the clue for good (the world, the quest's
+ * start, the beat and its index), so a reload with the model not yet on the beat does not ask twice
+ * in one session.
+ */
+export function ensureClueModel(
+  key: string,
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void = () => {},
+  o: FalOptions = {},
+): boolean {
+  const slot = `clue/${id}`;
+  if (refused.has('clue') || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
+  const p = inTurn(async () => {
+    if (refused.has('clue')) throw new Error('skipped: fal.ai refused the key');
+    const started = Date.now();
+    let spent = 0;
+    try {
+      const image = await drawImage(key, prompt, 'clue', o);
+      spent += imageCost();
+      const glb = await buildMesh(key, image, 'clue', o);
+      spent += FAL_PRICES.mesh;
+      const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, at: Date.now() };
+      recordMeasurement('rpg.landmark', { outcome: 'generated', piece: 'clue', ms: model.ms, costUsd: spent });
+      made.add(slot);
+      return model;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/^40[123]\b/.test(message)) refused.add('clue');
+      recordMeasurement('rpg.landmark', { outcome: 'failed', piece: 'clue', ms: Date.now() - started, costUsd: spent, error: message.slice(0, 200) });
+      throw err;
+    }
+  }).finally(() => inFlight.delete(slot));
+  inFlight.set(slot, p);
+  p.then(onModel, (err) => {
+    failed.add(slot);
+    onError(err);
+  });
+  return true;
 }
 
 const CACHE = 'rpg-landmarks';

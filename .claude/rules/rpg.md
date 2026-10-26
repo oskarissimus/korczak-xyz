@@ -325,6 +325,35 @@ waiting line or replies open with the character's name as the subject or report 
 ("mówi, że", "says that") — the next model is asked instead. Decision labels are the hunter's
 spoken line, at most 12 words.
 
+## The witcher's senses, the traces and the trail
+
+Owner, 26 Oct 2026: "generated assets to examine, and a button for hints like witcher senses to
+light them up — and the road should not render straight to the quest, but as a path the senses
+light up too". Three things, one feature:
+
+- **A clue is a real thing when there is a fal.ai key.** The beat writes each clue's `prop` in
+  English (an image model reads Polish badly, the same reason as the hub's `kit`), and
+  `ensureClueModel` (`landmark3d.ts`) makes it once, through the hub's queue and price (~$0.023,
+  `simplify` 0.98, kind `fal` labelled `clue` in the console), while the item-shape block stands in.
+  The model is kept on the beat (`Clue.model`), so the autosave has it and Continue loads it rather
+  than asking again; `RpgScene.setClueModel` puts it where the block lay, on the ground and not
+  turning (`CLUE_FIT`, knee-high). No key, no `prop` (an older beat), or a failure: the block stays.
+- **Q, or 👁 on a phone, sharpens the senses** for `SENSES_SECONDS` (12), or until pressed again or
+  a dialogue opens (`components/Rpg/senses.ts`). Every clue, every thing to pick up and every enemy
+  of the job gets a beam and a pulsing ring drawn through walls and fog, and the screen's edge
+  darkens (`.rpg-senses`, an inset shadow — a CSS animation on it stayed at opacity 0 in headless
+  Chromium). Light and darkness, not hue: it must read on a black-and-white phone.
+- **The road winds and the senses show the way.** `utils/rpg/trail.ts`: each place's road is a
+  seeded wander (`roadPoints`, the same bends every visit, straight out of the square and into the
+  place, leaving the square 6 m out so it does not run under the well) drawn as a ribbon
+  (`ribbon` in `RpgScene.ts`), and the trees it clears are measured to that line. Under the senses,
+  footprints glow from the hunter's feet to whatever the marker points at, lit outward like a wave:
+  along the road when one leads there (joined where the whole way is cheapest, a metre across the
+  fields counting 2.5 of road, so the trail never doubles back to the road's nearest point), across
+  the fields otherwise, round the square's middle rather than through it, and no further than
+  160 m. Relaid every half second while the senses last. The golden beam and the compass stay: the
+  trail is a hint, not the only way to know where to go.
+
 ## What it looks like
 
 Since Oct 2026 the people are not capsules (owner: "people looking like pills is a bit lame"; of
@@ -776,5 +805,5 @@ missing from the table shows `?`, never a guess. A new kind of request the game 
 ## Debugging
 
 `window.rpg.scene` (`teleport('marker' | 'npc' | 'spawn')`, `facePosition()` toward the marker,
-attack, interact) and `window.rpg.state()` (beat, progress, history, ending, chronicle, busy) exist
+`toggleSenses(on?)`, attack, interact) and `window.rpg.state()` (beat, progress, history, ending, chronicle, busy) exist
 for driving a whole quest from a test or the console without a mouse.

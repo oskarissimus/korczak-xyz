@@ -36,7 +36,7 @@ import {
   type PlaceSpec,
   type TargetLook,
 } from './place';
-import { classicWorld, worldLines, type WorldBrief } from './genesis';
+import { classicWorld, worldLines, type LandmarkModel, type WorldBrief } from './genesis';
 import { asAge, type VoiceAge } from './voicePick';
 
 export type Lang = 'en' | 'pl';
@@ -116,6 +116,13 @@ export interface Clue {
   ask: string;
   reply: string;
   look: TargetLook;
+  /**
+   * The thing itself in English, for the picture its 3D model is made from (`landmark3d.ts`,
+   * `generateClueModel`): an image model reads Polish badly. Absent in beats from before it.
+   */
+  prop?: string;
+  /** Its model from fal.ai once made, kept on the beat so the autosave never asks twice. */
+  model?: LandmarkModel;
 }
 
 /** Somebody else at the place, with their own view of it. */
@@ -562,7 +569,9 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "greeting": string (the first thing the npc says, one or two sentences),',
     '  "story": [{"ask": string (what the hero says to hear more), "say": string (the npc’s next part)}],',
     '  "smallTalk": [{"label": string (a follow-up question about something in the story), "reply": string}],',
-    `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)}}],`,
+    `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)},`,
+    '             "prop": string (IN ENGLISH whatever the language above, at most 12 words: the object alone as it',
+    '                     looks, for a 3D model — "a torn blue wool shawl caught on a thorn branch")}],',
     '  "witness": {"name": string, "gender": string, "age": string, "color": string, "voice": string, "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
@@ -766,7 +775,15 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
       const ask = text(c?.ask, 100);
       const replyText = text(c?.reply);
       if (!name || !seen || !ask || !replyText) return null;
-      return { name, text: seen, ask, reply: replyText, look: parseLook({ shape: c?.shape, color: '#e8d9a8', size: 0.8 }, 'collect') };
+      const prop = text(c?.prop, 120);
+      return {
+        name,
+        text: seen,
+        ask,
+        reply: replyText,
+        look: parseLook({ shape: c?.shape, color: '#e8d9a8', size: 0.8 }, 'collect'),
+        ...(prop ? { prop } : {}),
+      };
     })
     .filter((c): c is Clue => c !== null)
     .slice(0, 2);

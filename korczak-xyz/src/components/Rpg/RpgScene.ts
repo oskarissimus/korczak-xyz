@@ -31,6 +31,8 @@ import { CLASSIC_LOOK, type HubSizes, type WorldLook } from '../../utils/rpg/gen
 import { HUB_SLOTS, type HubSlot } from '../../utils/rpg/landmark3d';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
+import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
+import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -50,6 +52,8 @@ export interface SceneCallbacks {
   onLockChange: (locked: boolean) => void;
   /** The hunter has walked into one of the quest's places, once per place. */
   onArrive: (name: string) => void;
+  /** The witcher's senses came on or wore off (`senses.ts`). */
+  onSenses?: (on: boolean) => void;
 }
 
 /** Where characters stand in the village, in the order they first appear there. */
@@ -88,6 +92,8 @@ const WALK = 6;
 const RUN = 12;
 const TALK_RANGE = 3.2;
 const PICKUP_RANGE = 2.2;
+/** A clue's model from fal.ai: something lying on the ground, knee-high at most. */
+const CLUE_FIT = { height: 0.8, width: 1.2 };
 const ATTACK_RANGE = 3;
 const ATTACK_COOLDOWN = 0.55;
 const MAX_HP = 100;
@@ -181,6 +187,8 @@ interface Place {
   spec: PlaceSpec;
   group: THREE.Group;
   path: THREE.Mesh;
+  /** The road's middle line, village first (`utils/rpg/trail.ts`), which the senses' trail follows. */
+  road: Ground[];
   obstacles: Obstacle[];
   center: THREE.Vector3;
   arrived: boolean;
@@ -191,10 +199,34 @@ interface Place {
 
 export type MarkerTarget = { npc: string } | { place: string } | null;
 
-/** How far (x, z) is from the path running from the village square to (px, pz). */
-function nearSegment(x: number, z: number, px: number, pz: number): number {
-  const t = Math.max(0, Math.min(1, (x * px + z * pz) / (px * px + pz * pz)));
-  return Math.hypot(x - px * t, z - pz * t);
+/** A strip of ground `width` wide along a line, its texture running down it a tile every 3 m. */
+function ribbon(line: Ground[], width: number): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const index: number[] = [];
+  let along = 0;
+  for (let i = 0; i < line.length; i++) {
+    const prev = line[Math.max(0, i - 1)];
+    const next = line[Math.min(line.length - 1, i + 1)];
+    const dx = next.x - prev.x;
+    const dz = next.z - prev.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = (-dz / len) * (width / 2);
+    const nz = (dx / len) * (width / 2);
+    if (i > 0) along += Math.hypot(line[i].x - line[i - 1].x, line[i].z - line[i - 1].z);
+    pos.push(line[i].x + nx, 0, line[i].z + nz, line[i].x - nx, 0, line[i].z - nz);
+    uv.push(0, along / 3, 1, along / 3);
+    if (i > 0) {
+      const a = (i - 1) * 2;
+      index.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  return geo;
 }
 
 /** What a character looks like, drawn from their name so they look the same every time. */
@@ -297,6 +329,11 @@ export class RpgScene {
   private places = new Map<string, Place>();
   /** The character the marker points at, for `teleport('npc')`. */
   private markerNpc: string | null = null;
+  /** The witcher's senses: what they draw, how long they have left, and when the trail is next laid. */
+  private senses: SensesView;
+  private sensesLeft = 0;
+  private trailTimer = 0;
+  private senseTargets: SenseTarget[] = [];
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
     this.canvas = canvas;
@@ -356,6 +393,7 @@ export class RpgScene {
     );
     this.marker.visible = false;
     this.scene.add(this.marker);
+    this.senses = new SensesView(this.scene);
 
     this.bindInput();
   }
@@ -1051,10 +1089,11 @@ export class RpgScene {
     if (this.places.has(spec.name)) return;
     const { x, z } = placePosition(spec);
     const center = new THREE.Vector3(x, 0, z);
+    const road = roadPoints(x, z, hashString(spec.name), PLACE_RADIUS);
     for (const tree of this.trees) {
       const { x: tx, z: tz } = tree.obstacle;
       const inPlace = Math.hypot(tx - x, tz - z) < PLACE_RADIUS + 3;
-      if (inPlace || nearSegment(tx, tz, x, z) < 4) {
+      if (inPlace || nearestOnLine(tx, tz, road).d < 4) {
         tree.obstacle.off = true;
         showTree(tree, false);
       }
@@ -1065,20 +1104,14 @@ export class RpgScene {
     this.scene.add(built.group);
     const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
 
-    const length = Math.max(1, center.length() - PLACE_RADIUS);
-    const path = new THREE.Mesh(
-      new THREE.PlaneGeometry(3, length),
-      surfaceMat('dirt', 1, Math.round(length / 3), { roughness: 1 }),
-    );
-    path.rotation.x = -Math.PI / 2;
-    path.rotation.z = Math.atan2(-x, -z);
-    const mid = center.clone().setLength(length / 2);
-    path.position.set(mid.x, 0.01, mid.z);
+    // Winding, not ruled (owner, 26 Oct 2026): the same bends for the same place every time.
+    const path = new THREE.Mesh(ribbon(road, 3), surfaceMat('dirt', 1, 1, { roughness: 1 }));
+    path.position.y = 0.01;
     path.receiveShadow = true;
     this.scene.add(path);
 
     const keepOut = built.keepOut ? { x: built.keepOut.x + x, z: built.keepOut.z + z, r: built.keepOut.r } : null;
-    this.places.set(spec.name, { spec, group: built.group, path, obstacles, center, arrived: false, spinners: built.spinners, keepOut });
+    this.places.set(spec.name, { spec, group: built.group, path, road, obstacles, center, arrived: false, spinners: built.spinners, keepOut });
   }
 
   /** Takes down every place, for a new quest; the trees they cleared grow back. */
@@ -1219,6 +1252,29 @@ export class RpgScene {
     this.clues.clear();
   }
 
+  /**
+   * A clue's own model from fal.ai (`landmark3d.ts`, `ensureClueModel`) in place of its block, where
+   * the block lay, on the ground and still: a real thing lying there does not turn. A clue gone by
+   * the time it has loaded (the next beat) is left gone.
+   */
+  async setClueModel(id: string, url: string): Promise<void> {
+    const before = this.clues.get(id);
+    if (!before || before.userData.model === url) return;
+    const model = await loadHubModel(url, CLUE_FIT);
+    const now = this.clues.get(id);
+    if (!now || now !== before) {
+      disposeHubModel(model.group);
+      return;
+    }
+    model.group.position.set(now.position.x, 0, now.position.z);
+    model.group.rotation.y = rng(hashString(id))() * Math.PI * 2;
+    model.group.userData.model = url;
+    model.group.userData.still = true;
+    this.scene.remove(now);
+    this.scene.add(model.group);
+    this.clues.set(id, model.group);
+  }
+
   private nearestClue(): string | null {
     let best: string | null = null;
     let bestD = PICKUP_RANGE + 0.5;
@@ -1331,9 +1387,64 @@ export class RpgScene {
     else this.cb.onCompass(null, 0);
   }
 
+  /**
+   * The witcher's senses (`senses.ts`): on for `SENSES_SECONDS`, or off again early. Lights the
+   * clues and the job's targets and lays the trail to the marker.
+   */
+  toggleSenses(on = this.sensesLeft <= 0) {
+    if (on && this.paused) return;
+    this.sensesLeft = on ? SENSES_SECONDS : 0;
+    this.trailTimer = 0;
+    this.senses.setActive(on, this.clock.elapsedTime);
+    this.cb.onSenses?.(on);
+  }
+
+  sensesOn(): boolean {
+    return this.sensesLeft > 0;
+  }
+
+  /** The way to the marker, along the road that leads there if there is one (`trail.ts`). */
+  private layTrail() {
+    if (!this.markerTarget) {
+      this.senses.setTrail([]);
+      return;
+    }
+    const to = this.markerTarget;
+    let road: Ground[] | null = null;
+    for (const place of this.places.values()) {
+      if (Math.hypot(place.center.x - to.x, place.center.z - to.z) < PLACE_RADIUS + 5) road = place.road;
+    }
+    const from = { x: this.player.position.x, z: this.player.position.z };
+    const points = trailPoints(from, { x: to.x, z: to.z }, road, hashString(`${Math.round(to.x)},${Math.round(to.z)}`));
+    // The first step is the hunter's own; start the prints a stride ahead of his feet.
+    this.senses.setTrail(footprints(points).filter((p) => p.along > 1.2));
+  }
+
+  private updateSenses(dt: number) {
+    const t = this.clock.elapsedTime;
+    if (this.sensesLeft > 0) {
+      this.sensesLeft -= dt;
+      if (this.sensesLeft <= 0) this.toggleSenses(false);
+      this.trailTimer -= dt;
+      if (this.trailTimer <= 0) {
+        this.trailTimer = 0.5;
+        this.layTrail();
+      }
+    }
+    const targets = this.senseTargets;
+    targets.length = 0;
+    if (this.senses.active || this.sensesLeft > 0) {
+      for (const mesh of this.clues.values()) targets.push({ position: mesh.position, clue: true });
+      for (const p of this.pickups) targets.push({ position: p.mesh.position, clue: false });
+      for (const e of this.enemies) targets.push({ position: e.mesh.position, clue: false });
+    }
+    this.senses.update(dt, t, targets);
+  }
+
   /** While a dialogue or a menu is open the world stands still and the mouse is the reader's. */
   setPaused(paused: boolean) {
     this.paused = paused;
+    if (paused && this.sensesLeft > 0) this.toggleSenses(false);
     if (!paused) for (const npc of this.npcs.values()) npc.rig?.play('Idle_Loop', { fade: 0.6 });
     this.keys.clear();
     this.stick = { x: 0, y: 0 };
@@ -1447,6 +1558,7 @@ export class RpgScene {
       e.preventDefault();
     }
     if (code === 'KeyE' || code === 'KeyF') this.interact();
+    if (code === 'KeyQ' && !e.repeat) this.toggleSenses();
     this.keys.add(code);
   };
 
@@ -1525,6 +1637,7 @@ export class RpgScene {
       if (!this.paused) this.update(dt);
       // The people move even while a dialogue holds the world: whoever is talking talks.
       this.animate(dt);
+      this.updateSenses(dt);
       this.updateCamera();
       this.sky.update(dt, this.camera.position);
       this.cullFar();
@@ -1603,7 +1716,7 @@ export class RpgScene {
       this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
     }
 
-    for (const mesh of this.clues.values()) mesh.rotation.y += dt * 0.8;
+    for (const mesh of this.clues.values()) if (!mesh.userData.still) mesh.rotation.y += dt * 0.8;
     for (const p of this.pickups) {
       p.mesh.rotation.y += dt * 2;
       p.mesh.position.y = 0.8 + Math.sin(t * 2 + p.phase) * 0.15;
@@ -1762,6 +1875,7 @@ export class RpgScene {
 
   dispose() {
     cancelAnimationFrame(this.frame);
+    this.senses.dispose();
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
