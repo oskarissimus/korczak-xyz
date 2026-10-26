@@ -9,7 +9,9 @@ import {
   franchised,
   genesisPrompt,
   genesisTemperature,
+  hubSizesPrompt,
   lift,
+  parseHubSizes,
   parseLook,
   parseWorlds,
   pickWorld,
@@ -95,6 +97,29 @@ describe('parseWorlds', () => {
     expect(kit.kit).toEqual({ house: 'a cork hut', lamp: 'a lens on a stone stump' });
     expect(bare.kit).toBeUndefined();
     expect(genesisPrompt(ctx)).toContain('"kit"');
+  });
+
+  it('keeps each piece’s real size within what its slot allows, and drops what is not a size', () => {
+    const reply = JSON.stringify({
+      worlds: [candidate('Sized', 40, { sizes: { house: [3.6, 8.2], hall: [40, 900], lamp: ['2', 0.4], goods: [-1, 2], cart: 3, roof: [1, 1] } })],
+    });
+    const [w] = parseWorlds(reply, ctx, 1000);
+    expect(w.sizes).toEqual({ house: { height: 3.6, width: 7.5 }, hall: { height: 10, width: 9 }, lamp: { height: 2, width: 0.4 } });
+    expect(parseWorlds(JSON.stringify({ worlds: [candidate('Bare', 40)] }), ctx)[0].sizes).toBeUndefined();
+    expect(genesisPrompt(ctx)).toContain('"sizes"');
+  });
+
+  it('asks an older world’s sizes from the lines its pieces were drawn from', () => {
+    const world = { hub: 'Rust Halt', architecture: 'trucks', landmark: 'a rusted crane', kit: { house: 'a covered truck' } };
+    const prompt = hubSizesPrompt(world);
+    expect(prompt).toContain('house: a covered truck');
+    expect(prompt).toContain('landmark: a rusted crane');
+    expect(prompt).toContain('truck-sized');
+    expect(parseHubSizes('```json\n{"sizes": {"house": [3.5, 7], "landmark": [9, 4]}}\n```')).toEqual({
+      house: { height: 3.5, width: 7 },
+      landmark: { height: 9, width: 4 },
+    });
+    expect(parseHubSizes('no idea')).toBeNull();
   });
 
   it('tolerates a fence and a single world without the list', () => {

@@ -253,6 +253,16 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   finish (`hubWanted`): the world changes with every arrival and asks for all eight again, and
   restarting the loads each time kept the first models off screen for a minute. The classic world, a
   reader without a fal key, and a model that fails to load all keep the kit.
+- **Each piece is sized as what it is, not as its slot** (owner, 26 Oct 2026, a screenshot of a
+  caravan world's covered truck towering over the hero). TRELLIS answers in a unit box, so the size
+  is wholly the game's, and `HUB_FIT` gave every slot a building's: a "house" that was a truck came
+  out 6 m tall. Genesis now writes `sizes` beside the `kit` — each piece's real height and longest
+  ground length in metres, "next to a 1.8 m person, truck-sized if it is a truck" — clamped per slot
+  to sane values and to the room its plot has (`HUB_SIZE_LIMITS`), and `hubFit` uses them, with
+  `HUB_FIT` only for a world that has none. A world from before asks once (`generateHubSizes`, a
+  short request on the reader's own model, in the console like any other; not on the demo, whose
+  function builds only beats and worlds) and keeps the answer on the world (`setWorldSizes`). Sizes
+  arriving after the models reload them from the Cache API (`hubWanted` is the URL *and* the size).
 - **TRELLIS writes no metallic factor**, which glTF means as fully metallic, and with no environment
   map that renders black; `hubModels.ts` sets metalness to 0.
 - **In the console** as two rows per piece (kind `fal`, labelled `landmark`, `house`, `tree`…), with

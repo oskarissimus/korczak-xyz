@@ -9,10 +9,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import type { HubSizes } from '../../utils/rpg/genesis';
 import { loadLandmarkBytes, type HubSlot } from '../../utils/rpg/landmark3d';
 
 /**
- * Metres, tallest and widest. The landmark is twice the houses' eaves, seen over the roofs from the
+ * What a slot is sized to before the world says how big its piece really is (`WorldBible.sizes`):
+ * metres, tallest and widest. The landmark is twice the houses' eaves, seen over the roofs from the
  * edge of the village, and 5 m across at most: the square's walkway around it is ~5 m before the
  * first villager. The house and the hall take the kit's small (4×6 m) and large (6×8 m) houses'
  * plots; the rest stand where the kit's cart, wagon, barrels and crates stood.
@@ -27,6 +29,15 @@ export const HUB_FIT: Record<HubSlot, { height: number; width: number }> = {
   lamp: { height: 3.2, width: 1.2 },
   goods: { height: 1.4, width: 1.8 },
 };
+
+/**
+ * The piece's own size when the world has one, else the slot's. The world's comes from the model
+ * that described the piece, so a home that is a truck stands truck-sized; the slot's assumed a
+ * building, and stood that truck 6 m tall (owner, 26 Oct 2026).
+ */
+export function hubFit(slot: HubSlot, sizes: HubSizes | undefined): { height: number; width: number } {
+  return sizes?.[slot] ?? HUB_FIT[slot];
+}
 
 export interface HubModel {
   /** Stood on the origin and sized; clone it for each spot, the clones sharing its geometry. */

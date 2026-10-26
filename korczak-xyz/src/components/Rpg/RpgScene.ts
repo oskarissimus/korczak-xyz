@@ -24,10 +24,10 @@ import {
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { breakTiling, surfaceMat } from './surfaces';
-import { disposeHubModel, HUB_FIT, loadHubModel } from './hubModels';
+import { disposeHubModel, hubFit, loadHubModel } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
-import { CLASSIC_LOOK, type WorldLook } from '../../utils/rpg/genesis';
+import { CLASSIC_LOOK, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
 import { HUB_SLOTS, type HubSlot } from '../../utils/rpg/landmark3d';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
@@ -892,7 +892,7 @@ export class RpgScene {
   private houseBase: number[] = [];
   private hubModels = new Map<HubSlot, { url: string; group: THREE.Group; template: THREE.Group; radius: number }>();
   private hubTokens: Partial<Record<HubSlot, number>> = {};
-  /** The url each slot was last asked for, loaded or still loading. */
+  /** The url and size each slot was last asked for, loaded or still loading. */
   private hubWanted: Partial<Record<HubSlot, string | null>> = {};
 
   /**
@@ -954,17 +954,23 @@ export class RpgScene {
    * no url. What a model replaces stays until it has arrived; one that fails to load leaves it
    * there, and the others still come.
    */
-  async setHubModels(urls: Partial<Record<HubSlot, string>>, onError: (slot: HubSlot, e: unknown) => void = () => {}): Promise<void> {
+  async setHubModels(
+    urls: Partial<Record<HubSlot, string>>,
+    sizes: HubSizes | undefined,
+    onError: (slot: HubSlot, e: unknown) => void = () => {},
+  ): Promise<void> {
     await Promise.all(
-      HUB_SLOTS.map((slot) => this.setHubModel(slot, urls[slot] ?? null).catch((e) => onError(slot, e))),
+      HUB_SLOTS.map((slot) => this.setHubModel(slot, urls[slot] ?? null, hubFit(slot, sizes)).catch((e) => onError(slot, e))),
     );
   }
 
-  private async setHubModel(slot: HubSlot, url: string | null): Promise<void> {
+  private async setHubModel(slot: HubSlot, url: string | null, fit: { height: number; width: number }): Promise<void> {
     // The world changes with every model that arrives, and asks for all of them again each time: a
-    // load already on its way to the same url is left to finish, not started over.
-    if ((this.hubWanted[slot] ?? null) === url) return;
-    this.hubWanted[slot] = url;
+    // load already on its way to the same url and size is left to finish, not started over. Sizes
+    // that arrive after the model load it again, from the cache.
+    const wanted = url && `${url} ${fit.height}×${fit.width}`;
+    if ((this.hubWanted[slot] ?? null) === wanted) return;
+    this.hubWanted[slot] = wanted;
     const token = (this.hubTokens[slot] = (this.hubTokens[slot] ?? 0) + 1);
     const clear = () => {
       const now = this.hubModels.get(slot);
@@ -980,7 +986,7 @@ export class RpgScene {
     }
     let built;
     try {
-      built = await loadHubModel(url, HUB_FIT[slot]);
+      built = await loadHubModel(url, fit);
     } catch (e) {
       // Not wanted any more, so a later call may try the same url again.
       if (token === this.hubTokens[slot]) delete this.hubWanted[slot];

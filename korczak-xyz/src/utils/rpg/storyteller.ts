@@ -25,7 +25,19 @@
  */
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
-import { askedFor, genesisPrompt, genesisTemperature, parseWorlds, pickWorld, typicalityTarget, type GenesisContext, type WorldBible } from './genesis';
+import {
+  askedFor,
+  genesisPrompt,
+  genesisTemperature,
+  hubSizesPrompt,
+  parseHubSizes,
+  parseWorlds,
+  pickWorld,
+  typicalityTarget,
+  type GenesisContext,
+  type HubSizes,
+  type WorldBible,
+} from './genesis';
 import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
@@ -407,11 +419,14 @@ type DemoAsk = { kind: 'beat'; ctx: BeatContext } | { kind: 'world'; ctx: Genesi
 interface Ask<T> {
   prompt: string;
   temperature: number;
-  demo: DemoAsk;
+  /** What the demo's function is sent; none when the demo has nothing to answer it with. */
+  demo: DemoAsk | null;
   /** The answer as the game can use it, or null when it cannot. */
   parse: (raw: string) => T | null;
   /** Which beat, for the console; null for a world. */
   beat: number | null;
+  /** What an unusable answer was not, for the console: a beat or a world unless said. */
+  what?: string;
 }
 
 interface Asked<T> {
@@ -435,7 +450,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
   const started = Date.now();
   const provider: QuestSource = keys.google ? 'google' : keys.openai ? 'openai' : keys.demo ? 'demo' : 'static';
   const run: Asked<T> = { outcome: 'no-key', provider, model: null, tries: [], raw: null, error: null, ms: 0, value: null, refusal: null };
-  if (provider === 'static') return run;
+  if (provider === 'static' || (provider === 'demo' && !ask.demo)) return run;
 
   // A request the page's going to the background killed is not the model's fault: it is asked
   // again, the same model, once the page is back (owner, Oct 2026: on a phone, a new world asked for
@@ -465,7 +480,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
           provider === 'google'
             ? await askGoogle(keys.google!, model, ask.prompt, ask.temperature, dog, entry)
             : provider === 'demo'
-              ? await askDemo(model, ask.demo, dog, entry)
+              ? await askDemo(model, ask.demo!, dog, entry)
               : await askOpenAi(keys.openai!, ask.prompt, ask.temperature, dog, entry);
       } catch (e) {
         throw dog.wrap(e);
@@ -473,7 +488,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
         dog.done();
       }
       run.value = ask.parse(run.raw);
-      const unplayable = run.value ? null : `the answer was not a playable ${ask.beat === null ? 'world' : 'beat'}`;
+      const unplayable = run.value ? null : `the answer was not ${ask.what ?? `a playable ${ask.beat === null ? 'world' : 'beat'}`}`;
       endRequest(entry, unplayable);
       record(200, unplayable);
       if (run.value) break;
@@ -562,4 +577,21 @@ export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen
   });
   const { value, ...rest } = run;
   return { ...rest, prompt, seeds: ctx.seeds, candidates, world: value };
+}
+
+/**
+ * How big the hub's pieces are, for a world described before genesis asked (`hubSizesPrompt`). A
+ * short answer, asked once per world and kept on it; the demo's function builds only beats and
+ * worlds, so on the demo a world keeps the slots' own sizes.
+ */
+export async function generateHubSizes(keys: StoryKeys, world: WorldBible, chosen: string | null = null): Promise<HubSizes | null> {
+  const run = await askChain(keys, chosen, {
+    prompt: hubSizesPrompt(world),
+    temperature: 0.2,
+    demo: null,
+    parse: parseHubSizes,
+    beat: null,
+    what: 'a set of sizes',
+  });
+  return run.value;
 }

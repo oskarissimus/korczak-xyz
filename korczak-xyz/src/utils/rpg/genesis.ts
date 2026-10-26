@@ -123,6 +123,12 @@ export interface WorldBible extends WorldBrief {
   kit?: Partial<Record<HubPiece, string>>;
   /** Those pieces made into 3D models by fal.ai, each once, as they arrive. */
   kitModels?: Partial<Record<HubPiece, LandmarkModel>>;
+  /**
+   * How big the landmark and each piece really are, in metres, by the model that described them
+   * (`hubSizes`). A fixed size per slot drew a caravan world's "house", a covered truck, as tall as a
+   * two-storey building (owner, 26 Oct 2026). Worlds from before have none until it is asked for.
+   */
+  sizes?: HubSizes;
 }
 
 /**
@@ -132,6 +138,73 @@ export interface WorldBible extends WorldBrief {
  */
 export const HUB_PIECES = ['house', 'hall', 'tree', 'stall', 'cart', 'lamp', 'goods'] as const;
 export type HubPiece = (typeof HUB_PIECES)[number];
+
+/** A piece's real height and its longest length along the ground, in metres. */
+export interface HubSize {
+  height: number;
+  width: number;
+}
+export type HubSizes = Partial<Record<'landmark' | HubPiece, HubSize>>;
+
+/**
+ * What a size may be, per slot, so a model that answers in centimetres or invents a tower cannot
+ * put it in the game. The widths are also what the village has room for: the landmark's walkway,
+ * the houses' plots, the corner the cart stands in.
+ */
+export const HUB_SIZE_LIMITS: Record<'landmark' | HubPiece, { height: [number, number]; width: [number, number] }> = {
+  landmark: { height: [2, 12], width: [1, 6] },
+  house: { height: [2, 8], width: [2, 7.5] },
+  hall: { height: [2.5, 10], width: [3, 9] },
+  tree: { height: [2, 14], width: [1, 7] },
+  stall: { height: [1.2, 4.5], width: [1, 4.5] },
+  cart: { height: [0.8, 4.5], width: [1, 7] },
+  lamp: { height: [1, 6], width: [0.3, 1.8] },
+  goods: { height: [0.3, 2.2], width: [0.5, 2.8] },
+};
+
+const clampTo = (v: number, [lo, hi]: [number, number]) => Math.round(Math.min(hi, Math.max(lo, v)) * 10) / 10;
+
+/** `{"house": [height, width], …}` as the model wrote it, each pair kept within its slot's limits. */
+export function parseSizes(value: unknown): HubSizes | null {
+  if (!value || typeof value !== 'object') return null;
+  const sizes: HubSizes = {};
+  for (const slot of ['landmark', ...HUB_PIECES] as const) {
+    const pair = (value as Record<string, unknown>)[slot];
+    if (!Array.isArray(pair) || pair.length < 2) continue;
+    const [h, w] = pair.map(Number);
+    if (!(h > 0) || !(w > 0)) continue;
+    const limits = HUB_SIZE_LIMITS[slot];
+    sizes[slot] = { height: clampTo(h, limits.height), width: clampTo(w, limits.width) };
+  }
+  return Object.keys(sizes).length ? sizes : null;
+}
+
+const SIZE_RULE =
+  'its real height and its longest length along the ground, in metres, as it would stand next to a 1.8 m person: ' +
+  'size it as what it IS, not as the slot it fills (a home that is a truck is truck-sized, a lamp that is a torch ' +
+  'is torch-sized)';
+
+/**
+ * The sizes asked for on their own, for a world described before genesis asked for them: the same
+ * lines the pictures were made from, and the same rule.
+ */
+export function hubSizesPrompt(world: Pick<WorldBible, 'landmark' | 'kit' | 'hub' | 'architecture'>): string {
+  const lines = [
+    `Objects standing in ${world.hub}, a settlement built like this: ${world.architecture}.`,
+    ...(world.landmark ? [`landmark: ${world.landmark}`] : []),
+    ...HUB_PIECES.flatMap((p) => (world.kit?.[p] ? [`${p}: ${world.kit[p]}`] : [])),
+    '',
+    `For each object give ${SIZE_RULE}.`,
+    'Answer with JSON only: {"sizes": {"<name>": [height, length], …}}, one entry per object above, numbers only.',
+  ];
+  return lines.join('\n');
+}
+
+/** The answer to `hubSizesPrompt`, or null when it has no usable size. */
+export function parseHubSizes(reply: string): HubSizes | null {
+  const raw = extract(reply) as Record<string, unknown> | null;
+  return parseSizes(raw?.sizes ?? raw);
+}
 
 /**
  * The hub's landmark, or one of its pieces, as fal.ai made it (`landmark3d.ts`). Declared here rather than there because
@@ -462,6 +535,7 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
     '    "tree" (what grows here, as "flora" below says), "stall" (a market stall or workbench), "cart" (how',
     '    goods are moved here), "lamp" (a light post, beacon or totem), "goods" (a small pile of goods)},',
+    `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
     '  "words": [up to 6 words or short phrases people here use],',
     '  "look": {',
     '    "sky", "fog", "sun", "ground", "foliage", "wall", "roof", "accent": each a "#rrggbb" colour',
@@ -617,6 +691,7 @@ export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()
       look: parseLook(r.look),
       ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
       ...parseKit(r.kit),
+      ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
     });
   }
   return worlds;

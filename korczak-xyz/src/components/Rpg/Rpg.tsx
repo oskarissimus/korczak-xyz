@@ -44,7 +44,7 @@ import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
-import { generateBeat, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
+import { generateBeat, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
 import {
   addToAtlas,
   clearPendingGenesis,
@@ -59,6 +59,7 @@ import {
   savePendingGenesis,
   saveWorld,
   setWorldModel,
+  setWorldSizes,
   withModel,
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
@@ -831,6 +832,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // things in its square, from fal.ai, each made once and kept on the world; the kit's village
   // until they exist, and in the classic world or without a key.
   const falKey = keysReady ? account.keys.fal : null;
+  const sizesAskedRef = useRef(new Set<string>());
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !world) return;
@@ -839,7 +841,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const glb = hubModel(world, slot)?.glb;
       if (glb) urls[slot] = glb;
     }
-    void scene.setHubModels(urls, (slot, e) => log.warn('rpg.landmark.load.failed', { slot, ...describeError(e) }));
+    void scene.setHubModels(urls, world.sizes, (slot, e) => log.warn('rpg.landmark.load.failed', { slot, ...describeError(e) }));
+    // A world described before genesis gave sizes asks for them once, so its pieces stand as big as
+    // what they are rather than as big as their slot (`hubFit`).
+    if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {
+      sizesAskedRef.current.add(world.id);
+      const keys = { google: account.keys.google, openai: account.keys.openai, demo: false };
+      void generateHubSizes(keys, world, chosenModelRef.current)
+        .then((sizes) => {
+          if (!sizes) return;
+          setWorldSizes(world.id, sizes);
+          if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, sizes };
+          setWorld((now) => (now?.id === world.id ? { ...now, sizes } : now));
+        })
+        .catch((e) => log.warn('rpg.sizes.failed', describeError(e)));
+    }
     if (!falKey || world.createdAt === 0) return;
     ensureHubModels(
       falKey,
@@ -851,7 +867,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       },
       (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
     );
-  }, [world, falKey]);
+  }, [world, falKey, keysReady]);
 
   // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
   // that lands while the reply is still being read must not expire unseen.

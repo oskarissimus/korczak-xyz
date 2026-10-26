@@ -15,7 +15,7 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import type { HubPiece, LandmarkModel, WorldBible } from './genesis';
+import type { HubPiece, HubSizes, LandmarkModel, WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import type { Character, Lang } from './quest';
 import { dropGameFor } from './save';
@@ -113,7 +113,15 @@ export function withModel(world: WorldBible, slot: 'landmark' | HubPiece, model:
  * and marks the world for the account, so no other device makes it again (`landmark3d.ts`).
  */
 export function setWorldModel(id: string, slot: 'landmark' | HubPiece, model: LandmarkModel, now = Date.now()): void {
-  const put = (w: WorldBible) => withModel(w, slot, model);
+  putWorld(id, (w) => withModel(w, slot, model), now);
+}
+
+/** Keeps the hub's sizes on the world the same way (`generateHubSizes`), so they are asked once. */
+export function setWorldSizes(id: string, sizes: HubSizes, now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, sizes }), now);
+}
+
+function putWorld(id: string, put: (w: WorldBible) => WorldBible, now: number): void {
   const stored = read();
   const library = withLibrary(stored);
   const entry = library[id];
