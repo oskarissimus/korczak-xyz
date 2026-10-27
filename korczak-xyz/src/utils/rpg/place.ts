@@ -9,7 +9,15 @@
  *
  * So a new kind of place is a new word here, a builder for it, and a line in the prompt; nothing
  * a model writes reaches the scene without passing through `parsePlace` or `parseLook`.
+ *
+ * In an invented world none of that is drawn any more (owner, 27 Oct 2026: "a space station with stone
+ * pillars, a stone wall, a campfire and a lake — I thought we agreed: no procedural assets, only
+ * fal.ai's in the locations"). The model also writes the place's `assets` in English, the landmark
+ * and one or two things that stand around it many times over, and each becomes a fal.ai model
+ * (`ensurePieceModel`, `landmark3d.ts`); the features then only say where the world's own trees grow.
  */
+
+import type { LandmarkModel } from './genesis';
 
 export const DIRECTIONS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'] as const;
 export type Direction = (typeof DIRECTIONS)[number];
@@ -98,7 +106,31 @@ export interface PlaceSpec {
   groundColor: string;
   /** The building or thing that makes the place what it is, when it has one. */
   landmark?: Landmark | null;
+  /** What fal.ai makes for it, in an invented world: what stands there, and the model once made. */
+  assets?: PlaceAsset[];
 }
+
+export const ASSET_ROLES = ['landmark', 'scatter'] as const;
+export type AssetRole = (typeof ASSET_ROLES)[number];
+
+export interface PlaceAsset {
+  /** The landmark stands behind the place's middle; a scatter piece is copied around its ring. */
+  role: AssetRole;
+  /** In English, for the image model: the thing alone, as it looks. */
+  what: string;
+  /** Metres: how tall, and its longest length along the ground. */
+  size: { height: number; width: number };
+  /** Once fal.ai has made it, kept with the place so it is never made twice. */
+  model?: LandmarkModel;
+}
+
+/** What a size may be, so a model writing centimetres or a mountain cannot put it in the game. */
+export const ASSET_LIMITS: Record<AssetRole, { height: [number, number]; width: [number, number] }> = {
+  landmark: { height: [3, 20], width: [3, 16] },
+  scatter: { height: [0.3, 6], width: [0.3, 6] },
+};
+/** At most one landmark and two kinds of scattered thing: ~$0.07 a place. */
+export const MAX_SCATTER = 2;
 
 export interface TargetLook {
   shape: EnemyShape | ItemShape;
@@ -333,6 +365,34 @@ export function parseLandmark(raw: unknown): Landmark | null {
   return { name: typeof r.name === 'string' ? r.name.trim().slice(0, 60) : '', parts };
 }
 
+const clampTo = (v: number, [lo, hi]: [number, number]) => Math.round(Math.min(hi, Math.max(lo, v)) * 10) / 10;
+
+function model(raw: unknown): LandmarkModel | undefined {
+  const m = raw as Partial<LandmarkModel> | null;
+  return m && typeof m === 'object' && typeof m.glb === 'string' && /^https:\/\//.test(m.glb) ? (m as LandmarkModel) : undefined;
+}
+
+/** The place's `assets` as the model wrote them (or as saved, with their models): a landmark, two scattered. */
+export function parseAssets(raw: unknown): PlaceAsset[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PlaceAsset[] = [];
+  for (const a of raw) {
+    if (!a || typeof a !== 'object') continue;
+    const r = a as Record<string, unknown>;
+    const role = oneOf(r.role, ASSET_ROLES);
+    const what = typeof r.what === 'string' ? r.what.trim().slice(0, 140) : '';
+    if (!role || !what) continue;
+    if (role === 'landmark' ? out.some((x) => x.role === 'landmark') : out.filter((x) => x.role === 'scatter').length >= MAX_SCATTER) continue;
+    const limits = ASSET_LIMITS[role];
+    const pair = Array.isArray(r.size) ? r.size.map(Number) : r.size && typeof r.size === 'object' ? [(r.size as Record<string, unknown>).height, (r.size as Record<string, unknown>).width].map(Number) : [];
+    const height = pair[0] > 0 ? clampTo(pair[0], limits.height) : role === 'landmark' ? 8 : 1.5;
+    const width = pair[1] > 0 ? clampTo(pair[1], limits.width) : role === 'landmark' ? 8 : 1.5;
+    const m = model(r.model);
+    out.push({ role, what, size: { height, width }, ...(m ? { model: m } : {}) });
+  }
+  return out;
+}
+
 /**
  * A model's place, or null when the scene could not build it. Name, direction and biome are
  * required; the rest falls back to the biome's own.
@@ -355,6 +415,7 @@ export function parsePlace(raw: unknown): PlaceSpec | null {
     features: features.length ? features : BIOME_DEFAULTS[biome].features,
     groundColor: hex(r.groundColor) ?? BIOME_DEFAULTS[biome].groundColor,
     landmark: parseLandmark(r.landmark),
+    ...(Array.isArray(r.assets) && parseAssets(r.assets).length ? { assets: parseAssets(r.assets) } : {}),
   };
 }
 

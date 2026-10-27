@@ -457,7 +457,13 @@ const LANDMARK_LINES = [
   '   {"shape": "box", "size": [11, 0.6, 0.2], "at": [0, 6, 2.8], "material": "wood", "spin": "z"}]}',
   '  (the two sails share their middle, so they turn together as one cross). Leave it out only for a place that',
   '  is truly nothing but nature.',
-  '  A new place is {"name", "direction", "distance", "biome", "features", "groundColor", "landmark"};',
+  '- assets: what stands there, for 3D models made from pictures, so IN ENGLISH whatever the language above:',
+  '  [{"role": "landmark", "what": the landmark alone as it looks, at most 14 words, "size": [height, length] in metres},',
+  '   {"role": "scatter", "what": a thing that stands or lies around the place many times over, at most 14 words,',
+  '    "size": [height, length]}] — the landmark once when there is one, and one or two "scatter" things',
+  '  ("a rusted pressure tank", "a cracked burial urn", "a coral head"). Each a single solid object, made the way',
+  '  this world makes things; never a tree or plant (the world has its own), never ground, water or a crowd.',
+  '  A new place is {"name", "direction", "distance", "biome", "features", "groundColor", "landmark", "assets"};',
 ];
 
 function thisStep(ctx: BeatContext, hub: string): string[] {

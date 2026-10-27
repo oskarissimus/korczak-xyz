@@ -17,7 +17,7 @@ import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
-import type { PlaceSpec } from '../../utils/rpg/place';
+import type { PlaceAsset, PlaceSpec } from '../../utils/rpg/place';
 import {
   isDead,
   jobDone,
@@ -39,7 +39,7 @@ import { addGenerationTime, beginQuestSpend, NO_SPEND, onRequestEnd, questSpend,
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture } from '../../utils/rpg/groundTexture';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
-import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
+import { cluePrompt, ensureClueModel, ensureHubModels, ensurePlaceModel, placeAssetPrompt, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
@@ -67,6 +67,7 @@ import {
   setWorldGround,
   setWorldModel,
   setWorldSizes,
+  updateAtlasPlace,
   withModel,
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
@@ -460,6 +461,68 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, []);
 
   /**
+   * A place into the scene, and in an invented world its fal.ai pieces after it (owner, 27 Oct 2026:
+   * "no procedural assets, only fal.ai's in the locations"): each made once from the English the beat
+   * wrote (`PlaceAsset`), kept with the place wherever it is stored, and put up as it loads. A place
+   * from before `assets` gets its landmark from its name and the world's way of building.
+   */
+  const falKeyRef = useRef<string | null>(null);
+  const persistRef = useRef<() => void>(() => {});
+  const putPlace = useCallback((given: PlaceSpec) => {
+    const scene = sceneRef.current;
+    const world = worldRef.current;
+    const invented = !!world && world.createdAt > 0;
+    const place: PlaceSpec =
+      invented && !given.assets?.length && given.landmark?.name
+        ? {
+            ...given,
+            assets: [
+              {
+                role: 'landmark',
+                what: `${given.landmark.name}, built like this: ${world!.architecture || world!.pitch}`.slice(0, 140),
+                size: { height: 8, width: 8 },
+              },
+            ],
+          }
+        : given;
+    scene?.addPlace(place);
+    if (!scene || !world || !invented) return;
+    (place.assets ?? []).forEach((asset, i) => {
+      const show = (glb: string) =>
+        scene.setPlaceModel(place.name, i, glb, asset.size).catch((e) => log.warn('rpg.place.load.failed', { place: place.name, ...describeError(e) }));
+      if (asset.model) {
+        void show(asset.model.glb);
+        return;
+      }
+      const key = falKeyRef.current;
+      if (!key) return;
+      ensurePlaceModel(
+        key,
+        `${world.id}/${place.name}/${i}`,
+        placeAssetPrompt(asset.what, asset.role, world.look),
+        (model) => {
+          const assets = (place.assets ?? []).map((a, j): PlaceAsset => (j === i ? { ...a, model } : a));
+          // Every copy of the place takes it: the quest's list, its beats, the atlas.
+          const keep = (p: PlaceSpec): PlaceSpec => {
+            if (p.name !== place.name) return p;
+            const had = p.assets?.length ? p.assets : assets;
+            return { ...p, assets: had.map((a, j) => (j === i ? { ...a, model } : a)) };
+          };
+          placesRef.current = placesRef.current.map(keep);
+          const keepBeat = (b: Beat): Beat => (b.place ? { ...b, place: keep(b.place) } : b);
+          beatsRef.current = beatsRef.current.map(keepBeat);
+          if (beatRef.current) beatRef.current = keepBeat(beatRef.current);
+          const stored = placesRef.current.find((p) => p.name === place.name);
+          if (stored) updateAtlasPlace(world.id, stored);
+          persistRef.current();
+          if (worldRef.current?.id === world.id) void show(model.glb);
+        },
+        (e) => log.warn('rpg.place.failed', { place: place.name, ...describeError(e) }),
+      );
+    });
+  }, []);
+
+  /**
    * Puts the world's atlas into the scene and the quest's memory: every place built so far and
    * everyone met, standing where they were left (`worldSave.ts`). A new quest starts in a world
    * that already has a history.
@@ -469,7 +532,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const atlas = loadAtlas(worldRef.current?.id ?? gameLangRef.current);
     deadRef.current = atlas.dead ?? [];
     for (const place of atlas.places) {
-      scene?.addPlace(place);
+      putPlace(place);
       if (!placesRef.current.some((p) => p.name === place.name)) placesRef.current = [...placesRef.current, place];
     }
     const crowd = new Map<string, number>();
@@ -509,6 +572,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       spent: questSpend(),
     });
   }, []);
+  persistRef.current = persist;
 
   // A clip or a clue paid for between two of the quest's steps is in the autosave too, so the
   // closing screen of a quest finished another day still counts it. A beat's arrival saves anyway;
@@ -575,7 +639,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     (b: Beat, announce = true) => {
       const scene = sceneRef.current;
       if (b.place) {
-        scene?.addPlace(b.place);
+        putPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
       scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
@@ -892,6 +956,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // things in its square, from fal.ai, each made once and kept on the world, and the forest's trees
   // across the map; each stands the moment it has loaded, and nothing stands in for it before.
   const falKey = keysReady ? account.keys.fal : null;
+  falKeyRef.current = falKey;
+  // The places already standing ask again once the key is there (each piece is made once whatever happens).
+  useEffect(() => {
+    if (!falKey || !world || world.createdAt === 0 || creating) return;
+    for (const place of placesRef.current) putPlace(place);
+  }, [falKey, world, creating, putPlace]);
   const sizesAskedRef = useRef(new Set<string>());
   // Where it all stands is the world's own (`utils/rpg/hubLayout.ts`), and nothing stands there until
   // its model has come: an empty board, filling in. The board is empty while a world is invented,
@@ -1457,7 +1527,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const history = game.history;
     for (const b of game.beats.slice(0, -1)) {
       if (b.place) {
-        scene?.addPlace(b.place);
+        putPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
       if (!isDead(b.npc.name, deadRef.current)) scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);

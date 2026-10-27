@@ -237,7 +237,7 @@ export function onRequestEnd(listener: (entry: DevRequest) => void): () => void 
 /** The world's requests are the ones that make the world: its genesis, its sizes, its hub's models. */
 export function scopeOf(kind: DevRequest['kind'], beat: number | null, label?: string): SpendScope {
   if (kind === 'model') return beat === null ? 'world' : 'quest';
-  if (kind === 'fal') return label === 'clue' ? 'quest' : 'world';
+  if (kind === 'fal') return label === 'clue' || label === 'place' ? 'quest' : 'world';
   return 'quest';
 }
 

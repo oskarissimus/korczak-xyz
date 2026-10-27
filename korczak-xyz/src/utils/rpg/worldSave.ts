@@ -308,6 +308,19 @@ export function addToAtlas(worldId: string, add: Atlas): Atlas {
   return atlas;
 }
 
+/**
+ * A place already in the atlas, changed where it stands (a fal.ai piece made for it): it keeps its
+ * turn in the order. A place not in it yet is left for `addToAtlas` at the quest's end.
+ */
+export function updateAtlasPlace(worldId: string, place: PlaceSpec): void {
+  const all = readAtlases();
+  const atlas = all[worldId];
+  if (!atlas?.places?.some((p) => p.name === place.name)) return;
+  all[worldId] = { ...atlas, places: atlas.places.map((p) => (p.name === place.name ? place : p)) };
+  writeAtlases(evict(all, worldId));
+  touch(worldUnit(worldId));
+}
+
 /** For the account copy: a world's atlas as the account has it. */
 export function writeAtlas(worldId: string, atlas: Atlas | null): void {
   const all = readAtlases();

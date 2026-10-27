@@ -18,6 +18,7 @@ import {
   buildEnemy,
   buildItem,
   buildPlace,
+  forestTree,
   hashString,
   rng,
   type Obstacle,
@@ -190,6 +191,14 @@ interface Place {
   spinners: Spinner[];
   /** The landmark's ground, in world coordinates. */
   keepOut: { x: number; z: number; r: number } | null;
+  /** Built bare, for an invented world: everything in it is the world's trees and fal.ai's pieces. */
+  bare?: {
+    treeSpots: { x: number; z: number; s: number; r: number }[];
+    trees: THREE.Group;
+    treeObstacles: Obstacle[];
+    /** Each piece's spots (place coordinates) and the obstacles they become once it stands. */
+    pieces: Map<number, { spots: { x: number; z: number; rot: number }[]; obstacles: Obstacle[] }>;
+  };
 }
 
 export type MarkerTarget = { npc: string } | { place: string } | null;
@@ -667,6 +676,7 @@ export class RpgScene {
     if (gone.length) {
       this.forest = kept;
       this.plantTrees();
+      for (const place of this.places.values()) this.plantPlaceTrees(place);
       for (const parts of gone) {
         this.forestUrls.delete(parts);
         disposeTreeParts(parts);
@@ -692,6 +702,7 @@ export class RpgScene {
           // In the order asked for, so the trees are mixed the same way whichever loaded first.
           this.forest = [...this.forest, parts].sort((a, b) => urls.indexOf(this.forestUrls.get(a)!) - urls.indexOf(this.forestUrls.get(b)!));
           this.plantTrees();
+          for (const place of this.places.values()) this.plantPlaceTrees(place);
         }),
     );
   }
@@ -1145,7 +1156,9 @@ export class RpgScene {
    */
   setLayout(layout: HubLayout | null) {
     if ((layout?.key ?? null) === (this.layout?.key ?? null)) return;
+    const wasBare = this.layout !== null;
     this.layout = layout;
+    if (wasBare !== (layout !== null)) this.rebuildPlaces();
     const generatedSpots = new Set(
       Object.values(this.hubSpots)
         .flat()
@@ -1324,10 +1337,24 @@ export class RpgScene {
     const road = roadPoints(x, z, hashString(spec.name), PLACE_RADIUS);
     this.clearTrees(x, z, road);
 
-    const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look, this.isClassic() ? [] : this.forest);
+    const bare = this.layout !== null;
+    const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look, this.isClassic() ? [] : this.forest, bare);
     built.group.position.copy(center);
     this.scene.add(built.group);
     const obstacles = built.obstacles.map((o) => ({ ...o, x: o.x + x, z: o.z + z }));
+    let bareParts: Place['bare'];
+    if (bare) {
+      const trees = new THREE.Group();
+      built.group.add(trees);
+      const pieces: NonNullable<Place['bare']>['pieces'] = new Map();
+      for (const { index, spots } of built.assetSpots ?? []) {
+        // Nothing to walk into until the piece stands.
+        const blocks = spots.map((s) => ({ x: s.x + x, z: s.z + z, r: 0, off: true }));
+        obstacles.push(...blocks);
+        pieces.set(index, { spots, obstacles: blocks });
+      }
+      bareParts = { treeSpots: built.treeSpots ?? [], trees, treeObstacles: [], pieces };
+    }
 
     // Winding, not ruled (owner, 26 Oct 2026): the same bends for the same place every time.
     const path = new THREE.Mesh(ribbon(road, 3), surfaceMat('dirt', 1, 1, { roughness: 1 }));
@@ -1336,21 +1363,100 @@ export class RpgScene {
     this.scene.add(path);
 
     const keepOut = built.keepOut ? { x: built.keepOut.x + x, z: built.keepOut.z + z, r: built.keepOut.r } : null;
-    this.places.set(spec.name, { spec, group: built.group, path, road, obstacles, center, arrived: false, spinners: built.spinners, keepOut });
+    const place: Place = { spec, group: built.group, path, road, obstacles, center, arrived: false, spinners: built.spinners, keepOut, bare: bareParts };
+    this.places.set(spec.name, place);
+    if (bareParts) {
+      this.plantPlaceTrees(place);
+      for (const [index, piece] of this.placeModels.get(spec.name) ?? []) void this.putUpPiece(place, index, piece.url, piece.fit);
+    }
+  }
+
+  /** The fal.ai pieces each place has been given (`setPlaceModel`), kept so a place built again gets them back. */
+  private placeModels = new Map<string, Map<number, { url: string; fit: { height: number; width: number } }>>();
+
+  /**
+   * One of a place's fal.ai pieces (`spec.assets[index]`), sized to the beat's own size for it: put
+   * up on its spots the moment it has loaded, in a bare place. The same url again does nothing.
+   */
+  async setPlaceModel(name: string, index: number, url: string, fit: { height: number; width: number }): Promise<void> {
+    const known = this.placeModels.get(name) ?? new Map();
+    if (known.get(index)?.url === url) return;
+    known.set(index, { url, fit });
+    this.placeModels.set(name, known);
+    const place = this.places.get(name);
+    if (place?.bare) await this.putUpPiece(place, index, url, fit);
+  }
+
+  private async putUpPiece(place: Place, index: number, url: string, fit: { height: number; width: number }) {
+    const piece = place.bare?.pieces.get(index);
+    if (!piece || !piece.spots.length) return;
+    const model = await loadHubModel(url, fit);
+    // Taken down, or built again, while it loaded.
+    if (this.places.get(place.spec.name) !== place) {
+      disposeHubModel(model.group);
+      return;
+    }
+    const group = new THREE.Group();
+    group.name = `place-piece-${index}`;
+    piece.spots.forEach((s, i) => {
+      const copy = model.group.clone();
+      copy.position.set(s.x, 0, s.z);
+      copy.rotation.y = s.rot;
+      group.add(copy);
+      const o = piece.obstacles[i];
+      o.r = model.radius;
+      // A thing smaller than a step is walked past, not into.
+      o.off = model.radius < 0.6;
+    });
+    place.group.add(group);
+  }
+
+  /**
+   * A bare place's trees: the world's own, on the spots its features gave, as soon as there are any
+   * (`setForest` calls this again when they come); none before.
+   */
+  private plantPlaceTrees(place: Place) {
+    const bare = place.bare;
+    if (!bare) return;
+    bare.trees.clear();
+    place.obstacles = place.obstacles.filter((o) => !bare.treeObstacles.includes(o));
+    bare.treeObstacles = [];
+    if (!this.forest.length || this.isClassic()) return;
+    const rand = rng(hashString(place.spec.name));
+    for (const t of bare.treeSpots) {
+      bare.trees.add(forestTree(this.forest[Math.floor(rand() * this.forest.length)], t.x, t.z, t.s, rand));
+      bare.treeObstacles.push({ x: t.x + place.center.x, z: t.z + place.center.z, r: t.r });
+    }
+    place.obstacles.push(...bare.treeObstacles);
+  }
+
+  /** A place out of the scene, and what was its own freed; kit pieces and the forest's trees share theirs. */
+  private takeDown(place: Place) {
+    this.scene.remove(place.group, place.path);
+    place.group.traverse((o) => {
+      // Kit pieces share their geometry and materials with every other copy.
+      if (o.userData.shared) return;
+      const mesh = o as THREE.Mesh;
+      mesh.geometry?.dispose();
+      (mesh.material as THREE.Material | undefined)?.dispose?.();
+    });
+  }
+
+  /** Every place built again, as it was: after the village went from the kit's to a world's own, or back. */
+  private rebuildPlaces() {
+    const standing = [...this.places.values()];
+    for (const place of standing) this.takeDown(place);
+    this.places.clear();
+    for (const place of standing) {
+      this.addPlace(place.spec);
+      const again = this.places.get(place.spec.name);
+      if (again) again.arrived = place.arrived;
+    }
   }
 
   /** Takes down every place, for a new quest; the trees they cleared grow back. */
   clearPlaces() {
-    for (const place of this.places.values()) {
-      this.scene.remove(place.group, place.path);
-      place.group.traverse((o) => {
-        // Kit pieces share their geometry and materials with every other copy.
-        if (o.userData.shared) return;
-        const mesh = o as THREE.Mesh;
-        mesh.geometry?.dispose();
-        (mesh.material as THREE.Material | undefined)?.dispose?.();
-      });
-    }
+    for (const place of this.places.values()) this.takeDown(place);
     this.places.clear();
     for (const tree of this.trees) {
       tree.obstacle.off = false;

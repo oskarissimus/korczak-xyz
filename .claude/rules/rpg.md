@@ -331,7 +331,22 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   key is assumed, so a reader with one never sees the kit flash up first. There what a model would
   replace is hidden, not removed, and the kit's houses are merged per kind (`mergeStatic`). A model
   that fails to load leaves its spots empty under a layout. Quest places still build their pines,
-  rocks and huts from the kit when the forest has not come yet (`buildPlace`).
+  rocks and huts from the kit only in the classic village; an invented world's places are bare (below).
+- **A quest's place in an invented world is fal.ai's too** (owner, 27 Oct 2026, a screenshot of a
+  space station's place with stone pillars, a stone wall of blocks, a campfire and a lake: "no
+  procedural assets, only fal.ai's in the locations"). The beat writes a place's `assets` in English
+  (`PlaceAsset`, `parseAssets`): its landmark once and one or two `scatter` things that stand around
+  it many times over, each with a size; never a tree, ground or water. Under a layout `buildPlace`
+  builds the place **bare**: its ground disc and nothing else — no feature (pillars, rocks, graves,
+  campfire, water, huts, mushrooms, stones), no landmark of blocks, no kit tree. `pines` and
+  `dead_trees` only say where the world's own trees stand, planted when the forest comes
+  (`plantPlaceTrees`); the landmark stands where the blocks would have (`landmarkSpot`) and the
+  scattered things on free spots of the ring (5–12 copies by size), each put up when its model loads
+  (`setPlaceModel`), blocking nothing before. `ensurePlaceModel` makes each piece once (~$0.023,
+  label `place` in the console, counted to the quest); `putPlace` in `Rpg.tsx` keeps it on every
+  copy of the place (the quest's list, its beats, the atlas: `updateAtlasPlace`). A place from before
+  `assets` gets a landmark from its name and the world's architecture. The block landmark and the
+  features are still asked for and still drawn in the classic world and without a key.
 - **Each piece is sized as what it is, not as its slot** (owner, 26 Oct 2026, a screenshot of a
   caravan world's covered truck towering over the hero). TRELLIS answers in a unit box, so the size
   is wholly the game's, and `HUB_FIT` gave every slot a building's: a "house" that was a truck came

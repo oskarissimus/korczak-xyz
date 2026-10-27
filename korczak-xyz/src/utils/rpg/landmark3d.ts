@@ -63,8 +63,11 @@ export const FOREST_SLOTS: readonly HubSlot[] = ['tree', ...FOREST_VARIANTS];
 export function isForestVariant(slot: HubSlot): slot is ForestVariant {
   return (FOREST_VARIANTS as readonly string[]).includes(slot);
 }
-/** Everything fal.ai is asked to make: the hub's pieces, the forest, and a quest's clues (`ensureClueModel`). */
-export type FalSlot = HubSlot | 'clue';
+/**
+ * Everything fal.ai is asked to make: the hub's pieces, the forest, a quest's clues (`ensureClueModel`)
+ * and what stands at a quest's places (`ensurePlaceModel`).
+ */
+export type FalSlot = HubSlot | 'clue' | 'place';
 
 /**
  * Each piece's mesh is simplified as far as TRELLIS goes (0.98): at 0.96 one house was 36k
@@ -73,6 +76,8 @@ export type FalSlot = HubSlot | 'clue';
  */
 const SIMPLIFY: Record<FalSlot, number> = {
   clue: 0.98,
+  // A place's landmark and the things copied around it, between the hub's landmark and its pieces.
+  place: 0.97,
   landmark: 0.95,
   house: 0.98,
   hall: 0.98,
@@ -415,25 +420,66 @@ export function ensureClueModel(
   onError: (err: unknown) => void = () => {},
   o: FalOptions = {},
 ): boolean {
-  const slot = `clue/${id}`;
-  if (refused.has('clue') || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
+  return ensurePiece(key, 'clue', id, prompt, onModel, onError, o);
+}
+
+/**
+ * What a quest's place shows in an invented world (`PlaceAsset`): its landmark, or a thing that stands
+ * around it many times over, as the beat described it in English, in the world's colours.
+ */
+export function placeAssetPrompt(what: string, role: 'landmark' | 'scatter', look?: Pick<WorldBible['look'], 'wall' | 'roof' | 'accent'>): string {
+  return [
+    `A single stylised low-poly game asset: ${what.trim().replace(/[.\s]+$/, '')}.`,
+    look ? `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.` : '',
+    role === 'landmark'
+      ? 'Seen from the front and slightly above, its entrance or face toward the viewer, the whole of it in view, standing on a small base,'
+      : 'The whole object in view, three-quarter view from slightly above, chunky, thick proportions with no thin or spindly parts,',
+    'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A place's piece, made once: `id` names the world, the place and the piece for good. */
+export function ensurePlaceModel(
+  key: string,
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void = () => {},
+  o: FalOptions = {},
+): boolean {
+  return ensurePiece(key, 'place', id, prompt, onModel, onError, o);
+}
+
+function ensurePiece(
+  key: string,
+  label: 'clue' | 'place',
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void,
+  o: FalOptions,
+): boolean {
+  const slot = `${label}/${id}`;
+  if (refused.has(label) || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
   const p = inTurn(async () => {
-    if (refused.has('clue')) throw new Error('skipped: fal.ai refused the key');
+    if (refused.has(label)) throw new Error('skipped: fal.ai refused the key');
     const started = Date.now();
     let spent = 0;
     try {
-      const image = await drawImage(key, prompt, 'clue', o);
+      const image = await drawImage(key, prompt, label, o);
       spent += imageCost();
-      const glb = await buildMesh(key, image, 'clue', o);
+      const glb = await buildMesh(key, image, label, o);
       spent += FAL_PRICES.mesh;
       const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, at: Date.now() };
-      recordMeasurement('rpg.landmark', { outcome: 'generated', piece: 'clue', ms: model.ms, costUsd: spent });
+      recordMeasurement('rpg.landmark', { outcome: 'generated', piece: label, ms: model.ms, costUsd: spent });
       made.add(slot);
       return model;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (/^40[123]\b/.test(message)) refused.add('clue');
-      recordMeasurement('rpg.landmark', { outcome: 'failed', piece: 'clue', ms: Date.now() - started, costUsd: spent, error: message.slice(0, 200) });
+      if (/^40[123]\b/.test(message)) refused.add(label);
+      recordMeasurement('rpg.landmark', { outcome: 'failed', piece: label, ms: Date.now() - started, costUsd: spent, error: message.slice(0, 200) });
       throw err;
     }
   }).finally(() => inFlight.delete(slot));

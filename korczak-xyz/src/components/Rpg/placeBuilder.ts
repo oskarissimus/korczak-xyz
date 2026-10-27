@@ -34,6 +34,13 @@ export interface BuiltPlace {
   spinners: Spinner[];
   /** Where the landmark stands, in the place's coordinates: targets are kept out of it. */
   keepOut: { x: number; z: number; r: number } | null;
+  /**
+   * Bare (an invented world's) only: where the world's own trees stand, planted when they come
+   * (`RpgScene.plantPlaceTrees`), and where each of the place's fal.ai pieces stands, by its index in
+   * `spec.assets`, put up when its model has loaded.
+   */
+  treeSpots?: { x: number; z: number; s: number; r: number }[];
+  assetSpots?: { index: number; spots: { x: number; z: number; rot: number }[] }[];
 }
 
 /**
@@ -106,7 +113,7 @@ function kitPiece(kit: WorldKit, name: string, x: number, z: number, s: number, 
  * One of the world's own trees at (x, z), turned at random and scaled by `s`. Its meshes share their
  * geometry and materials with the forest's, so taking the place down disposes none of them.
  */
-function forestTree(parts: TreePart[], x: number, z: number, s: number, rand: () => number) {
+export function forestTree(parts: TreePart[], x: number, z: number, s: number, rand: () => number) {
   const tree = new THREE.Group();
   for (const part of parts) {
     const mesh = new THREE.Mesh(part.geometry, part.material);
@@ -374,8 +381,57 @@ const FEATURE_BUILDERS: Record<Feature, Builder> = {
   },
 };
 
-/** The place, centred on the origin of its group; the caller moves the group and its obstacles. */
-export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: WorldLook, forest: TreePart[][] = []): BuiltPlace {
+/** Where the landmark stands, in the place's coordinates: behind the middle, away from the village, facing it. */
+function landmarkSpot(spec: PlaceSpec) {
+  const { x: px, z: pz } = placePosition(spec);
+  const out = Math.hypot(px, pz) || 1;
+  const dx = px / out;
+  const dz = pz / out;
+  return { x: dx * LANDMARK_SETBACK, z: dz * LANDMARK_SETBACK, rot: Math.atan2(-dx, -dz) };
+}
+
+/**
+ * A place in an invented world (owner, 27 Oct 2026: "no procedural assets, only fal.ai's in the
+ * locations"): its ground and nothing else built here. No pillars, rocks, graves, campfire, water,
+ * huts, mushrooms or stones, no landmark of blocks and no kit tree: the features only say where the
+ * world's own trees grow, and the place's `assets` where its fal.ai pieces will stand. All of it
+ * appears as it loads; until then the place is open ground.
+ */
+function bareSpots(spec: PlaceSpec, rand: () => number, keepOut: BuiltPlace['keepOut']) {
+  const taken: { x: number; z: number; r: number }[] = keepOut ? [keepOut] : [];
+  const free = (x: number, z: number, r: number) => taken.every((t) => Math.hypot(t.x - x, t.z - z) > t.r + r + 0.6);
+  const treeSpots: NonNullable<BuiltPlace['treeSpots']> = [];
+  const trees = (spec.features.includes('pines') ? 28 : 0) + (spec.features.includes('dead_trees') ? 12 : 0);
+  for (let i = 0; i < trees; i++) {
+    const { x, z } = ringSpot(rand);
+    const s = 0.7 + rand() * 0.6;
+    if (!free(x, z, 0.6)) continue;
+    taken.push({ x, z, r: 0.6 });
+    treeSpots.push({ x, z, s, r: 0.5 * s });
+  }
+  const assetSpots: NonNullable<BuiltPlace['assetSpots']> = [];
+  (spec.assets ?? []).forEach((asset, index) => {
+    if (asset.role !== 'scatter') return;
+    const r = asset.size.width / 2 + 0.2;
+    // More of a small thing than a big one: a ring of urns, a few tanks.
+    const n = asset.size.width < 1.5 ? 12 : asset.size.width < 3 ? 8 : 5;
+    const spots: { x: number; z: number; rot: number }[] = [];
+    for (let tries = 0; tries < n * 6 && spots.length < n; tries++) {
+      const { x, z } = ringSpot(rand, CLEAR_RADIUS + 1 + r, PLACE_RADIUS - r);
+      if (!free(x, z, r)) continue;
+      taken.push({ x, z, r });
+      spots.push({ x, z, rot: rand() * Math.PI * 2 });
+    }
+    assetSpots.push({ index, spots });
+  });
+  return { treeSpots, assetSpots };
+}
+
+/**
+ * The place, centred on the origin of its group; the caller moves the group and its obstacles.
+ * `bare` is an invented world's place, whose things are all fal.ai's and come later (`bareSpots`).
+ */
+export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: WorldLook, forest: TreePart[][] = [], bare = false): BuiltPlace {
   const rand = rng(hashString(spec.name + spec.biome));
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
@@ -389,6 +445,20 @@ export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: 
   ground.receiveShadow = true;
   group.add(ground);
 
+  if (bare) {
+    ground.castShadow = false;
+    const landmark = spec.assets?.findIndex((a) => a.role === 'landmark') ?? -1;
+    let keepOut: BuiltPlace['keepOut'] = null;
+    const assetSpots: NonNullable<BuiltPlace['assetSpots']> = [];
+    if (landmark >= 0) {
+      const at = landmarkSpot(spec);
+      keepOut = { x: at.x, z: at.z, r: Math.min(12, spec.assets![landmark].size.width / 2 + 1) };
+      assetSpots.push({ index: landmark, spots: [at] });
+    }
+    const spots = bareSpots(spec, rand, keepOut);
+    return { group, obstacles, spinners: [], keepOut, treeSpots: spots.treeSpots, assetSpots: [...assetSpots, ...spots.assetSpots] };
+  }
+
   for (const feature of spec.features) FEATURE_BUILDERS[feature](group, obstacles, rand, kit, forest);
   shadowed(group);
   ground.castShadow = false;
@@ -397,14 +467,8 @@ export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: 
   let keepOut: BuiltPlace['keepOut'] = null;
   if (spec.landmark) {
     const built = buildLandmark(spec.landmark, look);
-    const { x: px, z: pz } = placePosition(spec);
-    const out = Math.hypot(px, pz) || 1;
-    const dx = px / out;
-    const dz = pz / out;
-    const lx = dx * LANDMARK_SETBACK;
-    const lz = dz * LANDMARK_SETBACK;
     // Its front (+z, as the prompt says) faces the village.
-    const turn = Math.atan2(-dx, -dz);
+    const { x: lx, z: lz, rot: turn } = landmarkSpot(spec);
     built.group.position.set(lx, 0, lz);
     built.group.rotation.y = turn;
     const cos = Math.cos(turn);

@@ -15,6 +15,7 @@ import {
   settleParts,
   type LandmarkPart,
 } from './place';
+import { parseAssets } from './place';
 
 describe('placePosition', () => {
   it('puts north at −z and east at +x, far beyond near', () => {
@@ -195,5 +196,39 @@ describe('settleParts', () => {
     expect(settled[0].at[1]).toBeCloseTo(0, 5);
     expect(settled[1]).toEqual(parts[1]);
     expect(settled[2]).toEqual(parts[2]);
+  });
+});
+
+describe('parseAssets', () => {
+  it('keeps one landmark and two scattered things, in English, sized within their limits', () => {
+    const assets = parseAssets([
+      { role: 'landmark', what: 'a rusted airlock gate with warning stripes', size: [40, 9] },
+      { role: 'landmark', what: 'a second landmark' },
+      { role: 'scatter', what: 'a dented oxygen tank', size: [1.2, 0.8] },
+      { role: 'scatter', what: 'a pile of cable reels', size: [0, -1] },
+      { role: 'scatter', what: 'one too many' },
+      { role: 'tree', what: 'a pine' },
+      { role: 'scatter', what: '' },
+    ]);
+    expect(assets.map((a) => a.what)).toEqual(['a rusted airlock gate with warning stripes', 'a dented oxygen tank', 'a pile of cable reels']);
+    expect(assets[0].size).toEqual({ height: 20, width: 9 });
+    expect(assets[2].size).toEqual({ height: 1.5, width: 1.5 });
+  });
+
+  it('keeps a model made for it, and only one fal.ai can have made', () => {
+    const model = { glb: 'https://v3.fal.media/files/x/model.glb', image: 'https://x/i.png', prompt: 'p', costUsd: 0.023, ms: 1, at: 1 };
+    const [kept, dropped] = parseAssets([
+      { role: 'landmark', what: 'a gate', size: { height: 6, width: 5 }, model },
+      { role: 'scatter', what: 'a tank', model: { glb: 'javascript:alert(1)' } },
+    ]);
+    expect(kept.model).toEqual(model);
+    expect(kept.size).toEqual({ height: 6, width: 5 });
+    expect(dropped.model).toBeUndefined();
+  });
+
+  it('comes through parsePlace, and a place without it has none', () => {
+    const raw = { name: 'Stara śluza', direction: 'north', biome: 'ruins' };
+    expect(parsePlace(raw)?.assets).toBeUndefined();
+    expect(parsePlace({ ...raw, assets: [{ role: 'scatter', what: 'a crate' }] })?.assets).toHaveLength(1);
   });
 });
