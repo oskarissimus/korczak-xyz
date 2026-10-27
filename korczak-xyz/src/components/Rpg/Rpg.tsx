@@ -40,22 +40,26 @@ import {
   addGenerationTime,
   beginQuestSpend,
   beginTimeline,
+  devRequests,
   markStage,
   NO_SPEND,
   onRequestEnd,
   questSpend,
   resetDevlog,
+  timeline,
   triesSpend,
   validSpend,
 } from '../../utils/rpg/devlog';
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
-import { ensureGroundTexture } from '../../utils/rpg/groundTexture';
+import { ensureGroundTexture, groundState } from '../../utils/rpg/groundTexture';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
 import {
   cluePrompt,
   ensureClueModel,
   ensureHubModels,
   ensurePlaceModel,
+  falPending,
+  hubSlotFailed,
   placeAssetPrompt,
   FOREST_SLOTS,
   HUB_SLOTS,
@@ -64,6 +68,7 @@ import {
   type HubSlot,
 } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
+import { rememberTiming, type Task } from '../../utils/rpg/progress';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
@@ -96,7 +101,7 @@ import {
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DevConsole, FpsBadge, QuestSummary, StreamLine } from './DevConsole';
+import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress } from './DevConsole';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
 import { RpgScene, type Prompt } from './RpgScene';
@@ -388,6 +393,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * Needed since the hunter plays while a beat is written: before, an overlay made that impossible.
    */
   const questTokenRef = useRef(0);
+  /** When the opening began to be written, for the start's progress and its usual time. */
+  const writingSinceRef = useRef(0);
+  /** The world as the genesis stream first described it, whose ground and hub fal.ai is already making. */
+  const previewRef = useRef<WorldBible | null>(null);
 
   /**
    * A beat that could not be written, waiting on the reader (owner, Oct 2026: "I would like to be
@@ -776,14 +785,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.teleport('spawn');
     restoreAtlas();
 
-    flash(tRef.current.writingBackground, 5000);
+    // A world just invented is still being built around the hero; an old one only waits for its quest.
+    flash(keepLog ? tRef.current.buildingWorld : tRef.current.writingBackground, 5000);
     const writeOpening = async (): Promise<void> => {
       setGenerating(true);
+      writingSinceRef.current = Date.now();
       const { beat: opening, failure } = await writeBeat(0, null, [], null);
       if (token !== questTokenRef.current) return;
       setGenerating(false);
       if (opening) {
         markStage('quest');
+        if (!staticRef.current) rememberTiming('quest', Date.now() - writingSinceRef.current);
         setupBeat(opening);
         return;
       }
@@ -829,6 +841,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** One of the hub's models has come: kept on the world, wherever it is by now, and in the scene. */
   const keepModel = useCallback((id: string, slot: HubSlot, model: LandmarkModel) => {
+    rememberTiming('model', model.ms);
     if (slot === 'landmark') markStage('landmark');
     markStage('firstModel');
     if (!findWorld(id)) {
@@ -846,6 +859,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** The world's ground has been painted: the same, for the texture. */
   const keepGround = useCallback((id: string, texture: GroundTexture) => {
+    rememberTiming('ground', texture.ms);
     markStage('ground');
     if (!findWorld(id)) {
       earlyFor(id).ground = texture;
@@ -895,6 +909,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setBeat(null);
     resetDevlog();
     beginTimeline('world');
+    previewRef.current = null;
     setCreating([]);
     setPendingGenesis(null);
     // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
@@ -916,6 +931,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const early = (preview: WorldBible) => {
       if (token !== questTokenRef.current) return;
       markStage('assets');
+      previewRef.current = preview;
       startWorldAssets(preview);
     };
     let attempt;
@@ -943,8 +959,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setCreating(null);
     // Answered, one way or the other: a reload now has nothing to finish.
     clearPendingGenesis();
+    previewRef.current = null;
     if (attempt) {
       addGenerationTime(attempt.ms, 'world');
+      if (attempt.world) rememberTiming('world', attempt.ms);
       recordWorld(uidRef.current, attempt, gameLang, chosen);
     }
     // What the genesis cost is the world's, kept on it for every quest's closing screen.
@@ -1083,6 +1101,59 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // things in its square, from fal.ai, each made once and kept on the world, and the forest's trees
   // across the map; each stands the moment it has loaded, and nothing stands in for it before.
   const falKey = keysReady ? account.keys.fal : null;
+
+  /**
+   * Everything the start is making, for the progress in the corner (`WorldProgress`): the world and
+   * the opening, then the ground and every hub model of the world being made (its preview while the
+   * genesis still streams, every slot assumed until even that has come), and the quest's own pieces.
+   */
+  const progressTasks = useCallback((): Task[] => {
+    const line = timeline();
+    const tasks: Task[] = [];
+    if (creating) tasks.push({ kind: 'world', state: 'running', since: line?.what === 'world' ? line.since : null });
+    else if (line?.what === 'world' && line.stages.world !== undefined) tasks.push({ kind: 'world', state: 'done', since: null });
+    if (generating) tasks.push({ kind: 'quest', state: 'running', since: writingSinceRef.current || null });
+    else if (creating) tasks.push({ kind: 'quest', state: 'queued', since: null });
+    else if (line && line.stages.quest !== undefined) tasks.push({ kind: 'quest', state: 'done', since: null });
+    if (!falKey) return tasks;
+    const pending = falPending();
+    const aw = creating ? previewRef.current : world;
+    if (creating && !aw) {
+      tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
+      for (let i = 0; i < HUB_SLOTS.length; i++) tasks.push({ kind: 'model', state: 'queued', since: null, afterWorld: true });
+    } else if (aw && aw.createdAt > 0) {
+      const early = earlyRef.current.get(aw.id);
+      const ground = groundState(aw.id);
+      tasks.push({
+        kind: 'ground',
+        state: aw.groundTexture || early?.ground ? 'done' : ground === 'pending' ? 'running' : ground === 'failed' ? 'failed' : 'queued',
+        since: null,
+      });
+      for (const slot of hubSlots(aw)) {
+        const asked = pending.find((p) => p.id === `${aw.id}/${slot}`);
+        const state: Task['state'] =
+          hubModel(aw, slot) || early?.models.some(([s]) => s === slot)
+            ? 'done'
+            : asked
+              ? asked.since === null
+                ? 'queued'
+                : 'running'
+              : hubSlotFailed(aw.id, slot)
+                ? 'failed'
+                : 'queued';
+        tasks.push({ kind: 'model', state, since: asked?.since ?? null });
+      }
+    }
+    for (const p of pending) {
+      if (p.id.startsWith('clue/') || p.id.startsWith('place/')) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
+    }
+    for (const r of devRequests()) {
+      if (r.kind !== 'fal' || (r.label !== 'clue' && r.label !== 'place') || (line && r.startedAt < line.since)) continue;
+      if (r.status === 'ok' && r.model.includes('trellis')) tasks.push({ kind: 'piece', state: 'done', since: null });
+      else if (r.status === 'error') tasks.push({ kind: 'piece', state: 'failed', since: null });
+    }
+    return tasks;
+  }, [creating, generating, falKey, world]);
   falKeyRef.current = falKey;
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
   useEffect(() => {
@@ -2051,13 +2122,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
             onClick={() => setLogOpen(true)}
             title={t.journal}
           >
+            {!creating && <WorldProgress lang={gameLang} tasks={progressTasks} since={timeline()?.since ?? null} />}
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
-            {(generating || unfolding) && (
-              <>
-                <div className="rpg-journal-objective">⏳ {generating ? t.writing : t.fate}</div>
-                <StreamLine />
-              </>
-            )}
+            {/* The opening is a row of the progress above; a later step is still "the story unfolds". */}
+            {unfolding && <div className="rpg-journal-objective">⏳ {t.fate}</div>}
+            {(generating || unfolding) && <StreamLine />}
             {ending && <div className="rpg-journal-objective">✓ {t.completed}</div>}
           </div>
 
@@ -2130,6 +2199,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
               {creatingWish && <p className="rpg-genesis-seeds">{t.worldWish(clip(creatingWish, 160))}</p>}
               {creating.length > 0 && <p className="rpg-genesis-seeds">{t.worldSeeds(creating.join(' · '))}</p>}
               <StreamLine />
+              <WorldProgress lang={gameLang} tasks={progressTasks} since={timeline()?.since ?? null} />
             </div>
           )}
 
@@ -2296,6 +2366,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {devOpen && (
         <DevConsole
           lang={gameLang}
+          tasks={progressTasks}
           onClose={() => setDevOpen(false)}
           scene={sceneRef.current}
           badge={fpsBadge}

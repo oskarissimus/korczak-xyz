@@ -402,7 +402,7 @@ export function questTotals(): QuestTotals {
  */
 
 /** What the start waits for, in the order it usually comes. */
-export const STAGES = ['assets', 'world', 'quest', 'ground', 'landmark', 'firstModel', 'hub'] as const;
+export const STAGES = ['assets', 'world', 'quest', 'ground', 'landmark', 'firstModel', 'hub', 'all'] as const;
 export type Stage = (typeof STAGES)[number];
 
 let timelineSince: number | null = null;

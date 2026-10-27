@@ -320,13 +320,17 @@ export function hubModel(world: WorldBible, slot: HubSlot): LandmarkModel | unde
 const PARALLEL = 4;
 let running = 0;
 const waiting: (() => void)[] = [];
+/** When each piece got its turn, by the same id as `inFlight`; a piece asked for and not in here is queued. */
+const turnSince = new Map<string, number>();
 
-async function inTurn<T>(run: () => Promise<T>): Promise<T> {
+async function inTurn<T>(id: string, run: () => Promise<T>): Promise<T> {
   if (running >= PARALLEL) await new Promise<void>((go) => waiting.push(go));
   running++;
+  turnSince.set(id, Date.now());
   try {
     return await run();
   } finally {
+    turnSince.delete(id);
     running--;
     waiting.shift()?.();
   }
@@ -364,7 +368,7 @@ export function ensureHubModels(
   for (const slot of hubSlots(world)) {
     const id = `${world.id}/${slot}`;
     if (hubModel(world, slot) || made.has(id) || failed.has(id) || inFlight.has(id)) continue;
-    const p = inTurn(async () => {
+    const p = inTurn(id, async () => {
       if (refused.has(world.id)) throw new Error('skipped: fal.ai refused the key');
       try {
         const model = await generateHubModel(key, world, slot, o);
@@ -387,6 +391,25 @@ export function ensureHubModels(
     );
   }
   return started;
+}
+
+/**
+ * What fal.ai has been asked for and not yet answered (the start's progress, `progress.ts`): each
+ * piece's id — `world/slot` for the hub, `clue/…` and `place/…` for a quest's — and when it got its
+ * turn, or null while it waits behind the four running.
+ */
+export function falPending(): { id: string; since: number | null }[] {
+  return [...inFlight.keys()].map((id) => ({ id, since: turnSince.get(id) ?? null }));
+}
+
+/** A hub slot of this world that failed this session and will not be asked again until a reload. */
+export function hubSlotFailed(worldId: string, slot: HubSlot): boolean {
+  return failed.has(`${worldId}/${slot}`) || refused.has(worldId);
+}
+
+/** A model fal.ai was asked to make for a hub slot and has not answered yet. */
+export function hubSlotPending(worldId: string, slot: HubSlot): boolean {
+  return inFlight.has(`${worldId}/${slot}`);
 }
 
 /**
@@ -463,7 +486,7 @@ function ensurePiece(
 ): boolean {
   const slot = `${label}/${id}`;
   if (refused.has(label) || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
-  const p = inTurn(async () => {
+  const p = inTurn(slot, async () => {
     if (refused.has(label)) throw new Error('skipped: fal.ai refused the key');
     const started = Date.now();
     let spent = 0;

@@ -62,6 +62,11 @@ const made = new Set<string>();
 const failed = new Set<string>();
 const inFlight = new Set<string>();
 
+/** Where the world's ground is this session: being painted, failed, or neither (painted, or never asked). */
+export function groundState(worldId: string): 'pending' | 'failed' | null {
+  return inFlight.has(worldId) ? 'pending' : failed.has(worldId) ? 'failed' : null;
+}
+
 /**
  * Paints the world's ground if it has none and none is being painted, and calls `onTexture` once
  * it has. A world that failed is not asked again this session. Returns whether it asked.

@@ -65,6 +65,28 @@ of the wait as the thinking. Four things, each kept:
 **The console's Start tab** shows where the time went: from the click (*New world* or *New quest*),
 when each awaited thing came (`markStage`: assets described, world ready, first step, ground, landmark,
 first 3D model, whole hub), and a bar per request on one time axis — running striped, failed hollow.
+Above them, what is in so far against everything the start is making (`N/M`), the ETA, and the usual
+time of each kind of task in this browser; the last stage, *everything in*, is when the panel below goes.
+
+**The corner says what is still coming and for how long** (owner, 27 Oct 2026: "instead of 'the
+storyteller is writing a quest' it should say the world is being generated; I'd like to know whether
+what I see is already everything, and roughly how long it takes"). `WorldProgress` (in
+`DevConsole.tsx`) sits at the top of the journal, and on the genesis screen while that runs: a
+headline with the time left (*Generuję świat · zostało ok. 1 min 20 s*), a bar, and a row per kind
+of work — the world, the quest's first step, the ground, the hub's 3D models `n/N`, the quest's own
+places and things — each ✓, ⏳ (running), … (waiting) or ✗, never colour alone. Once all of it has
+come it says *World ready — this is everything* with the total time for 10 s and goes. The tasks
+are built in `Rpg.tsx` (`progressTasks`) from what is already tracked: `creating`/`generating`, the
+world or the genesis preview (`previewRef`; before even that, every `HUB_SLOTS` assumed), what fal.ai
+has in flight and whether it has its turn yet (`falPending`, `turnSince` in `landmark3d.ts`), failed
+slots (`hubSlotFailed`, `groundState`), and the console's finished `clue`/`place` requests. The time
+left (`utils/rpg/progress.ts`, `remainingMs`) simulates the three lines: the world then the opening,
+the ground, and the models four at a time with each queued one on the first free worker; each
+task's length is its usual one, an average kept in localStorage `rpg-typical` that moves a third of
+the way on every measurement (defaults 12 s world, 12 s opening, 4 s ground, 50 s a model). The
+first measured run (27 Oct, dev, Flash): 2 min 40 s estimated at the click, 3 min 9 s to the last of
+15 pieces. The toast at a new world's first quest says the same (`buildingWorld`); a new quest in an
+old world still says the storyteller is writing.
 
 **A slider from classic to exotic** (owner, Oct 2026, a day later: "we overdid it, it is too
 exotic; a slider, typical RPG worlds on the left, the exotic ones on the right"). Under the start
@@ -144,8 +166,8 @@ the moment the hunter decides, so it is mostly written while the answer is read 
 **Nothing waits for the model** (owner, Oct 2026: "generating a quest should happen in the
 background"). Start drops the hunter into the village at once and the opening is written while
 they walk; a decision's next beat is waited for the same way, "Ruszam." only closing the dialogue.
-The journal says what is being written (`⏳ Bajarz pisze questa…` / `⏳ Losy się ważą…`) with one
-line of the stream under it (`StreamLine`), and the world never pauses for it. `questTokenRef` is
+The journal says what is being written (the opening as a row of the start's progress, below;
+a later beat `⏳ Losy się ważą…`) with one line of the stream under it (`StreamLine`), and the world never pauses for it. `questTokenRef` is
 what keeps that safe: a new quest, a resumed one or leaving to the intro bumps it, and an answer
 for an older token is dropped rather than put into a world it no longer belongs to.
 

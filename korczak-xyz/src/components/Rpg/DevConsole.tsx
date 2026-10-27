@@ -10,6 +10,7 @@ import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import {
   devlogVersion,
   devRequests,
+  markStage,
   questSpend,
   questTotals,
   spendUsd,
@@ -20,6 +21,7 @@ import {
   type DevRequest,
 } from '../../utils/rpg/devlog';
 import type { WorldBible } from '../../utils/rpg/genesis';
+import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
 import type { Lang } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
@@ -156,9 +158,12 @@ function at(ms: number): string {
  * each thing the reader waits for arrived, and every request since the click, by when it began,
  * first answered and ended — a bar per request, so the steps that ran one after another show.
  */
-function StartTab({ lang, requests }: { lang: Lang; requests: readonly DevRequest[] }) {
+function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly DevRequest[]; tasks: (() => Task[]) | null }) {
   const t = translations[lang];
   const line = timeline();
+  const list = tasks?.() ?? [];
+  const typical = loadTypical();
+  const p = progressOf(list, Date.now(), typical);
   if (!line) return <div className="rpg-dev-list"><div className="rpg-dev-empty">{t.devStartEmpty}</div></div>;
   const mine = requests.filter((r) => r.startedAt >= line.since && r.kind !== 'voice');
   // The clock runs while something does, and stops at the last thing that came.
@@ -174,6 +179,12 @@ function StartTab({ lang, requests }: { lang: Lang; requests: readonly DevReques
       <div className="rpg-dev-beat">
         {line.what === 'world' ? t.devStartWorld : t.devStartQuest} · {formatMs(now)}
       </div>
+      {list.length > 0 && (
+        <div className="rpg-dev-start-eta">
+          {t.devProgress(p.ended, p.total, p.failed)}
+          {p.finished ? '' : ` · ETA ${formatMs(p.leftMs)}`} · {t.devTypical(formatMs(typical.world), formatMs(typical.quest), formatMs(typical.ground), formatMs(typical.model))}
+        </div>
+      )}
       <dl>
         {reached.map((s) => (
           <React.Fragment key={s}>
@@ -212,12 +223,15 @@ export function DevConsole({
   lang,
   onClose,
   scene = null,
+  tasks = null,
   badge = false,
   onBadge = () => {},
 }: {
   lang: Lang;
   onClose: () => void;
   scene?: RpgScene | null;
+  /** What the start is still making (`WorldProgress`), for the Start tab's ETA. */
+  tasks?: (() => Task[]) | null;
   badge?: boolean;
   onBadge?: (on: boolean) => void;
 }) {
@@ -268,7 +282,7 @@ export function DevConsole({
       {tab === 'perf' ? (
         <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} />
       ) : tab === 'start' ? (
-        <StartTab lang={lang} requests={requests} />
+        <StartTab lang={lang} requests={requests} tasks={tasks} />
       ) : tab === 'lines' ? (
         <div className="rpg-dev-list rpg-dev-lines" ref={listRef}>
           {lines.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}
@@ -314,6 +328,92 @@ export function DevConsole({
  * One line about the model request still running, under the journal while a beat is written in
  * the background: which model, how long so far, and the last line it wrote or thought.
  */
+/** About how long, in the game's words: "35 s", "1 min 20 s", or a moment. */
+function eta(ms: number, lang: Lang): string {
+  const r = roughly(ms);
+  const t = translations[lang];
+  if (!r) return t.progressMoment;
+  return t.progressLeft(r.min > 0 ? `${r.min} min${r.s ? ` ${r.s} s` : ''}` : `${r.s} s`);
+}
+
+/** What the wait is mostly for: the world while any of it is still coming, else the quest, else its pieces. */
+function progressHeadline(list: readonly Task[], lang: Lang): string {
+  const t = translations[lang];
+  const open = (kinds: TaskKind[]) => list.some((x) => kinds.includes(x.kind) && (x.state === 'running' || x.state === 'queued'));
+  return open(['world', 'ground', 'model']) ? t.progressTitle : open(['quest']) ? t.progressQuestTitle : t.progressPiecesTitle;
+}
+
+/** The rows of the start's progress, one per kind of work, in the order they usually end. */
+const PROGRESS_ROWS: { kinds: TaskKind[]; key: 'progressWorld' | 'progressQuest' | 'progressGround' | 'progressModels' | 'progressPieces' }[] = [
+  { kinds: ['world'], key: 'progressWorld' },
+  { kinds: ['quest'], key: 'progressQuest' },
+  { kinds: ['ground'], key: 'progressGround' },
+  { kinds: ['model'], key: 'progressModels' },
+  { kinds: ['piece'], key: 'progressPieces' },
+];
+
+/**
+ * What the start is still making and about how long it has left (owner, 27 Oct 2026: "I'd like to
+ * know whether what I see is already everything, and roughly how long it takes"): the world, the
+ * opening, the ground, the hub's 3D models and the quest's own, each done or counted, and the time
+ * left by `progress.ts`. Once all of it has come it says so for a few seconds and goes.
+ */
+export function WorldProgress({ lang, tasks, since }: { lang: Lang; tasks: () => Task[]; since: number | null }) {
+  const t = translations[lang];
+  useDevlog();
+  const list = tasks();
+  const now = Date.now();
+  const p = progressOf(list, now, loadTypical());
+  useTick(list.length > 0, 1000);
+  // Shown while anything runs, and for a few seconds after the last thing came.
+  const [doneAt, setDoneAt] = useState<number | null>(null);
+  const [wasBusy, setWasBusy] = useState(false);
+  useEffect(() => {
+    if (list.length === 0) return;
+    if (!p.finished) {
+      setWasBusy(true);
+      setDoneAt(null);
+    } else if (wasBusy && doneAt === null) {
+      setDoneAt(Date.now());
+      markStage('all');
+    }
+  }, [list.length, p.finished, wasBusy, doneAt]);
+  if (list.length === 0) return null;
+  if (p.finished) {
+    if (!wasBusy || (doneAt !== null && now - doneAt > 10_000)) return null;
+    return (
+      <div className="rpg-progress rpg-progress-done" role="status">
+        ✓ {t.progressDone}
+        {since !== null ? ` · ${formatMs((doneAt ?? now) - since)}` : ''}
+        {p.failed > 0 ? ` · ${t.progressFailed(p.failed)}` : ''}
+      </div>
+    );
+  }
+  return (
+    <div className="rpg-progress" role="status">
+      <div className="rpg-progress-head">
+        ⏳ {progressHeadline(list, lang)} · {eta(p.leftMs, lang)}
+      </div>
+      <div className="rpg-progress-track" aria-hidden="true">
+        <div className="rpg-progress-fill" style={{ width: `${Math.round((p.ended / Math.max(p.total, 1)) * 100)}%` }} />
+      </div>
+      {PROGRESS_ROWS.map(({ kinds, key }) => {
+        const c = countOf(list, kinds);
+        if (c.total === 0) return null;
+        const ended = c.done + c.failed === c.total;
+        const mark = !ended ? (c.running > 0 ? '⏳' : '…') : c.failed === c.total ? '✗' : '✓';
+        return (
+          <div key={key} className={`rpg-progress-row${ended ? ' rpg-progress-ended' : ''}`}>
+            {mark} {t[key]}
+            {c.total > 1 ? ` ${c.done}/${c.total}` : ''}
+            {c.failed > 0 ? ` · ${t.progressFailed(c.failed)}` : ''}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StreamLine() {
   const requests = useDevlog();
   const current = [...requests].reverse().find((r) => r.kind === 'model');

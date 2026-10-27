@@ -430,6 +430,57 @@ ul.rpg-source {
   text-overflow: ellipsis;
 }
 
+/* What the start is still making and how long it has left (`WorldProgress`): a headline with the
+   time, a bar of what has come, one row per kind of work. Marked by ✓ ⏳ … ✗, never by colour alone. */
+.rpg-progress {
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 2px 0 4px;
+}
+
+.rpg-progress-head {
+  font-size: 14px;
+}
+
+.rpg-progress-track {
+  height: 4px;
+  margin: 3px 0 2px auto;
+  max-width: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.rpg-progress-fill {
+  height: 100%;
+  background: #fff;
+  transition: width 0.4s ease;
+}
+
+.rpg-progress-ended {
+  opacity: 0.65;
+}
+
+.rpg-progress-done {
+  font-size: 14px;
+}
+
+/* On the genesis screen the same panel, in the middle and a little larger. */
+.rpg-genesis .rpg-progress {
+  margin-top: 14px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.rpg-genesis .rpg-progress-track {
+  margin: 6px auto;
+  max-width: 260px;
+}
+
+.rpg-dev-start-eta {
+  margin-bottom: 6px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
 /* The journal changed: the banner in the middle of the view, and the journal itself pulses. The
    scroll glyph and the border say it as much as the colour does. */
 .rpg-notice {
