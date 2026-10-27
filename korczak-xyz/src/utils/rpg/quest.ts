@@ -91,6 +91,8 @@ export interface Decision {
    * accused the blacksmith whom only a follow-up question had). Absent: the story is enough.
    */
   after?: 'witness' | number | { ask: number };
+  /** Who dies if the hero chooses this, by name (`dead` in `BeatContext`). */
+  dies?: string[];
 }
 
 export interface BeatJob {
@@ -160,6 +162,11 @@ export interface Beat {
   /** Talk that changes nothing: lore, a rumour, a joke. */
   smallTalk: DialogueOption[];
   decisions: Decision[];
+  /**
+   * Who is dead as this beat tells it, by name: someone the story says was killed or found dead.
+   * Never its own npc or witness. Absent in beats from before it was asked.
+   */
+  dead?: string[];
 }
 
 /** One decided beat, as later beats and the chronicle are told it. */
@@ -169,6 +176,11 @@ export interface StepRecord {
   situation: string;
   chose: string;
   consequence: string;
+  /**
+   * What the hero did at the place before the talk, in English with the target as the model named
+   * it: "killed Ronin Takeda", "killed 4 × bandit". Absent for a talk and in steps from before it.
+   */
+  done?: string;
 }
 
 /** A finished quest, as every later quest is told it. */
@@ -197,6 +209,47 @@ export interface BeatContext {
   characters: Character[];
   /** Where it all happens (`genesis.ts`); absent is the classic world of the hand-written quest. */
   world?: WorldBrief;
+  /**
+   * Everyone dead in this world, by name: a foe the hero killed, someone a decision killed, someone
+   * the story said had died. Nobody here comes back (owner, Oct 2026: "I killed Takeda earlier and
+   * here he suddenly is and you can talk to him").
+   */
+  dead?: string[];
+}
+
+/**
+ * Whether `name` is one of the dead. Also by a single name inside a longer one, because the model
+ * names a target "Ronin Takeda" and then the man "Takeda".
+ */
+export function isDead(name: string, dead: readonly string[] | undefined): boolean {
+  const mine = nameWords(name);
+  if (mine.length === 0) return false;
+  return (dead ?? []).some((d) => {
+    const theirs = nameWords(d);
+    if (theirs.length === 0) return false;
+    const [short, long] = mine.length <= theirs.length ? [mine, theirs] : [theirs, mine];
+    return short.every((w) => long.includes(w));
+  });
+}
+
+/** A name's words of three letters or more, lower case: "Ronin Takeda" is ronin, takeda. */
+function nameWords(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3);
+}
+
+/** One line for what a beat's job came to, for `StepRecord.done`; null for a talk. */
+export function jobDone(job: BeatJob | null): string | null {
+  if (!job) return null;
+  const verb = job.kind === 'slay' ? 'killed' : 'gathered';
+  return job.count === 1 ? `${verb} ${job.targetName}` : `${verb} ${job.count} × ${job.targetName}`;
+}
+
+/** Whom a beat's job killed by name: a single foe, the one the story set the hero on. */
+export function slainBy(job: BeatJob | null): string | null {
+  return job?.kind === 'slay' && job.count === 1 ? job.targetName : null;
 }
 
 export const MAX_BEATS = 4;
@@ -473,11 +526,21 @@ export function beatPrompt(ctx: BeatContext): string {
       '',
     );
   }
-  if (ctx.characters.length) {
+  const living = ctx.characters.filter((c) => !isDead(c.name, ctx.dead));
+  if (living.length) {
     lines.push(
-      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits, in the same voice and manner): ${ctx.characters
+      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits, in the same voice and manner): ${living
         .map((c) => (c.voice ? `"${c.name}" (${c.voice})` : `"${c.name}"`))
         .join(', ')}.`,
+      '',
+    );
+  }
+  if (ctx.dead?.length) {
+    lines.push(
+      `THE DEAD: ${list(ctx.dead)}. They are dead for good. None of them is ever the "npc" or the "witness", none of`,
+      'them appears, speaks, fights or is met again, not under another title or as a ghost, unless this world’s',
+      'magic is stated to raise the dead. Others may only speak of them as dead: grieve them, curse them, inherit',
+      'their feuds, find their bodies.',
       '',
     );
   }
@@ -485,7 +548,7 @@ export function beatPrompt(ctx: BeatContext): string {
     lines.push(`THIS QUEST SO FAR ("${ctx.title ?? ''}"):`);
     ctx.history.forEach((s, i) => {
       lines.push(
-        `${i + 1}. At ${s.placeName ?? world.hub}, ${s.npcName}: ${s.situation}`,
+        `${i + 1}. At ${s.placeName ?? world.hub}${s.done ? `, where the hero ${s.done}` : ''}, ${s.npcName}: ${s.situation}`,
         `   The hero decided: "${s.chose}" — ${s.consequence}`,
       );
     });
@@ -576,7 +639,9 @@ export function beatPrompt(ctx: BeatContext): string {
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
-    '                 "after": "witness", "clue 1", "clue 2", "question 1" or "question 2", only when needed}]',
+    '                 "after": "witness", "clue 1", "clue 2", "question 1" or "question 2", only when needed,',
+    '                 "dies": [names of anyone who dies if the hero chooses this], only when someone does}],',
+    '  "dead": [names of everyone this step tells is dead: killed earlier, found dead, said to have died] (may be empty)',
     '}',
   );
   return lines.filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n');
@@ -720,6 +785,8 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
 
   const npc = character(r.npc, ctx.characters);
   if (!npc) return null;
+  // The dead do not come back; a beat written around one cannot be played, the next model may do better.
+  if (isDead(npc.name, ctx.dead)) return null;
 
   let place: PlaceSpec | null = null;
   let job: BeatJob | null = null;
@@ -747,7 +814,15 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     const replyText = text(d?.reply, 600);
     if (!label || !replyText) return null;
     const after = rawAfter(d?.after);
-    decisions.push({ label, reply: replyText, consequence: text(d?.consequence, 200) ?? label, next, ...(after !== undefined && { after }) });
+    const dies = names(d?.dies);
+    decisions.push({
+      label,
+      reply: replyText,
+      consequence: text(d?.consequence, 200) ?? label,
+      next,
+      ...(after !== undefined && { after }),
+      ...(dies.length > 0 && { dies }),
+    });
   }
 
   const title = text(r.title, 80) ?? ctx.title;
@@ -790,7 +865,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   let witness: Witness | null = null;
   const w = r.witness && typeof r.witness === 'object' ? (r.witness as Record<string, unknown>) : null;
   const wnpc = w ? character(w, ctx.characters) : null;
-  if (w && wnpc && !same(wnpc.name, npc.name)) {
+  if (w && wnpc && !same(wnpc.name, npc.name) && !isDead(wnpc.name, ctx.dead)) {
     const wGreeting = text(w.greeting);
     const talk = options(w.talk, 2);
     if (wGreeting && !narrated(wGreeting, wnpc.name) && !talk.some((o) => narrated(o.reply, wnpc.name))) {
@@ -818,6 +893,9 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   ];
   if (spoken.some((line) => narrated(line, npc.name))) return null;
 
+  // Whoever is standing there talking is not dead, whatever the list says.
+  const dead = names(r.dead).filter((n) => !same(n, npc.name) && !(witness && same(n, witness.npc.name)));
+
   return {
     index: ctx.index,
     // The opening names the quest; a later beat may rename it, but only the opening has to.
@@ -834,5 +912,14 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     waitingLine: text(r.waitingLine) ?? greeting,
     smallTalk,
     decisions,
+    ...(dead.length > 0 && { dead }),
   };
+}
+
+/** A model's list of names: strings only, short, at most six. */
+function names(raw: unknown): string[] {
+  return (Array.isArray(raw) ? raw : [])
+    .map((n) => text(n, 60))
+    .filter((n): n is string => n !== null)
+    .slice(0, 6);
 }

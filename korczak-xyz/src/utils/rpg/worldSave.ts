@@ -17,7 +17,7 @@
 
 import type { ForestVariant, HubPiece, HubSizes, LandmarkModel, WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
-import type { Character, Lang } from './quest';
+import { isDead, type Character, type Lang } from './quest';
 import { dropGameFor } from './save';
 import { forget, saveUnit, STATE_UNIT, touch, unsafeToDrop, worldUnit } from './sync';
 
@@ -238,7 +238,12 @@ export interface AtlasPerson {
 export interface Atlas {
   places: PlaceSpec[];
   people: AtlasPerson[];
+  /** Everyone dead in this world, by name (`BeatContext.dead`); absent in atlases from before it. */
+  dead?: string[];
 }
+
+/** As many of the dead as a prompt is told about. */
+export const ATLAS_DEAD = 40;
 
 function readAtlases(): Record<string, Atlas> {
   try {
@@ -266,6 +271,7 @@ function cleanAtlas(atlas: Atlas | undefined): Atlas {
       ? atlas.places.map((p) => parsePlace(p)).filter((p): p is PlaceSpec => p !== null)
       : [],
     people: Array.isArray(atlas?.people) ? atlas.people.filter((p) => p?.character && typeof p.character.name === 'string') : [],
+    dead: Array.isArray(atlas?.dead) ? atlas.dead.filter((n): n is string => typeof n === 'string' && n.trim() !== '') : [],
   };
 }
 
@@ -277,11 +283,15 @@ export function addToAtlas(worldId: string, add: Atlas): Atlas {
   const all = readAtlases();
   const before = all[worldId] ?? { places: [], people: [] };
   const places = [...(before.places ?? []).filter((p) => !add.places.some((q) => q.name === p.name)), ...add.places].slice(-ATLAS_PLACES);
+  const dead = [...(before.dead ?? []).filter((n) => !(add.dead ?? []).includes(n)), ...(add.dead ?? [])].slice(-ATLAS_DEAD);
+  // The dead stand nowhere: they leave the atlas's crowd and stay only on its list.
   const people = [
     ...(before.people ?? []).filter((p) => !add.people.some((q) => q.character.name === p.character.name)),
     ...add.people,
-  ].slice(-ATLAS_PEOPLE);
-  const atlas = { places, people };
+  ]
+    .filter((p) => typeof p?.character?.name !== 'string' || !isDead(p.character.name, dead))
+    .slice(-ATLAS_PEOPLE);
+  const atlas = { places, people, dead };
   all[worldId] = atlas;
   writeAtlases(evict(all, worldId));
   touch(worldUnit(worldId));

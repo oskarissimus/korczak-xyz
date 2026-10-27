@@ -17,7 +17,7 @@
  * Every change is stamped for the account copy (`sync.ts`, `cloud.ts`).
  */
 
-import type { Beat, Lang, StepRecord } from './quest';
+import { isDead, jobDone, slainBy, type Beat, type Lang, type StepRecord } from './quest';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
@@ -52,7 +52,8 @@ export interface SavedGame {
   /** Every line said so far, for the developer console; absent in older saves. */
   transcript?: TranscriptLine[];
   /** The world it is played in (`genesis.ts`); absent in saves from before there were worlds. */
-  worldId?: string;
+  worldId?: string;  /** Everyone dead so far, by name (`BeatContext.dead`); absent in older saves. */
+  dead?: string[];
 }
 
 function valid(saved: unknown): saved is SavedGame {
@@ -139,4 +140,52 @@ export function writeGameFor(worldId: string, game: SavedGame | null): void {
 /** Frees the storage of a world's save the account already has (`worldSave.ts`'s eviction). */
 export function dropGameFor(worldId: string): void {
   writeGameFor(worldId, null);
+}
+
+/**
+ * Everyone a save knows is dead: its own list, and what its decided beats tell — the single foe each
+ * one killed by name, whom it said had died, and whom the choice made there killed. So a save from
+ * before the list was kept knows its dead too.
+ */
+export function deadInSave(game: SavedGame): string[] {
+  const decided = game.beats.slice(0, game.history.length);
+  const names = [
+    ...(game.dead ?? []),
+    ...decided.flatMap((b, i) => [
+      slainBy(b.job),
+      ...(b.dead ?? []),
+      ...(b.decisions.find((d) => d.label === game.history[i]?.chose)?.dies ?? []),
+    ]),
+  ].filter((n): n is string => Boolean(n));
+  return names.filter((n, i) => names.findIndex((m) => m.toLowerCase() === n.toLowerCase()) === i);
+}
+
+/**
+ * A save as it should be resumed: each decided step knows what was done there (`StepRecord.done`),
+ * and a current beat not yet decided whose npc or witness is among `dead` is dropped, with the
+ * decision before it made again, so that beat is written anew (owner, Oct 2026: a ronin he had
+ * killed was the next step's npc). The step already decided stays.
+ */
+export function mendSave(game: SavedGame, dead: readonly string[]): SavedGame {
+  const history = game.history.map((step, i) => {
+    const done = game.beats[i] ? jobDone(game.beats[i].job) : null;
+    return step.done || !done ? step : { ...step, done };
+  });
+  const current = game.beats[game.beats.length - 1];
+  const before = game.beats[game.beats.length - 2];
+  const haunted = isDead(current.npc.name, dead) || (current.witness !== null && isDead(current.witness.npc.name, dead));
+  if (!haunted || game.decision !== null || !before || history.length !== game.beats.length - 1) return { ...game, history };
+  const chose = before.decisions.findIndex((d) => d.label === history[history.length - 1].chose);
+  if (chose < 0 || !before.decisions[chose].next) return { ...game, history };
+  return {
+    ...game,
+    beats: game.beats.slice(0, -1),
+    history,
+    progress: before.job?.count ?? 0,
+    seen: [],
+    heard: true,
+    witnessHeard: false,
+    askedTalk: [],
+    decision: chose,
+  };
 }

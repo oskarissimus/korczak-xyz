@@ -1296,6 +1296,16 @@ export class RpgScene {
     );
   }
 
+  /** Takes one character out of the world for good: they are dead. */
+  removeNpc(name: string) {
+    const npc = this.npcs.get(name);
+    if (!npc) return;
+    this.scene.remove(npc.group);
+    npc.obstacle.off = true;
+    this.obstacles = this.obstacles.filter((o) => o !== npc.obstacle);
+    this.npcs.delete(name);
+  }
+
   /** Sends every character away, for a new quest. */
   clearNpcs() {
     for (const npc of this.npcs.values()) {

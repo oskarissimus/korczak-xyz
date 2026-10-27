@@ -174,6 +174,7 @@ function step(value: unknown): StepRecord {
     situation: text(r.situation, 300),
     chose: text(r.chose, 160),
     consequence: text(r.consequence, 300),
+    ...(text(r.done, 120) && { done: text(r.done, 120) }),
   };
 }
 
@@ -219,5 +220,6 @@ export function demoContext(value: unknown): BeatContext {
     places: list(r.places, 16, parsePlace).filter((p): p is NonNullable<typeof p> => p !== null),
     characters,
     world: demoWorld(r.world),
+    dead: list(r.dead, 40, (v) => text(v, 60)).filter(Boolean),
   };
 }

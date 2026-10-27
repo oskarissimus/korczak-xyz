@@ -19,8 +19,11 @@ import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
 import type { PlaceSpec } from '../../utils/rpg/place';
 import {
+  isDead,
+  jobDone,
   planDecisions,
   SEEDS,
+  slainBy,
   staticBeat,
   type Beat,
   type Character,
@@ -36,7 +39,7 @@ import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
 import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
-import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from '../../utils/rpg/save';
+import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
@@ -289,6 +292,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** This quest's places and characters, which a later beat may return to. */
   const placesRef = useRef<PlaceSpec[]>([]);
   const charactersRef = useRef<Character[]>([]);
+  /**
+   * Everyone dead in this world, by name: kept in its atlas, told to every beat, and never stood up
+   * in the scene again (owner, Oct 2026: the ronin he had killed was back, and talking).
+   */
+  const deadRef = useRef<string[]>([]);
   /** What each character last said, for talking to them again after their beat. */
   const lastLinesRef = useRef(new Map<string, string>());
   /** Where each character stands: a place's name, or null for the hub. Kept in the world's atlas. */
@@ -427,7 +435,24 @@ export default function Rpg({ lang }: { lang: Lang }) {
         at: whereRef.current.get(character.name) ?? null,
         line: lastLinesRef.current.get(character.name) ?? '',
       })),
+      dead: deadRef.current,
     });
+  }, []);
+
+  /**
+   * Adds to the dead and takes them out of the scene, all but `spare`: the one speaking now, whose
+   * death in an ending is told while they are still on screen.
+   */
+  const bury = useCallback((names: (string | null | undefined)[], spare: string[] = []) => {
+    for (const name of names) {
+      if (!name || deadRef.current.some((d) => d.toLowerCase() === name.toLowerCase())) continue;
+      deadRef.current = [...deadRef.current, name];
+    }
+    for (const c of charactersRef.current) {
+      if (spare.includes(c.name) || !isDead(c.name, deadRef.current)) continue;
+      sceneRef.current?.removeNpc(c.name);
+      whereRef.current.delete(c.name);
+    }
   }, []);
 
   /**
@@ -438,12 +463,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const restoreAtlas = useCallback(() => {
     const scene = sceneRef.current;
     const atlas = loadAtlas(worldRef.current?.id ?? gameLangRef.current);
+    deadRef.current = atlas.dead ?? [];
     for (const place of atlas.places) {
       scene?.addPlace(place);
       if (!placesRef.current.some((p) => p.name === place.name)) placesRef.current = [...placesRef.current, place];
     }
     const crowd = new Map<string, number>();
     for (const { character, at, line } of atlas.people) {
+      if (isDead(character.name, deadRef.current)) continue;
       const where = at && placesRef.current.some((p) => p.name === at) ? at : null;
       // Spots 0 and 1 at a place are its beat's character and witness.
       const nth = where ? (crowd.get(where) ?? 2) : 0;
@@ -474,6 +501,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       playMs: playedNow(),
       transcript: [...transcript()],
       worldId: worldRef.current?.id ?? gameLangRef.current,
+      dead: deadRef.current,
     });
   }, []);
 
@@ -499,6 +527,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           places: placesRef.current,
           characters: charactersRef.current,
           world: worldRef.current ?? undefined,
+          dead: deadRef.current,
         }, chosen);
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
@@ -560,6 +589,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setBeat(b);
       beatsRef.current = [...beatsRef.current.filter((x) => x.index < b.index), b];
       decisionRef.current = null;
+      // Who this beat says is dead, and anyone a decision before it killed, leave the scene now.
+      bury(b.dead ?? [], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);
       recordLine({ kind: 'beat', beat: b.index, speaker: b.title, text: b.objectiveText });
       persist();
       if (!announce) return;
@@ -567,7 +598,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (b.index === 0) notify(tt.noticeQuest, b.title, b.job ? b.objectiveText : tt.talkTo(b.npc.name));
       else notify(tt.nextStep, b.objectiveText);
     },
-    [notify, persist],
+    [bury, notify, persist],
   );
 
   /** Makes `w` the world being played: the beats are written in it and the scene drawn from it. */
@@ -1020,7 +1051,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
         situation: b.situation.slice(0, 300),
         chose: d.label,
         consequence: d.consequence,
+        ...(jobDone(b.job) && { done: jobDone(b.job)! }),
       };
+      // A single foe killed by name, and whoever this choice kills. The one answering stays on screen.
+      bury([slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);
       const steps = [...historyRef.current, step];
       historyRef.current = steps;
       setHistory(steps);
@@ -1039,7 +1073,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       void proceed(b, d, steps);
       setDialogue({ line, choices: [{ label: t.onward, action: close }] });
     },
-    [close, finish, persist, proceed, t, writeBeat],
+    [bury, close, finish, persist, proceed, t, writeBeat],
   );
 
   const openTalk = useCallback(
@@ -1314,10 +1348,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => stopVoice, []);
 
   /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
-  const resume = (game: SavedGame) => {
+  const resume = (saved: SavedGame) => {
     questTokenRef.current += 1;
     setStalled(null);
     flushPlay();
+    // The world it was played in, made current again if another one is (`worldSave.ts`'s library),
+    // or the classic one for a save from before there were worlds.
+    const kept = saved.worldId ? findWorld(saved.worldId) : null;
+    const into = kept ?? classicWorld(saved.lang);
+    // A step written around someone already dead is written again (`mendSave`).
+    const game = mendSave(saved, [...(loadAtlas(into.id).dead ?? []), ...deadInSave(saved)]);
     playMsRef.current = game.playMs ?? 0;
     playSinceRef.current = playSinceRef.current === null ? null : Date.now();
     playFlushedRef.current = playMsRef.current;
@@ -1330,10 +1370,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setUnfolding(false);
     seedRef.current = game.seed;
     staticRef.current = game.static;
-    // The world it was played in, made current again if another one is (`worldSave.ts`'s library),
-    // or the classic one for a save from before there were worlds.
-    const kept = game.worldId ? findWorld(game.worldId) : null;
-    const into = kept ?? classicWorld(game.lang);
     if (kept && loadWorld(game.lang)?.id !== kept.id) saveWorld(kept);
     else playedWorld(into.id);
     enterWorld(into);
@@ -1357,21 +1393,23 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const remember = (c: Character) => {
       if (!charactersRef.current.some((x) => x.name === c.name)) charactersRef.current = [...charactersRef.current, c];
     };
+    bury(deadInSave(game));
+    const history = game.history;
     for (const b of game.beats.slice(0, -1)) {
       if (b.place) {
         scene?.addPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
-      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
+      if (!isDead(b.npc.name, deadRef.current)) scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
       remember(b.npc);
-      if (b.witness) {
+      if (b.witness && !isDead(b.witness.npc.name, deadRef.current)) {
         scene?.placeNpc(b.witness.npc.name, b.witness.npc.color, b.place?.name ?? null, 1, b.witness.npc.gender);
         remember(b.witness.npc);
       }
       beatsRef.current = [...beatsRef.current, b];
     }
-    historyRef.current = game.history;
-    setHistory(game.history);
+    historyRef.current = history;
+    setHistory(history);
     const current = game.beats[game.beats.length - 1];
     setupBeat(current, false);
     if (current.job && game.progress > 0) {
@@ -1396,11 +1434,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // Decided before the page went: carry it out now.
     decidedRef.current = true;
     if (!d.next) {
-      finish(current, current.npc.name, d.reply, game.history);
+      finish(current, current.npc.name, d.reply, history);
       return;
     }
-    pendingRef.current = writeBeat(current.index + 1, d.next, game.history, current.title);
-    void proceed(current, d, game.history);
+    pendingRef.current = writeBeat(current.index + 1, d.next, history, current.title);
+    void proceed(current, d, history);
   };
 
   /** Start, New quest or New world: a world first when there is none yet, or a new one is asked for. */

@@ -157,6 +157,29 @@ pauses under it, so a desktop gets its cursor back. No key is not a failure and 
 hand-written quest at once. Leaving to the intro with the panel up loses nothing: the decision is
 saved and Continue asks again.
 
+## The dead stay dead
+
+Owner, Oct 2026: "I killed Takeda earlier and here he suddenly is, and you can talk to him". The
+second beat's job was to slay one foe, `targetName` "Ronin Takeda"; the last beat made "Takeda" its
+npc. Nothing told the model: a `StepRecord` carried what was said and chosen but not what the hunter
+*did* at the place, a target is not a `Character`, and a death said only in dialogue was nowhere. A
+brother called dead in beat two came back as the witness in beat four the same way.
+
+- **The world keeps a list of its dead** (`Atlas.dead`, also `SavedGame.dead`), by name, fed from
+  three places: a slay job of count 1 (`slainBy` — a single foe is the one the story set the hunter
+  on, a person or a beast), the beat's own `dead` (the model names whom its step tells is dead), and
+  the chosen decision's `dies`. Groups ("4 × bandit") are not on it.
+- **Every prompt is told** (`BeatContext.dead`, `THE DEAD` in `beatPrompt`), the living list
+  leaves them out, and each history step says what was done there (`StepRecord.done`, `jobDone`).
+- **`parseBeat` enforces it**: a dead npc makes the answer unplayable (the next model is asked); a
+  dead witness is dropped. A name matches inside a longer one (`isDead`), because the model writes
+  the target "Ronin Takeda" and the man "Takeda".
+- **The scene buries them** (`bury` in `Rpg.tsx`, `removeNpc`): out of the crowd and the atlas's
+  people, except whoever is speaking the ending that kills them.
+- **An old save heals itself on resume** (`mendSave`): its dead are rebuilt from its beats
+  (`deadInSave`), and a current beat not yet decided whose npc or witness is among them is dropped
+  and written again from the decision before it.
+
 ## The model writes words and chooses blocks; the engine builds
 
 The model **invents the places** (owner's choice of the first step towards fully generated
