@@ -350,7 +350,9 @@ async function readVoiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<strin
     /* asked again */
   }
   const lists = voiceListsOf(parsed, lang);
-  if (Date.now() - at < VOICE_LISTS_MS && Object.keys(lists).length > 0) return lists;
+  // Every search present, not just some: a cache from before a search was added is asked again.
+  const complete = voiceQueries(lang).every((url) => url in lists);
+  if (Date.now() - at < VOICE_LISTS_MS && complete) return lists;
   const key = await elevenLabs();
   if (!key) return lists;
   try {
@@ -397,7 +399,7 @@ function speaker(raw: unknown): VoiceWho | null {
 }
 
 function speak(key: string, voiceId: string, text: string, lang: 'pl' | 'en'): Promise<globalThis.Response> {
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_64`, {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({

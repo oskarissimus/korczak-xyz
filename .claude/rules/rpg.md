@@ -833,6 +833,18 @@ voices**: designing there would spend the owner's slots and monthly operations o
 Untested against the live API at the time of writing — the shapes are from ElevenLabs' reference;
 the console shows the design request and its error if one comes.
 
+**Studio quality, always** (owner, 27 Oct 2026: the npcs "sometimes sound as if over a phone, with
+odd effects; only the hero's voice has studio quality"). The hero is a premade voice recorded in a
+studio; the npcs were whatever the description or the library gave. ElevenLabs' Voice Design guide:
+a description without a quality phrase varies, "Studio quality" / "perfect audio quality" pushes it
+clean, and FX words — phone, radio, tape, echo, reverb — degrade it (that is how lo-fi is asked for
+on purpose). So `description()` cuts any clause or simile about the medium, whatever the model or an
+old save wrote, and ends every description with *Studio-quality recording, perfect audio quality.*;
+the prompt also tells the model not to write one. Voices designed before are not reused: the name
+gained a ` · hq` suffix (`rpg · <world> · <name> · hq`) and the id cache became
+`rpg-designed-voices-hq`, so each character is designed once more and the old voices rotate out
+under `KEEP`. Every clip is now `mp3_44100_128` (was 64 kbps; the same credits).
+
 The same `voice` is the manner the lines are written in (*THEY ARE CHARACTERS, NOT NARRATORS* in
 the prompt: like people in a play or a film, not a book's narrator: half-sentences, dodging,
 lying, their own sayings, the npc and the witness never alike), and it is told back to the model
@@ -842,7 +854,12 @@ with each returning character's name so they keep it (`demoLimits.ts` passes it 
 voices; pick by characteristics or tags, else at random"). The model writes each character's
 `age` (`young`, `middle_aged`, `old`) beside their gender, and `utils/rpg/voicePick.ts` searches
 the Voice Library (`/v1/shared-voices`, the 30 most used) for that gender and age in the game's
-language, falling back to gender alone; the character's name hashes to one of them, so a
+language, falling back to gender alone — first among the voices ElevenLabs tags `high_quality`
+(`category=high_quality`; the library is mostly community clones on whatever microphone their owner
+had, which is where the phone-like npcs came from), then over the whole library when those have
+nothing usable, so `voiceQueries` is sixteen searches, not eight. The function's week-long cache is
+refreshed when a search is missing from it, and an empty answer counts as an answer in the
+browser, so a Polish search with no clean voice is not asked again with the reader's key. The character's name hashes to one of them, so a
 character keeps their voice across lines, quests and reloads. Only voices at the ordinary rate are
 taken (`rate` 1, no `fiat_rate`), because the cost console and the demo's reservations price every
 clip at it. A key that may not use the library (401/402/403 — a free plan cannot through the API)

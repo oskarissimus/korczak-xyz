@@ -83,7 +83,8 @@ export function prefetchVoices(lang: Lang): void {
     });
     if (!response.ok) throw new Error(`voices ${response.status}`);
     const got = voiceListsOf((await response.json())?.lists, lang);
-    for (const [u, voices] of Object.entries(got)) if (voices.length > 0) storeList(u, voices);
+    // An empty answer is an answer too: the high-quality searches often have nothing in Polish.
+    for (const [u, voices] of Object.entries(got)) storeList(u, voices);
     return got;
   })();
   served.set(lang, lists);
@@ -95,8 +96,7 @@ async function servedList(url: string): Promise<SharedVoice[] | null> {
   const lists = served.get(lang);
   if (!lists) return null;
   try {
-    const list = (await lists)[url];
-    return list && list.length > 0 ? list : null;
+    return (await lists)[url] ?? null;
   } catch {
     return null;
   }
@@ -133,7 +133,8 @@ function listVoices(key: string, url: string): Promise<SharedVoice[]> {
  * that. Cached here by world and name; a refusal that will not change this session (the plan, the
  * month's voice operations) turns designing off and every character falls back to the library.
  */
-const DESIGNED_KEY = 'rpg-designed-voices';
+/** `-hq`: the ids cached before every design asked for studio quality are not reused (`voiceDesign.ts`). */
+const DESIGNED_KEY = 'rpg-designed-voices-hq';
 const designed = new Map<string, Promise<string | null>>();
 let designOff = false;
 let voiceWorld = 'world';
@@ -221,8 +222,9 @@ async function libraryVoice(key: string, line: SpokenLine, lang: Lang): Promise<
   }
 }
 
+/** 128 kbps: the same credits as 64, and no codec smear on top of whatever the voice already has. */
 function speak(key: string, voiceId: string, text: string, lang: Lang): Promise<Response> {
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_64`, {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -360,7 +362,7 @@ export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): v
   const warm = warmNames();
   for (const w of who) {
     // A described voice is a new voice, whatever was warmed under the name before.
-    const id = `${voiceWorld}|${lang}:${w.name}${w.voice ? '|designed' : ''}`;
+    const id = `${voiceWorld}|${lang}:${w.name}${w.voice ? '|designed-hq' : ''}`;
     if (warm.includes(id) || warming.has(id)) continue;
     warming.add(id);
     fetchClip(key, { text: '.', voice: w.gender, who: w }, lang)

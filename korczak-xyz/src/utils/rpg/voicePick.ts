@@ -8,6 +8,12 @@
  * Compiled into the demo function too, which picks with the owner's key exactly as the browser
  * picks with the reader's. No DOM, no imports outside this directory.
  *
+ * HIGH QUALITY FIRST (owner, Oct 2026: the npcs sometimes sound "as if over a phone", beside the
+ * hero's studio voice). The library is mostly community clones, recorded on whatever microphone
+ * their owner had, and the most used are not the cleanest. ElevenLabs tags the ones whose recording
+ * is good as `high_quality`, so that search is asked first — with the age, then without it — and
+ * the whole library only when it has nothing usable (the Polish library is far smaller).
+ *
  * Only voices at the ordinary rate are taken (`rate` 1, no `fiat_rate`): a library voice can be
  * priced above it, and the cost console and the demo's reservations assume it is not.
  */
@@ -39,7 +45,7 @@ export interface SharedVoice {
 /** Enough to choose from; the most used first, which are the ones that have been listened to. */
 const PAGE = 30;
 
-export function sharedVoicesUrl(lang: Lang, gender: VoiceWho['gender'], age?: VoiceAge): string {
+export function sharedVoicesUrl(lang: Lang, gender: VoiceWho['gender'], age?: VoiceAge, hq = false): string {
   const query = new URLSearchParams({
     page_size: String(PAGE),
     sort: 'usage_character_count_1y',
@@ -47,6 +53,7 @@ export function sharedVoicesUrl(lang: Lang, gender: VoiceWho['gender'], age?: Vo
     gender,
   });
   if (age) query.set('age', age);
+  if (hq) query.set('category', 'high_quality');
   return `https://api.elevenlabs.io/v1/shared-voices?${query}`;
 }
 
@@ -79,9 +86,14 @@ export function pickVoice(list: readonly SharedVoice[], who: VoiceWho, lang: Lan
   return usable[hash(who.name) % usable.length].voice_id;
 }
 
+/** The searches for `who`, in the order they are tried: clean recordings first, the age before none. */
+function searches(lang: Lang, who: VoiceWho): string[] {
+  return [true, false].flatMap((hq) => [...(who.age ? [sharedVoicesUrl(lang, who.gender, who.age, hq)] : []), sharedVoicesUrl(lang, who.gender, undefined, hq)]);
+}
+
 /**
- * Searches by gender and age, then by gender alone when the age has nothing usable (the Polish
- * library is far smaller than the English one). `list` fetches a search URL; the caller caches it.
+ * The high-quality searches, by gender and age then gender alone, and then the same over the whole
+ * library when those have nothing usable. `list` fetches a search URL; the caller caches it.
  */
 export async function findVoice(
   who: VoiceWho,
@@ -90,15 +102,16 @@ export async function findVoice(
   list: (url: string) => Promise<SharedVoice[]>,
   avoid: readonly string[] = [],
 ): Promise<string | null> {
-  if (who.age) {
-    const picked = pickVoice(await list(sharedVoicesUrl(lang, who.gender, who.age)), who, lang, model, avoid);
+  for (const url of searches(lang, who)) {
+    const picked = pickVoice(await list(url), who, lang, model, avoid);
     if (picked) return picked;
   }
-  return pickVoice(await list(sharedVoicesUrl(lang, who.gender)), who, lang, model, avoid);
+  return null;
 }
 
 /**
- * Every search a character can need in `lang`: each gender with each age, and each gender alone.
+ * Every search a character can need in `lang`: each gender with each age, and each gender alone,
+ * among the high-quality voices and in the whole library.
  * The library answers a filtered search in 8 to 14 seconds (measured Oct 2026, against about one
  * second for the clip itself), which made a character's first line wait that long. So the demo
  * function asks all of them at once, keeps the answers in Firestore for a week, and hands them to
@@ -106,7 +119,9 @@ export async function findVoice(
  */
 export function voiceQueries(lang: Lang): string[] {
   const genders = ['male', 'female'] as const;
-  return genders.flatMap((g) => [...VOICE_AGES.map((a) => sharedVoicesUrl(lang, g, a)), sharedVoicesUrl(lang, g)]);
+  return [true, false].flatMap((hq) =>
+    genders.flatMap((g) => [...VOICE_AGES.map((a) => sharedVoicesUrl(lang, g, a, hq)), sharedVoicesUrl(lang, g, undefined, hq)]),
+  );
 }
 
 /** The searches' answers, by search URL, cut to the usable voices' ids. */

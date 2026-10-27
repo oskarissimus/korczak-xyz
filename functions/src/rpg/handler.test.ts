@@ -250,17 +250,31 @@ describe('rpgDemo', () => {
     const res = response();
     await handleRpgDemo(request('POST', { kind: 'voices', lang: 'pl' }), res);
     expect(res.statusCode).toBe(200);
-    expect(fetch).toHaveBeenCalledTimes(8);
+    // Each gender with each age and alone, among the high-quality voices and in the whole library.
+    expect(fetch).toHaveBeenCalledTimes(16);
     expect((fetch.mock.calls[0] as any)[1].headers['xi-api-key']).toBe('sk_owner-0000000000');
     const lists = res.body.lists as Record<string, { voice_id: string }[]>;
-    expect(Object.keys(lists)).toHaveLength(8);
+    expect(Object.keys(lists)).toHaveLength(16);
     expect(Object.values(lists).every((l) => l.length === 1 && l[0].voice_id === 'abcdefghij')).toBe(true);
     expect(store.get('rpgVoices/pl')).toMatchObject({ at: expect.any(Number) });
 
     const again = response();
     await handleRpgDemo(request('POST', { kind: 'voices', lang: 'pl' }), again);
     expect(again.body.lists).toEqual(lists);
-    expect(fetch).toHaveBeenCalledTimes(8);
+    expect(fetch).toHaveBeenCalledTimes(16);
+  });
+
+  it('asks the library again when the week-old cache lacks a search, as one from before the high-quality ones does', async () => {
+    const { voiceQueries } = await import('../../../korczak-xyz/src/utils/rpg/voicePick');
+    const old = Object.fromEntries(voiceQueries('en').filter((u) => !u.includes('category=')).map((u) => [u, [{ voice_id: 'abcdefghij' }]]));
+    store.set('rpgVoices/en', { at: Date.now(), lists: JSON.stringify(old) });
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ voices: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    // English: the test above left Polish in the function's hour-long memory.
+    const res = response();
+    await handleRpgDemo(request('POST', { kind: 'voices', lang: 'en' }), res);
+    expect(fetch).toHaveBeenCalledTimes(16);
+    expect(Object.keys(res.body.lists)).toHaveLength(16);
   });
 
   it('adds reported numbers to the day, capped, and gives them back with the demo spend', async () => {

@@ -22,6 +22,15 @@
  * Design, the month's operations spent, a network failure — falls back to a library voice
  * (`voicePick.ts`) for that character, for this session.
  *
+ * STUDIO QUALITY, ALWAYS (owner, Oct 2026: "they sometimes sound as if over a phone… only the
+ * hero's voice has studio quality"). The hero is a premade voice recorded in a studio; a designed
+ * voice is as clean as its description asks for. ElevenLabs' guide: without a quality phrase the
+ * result varies, "Studio quality" / "perfect audio quality" pushes it clean, and words like phone,
+ * radio, tape, echo or reverb degrade it (they are how you ask for lo-fi on purpose). So every
+ * description ends with the quality phrase, and any clause about how the voice is recorded or
+ * carried is cut, whatever the model wrote. Voices designed before this were saved under the old
+ * name, so they are not found again and get designed anew; the old ones rotate out with `KEEP`.
+ *
  * No DOM: `fetch` is passed in.
  */
 
@@ -47,17 +56,40 @@ const API = 'https://api.elevenlabs.io';
 /** A refusal that will not change by asking again this session (the plan, the key, the month). */
 export class DesignRefused extends Error {}
 
+/** ` · hq` marks a voice designed with the quality phrase; one without it is designed again. */
 export function voiceName(world: string, name: string): string {
-  return `${PREFIX}${world.slice(0, 40)} · ${name}`.slice(0, 100);
+  return `${PREFIX}${world.slice(0, 40)} · ${name.slice(0, 50)} · hq`;
+}
+
+const QUALITY = 'Studio-quality recording, perfect audio quality.';
+
+/** Words about the medium rather than the voice: phone, radio, tape, echo — lo-fi on request. */
+const MEDIUM =
+  '(?:(?:tele)?phones?|radio|tape|recording|recorded|microphone|mic|reverb\\w*|echo\\w*|muffled|distant|static|crackl\\w*|lo-?fi|low[- ]fidelity|voicemail|megaphone|walkie[- ]talkie|vintage|gramophone|vinyl|quality)';
+/** "…voice, like a crackling old radio" loses the simile and keeps the voice. */
+const SIMILE = new RegExp(`\\s+(?:with|like|as if|as though|through|over|on)\\b[^.,;!?]*\\b${MEDIUM}\\b[^.,;!?]*`, 'gi');
+/** Any other clause naming one goes whole. */
+const CLAUSE = new RegExp(`[^.,;!?]*\\b${MEDIUM}\\b[^.,;!?]*`, 'gi');
+
+function withoutEffects(d: string): string {
+  return d
+    .replace(SIMILE, '')
+    .replace(CLAUSE, '')
+    .replace(/\s*,\s*(?=[,.;!?]|$)/g, '')
+    .replace(/([.;!?])\s*[,.;]+/g, '$1')
+    .replace(/^[\s,.;]+/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /** The description as ElevenLabs' guide asks it to begin: the language first. */
 export function description(who: DesignWho, lang: Lang): string {
   const native = lang === 'pl' ? 'Native Polish.' : 'Native English.';
-  let d = who.voice.trim().replace(/\s+/g, ' ');
+  let d = withoutEffects(who.voice.trim().replace(/\s+/g, ' '));
   if (!/^native\b/i.test(d)) d = `${native} ${d}`;
-  if (d.length < 40) d = `${d} ${who.gender === 'female' ? 'Female' : 'Male'} voice, good quality.`;
-  return d.slice(0, 1000);
+  if (!/[.!?]$/.test(d)) d = `${d}.`;
+  if (d.length < 40) d = `${d} ${who.gender === 'female' ? 'Female' : 'Male'} voice.`;
+  return `${d.slice(0, 1000 - QUALITY.length - 1)} ${QUALITY}`;
 }
 
 /** 100 to 1000 characters of the character's own words, as the design endpoint requires. */

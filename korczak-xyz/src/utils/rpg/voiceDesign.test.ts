@@ -49,6 +49,13 @@ describe('voiceDesign', () => {
     expect(previewText({ ...who, sample: 'x'.repeat(900) }, 'pl')).toHaveLength(400);
   });
 
+  it('asks for studio quality and drops what the model says about the medium', () => {
+    const d = description({ ...who, voice: 'Native Polish. Male, 60s. Persona: smith. Gravelly, slow voice, like a crackling old radio. Slight echo.' }, 'pl');
+    expect(d).toBe('Native Polish. Male, 60s. Persona: smith. Gravelly, slow voice. Studio-quality recording, perfect audio quality.');
+    expect(description(who, 'pl')).toMatch(/Studio-quality recording, perfect audio quality\.$/);
+    expect(description({ ...who, voice: 'x'.repeat(2000) }, 'pl').length).toBeLessThanOrEqual(1000);
+  });
+
   it('designs, saves the first preview under the world and name, and finds it again by name', async () => {
     const account = fakeAccount([]);
     const id = await designVoice(account.fetch, 'sk', 'w1', who, 'pl');

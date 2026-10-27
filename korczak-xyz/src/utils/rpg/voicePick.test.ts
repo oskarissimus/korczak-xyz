@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { asAge, findVoice, pickVoice, sharedVoicesUrl, type SharedVoice } from './voicePick';
+import { asAge, findVoice, pickVoice, sharedVoicesUrl, voiceQueries, type SharedVoice } from './voicePick';
 
 const model = 'eleven_flash_v2_5';
 const pl = (id: string, extra: Partial<SharedVoice> = {}): SharedVoice => ({
@@ -32,9 +32,24 @@ describe('voicePick', () => {
     const asked: string[] = [];
     const voice = await findVoice({ name: 'Jagna', gender: 'female', age: 'old' }, 'pl', model, async (url) => {
       asked.push(url);
-      return url.includes('&age=') ? [] : [pl('ffffffffff')];
+      return url.includes('&age=') || url.includes('category=') ? [] : [pl('ffffffffff')];
     });
     expect(voice).toBe('ffffffffff');
-    expect(asked).toEqual([sharedVoicesUrl('pl', 'female', 'old'), sharedVoicesUrl('pl', 'female')]);
+    expect(asked).toEqual([
+      sharedVoicesUrl('pl', 'female', 'old', true),
+      sharedVoicesUrl('pl', 'female', undefined, true),
+      sharedVoicesUrl('pl', 'female', 'old'),
+      sharedVoicesUrl('pl', 'female'),
+    ]);
+  });
+
+  it('takes a high-quality voice before the rest of the library', async () => {
+    // No clean old man: a clean man of any age, before an old one from the rest of the library.
+    const voice = await findVoice({ name: 'Radomir', gender: 'male', age: 'old' }, 'pl', model, async (url) => {
+      if (!url.includes('category=high_quality')) return [pl('llllllllll')];
+      return url.includes('&age=') ? [] : [pl('hhhhhhhhhh')];
+    });
+    expect(voice).toBe('hhhhhhhhhh');
+    expect(voiceQueries('pl')).toHaveLength(16);
   });
 });
