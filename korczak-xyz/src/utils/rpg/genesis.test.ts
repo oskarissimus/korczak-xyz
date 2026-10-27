@@ -109,6 +109,14 @@ describe('parseWorlds', () => {
     expect(genesisPrompt(ctx)).toContain('"sizes"');
   });
 
+  it('keeps the ground a candidate described, in English, for the ground texture', () => {
+    const reply = JSON.stringify({ worlds: [candidate('Mud', 40, { terrain: ' wet black mud with puddles ' }), candidate('Bare', 40)] });
+    const [mud, bare] = parseWorlds(reply, ctx, 1000);
+    expect(mud.terrain).toBe('wet black mud with puddles');
+    expect(bare.terrain).toBeUndefined();
+    expect(genesisPrompt(ctx)).toContain('"terrain"');
+  });
+
   it('asks an older world’s sizes from the lines its pieces were drawn from', () => {
     const world = { hub: 'Rust Halt', architecture: 'trucks', landmark: 'a rusted crane', kit: { house: 'a covered truck' } };
     const prompt = hubSizesPrompt(world);

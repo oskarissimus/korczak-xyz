@@ -289,6 +289,24 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     says, and TRELLIS made two of three such pictures into a flat card or a cylinder with the picture
     on it — planted four hundred times. With the line, four kinds of tree all came back as trees.
     Nothing checks a model's shape after the fact, so a world that did get a card keeps it.
+- **And the ground** (owner, 27 Oct 2026: "the ground texture should be generated too; now it seems
+  to be always grass"). The one Poly Haven scan, dyed the world's ground colour, read as grass in a
+  desert, in snow and on a scrapyard alike. Now genesis writes `terrain` (English, ≤14 words, a
+  material up close: "wet black mud with puddles", agreeing with growth, weather and water), and
+  `utils/rpg/groundTexture.ts` has FLUX.1 [schnell] paint it from directly above at **992²**, the
+  largest square fal still bills as one megapixel: **$0.003 a world**, ~1 s. A world from before is
+  described from its weather, growth, water, climate and ground colour (`fallbackTerrain`).
+  - **Tiled in the browser, not by the model** (`seamless`, `surfaces.ts`): FLUX asked for
+    "seamless" stops its cracks dead at the edge, a grid of seams across the map. Each edge is
+    crossfaded (35% of each half) into the picture rolled by half, across then down, so it wraps with
+    no seam and a faint double image along the band; `breakTiling` still hides the repeat.
+  - `RpgScene.setGroundTexture` lays it at the scan's tiling (96×, ~3.75 m a tile) and **undyed**
+    (`recolor` 0), since it is already the world's colour; the flooded world's island shares the
+    material. Kept on the bible (`groundTexture`, `setWorldGround`), bytes in the Cache API with
+    the GLBs (`loadLandmarkBytes`); one try per world a session, a failure not asked again until a
+    reload. The classic world and a reader without a fal key keep the scan. In the console as kind
+    `fal` labelled `ground`, counted as `N× tex` beside the 3D models (`falTextures`), its price in
+    the fal.ai total and the closing screen's; Sentry Logs `rpg.landmark` with `piece: 'ground'`.
 - **The kit's village until then** (`RpgScene.setHubModels`, `components/Rpg/hubModels.ts`,
   `HUB_FIT` for each piece's height and width): what a model replaces is hidden, not removed, and
   shows again for a world without it; the kit's houses are merged per kind (`mergeStatic`) so a

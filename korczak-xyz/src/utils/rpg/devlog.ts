@@ -71,6 +71,8 @@ export interface QuestTotals {
   falCost: number;
   /** 3D models fal.ai finished. */
   falModels: number;
+  /** Ground textures fal.ai painted (`groundTexture.ts`). */
+  falTextures: number;
   requests: number;
   errors: number;
 }
@@ -88,6 +90,8 @@ export interface Spend {
   voiceCost: number;
   falCost: number;
   falModels: number;
+  /** Ground textures fal.ai painted (`groundTexture.ts`). */
+  falTextures: number;
   /** Part of it was spent before it was recorded (a save, or a world, from before), so a floor. */
   partial?: boolean;
 }
@@ -102,6 +106,7 @@ export const NO_SPEND: Spend = {
   voiceCost: 0,
   falCost: 0,
   falModels: 0,
+  falTextures: 0,
 };
 
 export function addSpend(a: Spend, b: Spend): Spend {
@@ -115,6 +120,7 @@ export function addSpend(a: Spend, b: Spend): Spend {
     voiceCost: a.voiceCost + b.voiceCost,
     falCost: a.falCost + b.falCost,
     falModels: a.falModels + b.falModels,
+    falTextures: a.falTextures + b.falTextures,
     ...(a.partial || b.partial ? { partial: true } : {}),
   };
 }
@@ -139,6 +145,7 @@ export function validSpend(raw: unknown): Spend | null {
     voiceCost: n(s.voiceCost),
     falCost: n(s.falCost),
     falModels: n(s.falModels),
+    falTextures: n(s.falTextures),
     ...(s.partial === true ? { partial: true } : {}),
   };
 }
@@ -159,7 +166,7 @@ export function triesSpend(tries: readonly ModelTry[], ms: number): ModelSpend {
 
 /**
  * What a world has cost, from what is kept on it: its model requests (`spent`) and its hub's 3D
- * models, each with the price of its picture and its mesh. A world with nothing to cost — the
+ * models, each with the price of its picture and its mesh, and its painted ground. A world with nothing to cost — the
  * classic one, which is written by hand and has no hub models — is null. A model that failed half
  * way is not kept, so its picture is missing here: a floor, like the rest.
  */
@@ -173,8 +180,12 @@ export function worldSpend(world: WorldBible | null): Spend | null {
     tokens: s ? { ...s.tokens } : { ...NO_SPEND.tokens },
     modelCost: s?.modelCost ?? 0,
     unpriced: s?.unpriced ?? false,
-    falCost: models.reduce((sum, m) => sum + (Number.isFinite(m.costUsd) ? m.costUsd : 0), 0),
+    falCost: [...models, ...(world.groundTexture ? [world.groundTexture] : [])].reduce(
+      (sum, m) => sum + (Number.isFinite(m.costUsd) ? m.costUsd : 0),
+      0,
+    ),
     falModels: models.length,
+    falTextures: world.groundTexture ? 1 : 0,
     ...(s ? {} : { partial: true }),
   };
 }
@@ -321,6 +332,7 @@ export function questSpend(): Spend {
     } else if (r.kind === 'fal') {
       now.falCost += r.cost ?? 0;
       if (r.status === 'ok' && r.model.includes('trellis')) now.falModels += 1;
+      if (r.status === 'ok' && r.label === 'ground') now.falTextures += 1;
     } else if (r.usage) {
       now.tokens.input += r.usage.input;
       now.tokens.output += r.usage.output;
@@ -353,6 +365,7 @@ export function questTotals(): QuestTotals {
     voiceCost: 0,
     falCost: 0,
     falModels: 0,
+    falTextures: 0,
     requests: requests.length,
     errors: 0,
   };
@@ -367,6 +380,7 @@ export function questTotals(): QuestTotals {
     if (r.kind === 'fal') {
       totals.falCost += r.cost ?? 0;
       if (r.status === 'ok' && r.model.includes('trellis')) totals.falModels += 1;
+      if (r.status === 'ok' && r.label === 'ground') totals.falTextures += 1;
       continue;
     }
     if (r.usage) {

@@ -224,7 +224,7 @@ export function DevConsole({
         {t.genTime}: {formatMs(totals.generationMs)} · {t.tokensLine}: in {tokens(totals.tokens.input)} out{' '}
         {tokens(totals.tokens.output)} think {tokens(totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}
         {totals.unpriced ? '+?' : ''} · ElevenLabs: {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈{' '}
-        {formatUsd(totals.voiceCost)} · fal.ai: {totals.falModels}× 3D ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
+        {formatUsd(totals.voiceCost)} · fal.ai: {totals.falModels}× 3D{totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
         {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}
         {totals.errors > 0 && <span className="rpg-dev-error"> · {t.errors(totals.errors)}</span>}
       </div>
@@ -271,7 +271,9 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
           : w.partial
             ? `${t.tokensLine.toLowerCase()} ?`
             : null,
-        w.falModels > 0 ? `fal.ai ${w.falModels}× 3D ≈ ${formatUsd(w.falCost)}` : null,
+        w.falModels + w.falTextures > 0
+          ? `fal.ai ${w.falModels}× 3D${w.falTextures > 0 ? ` + ${w.falTextures}× tex` : ''} ≈ ${formatUsd(w.falCost)}`
+          : null,
         w.ms > 0 ? formatMs(w.ms) : null,
       ].filter(Boolean)
     : [];
@@ -294,7 +296,7 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
           <>
             <dt>fal.ai</dt>
             <dd>
-              {q.falModels}× 3D ≈ {formatUsd(q.falCost)}
+              {q.falModels}× 3D{q.falTextures > 0 ? ` + ${q.falTextures}× tex` : ''} ≈ {formatUsd(q.falCost)}
             </dd>
           </>
         )}

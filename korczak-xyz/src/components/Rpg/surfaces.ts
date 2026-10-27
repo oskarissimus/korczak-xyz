@@ -105,3 +105,41 @@ export function breakTiling(material: THREE.MeshStandardMaterial): THREE.MeshSta
   material.customProgramCacheKey = () => 'break-tiling';
   return material;
 }
+
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * Makes a picture tile: each edge is crossfaded into the picture rolled by half, whose edges are
+ * the picture's own middle and so meet across the wrap; across, then down, so the second pass
+ * keeps the first's seam closed. `band` is how much of each half fades, from the edge in. FLUX
+ * asked for a seamless ground draws one that nearly is, and its cracks stopping dead at every edge
+ * drew a grid over the map (Oct 2026).
+ */
+export function seamless(source: CanvasImageSource, size = 1024, band = 0.35): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(source, 0, 0, size, size);
+  const img = ctx.getImageData(0, 0, size, size);
+  const half = size >> 1;
+  const weight = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    const d = Math.abs((i + 0.5) / size - 0.5) * 2;
+    weight[i] = smooth(Math.min(1, Math.max(0, (d - (1 - band)) / band)));
+  }
+  for (const across of [true, false]) {
+    const a = img.data.slice();
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const w = across ? weight[x] : weight[y];
+        if (w === 0) continue;
+        const sx = across ? (x + half) % size : x;
+        const sy = across ? y : (y + half) % size;
+        const o = (y * size + x) * 4;
+        const s = (sy * size + sx) * 4;
+        for (let c = 0; c < 3; c++) img.data[o + c] = a[o + c] * (1 - w) + a[s + c] * w;
+      }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}

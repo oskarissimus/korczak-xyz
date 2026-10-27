@@ -37,6 +37,7 @@ import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../ut
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, beginQuestSpend, NO_SPEND, onRequestEnd, questSpend, resetDevlog, triesSpend, validSpend } from '../../utils/rpg/devlog';
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
+import { ensureGroundTexture } from '../../utils/rpg/groundTexture';
 import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
@@ -62,6 +63,7 @@ import {
   savePendingGenesis,
   saveWorld,
   addWorldSpend,
+  setWorldGround,
   setWorldModel,
   setWorldSizes,
   withModel,
@@ -902,6 +904,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // The same tree, and its young and old ones, across the whole map, as big as the world says its tree is.
     const forest = FOREST_SLOTS.flatMap((slot) => (urls[slot] ? [urls[slot]] : []));
     void scene.setForest(forest, world.sizes?.tree, (url, e) => log.warn('rpg.forest.load.failed', { url, ...describeError(e) }));
+    // And the ground it all stands on, painted for the world (`utils/rpg/groundTexture.ts`).
+    const groundImage = world.createdAt > 0 ? (world.groundTexture?.image ?? null) : null;
+    void scene.setGroundTexture(groundImage, (e) => log.warn('rpg.ground.load.failed', describeError(e)));
     // A world described before genesis gave sizes asks for them once, so its pieces stand as big as
     // what they are rather than as big as their slot (`hubFit`).
     if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {
@@ -923,6 +928,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
         .catch((e) => log.warn('rpg.sizes.failed', describeError(e)));
     }
     if (!falKey || world.createdAt === 0) return;
+    ensureGroundTexture(
+      falKey,
+      world,
+      (texture) => {
+        setWorldGround(world.id, texture);
+        if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, groundTexture: texture };
+        setWorld((now) => (now?.id === world.id ? { ...now, groundTexture: texture } : now));
+      },
+      (e) => log.warn('rpg.ground.failed', describeError(e)),
+    );
     ensureHubModels(
       falKey,
       world,

@@ -135,6 +135,24 @@ export interface WorldBible extends WorldBrief {
    * Worlds from before 27 Oct 2026 have none, so their genesis shows as unknown.
    */
   spent?: ModelSpend;
+  /**
+   * What the open ground is, in ENGLISH like the landmark: a material seen up close, for an image
+   * model that paints the ground's texture (`groundTexture.ts`). Worlds from before 27 Oct 2026 have
+   * none and are described from their look and climate.
+   */
+  terrain?: string;
+  /** That ground painted by fal.ai, once; kept so it is never painted again. */
+  groundTexture?: GroundTexture;
+}
+
+/** A world's ground texture as fal.ai drew it; the scene makes it seamless when it loads it. */
+export interface GroundTexture {
+  /** The picture on fal's CDN. */
+  image: string;
+  prompt: string;
+  costUsd: number;
+  ms: number;
+  at: number;
 }
 
 /** Model requests' cost, kept on a world: wall time, tokens and their approximate dollars. */
@@ -568,6 +586,9 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
     '    "tree" (what grows here, as "flora" below says), "stall" (a market stall or workbench), "cart" (how',
     '    goods are moved here), "lamp" (a light post, beacon or totem), "goods" (a small pile of goods)},',
+    '  "terrain": string (IN ENGLISH too, at most 14 words: what the open ground between the buildings is, up',
+    '    close, as a material — "wet black mud with puddles", "fresh snow over frozen earth", "cracked red clay',
+    '    with pebbles", "rusted metal plates and sand"; it must agree with "growth", "weather" and "water" below),',
     `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
     '  "words": [up to 6 words or short phrases people here use],',
     '  "look": {',
@@ -724,6 +745,7 @@ export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()
       look: parseLook(r.look),
       ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
       ...parseKit(r.kit),
+      ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
       ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
     });
   }

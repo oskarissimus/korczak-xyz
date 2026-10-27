@@ -15,7 +15,7 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import { addModelSpend, type ForestVariant, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
+import { addModelSpend, type ForestVariant, type GroundTexture, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
 import { dropGameFor } from './save';
@@ -124,6 +124,11 @@ export function setWorldSizes(id: string, sizes: HubSizes, now = Date.now()): vo
 /** Adds a model request's cost to what the world has cost (`devlog.ts`'s `worldSpend`). */
 export function addWorldSpend(id: string, spent: ModelSpend, now = Date.now()): void {
   putWorld(id, (w) => ({ ...w, spent: addModelSpend(w.spent, spent) }), now);
+}
+
+/** Keeps the world's ground texture the same way (`groundTexture.ts`), so it is painted once. */
+export function setWorldGround(id: string, texture: GroundTexture, now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, groundTexture: texture }), now);
 }
 
 function putWorld(id: string, put: (w: WorldBible) => WorldBible, now: number): void {

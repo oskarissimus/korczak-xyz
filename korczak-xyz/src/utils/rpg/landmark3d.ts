@@ -208,8 +208,8 @@ async function failure(res: Response): Promise<Error> {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Step 1: the picture. */
-async function drawImage(key: string, prompt: string, label: FalSlot, o: FalOptions): Promise<string> {
+/** Step 1: the picture; also the whole of a world's ground texture (`groundTexture.ts`), at its own size. */
+export async function drawImage(key: string, prompt: string, label: FalSlot | 'ground', o: FalOptions, size = IMAGE_SIZE): Promise<string> {
   const f = o.fetchImpl ?? fetch;
   const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, label);
   try {
@@ -219,7 +219,7 @@ async function drawImage(key: string, prompt: string, label: FalSlot, o: FalOpti
       signal: o.signal,
       body: JSON.stringify({
         prompt,
-        image_size: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+        image_size: { width: size, height: size },
         num_inference_steps: 4,
         num_images: 1,
         enable_safety_checker: true,
@@ -229,7 +229,7 @@ async function drawImage(key: string, prompt: string, label: FalSlot, o: FalOpti
     const body = (await res.json()) as { images?: { url?: string }[] };
     const url = body.images?.[0]?.url;
     if (!url) throw new Error('no image in the answer');
-    endRequest(entry, null, { cost: imageCost(), text: `${prompt}\n→ ${url}` });
+    endRequest(entry, null, { cost: imageCost(size, size), text: `${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));

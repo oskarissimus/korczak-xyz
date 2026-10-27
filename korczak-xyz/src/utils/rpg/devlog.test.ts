@@ -80,5 +80,10 @@ describe('the closing screen counts the whole quest and its world', () => {
     expect(w?.partial).toBeUndefined();
     // From before its cost was kept: the models still count, the genesis is unknown.
     expect(worldSpend({ ...base, landmarkModel: model })).toMatchObject({ falModels: 1, partial: true });
+    // Its painted ground is the world's too.
+    const ground = { image: 'g.jpg', prompt: '', costUsd: 0.003, ms: 1, at: 1 };
+    const g = worldSpend({ ...base, spent, landmarkModel: model, groundTexture: ground });
+    expect(g).toMatchObject({ falModels: 1, falTextures: 1 });
+    expect(g?.falCost).toBeCloseTo(0.026);
   });
 });

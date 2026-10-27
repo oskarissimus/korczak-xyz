@@ -23,12 +23,12 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { breakTiling, surfaceMat } from './surfaces';
+import { breakTiling, seamless, surfaceMat } from './surfaces';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
-import { HUB_SLOTS, isForestVariant, type HubSlot } from '../../utils/rpg/landmark3d';
+import { HUB_SLOTS, isForestVariant, loadLandmarkBytes, type HubSlot } from '../../utils/rpg/landmark3d';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
@@ -435,6 +435,7 @@ export class RpgScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.ground = ground;
+    this.groundScan = (ground.material as THREE.MeshStandardMaterial).map!;
 
     this.buildVillage();
     this.buildTrees();
@@ -602,6 +603,44 @@ export class RpgScene {
   /** The urls the forest was last asked for, loaded or still loading. */
   private forestWanted = '';
   private forestToken = 0;
+
+  /**
+   * The world's own ground, painted by fal.ai (`utils/rpg/groundTexture.ts`), made to tile here
+   * (`seamless`) and laid at the scan's tiling, undyed since it is already the world's colour; null
+   * (a new world, the classic one, no key) puts the scan back.
+   */
+  async setGroundTexture(url: string | null, onError: (e: unknown) => void = () => {}): Promise<void> {
+    if (url === this.groundUrl) return;
+    this.groundUrl = url;
+    const mat = this.ground.material as THREE.MeshStandardMaterial;
+    const own = (tex: THREE.Texture | null) => {
+      this.groundOwn?.dispose();
+      this.groundOwn = tex;
+      mat.map = tex ?? this.groundScan;
+      recolor(mat, this.look.ground, this.isClassic() || tex ? 0 : 0.8);
+    };
+    if (!url) {
+      own(null);
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(new Blob([await loadLandmarkBytes(url)]));
+      if (this.groundUrl !== url) {
+        bitmap.close();
+        return;
+      }
+      const tex = new THREE.CanvasTexture(seamless(bitmap));
+      bitmap.close();
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.copy(this.groundScan.repeat);
+      tex.anisotropy = 4;
+      own(tex);
+    } catch (e) {
+      if (this.groundUrl === url) this.groundUrl = null;
+      onError(e);
+    }
+  }
 
   /**
    * The world's own trees across the map in place of the kit's (owner, 26 Oct 2026: "generate the
@@ -817,6 +856,11 @@ export class RpgScene {
   private fencePosts: THREE.Mesh[] = [];
   private cover: { mesh: THREE.InstancedMesh; n: number }[] = [];
   private ground!: THREE.Mesh;
+  /** The Poly Haven scan the ground starts with, and goes back to without a world's own. */
+  private groundScan!: THREE.Texture;
+  /** The world's own ground from fal.ai, made to tile, while it is on the ground. */
+  private groundOwn: THREE.Texture | null = null;
+  private groundUrl: string | null = null;
   private stopgapWall!: THREE.MeshStandardMaterial;
   private stopgapRoof!: THREE.MeshStandardMaterial;
 
@@ -879,7 +923,8 @@ export class RpgScene {
       this.weather.points.visible = this.quality.weather;
     }
 
-    recolor(this.ground.material as THREE.Material, look.ground, classic ? 0 : 0.8);
+    // A world's own ground is already its colour; the scan is grass until it is dyed.
+    recolor(this.ground.material as THREE.Material, look.ground, classic || this.groundOwn ? 0 : 0.8);
     recolor(this.stopgapWall, look.wall, classic ? 0 : 0.65);
     recolor(this.stopgapRoof, look.roof, classic ? 0 : 0.7);
     this.leafMat.color.set(classic ? 0x7d9a6a : look.foliage);
@@ -1963,6 +2008,7 @@ export class RpgScene {
     this.senses.dispose();
     // A forest tree still loading is not planted in a scene that is gone.
     this.forestToken++;
+    this.groundUrl = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
