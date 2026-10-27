@@ -131,6 +131,11 @@ export function setWorldGround(id: string, texture: GroundTexture, now = Date.no
   putWorld(id, (w) => ({ ...w, groundTexture: texture }), now);
 }
 
+/** And what grows on it (`groundCover.ts`). */
+export function setWorldCover(id: string, sprites: GroundTexture[], now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, coverSprites: sprites }), now);
+}
+
 function putWorld(id: string, put: (w: WorldBible) => WorldBible, now: number): void {
   const stored = read();
   const library = withLibrary(stored);

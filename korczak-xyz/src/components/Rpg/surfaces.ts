@@ -143,3 +143,122 @@ export function seamless(source: CanvasImageSource, size = 1024, band = 0.35): H
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+/**
+ * A clump fal.ai drew alone on white (`utils/rpg/groundCover.ts`) as a cut-out: the background
+ * taken away where it touches the edge, and where the stems close it in only where it is nearly
+ * pure white — so a shaded white flower inside the clump stays — its fringe
+ * unblended from the white, and the picture cropped to the clump, so its base is the quad's bottom. A picture whose edge is not mostly that white (a sky,
+ * a scene) is refused rather than cut into a card. The see-through pixels take the clump's average colour,
+ * or the smaller mipmaps would bleed a white halo around it at a distance — which is why it comes
+ * back as pixels, rows bottom first for a `DataTexture`, and not as a canvas: a canvas keeps colour
+ * premultiplied and forgets it where alpha is 0. Null if almost nothing
+ * is left: a picture that filled its frame or came back empty is no tuft.
+ */
+export function cutOut(source: CanvasImageSource & { width: number; height: number }): { pixels: ImageData; aspect: number } | null {
+  const w = source.width;
+  const h = source.height;
+  const full = document.createElement('canvas');
+  full.width = w;
+  full.height = h;
+  const ctx = full.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(source, 0, 0);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  // The background is what the corners are.
+  const bg = [0, 0, 0];
+  for (const [x, y] of [
+    [1, 1],
+    [w - 2, 1],
+    [1, h - 2],
+    [w - 2, h - 2],
+  ])
+    for (let c = 0; c < 3; c++) bg[c] += d[(y * w + x) * 4 + c] / 4;
+  const dist = (i: number) => Math.max(Math.abs(d[i * 4] - bg[0]), Math.abs(d[i * 4 + 1] - bg[1]), Math.abs(d[i * 4 + 2] - bg[2]));
+  const gone = new Uint8Array(w * h);
+  const stack: number[] = [];
+  const visit = (i: number, within: number) => {
+    if (!gone[i] && dist(i) < within) {
+      gone[i] = 1;
+      stack.push(i);
+    }
+  };
+  for (let x = 0; x < w; x++) {
+    visit(x, 64);
+    visit((h - 1) * w + x, 64);
+  }
+  for (let y = 0; y < h; y++) {
+    visit(y * w, 64);
+    visit(y * w + w - 1, 64);
+  }
+  // A picture with a sky or a scene behind its clump has no one background to take away.
+  if (stack.length < (w + h) * 2 * 0.6) return null;
+  while (stack.length) {
+    const i = stack.pop()!;
+    const x = i % w;
+    if (x > 0) visit(i - 1, 64);
+    if (x < w - 1) visit(i + 1, 64);
+    if (i >= w) visit(i - w, 64);
+    if (i < w * (h - 1)) visit(i + w, 64);
+  }
+  // And the white the stems close in, which no path from the edge reaches: only the nearly pure
+  // white of it, so a shaded white petal keeps its shading.
+  for (let i = 0; i < w * h; i++) if (!gone[i] && dist(i) < 24) gone[i] = 1;
+  // The fringe, two pixels deep, is clump and white blended: a thin stem is nothing else, and kept
+  // as it is a black weed came out silver. So it is unblended against the background — how far
+  // from white says how much of the pixel is clump, and the white is taken back out of its colour.
+  const touches = (i: number, set: Uint8Array) => {
+    const x = i % w;
+    return (x > 0 && set[i - 1]) || (x < w - 1 && set[i + 1]) || (i >= w && set[i - w]) || (i < w * (h - 1) && set[i + w]);
+  };
+  const near = new Uint8Array(gone);
+  for (let pass = 0; pass < 2; pass++) {
+    const ring: number[] = [];
+    for (let i = 0; i < w * h; i++) if (!near[i] && touches(i, near)) ring.push(i);
+    for (const i of ring) near[i] = 1;
+  }
+  const alpha = new Uint8Array(w * h).fill(255);
+  for (let i = 0; i < w * h; i++) {
+    if (gone[i] || !near[i]) continue;
+    const a = Math.min(1, dist(i) / 200);
+    if (a < 0.5) {
+      gone[i] = 1;
+      continue;
+    }
+    alpha[i] = Math.round(a * 255);
+    for (let c = 0; c < 3; c++) d[i * 4 + c] = Math.max(0, Math.min(255, (d[i * 4 + c] - bg[c] * (1 - a)) / a));
+  }
+  let x0 = w;
+  let y0 = h;
+  let x1 = -1;
+  let y1 = -1;
+  let kept = 0;
+  const avg = [0, 0, 0];
+  for (let i = 0; i < w * h; i++) {
+    if (gone[i]) continue;
+    kept++;
+    for (let c = 0; c < 3; c++) avg[c] += d[i * 4 + c];
+    const x = i % w;
+    const y = (i / w) | 0;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  if (kept < w * h * 0.02 || kept > w * h * 0.9) return null;
+  for (let c = 0; c < 3; c++) avg[c] /= kept;
+  for (let i = 0; i < w * h; i++) {
+    if (!gone[i]) continue;
+    for (let c = 0; c < 3; c++) d[i * 4 + c] = avg[c];
+    d[i * 4 + 3] = 0;
+  }
+  for (let i = 0; i < w * h; i++) if (!gone[i]) d[i * 4 + 3] = alpha[i];
+  const cw = x1 - x0 + 1;
+  const ch = y1 - y0 + 1;
+  const pixels = new ImageData(cw, ch);
+  for (let y = 0; y < ch; y++) {
+    const from = ((y0 + y) * w + x0) * 4;
+    pixels.data.set(d.subarray(from, from + cw * 4), (ch - 1 - y) * cw * 4);
+  }
+  return { pixels, aspect: cw / ch };
+}

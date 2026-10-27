@@ -214,7 +214,7 @@ async function failure(res: Response): Promise<Error> {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Step 1: the picture; also the whole of a world's ground texture (`groundTexture.ts`), at its own size. */
-export async function drawImage(key: string, prompt: string, label: FalSlot | 'ground', o: FalOptions, size = IMAGE_SIZE): Promise<string> {
+export async function drawImage(key: string, prompt: string, label: FalSlot | 'ground' | 'cover', o: FalOptions, size = IMAGE_SIZE): Promise<string> {
   const f = o.fetchImpl ?? fetch;
   const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, label);
   try {

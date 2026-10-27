@@ -52,6 +52,7 @@ import {
 } from '../../utils/rpg/devlog';
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture, groundState } from '../../utils/rpg/groundTexture';
+import { coverState, ensureGroundCover, hasCover } from '../../utils/rpg/groundCover';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
 import {
   cluePrompt,
@@ -92,6 +93,7 @@ import {
   savePendingGenesis,
   saveWorld,
   addWorldSpend,
+  setWorldCover,
   setWorldGround,
   setWorldModel,
   setWorldSizes,
@@ -832,7 +834,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * What fal.ai made for a world before the world existed to keep it (`previewWorld`): held here
    * by its id until the world is born and saved with it (`withEarly`).
    */
-  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture }>());
+  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture; cover?: GroundTexture[] }>());
   const earlyFor = (id: string) => {
     let kept = earlyRef.current.get(id);
     if (!kept) earlyRef.current.set(id, (kept = { models: [] }));
@@ -870,6 +872,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setWorld((now) => (now?.id === id ? { ...now, groundTexture: texture } : now));
   }, []);
 
+  /** And what grows on it. */
+  const keepCover = useCallback((id: string, sprites: GroundTexture[]) => {
+    markStage('cover');
+    if (!findWorld(id)) {
+      earlyFor(id).cover = sprites;
+      return;
+    }
+    setWorldCover(id, sprites);
+    if (worldRef.current?.id === id) worldRef.current = { ...worldRef.current, coverSprites: sprites };
+    setWorld((now) => (now?.id === id ? { ...now, coverSprites: sprites } : now));
+  }, []);
+
   /** A world just born, with whatever was made for it while it was still being written. */
   const withEarly = useCallback((w: WorldBible): WorldBible => {
     const kept = earlyRef.current.get(w.id);
@@ -877,6 +891,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     earlyRef.current.delete(w.id);
     let next = kept.models.reduce((acc, [slot, model]) => withModel(acc, slot, model), w);
     if (kept.ground) next = { ...next, groundTexture: kept.ground };
+    if (kept.cover) next = { ...next, coverSprites: kept.cover };
     return next;
   }, []);
 
@@ -886,6 +901,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const key = falKeyRef.current;
       if (!key || w.createdAt === 0) return;
       ensureGroundTexture(key, w, (texture) => keepGround(w.id, texture), (e) => log.warn('rpg.ground.failed', describeError(e)));
+      ensureGroundCover(key, w, (sprites) => keepCover(w.id, sprites), (e) => log.warn('rpg.cover.failed', describeError(e)));
       ensureHubModels(
         key,
         w,
@@ -893,7 +909,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
       );
     },
-    [keepGround, keepModel],
+    [keepCover, keepGround, keepModel],
   );
 
   /**
@@ -1119,6 +1135,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const pending = falPending();
     const aw = creating ? previewRef.current : world;
     if (creating && !aw) {
+      // The ground and what grows on it, both pictures, both in the ground's row.
+      tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       for (let i = 0; i < HUB_SLOTS.length; i++) tasks.push({ kind: 'model', state: 'queued', since: null, afterWorld: true });
     } else if (aw && aw.createdAt > 0) {
@@ -1129,6 +1147,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
         state: aw.groundTexture || early?.ground ? 'done' : ground === 'pending' ? 'running' : ground === 'failed' ? 'failed' : 'queued',
         since: null,
       });
+      if (hasCover(aw)) {
+        const cover = coverState(aw.id);
+        tasks.push({
+          kind: 'ground',
+          state: aw.coverSprites || early?.cover ? 'done' : cover === 'pending' ? 'running' : cover === 'failed' ? 'failed' : 'queued',
+          since: null,
+        });
+      }
       for (const slot of hubSlots(aw)) {
         const asked = pending.find((p) => p.id === `${aw.id}/${slot}`);
         const state: Task['state'] =
@@ -1190,6 +1216,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // And the ground it all stands on, painted for the world (`utils/rpg/groundTexture.ts`).
     const groundImage = world.createdAt > 0 ? (world.groundTexture?.image ?? null) : null;
     void scene.setGroundTexture(groundImage, (e) => log.warn('rpg.ground.load.failed', describeError(e)));
+    // And what grows on it (`utils/rpg/groundCover.ts`); under a layout nothing grows until it has come.
+    const cover = world.createdAt > 0 ? (world.coverSprites ?? []).map((s) => s.image) : [];
+    void scene.setGroundCover(cover, (url, e) => log.warn('rpg.cover.load.failed', { url, ...describeError(e) }));
     // A world described before genesis gave sizes asks for them once, so its pieces stand as big as
     // what they are rather than as big as their slot (`hubFit`).
     if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {

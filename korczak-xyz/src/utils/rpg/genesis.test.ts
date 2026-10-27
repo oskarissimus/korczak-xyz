@@ -113,11 +113,14 @@ describe('parseWorlds', () => {
   });
 
   it('keeps the ground a candidate described, in English, for the ground texture', () => {
-    const reply = JSON.stringify({ worlds: [candidate('Mud', 40, { terrain: ' wet black mud with puddles ' }), candidate('Bare', 40)] });
+    const reply = JSON.stringify({ worlds: [candidate('Mud', 40, { terrain: ' wet black mud with puddles ', cover: ' reeds and sedge ' }), candidate('Bare', 40)] });
     const [mud, bare] = parseWorlds(reply, ctx, 1000);
     expect(mud.terrain).toBe('wet black mud with puddles');
     expect(bare.terrain).toBeUndefined();
+    expect(mud.cover).toBe('reeds and sedge');
+    expect(bare.cover).toBeUndefined();
     expect(genesisPrompt(ctx)).toContain('"terrain"');
+    expect(genesisPrompt(ctx)).toContain('"cover"');
   });
 
   it('asks an older world’s sizes from the lines its pieces were drawn from', () => {

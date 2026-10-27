@@ -302,7 +302,8 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   `lamp`s around the square between the paths in, and `goods` where its barrels and crates are.
   A world whose flora is `none` makes no tree. Made four at a time (`PARALLEL`), all eight in
   ~1–1.5 min, the landmark first; each replaces what stood there the moment it has loaded, so the
-  village changes a piece at a time. Fence, bench and ground cover stay the kit's.
+  village changes a piece at a time. Fence and bench stay the kit's; the ground cover is the world's
+  own too (below).
 - **The prompts are English**: genesis writes the `landmark` and a `kit` line per piece (at most
   18 words each) in English whatever the world's language, since an image model reads Polish badly.
   A world from before them is described from its hub, architecture, tech and flora
@@ -360,6 +361,35 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     reload. The classic world and a reader without a fal key keep the scan. In the console as kind
     `fal` labelled `ground`, counted as `N× tex` beside the 3D models (`falTextures`), its price in
     the fal.ai total and the closing screen's; Sentry Logs `rpg.landmark` with `piece: 'ground'`.
+- **And what grows on it** (owner, 27 Oct 2026, a screenshot of a misty night world with the kit's
+  ferns and grass tufts on it: "the locations still use grass and plants read from the assets, not
+  generated, and they don't fit the location or the world"). The ~2,900 tufts were the kit's
+  meadow, tinted. Now genesis writes `cover` (English, ≤14 words, what grows or lies on the open
+  ground, knee-high at most, or `none`), and `utils/rpg/groundCover.ts` has FLUX.1 [schnell] draw
+  three clumps of it alone on white at 512² — a low wide one, a taller one, a striking one
+  (`COVER_KINDS`) — all three at once: **$0.009 a world**, ~1 s, beside the ground. A world from
+  before is described from its weather, growth, climate, terrain and foliage colour; `none`, a
+  barren or a flooded look asks for nothing.
+  - **Pictures on crossed quads, not models**: a TRELLIS model per tuft would be $0.02 and a minute
+    each and thousands in view. `RpgScene.setGroundCover` plants each kind as it arrives (4,000 /
+    1,500 / 700, 0.4–1.3 m, per 48 m cell like the kit's, thinned by growth like the kit's), eight
+    triangles a tuft: two quads crossed, each face both ways round with its normals up, since a
+    double-sided back face turns its normal down and goes dark. Alpha-tested, no shadow cast.
+  - **Cut out in the browser** (`cutOut`, `surfaces.ts`): the background flood-filled from the
+    edge, then the nearly pure white the stems close in, then the two-pixel fringe *unblended*
+    from the white (alpha from how far from white, white taken back out of the colour) — kept as
+    drawn, a black weed's thin stems were mostly grey-on-white and the clump came out silver. The
+    see-through pixels take the clump's average colour so the mipmaps bleed no white halo, and the
+    result is pixels for a `DataTexture`, not a canvas, which forgets colour where alpha is 0. A
+    picture whose edge is not mostly that white (FLUX drew a night sky behind a clump when the line
+    mentioned one) is refused rather than planted as a card. Prompt: "nothing under it: no ground,
+    no soil, no shadow" — without it FLUX stood each clump on a disc of soil.
+  - The kit's meadow (`kitCover`) shows only with no layout — the classic village, or no key; under
+    a layout the ground is bare until the world's own comes. Kept on the bible (`coverSprites`,
+    `setWorldCover`), bytes in the Cache API; one try per world a session. In the console as kind
+    `fal` labelled `cover`, counted with the ground as `N× tex`; stage `cover` on the start line, and
+    a task in the ground's row of the start's progress;
+    Sentry Logs `rpg.landmark` with `piece: 'cover'`.
 - **An empty board until then, and nothing where it was predefined** (owner, 27 Oct 2026: "while
   the world is generated and there are no assets yet there should be an empty board, not
   placeholders; things should just appear as they become available, and where they stand should be
@@ -374,7 +404,7 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   footprint, sized by the world's own `sizes`. `RpgScene.setLayout` puts each model's copies on its
   spots and plants the forest there; a spot blocks nothing until its model stands. Under a layout
   **no kit piece stands at all** — no house, well, fence, bench, prop or kit tree, no primitive
-  stopgap — so the board is the ground and the grass, and the hub fills in a model at a time as each
+  stopgap, not even the kit's grass — so the board is the bare ground, and the hub fills in a model at a time as each
   loads (`setHubModels`, `setForest`); while genesis runs the board is `EMPTY_LAYOUT`, so the last
   world's village does not stand behind the new one. A load already on its way to the same URL is
   left to finish (`hubWanted`): the world changes with every arrival and asks for all eight again,
@@ -542,7 +572,7 @@ content-hashed and immutable.
   whose top-level nodes are the pieces by source name. Houses are *built*, not loaded: 2 m wall
   modules (door, wide windows, plaster/timber/brick), corner posts, two gables and a tiled roof,
   small 4×6 m or large 6×8 m, facing the square. Trees and ground cover (~2,900 grass, fern,
-  bush and flower clumps outside radius 14) are `InstancedMesh` per part; a tree a place clears is
+  bush and flower clumps outside radius 14, the classic village's only) are `InstancedMesh` per part; a tree a place clears is
   hidden by a zero matrix, not removed. Kit meshes are `userData.shared`, so `clearPlaces`
   disposes none of them. Quest places use the kit's pines, dead trees, rocks and huts when it has
   loaded and primitives otherwise. The well is still hand-built (inner and outer walls — a single

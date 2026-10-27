@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { LANDMARK_REACH, placePosition, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
 import type { ObjectiveKind } from '../../utils/rpg/quest';
 import {
@@ -24,7 +25,7 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { breakTiling, seamless, surfaceMat } from './surfaces';
+import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
@@ -441,6 +442,7 @@ export class RpgScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.ground = ground;
+    this.scene.add(this.kitCover, this.ownCover);
     this.groundScan = (ground.material as THREE.MeshStandardMaterial).map!;
 
     this.buildVillage();
@@ -809,7 +811,7 @@ export class RpgScene {
           tufts.forEach((t, i) => m.setMatrixAt(i, t.base.clone().multiply(parts[j].matrix)));
           m.instanceMatrix.needsUpdate = true;
           m.computeBoundingSphere();
-          this.scene.add(m);
+          this.kitCover.add(m);
           this.cover.push({ mesh: m, n: tufts.length });
           return m;
         });
@@ -874,6 +876,8 @@ export class RpgScene {
 
   private fencePosts: THREE.Mesh[] = [];
   private cover: { mesh: THREE.InstancedMesh; n: number }[] = [];
+  /** The kit's meadow, only in the classic village: an invented world's grows its own (`setGroundCover`). */
+  private kitCover = new THREE.Group();
   private ground!: THREE.Mesh;
   /** The Poly Haven scan the ground starts with, and goes back to without a world's own. */
   private groundScan!: THREE.Texture;
@@ -979,6 +983,7 @@ export class RpgScene {
 
     if (this.kit.loaded) this.dressWorld();
     else if (!classic && (look.flora === 'fungi' || look.flora === 'spires' || look.flora === 'none')) this.plantTrees();
+    this.refreshCover();
   }
 
   /** What needs the kit: its leaves, walls and roofs recoloured, its trees replanted, its ground cover thinned. */
@@ -998,9 +1003,133 @@ export class RpgScene {
       if (m) recolor(m, look.roof, classic ? 0 : name === 'MI_WoodTrim' ? 0.35 : 0.75);
     }
     this.plantTrees();
-    // Bare ground, a little, or all of it; under a flood the only cover is the reeds of the places.
+    this.refreshCover();
+  }
+
+  /**
+   * How much grows: bare ground, a little, or all of it; under a flood the only cover is the reeds
+   * of the places. The kit's meadow only in the classic village, the world's own under a layout.
+   */
+  private refreshCover() {
+    const look = this.look;
+    const classic = this.isClassic();
     const share = classic ? 1 : look.water === 'flooded' ? 0 : look.growth === 'barren' ? 0 : look.growth === 'sparse' ? 0.3 : 1;
+    this.kitCover.visible = this.layout === null;
+    this.ownCover.visible = this.layout !== null;
     for (const { mesh, n } of this.cover) mesh.count = Math.floor(n * share);
+    for (const { mesh, n } of this.ownTufts) mesh.count = Math.floor(n * share);
+  }
+
+  // --- what grows on a world's own ground, from fal.ai (`utils/rpg/groundCover.ts`) ---------------
+
+  private ownCover = new THREE.Group();
+  private ownTufts: { mesh: THREE.InstancedMesh; n: number }[] = [];
+  private ownCoverCells: Cell[] = [];
+  private ownCoverWanted = '';
+  private ownCoverToken = 0;
+  /** Each kind's geometry, material and texture, to be given back when the world changes. */
+  private ownCoverKinds: { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial }[] = [];
+
+  /**
+   * The world's own grass and plants across the open ground in place of the kit's meadow, each kind
+   * a cut-out on crossed quads (`cutOut`), planted as it arrives where the kit's tufts would be. An
+   * empty list (none made yet, a bare world) leaves the ground bare under a layout; the classic
+   * village keeps the kit's either way.
+   */
+  async setGroundCover(urls: string[], onError: (url: string, e: unknown) => void = () => {}): Promise<void> {
+    const key = urls.join(' ');
+    if (key === this.ownCoverWanted) return;
+    this.ownCoverWanted = key;
+    const token = ++this.ownCoverToken;
+    this.ownCover.clear();
+    this.ownTufts = [];
+    this.ownCoverCells = [];
+    for (const k of this.ownCoverKinds) {
+      k.geometry.dispose();
+      k.material.map?.dispose();
+      k.material.dispose();
+    }
+    this.ownCoverKinds = [];
+    await Promise.all(
+      urls.map(async (url, kind) => {
+        let cut: ReturnType<typeof cutOut>;
+        try {
+          const bitmap = await createImageBitmap(new Blob([await loadLandmarkBytes(url)]));
+          cut = token === this.ownCoverToken ? cutOut(bitmap) : null;
+          bitmap.close();
+          if (token === this.ownCoverToken && !cut) throw new Error('no clump left once the background was taken away');
+        } catch (e) {
+          onError(url, e);
+          return;
+        }
+        if (!cut || token !== this.ownCoverToken) return;
+        this.plantOwnCover(kind, cut.pixels, cut.aspect);
+      }),
+    );
+  }
+
+  /**
+   * One kind of the world's own cover: how many and how tall in metres. Denser than the kit's meadow,
+   * eight triangles a tuft being a fraction of one of its clumps.
+   */
+  private plantOwnCover(kind: number, pixels: ImageData, aspect: number) {
+    const [count, minH, maxH] = ([[4000, 0.4, 0.8], [1500, 0.7, 1.3], [700, 0.4, 0.75]] as const)[kind] ?? [700, 0.4, 0.75];
+    const tex = new THREE.DataTexture(pixels.data, pixels.width, pixels.height, THREE.RGBAFormat);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    const material = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 1 });
+    // Two quads crossed, each face both ways round rather than double-sided: their normals point up,
+    // lit like the ground they grow from, and a double-sided back face would turn its normal down.
+    const quads: THREE.BufferGeometry[] = [];
+    for (const turn of [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2]) {
+      const q = new THREE.PlaneGeometry(aspect, 1);
+      q.translate(0, 0.5, 0);
+      q.rotateY(turn);
+      quads.push(q);
+    }
+    const geometry = mergeGeometries(quads)!;
+    for (const q of quads) q.dispose();
+    const normals = geometry.getAttribute('normal');
+    for (let i = 0; i < normals.count; i++) normals.setXYZ(i, 0, 1, 0);
+    this.ownCoverKinds.push({ geometry, material });
+
+    const rand = rng(31 + kind);
+    const byCell = new Map<string, { x: number; z: number; base: THREE.Matrix4; shade: number }[]>();
+    for (let i = 0; i < count; i++) {
+      let x = 0;
+      let z = 0;
+      do {
+        x = (rand() - 0.5) * COVER_HALF * 2;
+        z = (rand() - 0.5) * COVER_HALF * 2;
+      } while (Math.hypot(x, z) < 14);
+      const s = minH + rand() * (maxH - minH);
+      const base = new THREE.Matrix4().compose(
+        new THREE.Vector3(x, 0, z),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
+        new THREE.Vector3(s, s, s),
+      );
+      const key = cellKey(x, z);
+      byCell.set(key, [...(byCell.get(key) ?? []), { x, z, base, shade: 0.8 + rand() * 0.3 }]);
+    }
+    const color = new THREE.Color();
+    for (const tufts of byCell.values()) {
+      const m = new THREE.InstancedMesh(geometry, material, tufts.length);
+      m.receiveShadow = true;
+      tufts.forEach((t, i) => {
+        m.setMatrixAt(i, t.base);
+        m.setColorAt(i, color.setScalar(t.shade));
+      });
+      m.instanceMatrix.needsUpdate = true;
+      m.computeBoundingSphere();
+      this.ownCover.add(m);
+      this.ownTufts.push({ mesh: m, n: tufts.length });
+      this.ownCoverCells.push(cellOf([m], tufts));
+    }
+    this.refreshCover();
   }
 
   /**
@@ -1184,6 +1313,7 @@ export class RpgScene {
     for (const slot of this.hubModels.keys()) this.placeCopies(slot);
     this.layTrees();
     this.refreshHub();
+    this.refreshCover();
   }
 
   /** A model's copies on its slot's spots, again: the clones share the template's geometry and materials. */
@@ -2236,6 +2366,7 @@ export class RpgScene {
     };
     for (const cell of this.treeCells) set(cell);
     for (const cell of this.coverCells) set(cell);
+    for (const cell of this.ownCoverCells) set(cell);
     for (const place of this.places.values()) {
       place.group.visible = Math.hypot(place.center.x - x, place.center.z - z) - PLACE_RADIUS - LANDMARK_REACH < far;
     }
@@ -2282,6 +2413,7 @@ export class RpgScene {
     this.senses.dispose();
     // A forest tree still loading is not planted in a scene that is gone.
     this.forestToken++;
+    this.ownCoverToken++;
     this.groundUrl = null;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);

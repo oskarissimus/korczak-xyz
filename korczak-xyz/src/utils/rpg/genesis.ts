@@ -148,6 +148,14 @@ export interface WorldBible extends WorldBrief {
   terrain?: string;
   /** That ground painted by fal.ai, once; kept so it is never painted again. */
   groundTexture?: GroundTexture;
+  /**
+   * What grows or lies about on that ground, knee-high at most, in ENGLISH: the grass, moss, weeds or
+   * litter scattered across the map (`groundCover.ts`), or `none` for bare ground. Worlds from before
+   * 27 Oct 2026 have none and are described from their look and climate.
+   */
+  cover?: string;
+  /** Those painted by fal.ai as cut-out pictures, once each, the low clump first; kept like the ground. */
+  coverSprites?: GroundTexture[];
 }
 
 /** A world's ground texture as fal.ai drew it; the scene makes it seamless when it loads it. */
@@ -607,6 +615,9 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "terrain": string (IN ENGLISH too, at most 14 words: what the open ground between the buildings is, up',
     '    close, as a material — "wet black mud with puddles", "fresh snow over frozen earth", "cracked red clay',
     '    with pebbles", "rusted metal plates and sand"; it must agree with "growth", "weather" and "water" above),',
+    '  "cover": string (IN ENGLISH too, at most 14 words: the small things growing or lying on that ground, knee-high',
+    '    at most, that fit this world — "tufts of dry yellow grass and thistles", "glowing blue moss and tiny',
+    '    mushrooms", "wiry black weeds and rusty bolts"; exactly "none" if the ground is bare),',
     `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
     '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
     '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
@@ -839,6 +850,7 @@ function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBi
     ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
     ...parseKit(r.kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
+    ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }
@@ -896,6 +908,7 @@ export function previewWorld(soFar: string, ctx: GenesisContext, now: number): W
     landmark: text(r.landmark, 300)!,
     ...parseKit(kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
+    ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }

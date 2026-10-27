@@ -71,7 +71,7 @@ export interface QuestTotals {
   falCost: number;
   /** 3D models fal.ai finished. */
   falModels: number;
-  /** Ground textures fal.ai painted (`groundTexture.ts`). */
+  /** Pictures fal.ai painted for the ground and what grows on it (`groundTexture.ts`, `groundCover.ts`). */
   falTextures: number;
   requests: number;
   errors: number;
@@ -90,7 +90,7 @@ export interface Spend {
   voiceCost: number;
   falCost: number;
   falModels: number;
-  /** Ground textures fal.ai painted (`groundTexture.ts`). */
+  /** Pictures fal.ai painted for the ground and what grows on it (`groundTexture.ts`, `groundCover.ts`). */
   falTextures: number;
   /** Part of it was spent before it was recorded (a save, or a world, from before), so a floor. */
   partial?: boolean;
@@ -173,6 +173,7 @@ export function triesSpend(tries: readonly ModelTry[], ms: number): ModelSpend {
 export function worldSpend(world: WorldBible | null): Spend | null {
   if (!world || world.createdAt === 0) return null;
   const models = [world.landmarkModel, ...Object.values(world.kitModels ?? {})].filter((m) => m !== undefined);
+  const textures = [...(world.groundTexture ? [world.groundTexture] : []), ...(world.coverSprites ?? [])];
   const s = world.spent;
   return {
     ...NO_SPEND,
@@ -180,12 +181,12 @@ export function worldSpend(world: WorldBible | null): Spend | null {
     tokens: s ? { ...s.tokens } : { ...NO_SPEND.tokens },
     modelCost: s?.modelCost ?? 0,
     unpriced: s?.unpriced ?? false,
-    falCost: [...models, ...(world.groundTexture ? [world.groundTexture] : [])].reduce(
+    falCost: [...models, ...textures].reduce(
       (sum, m) => sum + (Number.isFinite(m.costUsd) ? m.costUsd : 0),
       0,
     ),
     falModels: models.length,
-    falTextures: world.groundTexture ? 1 : 0,
+    falTextures: textures.length,
     ...(s ? {} : { partial: true }),
   };
 }
@@ -332,7 +333,7 @@ export function questSpend(): Spend {
     } else if (r.kind === 'fal') {
       now.falCost += r.cost ?? 0;
       if (r.status === 'ok' && r.model.includes('trellis')) now.falModels += 1;
-      if (r.status === 'ok' && r.label === 'ground') now.falTextures += 1;
+      if (r.status === 'ok' && (r.label === 'ground' || r.label === 'cover')) now.falTextures += 1;
     } else if (r.usage) {
       now.tokens.input += r.usage.input;
       now.tokens.output += r.usage.output;
@@ -380,7 +381,7 @@ export function questTotals(): QuestTotals {
     if (r.kind === 'fal') {
       totals.falCost += r.cost ?? 0;
       if (r.status === 'ok' && r.model.includes('trellis')) totals.falModels += 1;
-      if (r.status === 'ok' && r.label === 'ground') totals.falTextures += 1;
+      if (r.status === 'ok' && (r.label === 'ground' || r.label === 'cover')) totals.falTextures += 1;
       continue;
     }
     if (r.usage) {
@@ -402,7 +403,7 @@ export function questTotals(): QuestTotals {
  */
 
 /** What the start waits for, in the order it usually comes. */
-export const STAGES = ['assets', 'world', 'quest', 'ground', 'landmark', 'firstModel', 'hub', 'all'] as const;
+export const STAGES = ['assets', 'world', 'quest', 'ground', 'cover', 'landmark', 'firstModel', 'hub', 'all'] as const;
 export type Stage = (typeof STAGES)[number];
 
 let timelineSince: number | null = null;
