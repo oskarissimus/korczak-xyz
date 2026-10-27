@@ -390,6 +390,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** Bumped whenever the library may have changed, so the intro reads it again. */
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
+  const [logOpen, setLogOpen] = useState(false);
   const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls'>('main');
   const startedRef = useRef(false);
   startedRef.current = started;
@@ -926,8 +927,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // beat being written is not such a thing: the hunter walks while it is (owner, Oct 2026).
   useEffect(() => {
     // A stalled beat asks a question, and on a desktop the cursor has to come back to answer it.
-    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null || stalled !== null);
-  }, [started, dialogue, held, ending, stalled]);
+    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null || stalled !== null || logOpen);
+  }, [started, dialogue, held, ending, stalled, logOpen]);
 
   // The play clock: from Start or Continue to the ending, talking and reading included, a hidden
   // page not. Measured by the clock rather than counted in ticks, which a main thread busy loading
@@ -1220,6 +1221,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [choose, close, dialogue, held]);
 
+  // J opens the quest journal, as in every RPG since the nineties; Escape or J again closes it.
+  useEffect(() => {
+    if (!started || dialogue) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyJ' && !e.repeat) setLogOpen((open) => !open);
+      else if (e.key === 'Escape') setLogOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [started, dialogue]);
+
   // `~` (the key under Escape, whatever the layout prints on it) opens the developer console.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1470,6 +1482,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setDialogue(null);
     setHeld(null);
     setStarted(false);
+    setLogOpen(false);
     setMenu('main');
     if (stalePullRef.current) {
       stalePullRef.current = false;
@@ -1671,6 +1684,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li>{t.touchLook}</li>
           <li>{t.touchAct}</li>
           <li>{t.touchSenses}</li>
+          <li>{t.touchJournal}</li>
         </ul>
       ) : (
         <ul className="rpg-controls">
@@ -1680,6 +1694,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li><kbd>LMB</kbd> {t.attack}</li>
           <li><kbd>E</kbd> {t.interact}</li>
           <li><kbd>Q</kbd> {t.sensesHelp}</li>
+          <li><kbd>J</kbd> {t.journal}</li>
         </ul>
       )}
       <p className="rpg-panel-note">{t.intro}</p>
@@ -1705,8 +1720,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
       {started && (
         <>
-          <div className={`rpg-journal${noticeShown ? ' rpg-journal-fresh' : ''}`}>
-            {beat && <div className="rpg-journal-title">{beat.title}</div>}
+          {/* Only what to do now (owner, Oct 2026: the whole log in the corner covered a third of an
+              iPhone screen). The quest so far is a tap away, in the journal. A div acting as a button: the
+              stream line inside it is a block, which a <button> may not hold. */}
+          <div
+            role="button"
+            tabIndex={0}
+            className={`rpg-journal${noticeShown ? ' rpg-journal-fresh' : ''}`}
+            onClick={() => setLogOpen(true)}
+            title={t.journal}
+          >
             {objective && <div className="rpg-journal-objective">◆ {objective}</div>}
             {(generating || unfolding) && (
               <>
@@ -1714,17 +1737,35 @@ export default function Rpg({ lang }: { lang: Lang }) {
                 <StreamLine />
               </>
             )}
-            {beat?.place && !ending && !unfolding && <div className="rpg-journal-place">{beat.place.name}</div>}
-            {beat && beat.clues.length > 0 && !ending && !unfolding && (
-              <div className="rpg-journal-step">{t.clues(seenCount, beat.clues.length)}</div>
-            )}
-            {history.slice(-3).map((step, i) => (
-              <div key={`${i}-${step.chose}`} className="rpg-journal-step">
-                ◇ {step.chose}
-              </div>
-            ))}
             {ending && <div className="rpg-journal-objective">✓ {t.completed}</div>}
           </div>
+
+          {logOpen && !dialogue && !ending && (
+            <div className="rpg-overlay rpg-log" role="dialog" aria-label={t.journal} onClick={() => setLogOpen(false)}>
+              <div className="rpg-log-page" onClick={(e) => e.stopPropagation()}>
+                <h3>📜 {t.journal}</h3>
+                {beat && <p className="rpg-log-title">{beat.title}</p>}
+                {objective && <p className="rpg-log-objective">◆ {objective}</p>}
+                {beat?.place && !unfolding && <p className="rpg-log-place">{beat.place.name}</p>}
+                {beat && beat.clues.length > 0 && !unfolding && <p className="rpg-log-place">{t.clues(seenCount, beat.clues.length)}</p>}
+                <h4>{t.yourDecisions}</h4>
+                {history.length > 0 ? (
+                  <ol className="rpg-ending-steps">
+                    {history.map((step, i) => (
+                      <li key={`${i}-${step.chose}`}>
+                        <strong>{step.chose}</strong> {step.consequence}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="rpg-ending-note">{t.noDecisions}</p>
+                )}
+                <button type="button" className="rpg-start" onClick={() => setLogOpen(false)}>
+                  {t.close}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rpg-hp" aria-label={`${t.health} ${hp}`}>
             <div className="rpg-hp-fill" style={{ width: `${hp}%` }} />
@@ -1794,7 +1835,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
             </div>
           )}
 
-          {touch && !dialogue && !held && !ending && (
+          {touch && !dialogue && !held && !ending && !logOpen && (
             <TouchControls
               prompt={prompt}
               promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}

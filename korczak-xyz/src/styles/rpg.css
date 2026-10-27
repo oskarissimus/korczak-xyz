@@ -46,18 +46,64 @@
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid transparent;
   transform: translateZ(0);
-  pointer-events: none;
-}
-
-.rpg-journal-title {
-  font-size: 17px;
-  font-weight: bold;
-  color: #ffd36b;
+  cursor: pointer;
+  z-index: 2;
 }
 
 .rpg-journal-objective {
   font-size: 14px;
-  margin-top: 4px;
+  margin: 2px 0;
+  /* The objective alone, and at most three lines of it: the rest is in the journal. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* The quest journal (J, or a tap on the objective): the quest so far, which used to be stacked
+   under the objective in the corner. */
+.rpg-log {
+  z-index: 7;
+  justify-content: safe center;
+  overflow-y: auto;
+  padding: calc(16px + var(--safe-top, 0px)) calc(16px + var(--safe-right, 0px))
+    calc(16px + var(--safe-bottom, 0px)) calc(16px + var(--safe-left, 0px));
+}
+
+.rpg-log-page {
+  width: 100%;
+  max-width: 34rem;
+}
+
+.rpg-log h3 {
+  margin: 0 0 0.4rem;
+  font-size: 22px;
+  color: #ffd36b;
+}
+
+.rpg-log h4 {
+  margin: 0.9rem 0 0.3rem;
+  font-size: 16px;
+  color: #ffd36b;
+}
+
+.rpg-log-title {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.rpg-log .rpg-log-objective {
+  margin-top: 0.3rem;
+}
+
+.rpg-log-place {
+  font-size: 14px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.rpg-log .rpg-start {
+  margin-top: 1rem;
 }
 
 .rpg-hp {
@@ -486,19 +532,6 @@ ul.rpg-source {
   .rpg-journal-fresh {
     animation: none;
   }
-}
-
-.rpg-journal-place {
-  font-size: 13px;
-  font-style: italic;
-  opacity: 0.85;
-  margin-top: 2px;
-}
-
-.rpg-journal-step {
-  margin-top: 0.2rem;
-  font-size: 0.78rem;
-  opacity: 0.75;
 }
 
 .rpg-today {
@@ -1068,10 +1101,6 @@ body:has(.rpg-immersive) .safe-top-band {
     max-width: calc(100% - 176px - var(--safe-left, 0px) - var(--safe-right, 0px));
   }
 
-  .rpg-journal-title {
-    font-size: 15px;
-  }
-
   .rpg-journal-objective {
     font-size: 13px;
   }
@@ -1107,7 +1136,7 @@ body:has(.rpg-immersive) .safe-top-band {
 }
 
 /* Landscape on a small phone: 375 px is not tall enough for the stick, the buttons and a journal,
-   so the journal shrinks and the dialogue may cover most of the height. */
+   so the objective gets two lines and the dialogue may cover most of the height. */
 @media (max-height: 480px) {
   .rpg-stick {
     width: 104px;
@@ -1133,8 +1162,8 @@ body:has(.rpg-immersive) .safe-top-band {
     max-height: 78%;
   }
 
-  .rpg-journal-step {
-    display: none;
+  .rpg-journal-objective {
+    -webkit-line-clamp: 2;
   }
 }
 

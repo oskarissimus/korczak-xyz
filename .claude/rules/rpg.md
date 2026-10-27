@@ -744,10 +744,16 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   ważą" over "Porozmawiaj", two clue counts stacked). Its own background and `translateZ(0)` are
   the fix; do not take either off to make it look lighter. The `✕`, `🔊` and `~` are one style,
   square, brown-bordered.
+- **The corner holds the objective and nothing else** (owner, Oct 2026, an iPhone screenshot: title,
+  objective, place, clue count and three past decisions covered a third of the screen — "leave
+  only the current objective, move the history deeper"). At most three lines of it, two in
+  landscape. Everything else — the quest's title, the place, the traces examined, every decision
+  with its consequence — is in the **quest journal**, opened by tapping the objective or with `J`;
+  the world pauses while it is open and the touch controls step aside.
 - **Small screens** (`max-width` or `max-height` 480 px): the dialogue is a sheet along the bottom,
   full width, scrolling, with 44 px rows; the journal, HP bar and headings shrink; the small
   buttons (🔊, `~`) move to the top, the bottom corners being the thumbs'. Landscape (375 px tall)
-  shrinks the stick and buttons and hides the journal's history lines.
+  shrinks the stick and buttons and clamps the objective to two lines.
 
 **It installs** (owner, Oct 2026: "it should be a PWA too"): `pwa="rpg"` on both pages, scope
 `/apps/rpg`, *Wanderer* / *Wędrowiec* under a sword-on-glass icon, a precache tier of its code
