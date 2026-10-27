@@ -71,6 +71,12 @@ describe('parseBeat', () => {
     expect(gated(['witness', 1])).toEqual([undefined, undefined]);
   });
 
+  it('keeps the English prop of a thing to gather, and only of one', () => {
+    const reply = JSON.stringify({ ...good, targetName: 'rdzeń', targetProp: 'a cracked green glowing reactor core' });
+    expect(parseBeat(reply, { ...ctx, job: { kind: 'collect', count: 2 } })?.job?.prop).toBe('a cracked green glowing reactor core');
+    expect(parseBeat(reply, ctx)?.job?.prop).toBeUndefined();
+  });
+
   it('plays a good beat, with the job and the plan the game drew', () => {
     const beat = parseBeat('```json\n' + JSON.stringify(good) + '\n```', ctx);
     expect(beat).toMatchObject({

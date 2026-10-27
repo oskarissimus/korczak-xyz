@@ -347,6 +347,13 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   copy of the place (the quest's list, its beats, the atlas: `updateAtlasPlace`). A place from before
   `assets` gets a landmark from its name and the world's architecture. The block landmark and the
   features are still asked for and still drawn in the classic world and without a key.
+- **And the things to gather** (owner, 27 Oct 2026: "the things to pick up should be generated
+  assets too"). A collect beat writes `targetProp` in English (`BeatJob.prop`); `ensureClueModel`
+  makes it once (`cluePrompt`, its name for a beat from before) and it is kept on the beat's job
+  (`job.model`) like a clue's. In an invented world with a key the things are nothing until it comes
+  (`spawnObjective`'s `item.wait`; an invisible thing cannot be picked up), then every one of them is
+  the model (`setItemModel`), floating and turning as the block did. A model that fails, or no key,
+  puts the block back, so the step can always be done.
 - **Each piece is sized as what it is, not as its slot** (owner, 26 Oct 2026, a screenshot of a
   caravan world's covered truck towering over the hero). TRELLIS answers in a unit box, so the size
   is wholly the game's, and `HUB_FIT` gave every slot a building's: a "house" that was a truck came

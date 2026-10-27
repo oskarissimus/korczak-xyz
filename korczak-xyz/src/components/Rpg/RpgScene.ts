@@ -90,6 +90,8 @@ const TALK_RANGE = 3.2;
 const PICKUP_RANGE = 2.2;
 /** A clue's model from fal.ai: something lying on the ground, knee-high at most. */
 const CLUE_FIT = { height: 0.8, width: 1.2 };
+/** A thing to gather from fal.ai, floating: about the block's size, times the look's own size. */
+const ITEM_FIT = { height: 0.7, width: 0.8 };
 const ATTACK_RANGE = 3;
 const ATTACK_COOLDOWN = 0.55;
 const MAX_HP = 100;
@@ -1642,6 +1644,7 @@ export class RpgScene {
     const clue = this.nearestClue();
     if (clue) options.push({ d: this.clues.get(clue)!.position.clone().setY(0).distanceTo(at), thing: { examine: clue } });
     for (const p of this.pickups) {
+      if (!p.mesh.visible) continue;
       const d = p.mesh.position.clone().setY(0).distanceTo(at);
       if (d < PICKUP_RANGE) options.push({ d, thing: { pickup: p } });
     }
@@ -1664,9 +1667,21 @@ export class RpgScene {
 
   // --- the quest's things -----------------------------------------------------------------------
 
-  /** Puts a beat's things in the middle of its place, replacing any left from before. */
-  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null) {
+  /**
+   * Puts a beat's things in the middle of its place, replacing any left from before. A thing to
+   * gather is its fal.ai model when `item` names one (`setItemModel`); with `item.wait` it is nothing
+   * at all until that model comes, in an invented world, where no block stands in for anything.
+   */
+  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null, item: { url?: string; wait?: boolean } = {}) {
     this.clearObjective();
+    this.itemLook = look;
+    this.itemWait = !!item.wait;
+    if (this.itemModel?.url !== item.url) {
+      if (this.itemModel) disposeHubModel(this.itemModel.template);
+      this.itemModel = null;
+      this.itemToken++;
+    }
+    if (kind === 'collect' && item.url) void this.setItemModel(item.url).catch(() => this.setItemModel(null));
     const place = at ? this.places.get(at) : undefined;
     const center = place?.center ?? SPAWN;
     const rand = rng(Math.floor(Math.random() * 1e6) + 1);
@@ -1683,10 +1698,11 @@ export class RpgScene {
         pos.set(keep.x + away.x, 0, keep.z + away.z);
       }
       if (kind === 'collect') {
-        const mesh = buildItem(look);
+        const mesh = new THREE.Group();
         mesh.position.copy(pos).setY(0.8);
         this.scene.add(mesh);
         this.pickups.push({ mesh, phase: rand() * 6 });
+        this.dressPickup(mesh);
       } else {
         const enemy: Enemy = { mesh: new THREE.Group(), rig: null, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 };
         enemy.mesh.position.copy(pos);
@@ -1705,6 +1721,53 @@ export class RpgScene {
         );
       }
     }
+  }
+
+  /** What a thing to gather looks like: the model, the block, or nothing yet. */
+  private itemLook: TargetLook | null = null;
+  private itemWait = false;
+  private itemModel: { url: string; template: THREE.Group; height: number } | null = null;
+  private itemToken = 0;
+
+  private dressPickup(mesh: THREE.Group) {
+    mesh.clear();
+    if (this.itemModel) {
+      const copy = this.itemModel.template.clone();
+      // Floating about its own middle, as the block did.
+      copy.position.y = -this.itemModel.height / 2;
+      mesh.add(copy);
+    } else if (!this.itemWait && this.itemLook) {
+      mesh.add(buildItem(this.itemLook));
+    }
+    mesh.visible = mesh.children.length > 0;
+  }
+
+  /**
+   * The things to gather as their own model from fal.ai (`ensureClueModel`, the beat's English
+   * `prop`), in place of the block or of nothing; null puts the block back (no key, a failed model).
+   * Made for the beat's things, so a new `spawnObjective` keeps it only when handed the same url.
+   */
+  async setItemModel(url: string | null): Promise<void> {
+    const token = ++this.itemToken;
+    if (!url) {
+      this.itemModel = null;
+      this.itemWait = false;
+      for (const p of this.pickups) this.dressPickup(p.mesh as THREE.Group);
+      return;
+    }
+    if (this.itemModel?.url !== url) {
+      const size = this.itemLook?.size ?? 1;
+      const fit = { height: Math.min(1.4, ITEM_FIT.height * size), width: Math.min(1.6, ITEM_FIT.width * size) };
+      const model = await loadHubModel(url, fit);
+      if (token !== this.itemToken) {
+        disposeHubModel(model.group);
+        return;
+      }
+      if (this.itemModel) disposeHubModel(this.itemModel.template);
+      const height = new THREE.Box3().setFromObject(model.group).getSize(new THREE.Vector3()).y;
+      this.itemModel = { url, template: model.group, height };
+    }
+    for (const p of this.pickups) this.dressPickup(p.mesh as THREE.Group);
   }
 
   clearObjective() {

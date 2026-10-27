@@ -101,6 +101,12 @@ export interface BeatJob {
   /** Names one of the things, for the HUD counter: "herb", "drowner". */
   targetName: string;
   look: TargetLook;
+  /**
+   * A thing to gather, in English, for the fal.ai model it is shown as in an invented world (owner,
+   * 27 Oct 2026: "the things to pick up should be generated assets too"), and that model once made.
+   */
+  prop?: string;
+  model?: LandmarkModel;
 }
 
 /** One turn of a character telling their story: what the hunter says to hear it, and what they say. */
@@ -631,6 +637,9 @@ export function beatPrompt(ctx: BeatContext): string {
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "targetName": string (singular noun for one of the things), "look": {"shape": string, "color": string, "size": number},'
       : '',
+    ctx.job?.kind === 'collect'
+      ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 12 words: one of the things alone as it looks, for a 3D model — "a cracked green glowing reactor core"),'
+      : '',
     '  "objectiveText": string (one line for the journal: what to do in this step),',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "waitingLine": string (what the npc says if talked to before the job is done),'
@@ -809,6 +818,8 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
         targetName,
         look: parseLook(r.look, ctx.job.kind),
       };
+      const prop = ctx.job.kind === 'collect' ? text(r.targetProp, 120) : '';
+      if (prop) job.prop = prop;
     }
   }
 

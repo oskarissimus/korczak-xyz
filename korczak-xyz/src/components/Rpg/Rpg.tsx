@@ -26,6 +26,7 @@ import {
   slainBy,
   staticBeat,
   type Beat,
+  type BeatJob,
   type Character,
   type ChronicleEntry,
   type Decision,
@@ -467,6 +468,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * from before `assets` gets its landmark from its name and the world's way of building.
    */
   const falKeyRef = useRef<string | null>(null);
+  /**
+   * How a beat's things to gather are shown: their fal.ai model once made, and in an invented world
+   * nothing until then (owner, 27 Oct 2026: "the things to pick up should be generated assets too");
+   * the block only where no model will come.
+   */
+  const itemFor = useCallback((job: BeatJob): { url?: string; wait: boolean } => {
+    const invented = (worldRef.current?.createdAt ?? 0) > 0;
+    return { url: job.model?.glb, wait: invented && (!!job.model || !!falKeyRef.current) };
+  }, []);
   const persistRef = useRef<() => void>(() => {});
   const putPlace = useCallback((given: PlaceSpec) => {
     const scene = sceneRef.current;
@@ -666,7 +676,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         setVoiceWorld(worldRef.current?.id ?? gameLangRef.current);
         warmVoices(voiceRef.current, who, gameLangRef.current);
       }
-      if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null);
+      if (b.job) scene?.spawnObjective(b.job.kind, b.job.count, b.job.look, b.place?.name ?? null, itemFor(b.job));
       else scene?.clearObjective();
       progressRef.current = 0;
       setProgress(0);
@@ -1070,6 +1080,36 @@ export default function Rpg({ lang }: { lang: Lang }) {
         (e) => log.warn('rpg.clue.failed', describeError(e)),
       );
     });
+  }, [beat, falKey, persist]);
+
+  // The beat's things to gather, made once by fal.ai from the English `prop` it wrote for them (its
+  // name for a beat from before), on the reader's own key, and kept on the beat like a clue's.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const job = beat?.job;
+    if (!scene || !beat || job?.kind !== 'collect' || job.model) return;
+    const world = worldRef.current;
+    if (!falKey || !world || world.createdAt === 0) return;
+    const token = questTokenRef.current;
+    ensureClueModel(
+      falKey,
+      `item/${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`,
+      cluePrompt(job.prop ?? job.targetName, world.look),
+      (model) => {
+        if (questTokenRef.current !== token) return;
+        const keep = (b: Beat): Beat =>
+          b.index === beat.index && b.title === beat.title && b.job ? { ...b, job: { ...b.job, model } } : b;
+        beatsRef.current = beatsRef.current.map(keep);
+        if (beatRef.current) beatRef.current = keep(beatRef.current);
+        persist();
+        if (beatRef.current?.index === beat.index) void scene.setItemModel(model.glb).catch(() => scene.setItemModel(null));
+      },
+      (e) => {
+        log.warn('rpg.item.failed', describeError(e));
+        // Nothing would ever stand there: the block, so the step can still be done.
+        if (beatRef.current?.index === beat.index) void scene.setItemModel(null);
+      },
+    );
   }, [beat, falKey, persist]);
 
   // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
@@ -1544,7 +1584,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setupBeat(current, false);
     if (current.job && game.progress > 0) {
       const left = Math.max(0, current.job.count - game.progress);
-      if (left > 0) scene?.spawnObjective(current.job.kind, left, current.job.look, current.place?.name ?? null);
+      if (left > 0) scene?.spawnObjective(current.job.kind, left, current.job.look, current.place?.name ?? null, itemFor(current.job));
       else {
         scene?.clearObjective();
         scene?.setMarker({ npc: current.npc.name });
