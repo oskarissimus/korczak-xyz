@@ -29,6 +29,7 @@ import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
 import { HUB_SLOTS, isForestVariant, loadLandmarkBytes, type HubSlot } from '../../utils/rpg/landmark3d';
+import { SPAWN_AT, VILLAGE_STANDS, type HubLayout } from '../../utils/rpg/hubLayout';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
@@ -57,13 +58,7 @@ export interface SceneCallbacks {
 }
 
 /** Where characters stand in the village, in the order they first appear there. */
-const VILLAGE_SPOTS = [
-  new THREE.Vector3(4, 0, -4),
-  new THREE.Vector3(-5, 0, 3),
-  new THREE.Vector3(6, 0, 5),
-  new THREE.Vector3(-4, 0, -9),
-  new THREE.Vector3(9, 0, -1),
-];
+const VILLAGE_SPOTS = VILLAGE_STANDS.map(({ x, z }) => new THREE.Vector3(x, 0, z));
 /** Spot `i` in the square: the five above, then a ring inside the houses for a world that has met many. */
 function villageSpot(i: number): THREE.Vector3 {
   if (i < VILLAGE_SPOTS.length) return VILLAGE_SPOTS[i].clone();
@@ -73,7 +68,7 @@ function villageSpot(i: number): THREE.Vector3 {
   const r = 7 + (k % 3) * 1.2;
   return new THREE.Vector3(Math.sin(a) * r, 0, Math.cos(a) * r);
 }
-const SPAWN = new THREE.Vector3(0, 0, 8);
+const SPAWN = new THREE.Vector3(SPAWN_AT.x, 0, SPAWN_AT.z);
 /** The five houses around the square, and which kit house stands on each plot. */
 const HOUSES: [number, number][] = [
   [-12, -10],
@@ -492,6 +487,7 @@ export class RpgScene {
       m.userData.shared = true;
       m.computeBoundingSphere();
       this.scene.add(m);
+      this.classicOnly.push(m);
     }
 
     // Life in the square: barrels and crates by the houses, a cart, a bench and a bucket by the well.
@@ -502,6 +498,7 @@ export class RpgScene {
       p.rotation.y = rot;
       this.scene.add(p);
       if (slot) (this.kitPieces[slot] ??= []).push(p);
+      else this.classicOnly.push(p);
     };
     place('Barrel', -8.2, -6.4, 0, 'goods');
     place('Barrel', -7.4, -6.9, 1, 'goods');
@@ -512,7 +509,12 @@ export class RpgScene {
     place('Prop_Wagon', -18, -2, 0.5, 'cart');
     place('Bench', 3.2, -0.2, 0.15);
     place('Bucket_Wooden_1', 1.5, -1.6, 0, 'landmark');
-    this.obstacles.push({ x: 9.5, z: 4.2, r: 1.6 }, { x: -18, z: -2, r: 2 });
+    const props = [
+      { x: 9.5, z: 4.2, r: 1.6 },
+      { x: -18, z: -2, r: 2 },
+    ];
+    this.hubObstacles.push(...props);
+    this.classicObstacles.push(...props);
     this.refreshHub();
 
     this.plantGroundCover();
@@ -534,8 +536,9 @@ export class RpgScene {
     }
     this.treeMeshes = [];
     this.treeCells = [];
-    const flora = this.look.flora;
     const classic = this.isClassic();
+    // Under a world's own layout its trees are its own or none yet: no kit tree stands in for them.
+    const flora = this.layout && !this.forest.length ? 'none' : this.look.flora;
     const forest = classic ? [] : this.forest;
     const kinds: readonly string[] | null = forest.length
       ? forest.map((_, i) => `forest${i}`)
@@ -549,12 +552,13 @@ export class RpgScene {
               ? DEAD_TREES
               : null;
     if (kinds && !forest.length && !this.kit.loaded) return;
+    const bare = flora === 'none' && (!classic || this.layout !== null);
     for (const tree of this.trees) {
       for (const m of tree.meshes) this.scene.remove(m);
       tree.slot = undefined;
-      tree.obstacle.r = flora === 'none' && !classic ? 0 : tree.r;
+      tree.obstacle.r = bare ? 0 : tree.r;
     }
-    if (!classic && flora === 'none') return;
+    if (bare) return;
     const rand = rng(7);
     const byKind = new Map<string, Tree[]>();
     for (const tree of this.trees) {
@@ -831,7 +835,8 @@ export class RpgScene {
       this.scene.add(house);
       this.stopgapHouses.push(house);
       const obstacle = { x, z, r: 4.3 };
-      this.obstacles.push(obstacle);
+      this.hubObstacles.push(obstacle);
+      this.classicObstacles.push(obstacle);
       this.houseObstacles.push(obstacle);
       this.houseBase.push(obstacle.r);
     }
@@ -850,6 +855,7 @@ export class RpgScene {
       p.castShadow = true;
       this.scene.add(p);
       this.fencePosts.push(p);
+      this.classicOnly.push(p);
     }
   }
 
@@ -1031,7 +1037,8 @@ export class RpgScene {
     this.scene.add(well);
     this.well = well;
     this.wellObstacle = { x, z, r: 1.6 };
-    this.obstacles.push(this.wellObstacle);
+    this.hubObstacles.push(this.wellObstacle);
+    this.classicObstacles.push(this.wellObstacle);
   }
 
   private well: THREE.Group | null = null;
@@ -1060,7 +1067,7 @@ export class RpgScene {
     const facing = (x: number, z: number) => Math.atan2(-x, -z);
     const spot = (x: number, z: number, obstacle?: Obstacle) => {
       const o = obstacle ?? { x, z, r: 0, off: true };
-      if (!obstacle) this.obstacles.push(o);
+      if (!obstacle) this.hubObstacles.push(o);
       return { x, z, rot: facing(x, z), obstacle: o };
     };
     const houses = (kind: HouseKind) =>
@@ -1085,25 +1092,95 @@ export class RpgScene {
       tree2: [],
       tree3: [],
     };
+    this.classicSpots = this.hubSpots;
     this.kitPieces.landmark = [this.well!];
     this.kitPieces.house = this.stopgapHouses.filter((_, i) => HOUSE_KINDS[i] === 'small');
     this.kitPieces.hall = this.stopgapHouses.filter((_, i) => HOUSE_KINDS[i] === 'large');
   }
 
-  /** Each model shown, or what it replaces, and the obstacles to match. */
+  /**
+   * Each model shown, or what it replaces, and the obstacles to match. Under a world's own layout
+   * nothing of the kit's village stands at all: a spot is empty ground until its model arrives.
+   */
   private refreshHub() {
+    const generated = this.layout !== null;
+    for (const o of this.classicOnly) o.visible = !generated;
+    if (generated) for (const list of Object.values(this.classicSpots)) for (const s of list) s.obstacle.off = true;
+    for (const o of this.classicObstacles) o.off = generated;
     for (const slot of HUB_SLOTS) {
       const model = this.hubModels.get(slot);
-      for (const o of this.kitPieces[slot] ?? []) o.visible = !model;
+      for (const o of this.kitPieces[slot] ?? []) o.visible = !model && !generated;
       for (const s of this.hubSpots[slot] ?? []) {
         const i = this.houseObstacles.indexOf(s.obstacle);
         if (model) {
           s.obstacle.r = model.radius;
           s.obstacle.off = false;
         } else if (i >= 0) s.obstacle.r = this.houseBase[i];
-        else if (slot === 'landmark') s.obstacle.r = 1.6;
+        else if (s.obstacle === this.wellObstacle) s.obstacle.r = 1.6;
         else s.obstacle.off = true;
       }
+    }
+  }
+
+  // --- where the village stands (`utils/rpg/hubLayout.ts`) ---------------------------------------
+
+  /** An invented world's own layout, or null for the classic village (the kit's, where it always stood). */
+  private layout: HubLayout | null = null;
+  /** The classic village's spots, planned once; `hubSpots` is these again when the layout is null. */
+  private classicSpots = {} as Record<HubSlot, { x: number; z: number; rot: number; obstacle: Obstacle }[]>;
+  /** Every obstacle of the village: kept apart from `obstacles`, which `clearNpcs` thins out. */
+  private hubObstacles: Obstacle[] = [];
+  /** What blocks walking only in the classic village: its houses, the well, the stall and the wagon. */
+  private classicObstacles: Obstacle[] = [];
+  /** The kit's pieces no model replaces (the fence, the bench), shown only in the classic village. */
+  private classicOnly: THREE.Object3D[] = [];
+
+  /**
+   * Where the village and the forest stand (owner, 27 Oct 2026: "an empty board, not placeholders,
+   * things appear as they become available, and where they stand generated"). A layout puts the
+   * hub's models on its spots and the world's trees on its forest, and nothing else: no kit house,
+   * well, fence or tree stands in for what has not come yet. Null is the classic village, the kit's,
+   * for the classic world and a world that will never have models of its own. The same layout
+   * again does nothing.
+   */
+  setLayout(layout: HubLayout | null) {
+    if ((layout?.key ?? null) === (this.layout?.key ?? null)) return;
+    this.layout = layout;
+    const generatedSpots = new Set(
+      Object.values(this.hubSpots)
+        .flat()
+        .map((s) => s.obstacle)
+        .filter((o) => !Object.values(this.classicSpots).some((list) => list.some((s) => s.obstacle === o))),
+    );
+    this.hubObstacles = this.hubObstacles.filter((o) => !generatedSpots.has(o));
+    if (layout) {
+      const spots = {} as typeof this.hubSpots;
+      for (const slot of HUB_SLOTS) {
+        spots[slot] = (layout.spots[slot] ?? []).map(({ x, z, rot }) => {
+          const obstacle: Obstacle = { x, z, r: 0, off: true };
+          this.hubObstacles.push(obstacle);
+          return { x, z, rot, obstacle };
+        });
+      }
+      this.hubSpots = spots;
+    } else {
+      this.hubSpots = this.classicSpots;
+    }
+    for (const slot of this.hubModels.keys()) this.placeCopies(slot);
+    this.layTrees();
+    this.refreshHub();
+  }
+
+  /** A model's copies on its slot's spots, again: the clones share the template's geometry and materials. */
+  private placeCopies(slot: HubSlot) {
+    const model = this.hubModels.get(slot);
+    if (!model) return;
+    model.group.clear();
+    for (const s of this.hubSpots[slot] ?? []) {
+      const copy = model.template.clone();
+      copy.position.set(s.x, 0, s.z);
+      copy.rotation.y = s.rot;
+      model.group.add(copy);
     }
   }
 
@@ -1157,16 +1234,11 @@ export class RpgScene {
     clear();
     const group = new THREE.Group();
     group.name = `hub-${slot}`;
-    for (const s of this.hubSpots[slot]) {
-      // The clones share the template's geometry and materials, so a house is drawn five times
-      // from one upload.
-      const copy = built.group.clone();
-      copy.position.set(s.x, 0, s.z);
-      copy.rotation.y = s.rot;
-      group.add(copy);
-    }
     this.scene.add(group);
+    // The clones share the template's geometry and materials, so a house is drawn five times from
+    // one upload.
     this.hubModels.set(slot, { url, group, template: built.group, radius: built.radius });
+    this.placeCopies(slot);
     this.refreshHub();
   }
 
@@ -1201,6 +1273,46 @@ export class RpgScene {
   }
 
   /**
+   * The scattered trees where the layout has them, or where the classic world always had them: the
+   * old ones taken up, with their obstacles, and the new ones planted and cleared for the places
+   * that stand. Under a layout a tree is only a spot until the world's own tree model has come.
+   */
+  private layTrees() {
+    for (const tree of this.trees) {
+      for (const m of tree.meshes) {
+        this.scene.remove(m);
+        m.geometry.dispose();
+      }
+    }
+    const old = new Set(this.trees.map((t) => t.obstacle));
+    this.obstacles = this.obstacles.filter((o) => !old.has(o));
+    this.trees = [];
+    if (this.layout) {
+      for (const { x, z, scale } of this.layout.forest) {
+        const obstacle = { x, z, r: 0.5 * scale };
+        this.obstacles.push(obstacle);
+        this.trees.push({ meshes: [], obstacle, r: obstacle.r });
+      }
+    } else {
+      this.buildTrees();
+    }
+    for (const place of this.places.values()) this.clearTrees(place.center.x, place.center.z, place.road);
+    this.plantTrees();
+  }
+
+  /** Takes away the scattered trees that stand on a place or its road. */
+  private clearTrees(x: number, z: number, road: Ground[]) {
+    for (const tree of this.trees) {
+      const { x: tx, z: tz } = tree.obstacle;
+      const inPlace = Math.hypot(tx - x, tz - z) < PLACE_RADIUS + 3;
+      if (inPlace || nearestOnLine(tx, tz, road).d < 4) {
+        tree.obstacle.off = true;
+        showTree(tree, false);
+      }
+    }
+  }
+
+  /**
    * Builds a place where its direction and distance put it, with a dirt path from the village,
    * clearing the scattered trees that stand on either. A place already standing under that name is
    * left as it is: a beat that returns somewhere returns to the same place.
@@ -1210,14 +1322,7 @@ export class RpgScene {
     const { x, z } = placePosition(spec);
     const center = new THREE.Vector3(x, 0, z);
     const road = roadPoints(x, z, hashString(spec.name), PLACE_RADIUS);
-    for (const tree of this.trees) {
-      const { x: tx, z: tz } = tree.obstacle;
-      const inPlace = Math.hypot(tx - x, tz - z) < PLACE_RADIUS + 3;
-      if (inPlace || nearestOnLine(tx, tz, road).d < 4) {
-        tree.obstacle.off = true;
-        showTree(tree, false);
-      }
-    }
+    this.clearTrees(x, z, road);
 
     const built = buildPlace(spec, this.kit.loaded ? this.kit : null, this.look, this.isClassic() ? [] : this.forest);
     built.group.position.copy(center);
@@ -1792,7 +1897,7 @@ export class RpgScene {
   }
 
   private collide(pos: THREE.Vector3, radius = 0.45) {
-    const all = [this.obstacles, ...[...this.places.values()].map((p) => p.obstacles)];
+    const all = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)];
     for (const o of all.flat()) {
       if (o.off) continue;
       const dx = pos.x - o.x;

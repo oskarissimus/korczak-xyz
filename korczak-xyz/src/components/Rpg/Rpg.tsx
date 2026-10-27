@@ -38,6 +38,7 @@ import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import { addGenerationTime, beginQuestSpend, NO_SPEND, onRequestEnd, questSpend, resetDevlog, triesSpend, validSpend } from '../../utils/rpg/devlog';
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture } from '../../utils/rpg/groundTexture';
+import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
 import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
@@ -889,9 +890,23 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // The hub (`utils/rpg/landmark3d.ts`): an invented world's own landmark, houses, tree and the
   // things in its square, from fal.ai, each made once and kept on the world, and the forest's trees
-  // across the map; the kit's village until they exist, and in the classic world or without a key.
+  // across the map; each stands the moment it has loaded, and nothing stands in for it before.
   const falKey = keysReady ? account.keys.fal : null;
   const sizesAskedRef = useRef(new Set<string>());
+  // Where it all stands is the world's own (`utils/rpg/hubLayout.ts`), and nothing stands there until
+  // its model has come: an empty board, filling in. The board is empty while a world is invented,
+  // the last world's village not being this one's. The kit's village only where no model will ever
+  // come — the classic world, and a world with none made and no key to make them (until the keys have
+  // loaded one is assumed, so the kit does not flash up first).
+  const inventing = creating !== null;
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !world) return;
+    if (inventing) return scene.setLayout(EMPTY_LAYOUT);
+    const made = world.createdAt > 0 && HUB_SLOTS.some((slot) => hubModel(world, slot)?.glb);
+    const ownModels = world.createdAt > 0 && (!keysReady || !!falKey || made);
+    scene.setLayout(ownModels ? hubLayout(world.id, world.sizes) : null);
+  }, [world, inventing, falKey, keysReady]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !world) return;

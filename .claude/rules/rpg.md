@@ -307,13 +307,31 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     reload. The classic world and a reader without a fal key keep the scan. In the console as kind
     `fal` labelled `ground`, counted as `N× tex` beside the 3D models (`falTextures`), its price in
     the fal.ai total and the closing screen's; Sentry Logs `rpg.landmark` with `piece: 'ground'`.
-- **The kit's village until then** (`RpgScene.setHubModels`, `components/Rpg/hubModels.ts`,
-  `HUB_FIT` for each piece's height and width): what a model replaces is hidden, not removed, and
-  shows again for a world without it; the kit's houses are merged per kind (`mergeStatic`) so a
-  house can stand in for the small ones alone. A load already on its way to the same URL is left to
-  finish (`hubWanted`): the world changes with every arrival and asks for all eight again, and
-  restarting the loads each time kept the first models off screen for a minute. The classic world, a
-  reader without a fal key, and a model that fails to load all keep the kit.
+- **An empty board until then, and nothing where it was predefined** (owner, 27 Oct 2026: "while
+  the world is generated and there are no assets yet there should be an empty board, not
+  placeholders; things should just appear as they become available, and where they stand should be
+  generated, not predefined"). An invented world's village and forest are laid out by
+  `utils/rpg/hubLayout.ts` from the world's id alone, so the same on every device and nothing to
+  store: a style (a ring round the square, a street along one of the roads out, a cluster to one
+  side, a scatter), how far it reaches (22–34 m), 1–3 halls, 2–6 houses, 1–2 stalls and carts,
+  3–7 lamps round the square or along a road, goods beside the buildings, 3–9 trees, and a forest of
+  280–460 trees partly in 4–12 groves. It keeps the square clear for the characters and the spawn
+  (`VILLAGE_STANDS`, `SPAWN_AT`, `SQUARE_RADIUS`; the landmark alone may stand in its middle),
+  buildings off the eight roads out (`roadDistance`), and every piece out of every other's
+  footprint, sized by the world's own `sizes`. `RpgScene.setLayout` puts each model's copies on its
+  spots and plants the forest there; a spot blocks nothing until its model stands. Under a layout
+  **no kit piece stands at all** — no house, well, fence, bench, prop or kit tree, no primitive
+  stopgap — so the board is the ground and the grass, and the hub fills in a model at a time as each
+  loads (`setHubModels`, `setForest`); while genesis runs the board is `EMPTY_LAYOUT`, so the last
+  world's village does not stand behind the new one. A load already on its way to the same URL is
+  left to finish (`hubWanted`): the world changes with every arrival and asks for all eight again,
+  and restarting the loads each time kept the first models off screen for a minute.
+- **The kit's village only where no model will ever come** (`setLayout(null)`): the classic world,
+  and an invented world with no model made and no fal key to make them. Until the keys have loaded a
+  key is assumed, so a reader with one never sees the kit flash up first. There what a model would
+  replace is hidden, not removed, and the kit's houses are merged per kind (`mergeStatic`). A model
+  that fails to load leaves its spots empty under a layout. Quest places still build their pines,
+  rocks and huts from the kit when the forest has not come yet (`buildPlace`).
 - **Each piece is sized as what it is, not as its slot** (owner, 26 Oct 2026, a screenshot of a
   caravan world's covered truck towering over the hero). TRELLIS answers in a unit box, so the size
   is wholly the game's, and `HUB_FIT` gave every slot a building's: a "house" that was a truck came
