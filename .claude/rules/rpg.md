@@ -731,7 +731,7 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   top left goes back to the intro, the quest autosaved and offered as Continue.
   It starts **under** the status bar, not behind it: iOS Safari lays its own blurred gradient over
   whatever sits up there and keeps those taps for itself (owner, Oct 2026: the console's tabs and
-  the top dialogue choices unclickable under the clock). The strip above is painted black while
+  the top dialogue choices unclickable under the clock). The strip above (`.safe-top-band`) is painted black while
   playing, page background included, since Safari tints that blur from both. Inside the container
   `--safe-top` is zeroed, the offset having been paid once by the container itself.
 - **The console and the dialogue share the height** (`rpg-dev-open`): the console is on top, so a

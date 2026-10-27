@@ -98,6 +98,7 @@ const recoveryStrings = {
     <ClientRouter />
   </head>
   <body>
+    <div class="safe-top-band" aria-hidden="true"></div>
     <!-- SVG filter for Win95 dithered 16-color effect -->
     <svg style="position: absolute; width: 0; height: 0;">
       <defs>
@@ -311,9 +312,16 @@ const recoveryStrings = {
 
      Above everything, including the taskbar (9999) and the typing modal (10000). The point is
      that the status bar always has an opaque backdrop of a known colour; a band any overlay can
-     paint over is a band that does not do its job. */
-  body::before {
-    content: '';
+     paint over is a band that does not do its job.
+
+     A real element, hit-testable, because iOS 26 decides by hit-testing. It draws its Liquid
+     Glass blur over the strip and ~40pt below it unless the point 4px under the top edge lands
+     in a fixed, full-width box with a plain background, whose colour it then uses as a hard
+     edge. A `body::before` with `pointer-events: none` is invisible to that test - the hit fell
+     through to whatever was scrolling - so the page kept the blur under a band painted on top of
+     it (owner, Oct 2026, the navbar's title bar smeared under the clock). Taps there are the
+     system's anyway, so nothing is lost by the band catching them. */
+  .safe-top-band {
     position: fixed;
     top: 0;
     left: 0;
@@ -321,7 +329,6 @@ const recoveryStrings = {
     height: var(--safe-top);
     background: var(--retro-navy);
     z-index: 10001;
-    pointer-events: none;
   }
 
   body {

@@ -892,7 +892,7 @@ body:has(.rpg-immersive) {
   background: #000;
 }
 
-body:has(.rpg-immersive)::before {
+body:has(.rpg-immersive) .safe-top-band {
   background: #000;
 }
 

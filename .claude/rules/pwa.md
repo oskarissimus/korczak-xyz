@@ -127,10 +127,19 @@ the clock. The maximized window is positioned on both edges and therefore sized 
 **Reserving the strip is only half of it: padding scrolls.** It holds the first screen clear of
 the clock and then the page slides straight under it, so the songbook read as fixed until you
 scrolled — while a maximized window, being fixed and inset, read as fixed all along. That pair
-of symptoms is the signature. So `body::before` also *paints* the strip: a fixed band in the
+of symptoms is the signature. So `.safe-top-band` also *paints* the strip: a fixed band in the
 desktop navy that the page scrolls behind, sized from `--safe-top` and therefore nothing at all
 in a browser. It sits above everything — the taskbar (9999) and the typing modal (10000) — on
 the grounds that a band any overlay can paint over is not doing its job.
+
+**The band is a real element, `.safe-top-band`, and it must stay hit-testable.** iOS 26 draws a
+Liquid Glass blur over the strip and about 40pt below it, and skips it only when the point 4px
+under the top edge hit-tests into a `position: fixed`/`sticky`, near-full-width box with a plain
+`background-color` and no `backdrop-filter` — whose colour it then uses as a hard edge. It was
+`body::before` with `pointer-events: none` until Oct 2026: painted on top, invisible to the hit
+test, so the blur smeared the navbar's title bar under the clock (owner's screenshot). Do not give
+it `pointer-events: none`, a translucent background or a backdrop filter, and do not turn it back
+into a pseudo-element. Taps under the status bar are the system's anyway.
 
 The corollary is that anything deliberately anchored to the top of the viewport must clear the
 band or it parks itself out of sight behind it. `typing.css` has two: the key table's sticky
