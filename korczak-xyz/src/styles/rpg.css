@@ -852,6 +852,10 @@ ul.rpg-source {
   margin: 0;
 }
 
+.rpg-summary-detail {
+  opacity: 0.75;
+}
+
 .rpg-dev pre {
   padding: 0;
   border: 0;

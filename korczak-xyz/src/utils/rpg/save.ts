@@ -17,6 +17,7 @@
  * Every change is stamped for the account copy (`sync.ts`, `cloud.ts`).
  */
 
+import type { Spend } from './devlog';
 import { isDead, jobDone, slainBy, type Beat, type Lang, type StepRecord } from './quest';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
@@ -52,8 +53,11 @@ export interface SavedGame {
   /** Every line said so far, for the developer console; absent in older saves. */
   transcript?: TranscriptLine[];
   /** The world it is played in (`genesis.ts`); absent in saves from before there were worlds. */
-  worldId?: string;  /** Everyone dead so far, by name (`BeatContext.dead`); absent in older saves. */
+  worldId?: string;
+  /** Everyone dead so far, by name (`BeatContext.dead`); absent in older saves. */
   dead?: string[];
+  /** What the quest has cost so far, every sitting (`devlog.ts`); absent in saves from before 27 Oct 2026. */
+  spent?: Spend;
 }
 
 function valid(saved: unknown): saved is SavedGame {

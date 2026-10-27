@@ -35,8 +35,8 @@ import {
 } from '../../utils/rpg/quest';
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
-import { addGenerationTime, resetDevlog } from '../../utils/rpg/devlog';
-import { clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
+import { addGenerationTime, beginQuestSpend, NO_SPEND, onRequestEnd, questSpend, resetDevlog, triesSpend, validSpend } from '../../utils/rpg/devlog';
+import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
 import { cluePrompt, ensureClueModel, ensureHubModels, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
@@ -61,6 +61,7 @@ import {
   playedWorld,
   savePendingGenesis,
   saveWorld,
+  addWorldSpend,
   setWorldModel,
   setWorldSizes,
   withModel,
@@ -502,8 +503,27 @@ export default function Rpg({ lang }: { lang: Lang }) {
       transcript: [...transcript()],
       worldId: worldRef.current?.id ?? gameLangRef.current,
       dead: deadRef.current,
+      spent: questSpend(),
     });
   }, []);
+
+  // A clip or a clue paid for between two of the quest's steps is in the autosave too, so the
+  // closing screen of a quest finished another day still counts it. A beat's arrival saves anyway;
+  // this catches the rest, a few at a time.
+  useEffect(() => {
+    let timer: number | null = null;
+    const off = onRequestEnd((entry) => {
+      if (entry.scope !== 'quest' || timer !== null) return;
+      timer = window.setTimeout(() => {
+        timer = null;
+        persist();
+      }, 2000);
+    });
+    return () => {
+      off();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [persist]);
 
   // --- the story ----------------------------------------------------------------------------------
 
@@ -630,6 +650,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     askedRef.current.clear();
     // A world invented just before this quest stays in the console with it.
     if (!keepLog) resetDevlog();
+    beginQuestSpend();
     resetTranscript();
     beatsRef.current = [];
     decisionRef.current = null;
@@ -730,10 +751,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // Answered, one way or the other: a reload now has nothing to finish.
     clearPendingGenesis();
     if (attempt) {
-      addGenerationTime(attempt.ms);
+      addGenerationTime(attempt.ms, 'world');
       recordWorld(uidRef.current, attempt, gameLang, chosen);
     }
-    const born = attempt?.world ?? null;
+    // What the genesis cost is the world's, kept on it for every quest's closing screen.
+    const born = attempt?.world ? { ...attempt.world, spent: triesSpend(attempt.tries, attempt.ms) } : null;
     if (born) {
       // A new world is a new game: the quest left half way belonged to the old one.
       saveWorld(born);
@@ -886,7 +908,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
       sizesAskedRef.current.add(world.id);
       const keys = { google: account.keys.google, openai: account.keys.openai, demo: false };
       void generateHubSizes(keys, world, chosenModelRef.current)
-        .then((sizes) => {
+        .then(({ sizes, tries, ms }) => {
+          const spent = triesSpend(tries, ms);
+          if (tries.length > 0) {
+            addWorldSpend(world.id, spent);
+            if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, spent: addModelSpend(worldRef.current.spent, spent) };
+            setWorld((now) => (now?.id === world.id ? { ...now, spent: addModelSpend(now.spent, spent) } : now));
+          }
           if (!sizes) return;
           setWorldSizes(world.id, sizes);
           if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, sizes };
@@ -1382,6 +1410,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     askedRef.current.clear();
     pendingRef.current = null;
     resetDevlog();
+    // What it cost in earlier sittings; a save from before that was kept says only that it cost something.
+    beginQuestSpend(validSpend(game.spent) ?? { ...NO_SPEND, partial: true });
     resetTranscript(game.transcript);
     const scene = sceneRef.current;
     scene?.clearObjective();
@@ -1983,7 +2013,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           {storyProvider !== 'static' || voiceKey ? (
             <>
               <h3>{t.summary}</h3>
-              <QuestSummary lang={gameLang} />
+              <QuestSummary lang={gameLang} world={world} />
               <p className="rpg-ending-note">{t.costNote}</p>
             </>
           ) : null}

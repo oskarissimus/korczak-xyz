@@ -584,7 +584,11 @@ export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen
  * short answer, asked once per world and kept on it; the demo's function builds only beats and
  * worlds, so on the demo a world keeps the slots' own sizes.
  */
-export async function generateHubSizes(keys: StoryKeys, world: WorldBible, chosen: string | null = null): Promise<HubSizes | null> {
+export async function generateHubSizes(
+  keys: StoryKeys,
+  world: WorldBible,
+  chosen: string | null = null,
+): Promise<{ sizes: HubSizes | null; tries: ModelTry[]; ms: number }> {
   const run = await askChain(keys, chosen, {
     prompt: hubSizesPrompt(world),
     temperature: 0.2,
@@ -593,5 +597,6 @@ export async function generateHubSizes(keys: StoryKeys, world: WorldBible, chose
     beat: null,
     what: 'a set of sizes',
   });
-  return run.value;
+  // The tries too: what they cost is the world's (`WorldBible.spent`).
+  return { sizes: run.value, tries: run.tries, ms: run.ms };
 }

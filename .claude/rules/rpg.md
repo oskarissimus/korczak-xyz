@@ -840,8 +840,17 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
 - **The closing screen says what the quest cost**: the time played (Start or Continue to the
   ending, a hidden page not counted, kept in the autosave), the writing time (each beat's
-  generation, added up), tokens and their price, ElevenLabs characters, credits and price, and the
-  total.
+  generation, added up), tokens and their price, ElevenLabs characters, credits and price, the
+  clues' fal.ai models, and the total — **for every sitting of the quest**, then the **world** on a
+  line of its own and the two together (owner, 27 Oct 2026: "it counts only this session, not the
+  assets made earlier in this quest, and not the world's generation"). Each request is the
+  quest's or the world's (`scopeOf` in `devlog.ts`): the genesis, the hub's sizes and the hub's 3D
+  models are the world's, beats, clips, voice designs and clue models the quest's. The quest's
+  spend rides in its autosave (`SavedGame.spent`, rewritten 2 s after any quest request ends and
+  at every step) and Continue carries it back in (`beginQuestSpend`). The world's is kept on the
+  world: `WorldBible.spent` for its model requests (genesis at birth, sizes when asked) and each
+  hub model's own `costUsd`, read by `worldSpend`. A save or a world from before shows `+?`, a
+  floor: its earlier spend was never written down. The console's own totals stay this sitting's.
 - **The intro says what today cost, across the whole site** (owner, Oct 2026: "general, from the
   whole site: how much money went today, how long was played and how many times"). The browser
   reports (`utils/rpg/stats.ts`): a launch at Start or Continue, time played, and each priced

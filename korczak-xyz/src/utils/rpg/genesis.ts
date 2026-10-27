@@ -129,6 +129,31 @@ export interface WorldBible extends WorldBrief {
    * two-storey building (owner, 26 Oct 2026). Worlds from before have none until it is asked for.
    */
   sizes?: HubSizes;
+  /**
+   * What the model requests that made this world cost: the genesis that wrote it and the sizes
+   * asked for later (`devlog.ts`'s `worldSpend`; the hub's 3D models carry their own `costUsd`).
+   * Worlds from before 27 Oct 2026 have none, so their genesis shows as unknown.
+   */
+  spent?: ModelSpend;
+}
+
+/** Model requests' cost, kept on a world: wall time, tokens and their approximate dollars. */
+export interface ModelSpend {
+  ms: number;
+  tokens: { input: number; output: number; thoughts: number };
+  modelCost: number;
+  /** Some request was made with a model that has no price, so `modelCost` is a floor. */
+  unpriced: boolean;
+}
+
+export function addModelSpend(a: ModelSpend | undefined, b: ModelSpend): ModelSpend {
+  if (!a) return b;
+  return {
+    ms: a.ms + b.ms,
+    tokens: { input: a.tokens.input + b.tokens.input, output: a.tokens.output + b.tokens.output, thoughts: a.tokens.thoughts + b.tokens.thoughts },
+    modelCost: a.modelCost + b.modelCost,
+    unpriced: a.unpriced || b.unpriced,
+  };
 }
 
 /**

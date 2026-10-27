@@ -15,7 +15,7 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import type { ForestVariant, HubPiece, HubSizes, LandmarkModel, WorldBible } from './genesis';
+import { addModelSpend, type ForestVariant, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
 import { dropGameFor } from './save';
@@ -119,6 +119,11 @@ export function setWorldModel(id: string, slot: 'landmark' | HubPiece | ForestVa
 /** Keeps the hub's sizes on the world the same way (`generateHubSizes`), so they are asked once. */
 export function setWorldSizes(id: string, sizes: HubSizes, now = Date.now()): void {
   putWorld(id, (w) => ({ ...w, sizes }), now);
+}
+
+/** Adds a model request's cost to what the world has cost (`devlog.ts`'s `worldSpend`). */
+export function addWorldSpend(id: string, spent: ModelSpend, now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, spent: addModelSpend(w.spent, spent) }), now);
 }
 
 function putWorld(id: string, put: (w: WorldBible) => WorldBible, now: number): void {

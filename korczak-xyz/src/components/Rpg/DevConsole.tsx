@@ -7,7 +7,8 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
-import { devlogVersion, devRequests, questTotals, subscribeDevlog, type DevRequest } from '../../utils/rpg/devlog';
+import { devlogVersion, devRequests, questSpend, questTotals, spendUsd, subscribeDevlog, worldSpend, type DevRequest } from '../../utils/rpg/devlog';
+import type { WorldBible } from '../../utils/rpg/genesis';
 import type { Lang } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
@@ -250,34 +251,73 @@ export function StreamLine() {
   );
 }
 
-/** What the quest cost and how long it was written for, on the closing screen. */
-export function QuestSummary({ lang }: { lang: Lang }) {
+/**
+ * What the quest cost and how long it was written for, on the closing screen: every sitting of it
+ * (the autosave carries the earlier ones), and the world it was played in on a line of its own.
+ */
+export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | null }) {
   const t = translations[lang];
   useDevlog();
-  const totals = questTotals();
+  const q = questSpend();
+  const w = worldSpend(world);
+  const floor = (unknown: boolean) => (unknown ? ' +?' : '');
+  const questUsd = spendUsd(q);
+  const worldUsd = w ? spendUsd(w) : 0;
+  const worldParts = w
+    ? [
+        // A world from before costs were kept: what its genesis cost is not known.
+        w.tokens.input + w.tokens.output + w.tokens.thoughts > 0
+          ? `${tokens(w.tokens.input + w.tokens.output + w.tokens.thoughts)} ${t.worldTokens} ≈ ${formatUsd(w.modelCost)}${floor(w.unpriced || Boolean(w.partial))}`
+          : w.partial
+            ? `${t.tokensLine.toLowerCase()} ?`
+            : null,
+        w.falModels > 0 ? `fal.ai ${w.falModels}× 3D ≈ ${formatUsd(w.falCost)}` : null,
+        w.ms > 0 ? formatMs(w.ms) : null,
+      ].filter(Boolean)
+    : [];
   return (
-    <dl className="rpg-summary">
-      <dt>{t.genTime}</dt>
-      <dd>{formatMs(totals.generationMs)}</dd>
-      <dt>{t.tokensLine}</dt>
-      <dd>
-        {tokens(totals.tokens.input + totals.tokens.output + totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}
-        {totals.unpriced ? ' +?' : ''}
-      </dd>
-      <dt>ElevenLabs</dt>
-      <dd>
-        {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈ {formatUsd(totals.voiceCost)}
-      </dd>
-      {totals.falCost > 0 && (
-        <>
-          <dt>fal.ai</dt>
-          <dd>
-            {totals.falModels}× 3D ≈ {formatUsd(totals.falCost)}
-          </dd>
-        </>
-      )}
-      <dt>{t.total}</dt>
-      <dd>≈ {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}</dd>
-    </dl>
+    <>
+      <dl className="rpg-summary">
+        <dt>{t.genTime}</dt>
+        <dd>{formatMs(q.ms)}{floor(Boolean(q.partial))}</dd>
+        <dt>{t.tokensLine}</dt>
+        <dd>
+          {tokens(q.tokens.input + q.tokens.output + q.tokens.thoughts)} ≈ {formatUsd(q.modelCost)}
+          {floor(q.unpriced || Boolean(q.partial))}
+        </dd>
+        <dt>ElevenLabs</dt>
+        <dd>
+          {q.voiceChars} {t.chars} ≈ {Math.round(q.voiceCredits)} cr ≈ {formatUsd(q.voiceCost)}
+          {floor(Boolean(q.partial))}
+        </dd>
+        {q.falCost > 0 && (
+          <>
+            <dt>fal.ai</dt>
+            <dd>
+              {q.falModels}× 3D ≈ {formatUsd(q.falCost)}
+            </dd>
+          </>
+        )}
+        <dt>{t.total}</dt>
+        <dd>≈ {formatUsd(questUsd)}{floor(q.unpriced || Boolean(q.partial))}</dd>
+        {w && (
+          <>
+            <dt>{t.worldLine}</dt>
+            <dd>
+              ≈ {formatUsd(worldUsd)}
+              {floor(w.unpriced || Boolean(w.partial))}
+              {worldParts.length > 0 && <span className="rpg-summary-detail"> ({worldParts.join(' · ')})</span>}
+            </dd>
+            <dt>{t.totalWithWorld}</dt>
+            <dd>
+              ≈ {formatUsd(questUsd + worldUsd)}
+              {floor(q.unpriced || Boolean(q.partial) || w.unpriced || Boolean(w.partial))}
+            </dd>
+          </>
+        )}
+      </dl>
+      <p className="rpg-ending-note">{t.costSittings}</p>
+      {(q.partial || w?.partial) && <p className="rpg-ending-note">{t.costFloor}</p>}
+    </>
   );
 }
