@@ -79,6 +79,23 @@ describe('landmark3d', () => {
     expect(totals.modelCost).toBe(0);
   });
 
+  it('asks for a picture again after fal.ai’s 429, and times the mesh’s wait in the queue apart', async () => {
+    const calls: string[] = [];
+    const ok = falFetch(calls);
+    let refusals = 2;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).startsWith('https://fal.run/') && refusals-- > 0
+        ? json({ detail: 'concurrent_requests_limit' }, 429)
+        : ok(input, init),
+    ) as unknown as typeof fetch;
+    const slept: number[] = [];
+    const model = await generateLandmark('k', world(), { fetchImpl, sleep: async (ms) => void slept.push(ms) });
+    expect(model.glb).toBe('https://fal.media/model.glb');
+    expect(slept.slice(0, 2)).toEqual([1000, 2000]);
+    expect(model.queuedMs).toBeGreaterThanOrEqual(0);
+    expect(devRequests().map((e) => e.status)).toEqual(['ok', 'ok']);
+  });
+
   it('puts a refused step in the console as an error, stops the world’s other pieces, and does not ask again this session', async () => {
     const calls: string[] = [];
     const fetchImpl = falFetch(calls, { url: 'https://fal.run/', status: 403 }) as typeof fetch;
@@ -87,8 +104,9 @@ describe('landmark3d', () => {
     const started = ensureHubModels('k', w, () => {}, (slot) => errors.push(slot), { ...now, fetchImpl });
     expect(started).toEqual(HUB_SLOTS);
     await vi.waitFor(() => expect(errors).toHaveLength(HUB_SLOTS.length));
-    // Four went at once before the first refusal came back; the rest never asked.
-    expect(calls.length).toBeLessThanOrEqual(4);
+    // Every picture went at once before the first refusal came back; no mesh was asked for.
+    expect(calls.length).toBeLessThanOrEqual(HUB_SLOTS.length);
+    expect(calls.some((c) => c.startsWith('https://queue.fal.run/'))).toBe(false);
     expect(devRequests()[0]).toMatchObject({ kind: 'fal', status: 'error', label: 'landmark' });
     expect(questTotals().falCost).toBe(0);
     expect(ensureHubModels('k', w, () => {}, () => {}, { ...now, fetchImpl })).toEqual([]);

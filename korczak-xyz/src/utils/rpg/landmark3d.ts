@@ -18,7 +18,7 @@
  * location from the assets"). Seven more pieces the same way, each from a line of the world's
  * `kit`: a house and a hall for the five houses, a tree, a stall, a cart, a lamp and a pile of goods
  * for the square (`HUB_PIECES`, placed by `RpgScene.setHubModels`). Eight models, about **$0.18 a
- * world**, made four at a time in ~1–1.5 min while the kit's village stands in for them.
+ * world**, all asked for at once while the kit's village stands in for them (`PARALLEL`, below).
  *
  * AND THE FOREST (owner, 26 Oct 2026: "generate the world's trees — they are static assets now").
  * The hub's tree is also every tree across the map, with two more of its kind made after the hub,
@@ -213,23 +213,37 @@ async function failure(res: Response): Promise<Error> {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * How often a picture is asked again after a 429. `fal.run` answers synchronously, so at the
+ * account's concurrency limit it refuses (`concurrent_requests_limit`, `X-Fal-Needs-Retry: 1`)
+ * where the queue would have waited; fal's own client backs off 1, 2, 4, 8 s, and so does this.
+ */
+const IMAGE_RETRIES = 5;
+
 /** Step 1: the picture; also the whole of a world's ground texture (`groundTexture.ts`), at its own size. */
 export async function drawImage(key: string, prompt: string, label: FalSlot | 'ground' | 'cover', o: FalOptions, size = IMAGE_SIZE): Promise<string> {
   const f = o.fetchImpl ?? fetch;
+  const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, label);
   try {
-    const res = await f(`https://fal.run/${FAL_IMAGE_MODEL}`, {
-      method: 'POST',
-      headers: headers(key),
-      signal: o.signal,
-      body: JSON.stringify({
-        prompt,
-        image_size: { width: size, height: size },
-        num_inference_steps: 4,
-        num_images: 1,
-        enable_safety_checker: true,
-      }),
-    });
+    let res: Response;
+    for (let attempt = 0; ; attempt++) {
+      res = await f(`https://fal.run/${FAL_IMAGE_MODEL}`, {
+        method: 'POST',
+        headers: headers(key),
+        signal: o.signal,
+        body: JSON.stringify({
+          prompt,
+          image_size: { width: size, height: size },
+          num_inference_steps: 4,
+          num_images: 1,
+          enable_safety_checker: true,
+        }),
+      });
+      if (res.status !== 429 || attempt >= IMAGE_RETRIES) break;
+      updateRequest(entry, { text: `${prompt}\n429, fal.ai at its limit: again in ${2 ** attempt} s` });
+      await sleep(1000 * 2 ** attempt);
+    }
     if (!res.ok) throw await failure(res);
     const body = (await res.json()) as { images?: { url?: string }[] };
     const url = body.images?.[0]?.url;
@@ -242,8 +256,12 @@ export async function drawImage(key: string, prompt: string, label: FalSlot | 'g
   }
 }
 
-/** Step 2: the model, through the queue, since it takes longer than a request should stay open. */
-async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptions): Promise<string> {
+/**
+ * Step 2: the model, through the queue, since it takes longer than a request should stay open.
+ * `started` is called when fal gives it a runner, which is not when it was asked: past the
+ * account's limit the queue holds it, and that wait comes back as `queuedMs`.
+ */
+async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptions, started?: () => void): Promise<{ glb: string; queuedMs: number }> {
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', FAL_MESH_MODEL, null, `← ${image}`, label);
@@ -258,7 +276,9 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
     const queued = (await submit.json()) as { status_url?: string; response_url?: string };
     if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
     const auth = { Authorization: `Key ${key}` };
-    const deadline = Date.now() + (o.timeoutMs ?? 300_000);
+    const asked = Date.now();
+    const deadline = asked + (o.timeoutMs ?? 300_000);
+    let queuedMs: number | null = null;
     for (;;) {
       await sleep(o.pollMs ?? 2000);
       if (Date.now() > deadline) throw new Error('timed out in the queue');
@@ -267,6 +287,10 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
       const s = (await res.json()) as { status?: string; queue_position?: number };
       const line = s.status === 'IN_QUEUE' ? `IN_QUEUE #${s.queue_position ?? '?'}` : (s.status ?? '?');
       updateRequest(entry, { text: `← ${image}\n${line}` });
+      if (queuedMs === null && s.status !== 'IN_QUEUE') {
+        queuedMs = Date.now() - asked;
+        started?.();
+      }
       if (s.status === 'COMPLETED') break;
     }
     const res = await f(queued.response_url, { headers: auth, signal: o.signal });
@@ -275,8 +299,10 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
     const glb = body.model_mesh?.url;
     if (!glb) throw new Error('no model in the answer');
     const kb = body.model_mesh?.file_size ? ` (${Math.round(body.model_mesh.file_size / 1024)} KB)` : '';
-    endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `← ${image}\n→ ${glb}${kb}` });
-    return glb;
+    const waited = queuedMs ?? 0;
+    const held = waited >= 1000 ? `, ${Math.round(waited / 1000)} s of it in fal's queue` : '';
+    endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `← ${image}\n→ ${glb}${kb}${held}` });
+    return { glb, queuedMs: waited };
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
@@ -284,16 +310,22 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
 }
 
 /** Picture, then model. Throws with the step's error; both steps are in the console either way. */
-export async function generateHubModel(key: string, world: WorldBible, slot: HubSlot, o: FalOptions = {}): Promise<LandmarkModel> {
+export async function generateHubModel(
+  key: string,
+  world: WorldBible,
+  slot: HubSlot,
+  o: FalOptions = {},
+  running?: () => void,
+): Promise<LandmarkModel> {
   const started = Date.now();
   const prompt = hubModelPrompt(world, slot);
   let spent = 0;
   try {
     const image = await drawImage(key, prompt, slot, o);
     spent += imageCost();
-    const glb = await buildMesh(key, image, slot, o);
+    const { glb, queuedMs } = await buildMesh(key, image, slot, o, running);
     spent += FAL_PRICES.mesh;
-    const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, at: Date.now() };
+    const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, queuedMs, at: Date.now() };
     recordMeasurement('rpg.landmark', { outcome: 'generated', piece: slot, ms: model.ms, costUsd: spent, lang: world.lang });
     return model;
   } catch (err) {
@@ -316,19 +348,30 @@ export function hubModel(world: WorldBible, slot: HubSlot): LandmarkModel | unde
   return slot === 'landmark' ? world.landmarkModel : world.kitModels?.[slot];
 }
 
-/** How many pieces fal.ai makes at once: the hub's eight took 55–80 s four at a time, and the queue holds the rest. */
-const PARALLEL = 4;
+/**
+ * How many pieces are asked of fal.ai at once: a whole world's ten and a quest's first few
+ * (owner, 27 Oct 2026: "the world could generate faster with parallel calls to fal.ai, but are
+ * there concurrency limits?"). There are, and they are fal's to keep: an account runs 2 at once
+ * when new and up to 40 as its invoices grow, across every endpoint, and a queued request over
+ * the limit is never refused, only held (fal.ai/docs, *Concurrency limits*). So the queue is the
+ * limiter and this only bounds what one tab has open. Measured on the owner's key the same day,
+ * ten pieces of a world: 113 s four at a time, 63 s all at once, sixteen at once 62 s, fal running
+ * 6–7 of them at any moment and holding the rest, no request refused.
+ */
+const PARALLEL = 12;
 let running = 0;
 const waiting: (() => void)[] = [];
-/** When each piece got its turn, by the same id as `inFlight`; a piece asked for and not in here is queued. */
+/**
+ * When fal.ai gave each piece a runner, by the same id as `inFlight`; a piece asked for and not
+ * in here is still waiting, in this tab's turn, on its picture or in fal's queue.
+ */
 const turnSince = new Map<string, number>();
 
-async function inTurn<T>(id: string, run: () => Promise<T>): Promise<T> {
+async function inTurn<T>(id: string, run: (started: () => void) => Promise<T>): Promise<T> {
   if (running >= PARALLEL) await new Promise<void>((go) => waiting.push(go));
   running++;
-  turnSince.set(id, Date.now());
   try {
-    return await run();
+    return await run(() => turnSince.set(id, Date.now()));
   } finally {
     turnSince.delete(id);
     running--;
@@ -368,10 +411,10 @@ export function ensureHubModels(
   for (const slot of hubSlots(world)) {
     const id = `${world.id}/${slot}`;
     if (hubModel(world, slot) || made.has(id) || failed.has(id) || inFlight.has(id)) continue;
-    const p = inTurn(id, async () => {
+    const p = inTurn(id, async (started) => {
       if (refused.has(world.id)) throw new Error('skipped: fal.ai refused the key');
       try {
-        const model = await generateHubModel(key, world, slot, o);
+        const model = await generateHubModel(key, world, slot, o, started);
         made.add(id);
         return model;
       } catch (err) {
@@ -395,8 +438,8 @@ export function ensureHubModels(
 
 /**
  * What fal.ai has been asked for and not yet answered (the start's progress, `progress.ts`): each
- * piece's id — `world/slot` for the hub, `clue/…` and `place/…` for a quest's — and when it got its
- * turn, or null while it waits behind the four running.
+ * piece's id — `world/slot` for the hub, `clue/…` and `place/…` for a quest's — and when fal.ai
+ * began making its model, or null while it waits for that.
  */
 export function falPending(): { id: string; since: number | null }[] {
   return [...inFlight.keys()].map((id) => ({ id, since: turnSince.get(id) ?? null }));
@@ -486,16 +529,16 @@ function ensurePiece(
 ): boolean {
   const slot = `${label}/${id}`;
   if (refused.has(label) || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
-  const p = inTurn(slot, async () => {
+  const p = inTurn(slot, async (running) => {
     if (refused.has(label)) throw new Error('skipped: fal.ai refused the key');
     const started = Date.now();
     let spent = 0;
     try {
       const image = await drawImage(key, prompt, label, o);
       spent += imageCost();
-      const glb = await buildMesh(key, image, label, o);
+      const { glb, queuedMs } = await buildMesh(key, image, label, o, running);
       spent += FAL_PRICES.mesh;
-      const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, at: Date.now() };
+      const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, queuedMs, at: Date.now() };
       recordMeasurement('rpg.landmark', { outcome: 'generated', piece: label, ms: model.ms, costUsd: spent });
       made.add(slot);
       return model;

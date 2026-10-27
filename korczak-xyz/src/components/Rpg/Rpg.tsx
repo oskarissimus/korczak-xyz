@@ -843,7 +843,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   /** One of the hub's models has come: kept on the world, wherever it is by now, and in the scene. */
   const keepModel = useCallback((id: string, slot: HubSlot, model: LandmarkModel) => {
-    rememberTiming('model', model.ms);
+    rememberTiming('model', model.ms - (model.queuedMs ?? 0));
     if (slot === 'landmark') markStage('landmark');
     markStage('firstModel');
     if (!findWorld(id)) {

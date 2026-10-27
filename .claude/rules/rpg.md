@@ -81,11 +81,25 @@ world or the genesis preview (`previewRef`; before even that, every `HUB_SLOTS` 
 has in flight and whether it has its turn yet (`falPending`, `turnSince` in `landmark3d.ts`), failed
 slots (`hubSlotFailed`, `groundState`), and the console's finished `clue`/`place` requests. The time
 left (`utils/rpg/progress.ts`, `remainingMs`) simulates the three lines: the world then the opening,
-the ground, and the models four at a time with each queued one on the first free worker; each
-task's length is its usual one, an average kept in localStorage `rpg-typical` that moves a third of
-the way on every measurement (defaults 12 s world, 12 s opening, 4 s ground, 50 s a model). The
+the ground, and the models six at a time (`FAL_RUNNING`, what fal ran at once for the account)
+with each queued one on the first free worker; each task's length is its usual one, an average kept
+in localStorage `rpg-typical` that moves a third of the way on every measurement (defaults 12 s
+world, 12 s opening, 4 s ground, 25 s a model). A model's usual time leaves out its wait in fal's
+queue (`LandmarkModel.queuedMs`), and it counts as running only once fal has given it a runner
+(`turnSince`), since the simulation already places the wait. The
 first measured run (27 Oct, dev, Flash): 2 min 40 s estimated at the click, 3 min 9 s to the last of
-15 pieces. The toast at a new world's first quest says the same (`buildingWorld`); a new quest in an
+15 pieces.
+
+**fal.ai's concurrency is fal's to limit, not ours** (owner, 27 Oct 2026: "the world could generate
+faster with parallel calls, but are there limits?"). An account runs 2 requests at once when new
+and up to 40 self-serve as its last four weeks of invoices grow, across all endpoints; over the
+limit the queue (`queue.fal.run`, the meshes) holds a request and never refuses it, while the
+synchronous `fal.run` (the pictures, the ground) answers 429 `concurrent_requests_limit`, which
+`drawImage` asks again after 1, 2, 4, 8, 16 s. So `PARALLEL` only bounds what a tab has open.
+Measured on the owner's key, ten pieces of a world: **113 s four at a time, 63 s all at once**,
+sixteen at once 62 s, fal running 6–7 meshes at a time and holding the rest, nothing refused. The
+cost is the same either way; a refused key now spends ten free 403s instead of four before it stops.
+The toast at a new world's first quest says the same (`buildingWorld`); a new quest in an
 old world still says the storyteller is writing.
 
 **A slider from classic to exotic** (owner, Oct 2026, a day later: "we overdid it, it is too
@@ -300,8 +314,8 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   the clones share geometry, so five houses are two uploads), five `tree`s inside the fence where
   the houses leave room, the `stall` and the `cart` where the kit's stall and wagon stand, four
   `lamp`s around the square between the paths in, and `goods` where its barrels and crates are.
-  A world whose flora is `none` makes no tree. Made four at a time (`PARALLEL`), all eight in
-  ~1–1.5 min, the landmark first; each replaces what stood there the moment it has loaded, so the
+  A world whose flora is `none` makes no tree. All asked for at once (`PARALLEL`, 12) and the
+  landmark first; each replaces what stood there the moment it has loaded, so the
   village changes a piece at a time. Fence and bench stay the kit's; the ground cover is the world's
   own too (below).
 - **The prompts are English**: genesis writes the `landmark` and a `kit` line per piece (at most

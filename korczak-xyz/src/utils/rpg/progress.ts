@@ -3,9 +3,10 @@
  * writing a quest" said nothing useful; "I'd like to know whether what I see is already everything,
  * and roughly how long it takes"). The start is three lines of work that overlap: the world's bible
  * and then the opening beat, one after the other; the ground, one picture; and fal.ai's 3D models,
- * four at a time (`PARALLEL` in `landmark3d.ts`) through its queue. Each is a task here, done,
- * running since some moment, queued or failed, and the time left is a small simulation of those
- * lines using how long each kind of task took in this browser before (`Typical`).
+ * all asked for at once and made as many at a time as fal runs for the account (`FAL_RUNNING`).
+ * Each is a task here, done, running since some moment, queued or failed, and the time left is a
+ * small simulation of those lines using how long each kind of task took in this browser before
+ * (`Typical`).
  *
  * No DOM beyond localStorage, so it can be tested.
  */
@@ -22,7 +23,10 @@ export interface Task {
   afterWorld?: boolean;
 }
 
-/** How long each kind of task usually takes, in ms; a model or a piece is one picture plus one mesh. */
+/**
+ * How long each kind of task usually takes, in ms; a model or a piece is one picture plus one
+ * mesh, without the time its mesh waited in fal's queue, which the simulation adds itself.
+ */
 export interface Typical {
   world: number;
   quest: number;
@@ -30,11 +34,18 @@ export interface Typical {
   model: number;
 }
 
-/** Before this browser has timed anything: quick start's world and opening, fal.ai's usual 3D model. */
-export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 50_000 };
+/**
+ * Before this browser has timed anything: quick start's world and opening, and fal.ai's usual 3D
+ * model with a runner (27 Oct 2026, 36 pieces: a picture in 1–6 s, a mesh in 14–37 s, ~22 s).
+ */
+export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 25_000 };
 
-/** Pieces fal.ai makes at once, as `landmark3d.ts` does. */
-export const FAL_PARALLEL = 4;
+/**
+ * Meshes fal.ai runs at once for the owner's account, the rest held in its queue: 6–7 at most
+ * whether 10 or 16 were asked (27 Oct 2026, `PARALLEL` in `landmark3d.ts`). The account's limit
+ * grows with its invoices, so this is a measurement to repeat, not a constant of fal's.
+ */
+export const FAL_RUNNING = 6;
 
 const TYPICAL_KEY = 'rpg-typical';
 
@@ -84,9 +95,10 @@ function left(task: Task, now: number, t: Typical): number {
 /**
  * Milliseconds until every task has ended, by the usual times: the world, then the opening; the
  * ground on its own; the models through `parallel` workers, each queued one on the first free
- * worker, and none of those marked `afterWorld` before the world is in.
+ * worker, and none of those marked `afterWorld` before the world is in. A running one is one fal
+ * has a runner for; should more be running than the workers, the extra ones only make more workers.
  */
-export function remainingMs(tasks: readonly Task[], now: number, t: Typical, parallel = FAL_PARALLEL): number {
+export function remainingMs(tasks: readonly Task[], now: number, t: Typical, parallel = FAL_RUNNING): number {
   const open = tasks.filter((x) => x.state === 'running' || x.state === 'queued');
   if (open.length === 0) return 0;
   const world = open.find((x) => x.kind === 'world');
@@ -98,11 +110,8 @@ export function remainingMs(tasks: readonly Task[], now: number, t: Typical, par
     end = Math.max(end, (g.state === 'queued' && g.afterWorld ? worldEnd : 0) + left(g, now, t));
   }
   const fal = open.filter((x) => x.kind === 'model' || x.kind === 'piece');
-  const workers = fal
-    .filter((x) => x.state === 'running')
-    .map((x) => left(x, now, t))
-    .slice(0, Math.max(parallel, 1));
-  while (workers.length < parallel) workers.push(0);
+  const workers = fal.filter((x) => x.state === 'running').map((x) => left(x, now, t));
+  while (workers.length < Math.max(parallel, 1)) workers.push(0);
   for (const q of fal.filter((x) => x.state === 'queued')) {
     let i = 0;
     for (let j = 1; j < workers.length; j++) if (workers[j] < workers[i]) i = j;

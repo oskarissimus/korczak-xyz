@@ -282,6 +282,8 @@ export interface LandmarkModel {
   prompt: string;
   costUsd: number;
   ms: number;
+  /** Of `ms`, how long the mesh waited in fal's queue for a runner; absent on models from before. */
+  queuedMs?: number;
   at: number;
 }
 
