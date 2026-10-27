@@ -6,6 +6,7 @@ import {
   DEFAULT_EXOTIC,
   demoGenesis,
   demoWorld,
+  firstObject,
   franchised,
   genesisPrompt,
   genesisTemperature,
@@ -14,7 +15,9 @@ import {
   parseHubSizes,
   parseLook,
   parseWorlds,
+  partialJson,
   pickWorld,
+  previewWorld,
   typicalityTarget,
 } from './genesis';
 
@@ -216,5 +219,81 @@ describe('lift', () => {
 
   it('leaves the classic look as it is', () => {
     expect(parseLook(CLASSIC_LOOK)).toEqual(CLASSIC_LOOK);
+  });
+});
+
+describe('one world written out', () => {
+  const kit = { house: 'a cork hut', hall: 'a brewery hall', tree: 'a fog mushroom', stall: 'a tap stand', cart: 'a barrel sled', lamp: 'a lens post', goods: 'kegs' };
+  const answer = JSON.stringify({
+    candidates: [
+      { name: 'A', typicality: 10, pitch: 'One.' },
+      { name: 'Latarnie', typicality: 30, pitch: 'Two.' },
+    ],
+    chosen: 2,
+    // In the order the prompt asks for: what the hub is made of before the rest of the bible.
+    world: (({ tone, tech, climate, people, threats, player, address, hub, words, ...first }) => ({
+      ...first,
+      landmark: 'a brass lighthouse',
+      terrain: 'wet cork',
+      sizes: { house: [3, 5] },
+      kit,
+      tone,
+      tech,
+      climate,
+      people,
+      threats,
+      player,
+      address,
+      hub,
+      words,
+    }))(candidate('Latarnie', 30, { look: { ...CLASSIC_LOOK, flora: 'fungi' } })),
+  });
+
+  it('asks for sketches and the one the game’s rule picks, written out with its look and kit first', () => {
+    const near = genesisPrompt(ctx);
+    expect(near).toContain('the closest to');
+    expect(near).not.toContain('SECOND');
+    expect(genesisPrompt({ ...ctx, nth: 2 })).toContain('the SECOND closest to');
+    expect(near.indexOf('"look"')).toBeLessThan(near.indexOf('"kit"'));
+    expect(near.indexOf('"kit"')).toBeLessThan(near.indexOf('  "threats": string'));
+    expect(demoGenesis({ ...ctx, nth: 2 }).nth).toBe(2);
+    expect(demoGenesis({ ...ctx, nth: 7 }).nth).toBe(1);
+  });
+
+  it('reads the written-out world under the chosen candidate’s id', () => {
+    const worlds = parseWorlds(answer, ctx, 1000);
+    expect(worlds).toHaveLength(1);
+    expect(worlds[0].name).toBe('Latarnie');
+    expect(worlds[0].id).toBe(`w${(1000).toString(36)}1`);
+    expect(worlds[0].kit?.cart).toBe('a barrel sled');
+    expect(pickWorld(worlds, 85)).toBe(worlds[0]);
+  });
+
+  it('sees the hub’s makings in the stream before the bible is finished, under the same id', () => {
+    // Cut in the middle of the world's words, after its kit.
+    const half = answer.slice(0, answer.indexOf('"threats"') + 14);
+    expect(parseWorlds(half, ctx, 1000)).toEqual([]);
+    const early = previewWorld(half, ctx, 1000);
+    expect(early?.id).toBe(parseWorlds(answer, ctx, 1000)[0].id);
+    expect(early?.landmark).toBe('a brass lighthouse');
+    expect(early?.kit?.goods).toBe('kegs');
+    expect(early?.look.flora).toBe('fungi');
+    // Not before the kit is whole.
+    expect(previewWorld(answer.slice(0, answer.indexOf('"goods"')), ctx, 1000)).toBeNull();
+  });
+});
+
+describe('partialJson', () => {
+  it('keeps every value before the last comma, closing what is open', () => {
+    expect(partialJson('{"a": 1, "b": {"c": "x, y", "d": [1, 2')).toEqual({ a: 1, b: { c: 'x, y', d: [1] } });
+    expect(partialJson('{"a": "he said \\"hi, there')).toBeNull();
+    expect(partialJson('noise {"a": [1, 2]} trailing')).toEqual({ a: [1, 2] });
+  });
+});
+
+describe('firstObject', () => {
+  it('reads an answer the model kept closing after it was whole', () => {
+    expect(firstObject('{"world": {"name": "x}"}}\n }\n}\n}')).toEqual({ world: { name: 'x}' } });
+    expect(parseWorlds(`${JSON.stringify({ chosen: 1, world: candidate('Ok', 20) })}\n }\n}`, ctx, 1)).toHaveLength(1);
   });
 });

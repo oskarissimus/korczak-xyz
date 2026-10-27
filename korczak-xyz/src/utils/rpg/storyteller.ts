@@ -33,6 +33,7 @@ import {
   parseHubSizes,
   parseWorlds,
   pickWorld,
+  previewWorld,
   typicalityTarget,
   type GenesisContext,
   type HubSizes,
@@ -56,6 +57,19 @@ export const GOOGLE_MODELS = [
   'gemma-4-31b-it',
 ];
 export const OPENAI_MODEL = 'gpt-4.1';
+
+/**
+ * What writes the world and the quest's opening when the start should be quick (owner, 27 Oct 2026:
+ * "about two minutes pass before the game is ready; maybe a faster model, maybe less thinking").
+ * Measured that day on the same prompts: the genesis 72 s on Pro thinking as usual, 48 s on Pro
+ * thinking little, 20 s on this one thinking little — and that was the old four-world answer; the
+ * opening beat 45 s, 33 s and 10 s. The later beats keep the chosen model, written while the hero
+ * walks and talks. `gemini-3.8-flash` writes as well but streamed at two thirds the speed that day.
+ */
+export const FAST_MODEL = 'gemini-3-flash-preview';
+
+/** How hard a Gemini model thinks before it writes: `low` for what the reader is waiting on. */
+export type Thinking = 'low' | 'high';
 
 /**
  * What the intro screen offers (owner, Oct 2026: "choose the model at the start, to try the
@@ -245,7 +259,16 @@ function handleLine(line: string, onData: (data: any) => void): boolean {
   return true;
 }
 
-async function askGoogle(key: string, model: string, prompt: string, temperature: number, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askGoogle(
+  key: string,
+  model: string,
+  prompt: string,
+  temperature: number,
+  dog: Watchdog,
+  entry: DevRequest,
+  thinking?: Thinking,
+  onText?: (soFar: string) => void,
+): Promise<string> {
   const gemma = model.startsWith('gemma');
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}` +
@@ -262,26 +285,35 @@ async function askGoogle(key: string, model: string, prompt: string, temperature
         // and a quest in Polish is ~1500 tokens on its own.
         maxOutputTokens: 16384,
         // The thought summaries are what the console shows while Pro is still deciding.
-        ...(gemma ? {} : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true } }),
+        ...(gemma
+          ? {}
+          : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true, ...(thinking ? { thinkingLevel: thinking } : {}) } }),
       },
     }),
   });
   if (!response.ok) throw new ProviderError(await errorText(response), response.status);
-  return readGoogle(response, dog, entry);
+  return readGoogle(response, dog, entry, onText);
 }
 
 /**
  * The demo: the context goes to our function, which builds the same prompt and passes Google's
  * stream back byte for byte. A refusal of its own carries a `reason`; anything else is Google's.
  */
-async function askDemo(model: string, body: DemoAsk, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askDemo(
+  model: string,
+  body: DemoAsk,
+  dog: Watchdog,
+  entry: DevRequest,
+  thinking?: Thinking,
+  onText?: (soFar: string) => void,
+): Promise<string> {
   const url = rpgDemoUrl();
   if (!url) throw new ProviderError('demo: no address', null, false, 'disabled');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: dog.controller.signal,
-    body: JSON.stringify({ ...body, model }),
+    body: JSON.stringify({ ...body, model, ...(thinking ? { thinking } : {}) }),
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -295,10 +327,10 @@ async function askDemo(model: string, body: DemoAsk, dog: Watchdog, entry: DevRe
     const message = (parsed as { error?: { message?: string } } | null)?.error?.message || body.slice(0, 500);
     throw new ProviderError(message, response.status, false, refusal);
   }
-  return readGoogle(response, dog, entry);
+  return readGoogle(response, dog, entry, onText);
 }
 
-async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest, onText?: (soFar: string) => void): Promise<string> {
   let text = '';
   let why: string | null = null;
   await readEvents(response, dog, (data) => {
@@ -308,7 +340,10 @@ async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest):
     for (const part of candidate?.content?.parts ?? []) {
       if (typeof part?.text !== 'string') continue;
       appendText(entry, part.text, part.thought === true);
-      if (!part.thought) text += part.text;
+      if (!part.thought) {
+        text += part.text;
+        onText?.(text);
+      }
     }
     const u = data?.usageMetadata;
     if (u) {
@@ -322,7 +357,14 @@ async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest):
   return text;
 }
 
-async function askOpenAi(key: string, prompt: string, temperature: number, dog: Watchdog, entry: DevRequest): Promise<string> {
+async function askOpenAi(
+  key: string,
+  prompt: string,
+  temperature: number,
+  dog: Watchdog,
+  entry: DevRequest,
+  onText?: (soFar: string) => void,
+): Promise<string> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -345,6 +387,7 @@ async function askOpenAi(key: string, prompt: string, temperature: number, dog: 
     if (typeof delta === 'string') {
       text += delta;
       appendText(entry, delta, false);
+      onText?.(text);
     }
     const u = data?.usage;
     if (u) updateRequest(entry, { usage: { input: u.prompt_tokens ?? 0, output: u.completion_tokens ?? 0, thoughts: 0 } });
@@ -427,6 +470,14 @@ interface Ask<T> {
   beat: number | null;
   /** What an unusable answer was not, for the console: a beat or a world unless said. */
   what?: string;
+  /** Asked before the chain, when the reader is waiting on the answer (`FAST_MODEL`). */
+  first?: string;
+  /** How hard a Gemini model thinks; its own default when absent. */
+  thinking?: Thinking;
+  /** The answer so far, each time it grows. */
+  onText?: (soFar: string) => void;
+  /** Each model's turn begins, the first and every retry. */
+  onTry?: () => void;
 }
 
 interface Asked<T> {
@@ -461,7 +512,9 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') hidden = true;
   };
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onHide);
-  const models = modelChain(provider, chosen);
+  const chain = modelChain(provider, chosen);
+  const first = ask.first && provider !== 'openai' && (provider !== 'demo' || (DEMO_MODELS as readonly string[]).includes(ask.first)) ? ask.first : null;
+  const models = first ? [first, ...chain.filter((m) => m !== first)] : chain;
   let again = 0;
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
@@ -472,16 +525,17 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
     run.model = model;
     const entry = startRequest('model', model, ask.beat);
     const dog = new Watchdog();
+    ask.onTry?.();
     const record = (status: number | null, error: string | null) =>
       run.tries.push({ model, status, ms: Date.now() - t0, firstMs: entry.firstMs, error, usage: entry.usage, cost: entry.cost });
     try {
       try {
         run.raw =
           provider === 'google'
-            ? await askGoogle(keys.google!, model, ask.prompt, ask.temperature, dog, entry)
+            ? await askGoogle(keys.google!, model, ask.prompt, ask.temperature, dog, entry, ask.thinking, ask.onText)
             : provider === 'demo'
-              ? await askDemo(model, ask.demo!, dog, entry)
-              : await askOpenAi(keys.openai!, ask.prompt, ask.temperature, dog, entry);
+              ? await askDemo(model, ask.demo!, dog, entry, ask.thinking, ask.onText)
+              : await askOpenAi(keys.openai!, ask.prompt, ask.temperature, dog, entry, ask.onText);
       } catch (e) {
         throw dog.wrap(e);
       } finally {
@@ -523,9 +577,21 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
   return run;
 }
 
-export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: string | null = null): Promise<StoryAttempt> {
+/** How a request the reader is waiting on is asked: a faster model first, thinking little. */
+export interface Quick {
+  first?: string;
+  thinking?: Thinking;
+}
+
+/** `fast` is the quick start (`FAST_MODEL`, thinking little); off, the chosen model as usual. */
+export function quick(fast: boolean): Quick {
+  return fast ? { first: FAST_MODEL, thinking: 'low' } : {};
+}
+
+export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: string | null = null, how: Quick = {}): Promise<StoryAttempt> {
   const prompt = beatPrompt(ctx);
   const run = await askChain(keys, chosen, {
+    ...how,
     prompt,
     temperature: 1,
     demo: { kind: 'beat', ctx },
@@ -559,21 +625,46 @@ export interface WorldAttempt extends Omit<Asked<WorldBible>, 'value'> {
 }
 
 /**
- * A new world (`genesis.ts`): four candidates from one answer, one of the two least typical chosen
- * by the game. Asked at `genesisTemperature`, through the same chain of models as a beat.
+ * A new world (`genesis.ts`): four candidates sketched in one answer and the one the game's rule
+ * picks written out. Asked at `genesisTemperature`, through the same chain of models as a beat.
+ * `onPreview` is told once per model's turn as soon as what the hub is made from has streamed
+ * (`previewWorld`), under the id the finished world will have, so its models can start early.
  */
-export async function generateWorld(keys: StoryKeys, ctx: GenesisContext, chosen: string | null = null): Promise<WorldAttempt> {
+export async function generateWorld(
+  keys: StoryKeys,
+  ctx: GenesisContext,
+  chosen: string | null = null,
+  how: Quick = {},
+  onPreview?: (world: WorldBible) => void,
+): Promise<WorldAttempt> {
   const prompt = genesisPrompt(ctx);
   let candidates: WorldBible[] = [];
+  // Minted per model's turn, so a world started from one model's stream is never another's.
+  let now = Date.now();
+  let previewed = false;
   const run = await askChain(keys, chosen, {
+    ...how,
     prompt,
     temperature: genesisTemperature(ctx.exotic),
     demo: { kind: 'world', ctx },
     parse: (raw) => {
-      candidates = parseWorlds(raw, ctx);
+      candidates = parseWorlds(raw, ctx, now);
       return pickWorld(candidates, typicalityTarget(ctx.exotic, askedFor(ctx)));
     },
     beat: null,
+    onTry: () => {
+      now = Date.now();
+      previewed = false;
+    },
+    onText: onPreview
+      ? (soFar) => {
+          if (previewed) return;
+          const world = previewWorld(soFar, ctx, now);
+          if (!world) return;
+          previewed = true;
+          onPreview(world);
+        }
+      : undefined,
   });
   const { value, ...rest } = run;
   return { ...rest, prompt, seeds: ctx.seeds, candidates, world: value };

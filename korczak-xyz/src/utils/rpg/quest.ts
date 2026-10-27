@@ -36,7 +36,7 @@ import {
   type PlaceSpec,
   type TargetLook,
 } from './place';
-import { classicWorld, worldLines, type LandmarkModel, type WorldBrief } from './genesis';
+import { classicWorld, firstObject, worldLines, type LandmarkModel, type WorldBrief } from './genesis';
 import { asAge, type VoiceAge } from './voicePick';
 
 export type Lang = 'en' | 'pl';
@@ -699,7 +699,8 @@ export function extractJson(reply: string): unknown {
     try {
       return JSON.parse(body.replace(/[\u0000-\u001f]+/g, ' ').replace(/,\s*([}\]])/g, '$1'));
     } catch {
-      return null;
+      // Something after the object, such as braces a model kept closing (`firstObject`).
+      return firstObject(reply);
     }
   }
 }

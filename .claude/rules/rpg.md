@@ -31,9 +31,40 @@ title (`drawSeeds`, a word instead when Wikipedia does not answer in 2.5 s), whi
 transform, never use literally. The model writes **four candidates** at `GENESIS_TEMPERATURE` 1.35
 (OpenAI caps at 1.2), each with its own `typicality` 0–100, told to make them differ from each other
 and from the worlds this browser already had (`pastWorlds`, the last 8, as "avoid"). The game, not
-the model, picks: one of the two nearest the slider's target (`pickWorld`). Names from a franchise list
-(`franchised`, Polish inflections included) disqualify a candidate. Measured on Flash: ~12 s,
-~2k tokens, worlds like a vertical shaft of steam with people living in rock bubbles.
+the model, picks: one of the two nearest the slider's target, the coin drawn before asking (`nth`)
+and applied by the model as a rule, because **only the picked one is written out**: the four are a
+sentence each (`candidates`), then `chosen` and the whole bible (`world`). Names from a franchise list
+(`franchised`, Polish inflections included) disqualify a candidate. `parseWorlds` still reads the old
+four-bible shape (`worlds`), which a demo function deployed before 27 Oct 2026 writes.
+
+**The start is quick** (owner, 27 Oct 2026: "about two minutes pass before the game is ready — a
+faster model, the asset descriptions before the whole bible, a smaller bible, less thinking"). Measured
+from the records that day: the genesis 65 s on Pro (5.4k thinking tokens, 3.5k answer, three of the
+four bibles thrown away), then the opening beat 53 s on Pro (5.9k thinking), one after the other; and
+fal.ai started only once the whole world was in. Benchmarked on the same prompts (`gemini-3.1-pro-preview`
+/ `gemini-3-flash-preview`, thinking high / low): old genesis 72 / 48 / 29 / 20 s; opening beat 45 / 33 /
+22 / 10 s; output streams at ~130 tokens/s on Pro and ~190 on Flash, so the answer's length is as much
+of the wait as the thinking. Four things, each kept:
+- **One world written out** (above): ~1.2k tokens instead of 3.5k.
+- **The world and the opening on `FAST_MODEL`, thinking `low`** (`quick` in `storyteller.ts`,
+  `thinkingConfig.thinkingLevel`; the demo passes `thinking` and its function sets the same). The
+  model picked in Settings stays first in the chain for every later beat, which is written while the
+  hero walks and talks, and the fallback after the fast one. A Settings checkbox, *Szybki start*,
+  turns it off (localStorage `rpg-fast-start` `'0'`). Measured after: the genesis 7.6–9.4 s in five
+  runs, the opening ~10 s.
+- **The hub's makings come first in the bible** — look, landmark, terrain, sizes, kit, then the words
+  — and `previewWorld` reads them from the stream (`partialJson`: everything before the last comma
+  outside a string, brackets closed) the moment the kit is whole, under the id the finished world will
+  get (minted per model's turn, so another model's world never inherits them). `createWorld` starts
+  the ground and the hub from it (`startWorldAssets`); what arrives before the world is saved waits in
+  `earlyRef` and is put on it at birth (`withEarly`), and the effect that asks for the rest finds the
+  same ids in flight. On Flash the preview comes ~6.5 s after the click.
+- **Flash at low thinking sometimes closes the object and keeps writing `}`**, so both JSON readers
+  fall back to the first balanced object (`firstObject`).
+
+**The console's Start tab** shows where the time went: from the click (*New world* or *New quest*),
+when each awaited thing came (`markStage`: assets described, world ready, first step, ground, landmark,
+first 3D model, whole hub), and a bar per request on one time axis — running striped, failed hollow.
 
 **A slider from classic to exotic** (owner, Oct 2026, a day later: "we overdid it, it is too
 exotic; a slider, typical RPG worlds on the left, the exotic ones on the right"). Under the start
@@ -518,7 +549,8 @@ better model first and a fallback; we switch to a cheaper one when we optimise f
 `gemini-3.1-pro-preview`, `gemini-3-flash-preview`, `gemini-flash-latest`,
 `gemini-flash-lite-latest`, all in JSON mode, then `gemma-4-31b-it` (no JSON mode;
 `gemma-3-27b-it` was withdrawn, 404, Oct 2026). Flash-Lite was first until it wrote briefings and
-narration.
+narration. The genesis and the opening beat ask `FAST_MODEL` before this chain unless the quick start is
+switched off (*The start is quick*, above).
 
 **Pro is slow, not broken.** Measured Oct 2026: its first token takes 3–40s even on a one-line
 prompt, and a whole beat can run past a minute. The first version had one 90s limit for the whole

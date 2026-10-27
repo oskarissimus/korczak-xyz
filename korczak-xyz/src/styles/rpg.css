@@ -747,6 +747,62 @@ ul.rpg-source {
   padding: 4px 0;
 }
 
+/* The Start tab: when each awaited thing came, and a bar per request on one time axis. Running is
+   striped and failed is hollow, so it reads on a black-and-white screen (see "On a phone"). */
+.rpg-dev-start dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 4px 0 8px;
+}
+
+.rpg-dev-start dt {
+  color: #9fd38a;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rpg-dev-start dd {
+  margin: 0;
+}
+
+.rpg-dev-start .rpg-dev-pending {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.rpg-dev-span {
+  padding: 2px 0;
+}
+
+.rpg-dev-span-text {
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpg-dev-bar-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rpg-dev-bar-fill {
+  height: 100%;
+  min-width: 2px;
+  background: #e8d9a8;
+}
+
+.rpg-dev-waiting .rpg-dev-bar-fill,
+.rpg-dev-streaming .rpg-dev-bar-fill {
+  background: repeating-linear-gradient(90deg, #e8d9a8 0 4px, transparent 4px 7px);
+}
+
+.rpg-dev-error .rpg-dev-bar-fill {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #e8d9a8;
+}
+
 /* The FPS counter: under the buttons on the left, where the HUD has nothing. */
 .rpg-fps {
   position: absolute;

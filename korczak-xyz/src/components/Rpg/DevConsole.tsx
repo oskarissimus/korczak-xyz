@@ -7,7 +7,18 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
-import { devlogVersion, devRequests, questSpend, questTotals, spendUsd, subscribeDevlog, worldSpend, type DevRequest } from '../../utils/rpg/devlog';
+import {
+  devlogVersion,
+  devRequests,
+  questSpend,
+  questTotals,
+  spendUsd,
+  STAGES,
+  subscribeDevlog,
+  timeline,
+  worldSpend,
+  type DevRequest,
+} from '../../utils/rpg/devlog';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import type { Lang } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
@@ -135,6 +146,68 @@ function PerfTab({ lang, scene, badge, onBadge }: { lang: Lang; scene: RpgScene 
   );
 }
 
+/** Seconds after the start, to a tenth. */
+function at(ms: number): string {
+  return `+${(ms / 1000).toFixed(1)} s`;
+}
+
+/**
+ * Where the start's time went (owner, 27 Oct 2026: "two minutes before the game is ready"): when
+ * each thing the reader waits for arrived, and every request since the click, by when it began,
+ * first answered and ended — a bar per request, so the steps that ran one after another show.
+ */
+function StartTab({ lang, requests }: { lang: Lang; requests: readonly DevRequest[] }) {
+  const t = translations[lang];
+  const line = timeline();
+  if (!line) return <div className="rpg-dev-list"><div className="rpg-dev-empty">{t.devStartEmpty}</div></div>;
+  const mine = requests.filter((r) => r.startedAt >= line.since && r.kind !== 'voice');
+  // The clock runs while something does, and stops at the last thing that came.
+  const busy = mine.some((r) => r.ms === null);
+  const ends = [...Object.values(line.stages), ...mine.map((r) => r.startedAt - line.since + elapsed(r))] as number[];
+  const now = busy ? Date.now() - line.since : Math.max(0, ...ends);
+  const span = Math.max(now, ...ends, 1);
+  const reached = STAGES.filter((s) => line.stages[s] !== undefined).sort((a, b) => line.stages[a]! - line.stages[b]!);
+  const waiting = STAGES.filter((s) => line.stages[s] === undefined);
+  const pct = (ms: number) => `${Math.min(100, (ms / span) * 100).toFixed(2)}%`;
+  return (
+    <div className="rpg-dev-list rpg-dev-start">
+      <div className="rpg-dev-beat">
+        {line.what === 'world' ? t.devStartWorld : t.devStartQuest} · {formatMs(now)}
+      </div>
+      <dl>
+        {reached.map((s) => (
+          <React.Fragment key={s}>
+            <dt>{at(line.stages[s]!)}</dt>
+            <dd>{t.stageNames[s]}</dd>
+          </React.Fragment>
+        ))}
+        {waiting.map((s) => (
+          <React.Fragment key={s}>
+            <dt>…</dt>
+            <dd className="rpg-dev-pending">{t.stageNames[s]}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+      {mine.map((r) => {
+        const from = r.startedAt - line.since;
+        const took = elapsed(r);
+        const what = r.kind === 'model' ? (r.beat === null ? 'world' : `beat ${r.beat + 1}`) : (r.label ?? r.kind);
+        return (
+          <div key={r.id} className={`rpg-dev-span rpg-dev-${r.status}`}>
+            <div className="rpg-dev-span-text">
+              {what} · {r.servedBy ?? r.model} · {at(from)} → {r.ms === null ? '…' : at(from + took)} ({formatMs(took)}
+              {r.firstMs !== null && r.kind === 'model' ? `, 1st ${formatMs(r.firstMs)}` : ''})
+            </div>
+            <div className="rpg-dev-bar-track" aria-hidden="true">
+              <div className="rpg-dev-bar-fill" style={{ marginLeft: pct(from), width: pct(took) }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DevConsole({
   lang,
   onClose,
@@ -151,11 +224,11 @@ export function DevConsole({
   const t = translations[lang];
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
+  const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'perf'>('requests');
   useTick(running);
   const totals = questTotals();
   const listRef = useRef<HTMLDivElement>(null);
   const [showVoice, setShowVoice] = useState(false);
-  const [tab, setTab] = useState<'requests' | 'lines' | 'perf'>('requests');
   const lines = useTranscript();
   const shown = showVoice ? requests : requests.filter((r) => r.kind !== 'voice');
 
@@ -172,6 +245,9 @@ export function DevConsole({
         <div className="rpg-dev-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'requests'} onClick={() => setTab('requests')}>
             {t.devRequests}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'start'} onClick={() => setTab('start')}>
+            {t.devStart}
           </button>
           <button type="button" role="tab" aria-selected={tab === 'lines'} onClick={() => setTab('lines')}>
             {t.devLines}
@@ -191,6 +267,8 @@ export function DevConsole({
       </div>
       {tab === 'perf' ? (
         <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} />
+      ) : tab === 'start' ? (
+        <StartTab lang={lang} requests={requests} />
       ) : tab === 'lines' ? (
         <div className="rpg-dev-list rpg-dev-lines" ref={listRef}>
           {lines.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}

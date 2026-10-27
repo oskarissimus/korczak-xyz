@@ -393,3 +393,37 @@ export function questTotals(): QuestTotals {
   }
   return totals;
 }
+
+/*
+ * Where the start's time goes (owner, 27 Oct 2026: "about two minutes pass before the game is ready"):
+ * from the click that starts a world or a quest, when each thing the reader waits for arrived. The
+ * console's Start tab shows these beside every request made since, by when it began, first answered
+ * and ended, so a slow start says which step it was slow in.
+ */
+
+/** What the start waits for, in the order it usually comes. */
+export const STAGES = ['assets', 'world', 'quest', 'ground', 'landmark', 'firstModel', 'hub'] as const;
+export type Stage = (typeof STAGES)[number];
+
+let timelineSince: number | null = null;
+let timelineWhat: 'world' | 'quest' = 'world';
+let stages: Partial<Record<Stage, number>> = {};
+
+/** The start begins now: a new world, or a new quest in this one. */
+export function beginTimeline(what: 'world' | 'quest'): void {
+  timelineSince = Date.now();
+  timelineWhat = what;
+  stages = {};
+  changed();
+}
+
+/** `stage` arrived, the first time only since the start began. */
+export function markStage(stage: Stage): void {
+  if (timelineSince === null || stages[stage] !== undefined) return;
+  stages[stage] = Date.now() - timelineSince;
+  changed();
+}
+
+export function timeline(): { since: number; what: 'world' | 'quest'; stages: Partial<Record<Stage, number>> } | null {
+  return timelineSince === null ? null : { since: timelineSince, what: timelineWhat, stages };
+}

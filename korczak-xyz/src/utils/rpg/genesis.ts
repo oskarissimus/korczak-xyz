@@ -13,9 +13,14 @@
  *   three unrelated things the world must be built around. Nobody listed worlds; "lighthouse,
  *   fermentation, a battle of 1632" is not a setting anybody wrote down.
  * - **Four candidates in one answer**, as different from one another as the model can make them,
- *   each with its own honest `typicality`. The game, not the model, picks one of the two least
- *   typical — since the slider, the two nearest the slider's target (`pickWorld`). A model asked
- *   for a spread reaches further than one asked for an answer.
+ *   each with its own honest `typicality`. The game, not the model, picks one of the two nearest
+ *   the slider's target. A model asked for a spread reaches further than one asked for an answer.
+ *   Since 27 Oct 2026 only the picked one is written out (owner: "it takes two minutes before the
+ *   game is ready"): four whole bibles were 3.5k tokens, three of them thrown away, and on Pro the
+ *   genesis alone took 65 s. Now the four are a sentence each, the game draws beforehand which of
+ *   the two nearest it takes (`nth`), the model applies that rule and writes that one in full, look,
+ *   landmark and kit first, so the hub's models can be started from the stream (`previewWorld`)
+ *   before the rest of the bible has been written.
  * - **A slider from familiar to exotic** (`exotic`, 0–100): three prompts — a classic RPG setting
  *   with the seeds as flavour, a familiar genre twisted by the seeds, or anything at all — a
  *   typicality to aim the candidates and the pick at, and a temperature from 0.9 to 1.35.
@@ -290,6 +295,11 @@ export interface GenesisContext {
   chosen?: boolean;
   /** The world as the player describes it, in their words; it is the premise when there is one. */
   wish?: string;
+  /**
+   * Which of the two candidates nearest the target the model writes out: the game's dice, drawn
+   * before asking, since only the picked one is written in full. Absent is the nearest.
+   */
+  nth?: 1 | 2;
 }
 
 /** The longest description of a world the player may write. */
@@ -550,11 +560,15 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     lines.push('', 'The player has ALREADY BEEN to these worlds; every candidate must be unlike all of them:');
     for (const w of ctx.avoid) lines.push(`- ${w}`);
   }
+  const which = ctx.nth === 2 ? 'the SECOND closest' : 'the closest';
   lines.push(
     '',
-    'Write 4 CANDIDATE worlds, as different from one another as you can make them. For each, rate honestly how',
+    'Think of 4 CANDIDATE worlds, as different from one another as you can make them. For each, rate honestly how',
     '"typical" it is, 0 to 100: how close it comes to what an average fantasy or science-fiction game offers',
     `(0: nobody has seen anything like it; 100: a stock setting). Aim them around ${target}.`,
+    'Sketch each in one sentence ("candidates"). Then take the candidate whose typicality is',
+    `${which} to ${target} — the game's rule, not a matter of taste — and write THAT one out in full ("world").`,
+    'Only the chosen one is written out; the other three stay one-sentence sketches.',
     '',
     'Every world must be PLAYABLE as this game: the player walks a landscape, talks to people, fights what is',
     'dangerous and gathers things. So it has a settlement where the player starts ("hub"), people who talk and',
@@ -564,33 +578,17 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     'choose the look to show this world and nothing generic.',
     '',
     `Write every text field in ${language}. Be concrete and sensory, not grand. Each text field at most 240 characters.`,
+    'Write the fields of "world" in exactly the order below: the game starts building the world from its look,',
+    'landmark and kit while you are still writing the rest.',
     '',
     'Answer with ONE JSON object and nothing else, no markdown fence:',
-    '{"worlds": [{',
+    '{"candidates": [{"name": string, "typicality": number 0–100, "pitch": string (one sentence)}, … 4 of them],',
+    ' "chosen": number (1–4: which candidate "world" is),',
+    ' "world": {',
     '  "name": string (the world’s own name),',
     '  "typicality": number 0–100,',
     '  "pitch": string (2–3 sentences: what this world is, as one would see, hear and smell it),',
-    '  "tone": string (a few words),',
-    '  "tech": string (how far technology and magic go here, if at all),',
-    '  "climate": string,',
-    '  "people": string (who lives here, what they look like and wear),',
     '  "architecture": string (what they build with, how it looks),',
-    '  "threats": string (what is dangerous: what the player fights),',
-    '  "player": string (who the player is here and why they help),',
-    '  "address": string (how people address the player, one or two words, as said to them),',
-    '  "hub": string (the name of the settlement where the player starts),',
-    '  "landmark": string (IN ENGLISH, whatever the language above: the ONE structure, monument, shrine or',
-    '    machine standing in the middle of the hub that says "this world" at a glance — its shape, materials',
-    '    and colours, for an image model; a single object about 6 m tall, not a scene, no people),',
-    '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
-    '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
-    '    "tree" (what grows here, as "flora" below says), "stall" (a market stall or workbench), "cart" (how',
-    '    goods are moved here), "lamp" (a light post, beacon or totem), "goods" (a small pile of goods)},',
-    '  "terrain": string (IN ENGLISH too, at most 14 words: what the open ground between the buildings is, up',
-    '    close, as a material — "wet black mud with puddles", "fresh snow over frozen earth", "cracked red clay',
-    '    with pebbles", "rusted metal plates and sand"; it must agree with "growth", "weather" and "water" below),',
-    `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
-    '  "words": [up to 6 words or short phrases people here use],',
     '  "look": {',
     '    "sky", "fog", "sun", "ground", "foliage", "wall", "roof", "accent": each a "#rrggbb" colour',
     '      (foliage is whatever grows; wall and roof are the buildings; accent is the world’s signature glow),',
@@ -602,8 +600,29 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     `    "flora": one of ${list(FLORAS)} (what stands where a forest would; fungi: giant mushrooms; spires: tall`,
     '      crystal or metal spikes),',
     `    "wallSurface": one of ${list(WALL_SURFACES)}, "roofSurface": one of ${list(ROOF_SURFACES)}`,
-    '  }',
-    '}]}',
+    '  },',
+    '  "landmark": string (IN ENGLISH, whatever the language above: the ONE structure, monument, shrine or',
+    '    machine standing in the middle of the hub that says "this world" at a glance — its shape, materials',
+    '    and colours, for an image model; a single object about 6 m tall, not a scene, no people),',
+    '  "terrain": string (IN ENGLISH too, at most 14 words: what the open ground between the buildings is, up',
+    '    close, as a material — "wet black mud with puddles", "fresh snow over frozen earth", "cracked red clay',
+    '    with pebbles", "rusted metal plates and sand"; it must agree with "growth", "weather" and "water" above),',
+    `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
+    '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
+    '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
+    '    "tree" (what grows here, as "flora" says), "stall" (a market stall or workbench), "cart" (how',
+    '    goods are moved here), "lamp" (a light post, beacon or totem), "goods" (a small pile of goods)},',
+    '  "tone": string (a few words),',
+    '  "tech": string (how far technology and magic go here, if at all),',
+    '  "climate": string,',
+    '  "people": string (who lives here, what they look like and wear),',
+    '  "threats": string (what is dangerous: what the player fights),',
+    '  "player": string (who the player is here and why they help),',
+    '  "address": string (how people address the player, one or two words, as said to them),',
+    '  "hub": string (the name of the settlement where the player starts),',
+    '  "words": [up to 6 words or short phrases people here use]',
+    ' }',
+    '}',
   );
   return lines.join('\n');
 }
@@ -716,8 +735,61 @@ function extract(reply: string): unknown {
     try {
       return JSON.parse(body.replace(/[\u0000-\u001f]+/g, ' ').replace(/,\s*([}\]])/g, '$1'));
     } catch {
-      return null;
+      return firstObject(reply);
     }
+  }
+}
+
+/**
+ * The first balanced `{…}` in a reply, parsed, or null. For an answer with something after its
+ * object: Flash at low thinking closed a whole world and then wrote four more `}` (27 Oct 2026),
+ * which the first-to-last-brace cut cannot parse.
+ */
+export function firstObject(reply: string): unknown {
+  const whole = scan(reply);
+  return whole.complete ? whole.value : null;
+}
+
+/** Walks a JSON answer from its first `{`: its first balanced object, or else what is whole before its last comma. */
+function scan(text: string): { complete: boolean; value: unknown } {
+  const none = { complete: false, value: null };
+  const start = text.indexOf('{');
+  if (start < 0) return none;
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let cut = -1;
+  let open = '';
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') {
+      stack.pop();
+      if (stack.length === 0) {
+        try {
+          return { complete: true, value: JSON.parse(text.slice(start, i + 1)) };
+        } catch {
+          return none;
+        }
+      }
+    } else if (ch === ',') {
+      cut = i;
+      open = [...stack].reverse().join('');
+    }
+  }
+  if (cut < 0) return none;
+  try {
+    return { complete: false, value: JSON.parse(text.slice(start, cut) + open) };
+  } catch {
+    return none;
   }
 }
 
@@ -727,29 +799,105 @@ function extract(reply: string): unknown {
  */
 export function parseWorlds(reply: string, ctx: GenesisContext, now = Date.now()): WorldBible[] {
   const raw = extract(reply) as Record<string, unknown> | null;
+  // Since 27 Oct 2026 one world written out (`world`) beside sketches; before, four whole ones.
+  const written = written1(raw);
+  if (written) {
+    const world = bible(written.world, written.index, ctx, now);
+    return world ? [world] : [];
+  }
   const candidates = Array.isArray(raw?.worlds) ? raw!.worlds : raw && typeof raw === 'object' && 'name' in raw ? [raw] : [];
   const worlds: WorldBible[] = [];
   for (const [i, c] of candidates.slice(0, 6).entries()) {
-    const brief = parseBrief(c);
-    if (!brief) continue;
-    if (franchised(JSON.stringify(brief))) continue;
-    const r = c as Record<string, unknown>;
-    const typicality = Number(r.typicality);
-    worlds.push({
-      ...brief,
-      id: `w${now.toString(36)}${i}`,
-      lang: ctx.lang,
-      createdAt: now,
-      seeds: ctx.seeds,
-      typicality: Number.isFinite(typicality) ? Math.min(100, Math.max(0, Math.round(typicality))) : 50,
-      look: parseLook(r.look),
-      ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
-      ...parseKit(r.kit),
-      ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
-      ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
-    });
+    const world = bible(c, i, ctx, now);
+    if (world) worlds.push(world);
   }
   return worlds;
+}
+
+/** The written-out world of the answer's new shape, and which candidate it is (0-based). */
+function written1(raw: Record<string, unknown> | null): { world: Record<string, unknown>; index: number } | null {
+  if (!raw || !raw.world || typeof raw.world !== 'object') return null;
+  const chosen = Math.round(Number(raw.chosen));
+  return { world: raw.world as Record<string, unknown>, index: chosen >= 1 && chosen <= 6 ? chosen - 1 : 0 };
+}
+
+/** One candidate as the game keeps it, or null when it lacks something the game needs or borrows a franchise. */
+function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBible | null {
+  const brief = parseBrief(c);
+  if (!brief) return null;
+  if (franchised(JSON.stringify(brief))) return null;
+  const r = c as Record<string, unknown>;
+  const typicality = Number(r.typicality);
+  return {
+    ...brief,
+    id: worldId(now, i),
+    lang: ctx.lang,
+    createdAt: now,
+    seeds: ctx.seeds,
+    typicality: Number.isFinite(typicality) ? Math.min(100, Math.max(0, Math.round(typicality))) : 50,
+    look: parseLook(r.look),
+    ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
+    ...parseKit(r.kit),
+    ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
+    ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
+  };
+}
+
+function worldId(now: number, i: number): string {
+  return `w${now.toString(36)}${i}`;
+}
+
+/**
+ * The complete part of a JSON answer still streaming: everything up to its last comma outside a
+ * string, with the brackets still open closed after it. A value before a comma is whole, so every
+ * key it gives is final — but for an array cut inside, which comes out shorter than it will be.
+ */
+export function partialJson(text: string): unknown {
+  return scan(text).value;
+}
+
+/** What the hub's models are made from: the look's colours and the landmark and kit lines. */
+const PREVIEW_LOOK = ['wall', 'roof', 'accent', 'foliage', 'flora'] as const;
+
+/**
+ * The world being written, as soon as what its hub is made from has streamed (owner, 27 Oct 2026:
+ * "the first assets should appear sooner"): its look, landmark and every piece of its kit, under
+ * the id the finished world will have. Null until then, and for an answer in the old shape. The
+ * words of its bible may still be missing; nothing the hub's prompts need is.
+ */
+export function previewWorld(soFar: string, ctx: GenesisContext, now: number): WorldBible | null {
+  const w = written1(partialJson(soFar) as Record<string, unknown> | null);
+  if (!w) return null;
+  const r = w.world;
+  const look = r.look as Record<string, unknown> | undefined;
+  const kit = r.kit as Record<string, unknown> | undefined;
+  if (!look || typeof look !== 'object' || PREVIEW_LOOK.some((k) => typeof look[k] !== 'string')) return null;
+  if (!text(r.landmark) || !kit || typeof kit !== 'object' || HUB_PIECES.some((p) => !text(kit[p]))) return null;
+  const typicality = Number(r.typicality);
+  return {
+    id: worldId(now, w.index),
+    lang: ctx.lang,
+    createdAt: now,
+    seeds: ctx.seeds,
+    typicality: Number.isFinite(typicality) ? typicality : 50,
+    name: text(r.name, 60) ?? '',
+    pitch: text(r.pitch, 400) ?? '',
+    tone: '',
+    tech: text(r.tech) ?? '',
+    climate: text(r.climate) ?? '',
+    people: '',
+    architecture: text(r.architecture) ?? '',
+    threats: '',
+    player: '',
+    address: '',
+    hub: text(r.hub, 60) ?? '',
+    words: [],
+    look: parseLook(look),
+    landmark: text(r.landmark, 300)!,
+    ...parseKit(kit),
+    ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
+    ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
+  };
 }
 
 /**
@@ -822,5 +970,6 @@ export function demoGenesis(value: unknown): GenesisContext {
     exotic: clampExotic(r.exotic),
     chosen: r.chosen === true,
     wish: cut(r.wish, WISH_MAX).trim() || undefined,
+    nth: r.nth === 2 ? 2 : 1,
   };
 }

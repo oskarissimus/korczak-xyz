@@ -36,11 +36,33 @@ import {
 } from '../../utils/rpg/quest';
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
-import { addGenerationTime, beginQuestSpend, NO_SPEND, onRequestEnd, questSpend, resetDevlog, triesSpend, validSpend } from '../../utils/rpg/devlog';
-import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type WorldBible } from '../../utils/rpg/genesis';
+import {
+  addGenerationTime,
+  beginQuestSpend,
+  beginTimeline,
+  markStage,
+  NO_SPEND,
+  onRequestEnd,
+  questSpend,
+  resetDevlog,
+  triesSpend,
+  validSpend,
+} from '../../utils/rpg/devlog';
+import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture } from '../../utils/rpg/groundTexture';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
-import { cluePrompt, ensureClueModel, ensureHubModels, ensurePlaceModel, placeAssetPrompt, FOREST_SLOTS, HUB_SLOTS, hubModel, type HubSlot } from '../../utils/rpg/landmark3d';
+import {
+  cluePrompt,
+  ensureClueModel,
+  ensureHubModels,
+  ensurePlaceModel,
+  placeAssetPrompt,
+  FOREST_SLOTS,
+  HUB_SLOTS,
+  hubModel,
+  hubSlots,
+  type HubSlot,
+} from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
@@ -50,7 +72,7 @@ import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
-import { generateBeat, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, type QuestSource } from '../../utils/rpg/storyteller';
+import { FAST_MODEL, generateBeat, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
 import {
   addToAtlas,
   clearPendingGenesis,
@@ -144,6 +166,8 @@ declare global {
 }
 
 const MODEL_KEY = 'rpg-model';
+/** Whether the world and the opening are written quickly (`quick` in `storyteller.ts`); on unless '0'. */
+const FAST_KEY = 'rpg-fast-start';
 /** `text` cut to `n` characters, with an ellipsis when it was longer. */
 function clip(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n - 1)}…` : text;
@@ -227,6 +251,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [chosenModel, setChosenModel] = useState<string | null>(null);
   const chosenModelRef = useRef<string | null>(null);
   chosenModelRef.current = chosenModel;
+  /** The world and the opening on the fast model, thinking little; the later beats keep the chosen one. */
+  const [fastStart, setFastStart] = useState(true);
+  const fastStartRef = useRef(true);
+  fastStartRef.current = fastStart;
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
   const [exotic, setExotic] = useState(DEFAULT_EXOTIC);
   const exoticRef = useRef(DEFAULT_EXOTIC);
@@ -625,7 +653,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           characters: charactersRef.current,
           world: worldRef.current ?? undefined,
           dead: deadRef.current,
-        }, chosen);
+        }, chosen, quick(index === 0 && fastStartRef.current));
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
         if (attempt.beat) return { beat: attempt.beat, failure: null };
@@ -725,8 +753,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
     whereRef.current.clear();
     spokenRef.current.clear();
     askedRef.current.clear();
-    // A world invented just before this quest stays in the console with it.
-    if (!keepLog) resetDevlog();
+    // A world invented just before this quest stays in the console with it, and so does its start.
+    if (!keepLog) {
+      resetDevlog();
+      beginTimeline('quest');
+    }
     beginQuestSpend();
     resetTranscript();
     beatsRef.current = [];
@@ -752,6 +783,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (token !== questTokenRef.current) return;
       setGenerating(false);
       if (opening) {
+        markStage('quest');
         setupBeat(opening);
         return;
       }
@@ -785,6 +817,72 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [enterWorld, flash, flushPlay, gameLang, setupBeat, writeBeat]);
 
   /**
+   * What fal.ai made for a world before the world existed to keep it (`previewWorld`): held here
+   * by its id until the world is born and saved with it (`withEarly`).
+   */
+  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture }>());
+  const earlyFor = (id: string) => {
+    let kept = earlyRef.current.get(id);
+    if (!kept) earlyRef.current.set(id, (kept = { models: [] }));
+    return kept;
+  };
+
+  /** One of the hub's models has come: kept on the world, wherever it is by now, and in the scene. */
+  const keepModel = useCallback((id: string, slot: HubSlot, model: LandmarkModel) => {
+    if (slot === 'landmark') markStage('landmark');
+    markStage('firstModel');
+    if (!findWorld(id)) {
+      earlyFor(id).models.push([slot, model]);
+      return;
+    }
+    setWorldModel(id, slot, model);
+    if (worldRef.current?.id === id) worldRef.current = withModel(worldRef.current, slot, model);
+    setWorld((now) => {
+      const next = now?.id === id ? withModel(now, slot, model) : now;
+      if (next && next.id === id && hubSlots(next).every((s) => hubModel(next, s))) markStage('hub');
+      return next;
+    });
+  }, []);
+
+  /** The world's ground has been painted: the same, for the texture. */
+  const keepGround = useCallback((id: string, texture: GroundTexture) => {
+    markStage('ground');
+    if (!findWorld(id)) {
+      earlyFor(id).ground = texture;
+      return;
+    }
+    setWorldGround(id, texture);
+    if (worldRef.current?.id === id) worldRef.current = { ...worldRef.current, groundTexture: texture };
+    setWorld((now) => (now?.id === id ? { ...now, groundTexture: texture } : now));
+  }, []);
+
+  /** A world just born, with whatever was made for it while it was still being written. */
+  const withEarly = useCallback((w: WorldBible): WorldBible => {
+    const kept = earlyRef.current.get(w.id);
+    if (!kept) return w;
+    earlyRef.current.delete(w.id);
+    let next = kept.models.reduce((acc, [slot, model]) => withModel(acc, slot, model), w);
+    if (kept.ground) next = { ...next, groundTexture: kept.ground };
+    return next;
+  }, []);
+
+  /** Asks fal.ai for whatever of the world's ground and hub it lacks; each piece once, however often asked. */
+  const startWorldAssets = useCallback(
+    (w: WorldBible) => {
+      const key = falKeyRef.current;
+      if (!key || w.createdAt === 0) return;
+      ensureGroundTexture(key, w, (texture) => keepGround(w.id, texture), (e) => log.warn('rpg.ground.failed', describeError(e)));
+      ensureHubModels(
+        key,
+        w,
+        (slot, model) => keepModel(w.id, slot, model),
+        (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
+      );
+    },
+    [keepGround, keepModel],
+  );
+
+  /**
    * Invents a world and starts its first quest in it. The reader waits for this one: the village
    * cannot be drawn, nor the opening written, before there is a world to draw and write it in.
    */
@@ -796,6 +894,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setEnding(null);
     setBeat(null);
     resetDevlog();
+    beginTimeline('world');
     setCreating([]);
     setPendingGenesis(null);
     // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
@@ -812,12 +911,29 @@ export default function Rpg({ lang }: { lang: Lang }) {
     savePendingGenesis({ ...pending, at: Date.now() });
     const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
+    // The hub's models start from the stream, the moment what they are made of has been written,
+    // rather than a minute later when the whole bible has (`previewWorld`).
+    const early = (preview: WorldBible) => {
+      if (token !== questTokenRef.current) return;
+      markStage('assets');
+      startWorldAssets(preview);
+    };
     let attempt;
     try {
       attempt = await generateWorld(
         keys,
-        { lang: gameLang, seeds, avoid: pastWorlds(), exotic: exoticNow, chosen: chosenSeeds, wish: wishText },
+        {
+          lang: gameLang,
+          seeds,
+          avoid: pastWorlds(),
+          exotic: exoticNow,
+          chosen: chosenSeeds,
+          wish: wishText,
+          nth: Math.random() < 0.5 ? 1 : 2,
+        },
         chosen,
+        quick(fastStartRef.current),
+        early,
       );
     } catch (e) {
       log.error('rpg.world.crashed', describeError(e));
@@ -832,8 +948,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
       recordWorld(uidRef.current, attempt, gameLang, chosen);
     }
     // What the genesis cost is the world's, kept on it for every quest's closing screen.
-    const born = attempt?.world ? { ...attempt.world, spent: triesSpend(attempt.tries, attempt.ms) } : null;
+    const born = attempt?.world ? withEarly({ ...attempt.world, spent: triesSpend(attempt.tries, attempt.ms) }) : null;
     if (born) {
+      markStage('world');
       // A new world is a new game: the quest left half way belonged to the old one.
       saveWorld(born);
       setSaved(null);
@@ -859,7 +976,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         void startQuest(true);
       },
     });
-  }, [account.keys.google, account.keys.openai, enterWorld, flash, gameLang, startQuest, storyProvider]);
+  }, [account.keys.google, account.keys.openai, enterWorld, flash, gameLang, startQuest, startWorldAssets, storyProvider, withEarly]);
   // A genesis a reload interrupted, offered on the intro to finish with the same seeds.
   const [pendingGenesis, setPendingGenesis] = useState<PendingGenesis | null>(null);
   useEffect(() => {
@@ -1023,27 +1140,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
         .catch((e) => log.warn('rpg.sizes.failed', describeError(e)));
     }
     if (!falKey || world.createdAt === 0) return;
-    ensureGroundTexture(
-      falKey,
-      world,
-      (texture) => {
-        setWorldGround(world.id, texture);
-        if (worldRef.current?.id === world.id) worldRef.current = { ...worldRef.current, groundTexture: texture };
-        setWorld((now) => (now?.id === world.id ? { ...now, groundTexture: texture } : now));
-      },
-      (e) => log.warn('rpg.ground.failed', describeError(e)),
-    );
-    ensureHubModels(
-      falKey,
-      world,
-      (slot, model) => {
-        setWorldModel(world.id, slot, model);
-        if (worldRef.current?.id === world.id) worldRef.current = withModel(worldRef.current, slot, model);
-        setWorld((now) => (now?.id === world.id ? withModel(now, slot, model) : now));
-      },
-      (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
-    );
-  }, [world, falKey, keysReady]);
+    startWorldAssets(world);
+  }, [world, falKey, keysReady, startWorldAssets]);
 
   // A beat's clues as real things (owner, 26 Oct 2026: "generated assets to examine"): each made
   // once by fal.ai from the English `prop` the beat wrote for it, on the reader's own key, while the
@@ -1449,6 +1547,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
+      setFastStart(localStorage.getItem(FAST_KEY) !== '0');
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
     } catch {
@@ -1459,6 +1558,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setExotic(clampExotic(value));
     try {
       localStorage.setItem(EXOTIC_KEY, String(clampExotic(value)));
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickFastStart = (on: boolean) => {
+    setFastStart(on);
+    try {
+      if (on) localStorage.removeItem(FAST_KEY);
+      else localStorage.setItem(FAST_KEY, '0');
     } catch {
       /* forgotten on reload */
     }
@@ -1839,6 +1947,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
               </option>
             ))}
           </select>
+        </label>
+      )}
+      {keysReady && storyProvider !== 'static' && storyProvider !== 'openai' && (
+        <label className="rpg-model">
+          <input type="checkbox" checked={fastStart} onChange={(e) => pickFastStart(e.target.checked)} /> {t.fastStart(FAST_MODEL)}
         </label>
       )}
       {keysReady ? (

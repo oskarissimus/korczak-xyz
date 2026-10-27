@@ -212,7 +212,7 @@ async function beat(req: Request, res: Response, body: Record<string, unknown>):
   } catch (e) {
     throw new BadRequest(e instanceof BadContext ? e.message : 'Bad context');
   }
-  await generate(req, res, model, beatPrompt(ctx), 1);
+  await generate(req, res, model, beatPrompt(ctx), 1, thinkingOf(body));
 }
 
 /** A new world (`genesis.ts`), at the genesis temperature: from seeds (dice or the player's words), a description, or both. */
@@ -221,11 +221,23 @@ async function world(req: Request, res: Response, body: Record<string, unknown>)
   if (!model) throw new BadRequest('Unknown model');
   const ctx = demoGenesis(body.ctx);
   if (ctx.seeds.length === 0 && !ctx.wish) throw new BadRequest('No seeds');
-  await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic));
+  await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic), thinkingOf(body));
+}
+
+/** How hard the model thinks: `low` when the reader is waiting on the start (`storyteller.ts`'s `quick`). */
+function thinkingOf(body: Record<string, unknown>): 'low' | 'high' | undefined {
+  return body.thinking === 'low' || body.thinking === 'high' ? body.thinking : undefined;
 }
 
 /** Reads Google's event stream for the usage and the model that answered, passing every byte on. */
-async function generate(req: Request, res: Response, model: string, prompt: string, temperature: number): Promise<void> {
+async function generate(
+  req: Request,
+  res: Response,
+  model: string,
+  prompt: string,
+  temperature: number,
+  thinking?: 'low' | 'high',
+): Promise<void> {
   const reservation = beatReservation(model, prompt.length);
   if (reservation === null) throw new BadRequest('Model has no price');
 
@@ -257,7 +269,9 @@ async function generate(req: Request, res: Response, model: string, prompt: stri
           generationConfig: {
             temperature,
             maxOutputTokens: MAX_OUTPUT_TOKENS,
-            ...(gemma ? {} : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true } }),
+            ...(gemma
+              ? {}
+              : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true, ...(thinking ? { thinkingLevel: thinking } : {}) } }),
           },
         }),
       },
