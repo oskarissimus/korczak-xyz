@@ -21,13 +21,16 @@ import type { PlaceAsset, PlaceSpec } from '../../utils/rpg/place';
 import {
   isDead,
   jobDone,
+  drawMood,
   planDecisions,
+  seedFor,
   SEEDS,
   slainBy,
   staticBeat,
   type Beat,
   type BeatJob,
   type Character,
+  type QuestMood,
   type ChronicleEntry,
   type Decision,
   type Job,
@@ -166,6 +169,8 @@ declare global {
         history: StepRecord[];
         ending: Ending | null;
         chronicle: ChronicleEntry[];
+        mood: QuestMood | undefined;
+        dead: string[];
         busy: boolean;
       };
     };
@@ -338,6 +343,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * in the scene again (owner, Oct 2026: the ronin he had killed was back, and talking).
    */
   const deadRef = useRef<string[]>([]);
+  /** This quest's tone and how it touches the world's past, drawn at its start (`drawMood`). */
+  const moodRef = useRef<QuestMood | undefined>(undefined);
   /** What each character last said, for talking to them again after their beat. */
   const lastLinesRef = useRef(new Map<string, string>());
   /** Where each character stands: a place's name, or null for the hub. Kept in the world's atlas. */
@@ -618,6 +625,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       transcript: [...transcript()],
       worldId: worldRef.current?.id ?? gameLangRef.current,
       dead: deadRef.current,
+      ...(moodRef.current && { mood: moodRef.current }),
       spent: questSpend(),
     });
   }, []);
@@ -664,6 +672,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           characters: charactersRef.current,
           world: worldRef.current ?? undefined,
           dead: deadRef.current,
+          ...(moodRef.current && { mood: moodRef.current }),
         }, chosen, quick(index === 0 && fastStartRef.current));
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
@@ -778,7 +787,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setSaved(null);
     staticRef.current = false;
     pendingRef.current = null;
-    seedRef.current = SEEDS[Math.floor(Math.random() * SEEDS.length)];
     const scene = sceneRef.current;
     scene?.clearObjective();
     scene?.clearPlaces();
@@ -786,6 +794,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.setMarker(null);
     scene?.teleport('spawn');
     restoreAtlas();
+    // Drawn against what the world already has: a quest can only cross a past there is.
+    const mood = drawMood({ places: placesRef.current.length, people: charactersRef.current.length });
+    moodRef.current = mood;
+    seedRef.current = seedFor(mood.tone);
+    log.info('rpg.quest.mood', { ...mood, seed: seedRef.current });
 
     // A world just invented is still being built around the hero; an old one only waits for its quest.
     flash(keepLog ? tRef.current.buildingWorld : tRef.current.writingBackground, 5000);
@@ -1098,6 +1111,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
         history: historyRef.current,
         ending: endingRef.current,
         chronicle: chronicleRef.current,
+        mood: moodRef.current,
+        dead: deadRef.current,
         busy: busyRef.current,
       }),
     };
@@ -1745,6 +1760,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setGenerating(false);
     setUnfolding(false);
     seedRef.current = game.seed;
+    moodRef.current = game.mood;
     staticRef.current = game.static;
     if (kept && loadWorld(game.lang)?.id !== kept.id) saveWorld(kept);
     else playedWorld(into.id);

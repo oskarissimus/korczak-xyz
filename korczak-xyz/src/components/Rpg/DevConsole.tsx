@@ -63,7 +63,7 @@ function tail(text: string, lines: number): string {
 
 function headline(r: DevRequest): string {
   const parts = [r.servedBy && r.servedBy !== r.model ? `${r.model} → ${r.servedBy}` : r.model];
-  if (r.beat !== null) parts.unshift(`beat ${r.beat + 1}`);
+  if (r.beat !== null) parts.unshift(r.label ? `beat ${r.beat + 1} (${r.label})` : `beat ${r.beat + 1}`);
   else if (r.kind === 'model') parts.unshift('world');
   else if (r.kind === 'fal') parts.unshift(r.label ?? 'landmark');
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);

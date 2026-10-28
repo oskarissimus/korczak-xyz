@@ -24,7 +24,7 @@
  * the hand-written quest, every time.
  */
 
-import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job } from './quest';
+import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job, type QuestMood } from './quest';
 import {
   askedFor,
   genesisPrompt,
@@ -134,6 +134,8 @@ export interface StoryAttempt {
   /** What this beat asks of the hunter, and what each decision leads to: the game's, not the model's. */
   job: Job | null;
   plan: (Job | null)[];
+  /** The quest's tone and tie (`drawMood`), when it has one. */
+  mood?: QuestMood;
   prompt: string;
   tries: ModelTry[];
   /** What the model sent back, whole. Null when nothing answered. */
@@ -468,6 +470,8 @@ interface Ask<T> {
   parse: (raw: string) => T | null;
   /** Which beat, for the console; null for a world. */
   beat: number | null;
+  /** A word or two on what was asked, for the console's headline (a beat's tone and tie). */
+  label?: string;
   /** What an unusable answer was not, for the console: a beat or a world unless said. */
   what?: string;
   /** Asked before the chain, when the reader is waiting on the answer (`FAST_MODEL`). */
@@ -523,7 +527,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
     hidden = false;
     const t0 = Date.now();
     run.model = model;
-    const entry = startRequest('model', model, ask.beat);
+    const entry = startRequest('model', model, ask.beat, '', ask.label);
     const dog = new Watchdog();
     ask.onTry?.();
     const record = (status: number | null, error: string | null) =>
@@ -597,6 +601,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
     demo: { kind: 'beat', ctx },
     parse: (raw) => parseBeat(raw, ctx),
     beat: ctx.index,
+    ...(ctx.mood && { label: `${ctx.mood.tone} · ${ctx.mood.tie}` }),
   });
   return {
     outcome: run.outcome,
@@ -606,6 +611,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
     index: ctx.index,
     job: ctx.job,
     plan: ctx.plan,
+    ...(ctx.mood && { mood: ctx.mood }),
     prompt,
     tries: run.tries,
     raw: run.raw,

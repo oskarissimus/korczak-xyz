@@ -211,8 +211,9 @@ character is the one the marker points at once the job is done.
 
 **The chronicle is what outlives a quest** (`utils/rpg/chronicle.ts`): each finished quest's title,
 decisions with their one-sentence consequences, and epilogue, in localStorage per game language,
-the last 8. The last 5 go into every beat's prompt as "the world remembers", with the instruction to
-let them show and refer to one. Shown on the intro screen with a button to forget it. Not on the
+the last 8. The last 5 go into every beat's prompt as "the world remembers" — as the world's past,
+not the quest's plot (see *A quest is its own story* below; until 28 Oct 2026 every beat was told to
+refer to one of them, and every quest read as a sequel). Shown on the intro screen with a button to forget it. Not on the
 account yet; following the reader between devices is a Firestore document for later.
 
 **A beat that fails waits for the reader** (owner, Oct 2026: "I would like to be able to retry",
@@ -223,6 +224,41 @@ end of the quest on the decision just made, still into the chronicle, for a late
 pauses under it, so a desktop gets its cursor back. No key is not a failure and plays the
 hand-written quest at once. Leaving to the intro with the panel up loses nothing: the decision is
 saved and Continue asks again.
+
+## A quest is its own story, in a tone of its own
+
+Owner, 28 Oct 2026: "old places don't disappear, a new quest may use them but doesn't have to; the
+dead stay dead and no new characters get old characters' names, so nothing is confused. A new quest
+shouldn't be a strict continuation of the last; it may cross it, but rather rarely — the same place or
+the same person. And not every quest needs a deep moral choice: there can be simple, easy, light
+quests that show the world, and funny ones." Every quest had been a grey dilemma that "refers to at
+least one of those deeds", because the prompt said both. So, as with the jobs, **the game draws and
+the model is told** (`drawMood` in `quest.ts`, once per quest in `startQuest`, kept in
+`SavedGame.mood` and sent to the demo as `BeatContext.mood`):
+
+- **A tone** (`TONES`, weights 25/20/25/30): `light` (a small warm errand that shows the world's
+  everyday life; no dilemma, nobody dies, foes are pests), `comic` (absurd problem, ridiculous
+  people, a punchline; nobody dies), `adventure` (danger and wonder, decisions are approaches —
+  bold, clever, careful — not dilemmas) and `grim` (the old "real choices with a cost" and "moral
+  greyness", which only it still gets). `TONE_LINES` replaces the one line every quest used to get,
+  and the inspiration comes from the tone's own list (`seedFor`; `SEEDS` is the grim one's — a
+  grieving widow does not start a comedy).
+- **A tie to the past** (`TIES`, 65/20/15): `fresh` — the chronicle may show in a passing remark,
+  nothing built on it, the opening npc someone new; `place` — one step passes through a place from
+  before this quest (the prompt names those, i.e. the places no step of this quest has been to);
+  `person` — one living person already met takes part, with a new trouble of their own. A tie is
+  drawn only to what the world has (no places, no `place`). Every quest is told it is NOT a sequel.
+- **Old places stay standing either way** (the atlas, above), listed to every beat; untied, the
+  prompt says they are never required, and a place this quest itself built may always be returned to.
+- **A name is one person's** (`NAMES ALREADY TAKEN`, every living and dead name): a new character
+  never takes one, nor a first name or surname from one. `parseBeat` enforces the half it can: an
+  npc or witness whose name is inside a known one's or the other way round (`samePerson`, the rule
+  `isDead` uses) *is* that person — "Takeda" next to "Ronin Takeda" is him, with his clothes and
+  voice, not a second Takeda; a witness that collapses into the npc is dropped. Dead names were
+  already refused (below). Two people sharing only a surname are not caught.
+- **In the console** the beat's headline says `beat 1 (comic · fresh)`, the prompt under it has the
+  lines, `window.rpg.state()` has `mood` and `dead`, and Sentry Logs `rpg.quest` carry `tone`/`tie`.
+  A quest from before it has no mood and is written as a grim one of its own.
 
 ## The dead stay dead
 

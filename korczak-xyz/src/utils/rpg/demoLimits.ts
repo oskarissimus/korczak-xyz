@@ -25,7 +25,7 @@
 import { tokenPrice, VOICE_CREDITS_PER_CHAR, USD_PER_VOICE_CREDIT } from './cost';
 import { demoWorld } from './genesis';
 import { parsePlace } from './place';
-import type { BeatContext, Character, ChronicleEntry, Job, Lang, StepRecord } from './quest';
+import { parseMood, type BeatContext, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
 
 /** The Google models the demo may be asked for: the game's picker, less what is not Google. */
 export const DEMO_MODELS = [
@@ -221,5 +221,6 @@ export function demoContext(value: unknown): BeatContext {
     characters,
     world: demoWorld(r.world),
     dead: list(r.dead, 40, (v) => text(v, 60)).filter(Boolean),
+    ...(parseMood(r.mood) && { mood: parseMood(r.mood)! }),
   };
 }

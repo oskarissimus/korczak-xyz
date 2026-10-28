@@ -221,21 +221,75 @@ export interface BeatContext {
    * here he suddenly is and you can talk to him").
    */
   dead?: string[];
+  /** What kind of quest this is and how it touches the world's past (`drawMood`); absent is a grim one of its own. */
+  mood?: QuestMood;
 }
+
+/*
+ * THE QUEST'S MOOD (owner, 28 Oct 2026: "a new quest should not be a strict continuation of the last
+ * one; it may cross it, but rather rarely than often, the same place or the same person. Not every
+ * quest needs a deep moral choice: there can be simple, easy, light quests that show the world, and
+ * funny ones"). Left to the prompt, every quest was a grey dilemma that "refers to at least one of
+ * those deeds" — so both are drawn here, once per quest, and told to the model as given, like the jobs.
+ */
+export const TONES = ['light', 'comic', 'adventure', 'grim'] as const;
+export type Tone = (typeof TONES)[number];
+/** How the quest touches the world's past: not at all, through a place already standing, or a person already met. */
+export const TIES = ['fresh', 'place', 'person'] as const;
+export type Tie = (typeof TIES)[number];
+export interface QuestMood {
+  tone: Tone;
+  tie: Tie;
+}
+
+const TONE_WEIGHTS: Record<Tone, number> = { light: 25, comic: 20, adventure: 25, grim: 30 };
+/** Most quests are their own story; a crossing with the past is the exception. */
+const TIE_WEIGHTS: Record<Tie, number> = { fresh: 65, place: 20, person: 15 };
+
+function weighted<T extends string>(weights: Partial<Record<T, number>>, rand: () => number): T {
+  const entries = Object.entries(weights) as [T, number][];
+  let r = rand() * entries.reduce((n, [, w]) => n + w, 0);
+  for (const [k, w] of entries) {
+    if ((r -= w) < 0) return k;
+  }
+  return entries[entries.length - 1][0];
+}
+
+/** A quest's tone and tie, drawn at its start: a tie only to what the world already has. */
+export function drawMood(past: { places: number; people: number }, rand: () => number = Math.random): QuestMood {
+  const tone = weighted(TONE_WEIGHTS, rand);
+  const ties: Partial<Record<Tie, number>> = { fresh: TIE_WEIGHTS.fresh };
+  if (past.places > 0) ties.place = TIE_WEIGHTS.place;
+  if (past.people > 0) ties.person = TIE_WEIGHTS.person;
+  return { tone, tie: weighted(ties, rand) };
+}
+
+/** A mood as stored or sent, or null. */
+export function parseMood(raw: unknown): QuestMood | null {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const tone = (TONES as readonly unknown[]).includes(r.tone) ? (r.tone as Tone) : null;
+  const tie = (TIES as readonly unknown[]).includes(r.tie) ? (r.tie as Tie) : null;
+  return tone && tie ? { tone, tie } : null;
+}
+
+/** Quests from before the mood: grim, and their own story. */
+const DEFAULT_MOOD: QuestMood = { tone: 'grim', tie: 'fresh' };
 
 /**
  * Whether `name` is one of the dead. Also by a single name inside a longer one, because the model
  * names a target "Ronin Takeda" and then the man "Takeda".
  */
 export function isDead(name: string, dead: readonly string[] | undefined): boolean {
-  const mine = nameWords(name);
-  if (mine.length === 0) return false;
-  return (dead ?? []).some((d) => {
-    const theirs = nameWords(d);
-    if (theirs.length === 0) return false;
-    const [short, long] = mine.length <= theirs.length ? [mine, theirs] : [theirs, mine];
-    return short.every((w) => long.includes(w));
-  });
+  return (dead ?? []).some((d) => samePerson(name, d));
+}
+
+/** Whether two names are one person's: the same, or one's words all inside the other's. */
+export function samePerson(a: string, b: string): boolean {
+  const mine = nameWords(a);
+  const theirs = nameWords(b);
+  if (mine.length === 0 || theirs.length === 0) return false;
+  const [short, long] = mine.length <= theirs.length ? [mine, theirs] : [theirs, mine];
+  return short.every((w) => long.includes(w));
 }
 
 /** A name's words of three letters or more, lower case: "Ronin Takeda" is ronin, takeda. */
@@ -473,13 +527,80 @@ const LANDMARK_LINES = [
   '  A new place is {"name", "direction", "distance", "biome", "features", "groundColor", "landmark", "assets"};',
 ];
 
+/** How this quest is to stand to the chronicle: its own story, crossing the past at most once. */
+function tieLines(tie: Tie): string[] {
+  const own = 'THIS QUEST is a story of its own, NOT a sequel to the earlier ones: new trouble, mostly new people and new places.';
+  if (tie === 'place') {
+    return [
+      own,
+      'It crosses the past in one way only: one of its steps happens at a place already standing in this world',
+      '(listed below), and may show what became of it. Nobody from those quests needs to appear.',
+    ];
+  }
+  if (tie === 'person') {
+    return [
+      own,
+      'It crosses the past in one way only: one person already met (from PEOPLE ALREADY IN THIS WORLD) takes part,',
+      'with a new trouble of their own, not the old one continued.',
+    ];
+  }
+  return [own, 'The past may show at most in a passing remark or a rumour; do not build on it.'];
+}
+
+/** Whether to go back to a place: always free within the quest, and to an older one only when the tie says so. */
+function placeAdvice(ctx: BeatContext, mood: QuestMood): string {
+  const ours = ctx.history.some((s) => s.placeName);
+  const grow = 'Otherwise build a new place, in a direction and distance nothing stands at yet (the world grows outward).';
+  const older = ctx.places.filter((p) => !ctx.history.some((s) => s.placeName === p.name));
+  if (mood.tie === 'place' && older.length) {
+    return `This quest is to pass through one of the places from before it (${list(older.map((p) => p.name))}) in one of its steps, unless a step so far already has. ${grow}`;
+  }
+  return `${ours ? 'A place this quest has already been to may be used again. ' : ''}The older places stay standing but are no part of this quest unless it truly needs one — never required. ${grow}`;
+}
+
+/** Every name the world has used, living and dead, which no new character may take. */
+function takenNames(ctx: BeatContext): string[] {
+  const all = [...ctx.characters.map((c) => c.name), ...(ctx.dead ?? [])];
+  return all.filter((n, i) => n && all.findIndex((m) => m.toLowerCase() === n.toLowerCase()) === i);
+}
+
+/** What the quest feels like, and so what its decisions are: a dilemma only in a grim one. */
+const TONE_LINES: Record<Tone, string[]> = {
+  grim: [
+    'THIS QUEST’S TONE: grim and grey. Make the decisions real choices with a cost — mercy or coin, truth or',
+    'peace, a promise kept or broken — so that each one leads to a genuinely different story.',
+  ],
+  adventure: [
+    'THIS QUEST’S TONE: adventure. Danger, wonder and a clear goal; nobody needs to be morally grey and there is',
+    'no dilemma. The decisions are different ways to go about it — bold, clever, careful, kind — each leading',
+    'somewhere genuinely different.',
+  ],
+  light: [
+    'THIS QUEST’S TONE: light. A small, easy, warm errand that shows off this world: its everyday life, trades,',
+    'customs, food, festivals, oddities and the people in it. Low stakes, no dilemma, nobody dies, nobody is a',
+    'villain. Foes, if the step has any, are pests or a nuisance. The decisions are different ways to help, each',
+    'pleasant, each leading somewhere different. Keep it short and simple.',
+  ],
+  comic: [
+    'THIS QUEST’S TONE: comic. Make the player laugh: an absurd problem taken deadly seriously, a vain, stubborn',
+    'or ridiculous character, misunderstandings, this world’s quirks played for laughs, a punchline of an ending.',
+    'Nobody dies; foes are more silly than grim. The decisions are funny alternatives, each leading somewhere',
+    'different. Funny in the characters’ own lines, never a narrator winking.',
+  ],
+};
+
 function thisStep(ctx: BeatContext, hub: string): string[] {
   const job = ctx.job;
+  const mood = ctx.mood ?? DEFAULT_MOOD;
   if (!job) {
     return [
       `THIS STEP IS THE OPENING. The hero meets someone (the "npc") in ${hub}, who presents a problem.`,
       ...(ctx.characters.length
-        ? ['Usually someone the hero has not met yet: the world grows with every quest. One of the people already here may come back instead when the chronicle gives them a reason.']
+        ? [
+            mood.tie === 'person'
+              ? 'The npc may be the person already met who returns in this quest (see above), or someone new who leads the hero to them.'
+              : 'Someone the hero has not met yet, with a name of their own: the world grows with every quest.',
+          ]
         : []),
       `Set "place" to "village" (that is ${hub}).`,
     ];
@@ -494,7 +615,7 @@ function thisStep(ctx: BeatContext, hub: string): string[] {
     '- groundColor: a "#rrggbb" colour that suits the mood of the place',
     ...LANDMARK_LINES,
     ctx.places.length
-      ? `or a place already standing in this world, given as {"name": "<its exact name>"}: ${list(ctx.places.map((p) => p.name))}. Mostly build new places, in directions and distances nothing stands at yet (the world grows outward), and return to an old one when the story calls for it.`
+      ? `or a place already standing in this world, given as {"name": "<its exact name>"}: ${list(ctx.places.map((p) => p.name))}. ${placeAdvice(ctx, mood)}`
       : '',
     job.kind === 'talk' ? `or "village" to have the meeting in ${hub}.` : '',
   ].filter(Boolean);
@@ -520,6 +641,7 @@ export function beatPrompt(ctx: BeatContext): string {
   const language = ctx.lang === 'pl' ? 'Polish' : 'English';
   const chronicle = ctx.chronicle.slice(-5);
   const world = ctx.world ?? classicWorld(ctx.lang);
+  const mood = ctx.mood ?? DEFAULT_MOOD;
   const lines: string[] = [
     'You are the storyteller of an RPG played like a branching text adventure: the quest is written one step at a',
     'time, and the hero’s decisions decide what comes next.',
@@ -528,23 +650,29 @@ export function beatPrompt(ctx: BeatContext): string {
     '',
   ];
   if (chronicle.length) {
-    lines.push('THE WORLD REMEMBERS the hero’s earlier quests:');
+    lines.push('THE WORLD REMEMBERS the hero’s earlier quests (the world’s past, not this quest’s plot):');
     for (const q of chronicle) {
       const chose = q.steps.map((s) => `chose "${s.chose}" (${s.consequence})`).join('; then ');
       lines.push(`- "${q.title}": ${chose}. Ending: ${q.ending}`);
     }
-    lines.push(
-      'Let it show: people who were helped or wronged remember, rumours travel, debts come due. Characters from',
-      'those quests may come back. Refer to at least one of those deeds somewhere in this step.',
-      '',
-    );
   }
+  if (chronicle.length || ctx.places.length || ctx.characters.length) lines.push(...tieLines(mood.tie), '');
   const living = ctx.characters.filter((c) => !isDead(c.name, ctx.dead));
   if (living.length) {
     lines.push(
-      `PEOPLE ALREADY IN THIS WORLD (bring one back by this exact name when it fits, in the same voice and manner): ${living
+      `PEOPLE ALREADY IN THIS WORLD (whoever of them takes part is written with this exact name, in the same voice and manner): ${living
         .map((c) => (c.voice ? `"${c.name}" (${c.voice})` : `"${c.name}"`))
         .join(', ')}.`,
+      '',
+    );
+  }
+  const taken = takenNames(ctx);
+  if (taken.length) {
+    lines.push(
+      `NAMES ALREADY TAKEN: ${list(taken)}. Each belongs to one person only, living or dead. Someone who returns`,
+      'is written with exactly that name. A NEW character never gets any of these names, nor a first name or a',
+      'surname from one of them (no second "Takeda", no "Marta Nowak" beside a "Marta", no son named after his',
+      'father), so the player never mistakes one person for another.',
       '',
     );
   }
@@ -579,10 +707,8 @@ export function beatPrompt(ctx: BeatContext): string {
         : `${i + 1}. ENDS the quest: its "reply" is the epilogue, how it ends for everyone involved.`,
     );
   });
+  lines.push(...TONE_LINES[mood.tone], 'Never two decisions that are two ways of saying the same thing.', '');
   lines.push(
-    'Make them real choices with a cost — mercy or coin, truth or peace, a promise kept or broken — so that each',
-    'one leads to a genuinely different story. Never two ways of saying the same thing.',
-    '',
     'HOW IT IS TOLD. This is a conversation with a real person, not a briefing. Nobody pours out the whole story',
     'and the stakes in their first breath: the npc opens with a line or two the way a real person would (a plea,',
     'suspicion, fear, a reaction to the hero at the door), and the story comes out in 2 to 4 parts as the hero',
@@ -626,7 +752,7 @@ export function beatPrompt(ctx: BeatContext): string {
     'hero’s own eye, first person ("Claw marks, and too high for a wolf.").',
     'Every "label" and "ask" is the hero’s own spoken line, short: at most 12 words, one sentence.',
     `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
-    `Make it original, with a twist or a hint of moral greyness. Inspiration: ${ctx.seed}.`,
+    `Make it original${mood.tone === 'grim' ? ', with a twist or a hint of moral greyness' : ''}. Inspiration: ${ctx.seed}.`,
     '',
     'Answer with ONE JSON object and nothing else, no markdown fence, with these keys:',
     '{',
@@ -663,7 +789,7 @@ export function beatPrompt(ctx: BeatContext): string {
   return lines.filter((l, i, all) => l !== '' || all[i - 1] !== '').join('\n');
 }
 
-/** A few nudges so two runs do not tell the same story. */
+/** A few nudges so two runs do not tell the same story; these are a grim quest's, `seedFor` the rest's. */
 export const SEEDS = [
   'a grieving widow',
   'a greedy merchant',
@@ -678,6 +804,51 @@ export const SEEDS = [
   'a feud between two families',
   'a relic someone powerful wants back',
 ];
+
+const LIGHT_SEEDS: Record<Exclude<Tone, 'grim'>, string[]> = {
+  light: [
+    'a festival short of one thing',
+    'a lost pet with opinions',
+    'a recipe that needs one rare ingredient',
+    'a shy suitor and a letter',
+    'a craftsman’s masterpiece missing its last part',
+    'a child’s birthday',
+    'a traveller asking the way',
+    'a local custom the hero does not know',
+    'a delivery that must arrive today',
+    'an old couple’s anniversary',
+  ],
+  comic: [
+    'a self-proclaimed genius and their invention',
+    'a feud over a prize vegetable',
+    'a pompous official and a missing hat',
+    'a fortune teller who is always wrong',
+    'a bet made while drunk',
+    'an animal that someone swears can talk',
+    'a hero’s reputation wildly exaggerated',
+    'a wedding where everything goes wrong',
+    'a ghost who is merely annoying',
+    'a merchant selling something useless as a miracle',
+  ],
+  adventure: [
+    'a map with one corner torn off',
+    'a beast that has been seen nearer the settlement',
+    'a rescue against the clock',
+    'something wondrous that fell from the sky',
+    'a race or a contest',
+    'a guide who never came back',
+    'an old path reopened',
+    'a treasure everyone says is a legend',
+    'a storm coming',
+    'a stranger who needs an escort',
+  ],
+};
+
+/** A seed that suits the quest's tone. */
+export function seedFor(tone: Tone, rand: () => number = Math.random): string {
+  const seeds = tone === 'grim' ? SEEDS : LIGHT_SEEDS[tone];
+  return seeds[Math.floor(rand() * seeds.length)];
+}
 
 function text(value: unknown, max = 400): string | null {
   if (typeof value !== 'string') return null;
@@ -760,7 +931,9 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
   const name = text(r.name, 60);
   if (!name) return null;
   const voice = text(r.voice, 400);
-  const met = known.find((c) => same(c.name, name));
+  // A name inside a known one is that person ("Takeda" is "Ronin Takeda"): a new character may not
+  // take an old one's name (owner, 28 Oct 2026: "no new characters with old characters' names").
+  const met = known.find((c) => same(c.name, name)) ?? known.find((c) => samePerson(c.name, name));
   // Someone met before voices were described keeps everything else, and gets one now.
   if (met) return met.voice || !voice ? met : { ...met, voice };
   const color = typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color.trim()) ? r.color.trim().toLowerCase() : null;

@@ -18,7 +18,7 @@
  */
 
 import type { Spend } from './devlog';
-import { isDead, jobDone, slainBy, type Beat, type Lang, type StepRecord } from './quest';
+import { isDead, jobDone, slainBy, type Beat, type Lang, type QuestMood, type StepRecord } from './quest';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
@@ -56,6 +56,8 @@ export interface SavedGame {
   worldId?: string;
   /** Everyone dead so far, by name (`BeatContext.dead`); absent in older saves. */
   dead?: string[];
+  /** The quest's tone and tie to the past (`drawMood`); absent in saves from before 28 Oct 2026. */
+  mood?: QuestMood;
   /** What the quest has cost so far, every sitting (`devlog.ts`); absent in saves from before 27 Oct 2026. */
   spent?: Spend;
 }

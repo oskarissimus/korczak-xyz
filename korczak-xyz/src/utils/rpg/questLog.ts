@@ -99,6 +99,8 @@ export function recordQuest(uid: string | null, attempt: StoryAttempt, lang: Lan
     kind: attempt.job?.kind ?? 'opening',
     count: attempt.job?.count,
     plan: attempt.plan.map((j) => j?.kind ?? 'end').join(','),
+    tone: attempt.mood?.tone,
+    tie: attempt.mood?.tie,
     biome: attempt.beat ? (attempt.beat.place?.biome ?? 'village') : undefined,
     shape: attempt.beat?.job?.look.shape,
     parts: attempt.beat?.story.length,
