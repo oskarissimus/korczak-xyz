@@ -280,9 +280,9 @@ const recoveryStrings = {
        custom properties the whole layout can be driven from a desktop console with the insets
        a real phone reports. */
     --safe-top: env(safe-area-inset-top);
-    /* Plus 16px wherever there is a status bar over the page at all (the `min()` is 1px when the
+    /* Plus 8px wherever there is a status bar over the page at all (the `min()` is 1px when the
        inset is anything, 0 in a browser tab), for iOS 26's edge probe - see `.safe-top-band`. */
-    --safe-top: calc(env(safe-area-inset-top) + min(env(safe-area-inset-top), 1px) * 16);
+    --safe-top: calc(env(safe-area-inset-top) + min(env(safe-area-inset-top), 1px) * 8);
     --safe-right: env(safe-area-inset-right);
     --safe-bottom: env(safe-area-inset-bottom);
     --safe-left: env(safe-area-inset-left);
@@ -317,8 +317,8 @@ const recoveryStrings = {
      that the status bar always has an opaque backdrop of a known colour; a band any overlay can
      paint over is a band that does not do its job.
 
-     And it is a real element 16px taller than the status bar, because that is what iOS 26
-     looks for. It draws a Liquid Glass blur over the strip and ~40pt below it unless a probe
+     And it is a real element 8px taller than the status bar, because that is what iOS 26
+     looks for - the probe reads 4-6px below the bar, and 16px read as a slab (owner, Oct 2026). It draws a Liquid Glass blur over the strip and ~40pt below it unless a probe
      hits a fixed or sticky box at least 90% of the viewport wide, over 10px in both directions,
      with a plain `background-color` and no `backdrop-filter` - whose colour then becomes a hard
      edge instead (WebKit, `LocalFrameView::fixedContainerEdges`). The probe is the midpoint 4px

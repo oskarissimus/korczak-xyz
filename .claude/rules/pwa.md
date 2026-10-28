@@ -132,17 +132,21 @@ desktop navy that the page scrolls behind, sized from `--safe-top` and therefore
 in a browser. It sits above everything — the taskbar (9999) and the typing modal (10000) — on
 the grounds that a band any overlay can paint over is not doing its job.
 
-**The band is a real element, `.safe-top-band`, 16px taller than the status bar.** iOS 26 draws
+**The band is a real element, `.safe-top-band`, 8px taller than the status bar.** iOS 26 draws
 a Liquid Glass blur over the strip and about 40pt below it, and skips it only when a probe hits a
 `position: fixed`/`sticky` box at least 90% of the viewport wide, over 10px in both directions,
 with a plain `background-color` and no `backdrop-filter` — whose colour it then uses as a hard
 edge (WebKit, `LocalFrameView::fixedContainerEdges`). The probe is the midpoint 4px inside the
 top of the fixed-position rect, which on a phone starts *below* the status bar. So the band has to
-reach past it: `--safe-top` is the inset plus 16px whenever the inset is non-zero (a `min()` trick
+reach past it: `--safe-top` is the inset plus 8px whenever the inset is non-zero (a `min()` trick
 in `Layout.astro`), and everything that clears the band clears that too. Two attempts failed
 first, Oct 2026, each on the owner's iPhone: `body::before` (the hit lands on its host, `body`,
 which is not fixed) and a div exactly the inset tall (it ended where the probe began). The probe
-ignores `pointer-events`, so that is not a lever either way.
+ignores `pointer-events`, so that is not a lever either way. The probe's 2px sample sits 4-6px
+below the bar, so 8px is the margin; it was 16 for a day and looked like a slab (owner).
+
+Even with a solid edge iOS keeps a soft fade just under it; no page can turn that off. The owner
+removed it on their iPhone with Settings → Accessibility → Display & Text Size → Reduce Transparency.
 
 **`scripts/ios-edge-check.mjs` replays that decision in Chromium** with a real safe-area inset (the
 CDP override, so `env()` returns it) and probes at both 4px and inset+4px; it exits non-zero
