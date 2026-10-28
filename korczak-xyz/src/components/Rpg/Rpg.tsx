@@ -22,7 +22,9 @@ import {
   isDead,
   jobDone,
   drawMood,
+  heardAside,
   planDecisions,
+  SITUATION_MAX,
   seedFor,
   SEEDS,
   slainBy,
@@ -1433,13 +1435,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const decide = useCallback(
     (b: Beat, d: Decision) => {
+      const heard = heardAside(b, witnessHeardRef.current, askedTalkRef.current);
       const step: StepRecord = {
         npcName: b.npc.name,
         placeName: b.place?.name ?? null,
-        situation: b.situation.slice(0, 300),
+        situation: b.situation.slice(0, SITUATION_MAX),
         chose: d.label,
         consequence: d.consequence,
         ...(jobDone(b.job) && { done: jobDone(b.job)! }),
+        ...(heard && { heard }),
+        ...(b.witness && { witnessName: b.witness.npc.name }),
+        ...(d.meet && { meet: d.meet }),
       };
       // A single foe killed by name, and whoever this choice kills. The one answering stays on screen.
       bury([slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);

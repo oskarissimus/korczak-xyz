@@ -260,6 +260,26 @@ the model is told** (`drawMood` in `quest.ts`, once per quest in `startQuest`, k
   lines, `window.rpg.state()` has `mood` and `dead`, and Sentry Logs `rpg.quest` carry `tone`/`tie`.
   A quest from before it has no mood and is written as a grim one of its own.
 
+## A meeting is with whom the hero went to meet
+
+Owner, 28 Oct 2026: "first Tiago says to talk to his friend, then we go there and it's Tiago again,
+saying something else". In the elders' cave Tzola was the npc and Tiago the witness; Tiago said "my
+friend from the tribe knows more", and the decision "I'll find your friend on the outskirts, Tiago"
+was answered by Tzola, as every decision is. The next beat was told only Tzola's story and that
+decision, read it as "Tzola's friend Tiago", and wrote Tiago waiting in the swamp.
+
+- **A step passes on what else was heard** (`StepRecord.heard`, `heardAside`): the witness's greeting
+  and answers once spoken to, and the follow-up questions asked, as `Also heard there:` in the
+  history. Its story is kept to `SITUATION_MAX` (700; it was 300, which cut the elder off mid-word).
+- **A decision that leads to a talk says whom** (`Decision.meet`, `{name?, who}`): `name` only for
+  someone already met (resolved to their exact name), otherwise a description of someone new. The
+  step carries it with its witness's name (`StepRecord.meet`, `witnessName`), and the talk beat's
+  prompt says who the npc is and that it is not whoever the hero just left (`talkNpc`).
+- **`parseBeat` enforces the half it can**: a meeting with someone new whose npc is anyone already
+  in the world is unplayable, and the next model is asked.
+- **Decisions are said to the npc**: the prompt forbids addressing the witness in a label; one that
+  follows up the witness names them in the third person and waits for them (`after: "witness"`).
+
 ## The dead stay dead
 
 Owner, Oct 2026: "I killed Takeda earlier and here he suddenly is, and you can talk to him". The

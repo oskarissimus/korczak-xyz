@@ -25,7 +25,7 @@
 import { tokenPrice, VOICE_CREDITS_PER_CHAR, USD_PER_VOICE_CREDIT } from './cost';
 import { demoWorld } from './genesis';
 import { parsePlace } from './place';
-import { parseMood, type BeatContext, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
+import { HEARD_MAX, parseMood, SITUATION_MAX, type BeatContext, type Meeting, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
 
 /** The Google models the demo may be asked for: the game's picker, less what is not Google. */
 export const DEMO_MODELS = [
@@ -171,11 +171,22 @@ function step(value: unknown): StepRecord {
   return {
     npcName: text(r.npcName, 60),
     placeName: typeof r.placeName === 'string' ? r.placeName.slice(0, 60) : null,
-    situation: text(r.situation, 300),
+    situation: text(r.situation, SITUATION_MAX),
     chose: text(r.chose, 160),
     consequence: text(r.consequence, 300),
     ...(text(r.done, 120) && { done: text(r.done, 120) }),
+    ...(text(r.heard, HEARD_MAX) && { heard: text(r.heard, HEARD_MAX) }),
+    ...(text(r.witnessName, 60) && { witnessName: text(r.witnessName, 60) }),
+    ...(meet(r.meet) && { meet: meet(r.meet)! }),
   };
+}
+
+function meet(value: unknown): Meeting | null {
+  const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const who = text(r.who, 160);
+  if (!who) return null;
+  const name = text(r.name, 60);
+  return name ? { name, who } : { who };
 }
 
 function list<T>(value: unknown, max: number, each: (v: unknown) => T): T[] {
@@ -184,7 +195,7 @@ function list<T>(value: unknown, max: number, each: (v: unknown) => T): T[] {
 
 /**
  * A stranger's JSON, turned into a context `beatPrompt` can be given: closed values checked, every
- * string cut to what the game itself sends (`decide` cuts a situation to 300), every list to the
+ * string cut to what the game itself sends (`decide` cuts a situation to `SITUATION_MAX`), every list to the
  * size the game keeps (four beats, the chronicle's last five, the atlas's sixteen places).
  */
 export function demoContext(value: unknown): BeatContext {

@@ -73,7 +73,7 @@ describe('beatReservation', () => {
 describe('demoContext', () => {
   it('cuts what a stranger sends to what the game itself would', () => {
     const clean = demoContext(ctx);
-    expect(clean.history[0].situation).toHaveLength(300);
+    expect(clean.history[0].situation).toHaveLength(700);
     expect(clean.characters[0].color).toBe('#666666');
     expect(clean.lang).toBe('pl');
     expect(() => beatPrompt(clean)).not.toThrow();

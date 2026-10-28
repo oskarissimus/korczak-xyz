@@ -93,6 +93,21 @@ export interface Decision {
   after?: 'witness' | number | { ask: number };
   /** Who dies if the hero chooses this, by name (`dead` in `BeatContext`). */
   dies?: string[];
+  /**
+   * For a decision that leads to a talk: whom the hero sets out to meet. `name` only when it is
+   * someone already met; without it, a new person the next beat must invent (owner, 28 Oct 2026: a
+   * witness said "my friend from the tribe knows more", the hero went to find the friend, and the
+   * next beat had the witness himself waiting there).
+   */
+  meet?: Meeting;
+}
+
+/** Whom a talk step is with, as the decision before it set out. */
+export interface Meeting {
+  /** Someone already met, by their exact name; absent for someone new. */
+  name?: string;
+  /** Who they are, in the story's words: "Tiago's friend from the tribe, a scout on the outskirts". */
+  who: string;
 }
 
 export interface BeatJob {
@@ -187,6 +202,15 @@ export interface StepRecord {
    * it: "killed Ronin Takeda", "killed 4 × bandit". Absent for a talk and in steps from before it.
    */
   done?: string;
+  /**
+   * What else the hero heard there besides the npc's story: the witness, the follow-up questions
+   * asked (`heardAside`). A decision may rest on it, so the next beat has to know it was said.
+   */
+  heard?: string;
+  /** The witness at the place, so the next beat knows who that was. */
+  witnessName?: string;
+  /** Whom the chosen decision sent the hero to meet (`Decision.meet`). */
+  meet?: Meeting;
 }
 
 /** A finished quest, as every later quest is told it. */
@@ -299,6 +323,30 @@ function nameWords(name: string): string[] {
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 3);
 }
+
+/**
+ * What the hero heard at a beat besides the npc's story, in one string for `StepRecord.heard`: the
+ * witness's greeting and answers once spoken to, and the follow-up questions asked. Only the story
+ * used to be passed on, so "my friend from the tribe knows more" — the witness's line the decision
+ * rested on — never reached the beat that followed it.
+ */
+export function heardAside(b: Beat, witnessHeard: boolean, askedTalk: Iterable<number>): string {
+  const parts: string[] = [];
+  if (b.witness && witnessHeard) {
+    const w = b.witness;
+    parts.push(`${w.npc.name} (another person there): ${[w.greeting, ...w.talk.map((o) => o.reply)].join(' ')}`);
+  }
+  for (const i of [...askedTalk].sort((a, z) => a - z)) {
+    const o = b.smallTalk[i];
+    if (o) parts.push(`asked "${o.label}", ${b.npc.name}: ${o.reply}`);
+  }
+  return parts.join(' | ').slice(0, HEARD_MAX);
+}
+
+/** How much of what else was heard is kept per step, as the game sends it and the demo accepts it. */
+export const HEARD_MAX = 700;
+/** How much of a step's story is kept (it was 300, which cut the elder off mid-word). */
+export const SITUATION_MAX = 700;
 
 /** One line for what a beat's job came to, for `StepRecord.done`; null for a talk. */
 export function jobDone(job: BeatJob | null): string | null {
@@ -589,6 +637,28 @@ const TONE_LINES: Record<Tone, string[]> = {
   ],
 };
 
+function meetingWords(m: Meeting): string {
+  return m.name ? `"${m.name}", already met (${m.who})` : `someone NOT met yet: ${m.who}`;
+}
+
+/** Who a talk step's npc is: whom the decision went to meet, never by default whoever was just left. */
+function talkNpc(ctx: BeatContext): string[] {
+  const last = ctx.history.at(-1);
+  const left = last ? [last.npcName, ...(last.witnessName ? [last.witnessName] : [])] : [];
+  const notLeft = left.length
+    ? ` It is not ${left.map((n) => `"${n}"`).join(' or ')}, whom the hero has just left, unless that is who the decision named.`
+    : '';
+  if (last?.meet?.name) {
+    return [`The "npc" is the person the hero set out to meet: "${last.meet.name}" (${last.meet.who}), with exactly that name.`];
+  }
+  if (last?.meet) {
+    return [
+      `The "npc" is the person the hero set out to meet: ${last.meet.who}. They have not been met yet: a NEW character with a name of their own.${notLeft}`,
+    ];
+  }
+  return [`The "npc" is the person the last decision sends the hero to meet: a new character, or one already met (same exact name).${notLeft}`];
+}
+
 function thisStep(ctx: BeatContext, hub: string): string[] {
   const job = ctx.job;
   const mood = ctx.mood ?? DEFAULT_MOOD;
@@ -621,7 +691,7 @@ function thisStep(ctx: BeatContext, hub: string): string[] {
   ].filter(Boolean);
   const npc = 'The "npc" is the person the hero talks to there: a new character, or one already met (same exact name).';
   if (job.kind === 'talk') {
-    return [`THIS STEP: the hero goes to meet someone and talk (given by the last decision).`, ...where, npc];
+    return [`THIS STEP: the hero goes to meet someone and talk (given by the last decision).`, ...where, ...talkNpc(ctx)];
   }
   const shapes = job.kind === 'slay' ? ENEMY_SHAPES : ITEM_SHAPES;
   return [
@@ -690,7 +760,9 @@ export function beatPrompt(ctx: BeatContext): string {
     ctx.history.forEach((s, i) => {
       lines.push(
         `${i + 1}. At ${s.placeName ?? world.hub}${s.done ? `, where the hero ${s.done}` : ''}, ${s.npcName}: ${s.situation}`,
-        `   The hero decided: "${s.chose}" — ${s.consequence}`,
+        ...(s.heard ? [`   Also heard there: ${s.heard}`] : []),
+        `   The hero decided (said to ${s.npcName}): "${s.chose}" — ${s.consequence}`,
+        ...(s.meet ? [`   and set out to meet: ${meetingWords(s.meet)}`] : []),
       );
     });
     lines.push(
@@ -728,6 +800,9 @@ export function beatPrompt(ctx: BeatContext): string {
     'while the hero does what they chose, so the "consequence" also says only what the hero set out to do;',
     'what is found is for the next step to write. A decision that ends the quest may name only who and what the',
     'player has already heard of.',
+    'Every decision is said to the npc, who answers it ("reply"); never address the witness in a label. A decision',
+    'that follows up something the witness said speaks of them in the third person ("I will find the friend Tiago',
+    'spoke of.") and sets "after": "witness".',
     'Each decision rests on the npc’s greeting and story parts by default. A decision that only makes sense',
     'after something optional — the witness, a clue, or the answer to a "smallTalk" question — sets "after":',
     '"witness", "clue 1", "clue 2", "question 1" or "question 2" (smallTalk in order), and the game offers it only',
@@ -782,7 +857,9 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
     '                 "after": "witness", "clue 1", "clue 2", "question 1" or "question 2", only when needed,',
-    '                 "dies": [names of anyone who dies if the hero chooses this], only when someone does}],',
+    '                 "dies": [names of anyone who dies if the hero chooses this], only when someone does,',
+    '                 "meet": {"name": exact name of someone already met, or null for someone new, "who": who they are in a few words},',
+    '                 only for a decision that leads on to meeting and talking with someone}],',
     '  "dead": [names of everyone this step tells is dead: killed earlier, found dead, said to have died] (may be empty)',
     '}',
   );
@@ -977,6 +1054,9 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   if (!npc) return null;
   // The dead do not come back; a beat written around one cannot be played, the next model may do better.
   if (isDead(npc.name, ctx.dead)) return null;
+  // The hero went to meet someone new; a beat with someone already met waiting there is not that meeting.
+  const meet = ctx.job?.kind === 'talk' ? ctx.history.at(-1)?.meet : undefined;
+  if (meet && !meet.name && ctx.characters.some((c) => samePerson(c.name, npc.name))) return null;
 
   let place: PlaceSpec | null = null;
   let job: BeatJob | null = null;
@@ -1007,6 +1087,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     if (!label || !replyText) return null;
     const after = rawAfter(d?.after);
     const dies = names(d?.dies);
+    const meet = next?.kind === 'talk' ? meeting(d?.meet, ctx.characters) : null;
     decisions.push({
       label,
       reply: replyText,
@@ -1014,6 +1095,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
       next,
       ...(after !== undefined && { after }),
       ...(dies.length > 0 && { dies }),
+      ...(meet && { meet }),
     });
   }
 
@@ -1106,6 +1188,16 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     decisions,
     ...(dead.length > 0 && { dead }),
   };
+}
+
+/** A decision's `meet`: a known person by their exact name, or someone new described. */
+function meeting(raw: unknown, known: readonly Character[]): Meeting | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  const who = text(r?.who, 160);
+  const name = text(r?.name, 60);
+  const met = name ? (known.find((c) => same(c.name, name)) ?? known.find((c) => samePerson(c.name, name))) : undefined;
+  if (met) return { name: met.name, who: who ?? met.name };
+  return who ? { who } : null;
 }
 
 /** A model's list of names: strings only, short, at most six. */

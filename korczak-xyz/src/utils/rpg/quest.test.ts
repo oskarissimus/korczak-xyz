@@ -4,6 +4,7 @@ import {
   MAX_BEATS,
   beatPrompt,
   extractJson,
+  heardAside,
   narrated,
   parseBeat,
   pickJob,
@@ -157,7 +158,7 @@ describe('beatPrompt', () => {
     expect(prompt).toContain('"clues"');
     expect(prompt).toContain('1. leads on to a step of gathering 2 things');
     expect(prompt).toContain('2. ENDS the quest');
-    expect(prompt).toContain('The hero decided: "I will find it."');
+    expect(prompt).toContain('The hero decided (said to Marta): "I will find it."');
   });
 
   it('is written in the world it is given, and in no franchise', () => {
@@ -248,5 +249,81 @@ describe('narrated', () => {
   it('throws away a beat written as narration', () => {
     const told = { ...good, story: [{ ask: 'And?', say: 'Old Tomasz says that the ring was sold.' }] };
     expect(parseBeat(JSON.stringify(told), ctx)).toBeNull();
+  });
+});
+
+describe('going to meet someone', () => {
+  // Owner, 28 Oct 2026: Tiago, the witness, said his friend from the tribe knew more; the hero went to
+  // find the friend, and found Tiago, because the next beat never heard what Tiago had said.
+  const cave = parseBeat(
+    JSON.stringify({
+      ...good,
+      witness: { name: 'Tiago', gender: 'male', greeting: 'You believe them?', talk: [{ label: 'Meaning?', reply: 'My friend from the tribe knows more.' }] },
+      decisions: [
+        { label: 'I will gather the vines.', reply: 'Go.', consequence: 'Off to the vines.' },
+        {
+          label: 'I will find the friend Tiago spoke of.',
+          reply: 'Fool!',
+          consequence: 'The hero went to find the scout.',
+          after: 'witness',
+          meet: { name: null, who: 'Tiago’s friend from the tribe, a scout on the outskirts' },
+        },
+      ],
+    }),
+    { ...ctx, plan: [{ kind: 'collect', count: 2 }, { kind: 'talk', count: 0 }], characters: [...ctx.characters, { name: 'Tiago', gender: 'male', color: '#8b4513' }] },
+  )!;
+
+  it('keeps whom a decision sets out to meet, and someone known by their exact name', () => {
+    expect(cave.decisions[1].meet).toEqual({ who: 'Tiago’s friend from the tribe, a scout on the outskirts' });
+    expect(cave.decisions[0].meet).toBeUndefined();
+    const known = parseBeat(
+      JSON.stringify({ ...good, decisions: [good.decisions[0], { ...good.decisions[1], meet: { name: 'marta', who: 'the widow' } }] }),
+      { ...ctx, plan: [{ kind: 'collect', count: 2 }, { kind: 'talk', count: 0 }] },
+    )!;
+    expect(known.decisions[1].meet).toEqual({ name: 'Marta', who: 'the widow' });
+  });
+
+  it('passes on what the witness said and what was asked, once heard', () => {
+    expect(heardAside(cave, false, [])).toBe('');
+    const heard = heardAside(cave, true, [0]);
+    expect(heard).toContain('Tiago (another person there): You believe them? My friend from the tribe knows more.');
+    expect(heard).toContain('asked "Who are you?", Old Tomasz: The gravedigger.');
+  });
+
+  const after = (meet: { name?: string; who: string }): BeatContext => ({
+    ...ctx,
+    index: 2,
+    job: { kind: 'talk', count: 0 },
+    plan: [null, null],
+    characters: [...ctx.characters, { name: 'Old Tomasz', gender: 'male', color: '#334455' }, { name: 'Tiago', gender: 'male', color: '#8b4513' }],
+    history: [
+      ...ctx.history,
+      {
+        npcName: 'Old Tomasz',
+        placeName: 'Gallows Hill',
+        situation: 'They came at dusk.',
+        chose: 'I will find the friend Tiago spoke of.',
+        consequence: 'The hero went to find the scout.',
+        heard: heardAside(cave, true, []),
+        witnessName: 'Tiago',
+        meet,
+      },
+    ],
+  });
+
+  it('tells the next beat who it is with, and who it is not', () => {
+    const prompt = beatPrompt(after({ who: 'Tiago’s friend from the tribe' }));
+    expect(prompt).toContain('Also heard there: Tiago (another person there)');
+    expect(prompt).toContain('set out to meet: someone NOT met yet: Tiago’s friend from the tribe');
+    expect(prompt).toContain('a NEW character with a name of their own. It is not "Old Tomasz" or "Tiago"');
+    expect(beatPrompt(after({ name: 'Marta', who: 'the widow' }))).toContain('set out to meet: "Marta" (the widow), with exactly that name');
+    expect(beatPrompt(ctx)).toContain('Every decision is said to the npc');
+  });
+
+  it('will not play a meeting with someone new that has someone already met waiting there', () => {
+    const reply = (name: string) => JSON.stringify({ ...good, place: 'village', npc: { name, gender: 'male' } });
+    expect(parseBeat(reply('Tiago'), after({ who: 'Tiago’s friend' }))).toBeNull();
+    expect(parseBeat(reply('Itzel'), after({ who: 'Tiago’s friend' }))?.npc.name).toBe('Itzel');
+    expect(parseBeat(reply('Tiago'), after({ name: 'Tiago', who: 'the scout' }))?.npc.name).toBe('Tiago');
   });
 });
