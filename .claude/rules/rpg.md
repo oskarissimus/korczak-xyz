@@ -646,6 +646,35 @@ content-hashed and immutable.
   picks the body; their clothes colour is multiplied into the outfit at 55%, so "a woman in red"
   still reads as red. The hunter is the male ranger with a beard; the sword sits in the right
   hand, placed from the hand's own finger bones (`gripSword`), not tuned by eye.
+- **Generated people** (owner, 28 Oct 2026: "it is always the same few models and it breaks
+  immersion", then "no Quaternius characters: nothing until it is generated, then it is there").
+  In an invented world with a fal key, every person is made for them: the hero once per world
+  (`WorldBible.hero`, an English look the genesis call writes, kept as `heroModel` beside the
+  world), each NPC and witness from the `appearance` the quest beat gives them (kept on the
+  character in the atlas, so somebody met again is the same model), and a humanoid slay target from
+  its `targetProp`. `personPrompt` (`falPrompts.ts`) asks FLUX schnell for one person, A-pose, hands
+  empty, on white; TRELLIS makes the mesh at `mesh_simplify` 0.95 (~6k vertices). **~$0.023 a
+  person**, ~30–60 s.
+  - **The rig costs nothing.** Meshy's rigging was used once, to rig two donor bodies (a guard and
+    a wanderer) and make the clip library on the male one; `scripts/rpg-people.mjs` turns those
+    into `src/assets/rpg/people/` (two ~70 KB donors, clips ~110 KB gzipped) and regenerates them
+    byte for byte. Each person is then rigged in the browser by `utils/rpg/selfRig.ts`, in a worker
+    (`components/Rpg/selfRig.worker.ts`), ~1 s: the donor is laid over the mesh, warped onto it
+    through control nodes on a 4 cm grid (40 rounds, stiffness easing, nearest points pulled both
+    ways), and each vertex copies the weights of the nearest warped donor point; joints move with
+    the donor points bound to them, rest rotations stay the donor's, which is why one library of
+    clips (under the game's `Clip` names) moves every person. The rig is cached in the Cache API
+    beside the GLB under `?rig=N&body=…&height=…` — **a query, not a fragment**: the Cache API
+    drops fragments, and a `#` key once handed back the GLB's own bytes as a rig. Bump
+    `RIG_VERSION` in `people.ts` when `selfRig` changes what it answers.
+  - **Nothing stands there until the model is ready** (`PersonBody {wait}` in `RpgScene.ts`): the
+    group is empty, `nearestNpc`, `attack` and `updateEnemies` skip an empty one. The kit appears
+    only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
+    wider than 0.85× its height is refused as "not one standing person" — FLUX did once draw two).
+  - Each worked-out rig is a console row (kind `fal`, model `self-rig`, price $0); a cached one is
+    not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
+    The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
+    having no finger bones to place it by.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
   flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once). Beasts
   and blobs are still primitives: Quaternius's monster packs were behind a Google Drive quota the

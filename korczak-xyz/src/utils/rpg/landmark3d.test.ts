@@ -19,6 +19,9 @@ import {
   type HubSlot,
   type LandmarkModel,
   PIECE_TRIES,
+  heroLook,
+  personLook,
+  personPrompt,
   withRetries,
 } from './landmark3d';
 
@@ -220,5 +223,29 @@ describe('withRetries', () => {
       }, noWait),
     ).rejects.toThrow('402');
     expect(tries).toBe(1);
+  });
+});
+
+describe('personPrompt', () => {
+  it('asks for one person, whole, front-on in an A-pose with empty hands, on white', () => {
+    const p = personPrompt('a lean hunter in an oiled leather coat.', { gender: 'female', color: '#7a5230' });
+    expect(p).toContain('one person only: a lean hunter in an oiled leather coat.');
+    expect(p).toContain('A woman.');
+    expect(p).toContain('#7a5230');
+    expect(p).toContain('A-pose');
+    expect(p).toContain('hands empty');
+    expect(p).toContain('plain white background');
+    expect(personPrompt('a drowner', {})).not.toMatch(/A (wo)?man\./);
+  });
+
+  it('describes someone from before `appearance` from their voice’s persona, and the hero from the world', () => {
+    const world = { people: 'fisher folk in oilskins', hub: 'Saltmarsh', hero: undefined, player: 'a hired witch-hunter' };
+    expect(personLook({ appearance: 'a tall smith' }, world)).toBe('a tall smith');
+    expect(personLook({ voice: 'Native Polish. Female, 60s. Persona: weary herbalist. Emotion: tired.', age: 'old' }, world)).toBe(
+      'an old weary herbalist, dressed as people here dress: fisher folk in oilskins',
+    );
+    expect(personLook({}, world)).toContain('villager of Saltmarsh');
+    expect(heroLook({ ...world, hero: 'a scarred hunter in a hood' })).toBe('a scarred hunter in a hood');
+    expect(heroLook(world)).toContain('a hired witch-hunter');
   });
 });

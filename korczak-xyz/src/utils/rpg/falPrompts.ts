@@ -29,10 +29,12 @@ export function isForestVariant(slot: HubSlot): slot is ForestVariant {
   return (FOREST_VARIANTS as readonly string[]).includes(slot);
 }
 /**
- * Everything fal.ai is asked to make: the hub's pieces, the forest, a quest's clues (`ensureClueModel`)
- * and what stands at a quest's places (`ensurePlaceModel`).
+ * Everything fal.ai is asked to make: the hub's pieces, the forest, a quest's clues (`ensureClueModel`),
+ * what stands at a quest's places (`ensurePlaceModel`), and the people (`ensurePersonModel`): the
+ * quest's characters, the hero, and the enemies that walk on two legs.
  */
-export type FalSlot = HubSlot | 'clue' | 'place';
+export type FalSlot = HubSlot | 'clue' | 'place' | PersonSlot;
+export type PersonSlot = 'person' | 'hero' | 'enemy';
 
 /**
  * Each piece's mesh is simplified as far as TRELLIS goes (0.98): at 0.96 one house was 36k
@@ -41,6 +43,10 @@ export type FalSlot = HubSlot | 'clue' | 'place';
  */
 export const SIMPLIFY: Record<FalSlot, number> = {
   clue: 0.98,
+  // A person is looked at up close and bends at every joint: ~9k triangles, as many as a Quaternius one.
+  person: 0.95,
+  hero: 0.95,
+  enemy: 0.95,
   // A place's landmark and the things copied around it, between the hub's landmark and its pieces.
   place: 0.97,
   landmark: 0.95,
@@ -147,3 +153,46 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
 
 /** The landmark's picture prompt, as it was before the other pieces. */
 export const landmarkPrompt = (world: PromptWorld) => hubModelPrompt(world, 'landmark');
+
+/**
+ * The picture a person's model is made from (`components/Rpg/people.ts`): one person, whole, front-on,
+ * in an A-pose with empty hands, on white. The pose is the rig's: every person is warped from the same
+ * donor body standing that way (`utils/rpg/selfRig.ts`), so a figure with folded arms, a staff in hand
+ * or a friend beside them comes out with the wrong bones. "One person only" is there because FLUX drew
+ * the same woman twice side by side (28 Oct 2026), and TRELLIS made both.
+ */
+export function personPrompt(appearance: string, who: { gender?: 'male' | 'female'; color?: string }): string {
+  return [
+    `A single full-body 3D game character, one person only: ${appearance.trim().replace(/[.\s]+$/, '')}.`,
+    who.gender === 'female' ? 'A woman.' : who.gender === 'male' ? 'A man.' : '',
+    who.color ? `Their clothes are mostly ${who.color}.` : '',
+    'Standing straight in an A-pose, arms held a little away from the body, legs apart, hands empty and open,',
+    'facing the viewer, the whole figure from head to feet, centred.',
+    'Stylised low-poly game character, chunky proportions,',
+    'isolated on a plain white background, no ground, no shadow, no text, soft even light.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * How a character looks, for `personPrompt`: what the beat wrote (`appearance`), or for one from
+ * before it, the persona their voice was designed from (English too) and what people wear here.
+ */
+export function personLook(
+  c: { appearance?: string; voice?: string; age?: string },
+  world: Pick<WorldBible, 'people' | 'hub'>,
+): string {
+  if (c.appearance?.trim()) return c.appearance.trim();
+  const persona = c.voice?.match(/Persona:\s*([^.]+)/i)?.[1]?.trim();
+  const age = c.age === 'old' ? 'an old' : c.age === 'young' ? 'a young' : 'a';
+  return [persona ? `${age} ${persona}` : `${age} villager of ${world.hub}`, world.people ? `dressed as people here dress: ${world.people}` : '']
+    .filter(Boolean)
+    .join(', ')
+    .slice(0, 300);
+}
+
+/** How the hero looks, for `personPrompt`: the world's `hero` line, or who the player is in a world from before it. */
+export function heroLook(world: Pick<WorldBible, 'hero' | 'player' | 'people'>): string {
+  return world.hero?.trim() || `a wandering adventurer in sturdy travelling clothes: ${world.player || world.people}`.slice(0, 300);
+}

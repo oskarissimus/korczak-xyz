@@ -73,6 +73,13 @@ export interface Character {
   voice?: string;
   /** `#rrggbb`, their clothes. */
   color: string;
+  /**
+   * How they look, in English, for the picture their 3D model is made from (`personPrompt`): build,
+   * age, clothes, hair. Absent in beats from before it was asked; they are drawn from `voice` then.
+   */
+  appearance?: string;
+  /** Their model from fal.ai once made (`ensurePersonModel`), kept wherever they are, so it is made once. */
+  model?: LandmarkModel;
 }
 
 export interface Decision {
@@ -119,6 +126,8 @@ export interface BeatJob {
   /**
    * A thing to gather, in English, for the fal.ai model it is shown as in an invented world (owner,
    * 27 Oct 2026: "the things to pick up should be generated assets too"), and that model once made.
+   * For a slay job, one of the enemies, made only when they walk on two legs (`humanoid`) and rigged
+   * as a person is (`people.ts`).
    */
   prop?: string;
   model?: LandmarkModel;
@@ -834,14 +843,19 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "title": string (the quest’s title),',
     '  "npc": {"name": string, "gender": "male" or "female", "age": "young", "middle_aged" or "old" (picks their voice),',
     '          "color": "#rrggbb" for their clothes,',
-    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk, never on how they sound recorded (no phone, radio, echo); for someone already met, what you were told)},`,
+    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk, never on how they sound recorded (no phone, radio, echo); for someone already met, what you were told),`,
+    '          "appearance": string (IN ENGLISH whatever the language above, at most 20 words: how they look, for a 3D model of',
+    '                        them: build, age, clothes, hair, nothing held — "a stooped old woman in a patched green wool dress and',
+    '                        leather apron, grey braid"; for someone already met, what you were told)},',
     ctx.job ? '  "place": {...} or {"name": string}' + (ctx.job.kind === 'talk' ? ' or "village",' : ',') : '  "place": "village",',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "targetName": string (singular noun for one of the things), "look": {"shape": string, "color": string, "size": number},'
       : '',
     ctx.job?.kind === 'collect'
       ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 12 words: one of the things alone as it looks, for a 3D model — "a cracked green glowing reactor core"),'
-      : '',
+      : ctx.job?.kind === 'slay'
+        ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 20 words: one of them alone as it looks, for a 3D model — "a gaunt drowned man with grey-green skin, rags and weeds in his hair"),'
+        : '',
     '  "objectiveText": string (one line for the journal: what to do in this step),',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "waitingLine": string (what the npc says if talked to before the job is done),'
@@ -852,7 +866,8 @@ export function beatPrompt(ctx: BeatContext): string {
     `  "clues": [{"name": string (a few words), "text": string, "ask": string, "reply": string, "shape": one of ${list(ITEM_SHAPES)},`,
     '             "prop": string (IN ENGLISH whatever the language above, at most 12 words: the object alone as it',
     '                     looks, for a 3D model — "a torn blue wool shawl caught on a thorn branch")}],',
-    '  "witness": {"name": string, "gender": string, "age": string, "color": string, "voice": string, "greeting": string,',
+    '  "witness": {"name": string, "gender": string, "age": string, "color": string, "voice": string, "appearance": string,',
+    '              "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
     '                 "reply": string (the npc’s answer), "consequence": string (one sentence: what it changed),',
@@ -1008,11 +1023,15 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
   const name = text(r.name, 60);
   if (!name) return null;
   const voice = text(r.voice, 400);
+  const appearance = text(r.appearance, 200);
   // A name inside a known one is that person ("Takeda" is "Ronin Takeda"): a new character may not
   // take an old one's name (owner, 28 Oct 2026: "no new characters with old characters' names").
   const met = known.find((c) => same(c.name, name)) ?? known.find((c) => samePerson(c.name, name));
-  // Someone met before voices were described keeps everything else, and gets one now.
-  if (met) return met.voice || !voice ? met : { ...met, voice };
+  // Someone met before voices (or looks) were described keeps everything else, and gets one now.
+  if (met) {
+    const more = { ...(!met.voice && voice ? { voice } : {}), ...(!met.appearance && appearance ? { appearance } : {}) };
+    return Object.keys(more).length ? { ...met, ...more } : met;
+  }
   const color = typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color.trim()) ? r.color.trim().toLowerCase() : null;
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -1023,6 +1042,7 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
     color: color ?? CLOTHES[h % CLOTHES.length],
     ...(age && { age }),
     ...(voice && { voice }),
+    ...(appearance && { appearance }),
   };
 }
 
@@ -1073,7 +1093,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
         targetName,
         look: parseLook(r.look, ctx.job.kind),
       };
-      const prop = ctx.job.kind === 'collect' ? text(r.targetProp, 120) : '';
+      const prop = ctx.job.kind === 'collect' ? text(r.targetProp, 120) : ctx.job.kind === 'slay' ? text(r.targetProp, 200) : '';
       if (prop) job.prop = prop;
     }
   }

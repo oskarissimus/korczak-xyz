@@ -25,6 +25,7 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
+import { People, type Body } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
@@ -38,6 +39,28 @@ import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
 import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
+
+/**
+ * Who a person is drawn as: their fal.ai model (`url`, rigged in `people.ts`), nothing at all while it
+ * is being made (`wait`), or else Quaternius's kit — only where no model will ever come: the classic
+ * world, a reader without a fal.ai key (owner, 28 Oct 2026: "no Quaternius characters; nothing until
+ * it is generated, then it is there"), and a model that would not load or rig.
+ */
+export interface PersonBody {
+  url?: string;
+  wait?: boolean;
+}
+
+/** What a body asks for, as one string to compare: the model's URL, `wait` or `kit`. */
+const wanted = (body: PersonBody) => body.url ?? (body.wait ? 'wait' : 'kit');
+
+/** Heights a person is rigged at, feet to crown. */
+const HEIGHT = { male: 1.78, female: 1.68, hero: 1.85, enemy: 1.8 } as const;
+
+/** A hero described as a woman stands on the female donor; anyone else on the male one. */
+export function heroBody(description: string): Body {
+  return /\b(woman|female|girl|lady|she|her|heroine|priestess|witch|queen)\b/i.test(description) ? 'female' : 'male';
+}
 
 export interface SceneCallbacks {
   /** A hint for what E would do here, or null when nothing is in reach. */
@@ -177,6 +200,12 @@ interface Npc {
   rig: Rig | null;
   /** Their clothes, for the capsule they become if the models never load. */
   color: number;
+  /** The same, as the quest wrote it, for the kit's look (`lookFor`). */
+  css: string;
+  gender: 'male' | 'female';
+  /** What they are drawn as (`wanted`), and a count that makes an older load's arrival stale. */
+  want: string;
+  token: number;
   obstacle: Obstacle;
   /** The village spot it holds, if it stands in the village. */
   spot: number | null;
@@ -300,6 +329,7 @@ export class RpgScene {
   private player: THREE.Group;
   private sword: THREE.Mesh;
   private chars = new Characters();
+  private people = new People();
   private kit = new WorldKit();
   /** The primitive houses, taken down when the kit's are put up. */
   private stopgapHouses: THREE.Group[] = [];
@@ -368,25 +398,7 @@ export class RpgScene {
     this.sword.castShadow = true;
     this.player.position.copy(SPAWN);
     this.scene.add(this.player);
-    this.chars.ready.then(
-      () => {
-        this.playerRig = this.chars.dress(this.player, {
-          outfit: 'male_ranger',
-          head: 'head_male',
-          hair: ['hair_beard'],
-          hairColor: HAIR_COLORS[4],
-          height: 1.85,
-        });
-        this.gripSword(this.playerRig);
-      },
-      () => {
-        // No models (offline, a failed fetch): the game still plays, with the old shapes.
-        this.player.add(humanoid(0x3b3b46, 0xe0c2a2));
-        this.sword.position.set(0.45, 1.05, 0.45);
-        this.player.add(this.sword);
-        for (const npc of this.npcs.values()) npc.group.add(humanoid(npc.color, 0xd9b38c, 1.75));
-      },
-    );
+    // Nobody until the game says who the hero is (`setHero`): a generated hero must not have the kit's flash up first.
 
     this.marker = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.5, 60, 12, 1, true),
@@ -1602,23 +1614,19 @@ export class RpgScene {
    * Puts a character at a place (by name) or, with null, on a free spot in the village square;
    * one already standing somewhere walks over. Their clothes are `color`.
    */
-  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male') {
+  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male', body: PersonBody = {}) {
     let npc = this.npcs.get(name);
     if (!npc) {
       const group = new THREE.Group();
       const obstacle: Obstacle = { x: 0, z: 0, r: 0.6 };
       this.obstacles.push(obstacle);
       this.scene.add(group);
-      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), obstacle, spot: null };
+      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), css: color, gender, want: 'none', token: 0, obstacle, spot: null };
       npc = created;
       this.npcs.set(name, created);
-      this.chars.ready.then(
-        () => {
-          if (this.npcs.get(name) === created) created.rig = this.chars.dress(group, lookFor(name, color, gender));
-        },
-        () => group.add(humanoid(created.color, 0xd9b38c, 1.75)),
-      );
     }
+    // A failure has already put the kit's look up; the caller hears of it through `setNpcBody`.
+    this.setNpcBody(name, body).catch(() => {});
     const place = at ? this.places.get(at) : undefined;
     let pos: THREE.Vector3;
     if (place) {
@@ -1642,6 +1650,137 @@ export class RpgScene {
   }
 
   /**
+   * What a character is drawn as (`PersonBody`); the same body again changes nothing. Rejects when a
+   * model would not load or rig, after putting the kit's look up in its place.
+   */
+  async setNpcBody(name: string, body: PersonBody): Promise<void> {
+    const npc = this.npcs.get(name);
+    if (!npc) return;
+    const want = wanted(body);
+    if (want === npc.want) return;
+    npc.want = want;
+    const token = ++npc.token;
+    const current = () => this.npcs.get(name) === npc && npc.token === token;
+    npc.group.clear();
+    npc.rig = null;
+    if (want === 'wait') return;
+    if (want !== 'kit') {
+      try {
+        const template = await this.people.template(want, npc.gender, HEIGHT[npc.gender], 'person');
+        if (current()) npc.rig = this.people.dress(npc.group, template);
+        return;
+      } catch (err) {
+        if (!current()) return;
+        npc.want = 'kit';
+        this.dressKitNpc(name, npc, token);
+        throw err;
+      }
+    }
+    this.dressKitNpc(name, npc, token);
+  }
+
+  private dressKitNpc(name: string, npc: Npc, token: number) {
+    const current = () => this.npcs.get(name) === npc && npc.token === token;
+    this.chars.ready.then(
+      () => {
+        if (current()) npc.rig = this.chars.dress(npc.group, lookFor(name, npc.css, npc.gender));
+      },
+      () => {
+        if (current()) npc.group.add(humanoid(npc.color, 0xd9b38c, 1.75));
+      },
+    );
+  }
+
+  private heroWant = 'none';
+  private heroToken = 0;
+
+  /**
+   * Who the hunter is drawn as (`PersonBody`): the world's generated hero, nobody while it is made, or
+   * the kit's bearded ranger. Rejects when a model would not load or rig, after putting the ranger up.
+   */
+  async setHero(body: PersonBody, description = ''): Promise<void> {
+    const want = wanted(body);
+    if (want === this.heroWant) return;
+    this.heroWant = want;
+    const token = ++this.heroToken;
+    this.player.clear();
+    this.playerRig = null;
+    if (want === 'wait') return;
+    if (want !== 'kit') {
+      try {
+        const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero');
+        if (token !== this.heroToken) return;
+        this.playerRig = this.people.dress(this.player, template);
+        this.gripSword(this.playerRig);
+        return;
+      } catch (err) {
+        if (token !== this.heroToken) return;
+        this.heroWant = 'kit';
+        this.dressKitHero(token);
+        throw err;
+      }
+    }
+    this.dressKitHero(token);
+  }
+
+  private dressKitHero(token: number) {
+    this.chars.ready.then(
+      () => {
+        if (token !== this.heroToken) return;
+        this.playerRig = this.chars.dress(this.player, {
+          outfit: 'male_ranger',
+          head: 'head_male',
+          hair: ['hair_beard'],
+          hairColor: HAIR_COLORS[4],
+          height: 1.85,
+        });
+        this.gripSword(this.playerRig);
+      },
+      () => {
+        // No models (offline, a failed fetch): the game still plays, with the old shapes.
+        if (token !== this.heroToken) return;
+        this.player.add(humanoid(0x3b3b46, 0xe0c2a2));
+        this.sword.position.set(0.45, 1.05, 0.45);
+        this.player.add(this.sword);
+      },
+    );
+  }
+
+  /**
+   * The sword in a generated person's hand (`people.ts`), which has a wrist and no fingers: from the
+   * hand's rest pose, the blade points where the body faces, and the fist is a few centimetres past
+   * the wrist along the hand.
+   */
+  private gripGenerated(rig: Rig, hand: THREE.Object3D) {
+    let mesh: THREE.SkinnedMesh | null = null;
+    rig.model.traverse((o) => {
+      if ((o as THREE.SkinnedMesh).isSkinnedMesh && !mesh) mesh = o as THREE.SkinnedMesh;
+    });
+    const skinned = mesh as THREE.SkinnedMesh | null;
+    const i = skinned ? skinned.skeleton.bones.findIndex((b) => b.name === hand.name) : -1;
+    const rest = new THREE.Quaternion();
+    if (skinned && i >= 0) new THREE.Matrix4().copy(skinned.skeleton.boneInverses[i]).invert().decompose(new THREE.Vector3(), rest, new THREE.Vector3());
+    const along = new THREE.Vector3(0, 0, 1).applyQuaternion(rest.invert()).normalize();
+    const grip = new THREE.Vector3(0, 0.08, 0);
+    hand.add(this.sword);
+    this.sword.scale.setScalar(1);
+    this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
+    this.sword.position.copy(grip).addScaledVector(along, 0.42);
+    this.kit.ready.then(
+      () => {
+        if (this.playerRig !== rig) return;
+        const blade = this.kit.piece('Sword_Bronze');
+        const box = new THREE.Box3().setFromObject(blade);
+        blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
+        blade.position.copy(grip).addScaledVector(along, -(box.min.y + 0.12));
+        hand.remove(this.sword);
+        hand.add(blade);
+      },
+      () => {},
+    );
+  }
+
+  /**
    * Puts the sword in the hunter's right hand, worked out from the hand's own bones rather than
    * tuned by eye: the grip is between the wrist and the knuckles, and the blade leaves the fist
    * on the thumb side, along the line from the little finger's knuckle to the index finger's.
@@ -1651,6 +1790,10 @@ export class RpgScene {
     const index = rig.model.getObjectByName('index_01_r');
     const pinky = rig.model.getObjectByName('pinky_01_r');
     const middle = rig.model.getObjectByName('middle_01_r');
+    if (hand && hand.name === 'RightHand') {
+      this.gripGenerated(rig, hand);
+      return;
+    }
     if (!hand || !index || !pinky || !middle) {
       this.sword.position.set(0.45, 1.05, 0.45);
       this.player.add(this.sword);
@@ -1786,6 +1929,8 @@ export class RpgScene {
     let best: string | null = null;
     let bestD = TALK_RANGE;
     for (const [name, npc] of this.npcs) {
+      // Nobody to talk to until they are there to be seen.
+      if (npc.group.children.length === 0) continue;
       const d = npc.group.position.distanceTo(this.player.position);
       if (d < bestD) {
         bestD = d;
@@ -1801,9 +1946,15 @@ export class RpgScene {
    * Puts a beat's things in the middle of its place, replacing any left from before. A thing to
    * gather is its fal.ai model when `item` names one (`setItemModel`); with `item.wait` it is nothing
    * at all until that model comes, in an invented world, where no block stands in for anything.
+   * For enemies that walk on two legs `item` is their generated body the same way (`setEnemyBody`).
    */
   spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null, item: { url?: string; wait?: boolean } = {}) {
     this.clearObjective();
+    if (kind === 'slay') {
+      this.enemyLook = look;
+      this.enemyWant = wanted(item);
+      this.enemyToken++;
+    }
     this.itemLook = look;
     this.itemWait = !!item.wait;
     if (this.itemModel?.url !== item.url) {
@@ -1842,15 +1993,62 @@ export class RpgScene {
           enemy.mesh.add(buildEnemy({ ...look, size: 1 }));
           continue;
         }
-        // Something that was a man once: the bare base body, washed in the target's colour.
-        this.chars.ready.then(
-          () => {
-            if (enemy.hp > 0) enemy.rig = this.chars.dress(enemy.mesh, { outfit: 'body_male', head: undefined, tint: new THREE.Color(look.color).getHex(), tintAmount: 0.8, height: 1.8 });
-          },
-          () => enemy.mesh.add(buildEnemy({ ...look, size: 1 })),
-        );
+        void this.dressEnemy(enemy, this.enemyToken).catch(() => {});
       }
     }
+  }
+
+  /** What the humanoid enemies are drawn as (`PersonBody`), and a count that makes an older load stale. */
+  private enemyWant = 'kit';
+  private enemyToken = 0;
+  private enemyLook: TargetLook | null = null;
+
+  /**
+   * The job's enemies as their generated body, once made (`ensurePersonModel`, the beat's English
+   * `prop`); null for the kit's bare body washed in their colour (no key, a failed model).
+   */
+  async setEnemyBody(body: PersonBody): Promise<void> {
+    const want = wanted(body);
+    if (want === this.enemyWant) return;
+    this.enemyWant = want;
+    const token = ++this.enemyToken;
+    if (this.enemyLook?.shape !== 'humanoid') return;
+    await Promise.all(this.enemies.map((e) => this.dressEnemy(e, token)));
+  }
+
+  private async dressEnemy(enemy: Enemy, token: number): Promise<void> {
+    const look = this.enemyLook;
+    if (!look) return;
+    const want = this.enemyWant;
+    enemy.mesh.clear();
+    enemy.rig = null;
+    if (want === 'wait') return;
+    if (want !== 'kit') {
+      try {
+        const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy');
+        if (token === this.enemyToken && enemy.hp > 0) enemy.rig = this.people.dress(enemy.mesh, template);
+        return;
+      } catch (err) {
+        if (token !== this.enemyToken) return;
+        this.enemyWant = 'kit';
+        this.dressKitEnemy(enemy, look, token);
+        throw err;
+      }
+    }
+    this.dressKitEnemy(enemy, look, token);
+  }
+
+  /** Something that was a man once: the bare base body, washed in the target's colour. */
+  private dressKitEnemy(enemy: Enemy, look: TargetLook, token: number) {
+    this.chars.ready.then(
+      () => {
+        if (token === this.enemyToken && enemy.hp > 0)
+          enemy.rig = this.chars.dress(enemy.mesh, { outfit: 'body_male', head: undefined, tint: new THREE.Color(look.color).getHex(), tintAmount: 0.8, height: 1.8 });
+      },
+      () => {
+        if (token === this.enemyToken) enemy.mesh.add(buildEnemy({ ...look, size: 1 }));
+      },
+    );
   }
 
   /** What a thing to gather looks like: the model, the block, or nothing yet. */
@@ -2033,6 +2231,8 @@ export class RpgScene {
     this.playerRig?.once('Sword_Attack', ATTACK_COOLDOWN);
     const forward = new THREE.Vector3(Math.sin(this.player.rotation.y), 0, Math.cos(this.player.rotation.y));
     for (const enemy of [...this.enemies]) {
+      // Not there yet: its body is still being made.
+      if (enemy.mesh.children.length === 0) continue;
       const to = enemy.mesh.position.clone().sub(this.player.position);
       const dist = to.length();
       if (dist > ATTACK_RANGE) continue;
@@ -2297,6 +2497,8 @@ export class RpgScene {
 
   private updateEnemies(dt: number) {
     for (const enemy of this.enemies) {
+      // An enemy with no body yet stands still and harms nobody until it has one.
+      if (enemy.mesh.children.length === 0) continue;
       const pos = enemy.mesh.position;
       const toPlayer = this.player.position.clone().sub(pos).setY(0);
       const dist = toPlayer.length();

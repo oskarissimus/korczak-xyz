@@ -86,9 +86,11 @@ export class Rig {
   constructor(
     readonly model: THREE.Object3D,
     private clips: Map<string, THREE.AnimationClip>,
+    /** The right hand's bone: Quaternius's, or a generated person's (`people.ts`). */
+    hand = 'hand_r',
   ) {
     this.mixer = new THREE.AnimationMixer(model);
-    this.hand = model.getObjectByName('hand_r') ?? null;
+    this.hand = model.getObjectByName(hand) ?? null;
     this.mixer.addEventListener('finished', (e) => {
       // A one-off (a swing, a flinch) hands back to whatever was looping.
       if (e.action === this.current && this.loop && e.action.loop === THREE.LoopOnce && !this.dead) {

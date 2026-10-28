@@ -39,7 +39,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
@@ -490,9 +490,25 @@ export function ensurePlaceModel(
   return ensurePiece(key, 'place', id, prompt, onModel, onError, o);
 }
 
+/**
+ * A person's model (`personPrompt`), made once: a quest's character by world and name, the hero by
+ * world, an enemy by the beat whose job it is. Rigged in the browser when it loads (`people.ts`).
+ */
+export function ensurePersonModel(
+  key: string,
+  label: PersonSlot,
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void = () => {},
+  o: FalOptions = {},
+): boolean {
+  return ensurePiece(key, label, id, prompt, onModel, onError, o);
+}
+
 function ensurePiece(
   key: string,
-  label: 'clue' | 'place',
+  label: 'clue' | 'place' | PersonSlot,
   id: string,
   prompt: string,
   onModel: (model: LandmarkModel) => void,

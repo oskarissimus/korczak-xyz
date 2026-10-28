@@ -72,10 +72,22 @@ describe('parseBeat', () => {
     expect(gated(['witness', 1])).toEqual([undefined, undefined]);
   });
 
-  it('keeps the English prop of a thing to gather, and only of one', () => {
+  it('keeps the English prop of a thing to gather, and of an enemy to slay', () => {
     const reply = JSON.stringify({ ...good, targetName: 'rdzeń', targetProp: 'a cracked green glowing reactor core' });
     expect(parseBeat(reply, { ...ctx, job: { kind: 'collect', count: 2 } })?.job?.prop).toBe('a cracked green glowing reactor core');
-    expect(parseBeat(reply, ctx)?.job?.prop).toBeUndefined();
+    // A slay job's is one of the enemies, made a person when they walk on two legs (`people.ts`).
+    expect(parseBeat(reply, ctx)?.job?.prop).toBe('a cracked green glowing reactor core');
+  });
+
+  it('keeps how a character looks, in English, and lets someone met before keep their model', () => {
+    const look = 'a stooped old woman in a patched green wool dress, grey braid';
+    const reply = JSON.stringify({ ...good, npc: { ...good.npc, appearance: look } });
+    const beat = parseBeat(reply, ctx);
+    expect(beat?.npc.appearance).toBe(look);
+    const model = { glb: 'https://fal.media/m.glb', image: 'i', prompt: 'p', costUsd: 0.023, ms: 1, at: 1 };
+    const met = parseBeat(reply, { ...ctx, characters: [{ ...beat!.npc, appearance: undefined, model }] });
+    expect(met?.npc.model).toEqual(model);
+    expect(met?.npc.appearance).toBe(look);
   });
 
   it('plays a good beat, with the job and the plan the game drew', () => {

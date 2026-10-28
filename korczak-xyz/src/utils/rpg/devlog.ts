@@ -174,7 +174,7 @@ export function triesSpend(tries: readonly ModelTry[], ms: number): ModelSpend {
  */
 export function worldSpend(world: WorldBible | null): Spend | null {
   if (!world || world.createdAt === 0) return null;
-  const models = [world.landmarkModel, ...Object.values(world.kitModels ?? {})].filter((m) => m !== undefined);
+  const models = [world.landmarkModel, ...Object.values(world.kitModels ?? {}), world.heroModel].filter((m) => m !== undefined);
   const textures = [...(world.groundTexture ? [world.groundTexture] : []), ...(world.coverSprites ?? [])];
   const s = world.spent;
   return {
@@ -240,7 +240,7 @@ export function onRequestEnd(listener: (entry: DevRequest) => void): () => void 
 /** The world's requests are the ones that make the world: its genesis, its sizes, its hub's models. */
 export function scopeOf(kind: DevRequest['kind'], beat: number | null, label?: string): SpendScope {
   if (kind === 'model') return beat === null ? 'world' : 'quest';
-  if (kind === 'fal') return label === 'clue' || label === 'place' ? 'quest' : 'world';
+  if (kind === 'fal') return label === 'clue' || label === 'place' || label === 'person' || label === 'enemy' ? 'quest' : 'world';
   return 'quest';
 }
 

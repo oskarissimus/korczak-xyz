@@ -156,6 +156,13 @@ export interface WorldBible extends WorldBrief {
   cover?: string;
   /** Those painted by fal.ai as cut-out pictures, once each, the low clump first; kept like the ground. */
   coverSprites?: GroundTexture[];
+  /**
+   * How the hero looks, in ENGLISH like the landmark, for the picture their 3D model is made from
+   * (`personPrompt`). Worlds from before 28 Oct 2026 have none and are described from `player`.
+   */
+  hero?: string;
+  /** That hero made by fal.ai and rigged in the browser (`people.ts`), once; kept like the hub's models. */
+  heroModel?: LandmarkModel;
 }
 
 /** A world's ground texture as fal.ai drew it; the scene makes it seamless when it loads it. */
@@ -634,6 +641,9 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "cover": string (IN ENGLISH too, at most 14 words: the small things growing or lying on that ground, knee-high',
     '    at most, that fit this world — "tufts of dry yellow grass and thistles", "glowing blue moss and tiny',
     '    mushrooms", "wiry black weeds and rusty bolts"; exactly "none" if the ground is bare),',
+    '  "hero": string (IN ENGLISH too, at most 20 words: how the player looks, for a 3D model of them — build,',
+    '    clothes and gear worn on the body, hair, nothing held; "a lean scarred hunter in a long oiled leather coat,',
+    '    boots and a hood"),',
     `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
     '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
     '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
@@ -867,6 +877,7 @@ function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBi
     ...parseKit(r.kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
     ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
+    ...(text(r.hero, 200) ? { hero: text(r.hero, 200)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }
@@ -925,6 +936,7 @@ export function previewWorld(soFar: string, ctx: GenesisContext, now: number): W
     ...parseKit(kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
     ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
+    ...(text(r.hero, 200) ? { hero: text(r.hero, 200)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }

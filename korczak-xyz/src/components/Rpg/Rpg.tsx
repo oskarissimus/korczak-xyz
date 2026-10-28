@@ -63,8 +63,12 @@ import {
   cluePrompt,
   ensureClueModel,
   ensureHubModels,
+  ensurePersonModel,
   ensurePlaceModel,
   falPending,
+  heroLook,
+  personLook,
+  personPrompt,
   hubSlotFailed,
   placeAssetPrompt,
   FOREST_SLOTS,
@@ -101,8 +105,10 @@ import {
   addWorldSpend,
   setWorldCover,
   setWorldGround,
+  setWorldHero,
   setWorldModel,
   setWorldSizes,
+  updateAtlasPerson,
   updateAtlasPlace,
   withModel,
   type PendingGenesis,
@@ -112,8 +118,11 @@ import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stop
 import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress } from './DevConsole';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
-import { RpgScene, type Prompt } from './RpgScene';
+import { heroBody, RpgScene, type PersonBody, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
+
+/** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
+const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy']);
 import { translations } from './translations';
 
 interface DialogueLine {
@@ -586,6 +595,71 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, []);
 
   /**
+   * How a character is drawn: their fal.ai model once made, and in an invented world nothing until
+   * then (owner, 28 Oct 2026: "no Quaternius characters; nothing until it is generated, then it is
+   * there"); the kit's people only where no model will ever come — the classic world, no fal.ai key.
+   * Until the keys have loaded a key is assumed, so the kit does not flash up first.
+   */
+  const keysReadyRef = useRef(false);
+  const modelOf = useCallback((c: Character) => c.model ?? charactersRef.current.find((k) => k.name === c.name)?.model, []);
+  const bodyFor = useCallback(
+    (c: Character): PersonBody => {
+      const invented = (worldRef.current?.createdAt ?? 0) > 0;
+      const model = modelOf(c);
+      return { url: model?.glb, wait: invented && (!!model || !keysReadyRef.current || !!falKeyRef.current) };
+    },
+    [modelOf],
+  );
+
+  /** A character's model has come: on every copy of them — the quest's people, its beats, the atlas. */
+  const keepPerson = useCallback((worldId: string, name: string, model: LandmarkModel) => {
+    if (worldRef.current?.id !== worldId) return;
+    const keep = (c: Character): Character => (c.name === name ? { ...c, model } : c);
+    charactersRef.current = charactersRef.current.map(keep);
+    const keepBeat = (b: Beat): Beat => ({ ...b, npc: keep(b.npc), ...(b.witness ? { witness: { ...b.witness, npc: keep(b.witness.npc) } } : {}) });
+    beatsRef.current = beatsRef.current.map(keepBeat);
+    if (beatRef.current) beatRef.current = keepBeat(beatRef.current);
+    const person = charactersRef.current.find((c) => c.name === name);
+    if (person) updateAtlasPerson(worldId, person);
+    persistRef.current();
+  }, []);
+
+  /** Asks fal.ai for a character's model if they have none: once, from how the beat said they look. */
+  const ensureNpcModel = useCallback(
+    (c: Character) => {
+      const world = worldRef.current;
+      const key = falKeyRef.current;
+      if (!world || world.createdAt === 0 || !key || modelOf(c)) return;
+      ensurePersonModel(
+        key,
+        'person',
+        `${world.id}/${c.name}`,
+        personPrompt(personLook(c, world), c),
+        (model) => {
+          keepPerson(world.id, c.name, model);
+          if (worldRef.current?.id === world.id)
+            void sceneRef.current?.setNpcBody(c.name, { url: model.glb }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
+        },
+        (e) => {
+          log.warn('rpg.person.failed', { name: c.name, ...describeError(e) });
+          // Nothing would ever stand there: the kit's look, so they can still be talked to.
+          if (worldRef.current?.id === world.id) void sceneRef.current?.setNpcBody(c.name, {});
+        },
+      );
+    },
+    [keepPerson, modelOf],
+  );
+
+  /** A character into the scene, drawn as `bodyFor` says, and their model asked for if it is missing. */
+  const putNpc = useCallback(
+    (c: Character, at: string | null, nth: number) => {
+      sceneRef.current?.placeNpc(c.name, c.color, at, nth, c.gender, bodyFor(c));
+      ensureNpcModel(c);
+    },
+    [bodyFor, ensureNpcModel],
+  );
+
+  /**
    * Puts the world's atlas into the scene and the quest's memory: every place built so far and
    * everyone met, standing where they were left (`worldSave.ts`). A new quest starts in a world
    * that already has a history.
@@ -605,7 +679,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       // Spots 0 and 1 at a place are its beat's character and witness.
       const nth = where ? (crowd.get(where) ?? 2) : 0;
       if (where) crowd.set(where, nth + 1);
-      scene?.placeNpc(character.name, character.color, where, nth, character.gender);
+      putNpc(character, where, nth);
       whereRef.current.set(character.name, where);
       if (!charactersRef.current.some((c) => c.name === character.name)) charactersRef.current = [...charactersRef.current, character];
       if (line && !lastLinesRef.current.has(character.name)) lastLinesRef.current.set(character.name, line);
@@ -707,7 +781,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         putPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
-      scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
+      putNpc(b.npc, b.place?.name ?? null, 0);
       whereRef.current.set(b.npc.name, b.place?.name ?? null);
       if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
       scene?.clearClues();
@@ -719,7 +793,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       askedTalkRef.current = new Set();
       if (b.witness) {
         const w = b.witness;
-        scene?.placeNpc(w.npc.name, w.npc.color, b.place?.name ?? null, 1, w.npc.gender);
+        putNpc(w.npc, b.place?.name ?? null, 1);
         whereRef.current.set(w.npc.name, b.place?.name ?? null);
         if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
       }
@@ -854,7 +928,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * What fal.ai made for a world before the world existed to keep it (`previewWorld`): held here
    * by its id until the world is born and saved with it (`withEarly`).
    */
-  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture; cover?: GroundTexture[] }>());
+  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture; cover?: GroundTexture[]; hero?: LandmarkModel }>());
   const earlyFor = (id: string) => {
     let kept = earlyRef.current.get(id);
     if (!kept) earlyRef.current.set(id, (kept = { models: [] }));
@@ -892,6 +966,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setWorld((now) => (now?.id === id ? { ...now, groundTexture: texture } : now));
   }, []);
 
+  /** The hero's model: the same, kept on the world. */
+  const keepHero = useCallback((id: string, model: LandmarkModel) => {
+    if (!findWorld(id)) {
+      earlyFor(id).hero = model;
+      return;
+    }
+    setWorldHero(id, model);
+    if (worldRef.current?.id === id) worldRef.current = { ...worldRef.current, heroModel: model };
+    setWorld((now) => (now?.id === id ? { ...now, heroModel: model } : now));
+  }, []);
+
   /** And what grows on it. */
   const keepCover = useCallback((id: string, sprites: GroundTexture[]) => {
     markStage('cover');
@@ -912,6 +997,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     let next = kept.models.reduce((acc, [slot, model]) => withModel(acc, slot, model), w);
     if (kept.ground) next = { ...next, groundTexture: kept.ground };
     if (kept.cover) next = { ...next, coverSprites: kept.cover };
+    if (kept.hero) next = { ...next, heroModel: kept.hero };
     return next;
   }, []);
 
@@ -928,8 +1014,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
         (slot, model) => keepModel(w.id, slot, model),
         (slot, e) => log.warn('rpg.landmark.failed', { slot, ...describeError(e) }),
       );
+      // The hero (`people.ts`): a world from before `hero` is described from who the player is.
+      if (!w.heroModel)
+        ensurePersonModel(
+          key,
+          'hero',
+          w.id,
+          personPrompt(heroLook(w), { gender: heroBody(heroLook(w)) }),
+          (model) => keepHero(w.id, model),
+          (e) => {
+            log.warn('rpg.hero.failed', describeError(e));
+            if (worldRef.current?.id === w.id) void sceneRef.current?.setHero({});
+          },
+        );
     },
-    [keepCover, keepGround, keepModel],
+    [keepCover, keepGround, keepHero, keepModel],
   );
 
   /**
@@ -1198,10 +1297,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
     }
     for (const p of pending) {
-      if (p.id.startsWith('clue/') || p.id.startsWith('place/')) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
+      if (/^(clue|place|person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
     }
     for (const r of devRequests()) {
-      if (r.kind !== 'fal' || (r.label !== 'clue' && r.label !== 'place') || (line && r.startedAt < line.since)) continue;
+      if (r.kind !== 'fal' || !PIECE_LABELS.has(r.label ?? '') || (line && r.startedAt < line.since)) continue;
       if (r.status === 'ok' && r.model.includes('trellis')) tasks.push({ kind: 'piece', state: 'done', since: null });
       else if (r.status === 'error') tasks.push({ kind: 'piece', state: 'failed', since: null });
     }
@@ -1213,6 +1312,30 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (!falKey || !world || world.createdAt === 0 || creating) return;
     for (const place of placesRef.current) putPlace(place);
   }, [falKey, world, creating, putPlace]);
+  keysReadyRef.current = keysReady;
+  // Everyone standing is drawn again once it is known whether a key will make their models: the
+  // ones waiting for it are asked for, and without one the kit's people come.
+  useEffect(() => {
+    if (!world || creating) return;
+    for (const c of charactersRef.current) {
+      if (!whereRef.current.has(c.name)) continue;
+      void sceneRef.current?.setNpcBody(c.name, bodyFor(c)).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
+      ensureNpcModel(c);
+    }
+  }, [falKey, keysReady, world, creating, bodyFor, ensureNpcModel]);
+  // The hero: the world's own once made, nobody while it is (and while a world is being invented),
+  // the kit's ranger in the classic world and without a key.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const invented = !!world && world.createdAt > 0;
+    const look = world ? heroLook(world) : '';
+    const body: PersonBody =
+      creating !== null
+        ? { wait: true }
+        : { url: invented ? world!.heroModel?.glb : undefined, wait: invented && (!!world!.heroModel || !keysReady || !!falKey) };
+    void scene.setHero(body, look).catch((e) => log.warn('rpg.hero.load.failed', describeError(e)));
+  }, [world, creating, falKey, keysReady]);
   const sizesAskedRef = useRef(new Set<string>());
   // Where it all stands is the world's own (`utils/rpg/hubLayout.ts`), and nothing stands there until
   // its model has come: an empty board, filling in. The board is empty while a world is invented,
@@ -1333,6 +1456,38 @@ export default function Rpg({ lang }: { lang: Lang }) {
         log.warn('rpg.item.failed', describeError(e));
         // Nothing would ever stand there: the block, so the step can still be done.
         if (beatRef.current?.index === beat.index) void scene.setItemModel(null);
+      },
+    );
+  }, [beat, falKey, persist]);
+
+  // The beat's enemies, when they walk on two legs: a person made once from the English `prop` the
+  // beat wrote for them (their name for a beat from before), rigged as a person is, kept on the beat.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const job = beat?.job;
+    if (!scene || !beat || job?.kind !== 'slay' || job.look.shape !== 'humanoid' || job.model) return;
+    const world = worldRef.current;
+    if (!falKey || !world || world.createdAt === 0) return;
+    const token = questTokenRef.current;
+    ensurePersonModel(
+      falKey,
+      'enemy',
+      `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`,
+      personPrompt(job.prop ?? job.targetName, { color: job.look.color }),
+      (model) => {
+        if (questTokenRef.current !== token) return;
+        const keep = (b: Beat): Beat =>
+          b.index === beat.index && b.title === beat.title && b.job ? { ...b, job: { ...b.job, model } } : b;
+        beatsRef.current = beatsRef.current.map(keep);
+        if (beatRef.current) beatRef.current = keep(beatRef.current);
+        persist();
+        if (beatRef.current?.index === beat.index)
+          void scene.setEnemyBody({ url: model.glb }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
+      },
+      (e) => {
+        log.warn('rpg.enemy.failed', describeError(e));
+        // Nobody would ever come: the kit's body, so the step can still be done.
+        if (beatRef.current?.index === beat.index) void scene.setEnemyBody({});
       },
     );
   }, [beat, falKey, persist]);
@@ -1810,10 +1965,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
         putPlace(b.place);
         if (!placesRef.current.some((p) => p.name === b.place!.name)) placesRef.current = [...placesRef.current, b.place];
       }
-      if (!isDead(b.npc.name, deadRef.current)) scene?.placeNpc(b.npc.name, b.npc.color, b.place?.name ?? null, 0, b.npc.gender);
+      if (!isDead(b.npc.name, deadRef.current)) putNpc(b.npc, b.place?.name ?? null, 0);
       remember(b.npc);
       if (b.witness && !isDead(b.witness.npc.name, deadRef.current)) {
-        scene?.placeNpc(b.witness.npc.name, b.witness.npc.color, b.place?.name ?? null, 1, b.witness.npc.gender);
+        putNpc(b.witness.npc, b.place?.name ?? null, 1);
         remember(b.witness.npc);
       }
       beatsRef.current = [...beatsRef.current, b];

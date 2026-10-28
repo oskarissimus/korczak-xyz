@@ -131,6 +131,11 @@ export function setWorldGround(id: string, texture: GroundTexture, now = Date.no
   putWorld(id, (w) => ({ ...w, groundTexture: texture }), now);
 }
 
+/** The hero's model the same way (`people.ts`), so it is made once. */
+export function setWorldHero(id: string, model: LandmarkModel, now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, heroModel: model }), now);
+}
+
 /** And what grows on it (`groundCover.ts`). */
 export function setWorldCover(id: string, sprites: GroundTexture[], now = Date.now()): void {
   putWorld(id, (w) => ({ ...w, coverSprites: sprites }), now);
@@ -322,6 +327,16 @@ export function updateAtlasPlace(worldId: string, place: PlaceSpec): void {
   const atlas = all[worldId];
   if (!atlas?.places?.some((p) => p.name === place.name)) return;
   all[worldId] = { ...atlas, places: atlas.places.map((p) => (p.name === place.name ? place : p)) };
+  writeAtlases(evict(all, worldId));
+  touch(worldUnit(worldId));
+}
+
+/** A person already in the atlas, changed (their model made): they keep their turn in the order. */
+export function updateAtlasPerson(worldId: string, character: Character): void {
+  const all = readAtlases();
+  const atlas = all[worldId];
+  if (!atlas?.people?.some((p) => p.character.name === character.name)) return;
+  all[worldId] = { ...atlas, people: atlas.people.map((p) => (p.character.name === character.name ? { ...p, character } : p)) };
   writeAtlases(evict(all, worldId));
   touch(worldUnit(worldId));
 }
