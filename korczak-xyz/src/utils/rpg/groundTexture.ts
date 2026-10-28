@@ -82,7 +82,7 @@ export function ensureGroundTexture(
   inFlight.add(world.id);
   const started = Date.now();
   const prompt = groundPrompt(world);
-  drawImage(key, prompt, 'ground', o, GROUND_SIZE)
+  drawImage(key, prompt, 'ground', o, GROUND_SIZE, `${world.id}/ground`)
     .then(
       (image) => {
         const costUsd = imageCost(GROUND_SIZE, GROUND_SIZE);

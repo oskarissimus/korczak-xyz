@@ -67,3 +67,20 @@ resource "google_firestore_backup_schedule" "weekly" {
     prevent_destroy = true
   }
 }
+
+/*
+ * The RPG's generation jobs (`korczak-xyz/src/utils/rpg/jobs.ts`) are working state, not records: a
+ * beat's prompt and answer, a fal.ai piece's URLs, kept so a page that comes back from the
+ * background or a reload can pick up what the server made. What the game keeps is on the world and
+ * the save. So each job carries `expireAt` (two weeks on) and Firestore deletes it after that.
+ * `index_config {}` because nothing queries on the field, and a TTL field needs no index.
+ */
+resource "google_firestore_field" "rpg_jobs_ttl" {
+  project    = local.project_id
+  database   = "(default)"
+  collection = "rpgJobs"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}

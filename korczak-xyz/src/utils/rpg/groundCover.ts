@@ -91,9 +91,9 @@ export function ensureGroundCover(
   inFlight.add(world.id);
   const started = Date.now();
   Promise.allSettled(
-    COVER_KINDS.map(async (kind) => {
+    COVER_KINDS.map(async (kind, i) => {
       const prompt = coverPrompt(world, kind);
-      const image = await drawImage(key, prompt, 'cover', o, COVER_SIZE);
+      const image = await drawImage(key, prompt, 'cover', o, COVER_SIZE, `${world.id}/cover/${i}`);
       return { image, prompt, costUsd: imageCost(COVER_SIZE, COVER_SIZE), ms: Date.now() - started, at: Date.now() } satisfies GroundTexture;
     }),
   )

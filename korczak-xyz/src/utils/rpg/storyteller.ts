@@ -43,6 +43,8 @@ import { appendText, endRequest, startRequest, updateRequest, type DevRequest } 
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
 import { DEMO_MODELS, type RpgDemoReason } from './demoLimits';
+import { llmJobId, textRandom, type JobDoc, type JobParse, type LlmSpec } from './jobs';
+import { jobsOn, runServerJob } from './serverJobs';
 
 // The strongest first (owner, Oct 2026: "the better model first, and a fallback; we will move to a
 // cheaper one when we optimise for cost"). Flash-Lite, first until then, wrote briefings and slid
@@ -69,7 +71,8 @@ export const OPENAI_MODEL = 'gpt-4.1';
 export const FAST_MODEL = 'gemini-3-flash-preview';
 
 /** How hard a Gemini model thinks before it writes: `low` for what the reader is waiting on. */
-export type Thinking = 'low' | 'high';
+export type { Thinking } from './jobs';
+import type { Thinking } from './jobs';
 
 /**
  * What the intro screen offers (owner, Oct 2026: "choose the model at the start, to try the
@@ -480,8 +483,10 @@ interface Ask<T> {
   thinking?: Thinking;
   /** The answer so far, each time it grows. */
   onText?: (soFar: string) => void;
-  /** Each model's turn begins, the first and every retry. */
-  onTry?: () => void;
+  /** Each model's turn begins, the first and every retry, at this time (the server's, for a job). */
+  onTry?: (at: number) => void;
+  /** What the server checks the answer with when it asks instead (`serverJobs.ts`). */
+  job: { parse: JobParse; ctx: unknown; pieces?: boolean };
 }
 
 interface Asked<T> {
@@ -507,6 +512,20 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
   const run: Asked<T> = { outcome: 'no-key', provider, model: null, tries: [], raw: null, error: null, ms: 0, value: null, refusal: null };
   if (provider === 'static' || (provider === 'demo' && !ask.demo)) return run;
 
+  const chain = modelChain(provider, chosen);
+  const first = ask.first && provider !== 'openai' && (provider !== 'demo' || (DEMO_MODELS as readonly string[]).includes(ask.first)) ? ask.first : null;
+  const models = first ? [first, ...chain.filter((m) => m !== first)] : chain;
+
+  // Signed in with the keys on the account: the server asks, and keeps asking with the phone in a
+  // pocket (`jobs.ts`). Null is anything that means the browser should ask itself after all.
+  if (provider !== 'demo' && jobsOn()) {
+    const served = await askServer(provider, models, ask, run);
+    if (served) {
+      served.ms = Date.now() - started;
+      return served;
+    }
+  }
+
   // A request the page's going to the background killed is not the model's fault: it is asked
   // again, the same model, once the page is back (owner, Oct 2026: on a phone, a new world asked for
   // and the app put in the background was simply gone on return). `hidden` notes that the page was
@@ -516,9 +535,6 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') hidden = true;
   };
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onHide);
-  const chain = modelChain(provider, chosen);
-  const first = ask.first && provider !== 'openai' && (provider !== 'demo' || (DEMO_MODELS as readonly string[]).includes(ask.first)) ? ask.first : null;
-  const models = first ? [first, ...chain.filter((m) => m !== first)] : chain;
   let again = 0;
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
@@ -529,7 +545,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
     run.model = model;
     const entry = startRequest('model', model, ask.beat, '', ask.label);
     const dog = new Watchdog();
-    ask.onTry?.();
+    ask.onTry?.(t0);
     const record = (status: number | null, error: string | null) =>
       run.tries.push({ model, status, ms: Date.now() - t0, firstMs: entry.firstMs, error, usage: entry.usage, cost: entry.cost });
     try {
@@ -581,6 +597,85 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
   return run;
 }
 
+/**
+ * The chain asked by the server instead (`serverJobs.ts`): the same models in the same order, its
+ * stream mirrored into the console a request per model's turn, and the answer parsed here as well
+ * as there. Null when the browser should ask itself after all.
+ */
+async function askServer<T>(provider: 'google' | 'openai', models: string[], ask: Ask<T>, run: Asked<T>): Promise<Asked<T> | null> {
+  const base = { kind: 'llm' as const, provider, models, prompt: ask.prompt, temperature: ask.temperature, thinking: ask.thinking ?? null, parse: ask.job.parse };
+  const spec: LlmSpec = { ...base, ctx: JSON.stringify(ask.job.ctx ?? null), pieces: ask.job.pieces ?? false };
+  // One console request per model's turn, by when the turn began.
+  const entries = new Map<number, { entry: DevRequest; text: number; thoughts: string; ended: boolean }>();
+  const turn = (model: string, at: number) => {
+    let t = entries.get(at);
+    if (!t) {
+      const entry = startRequest('model', model, ask.beat, '', ask.label);
+      updateRequest(entry, { startedAt: at, server: true });
+      t = { entry, text: 0, thoughts: '', ended: false };
+      entries.set(at, t);
+      ask.onTry?.(at);
+    }
+    return t;
+  };
+  const job = await runServerJob(llmJobId(base), spec, (doc: JobDoc) => {
+    for (const tr of doc.tries ?? []) {
+      const t = turn(tr.model, tr.at);
+      if (t.ended) continue;
+      t.ended = true;
+      updateRequest(t.entry, { servedBy: tr.servedBy ?? t.entry.servedBy, usage: tr.usage });
+      endRequest(t.entry, tr.error);
+      updateRequest(t.entry, { ms: tr.ms, firstMs: tr.firstMs });
+    }
+    const c = doc.current;
+    if (!c) return;
+    const t = turn(c.model, c.at);
+    if (t.ended) return;
+    if (c.text.length > t.text) {
+      appendText(t.entry, c.text.slice(t.text), false);
+      t.text = c.text.length;
+      ask.onText?.(c.text);
+    }
+    if (c.thoughts !== t.thoughts) {
+      // The server keeps only the thoughts' tail: the new part is what follows the old tail's end.
+      const tail = t.thoughts.slice(-200);
+      const at = tail ? c.thoughts.lastIndexOf(tail) : -1;
+      appendText(t.entry, at >= 0 ? c.thoughts.slice(at + tail.length) : c.thoughts, true);
+      t.thoughts = c.thoughts;
+    }
+    updateRequest(t.entry, { servedBy: c.servedBy ?? t.entry.servedBy, usage: c.usage ?? t.entry.usage, firstMs: c.firstMs });
+  });
+  if (!job) {
+    // The browser asks after all: whatever the server had begun is not this attempt's.
+    for (const t of entries.values()) if (!t.ended) endRequest(t.entry, 'handed back to the browser');
+    return null;
+  }
+  for (const t of entries.values()) if (!t.ended) endRequest(t.entry, job.error ?? null);
+  run.tries = (job.tries ?? []).map((tr) => ({
+    model: tr.model,
+    status: tr.status,
+    ms: tr.ms,
+    firstMs: tr.firstMs,
+    error: tr.error,
+    usage: tr.usage,
+    cost: entries.get(tr.at)?.entry.cost ?? null,
+  }));
+  run.model = job.model ?? job.tries?.at(-1)?.model ?? null;
+  run.raw = job.raw ?? null;
+  if (job.status === 'done' && job.raw) {
+    if (job.at) ask.onTry?.(job.at);
+    run.value = ask.parse(job.raw);
+  }
+  if (run.value) {
+    run.outcome = 'generated';
+    run.error = null;
+  } else {
+    run.outcome = job.outcome === 'unusable' || job.status === 'done' ? 'unusable' : 'failed';
+    run.error = job.error ?? (job.status === 'done' ? `the answer was not ${ask.what ?? 'playable'}` : 'failed on the server');
+  }
+  return run;
+}
+
 /** How a request the reader is waiting on is asked: a faster model first, thinking little. */
 export interface Quick {
   first?: string;
@@ -602,6 +697,7 @@ export async function generateBeat(keys: StoryKeys, ctx: BeatContext, chosen: st
     parse: (raw) => parseBeat(raw, ctx),
     beat: ctx.index,
     ...(ctx.mood && { label: `${ctx.mood.tone} · ${ctx.mood.tie}` }),
+    job: { parse: 'beat', ctx },
   });
   return {
     outcome: run.outcome,
@@ -655,11 +751,12 @@ export async function generateWorld(
     demo: { kind: 'world', ctx },
     parse: (raw) => {
       candidates = parseWorlds(raw, ctx, now);
-      return pickWorld(candidates, typicalityTarget(ctx.exotic, askedFor(ctx)));
+      return pickWorld(candidates, typicalityTarget(ctx.exotic, askedFor(ctx)), () => textRandom(raw));
     },
     beat: null,
-    onTry: () => {
-      now = Date.now();
+    job: { parse: 'world', ctx, pieces: true },
+    onTry: (at) => {
+      now = at;
       previewed = false;
     },
     onText: onPreview
@@ -692,6 +789,7 @@ export async function generateHubSizes(
     demo: null,
     parse: parseHubSizes,
     beat: null,
+    job: { parse: 'sizes', ctx: null },
     what: 'a set of sizes',
   });
   // The tries too: what they cost is the world's (`WorldBible.spent`).

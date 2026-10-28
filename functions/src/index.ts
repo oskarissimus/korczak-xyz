@@ -7,6 +7,7 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import {
   db,
   PROJECT_ID,
@@ -23,6 +24,7 @@ import { configureWebPush, sendTo } from './push';
 import { handleAssembleVideo } from './sloper/handler';
 import { handleRoastDemo } from './demo/handler';
 import { handleRpgDemo } from './rpg/handler';
+import { runJob } from './rpg/jobs';
 import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
@@ -283,4 +285,35 @@ export const rpgDemo = onRequest(
     cors: false,
   },
   handleRpgDemo,
+);
+
+/**
+ * The RPG's generation, off the page (`rpg/jobs.ts`): a beat, a world or a fal.ai piece the browser
+ * queued under `users/{uid}/rpgJobs/{id}`, run to the end on the account's own keys whether or not
+ * the phone that asked is still looking. Every progress write fires this again; anything but a
+ * fresh `queued` returns before reading a thing.
+ */
+export const rpgJob = onDocumentWritten(
+  {
+    document: 'users/{uid}/rpgJobs/{jobId}',
+    region: REGION,
+    memory: '512MiB',
+    cpu: 1,
+    concurrency: 40,
+    maxInstances: 6,
+    timeoutSeconds: 540,
+    retry: false,
+  },
+  async (event) => {
+    const after = event.data?.after.data();
+    if (!after || after.status !== 'queued') return;
+    const before = event.data?.before.data();
+    if (before && before.status === 'queued' && before.createdAt === after.createdAt) return;
+    try {
+      await runJob(event.params.uid, event.params.jobId);
+    } catch (error) {
+      reportError('rpgJob', error, { jobId: event.params.jobId });
+      await flushSentry();
+    }
+  },
 );

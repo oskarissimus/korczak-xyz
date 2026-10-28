@@ -701,6 +701,47 @@ for 30 minutes): after a reload the intro's first button is *🎲 Dokończ rodz�
 asks for that same world again rather than rolling new dice. No key plays the
 hand-written quest; no usable answer puts up the retry panel above, with **the reason on screen**.
 
+**And for a signed-in reader the server writes it** (owner, 28 Oct 2026: "on the phone, when I
+switch apps, the quest stops generating in the background; the server should do it and I should come
+back to it finished — the same with the world"). Waiting for the page to be visible only stopped the
+background from *failing* a request; it still did nothing while the phone was in a pocket, and iOS
+often reloads the page on return. So a reader who is signed in and whose key sync is `synced`
+(`setJobAccount` in `Rpg.tsx`) has every model request and every fal.ai piece made by **`rpgJob`**
+(`functions/src/rpg/jobs.ts`), a Firestore-triggered gen-2 function on `users/{uid}/rpgJobs/{id}`:
+- **The browser writes a job, the function claims it** in a transaction (a redelivered event does
+  nothing) and runs it on the account's own keys from `users/{uid}/keys/config` — the store every
+  app reads, not a secret of ours. `llm`: the same chain in the same order (`askChain` hands it the
+  models), streamed, each answer checked with the game's own `parseBeat`/`parseWorlds`/`parseHubSizes`
+  compiled in, moving on as the browser does. `fal`: FLUX then TRELLIS, or a picture alone for the
+  ground and the cover. It writes the answer so far, the tail of the thoughts, each finished try and
+  fal's queue position back into the document at most once a second, with a `heartbeat`.
+- **The browser watches the document** (`serverJobs.ts`, `onSnapshot`) and mirrors it into the
+  console as if it had asked itself — a request per model's turn, `☁ server` in its headline, the
+  stream, the tokens, the price — so the `~` console, the progress panel and the closing screen's
+  costs are unchanged. The answer is parsed again here, against the game's own context.
+- **The id is the work** (`jobs.ts`): a model request's is a hash of provider, models, prompt,
+  temperature and thinking; a piece's is what it is for (`world/slot`, `world/ground`,
+  `world/cover/i`, `clue/…`, `place/…`). A page that comes back from a reload and asks for the same
+  beat or piece finds the job running or done and takes it (`reuse`: a finished answer for 6 h, a
+  made piece for good). That is why the pending genesis now keeps its coin and its *avoid* list
+  (`PendingGenesis.nth`, `avoid`): *Dokończ rodzący się świat* asks the same prompt and gets the
+  world the server finished meanwhile. The pick among candidates is drawn from the answer's own hash
+  (`textRandom`), and the world's id from the try's start as the server timed it, so both sides
+  arrive at the same world.
+- **A world starts its own village.** A genesis job is queued with `pieces`; once the world parses,
+  the function creates the jobs for its hub's and forest's models (`worldPieceJobs`, the browser's
+  ids, prompts from `falPrompts.ts`, which is why those builders moved out of `landmark3d.ts`). The
+  ground and the cover are still started by the browser — a second each once the page is back.
+  Nor is the **opening beat** started on the server: it needs the quest's seed and plan, which the
+  page draws, so after a world born in the background it is written on return (~10 s on Flash).
+- **The browser path stays, and is the fallback.** Signed out, keys only in this browser, the demo,
+  the account missing the key (`noKey`), the runner itself crashing (`crashed`), a job nobody
+  claimed in `UNCLAIMED_MS` (25 s; the function not deployed, Eventarc down) or a runner silent for
+  `DEAD_MS` (90 s) — judged only on a page that has been in front 8 s, since a frozen page's clock
+  says nothing — and the browser asks the provider itself, as before.
+- The function has 540 s; the chain stops starting models after `JOB_BUDGET_MS` (480 s). Jobs keep
+  `expireAt` and Firestore's TTL (`terraform/firestore.tf`) deletes them after two weeks.
+
 **Every generation is recorded** (`questLog.ts`), because the first version swallowed failures into
 a breadcrumb and the only symptom, reported by the owner, was "always the drowners":
 

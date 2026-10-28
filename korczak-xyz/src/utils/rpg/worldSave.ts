@@ -385,6 +385,9 @@ export interface PendingGenesis {
   chosen?: boolean;
   /** The player's description of the world (`GenesisContext.wish`). */
   wish?: string;
+  /** The coin and the worlds to be unlike, as asked: the same prompt finds the server's job again (`jobs.ts`). */
+  nth?: 1 | 2;
+  avoid?: string[];
   at: number;
 }
 
@@ -408,6 +411,8 @@ export function loadPendingGenesis(lang: Lang, now = Date.now()): PendingGenesis
       exotic: Number(p.exotic) || 0,
       chosen: p.chosen === true,
       wish,
+      ...(p.nth === 1 || p.nth === 2 ? { nth: p.nth } : {}),
+      ...(Array.isArray(p.avoid) ? { avoid: p.avoid.filter((a: unknown) => typeof a === 'string') } : {}),
       at: p.at,
     };
   } catch {

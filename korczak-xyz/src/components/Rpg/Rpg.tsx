@@ -81,6 +81,7 @@ import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
+import { setJobAccount } from '../../utils/rpg/serverJobs';
 import { FAST_MODEL, generateBeat, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
 import {
   addToAtlas,
@@ -211,6 +212,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const account = useAccountKeys(auth.user);
   const uidRef = useRef<string | null>(null);
   uidRef.current = auth.user?.uid ?? null;
+  // The server writes the quest and the world for a reader whose keys it can read: signed in, with
+  // the key sync done (`utils/rpg/jobs.ts`). Anyone else is written for by this browser, as before.
+  const jobUid = auth.user && account.sync === 'synced' ? auth.user.uid : null;
+  setJobAccount(jobUid);
   // A signed-in reader's keys may be in the account and not yet in this browser, so nothing decides
   // "no key" before the account has answered — or failed to.
   const keysReady =
@@ -951,7 +956,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (token !== questTokenRef.current) return;
     setCreating(seeds);
     setCreatingWish(wishText ?? '');
-    const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText };
+    const nth: 1 | 2 = again?.nth ?? (Math.random() < 0.5 ? 1 : 2);
+    const avoid = again?.avoid ?? pastWorlds();
+    const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText, nth, avoid };
     savePendingGenesis({ ...pending, at: Date.now() });
     const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
@@ -970,11 +977,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
         {
           lang: gameLang,
           seeds,
-          avoid: pastWorlds(),
+          avoid,
           exotic: exoticNow,
           chosen: chosenSeeds,
           wish: wishText,
-          nth: Math.random() < 0.5 ? 1 : 2,
+          nth,
         },
         chosen,
         quick(fastStartRef.current),

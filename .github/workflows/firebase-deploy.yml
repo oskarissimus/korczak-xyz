@@ -70,6 +70,10 @@ on:
       - "korczak-xyz/src/utils/rpg/cost.ts"
       - "korczak-xyz/src/utils/rpg/demoLimits.ts"
       - "korczak-xyz/src/utils/rpg/voicePick.ts"
+      # And the generation jobs the `rpgJob` function runs: their shape and ids, and the fal.ai prompts it
+      # builds for a world it has just born.
+      - "korczak-xyz/src/utils/rpg/jobs.ts"
+      - "korczak-xyz/src/utils/rpg/falPrompts.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
       - "audio-guide-function/**"

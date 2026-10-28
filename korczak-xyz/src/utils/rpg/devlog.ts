@@ -55,6 +55,8 @@ export interface DevRequest {
   credits: number;
   /** Dollars, approximately; null when the model has no price. */
   cost: number | null;
+  /** Asked by the server's job runner rather than this browser (`serverJobs.ts`). */
+  server?: boolean;
 }
 
 export interface QuestTotals {
