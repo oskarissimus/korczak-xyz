@@ -33,7 +33,7 @@ describe('groundCover', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('paints each kind once, all at once, prices them as fal.ai textures, and keeps the ones that came', async () => {
+  it('paints each kind once, all at once, asks again for one that failed, and prices them as fal.ai textures', async () => {
     let n = 0;
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body)).image_size).toEqual({ width: COVER_SIZE, height: COVER_SIZE });
@@ -41,15 +41,18 @@ describe('groundCover', () => {
     }) as unknown as typeof fetch;
     const got: GroundTexture[][] = [];
     const w = world({ id: 'c-once', cover: 'dry thistles' });
-    expect(ensureGroundCover('k', w, (s) => got.push(s), undefined, { fetchImpl })).toBe(true);
-    expect(ensureGroundCover('k', w, () => {}, undefined, { fetchImpl })).toBe(false);
+    const sleep = async () => {};
+    expect(ensureGroundCover('k', w, (s) => got.push(s), undefined, { fetchImpl, sleep })).toBe(true);
+    expect(ensureGroundCover('k', w, () => {}, undefined, { fetchImpl, sleep })).toBe(false);
     await vi.waitFor(() => expect(got).toHaveLength(1));
-    expect(got[0].map((s) => s.image)).toEqual(['https://fal.media/cover1.jpg', 'https://fal.media/cover3.jpg']);
-    expect(fetchImpl).toHaveBeenCalledTimes(COVER_KINDS.length);
+    // The second kind's 500 is asked again (`withRetries`) and comes as the fourth picture.
+    expect(got[0].map((s) => s.image)).toEqual(['https://fal.media/cover1.jpg', 'https://fal.media/cover4.jpg', 'https://fal.media/cover3.jpg']);
+    expect(fetchImpl).toHaveBeenCalledTimes(COVER_KINDS.length + 1);
     expect(ensureGroundCover('k', w, () => {}, undefined, { fetchImpl })).toBe(false);
     expect(devRequests().every((r) => r.kind === 'fal' && r.label === 'cover')).toBe(true);
-    expect(questTotals()).toMatchObject({ falTextures: 2 });
-    expect(worldSpend({ ...w, coverSprites: got[0] })).toMatchObject({ falTextures: 2, falCost: 0.006 });
+    expect(questTotals()).toMatchObject({ falTextures: 3 });
+    expect(worldSpend({ ...w, coverSprites: got[0] })).toMatchObject({ falTextures: 3 });
+    expect(worldSpend({ ...w, coverSprites: got[0] })?.falCost).toBeCloseTo(0.009);
   });
 
   it('does not ask again this session for a world whose every picture failed', async () => {

@@ -23,7 +23,7 @@
 
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
-import { drawImage, imageCost, type FalOptions } from './landmark3d';
+import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
 
 export type { GroundTexture };
 
@@ -82,7 +82,7 @@ export function ensureGroundTexture(
   inFlight.add(world.id);
   const started = Date.now();
   const prompt = groundPrompt(world);
-  drawImage(key, prompt, 'ground', o, GROUND_SIZE, `${world.id}/ground`)
+  withRetries((each) => drawImage(key, prompt, 'ground', each, GROUND_SIZE, `${world.id}/ground`), o)
     .then(
       (image) => {
         const costUsd = imageCost(GROUND_SIZE, GROUND_SIZE);

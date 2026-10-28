@@ -18,6 +18,8 @@ import {
   landmarkPrompt,
   type HubSlot,
   type LandmarkModel,
+  PIECE_TRIES,
+  withRetries,
 } from './landmark3d';
 
 const world = (over: Partial<WorldBible> = {}): WorldBible => ({
@@ -181,5 +183,42 @@ describe('landmark3d', () => {
     release();
     await p;
     expect(devRequests()).toHaveLength(2);
+  });
+});
+
+describe('withRetries', () => {
+  const noWait = { sleep: async () => {} };
+
+  it('asks again after a failure, each try told its number', async () => {
+    const seen: (number | undefined)[] = [];
+    const out = await withRetries(async (o) => {
+      seen.push(o.attempt);
+      if (seen.length < 3) throw new Error('500 fal.ai: internal error');
+      return 'glb';
+    }, noWait);
+    expect(out).toBe('glb');
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it('gives up after PIECE_TRIES', async () => {
+    let tries = 0;
+    await expect(
+      withRetries(async () => {
+        tries++;
+        throw new Error('timed out in the queue');
+      }, noWait),
+    ).rejects.toThrow('timed out');
+    expect(tries).toBe(PIECE_TRIES);
+  });
+
+  it('never asks again with a refused key', async () => {
+    let tries = 0;
+    await expect(
+      withRetries(async () => {
+        tries++;
+        throw new Error('402 fal.ai: balance exhausted');
+      }, noWait),
+    ).rejects.toThrow('402');
+    expect(tries).toBe(1);
   });
 });

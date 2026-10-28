@@ -21,7 +21,7 @@
 
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
-import { drawImage, imageCost, type FalOptions } from './landmark3d';
+import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
 
 /** Square: the clump is cropped out of it in the browser. Below a megapixel, so the cheapest picture. */
 export const COVER_SIZE = 512;
@@ -93,7 +93,7 @@ export function ensureGroundCover(
   Promise.allSettled(
     COVER_KINDS.map(async (kind, i) => {
       const prompt = coverPrompt(world, kind);
-      const image = await drawImage(key, prompt, 'cover', o, COVER_SIZE, `${world.id}/cover/${i}`);
+      const image = await withRetries((each) => drawImage(key, prompt, 'cover', each, COVER_SIZE, `${world.id}/cover/${i}`), o);
       return { image, prompt, costUsd: imageCost(COVER_SIZE, COVER_SIZE), ms: Date.now() - started, at: Date.now() } satisfies GroundTexture;
     }),
   )

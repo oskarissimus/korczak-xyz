@@ -54,6 +54,36 @@ export interface FalOptions {
   /** How long the queue may take before the mesh is given up on. */
   timeoutMs?: number;
   pollMs?: number;
+  /** Which try of the piece this is (`withRetries`), from 1; said in the console from the second. */
+  attempt?: number;
+}
+
+/**
+ * How many times a piece is asked for before it counts as failed (owner, 28 Oct 2026, a world
+ * ready with "4 failed": "was there a retry?" — there was none, only FLUX's 429s were waited out).
+ * A mesh that times out in fal's queue, a 500, a picture TRELLIS cannot read, all come right on a
+ * second ask more often than not; a refused key (401, 402, 403) never does, and stops at once.
+ */
+export const PIECE_TRIES = 3;
+const RETRY_AFTER_MS = [3_000, 10_000];
+
+/** The console's mark on a retry's requests: `retry 2/3 · `. */
+function tryMark(o: FalOptions): string {
+  return o.attempt && o.attempt > 1 ? `retry ${o.attempt}/${PIECE_TRIES} · ` : '';
+}
+
+/** Runs a piece up to `PIECE_TRIES` times, a pause between, passing each try its number. */
+export async function withRetries<T>(run: (o: FalOptions) => Promise<T>, o: FalOptions = {}): Promise<T> {
+  const sleep = o.sleep ?? wait;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run({ ...o, attempt });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt >= PIECE_TRIES || o.signal?.aborted || /^40[123]\b/.test(message) || message.startsWith('skipped')) throw err;
+      await sleep(RETRY_AFTER_MS[attempt - 1] ?? RETRY_AFTER_MS[RETRY_AFTER_MS.length - 1]);
+    }
+  }
 }
 
 function headers(key: string): Record<string, string> {
@@ -100,7 +130,7 @@ export async function drawImage(
   }
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
-  const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, label);
+  const entry = startRequest('fal', FAL_IMAGE_MODEL, null, `${tryMark(o)}${prompt}`, label);
   try {
     let res: Response;
     for (let attempt = 0; ; attempt++) {
@@ -117,14 +147,14 @@ export async function drawImage(
         }),
       });
       if (res.status !== 429 || attempt >= IMAGE_RETRIES) break;
-      updateRequest(entry, { text: `${prompt}\n429, fal.ai at its limit: again in ${2 ** attempt} s` });
+      updateRequest(entry, { text: `${tryMark(o)}${prompt}\n429, fal.ai at its limit: again in ${2 ** attempt} s` });
       await sleep(1000 * 2 ** attempt);
     }
     if (!res.ok) throw await failure(res);
     const body = (await res.json()) as { images?: { url?: string }[] };
     const url = body.images?.[0]?.url;
     if (!url) throw new Error('no image in the answer');
-    endRequest(entry, null, { cost: imageCost(size, size), text: `${prompt}\n→ ${url}` });
+    endRequest(entry, null, { cost: imageCost(size, size), text: `${tryMark(o)}${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -140,7 +170,7 @@ export async function drawImage(
 async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptions, started?: () => void): Promise<{ glb: string; queuedMs: number }> {
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
-  const entry = startRequest('fal', FAL_MESH_MODEL, null, `← ${image}`, label);
+  const entry = startRequest('fal', FAL_MESH_MODEL, null, `${tryMark(o)}← ${image}`, label);
   try {
     const submit = await f(`https://queue.fal.run/${FAL_MESH_MODEL}`, {
       method: 'POST',
@@ -162,7 +192,7 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
       if (!res.ok) throw await failure(res);
       const s = (await res.json()) as { status?: string; queue_position?: number };
       const line = s.status === 'IN_QUEUE' ? `IN_QUEUE #${s.queue_position ?? '?'}` : (s.status ?? '?');
-      updateRequest(entry, { text: `← ${image}\n${line}` });
+      updateRequest(entry, { text: `${tryMark(o)}← ${image}\n${line}` });
       if (queuedMs === null && s.status !== 'IN_QUEUE') {
         queuedMs = Date.now() - asked;
         started?.();
@@ -177,7 +207,7 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
     const kb = body.model_mesh?.file_size ? ` (${Math.round(body.model_mesh.file_size / 1024)} KB)` : '';
     const waited = queuedMs ?? 0;
     const held = waited >= 1000 ? `, ${Math.round(waited / 1000)} s of it in fal's queue` : '';
-    endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `← ${image}\n→ ${glb}${kb}${held}` });
+    endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `${tryMark(o)}← ${image}\n→ ${glb}${kb}${held}` });
     return { glb, queuedMs: waited };
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -356,7 +386,7 @@ export function ensureHubModels(
     const p = inTurn(id, async (started) => {
       if (refused.has(world.id)) throw new Error('skipped: fal.ai refused the key');
       try {
-        const model = await generateHubModel(key, world, slot, o, started);
+        const model = await withRetries((each) => generateHubModel(key, world, slot, each, started), o);
         made.add(id);
         return model;
       } catch (err) {
@@ -476,7 +506,7 @@ function ensurePiece(
     const started = Date.now();
     let spent = 0;
     try {
-      const { image, glb, queuedMs, costUsd } = await imageAndMesh(key, prompt, label, o, slot, running);
+      const { image, glb, queuedMs, costUsd } = await withRetries((each) => imageAndMesh(key, prompt, label, each, slot, running), o);
       spent += costUsd;
       const model: LandmarkModel = { glb, image, prompt, costUsd: spent, ms: Date.now() - started, queuedMs, at: Date.now() };
       recordMeasurement('rpg.landmark', { outcome: 'generated', piece: label, ms: model.ms, costUsd: spent });

@@ -373,6 +373,13 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   before the world's state has it (`made` — the effect ran between a model's arrival and its
   `setWorld` and asked for three pieces twice, Oct 2026), a slot that failed is not asked again
   until a reload, and a 401/402/403 stops the world's remaining slots before they spend anything.
+  **"Failed" means three tries** (`withRetries`, `PIECE_TRIES`; owner, 28 Oct 2026, a world ready
+  with "4 nie wyszło": "was there a retry?" — there was not, only FLUX's 429s were waited out). A
+  piece that throws is asked again from the picture after 3 s and then 10 s, unless the key was
+  refused (401/402/403) or the request aborted; the hub's models, the quest's places and clues, the
+  ground and the ground cover alike. Each try is its own pair of rows in the console, marked
+  `retry 2/3 ·`, so the failure that caused it stays readable above; the progress panel keeps the
+  piece ⏳ until the last try has ended.
 - **And the forest** (owner, 26 Oct 2026: "generate the world's trees — now they are static
   assets"). The ~400 trees across the map were the kit's, in the world's flora; now they are the
   hub's `tree` model and two more of its kind made after the hub, `tree2` a young one and `tree3`
@@ -407,8 +414,8 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   - `RpgScene.setGroundTexture` lays it at the scan's tiling (96×, ~3.75 m a tile) and **undyed**
     (`recolor` 0), since it is already the world's colour; the flooded world's island shares the
     material. Kept on the bible (`groundTexture`, `setWorldGround`), bytes in the Cache API with
-    the GLBs (`loadLandmarkBytes`); one try per world a session, a failure not asked again until a
-    reload. The classic world and a reader without a fal key keep the scan. In the console as kind
+    the GLBs (`loadLandmarkBytes`); up to three tries per world a session (`withRetries`), a
+    failure not asked again until a reload. The classic world and a reader without a fal key keep the scan. In the console as kind
     `fal` labelled `ground`, counted as `N× tex` beside the 3D models (`falTextures`), its price in
     the fal.ai total and the closing screen's; Sentry Logs `rpg.landmark` with `piece: 'ground'`.
 - **And what grows on it** (owner, 27 Oct 2026, a screenshot of a misty night world with the kit's
