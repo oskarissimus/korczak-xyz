@@ -17,6 +17,12 @@ import { DEAD_MS, JOBS, KEEP_MS, reuse, UNCLAIMED_MS, type JobDoc, type JobSpec 
 let account: string | null = null;
 
 /**
+ * Off until `rpgJob` is deployed: its first deploy (28 Oct 2026) stopped on Eventarc's service agent
+ * lacking its role, and a job nobody claims costs the reader `UNCLAIMED_MS` before the browser asks.
+ */
+const ENABLED = false;
+
+/**
  * Who the jobs are for: a signed-in reader whose keys the account has (the key sync `synced`), or
  * nobody. `Rpg.tsx` says so whenever either changes.
  */
@@ -26,7 +32,7 @@ export function setJobAccount(uid: string | null): void {
 
 /** Whether the server can be asked: there is an account and a database to write the job into. */
 export function jobsOn(): boolean {
-  return account !== null && typeof window !== 'undefined' && getDb() !== null;
+  return ENABLED && account !== null && typeof window !== 'undefined' && getDb() !== null;
 }
 
 /** When the page last came to the front: a frozen page's clock says nothing about a job's runner. */
