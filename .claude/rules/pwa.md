@@ -132,14 +132,23 @@ desktop navy that the page scrolls behind, sized from `--safe-top` and therefore
 in a browser. It sits above everything — the taskbar (9999) and the typing modal (10000) — on
 the grounds that a band any overlay can paint over is not doing its job.
 
-**The band is a real element, `.safe-top-band`, and it must stay hit-testable.** iOS 26 draws a
-Liquid Glass blur over the strip and about 40pt below it, and skips it only when the point 4px
-under the top edge hit-tests into a `position: fixed`/`sticky`, near-full-width box with a plain
-`background-color` and no `backdrop-filter` — whose colour it then uses as a hard edge. It was
-`body::before` with `pointer-events: none` until Oct 2026: painted on top, invisible to the hit
-test, so the blur smeared the navbar's title bar under the clock (owner's screenshot). Do not give
-it `pointer-events: none`, a translucent background or a backdrop filter, and do not turn it back
-into a pseudo-element. Taps under the status bar are the system's anyway.
+**The band is a real element, `.safe-top-band`, 16px taller than the status bar.** iOS 26 draws
+a Liquid Glass blur over the strip and about 40pt below it, and skips it only when a probe hits a
+`position: fixed`/`sticky` box at least 90% of the viewport wide, over 10px in both directions,
+with a plain `background-color` and no `backdrop-filter` — whose colour it then uses as a hard
+edge (WebKit, `LocalFrameView::fixedContainerEdges`). The probe is the midpoint 4px inside the
+top of the fixed-position rect, which on a phone starts *below* the status bar. So the band has to
+reach past it: `--safe-top` is the inset plus 16px whenever the inset is non-zero (a `min()` trick
+in `Layout.astro`), and everything that clears the band clears that too. Two attempts failed
+first, Oct 2026, each on the owner's iPhone: `body::before` (the hit lands on its host, `body`,
+which is not fixed) and a div exactly the inset tall (it ended where the probe began). The probe
+ignores `pointer-events`, so that is not a lever either way.
+
+**`scripts/ios-edge-check.mjs` replays that decision in Chromium** with a real safe-area inset (the
+CDP override, so `env()` returns it) and probes at both 4px and inset+4px; it exits non-zero
+unless both land on a solid colour. Run it against `astro preview` or the live site before
+touching anything fixed at the top — no emulator on Linux draws Liquid Glass, but this is the
+part that decides whether it is drawn. `--immersive` puts the RPG in its playing state.
 
 The corollary is that anything deliberately anchored to the top of the viewport must clear the
 band or it parks itself out of sight behind it. `typing.css` has two: the key table's sticky

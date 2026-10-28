@@ -280,6 +280,9 @@ const recoveryStrings = {
        custom properties the whole layout can be driven from a desktop console with the insets
        a real phone reports. */
     --safe-top: env(safe-area-inset-top);
+    /* Plus 16px wherever there is a status bar over the page at all (the `min()` is 1px when the
+       inset is anything, 0 in a browser tab), for iOS 26's edge probe - see `.safe-top-band`. */
+    --safe-top: calc(env(safe-area-inset-top) + min(env(safe-area-inset-top), 1px) * 16);
     --safe-right: env(safe-area-inset-right);
     --safe-bottom: env(safe-area-inset-bottom);
     --safe-left: env(safe-area-inset-left);
@@ -314,13 +317,17 @@ const recoveryStrings = {
      that the status bar always has an opaque backdrop of a known colour; a band any overlay can
      paint over is a band that does not do its job.
 
-     A real element, hit-testable, because iOS 26 decides by hit-testing. It draws its Liquid
-     Glass blur over the strip and ~40pt below it unless the point 4px under the top edge lands
-     in a fixed, full-width box with a plain background, whose colour it then uses as a hard
-     edge. A `body::before` with `pointer-events: none` is invisible to that test - the hit fell
-     through to whatever was scrolling - so the page kept the blur under a band painted on top of
-     it (owner, Oct 2026, the navbar's title bar smeared under the clock). Taps there are the
-     system's anyway, so nothing is lost by the band catching them. */
+     And it is a real element 16px taller than the status bar, because that is what iOS 26
+     looks for. It draws a Liquid Glass blur over the strip and ~40pt below it unless a probe
+     hits a fixed or sticky box at least 90% of the viewport wide, over 10px in both directions,
+     with a plain `background-color` and no `backdrop-filter` - whose colour then becomes a hard
+     edge instead (WebKit, `LocalFrameView::fixedContainerEdges`). The probe is the midpoint 4px
+     inside the top of the fixed-position rect, and on a phone that rect starts *below* the
+     status bar: a band exactly the inset tall ended where the probe began, so the game and the
+     navbar were blurred under a band painted right above them (owner, Oct 2026, two
+     screenshots). A `body::before` failed for its own reason first: the hit test lands on the
+     pseudo-element's host, `body`, which is not fixed. `pointer-events` does not matter, the
+     probe ignores it. `scripts/ios-edge-check.mjs` replays the decision in Chromium. */
   .safe-top-band {
     position: fixed;
     top: 0;
