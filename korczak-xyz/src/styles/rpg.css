@@ -1186,6 +1186,12 @@ body:has(.rpg-immersive) .safe-top-band {
   right: auto;
 }
 
+/* With the console open its own × closes it: the toggle would sit on top of the tabs (owner,
+   28 Oct 2026, a screenshot: the ~ over "Wydajność"). */
+.rpg-dev-open .rpg-devtoggle {
+  display: none;
+}
+
 .rpg-touch .rpg-dev-bar button {
   min-height: 32px;
   min-width: 32px;
