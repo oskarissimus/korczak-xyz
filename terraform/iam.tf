@@ -63,3 +63,38 @@ resource "google_project_iam_member" "deployer_log_metrics" {
   role    = "roles/logging.configWriter"
   member  = "serviceAccount:github-deployer@${local.project_id}.iam.gserviceaccount.com"
 }
+
+/*
+ * What a Firestore-triggered function needs, which `rpgJob` (the RPG's generation jobs, Oct 2026)
+ * is the first of. Its first deploy failed with "Permission denied while using the Eventarc
+ * Service Agent": the API was enabled long ago, but nothing had ever made Eventarc's agent exist or
+ * given it its role, since every function before was HTTP or scheduled.
+ *
+ * - the agent itself, created on demand (`google_project_service_identity`, a beta resource);
+ * - its own role, which is what reads the Firestore events and creates the trigger;
+ * - the functions' runtime account as an event receiver, which the trigger delivers as;
+ * - Pub/Sub's agent minting tokens, which the push from the trigger's topic is signed with.
+ */
+resource "google_project_service_identity" "eventarc" {
+  provider = google-beta
+  project  = local.project_id
+  service  = "eventarc.googleapis.com"
+}
+
+resource "google_project_iam_member" "eventarc_agent" {
+  project = local.project_id
+  role    = "roles/eventarc.serviceAgent"
+  member  = "serviceAccount:${google_project_service_identity.eventarc.email}"
+}
+
+resource "google_project_iam_member" "functions_event_receiver" {
+  project = local.project_id
+  role    = "roles/eventarc.eventReceiver"
+  member  = "serviceAccount:${local.functions_runtime_sa}"
+}
+
+resource "google_project_iam_member" "pubsub_token_creator" {
+  project = local.project_id
+  role    = "roles/iam.serviceAccountTokenCreator"
+  member  = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
