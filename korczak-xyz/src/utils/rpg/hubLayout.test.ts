@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { EMPTY_LAYOUT, hubFit, hubLayout, roadDistance, SPAWN_AT, SQUARE_RADIUS, VILLAGE_STANDS } from './hubLayout';
+import { EMPTY_LAYOUT, fitScale, hubFit, hubLayout, roadDistance, SPAWN_AT, SIZE_BIAS, SQUARE_RADIUS, VILLAGE_STANDS, WIDTH_SLACK } from './hubLayout';
 import type { HubSlot } from './landmark3d';
 
 const ids = Array.from({ length: 60 }, (_, i) => `world-${i}-${(i * 7919).toString(36)}`);
 const placed = (id: string) => {
   const layout = hubLayout(id);
   return (Object.entries(layout.spots) as [HubSlot, { x: number; z: number }[]][]).flatMap(([slot, list]) =>
-    list.map((s) => ({ slot, ...s, r: hubFit(slot, undefined).width / 2 + 0.3 })),
+    list.map((s) => ({ slot, ...s, r: (hubFit(slot, undefined).width * SIZE_BIAS) / 2 + 0.3 })),
   );
 };
 
@@ -85,5 +85,29 @@ describe('roadDistance', () => {
     expect(roadDistance(0, -20)).toBeCloseTo(0, 6); // north
     expect(roadDistance(3, -20)).toBeCloseTo(3, 6);
     expect(roadDistance(0, 2)).toBe(Infinity); // inside the square, where no road is yet
+  });
+});
+
+describe('fitScale', () => {
+  it('stands a piece by its height, a little over it', () => {
+    // A stall drawn with a deep awning: as wide as it is tall, wider than the 3 m it was described.
+    const stall = { x: 1, y: 1, z: 0.6 };
+    expect(fitScale(stall, { height: 3, width: 3 }) * stall.y).toBeCloseTo(3 * SIZE_BIAS);
+    expect(fitScale(stall, { height: 3, width: 2.2 }) * stall.y).toBeCloseTo(3 * SIZE_BIAS);
+  });
+
+  it('lets the length decide only when the model came out far wider than described', () => {
+    const slab = { x: 4, y: 1, z: 1 };
+    const scale = fitScale(slab, { height: 2, width: 2 });
+    expect(scale * slab.x).toBeCloseTo(2 * SIZE_BIAS * WIDTH_SLACK);
+    expect(scale * slab.y).toBeLessThan(2);
+  });
+});
+
+describe('hubFit', () => {
+  it('raises a size kept under older floors to today\'s', () => {
+    expect(hubFit('stall', { stall: { height: 1.6, width: 2 } }).height).toBeGreaterThanOrEqual(2.6);
+    expect(hubFit('stall', { stall: { height: 3.2, width: 3 } })).toEqual({ height: 3.2, width: 3 });
+    expect(hubFit('tree2', undefined)).toEqual(hubFit('tree2', {}));
   });
 });

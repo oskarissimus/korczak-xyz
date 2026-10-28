@@ -208,17 +208,20 @@ export type HubSizes = Partial<Record<'landmark' | HubPiece, HubSize>>;
  * the houses' plots, the corner the cart stands in.
  */
 export const HUB_SIZE_LIMITS: Record<'landmark' | HubPiece, { height: [number, number]; width: [number, number] }> = {
-  landmark: { height: [2, 12], width: [1, 6] },
-  house: { height: [2, 8], width: [2, 7.5] },
-  hall: { height: [2.5, 10], width: [3, 9] },
-  tree: { height: [2, 14], width: [1, 7] },
-  stall: { height: [1.2, 4.5], width: [1, 4.5] },
+  // The floors are what a 1.8 m person must fit under or beside (owner, 28 Oct 2026: a stall that
+  // came out under the hero's height; "rather a touch too big than too small"): a stall's awning is
+  // over a head, a house has a door and a roof above it, the landmark is seen over the roofs.
+  landmark: { height: [3.5, 12], width: [1, 6] },
+  house: { height: [3.5, 8], width: [2, 7.5] },
+  hall: { height: [4.5, 10], width: [3, 9] },
+  tree: { height: [2.5, 14], width: [1, 7] },
+  stall: { height: [2.6, 4.5], width: [1.5, 4.5] },
   cart: { height: [0.8, 4.5], width: [1, 7] },
-  lamp: { height: [1, 6], width: [0.3, 1.8] },
+  lamp: { height: [1.2, 6], width: [0.3, 1.8] },
   goods: { height: [0.3, 2.2], width: [0.5, 2.8] },
 };
 
-const clampTo = (v: number, [lo, hi]: [number, number]) => Math.round(Math.min(hi, Math.max(lo, v)) * 10) / 10;
+export const clampTo = (v: number, [lo, hi]: [number, number]) => Math.round(Math.min(hi, Math.max(lo, v)) * 10) / 10;
 
 /** `{"house": [height, width], …}` as the model wrote it, each pair kept within its slot's limits. */
 export function parseSizes(value: unknown): HubSizes | null {
@@ -235,10 +238,21 @@ export function parseSizes(value: unknown): HubSizes | null {
   return Object.keys(sizes).length ? sizes : null;
 }
 
-const SIZE_RULE =
-  'its real height and its longest length along the ground, in metres, as it would stand next to a 1.8 m person: ' +
-  'size it as what it IS, not as the slot it fills (a home that is a truck is truck-sized, a lamp that is a torch ' +
-  'is torch-sized)';
+/**
+ * The two numbers are the box the model is fitted into (`fitScale`), so they are asked for as that
+ * box: the highest point and the whole footprint, roof, awning and eaves included. Asked for "the
+ * building", a model answers the walls, and the mesh with its roof was then squeezed into them. The
+ * reference sizes are the category priors scene generators give a language model (Holodeck,
+ * MagicCraft): a model sizes far better against a door and a cottage than against nothing, and
+ * guesses short without them.
+ */
+export const SIZE_RULE =
+  'its overall height from the ground to its highest point (roof ridge, awning, chimney, crown, load) and its ' +
+  'longest length along the ground including eaves, awnings and overhangs, in metres, as it would stand next to a ' +
+  '1.8 m person: size it as what it IS, not as the slot it fills (a home that is a truck is truck-sized, a lamp ' +
+  'that is a torch is torch-sized). For scale: a door is 2.1 m tall, a market stall with its awning 3 m tall and ' +
+  '3.5 m long, a one-storey cottage 5.5 m to the ridge, a hand cart 1.2 m tall, a covered wagon 3 m tall and 5 m ' +
+  'long, a street lamp 3.5 m, a full-grown tree 9–14 m. When unsure, err larger rather than smaller';
 
 /**
  * The sizes asked for on their own, for a world described before genesis asked for them: the same

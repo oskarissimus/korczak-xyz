@@ -461,6 +461,20 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   short request on the reader's own model, in the console like any other; not on the demo, whose
   function builds only beats and worlds) and keeps the answer on the world (`setWorldSizes`). Sizes
   arriving after the models reload them from the Cache API (`hubWanted` is the URL *and* the size).
+- **Height is the anchor, and a little over it** (owner, 28 Oct 2026: a stall shorter than the
+  hero next to a huge tree, "rather a touch too big than too small"). `fitScale` used to take the
+  smaller of the height's and the length's scale, so an awning, eaves or shafts reaching past what
+  the model called the thing's length shrank the whole piece. Now the height decides — the number a
+  model judges best against a 1.8 m figure and the one the eye compares to the hero — times
+  `SIZE_BIAS` (1.1), and the length only caps a mesh that came out more than `WIDTH_SLACK` (1.5×)
+  wider than described. This is the Holodeck-style rule (one metric dimension from a language model,
+  the asset's own proportions for the rest). The sizes are asked for as the box the mesh is fitted
+  into (highest point, whole footprint with overhangs), with reference sizes in the prompt (a door,
+  a stall, a cottage, a wagon, a tree: category priors, `SIZE_RULE`) and "err larger"; the places'
+  `assets` prompt says the same in one line. `HUB_SIZE_LIMITS` has floors a person fits under (a
+  stall 2.6 m, a house 3.5, a hall 4.5, the landmark 3.5) and `hubFit` clamps again, so a world kept
+  with older sizes stands at today's. Same rule for places' pieces, the forest and the things to
+  gather (all go through `loadHubModel`/`loadForestTree`).
 - **TRELLIS writes no metallic factor**, which glTF means as fully metallic, and with no environment
   map that renders black; `hubModels.ts` sets metalness to 0.
 - **In the console** as two rows per piece (kind `fal`, labelled `landmark`, `house`, `tree`…), with

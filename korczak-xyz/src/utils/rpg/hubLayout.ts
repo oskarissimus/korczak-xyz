@@ -18,7 +18,7 @@
  * Plain numbers on the ground plane, no Three.js, so it can be tested.
  */
 
-import type { HubSize, HubSizes } from './genesis';
+import { clampTo, HUB_SIZE_LIMITS, type HubSize, type HubSizes } from './genesis';
 import type { HubSlot } from './landmark3d';
 import { ROAD_START } from './trail';
 
@@ -46,11 +46,44 @@ export const HUB_FIT: Record<HubSlot, { height: number; width: number }> = {
 /**
  * The piece's own size when the world has one, else the slot's. The world's comes from the model
  * that described the piece, so a home that is a truck stands truck-sized; the slot's assumed a
- * building, and stood that truck 6 m tall (owner, 26 Oct 2026).
+ * building, and stood that truck 6 m tall (owner, 26 Oct 2026). Clamped again here, so a world whose
+ * sizes were kept under older, lower floors stands at today's (owner, 28 Oct 2026).
  */
 export function hubFit(slot: HubSlot, sizes: HubSizes | undefined): { height: number; width: number } {
   // The forest's other trees have no size of their own: they are planted at the tree's (`setForest`).
-  return (sizes as Partial<Record<HubSlot, HubSize>> | undefined)?.[slot] ?? HUB_FIT[slot];
+  const own = (sizes as Partial<Record<HubSlot, HubSize>> | undefined)?.[slot];
+  if (!own) return HUB_FIT[slot];
+  const limits = HUB_SIZE_LIMITS[slot as keyof typeof HUB_SIZE_LIMITS];
+  return limits ? { height: clampTo(own.height, limits.height), width: clampTo(own.width, limits.width) } : own;
+}
+
+/**
+ * Every generated piece stands a tenth over the size it was given (owner, 28 Oct 2026: "rather a
+ * touch too big than too small"). A model guessing sizes guesses short more often than tall, and a
+ * hut the hero has to stoop into reads as a toy where one a little roomy reads as a hut.
+ */
+export const SIZE_BIAS = 1.1;
+
+/**
+ * How far past its stated length a piece may stand before the length, and not the height, decides
+ * its size. A wide awning, a cart's shafts or a roof's eaves reach out past what a model calls the
+ * thing's length; fitting to the smaller of the two scales, as this used to, let those shrink the
+ * whole piece, and a stall with a deep awning came out shorter than the hero (owner, 28 Oct 2026).
+ */
+export const WIDTH_SLACK = 1.5;
+
+/**
+ * The uniform scale that stands a model, `size` its own bounding box, as `fit` says. Height is the
+ * anchor: it is the number a person (and a model) judges best against a 1.8 m figure, and the one the
+ * eye compares to the hero. The length only caps a model whose proportions came out far wider than
+ * described, so a flat thing drawn as a slab cannot fill the square. This is the rule scene
+ * generators that size assets by language model use (Holodeck and its successors: one metric
+ * dimension from the model, the asset's own proportions for the rest).
+ */
+export function fitScale(size: { x: number; y: number; z: number }, fit: { height: number; width: number }): number {
+  const byHeight = (fit.height * SIZE_BIAS) / Math.max(size.y, 1e-3);
+  const byWidth = (fit.width * SIZE_BIAS * WIDTH_SLACK) / Math.max(size.x, size.z, 1e-3);
+  return Math.min(byHeight, byWidth);
 }
 
 /** Where the characters stand in the square, in the order they first appear there. */
@@ -148,9 +181,9 @@ export function roadDistance(x: number, z: number): number {
   return best;
 }
 
-/** The footprint each slot is kept apart by: half its width and a little. */
+/** The footprint each slot is kept apart by: half its width as it stands (`SIZE_BIAS`) and a little. */
 function footprint(slot: HubSlot, sizes: HubSizes | undefined): number {
-  return hubFit(slot, sizes).width / 2 + 0.3;
+  return (hubFit(slot, sizes).width * SIZE_BIAS) / 2 + 0.3;
 }
 
 /** Facing (x, z) from (fromX, fromZ): the rotation that turns +z toward it. */

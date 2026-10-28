@@ -1,8 +1,9 @@
 /*
  * The hub's models, from the GLBs fal.ai made for the world (`utils/rpg/landmark3d.ts`), each sized
  * to the place it takes in the village (`HUB_FIT`). TRELLIS answers in a unit box, centred on the
- * origin, Y up and the picture's front toward +Z, so a model is scaled to its height (or narrower,
- * to its width, for a wide one), stood on the ground and left facing +Z; the scene turns +Z toward
+ * origin, Y up and the picture's front toward +Z, so a model is scaled to its height (`fitScale`:
+ * a little over it, and by its width only when it came out far wider than described), stood on the
+ * ground and left facing +Z; the scene turns +Z toward
  * the square, which is where its door was drawn.
  */
 
@@ -10,6 +11,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import type { HubSize } from '../../utils/rpg/genesis';
+import { fitScale } from '../../utils/rpg/hubLayout';
 import { loadLandmarkBytes } from '../../utils/rpg/landmark3d';
 
 // Sized by the slot, or by the world's own size for it: `HUB_FIT`, `hubFit` (`utils/rpg/hubLayout.ts`).
@@ -28,7 +30,7 @@ export async function loadHubModel(url: string, fit: { height: number; width: nu
   const model = gltf.scene;
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
-  const scale = Math.min(fit.height / Math.max(size.y, 1e-3), fit.width / Math.max(size.x, size.z, 1e-3));
+  const scale = fitScale(size, fit);
   const centre = box.getCenter(new THREE.Vector3());
   model.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
   model.scale.setScalar(scale);
@@ -99,7 +101,7 @@ export async function loadForestTree(url: string, fit: HubSize = FOREST_FIT): Pr
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
-  const scale = Math.min(fit.height / Math.max(size.y, 1e-3), fit.width / Math.max(size.x, size.z, 1e-3));
+  const scale = fitScale(size, fit);
   const centre = box.getCenter(new THREE.Vector3());
   const stand = new THREE.Matrix4().makeTranslation(-centre.x * scale, -box.min.y * scale, -centre.z * scale).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
   const meshes: THREE.Mesh[] = [];
