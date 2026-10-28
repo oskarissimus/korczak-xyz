@@ -110,6 +110,9 @@ const ALIASES: Record<string, string> = {
   'targowek mieszkaniowy': 'Targówek Mieszkaniowy',
   'dworzec gdanski': 'Dworzec Gdański',
   'dworzec wilenski': 'Dworzec Wileński',
+  // `Dw. Gdański` is how WTP writes the loop terminus in its own two-loop notices.
+  'dw gdanski': 'Dworzec Gdański',
+  'dw wilenski': 'Dworzec Wileński',
   'stadion narodowy': 'Stadion Narodowy',
 };
 
@@ -143,6 +146,18 @@ export function canonicalStation(line: MetroLine, name: string): string | null {
     if (normalizeStationKey(station) === key) return station;
   }
   return null;
+}
+
+/**
+ * Every spelling this file resolves to a station of `line`, as comparison keys, with the station
+ * each one means. For scanning prose for station names rather than resolving a name already cut out.
+ */
+export function stationSpellings(line: MetroLine): Array<{ key: string; station: string }> {
+  const out = STATIONS[line].map((station) => ({ key: normalizeStationKey(station), station }));
+  for (const [alias, station] of Object.entries(ALIASES)) {
+    if (STATIONS[line].includes(station)) out.push({ key: normalizeStationKey(alias), station });
+  }
+  return out;
 }
 
 /** The same, over both lines, for a name whose line is not yet known. */

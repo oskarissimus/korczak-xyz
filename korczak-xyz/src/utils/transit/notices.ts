@@ -47,6 +47,18 @@ import type {
  */
 const MAX_AGE_MS = 14 * 86400000;
 
+/**
+ * How long after the collector first saw "it is over" an ending may still ring the phone.
+ *
+ * An ending is claimed under its own revision (`~end` on the alert id) because WTP ends an incident
+ * by rewriting the RSS row and nothing else: on 28 Oct 2026 the article the mirror served after the
+ * rewrite was word for word the one read during the closure, so `contentHash` did not move, the
+ * ending landed on the alert id the closure had already claimed, and *"koniec utrudnień"* was
+ * latched away unsent. The window is what keeps the new id from announcing every ending already in
+ * the corpus on the deploy that introduced it — those carry no `endedSeenAt` at all.
+ */
+const ENDED_FRESH_MS = 2 * 3600000;
+
 export interface PendingAlert {
   alertId: string;
   kind: AlertKind;
@@ -115,7 +127,10 @@ export function planAlerts(
     const decided = alertKindFor(item, segments, settings);
     if (!decided) continue;
 
-    const alertId = alertIdFor(item.guid, decided.kind, revisionOf(item));
+    const ended = decided.verdict.ended === true;
+    if (ended && (item.endedSeenAt === undefined || now - item.endedSeenAt > ENDED_FRESH_MS)) continue;
+
+    const alertId = alertIdFor(item.guid, decided.kind, `${revisionOf(item)}${ended ? '~end' : ''}`);
     if (seen.has(alertId)) continue;
 
     candidates.push({ alertId, kind: decided.kind, item, verdict: decided.verdict });

@@ -29,7 +29,8 @@
  */
 
 import { GoogleGenAI, Type, type Schema } from '@google/genai';
-import { STATIONS } from '../../../korczak-xyz/src/utils/transit/lines';
+import { foldText } from '../../../korczak-xyz/src/utils/events/normalize';
+import { metroLinesInTitle, STATIONS, stationSpellings } from '../../../korczak-xyz/src/utils/transit/lines';
 import { hasProse, proseOf } from '../../../korczak-xyz/src/utils/transit/normalize';
 import { METRO_LINES, type MetroLine, type TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
 
@@ -59,12 +60,17 @@ const LOCATION = 'global';
  * prompt had one range rule and it was the closed-stretch one; this notice named the *open*
  * stretches instead, so the model had to invert it and got one endpoint of two right. See rule 2.
  *
+ * **3 is `closedFromRunningStretches`**, which takes the two-loop phrasing out of the model's hands
+ * altogether. On 28 Oct 2026 the model read *"w pętlach: Bemowo <-> Księcia Janusza oraz Rondo
+ * Daszyńskiego <-> Bródno"* as fifteen closed stations instead of two, one of them spelt
+ * `Kondratowytcz` — see that function.
+ *
  * Re-reading cannot re-alert: `alertIdFor` keys on `contentHash`, which is the prose, and a second
  * reading of unchanged prose leaves it alone. A *corrected* reading that moves an item between
  * route and line level does mint one new alert id — which is right, since what it says about the
  * commute has genuinely changed.
  */
-const EXTRACTOR_VERSION = 2;
+const EXTRACTOR_VERSION = 3;
 
 /**
  * The lines whose prose is read at all.
@@ -358,19 +364,109 @@ export function parseWhen(value: unknown, publishedAt: number): number | null {
   return at;
 }
 
+/**
+ * The closed stations of a notice phrased as the stretches still **running**, worked out from the
+ * station table rather than asked of the model — or null when the notice is not phrased that way,
+ * or not cleanly enough to be sure.
+ *
+ * Rule 2(b) of the prompt explains this phrasing to the model, and on 28 Oct 2026 it still got it
+ * wrong in both directions at once. The notice:
+ *
+ *   *"Kursowanie pociągów odbywa się w pętlach: Bemowo <-> Księcia Janusza oraz Rondo Daszyńskiego
+ *   <-> Bródno."*
+ *
+ * The answer is Młynów and Płocka — the gap between the loops. The reading came back as those two
+ * plus every station of the second loop, Rondo Daszyńskiego to Bródno, with `Kondratowicza` spelt
+ * `Kondratowytcz`. The unknown name made the verdict uncertain, so the push said it could not read
+ * which stations were shut; the card, which draws placed names, showed the reader's whole route as
+ * closed while the trains were running on it. Both wrong, in different words.
+ *
+ * Nothing in that sentence needs reading comprehension. It is a list of intervals on a line whose
+ * order this app already holds, and the closed stations are the complement — so it is computed.
+ * Two phrasings are recognised, both naming what runs: *"w (dwóch) pętlach: A – B, C – D"* and
+ * *"(kursuje) na trasie skróconej: A – B"*. Within that sentence every station name is found in
+ * order and paired off, and the answer stands only when the names pair up exactly and all lie on
+ * one line. Anything else — an odd count, a name on another line, a gap of nothing — is null, and
+ * the model's reading stands as it did before this existed.
+ */
+export function closedFromRunningStretches(text: string, lines: readonly MetroLine[]): string[] | null {
+  const sentence = runningStretchSentence(text);
+  if (!sentence) return null;
+
+  const flat = ` ${foldText(sentence).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const found = (line: MetroLine): Array<{ at: number; end: number; station: string }> => {
+    const hits: Array<{ at: number; end: number; station: string }> = [];
+    for (const { key, station } of stationSpellings(line)) {
+      if (!key) continue;
+      let from = 0;
+      for (;;) {
+        const at = flat.indexOf(` ${key} `, from);
+        if (at < 0) break;
+        hits.push({ at, end: at + key.length + 1, station });
+        from = at + 1;
+      }
+    }
+    // Longest first at each position, then drop anything inside an earlier match: `Centrum` is in
+    // `Centrum Nauki Kopernik`, and `Rondo` is not a station but would be the start of two.
+    hits.sort((a, b) => a.at - b.at || b.end - a.end);
+    const kept: typeof hits = [];
+    for (const hit of hits) {
+      if (kept.length > 0 && hit.at < kept[kept.length - 1].end) continue;
+      kept.push(hit);
+    }
+    return kept;
+  };
+
+  const everywhere = METRO_LINES.flatMap((line) => found(line).map((hit) => hit.at));
+  for (const line of lines) {
+    const hits = found(line);
+    // Every station named in the sentence must be this line's; a name only the other line has means
+    // the pairing below would be pairing the wrong things.
+    if (hits.length < 2 || hits.length % 2 !== 0) continue;
+    if (new Set(everywhere).size !== new Set(hits.map((hit) => hit.at)).size) continue;
+
+    const order = STATIONS[line];
+    const running = new Set<string>();
+    for (let i = 0; i < hits.length; i += 2) {
+      const a = order.indexOf(hits[i].station);
+      const b = order.indexOf(hits[i + 1].station);
+      if (a === b) return null;
+      for (let k = Math.min(a, b); k <= Math.max(a, b); k += 1) running.add(order[k]);
+    }
+    const closed = order.filter((station) => !running.has(station));
+    return closed.length > 0 ? closed : null;
+  }
+  return null;
+}
+
+/**
+ * The one sentence naming what still runs, cut off at its end. The full stop has to be told apart
+ * from the one in `Dw. Gdański`, which WTP writes inside exactly these sentences.
+ */
+function runningStretchSentence(text: string): string | null {
+  const match = /(?:p[eę]tl\p{L}*|na\s+tras\p{L}*\s+skr[oó]con\p{L}*)\s*:?/iu.exec(text);
+  if (!match) return null;
+  // WTP's markdown-ish articles put the list on its own line after the colon.
+  const rest = text.slice(match.index + match[0].length).replace(/^\s+/, '');
+  const end = rest.search(/\n|(?<!\b(?:[Dd]w|[Pp]l|[Uu]l|[Kk]s|[Aa]l))\.(?=\s|$)/);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
 /** The fields to write for one reading. */
 export function readingUpdate(
   item: TransitItem,
   reading: Reading,
   now: number,
 ): Partial<TransitItem> {
+  const lines = [...new Set([...(reading.lines ?? []), ...metroLinesInTitle(item.title)])];
+  const computed = closedFromRunningStretches(proseOf(item), lines);
   const update: Partial<TransitItem> = {
     extractedAt: now,
     extractHash: extractHashOf(item),
     // Cleared explicitly: a successful read after a failed one must not leave last week's error
     // sitting on the card. `stripUndefined` would drop it, so the empty string is the erasure.
     extractError: '',
-    closedStops: reading.closedStops ?? [],
+    closedStops: computed ?? reading.closedStops ?? [],
     wholeLine: reading.wholeLine === true,
   };
   if (reading.lines) update.lines = reading.lines;

@@ -418,6 +418,17 @@ Four things about the prompt are load-bearing:
   here, and it is still a card naming a station you could have used, which is what teaches a reader
   to discount the loud kind. `EXTRACTOR_VERSION` is at **2** for the fix.
 
+  **And since 28 Oct 2026 the running-stretch phrasing is not the model's to read at all.** That
+  evening *"w pętlach: Bemowo <-> Księcia Janusza oraz Rondo Daszyńskiego <-> Bródno"* came back as
+  fifteen closed stations — the gap (Młynów, Płocka) plus the whole second loop, `Kondratowicza`
+  spelt `Kondratowytcz`. The unknown name made the verdict uncertain, so the push said *"Nie udało
+  się odczytać, które stacje są zamknięte"*, while the card drew the placed names and showed the
+  reader's whole M2 leg as shut. `closedFromRunningStretches` (`extract.ts`) now computes that
+  answer from the station table — a list of intervals is not a comprehension task — and
+  `readingUpdate` takes it over the model's whenever the sentence pairs off cleanly on one line.
+  Recognised: *"w (dwóch) pętlach: A – B, C – D"* and *"na trasie skróconej: A – B"*. Anything it
+  cannot pair exactly is left to the model. `EXTRACTOR_VERSION` is at **3** for it.
+
   Re-reading on a version bump cannot re-alert — `alertIdFor` keys on `contentHash`, the prose,
   which a second reading does not touch. A *corrected* reading that moves an item between route and
   line level does mint one new alert id, which is right: what it says about the commute changed.
@@ -492,6 +503,14 @@ article strikes the closure through under *"Trwa przywracanie podstawowej organi
 ending reached `impactOf` as a fresh revision whose article was that one 77-character sentence, so
 `hasProse` escalated it and the phone said *"Nie udało się odczytać, które stacje są zamknięte"*
 about a line that had just reopened.
+
+**An ending has an alert id of its own** (`~end` after the revision), because the revision alone
+cannot be trusted to move. On 28 Oct 2026 the row turned to *ZAKOŃCZONO*, the article was fetched
+again and came back word for word what it had been during the closure, so `contentHash` — and with
+it the alert id — was the one the closure had already claimed, and *"koniec utrudnień"* was latched
+away unsent. The ending only rings within `ENDED_FRESH_MS` (2 h) of `TransitItem.endedSeenAt`, which
+`mergeItem` stamps on the run that first sees the row say it is over; a row already over before the
+stamp existed never gets one, which is what stops the deploy announcing a fortnight of old endings.
 
 So `isEnded` is checked **before** `hasProse`: the verdict carries `ended: true`, is `certain`
 (the claim is that it is over, which is WTP's own word), and is filed where the closure was —

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPrompt,
+  closedFromRunningStretches,
   extractHashOf,
   isExtractable,
   needsExtracting,
@@ -131,7 +132,7 @@ describe('the prompt', () => {
 
   /* A prompt change is a re-read of the corpus, and the stored hash is what makes that happen. */
   it('invalidates every stored reading when the prompt changes', () => {
-    expect(extractHashOf({ contentHash: 'abcd1234abcd1234' })).toBe('2:abcd1234abcd1234');
+    expect(extractHashOf({ contentHash: 'abcd1234abcd1234' })).toBe('3:abcd1234abcd1234');
   });
 
   it('gives each notice its own publication date, since the prose gives times without dates', () => {
@@ -264,5 +265,42 @@ describe('readingUpdate', () => {
 
   it('clears a previous failure rather than leaving it on the card', () => {
     expect(readingUpdate(item({ extractError: 'timed out' }), { closedStops: [] }, NOW).extractError).toBe('');
+  });
+});
+
+describe('closedFromRunningStretches', () => {
+  // The 28 Oct 2026 notice, word for word as the article carried it.
+  const twoLoops =
+    'Z powodu pozostawionego bagażu bez opieki na stacji Metro Płocka występują utrudnienia w ' +
+    'kursowaniu pociągów metra linii M2. Kursowanie pociągów odbywa się w pętlach: Bemowo <-> ' +
+    'Księcia Janusza oraz Rondo Daszyńskiego <-> Bródno.\n\nTrwa uruchamianie zastępczej ' +
+    'komunikacji naziemnej.\n\nPrzepraszamy za utrudnienia.';
+
+  it('closes the gap between two loops and nothing else', () => {
+    expect(closedFromRunningStretches(twoLoops, ['M2'])).toEqual(['Młynów', 'Płocka']);
+  });
+
+  it('reads the prompt\'s own M1 example, Dw. Gdański and all', () => {
+    const text = 'Pociągi kursują w dwóch pętlach: Kabaty – Politechnika, Młociny – Dw. Gdański. Przepraszamy.';
+    expect(closedFromRunningStretches(text, ['M1'])).toEqual(['Centrum', 'Świętokrzyska', 'Ratusz Arsenał']);
+  });
+
+  it('reads a shortened route, with the list on its own line', () => {
+    const text = 'W dniach 17-25 października linia metra M2 kursuje na trasie skróconej:\n\nBRÓDNO – KSIĘCIA JANUSZA.\n\nZ ruchu wyłączone zostają stacje BEMOWO oraz ULRYCHÓW.';
+    expect(closedFromRunningStretches(text, ['M2'])).toEqual(['Bemowo', 'Ulrychów']);
+  });
+
+  it('leaves a closed-stretch notice to the model', () => {
+    expect(closedFromRunningStretches(item().body!, ['M1'])).toBeNull();
+  });
+
+  it('gives up on names that do not pair off', () => {
+    expect(closedFromRunningStretches('Pociągi kursują w pętlach: Kabaty – Politechnika oraz Młociny.', ['M1'])).toBeNull();
+  });
+
+  it('overrides the model in readingUpdate', () => {
+    const notice = item({ title: 'Utrudnienia w komunikacji: M2', article: twoLoops });
+    const update = readingUpdate(notice, { lines: ['M2'], closedStops: ['Płocka', 'Kondratowytcz'] }, NOW);
+    expect(update.closedStops).toEqual(['Młynów', 'Płocka']);
   });
 });

@@ -18,7 +18,7 @@
 
 import type { DocumentData, Firestore } from 'firebase-admin/firestore';
 import type { FeedFetch, RawFeedItem, TransitItem } from '../../../korczak-xyz/src/utils/transit/types';
-import { contentHashOf } from '../../../korczak-xyz/src/utils/transit/normalize';
+import { contentHashOf, isEnded } from '../../../korczak-xyz/src/utils/transit/normalize';
 import { articleStampOf } from './article';
 import type { FetchOutcome } from './wtp';
 
@@ -70,7 +70,15 @@ export function mergeItem(
   stored: TransitItem | null,
   now: number,
 ): { record: TransitItem; created: boolean } {
-  if (!stored) return { record: { ...incoming, firstSeenAt: now, updatedAt: now }, created: true };
+  if (!stored) {
+    return {
+      record: { ...incoming, firstSeenAt: now, updatedAt: now, ...(isEnded(incoming) ? { endedSeenAt: now } : {}) },
+      created: true,
+    };
+  }
+
+  // Stamped on the run that first sees the row say it is over, and kept while it goes on saying so.
+  const endedSeenAt = isEnded(incoming) ? (stored.endedSeenAt ?? (isEnded(stored) ? undefined : now)) : undefined;
 
   /*
    * Stamped against the row as it will be *stored*, which is the incoming feed fields under the
@@ -110,6 +118,7 @@ export function mergeItem(
       extractedAt: stored.extractedAt,
       extractHash: stored.extractHash,
       extractError: stored.extractError,
+      endedSeenAt,
       updatedAt: now,
     },
     created: false,

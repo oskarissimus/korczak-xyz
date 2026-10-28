@@ -191,3 +191,24 @@ describe('an item nobody could read', () => {
     expect(plan.send[0].verdict.certain).toBe(false);
   });
 });
+
+describe('an ending', () => {
+  const ENDED_BODY = 'ZAKOŃCZONO: Utrudnienia w kursowaniu pociągów metra na linii M1.';
+  // 28 Oct 2026: the article did not change when the row said it was over, so neither did the hash.
+  const live = item(1, { closedStops: ['Centrum'] });
+  const liveId = planAlerts([live], SEGMENTS, ctx()).send[0].alertId;
+
+  it('gets an alert id of its own, so the closure that was sent cannot latch it away', () => {
+    const over = { ...live, body: ENDED_BODY, endedSeenAt: NOW - 600_000 };
+    const plan = planAlerts([over], SEGMENTS, ctx({ seen: new Set([liveId]) }));
+    expect(plan.send).toHaveLength(1);
+    expect(plan.send[0].verdict.ended).toBe(true);
+    expect(plan.send[0].alertId).toBe(`${liveId}~end`);
+  });
+
+  it('is not announced long after it happened, or at all without a stamp', () => {
+    const stale = { ...live, body: ENDED_BODY, endedSeenAt: NOW - 3 * 3600000 };
+    expect(planAlerts([stale], SEGMENTS, ctx()).send).toEqual([]);
+    expect(planAlerts([{ ...live, body: ENDED_BODY }], SEGMENTS, ctx()).send).toEqual([]);
+  });
+});

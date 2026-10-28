@@ -122,3 +122,21 @@ describe('an article outlives its row only as long as the row', () => {
     expect(record.firstSeenAt).toBe(NOW);
   });
 });
+
+describe('when the ending was first seen', () => {
+  it('is stamped on the run that sees the row turn over, and kept after', () => {
+    const live = withArticle(STUB);
+    const first = mergeItem(fromFeed(ENDED), live, NOW).record;
+    expect(first.endedSeenAt).toBe(NOW);
+    expect(mergeItem(fromFeed(ENDED), first, NOW + 600_000).record.endedSeenAt).toBe(NOW);
+  });
+
+  it('is never invented for a row that was already over before the stamp existed', () => {
+    const before = withArticle(ENDED);
+    expect(mergeItem(fromFeed(ENDED), before, NOW).record.endedSeenAt).toBeUndefined();
+  });
+
+  it('is stamped on a row first met already over', () => {
+    expect(mergeItem(fromFeed(ENDED), null, NOW).record.endedSeenAt).toBe(NOW);
+  });
+});

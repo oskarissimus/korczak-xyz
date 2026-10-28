@@ -88,6 +88,11 @@ export interface TransitItem {
   articleFetchedFor?: string;
   /** Why the last article fetch produced nothing. The Raw tab's answer to a card that says little. */
   articleError?: string;
+  /**
+   * When this app first saw the row say it was over (`isEnded`). The ending has no date of its own,
+   * and an ending push is only news while it is fresh — see `ENDED_FRESH_MS` in `notices.ts`.
+   */
+  endedSeenAt?: number;
   /** `pubDate` as epoch ms. A communiqué is an article, so this is the only date the feed states. */
   publishedAt: number;
   /**
