@@ -627,6 +627,14 @@ content-hashed and immutable.
   material and cached per tiling (each tiling is its own GPU texture, so taking a place down
   disposes none). A biome's ground colour becomes a tint at full brightness (`hueTint`), because
   multiplying the dark colour itself into an already dark scan made every place a black disc.
+- **A place's ground frays into the land around it** (owner, 28 Oct 2026: "locations are discs of
+  one texture … it has to pass smoothly and irregularly into the surroundings"). The disc is wider
+  than the place (`PLACE_RADIUS + 28`) and transparent, and `frayEdge` (`surfaces.ts`) decides in
+  the shader, from two fbm noises over the disc's own coordinates, where between `inner` (R − 4) and
+  `outer` (R + 14) it gives way: lobes several metres across push the edge in and out, a finer
+  mottle leaves patches of each ground in the other, and the place's name seeds the noise so no two
+  places fray alike. Under a flood the coast is as ragged but hard (`sharp`), starting further out,
+  since a faded island is land under the sea.
 - **No environment map**, so anything fully metallic renders black: `dress` caps the outfits'
   metalness at 0.3 and the sword is 0.35.
 - **The models never block the game.** A character is an empty `THREE.Group` until the files

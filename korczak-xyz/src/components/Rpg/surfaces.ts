@@ -106,6 +106,77 @@ export function breakTiling(material: THREE.MeshStandardMaterial): THREE.MeshSta
   return material;
 }
 
+/**
+ * Frays a ground disc into what lies around it: the disc (a `CircleGeometry`, laid flat, a good
+ * deal wider than `outer`) is itself inside `inner` metres and the land around it beyond `outer`,
+ * and between them noise over the ground decides, so the edge wanders by several metres, throws
+ * tongues and islands outwards and leaves patches of the neighbour inside. A place stood on the
+ * world as a perfect disc of one texture, a coin dropped on a tablecloth (owner, 28 Oct 2026: "it
+ * has to pass smoothly and irregularly into the surroundings"). `seed` moves the noise, so no two places fray alike; `sharp`
+ * keeps the edge as ragged but hard, for an island whose surroundings are water.
+ */
+export function frayEdge(
+  material: THREE.MeshStandardMaterial,
+  { inner, outer, seed, sharp = false }: { inner: number; outer: number; seed: number; sharp?: boolean },
+): THREE.MeshStandardMaterial {
+  material.transparent = true;
+  material.depthWrite = false;
+  const uniforms = {
+    frayInner: { value: inner },
+    frayOuter: { value: outer },
+    fraySeed: { value: new THREE.Vector2((seed % 997) * 1.37, (seed % 991) * 0.71) },
+    fraySoft: { value: sharp ? 0.02 : 0.1 },
+  };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vFrayXY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFrayXY = position.xy;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec2 vFrayXY;
+        uniform float frayInner;
+        uniform float frayOuter;
+        uniform vec2 fraySeed;
+        uniform float fraySoft;
+        float frayHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float frayNoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(frayHash(i), frayHash(i + vec2(1.0, 0.0)), u.x), mix(frayHash(i + vec2(0.0, 1.0)), frayHash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }
+        float frayFbm(vec2 p) {
+          float s = 0.0;
+          float a = 0.5;
+          for (int k = 0; k < 4; k++) {
+            s += a * frayNoise(p);
+            p = mat2(0.8, -0.6, 0.6, 0.8) * p * 2.03;
+            a *= 0.5;
+          }
+          return s / 0.9375;
+        }`,
+      )
+      .replace(
+        '#include <alphamap_fragment>',
+        `#include <alphamap_fragment>
+        {
+          // How far across the band, pushed in and out by lobes several metres across and broken up
+          // by a finer mottle, so the band is patches of both grounds rather than a gradient.
+          float across = (length(vFrayXY) - frayInner) / (frayOuter - frayInner);
+          float lobes = frayFbm(vFrayXY * 0.06 + fraySeed) - 0.5;
+          float mottle = frayFbm(vFrayXY * 0.32 + fraySeed.yx) - 0.5;
+          float v = across + lobes * 1.6 + mottle * 0.55;
+          diffuseColor.a *= 1.0 - smoothstep(0.5 - fraySoft, 0.5 + fraySoft, v);
+        }`,
+      );
+  };
+  material.customProgramCacheKey = () => 'fray-edge';
+  return material;
+}
+
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
 /**

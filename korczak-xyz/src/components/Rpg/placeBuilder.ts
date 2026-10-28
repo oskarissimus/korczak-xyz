@@ -13,7 +13,7 @@ import type { WorldLook } from '../../utils/rpg/genesis';
 import { placePosition, type Feature, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
 import type { TreePart } from './hubModels';
 import { buildLandmark, type Spinner } from './landmark';
-import { surfaceMat } from './surfaces';
+import { frayEdge, surfaceMat } from './surfaces';
 import { DEAD_TREES, ROCKS, TREES, type WorldKit } from './world';
 
 export const PLACE_RADIUS = 24;
@@ -436,9 +436,16 @@ export function buildPlace(spec: PlaceSpec, kit: WorldKit | null = null, look?: 
   const group = new THREE.Group();
   const obstacles: Obstacle[] = [];
 
+  // Frayed into the land around it rather than cut as a disc; on a flooded world it is an island,
+  // its coast as ragged but hard, since a coast that faded out would be ground under the sea.
   const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(PLACE_RADIUS + 4, 40),
-    surfaceMat('ground', 7, 7, { color: hueTint(spec.groundColor) }),
+    new THREE.CircleGeometry(PLACE_RADIUS + 28, 72),
+    frayEdge(surfaceMat('ground', 12, 12, { color: hueTint(spec.groundColor) }), {
+      inner: PLACE_RADIUS + (look?.water === 'flooded' ? 2 : -4),
+      outer: PLACE_RADIUS + 14,
+      seed: hashString(spec.name),
+      sharp: look?.water === 'flooded',
+    }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.015;
