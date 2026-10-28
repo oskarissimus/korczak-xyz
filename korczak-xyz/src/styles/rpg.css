@@ -704,8 +704,9 @@ ul.rpg-source {
 
 .rpg-dev-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 4px 12px;
   padding: 4px 8px;
   border-bottom: 1px solid #3a3326;
 }
@@ -717,13 +718,40 @@ ul.rpg-source {
   cursor: pointer;
 }
 
-.rpg-dev-close {
+/* The two buttons keep the right edge together, whatever the tabs wrap to. */
+.rpg-dev-fulltoggle {
   margin-left: auto;
+}
+
+/* Over the whole screen rather than the top of the game. Fixed to the viewport, not the
+   container, so it is the whole screen before Start too; clear of the status bar and the home
+   bar (the game's own lesson: iOS keeps the taps under the clock for itself). `env()` and not
+   `--safe-*`, which the immersive container zeroes for its children. */
+.rpg-dev.rpg-dev-full {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-height: none;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: rgb(8, 8, 6);
+  border-bottom: 0;
+  z-index: 2000;
+}
+
+.rpg-dev-full .rpg-dev-list {
+  overscroll-behavior: contain;
 }
 
 .rpg-dev-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+.rpg-dev-tabs button {
+  white-space: nowrap;
 }
 
 .rpg-dev-tabs button[aria-selected='true'] {
@@ -902,13 +930,6 @@ ul.rpg-source {
 
 .rpg-dev-text {
   color: #e8e2d2;
-}
-
-.rpg-dev-totals {
-  padding: 4px 8px;
-  border-top: 1px solid #3a3326;
-  color: #ffd36b;
-  overflow-wrap: anywhere;
 }
 
 .rpg-dev-empty {
@@ -1165,6 +1186,12 @@ body:has(.rpg-immersive) .safe-top-band {
   right: auto;
 }
 
+.rpg-touch .rpg-dev-bar button {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+}
+
 .rpg-touch .rpg-dialogue-choices button {
   padding: 9px 8px;
   min-height: 44px;
@@ -1178,8 +1205,13 @@ body:has(.rpg-immersive) .safe-top-band {
 }
 
 @media (max-width: 480px), (max-height: 480px) {
-  .rpg-dev {
+  .rpg-dev:not(.rpg-dev-full) {
     max-height: 40%;
+  }
+
+  /* A phone needs the row for the tabs more than for the console's name. */
+  .rpg-dev-bar > strong {
+    display: none;
   }
 
   .rpg-dev-open .rpg-dialogue {

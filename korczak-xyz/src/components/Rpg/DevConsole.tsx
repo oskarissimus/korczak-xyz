@@ -221,6 +221,64 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
   );
 }
 
+/**
+ * What this sitting's requests cost and how long they wrote for (owner, 28 Oct 2026: the strip
+ * along the bottom "grew too big, it can be a tab of its own"). The closing screen's
+ * `QuestSummary` is the one that counts every sitting and the world.
+ */
+function CostTab({ lang }: { lang: Lang }) {
+  const t = translations[lang];
+  const totals = questTotals();
+  const rows: [string, string][] = [
+    [t.genTime, formatMs(totals.generationMs)],
+    [
+      t.tokensLine,
+      `in ${tokens(totals.tokens.input)} out ${tokens(totals.tokens.output)} think ${tokens(totals.tokens.thoughts)} ≈ ${formatUsd(totals.modelCost)}${totals.unpriced ? '+?' : ''}`,
+    ],
+    ['ElevenLabs', `${totals.voiceChars} ${t.chars} ≈ ${Math.round(totals.voiceCredits)} cr ≈ ${formatUsd(totals.voiceCost)}`],
+    ['fal.ai', `${totals.falModels}× 3D${totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ ${formatUsd(totals.falCost)}`],
+    [t.total, `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}${totals.unpriced ? '+?' : ''}`],
+    [t.devRequestCount, String(totals.requests)],
+  ];
+  return (
+    <div className="rpg-dev-list rpg-dev-perf">
+      <dl>
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </React.Fragment>
+        ))}
+        {totals.errors > 0 && (
+          <>
+            <dt>✗</dt>
+            <dd className="rpg-dev-error">{t.errors(totals.errors)}</dd>
+          </>
+        )}
+      </dl>
+      <p className="rpg-dev-empty">{t.devCostsHint}</p>
+    </div>
+  );
+}
+
+const FULL_KEY = 'rpg-dev-full';
+
+function loadFull(): boolean {
+  try {
+    return localStorage.getItem(FULL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveFull(on: boolean) {
+  try {
+    localStorage.setItem(FULL_KEY, on ? '1' : '0');
+  } catch {
+    // Private mode: the console just opens as a strip next time.
+  }
+}
+
 export function DevConsole({
   lang,
   onClose,
@@ -240,13 +298,32 @@ export function DevConsole({
   const t = translations[lang];
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
-  const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'perf'>('requests');
+  const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'costs' | 'perf'>('requests');
+  // Over the whole screen, to read a long stream or a transcript (owner, 28 Oct 2026). Not the
+  // Fullscreen API: iOS Safari has none for anything but a video, so this is CSS, the same on every device.
+  const [full, setFull] = useState(loadFull);
+  const toggleFull = () => {
+    setFull(!full);
+    saveFull(!full);
+  };
   useTick(running);
   const totals = questTotals();
+  const totalUsd = totals.modelCost + totals.voiceCost + totals.falCost;
   const listRef = useRef<HTMLDivElement>(null);
   const [showVoice, setShowVoice] = useState(false);
   const lines = useTranscript();
   const shown = showVoice ? requests : requests.filter((r) => r.kind !== 'voice');
+
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setFull(false);
+      saveFull(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [full]);
 
   // Follows the newest output, unless the reader has scrolled up to read something.
   useEffect(() => {
@@ -255,7 +332,7 @@ export function DevConsole({
   });
 
   return (
-    <div className="rpg-dev" role="log" aria-label={t.devConsole}>
+    <div className={`rpg-dev${full ? ' rpg-dev-full' : ''}`} role="log" aria-label={t.devConsole}>
       <div className="rpg-dev-bar">
         <strong>~ {t.devConsole}</strong>
         <div className="rpg-dev-tabs" role="tablist">
@@ -268,6 +345,11 @@ export function DevConsole({
           <button type="button" role="tab" aria-selected={tab === 'lines'} onClick={() => setTab('lines')}>
             {t.devLines}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'costs'} onClick={() => setTab('costs')}>
+            {t.devCosts} ≈ {formatUsd(totalUsd)}
+            {totals.unpriced ? '+?' : ''}
+            {totals.errors > 0 && <span className="rpg-dev-error"> ✗{totals.errors}</span>}
+          </button>
           <button type="button" role="tab" aria-selected={tab === 'perf'} onClick={() => setTab('perf')}>
             {t.devPerf}
           </button>
@@ -277,12 +359,24 @@ export function DevConsole({
             <input type="checkbox" checked={showVoice} onChange={(e) => setShowVoice(e.target.checked)} /> ElevenLabs
           </label>
         )}
+        <button
+          type="button"
+          className="rpg-dev-fulltoggle"
+          onClick={toggleFull}
+          aria-pressed={full}
+          aria-label={full ? t.devFullExit : t.devFull}
+          title={full ? t.devFullExit : t.devFull}
+        >
+          {full ? '▭' : '⛶'}
+        </button>
         <button type="button" className="rpg-dev-close" onClick={onClose} aria-label={t.close}>
           ×
         </button>
       </div>
       {tab === 'perf' ? (
         <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} />
+      ) : tab === 'costs' ? (
+        <CostTab lang={lang} />
       ) : tab === 'start' ? (
         <StartTab lang={lang} requests={requests} tasks={tasks} />
       ) : tab === 'lines' ? (
@@ -314,14 +408,6 @@ export function DevConsole({
           ))}
         </div>
       )}
-      <div className="rpg-dev-totals">
-        {t.genTime}: {formatMs(totals.generationMs)} · {t.tokensLine}: in {tokens(totals.tokens.input)} out{' '}
-        {tokens(totals.tokens.output)} think {tokens(totals.tokens.thoughts)} ≈ {formatUsd(totals.modelCost)}
-        {totals.unpriced ? '+?' : ''} · ElevenLabs: {totals.voiceChars} {t.chars} ≈ {Math.round(totals.voiceCredits)} cr ≈{' '}
-        {formatUsd(totals.voiceCost)} · fal.ai: {totals.falModels}× 3D{totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ {formatUsd(totals.falCost)} · {t.total} ≈{' '}
-        {formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}
-        {totals.errors > 0 && <span className="rpg-dev-error"> · {t.errors(totals.errors)}</span>}
-      </div>
     </div>
   );
 }
