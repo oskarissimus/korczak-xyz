@@ -22,7 +22,7 @@ import {
 } from '../../utils/rpg/devlog';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
-import type { Lang } from '../../utils/rpg/quest';
+import type { Beat, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
 import type { RpgScene } from './RpgScene';
@@ -78,6 +78,49 @@ function headline(r: DevRequest): string {
 
 function thousands(n: number): string {
   return n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+}
+
+/** A model's answer as it came, indented if it is JSON (it is once it has all come). */
+function pretty(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/** The quest as the console reads it: every beat written so far, and what was decided in each. */
+export interface QuestView {
+  beats: readonly Beat[];
+  history: readonly StepRecord[];
+}
+
+/**
+ * Every decision a step offered, the one taken marked and the rest with what they would have
+ * brought (owner, 28 Oct 2026: "I want to see the dialogue options I did not choose"), and the
+ * step itself as the model wrote it, behind a toggle. Read from the beats, which the autosave
+ * keeps, so a quest from before the transcript knew of them shows them too.
+ */
+function BeatDecisions({ lang, beat, chose }: { lang: Lang; beat: Beat; chose: string | null }) {
+  const t = translations[lang];
+  const [json, setJson] = useState(false);
+  return (
+    <div className="rpg-dev-options">
+      {beat.decisions.map((d, i) => {
+        const taken = chose !== null && d.label.trim() === chose.trim();
+        return (
+          <div key={i} className={taken ? 'rpg-dev-option-taken' : 'rpg-dev-option'}>
+            {taken ? '⚑' : chose === null ? '?' : '○'} {d.label}
+            {!taken && <span> → {d.reply}</span>}
+          </div>
+        );
+      })}
+      <button type="button" className="rpg-dev-json" onClick={() => setJson(!json)} aria-expanded={json}>
+        {json ? '▾' : '▸'} {t.devBeatJson}
+      </button>
+      {json && <pre className="rpg-dev-text">{JSON.stringify(beat, null, 2)}</pre>}
+    </div>
+  );
 }
 
 /** The badge's one line: what a frame is now. */
@@ -284,6 +327,7 @@ export function DevConsole({
   onClose,
   scene = null,
   tasks = null,
+  quest = null,
   badge = false,
   onBadge = () => {},
 }: {
@@ -292,6 +336,8 @@ export function DevConsole({
   scene?: RpgScene | null;
   /** What the start is still making (`WorldProgress`), for the Start tab's ETA. */
   tasks?: (() => Task[]) | null;
+  /** The quest's beats and decisions, for the Dialogi tab's options not taken. */
+  quest?: (() => QuestView | null) | null;
   badge?: boolean;
   onBadge?: (on: boolean) => void;
 }) {
@@ -313,6 +359,17 @@ export function DevConsole({
   const [showVoice, setShowVoice] = useState(false);
   const lines = useTranscript();
   const shown = showVoice ? requests : requests.filter((r) => r.kind !== 'voice');
+  // The requests whose whole answer is unfolded, rather than its last lines.
+  const [open, setOpen] = useState<ReadonlySet<string | number>>(new Set());
+  const toggleOpen = (id: string | number) => {
+    const next = new Set(open);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setOpen(next);
+  };
+  const view = tab === 'lines' ? (quest?.() ?? null) : null;
+  const beats = view?.beats ?? [];
+  const steps = [...new Set([...lines.map((l) => l.beat), ...beats.map((b) => b.index)])].sort((a, b) => a - b);
 
   useEffect(() => {
     if (!full) return;
@@ -381,19 +438,35 @@ export function DevConsole({
         <StartTab lang={lang} requests={requests} tasks={tasks} />
       ) : tab === 'lines' ? (
         <div className="rpg-dev-list rpg-dev-lines" ref={listRef}>
-          {lines.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}
-          {lines.map((l, i) =>
-            l.kind === 'beat' ? (
-              <div key={i} className="rpg-dev-beat">
-                {t.devBeat(l.beat + 1)} · {l.speaker}
-                <span>{l.text}</span>
-              </div>
-            ) : (
-              <div key={i} className={`rpg-dev-line rpg-dev-line-${l.kind}`}>
-                <b>{l.kind === 'decision' ? `${l.speaker} ⚑` : l.speaker}:</b> {l.text}
-              </div>
-            ),
-          )}
+          {lines.length === 0 && beats.length === 0 && <div className="rpg-dev-empty">{t.devNoLines}</div>}
+          {steps.map((n) => {
+            const beat = beats.find((b) => b.index === n);
+            return (
+              <React.Fragment key={n}>
+                {lines
+                  .filter((l) => l.beat === n)
+                  .map((l, i) =>
+                    l.kind === 'beat' ? (
+                      <div key={i} className="rpg-dev-beat">
+                        {t.devBeat(l.beat + 1)} · {l.speaker}
+                        <span>{l.text}</span>
+                      </div>
+                    ) : (
+                      <div key={i} className={`rpg-dev-line rpg-dev-line-${l.kind}`}>
+                        <b>{l.kind === 'decision' ? `${l.speaker} ⚑` : l.speaker}:</b> {l.text}
+                      </div>
+                    ),
+                  )}
+                {beat && !lines.some((l) => l.beat === n && l.kind === 'beat') && (
+                  <div className="rpg-dev-beat">
+                    {t.devBeat(n + 1)} · {beat.title}
+                    <span>{beat.objectiveText}</span>
+                  </div>
+                )}
+                {beat && beat.decisions.length > 0 && <BeatDecisions lang={lang} beat={beat} chose={view?.history[n]?.chose ?? null} />}
+              </React.Fragment>
+            );
+          })}
         </div>
       ) : (
         <div className="rpg-dev-list" ref={listRef}>
@@ -402,7 +475,14 @@ export function DevConsole({
             <div key={r.id} className={`rpg-dev-entry rpg-dev-${r.status}`}>
               <div className="rpg-dev-head">{headline(r)}</div>
               {r.kind === 'model' && r.thoughts && <pre className="rpg-dev-thoughts">{tail(r.thoughts, 4)}</pre>}
-              {r.text && <pre className="rpg-dev-text">{r.kind === 'model' ? tail(r.text, 8) : r.text}</pre>}
+              {r.text && (
+                <pre className="rpg-dev-text">{r.kind !== 'model' ? r.text : open.has(r.id) ? pretty(r.text) : tail(r.text, 8)}</pre>
+              )}
+              {r.kind === 'model' && r.text && (
+                <button type="button" className="rpg-dev-json" onClick={() => toggleOpen(r.id)} aria-expanded={open.has(r.id)}>
+                  {open.has(r.id) ? `▾ ${t.devAnswerTail}` : `▸ ${t.devAnswerFull}`}
+                </button>
+              )}
               {r.error && <div className="rpg-dev-error">✗ {r.error}</div>}
             </div>
           ))}

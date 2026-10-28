@@ -1139,6 +1139,12 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   decisions (⚑), and the clues read, in order. `utils/rpg/transcript.ts` records it — choices with
   a `kind` only, so "Back" and "Goodbye" stay out, and a line shown again in the same beat once.
   It rides in the autosave, so Continue keeps it; a new quest clears it.
+  Under each step's lines the tab lists **every decision that step offered** (owner, 28 Oct 2026:
+  "I want to see the dialogue options I did not choose"): ⚑ the one taken (matched by label against
+  `history[n].chose`), ○ the others with the reply they would have brought, ? while none is taken
+  yet, and the beat itself as JSON behind a toggle. Read from `beatsRef`/`historyRef`, not the
+  transcript, so a save from before this shows them as well. In **Zapytania** a model request's
+  answer unfolds whole (indented, once it parses as JSON) instead of its last eight lines.
 - **The waiting screens show the stream**: the last few lines of what the model is writing, and the
   models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
 - **The closing screen says what the quest cost**: the time played (Start or Continue to the

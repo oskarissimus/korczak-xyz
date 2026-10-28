@@ -1147,6 +1147,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * the opening, then the ground and every hub model of the world being made (its preview while the
    * genesis still streams, every slot assumed until even that has come), and the quest's own pieces.
    */
+  /** What the console's Dialogi tab reads: the beats so far and the decisions taken in them. */
+  const questView = useCallback(() => ({ beats: beatsRef.current, history: historyRef.current }), []);
+
   const progressTasks = useCallback((): Task[] => {
     const line = timeline();
     const tasks: Task[] = [];
@@ -2425,6 +2428,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         <DevConsole
           lang={gameLang}
           tasks={progressTasks}
+          quest={questView}
           onClose={() => setDevOpen(false)}
           scene={sceneRef.current}
           badge={fpsBadge}
