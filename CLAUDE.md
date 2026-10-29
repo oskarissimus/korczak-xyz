@@ -109,6 +109,18 @@ is the one Sentry credential that can do damage, so unlike the DSNs — which ar
 and live in the source — it never reaches the bundle. Rotating it is a new token in Sentry plus
 `gh secret set SENTRY_AUTH_TOKEN`; nothing in the repo names its value.
 
+## An example from the game is checked against the quest's data
+
+When explaining how a game engine behaves (the RPG above all) with an example — "Elara stays in the
+square because…", "the next beat puts her in…" — **verify that example against the real quest in
+Firestore before giving it**, not against what the code suggests should have happened. The game's
+state lives in `users/{uid}/rpgSaves/{worldId}` (the quest in progress: beats, `lastLines`,
+`history`, `mood`), `users/{uid}/rpgWorlds/{worldId}` (the atlas — every place and every person
+with `at` and `line` — and the chronicle) and `users/{uid}/rpgState/current` (which world is
+current per language); the payloads are JSON strings (see `.claude/rules/rpg.md`, *On the
+account*). Quote the fields that back the example. An example reasoned from the code alone is a
+guess, and say so if the data cannot be read.
+
 ## Solitaire Game
 
 The solitaire game is at `/apps/solitaire/`. A JavaScript debug interface is available at
