@@ -118,6 +118,7 @@ import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stop
 import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress } from './DevConsole';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
+import { DEFAULT_RIGGER, type Rigger } from './people';
 import { heroBody, RpgScene, type PersonBody, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
 
@@ -199,6 +200,8 @@ function clip(text: string, n: number): string {
 
 /** The exotic slider's last position (`GenesisContext.exotic`). */
 const EXOTIC_KEY = 'rpg-exotic';
+/** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self'. */
+const RIGGER_KEY = 'rpg-rigger';
 
 export default function Rpg({ lang }: { lang: Lang }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
@@ -281,6 +284,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   chosenModelRef.current = chosenModel;
   /** The world and the opening on the fast model, thinking little; the later beats keep the chosen one. */
   const [fastStart, setFastStart] = useState(true);
+  const [rigger, setRigger] = useState<Rigger>(DEFAULT_RIGGER);
+  const riggerRef = useRef(rigger);
+  riggerRef.current = rigger;
   const fastStartRef = useRef(true);
   fastStartRef.current = fastStart;
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
@@ -1189,6 +1195,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       onSenses: setSenses,
     });
     sceneRef.current = scene;
+    scene.setRigger(riggerRef.current, falKeyRef.current);
     scene.setPaused(true);
     scene.resize(container.clientWidth, container.clientHeight);
     scene.setQuality(loadQuality());
@@ -1307,6 +1314,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     return tasks;
   }, [creating, generating, falKey, world]);
   falKeyRef.current = falKey;
+  useEffect(() => sceneRef.current?.setRigger(rigger, falKey), [rigger, falKey]);
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
   useEffect(() => {
     if (!falKey || !world || world.createdAt === 0 || creating) return;
@@ -1834,6 +1842,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
+      setRigger(localStorage.getItem(RIGGER_KEY) === 'self' ? 'self' : DEFAULT_RIGGER);
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
     } catch {
@@ -1853,6 +1862,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (on) localStorage.removeItem(FAST_KEY);
       else localStorage.setItem(FAST_KEY, '0');
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickRigger = (value: Rigger) => {
+    setRigger(value);
+    try {
+      if (value === DEFAULT_RIGGER) localStorage.removeItem(RIGGER_KEY);
+      else localStorage.setItem(RIGGER_KEY, value);
     } catch {
       /* forgotten on reload */
     }
@@ -2239,6 +2257,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {keysReady && storyProvider !== 'static' && storyProvider !== 'openai' && (
         <label className="rpg-model">
           <input type="checkbox" checked={fastStart} onChange={(e) => pickFastStart(e.target.checked)} /> {t.fastStart(FAST_MODEL)}
+        </label>
+      )}
+      {keysReady && falKey && (
+        <label className="rpg-model">
+          {t.rigger}:{' '}
+          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'self' ? 'self' : 'meshy')}>
+            <option value="meshy">{t.riggerMeshy}</option>
+            <option value="self">{t.riggerSelf}</option>
+          </select>
         </label>
       )}
       {keysReady ? (

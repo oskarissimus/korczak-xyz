@@ -25,7 +25,7 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { People, type Body } from './people';
+import { People, type Body, type Rigger } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
@@ -1693,12 +1693,42 @@ export class RpgScene {
 
   private heroWant = 'none';
   private heroToken = 0;
+  private heroDescription = '';
+
+  /**
+   * Who rigs the generated people (`Rigger`, the settings' switch), and the fal key Meshy is paid
+   * with. A change re-rigs everyone already standing, so the two can be compared on the spot.
+   */
+  setRigger(rigger: Rigger, falKey: string | null) {
+    const was = this.people.rigger === 'meshy' && !!this.people.falKey;
+    this.people.rigger = rigger;
+    this.people.falKey = falKey;
+    if (was === (rigger === 'meshy' && !!falKey)) return;
+    const model = (want: string) => want !== 'none' && want !== 'wait' && want !== 'kit';
+    for (const [name, npc] of this.npcs) {
+      if (!model(npc.want)) continue;
+      const url = npc.want;
+      npc.want = 'none';
+      this.setNpcBody(name, { url }).catch(() => {});
+    }
+    if (model(this.heroWant)) {
+      const url = this.heroWant;
+      this.heroWant = 'none';
+      void this.setHero({ url }, this.heroDescription).catch(() => {});
+    }
+    if (model(this.enemyWant)) {
+      const url = this.enemyWant;
+      this.enemyWant = 'none';
+      void this.setEnemyBody({ url }).catch(() => {});
+    }
+  }
 
   /**
    * Who the hunter is drawn as (`PersonBody`): the world's generated hero, nobody while it is made, or
    * the kit's bearded ranger. Rejects when a model would not load or rig, after putting the ranger up.
    */
   async setHero(body: PersonBody, description = ''): Promise<void> {
+    this.heroDescription = description;
     const want = wanted(body);
     if (want === this.heroWant) return;
     this.heroWant = want;

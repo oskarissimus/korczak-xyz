@@ -9,9 +9,11 @@ import { FOREST_VARIANTS, HUB_PIECES, type ForestVariant, type HubPiece, type Wo
 
 export const FAL_IMAGE_MODEL = 'fal-ai/flux/schnell';
 export const FAL_MESH_MODEL = 'fal-ai/trellis';
+/** Meshy's auto-rig, one of the two ways a person gets a skeleton (`Rigger` in `people.ts`). */
+export const FAL_RIG_MODEL = 'fal-ai/meshy/rigging';
 
-/** List prices, US dollars, Oct 2026 (fal.ai/models/fal-ai/flux/schnell, …/fal-ai/trellis). */
-export const FAL_PRICES = { imagePerMegapixel: 0.003, mesh: 0.02 } as const;
+/** List prices, US dollars, Oct 2026 (fal.ai/models/fal-ai/flux/schnell, …/fal-ai/trellis, …/fal-ai/meshy/rigging). */
+export const FAL_PRICES = { imagePerMegapixel: 0.003, mesh: 0.02, rig: 0.2 } as const;
 
 export const IMAGE_SIZE = 512;
 

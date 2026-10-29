@@ -671,8 +671,23 @@ content-hashed and immutable.
     group is empty, `nearestNpc`, `attack` and `updateEnemies` skip an empty one. The kit appears
     only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
     wider than 0.85× its height is refused as "not one standing person" — FLUX did once draw two).
-  - Each worked-out rig is a console row (kind `fal`, model `self-rig`, price $0); a cached one is
-    not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
+  - **Or Meshy, and Meshy by default** (owner, 29 Oct 2026: "a toggle in the settings, our own rig
+    or Meshy via fal.ai; ours is weak, maybe Meshy is better, I want to try; Meshy by default").
+    *Character rig* in the settings (`rpg-rigger` in localStorage, absent = `meshy`, shown only with
+    a fal key): with Meshy, `people.ts` sends the TRELLIS GLB to `fal-ai/meshy/rigging`
+    (`rigWithMeshy` in `landmark3d.ts`, the queue, **$0.20 a person**, ~1.5 min measured) and loads
+    the rigged GLB it answers: Meshy's own 24 bones under the names the donors have, so the same
+    clips fit with only the hips' height (`fitClips`), stood on the origin at the role's height. The
+    rigged URL is kept in the Cache API under `?meshy=1&height=…` beside the GLB, so a model is paid
+    for once per browser (not per account: it is not on the world). The one-person check runs first,
+    so a picture of two is not paid for; a refusal or a failed request falls back to the browser's
+    rig, both in the console. Switching re-rigs everyone standing (`RpgScene.setRigger`). Meshy's
+    GLB is ~2 MB and ~22k vertices against the self-rig's ~5.5k. Compared on a blacksmith in a
+    leather apron (`rpg/postacie-3d/meshy-vs-wlasny-kowal.gif` in the project files), same clips:
+    Meshy frees the arms from the body and splits the legs cleanly in the walk; ours keeps the apron
+    on the body but glues the hands to it, and Meshy's apron splays into spikes in the idle and swing.
+  - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
+    `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
     having no finger bones to place it by.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,

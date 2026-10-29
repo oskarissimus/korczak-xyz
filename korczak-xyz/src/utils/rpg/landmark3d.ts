@@ -39,7 +39,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
@@ -209,6 +209,53 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
     const held = waited >= 1000 ? `, ${Math.round(waited / 1000)} s of it in fal's queue` : '';
     endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `${tryMark(o)}← ${image}\n→ ${glb}${kb}${held}` });
     return { glb, queuedMs: waited };
+  } catch (err) {
+    endRequest(entry, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
+/**
+ * A person's TRELLIS model rigged by Meshy (owner, 29 Oct 2026: "a toggle to choose our own rig or
+ * Meshy via fal.ai, our own is weak, maybe Meshy will be better; Meshy by default"). The same queue
+ * as the mesh, 1–3 minutes, $0.20; the answer is the rigged GLB's URL, with Meshy's 24 bones under
+ * the names the donors have, so the one clip library moves it (`people.ts`). Not retried: a body
+ * Meshy will not rig does not become one on a second ask, and the browser's own rig stands in.
+ */
+export async function rigWithMeshy(key: string, glb: string, height: number, label: string, o: FalOptions = {}): Promise<string> {
+  const f = o.fetchImpl ?? fetch;
+  const sleep = o.sleep ?? wait;
+  const entry = startRequest('fal', FAL_RIG_MODEL, null, `← ${glb}\n${height} m`, label);
+  try {
+    const submit = await f(`https://queue.fal.run/${FAL_RIG_MODEL}`, {
+      method: 'POST',
+      headers: headers(key),
+      signal: o.signal,
+      body: JSON.stringify({ model_url: glb, height_meters: height, enable_animation: false }),
+    });
+    if (!submit.ok) throw await failure(submit);
+    const queued = (await submit.json()) as { status_url?: string; response_url?: string };
+    if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
+    const auth = { Authorization: `Key ${key}` };
+    const deadline = Date.now() + (o.timeoutMs ?? 360_000);
+    for (;;) {
+      await sleep(o.pollMs ?? 3000);
+      if (Date.now() > deadline) throw new Error('timed out in the queue');
+      const res = await f(queued.status_url, { headers: auth, signal: o.signal });
+      if (!res.ok) throw await failure(res);
+      const s = (await res.json()) as { status?: string; queue_position?: number };
+      const line = s.status === 'IN_QUEUE' ? `IN_QUEUE #${s.queue_position ?? '?'}` : (s.status ?? '?');
+      updateRequest(entry, { text: `← ${glb}\n${height} m · ${line}` });
+      if (s.status === 'COMPLETED') break;
+    }
+    const res = await f(queued.response_url, { headers: auth, signal: o.signal });
+    if (!res.ok) throw await failure(res);
+    const body = (await res.json()) as { rigged_character_glb?: { url?: string; file_size?: number } | null };
+    const rigged = body.rigged_character_glb?.url;
+    if (!rigged) throw new Error('no rigged model in the answer');
+    const kb = body.rigged_character_glb?.file_size ? ` (${Math.round(body.rigged_character_glb.file_size / 1024)} KB)` : '';
+    endRequest(entry, null, { cost: FAL_PRICES.rig, text: `← ${glb}\n${height} m\n→ ${rigged}${kb}` });
+    return rigged;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;

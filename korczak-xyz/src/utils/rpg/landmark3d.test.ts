@@ -8,6 +8,7 @@ import {
   ensureHubModels,
   FAL_IMAGE_MODEL,
   FAL_MESH_MODEL,
+  FAL_RIG_MODEL,
   FOREST_SLOTS,
   generateHubModel,
   generateLandmark,
@@ -22,6 +23,7 @@ import {
   heroLook,
   personLook,
   personPrompt,
+  rigWithMeshy,
   withRetries,
 } from './landmark3d';
 
@@ -61,6 +63,33 @@ describe('landmark3d', () => {
     const old = landmarkPrompt(world({ landmark: undefined }));
     expect(old).toContain(classicWorld('en').hub);
     expect(old).toContain('white background');
+  });
+
+  it('rigs a person with Meshy through the queue, at its height, priced in the console', async () => {
+    const bodies: unknown[] = [];
+    let polls = 0;
+    const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === `https://queue.fal.run/${FAL_RIG_MODEL}`) {
+        bodies.push(JSON.parse(String(init?.body)));
+        return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
+      }
+      if (url === 'https://q/status') return json({ status: polls++ ? 'COMPLETED' : 'IN_QUEUE', queue_position: 3 });
+      if (url === 'https://q/result') return json({ rigged_character_glb: { url: 'https://fal.media/rigged.glb', file_size: 2_400_000 }, basic_animations: null });
+      throw new Error(`unexpected ${url}`);
+    });
+    const rigged = await rigWithMeshy('k', 'https://fal.media/model.glb', 1.78, 'person', { ...now, fetchImpl: f as typeof fetch });
+    expect(rigged).toBe('https://fal.media/rigged.glb');
+    expect(bodies).toEqual([{ model_url: 'https://fal.media/model.glb', height_meters: 1.78, enable_animation: false }]);
+    const [entry] = devRequests();
+    expect([entry.kind, entry.model, entry.label, entry.status, entry.cost]).toEqual(['fal', FAL_RIG_MODEL, 'person', 'ok', 0.2]);
+  });
+
+  it('says in the console why Meshy would not rig, and throws for the browser’s own rig to stand in', async () => {
+    const f = vi.fn(async () => json({ detail: 'not a humanoid' }, 422));
+    await expect(rigWithMeshy('k', 'https://fal.media/model.glb', 1.8, 'enemy', { ...now, fetchImpl: f as typeof fetch })).rejects.toThrow(/^422/);
+    const [entry] = devRequests();
+    expect([entry.status, entry.error]).toEqual(['error', expect.stringContaining('not a humanoid')]);
   });
 
   it('bills the picture by the megapixel, rounded up', () => {

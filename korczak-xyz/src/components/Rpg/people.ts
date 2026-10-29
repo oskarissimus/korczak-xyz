@@ -13,6 +13,14 @@
  *
  * The files are `src/assets/rpg/people/`, made by `scripts/rpg-people.mjs`: two donors (~70 KB each)
  * and the clips (~110 KB gzipped).
+ *
+ * OR MESHY, BY DEFAULT (owner, 29 Oct 2026: "a toggle in the settings to choose our own rig or Meshy
+ * via fal.ai; ours is weak, maybe Meshy will be better, I'd like to try; Meshy by default"). With
+ * `rigger` 'meshy' and a fal key, the TRELLIS model goes to Meshy's auto-rig (`rigWithMeshy`, $0.20,
+ * 1–3 min) and comes back with the very skeleton the donors were cut from, so the same clips fit it
+ * with nothing but the hips' height. The rigged GLB's URL is kept in the Cache API beside the GLB, so a
+ * model is paid for once per browser; a body Meshy refuses or a failed request falls back to the
+ * browser's own rig, and the console says both.
  */
 
 import * as THREE from 'three';
@@ -23,11 +31,15 @@ import clipsUrl from '../../assets/rpg/people/people_clips.json?url';
 import donorFemaleUrl from '../../assets/rpg/people/donor_female.bin?url';
 import donorMaleUrl from '../../assets/rpg/people/donor_male.bin?url';
 import { endRequest, startRequest } from '../../utils/rpg/devlog';
-import { loadLandmarkBytes } from '../../utils/rpg/landmark3d';
+import { loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
 import { parseDonor, selfRig, type Donor, type SelfRig } from '../../utils/rpg/selfRig';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
+
+/** Who gives a generated person their skeleton: Meshy on fal.ai, or the browser (`selfRig`). */
+export type Rigger = 'meshy' | 'self';
+export const DEFAULT_RIGGER: Rigger = 'meshy';
 
 /** A person rigged and stood on the origin, facing +Z; clone it for each copy (`dress`). */
 export interface PersonTemplate {
@@ -47,6 +59,40 @@ interface ClipData {
 /** Bumped when `selfRig` changes what it answers, so no rig worked out before is reused. */
 const RIG_VERSION = 1;
 const CACHE = 'rpg-landmarks';
+
+/** The rigged GLB's URL Meshy answered, from the cache when this browser has paid for it before. */
+async function cachedMeshy(key: string, make: () => Promise<string>): Promise<string> {
+  let cache: Cache | null = null;
+  try {
+    cache = typeof caches === 'undefined' ? null : await caches.open(CACHE);
+    const hit = await cache?.match(key);
+    if (hit) return await hit.text();
+  } catch {
+    cache = null;
+  }
+  const url = await make();
+  try {
+    await cache?.put(key, new Response(url));
+  } catch {
+    /* asked again next time, and paid again */
+  }
+  return url;
+}
+
+/** Clips fitted to a rig whose hips rest at `hips` (in the hips' parent's units). */
+function fitClips(clips: ClipData[], hips: THREE.Vector3): Map<string, THREE.AnimationClip> {
+  const fitted = new Map<string, THREE.AnimationClip>();
+  for (const c of clips) {
+    const tracks = c.tracks.map((t) => {
+      if (t.type === 'quaternion') return new THREE.QuaternionKeyframeTrack(t.name, t.times, t.values);
+      // The library's hips are a share of its rig's height; these are this rig's.
+      const values = t.values.map((v, i) => (i % 3 === 1 ? v * hips.y : i % 3 === 0 ? hips.x : hips.z));
+      return new THREE.VectorKeyframeTrack(t.name, t.times, values);
+    });
+    fitted.set(c.name, new THREE.AnimationClip(c.name, c.duration, tracks));
+  }
+  return fitted;
+}
 
 let worker: Worker | null | undefined;
 let nextJob = 0;
@@ -135,6 +181,9 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
 export class People {
   private loaded: Promise<{ donors: Record<Body, Donor>; clips: ClipData[] }> | null = null;
   private templates = new Map<string, Promise<PersonTemplate>>();
+  /** Who rigs the people asked for from now on; Meshy only with a fal key to pay with. */
+  rigger: Rigger = DEFAULT_RIGGER;
+  falKey: string | null = null;
 
   private load() {
     this.loaded ??= (async () => {
@@ -151,23 +200,28 @@ export class People {
 
   /**
    * A person from their GLB, rigged on `body`'s donor at `height` metres; once per model and body.
-   * Working out a rig is a row in the console (kind `fal`, model `self-rig`, `label` as the piece's),
-   * with its time and a price of nothing; one from the cache is not.
+   * Working out a rig is a row in the console (kind `fal`, `label` as the piece's): model `self-rig`,
+   * with its time and a price of nothing, or Meshy's with its $0.20; one from the cache is not.
    */
   template(url: string, body: Body, height: number, label = 'person'): Promise<PersonTemplate> {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
-    const key = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}`;
+    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}`;
+    const falKey = this.rigger === 'meshy' ? this.falKey : null;
+    const key = falKey ? `${url}?meshy=1&height=${height}` : own;
     let t = this.templates.get(key);
     if (!t) {
-      t = this.build(url, key, body, height, label);
+      t = falKey
+        ? this.buildMeshy(falKey, url, key, height, label).catch(() => this.build(url, own, body, height, label))
+        : this.build(url, key, body, height, label);
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
     }
     return t;
   }
 
-  private async build(url: string, key: string, body: Body, height: number, label: string): Promise<PersonTemplate> {
-    const [{ donors, clips }, bytes] = await Promise.all([this.load(), loadLandmarkBytes(url)]);
+  /** The TRELLIS model's one mesh, in its file's frame; refused when it is not one standing person. */
+  private async standing(url: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry }> {
+    const bytes = await loadLandmarkBytes(url);
     const gltf = await new GLTFLoader().parseAsync(bytes, '');
     gltf.scene.updateMatrixWorld(true);
     let source: THREE.Mesh | null = null;
@@ -182,6 +236,51 @@ export class People {
     const size = geometry.boundingBox!.getSize(new THREE.Vector3());
     // A person in an A-pose is about half as wide as tall; two side by side (FLUX did draw that) are not.
     if (size.x > size.y * 0.85) throw new Error(`not one standing person (${size.x.toFixed(2)} wide, ${size.y.toFixed(2)} tall)`);
+    return { mesh, geometry };
+  }
+
+  /**
+   * A person rigged by Meshy: its own skeleton, the donors' bone names, stood on the origin at
+   * `height` (Meshy keeps the TRELLIS frame and its own centimetre armature). Checked as one standing
+   * person first, so a picture of two is not paid for.
+   */
+  private async buildMeshy(falKey: string, url: string, key: string, height: number, label: string): Promise<PersonTemplate> {
+    const [{ clips }] = await Promise.all([this.load(), this.standing(url)]);
+    const started = performance.now();
+    const rigged = await cachedMeshy(key, () => rigWithMeshy(falKey, url, height, label));
+    const gltf = await new GLTFLoader().parseAsync(await loadLandmarkBytes(rigged), '');
+    const model = gltf.scene;
+    let hips: THREE.Bone | null = null;
+    let skinned = false;
+    model.traverse((o) => {
+      if ((o as THREE.Bone).isBone && o.name === 'Hips' && !hips) hips = o as THREE.Bone;
+      const mesh = o as THREE.SkinnedMesh;
+      if (!mesh.isMesh) return;
+      skinned ||= !!mesh.isSkinnedMesh;
+      mesh.castShadow = true;
+      mesh.frustumCulled = false;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      // TRELLIS writes no metallic factor, which glTF reads as fully metallic: black, with no environment map.
+      for (const m of materials) if (typeof (m as THREE.MeshStandardMaterial).metalness === 'number') (m as THREE.MeshStandardMaterial).metalness = 0;
+    });
+    if (!skinned || !hips) throw new Error('Meshy answered a model with no skeleton');
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    const s = height / Math.max(box.max.y - box.min.y, 1e-3);
+    const centre = box.getCenter(new THREE.Vector3());
+    const stand = new THREE.Group();
+    stand.scale.setScalar(s);
+    stand.position.set(-centre.x * s, -box.min.y * s, -centre.z * s);
+    stand.add(model);
+    const group = new THREE.Group();
+    group.add(stand);
+    group.updateMatrixWorld(true);
+    const ms = performance.now() - started;
+    return { group, clips: fitClips(clips, (hips as THREE.Bone).position.clone()), ms };
+  }
+
+  private async build(url: string, key: string, body: Body, height: number, label: string): Promise<PersonTemplate> {
+    const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
     const donor = donors[body];
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
     const { rig, ms } = await cachedRig(key, async () => {
@@ -235,18 +334,7 @@ export class People {
     group.updateMatrixWorld(true);
     skinned.bind(new THREE.Skeleton(bones));
 
-    const hips = bones[0].position;
-    const fitted = new Map<string, THREE.AnimationClip>();
-    for (const c of clips) {
-      const tracks = c.tracks.map((t) => {
-        if (t.type === 'quaternion') return new THREE.QuaternionKeyframeTrack(t.name, t.times, t.values);
-        // The library's hips are a share of its rig's height; these are this rig's.
-        const values = t.values.map((v, i) => (i % 3 === 1 ? v * hips.y : i % 3 === 0 ? hips.x : hips.z));
-        return new THREE.VectorKeyframeTrack(t.name, t.times, values);
-      });
-      fitted.set(c.name, new THREE.AnimationClip(c.name, c.duration, tracks));
-    }
-    return { group, clips: fitted, ms };
+    return { group, clips: fitClips(clips, bones[0].position), ms };
   }
 
   /** A copy of the person into `group` (emptied first), idling somewhere in the loop. */
