@@ -64,6 +64,10 @@ import {
   ensureClueModel,
   ensureHubModels,
   DEFAULT_MESHER,
+  DEFAULT_PAINTER,
+  PERSON_PAINTERS,
+  setPersonPainter,
+  type PersonPainter,
   ensurePersonModel,
   setPersonMesher,
   type Mesher,
@@ -208,6 +212,8 @@ const EXOTIC_KEY = 'rpg-exotic';
 const RIGGER_KEY = 'rpg-rigger';
 /** What makes the generated people's models (`Mesher` in `landmark3d.ts`); TRELLIS unless 'meshy'. */
 const MESHER_KEY = 'rpg-mesher';
+/** What draws the generated people's pictures (`PersonPainter` in `landmark3d.ts`); FLUX schnell when absent. */
+const PAINTER_KEY = 'rpg-painter';
 
 /**
  * A line as the dialogue shows it: an audio tag ("[coughs]", or an old save's "[Kaszel]") as a short
@@ -312,6 +318,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   riggerRef.current = rigger;
   const [mesher, setMesher] = useState<Mesher>(DEFAULT_MESHER);
   setPersonMesher(mesher);
+  const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
+  setPersonPainter(painter);
   const fastStartRef = useRef(true);
   fastStartRef.current = fastStart;
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
@@ -1869,6 +1877,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
       setRigger(localStorage.getItem(RIGGER_KEY) === 'self' ? 'self' : DEFAULT_RIGGER);
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
+      const keptPainter = localStorage.getItem(PAINTER_KEY);
+      setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : DEFAULT_PAINTER);
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
     } catch {
@@ -1897,6 +1907,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (value === DEFAULT_RIGGER) localStorage.removeItem(RIGGER_KEY);
       else localStorage.setItem(RIGGER_KEY, value);
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickPainter = (value: PersonPainter) => {
+    setPainter(value);
+    try {
+      if (value === DEFAULT_PAINTER) localStorage.removeItem(PAINTER_KEY);
+      else localStorage.setItem(PAINTER_KEY, value);
     } catch {
       /* forgotten on reload */
     }
@@ -2311,6 +2330,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
             <option value="meshy">{t.mesherMeshy}</option>
           </select>
           <small> {t.mesherNote}</small>
+        </label>
+      )}
+      {keysReady && falKey && (
+        <label className="rpg-model">
+          {t.painter}:{' '}
+          <select value={painter} onChange={(e) => pickPainter(e.target.value as PersonPainter)}>
+            {(Object.keys(PERSON_PAINTERS) as PersonPainter[]).map((p) => (
+              <option key={p} value={p}>
+                {t.painters[p]}
+              </option>
+            ))}
+          </select>
         </label>
       )}
       {keysReady ? (

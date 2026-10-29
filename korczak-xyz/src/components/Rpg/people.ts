@@ -59,6 +59,32 @@ interface ClipData {
   tracks: { name: string; type: 'quaternion' | 'vector'; times: number[]; values: number[] }[];
 }
 
+/**
+ * How many heads the model has: the separate lumps of it across the band just under its top (86 to
+ * 96 per cent of its height), above where arms held out in a T-pose reach. One person has one; two
+ * side by side, even of different heights, have two.
+ */
+export function heads(geometry: THREE.BufferGeometry): number {
+  const p = geometry.attributes.position;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const height = maxY - minY || 1;
+  const xs: number[] = [];
+  for (let i = 0; i < p.count; i++) {
+    const y = (p.getY(i) - minY) / height;
+    if (y >= 0.86 && y <= 0.96) xs.push(p.getX(i));
+  }
+  xs.sort((a, b) => a - b);
+  let count = xs.length ? 1 : 0;
+  for (let i = 1; i < xs.length; i++) if (xs[i] - xs[i - 1] > height * 0.05) count++;
+  return count;
+}
+
 /** Bumped when `selfRig` changes what it answers, so no rig worked out before is reused. */
 const RIG_VERSION = 1;
 const CACHE = 'rpg-landmarks';
@@ -246,9 +272,11 @@ export class People {
     const geometry = mesh.geometry.clone();
     geometry.applyMatrix4(mesh.matrixWorld);
     geometry.computeBoundingBox();
-    const size = geometry.boundingBox!.getSize(new THREE.Vector3());
-    // A person in an A-pose is about half as wide as tall; two side by side (FLUX did draw that) are not.
-    if (size.x > size.y * 0.85) throw new Error(`not one standing person (${size.x.toFixed(2)} wide, ${size.y.toFixed(2)} tall)`);
+    // Two people side by side (FLUX did draw that) are two heads. Counted rather than measured: a
+    // wide stance or a T-pose — Nano Banana draws one when asked for a wide pose — is as wide as two
+    // people, but still has one head.
+    const n = heads(geometry);
+    if (n !== 1) throw new Error(`not one standing person (${n} heads)`);
     return { mesh, geometry };
   }
 

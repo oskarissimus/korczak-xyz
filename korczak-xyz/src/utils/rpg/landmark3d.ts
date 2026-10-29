@@ -114,6 +114,48 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
  */
 const IMAGE_RETRIES = 5;
 
+/**
+ * What can draw a person's picture (owner, 29 Oct 2026: "a picker for those models in the lab and a
+ * switch in the game's settings, Nano Banana by default in the lab, because the pose matters a lot
+ * here"). FLUX schnell is the game's default and everything else's only painter: the cheapest and
+ * fastest, and the loosest about a pose. The others are asked for a square picture and priced as
+ * fal bills them, Oct 2026. Every one answers `images[0].url`.
+ */
+export const PERSON_PAINTERS = {
+  schnell: {
+    model: FAL_IMAGE_MODEL,
+    price: (size: number) => imageCost(size, size),
+    body: (prompt: string, size: number) => ({ prompt, image_size: { width: size, height: size }, num_inference_steps: 4, num_images: 1, enable_safety_checker: true }),
+  },
+  fluxDev: {
+    model: 'fal-ai/flux/dev',
+    price: (size: number) => Math.ceil((size * size) / 1_000_000) * 0.025,
+    body: (prompt: string, size: number) => ({ prompt, image_size: { width: size, height: size }, num_inference_steps: 28, num_images: 1, enable_safety_checker: true }),
+  },
+  flux2: {
+    model: 'fal-ai/flux-2',
+    price: () => 0.012,
+    body: (prompt: string, size: number) => ({ prompt, image_size: { width: size, height: size }, num_images: 1, enable_safety_checker: true }),
+  },
+  nanoBanana: {
+    model: 'fal-ai/nano-banana',
+    price: () => 0.0398,
+    body: (prompt: string) => ({ prompt, aspect_ratio: '1:1', output_format: 'jpeg', num_images: 1 }),
+  },
+  nanoBanana2: {
+    model: 'fal-ai/nano-banana-2',
+    price: () => 0.08,
+    body: (prompt: string) => ({ prompt, aspect_ratio: '1:1', output_format: 'jpeg', num_images: 1 }),
+  },
+} as const;
+export type PersonPainter = keyof typeof PERSON_PAINTERS;
+export const DEFAULT_PAINTER: PersonPainter = 'schnell';
+let personPainter: PersonPainter = DEFAULT_PAINTER;
+/** The game's switch: what draws its people's pictures from now on. */
+export function setPersonPainter(p: PersonPainter) {
+  personPainter = p;
+}
+
 /** Step 1: the picture; also the whole of a world's ground texture (`groundTexture.ts`), at its own size. */
 export async function drawImage(
   key: string,
@@ -123,28 +165,25 @@ export async function drawImage(
   size = IMAGE_SIZE,
   /** What the picture is for, for good (`world/ground`): given, a signed-in reader's server paints it. */
   scope?: string,
+  /** Who paints it; the server's runner only knows FLUX schnell. */
+  painter: PersonPainter = 'schnell',
 ): Promise<string> {
-  if (scope && jobsOn() && !o.fetchImpl) {
+  const paint = PERSON_PAINTERS[painter];
+  if (scope && painter === 'schnell' && jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt, size, false));
     if (made) return made.image;
   }
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
-  const entry = startRequest('fal', FAL_IMAGE_MODEL, null, `${tryMark(o)}${prompt}`, label);
+  const entry = startRequest('fal', paint.model, null, `${tryMark(o)}${prompt}`, label);
   try {
     let res: Response;
     for (let attempt = 0; ; attempt++) {
-      res = await f(`https://fal.run/${FAL_IMAGE_MODEL}`, {
+      res = await f(`https://fal.run/${paint.model}`, {
         method: 'POST',
         headers: headers(key),
         signal: o.signal,
-        body: JSON.stringify({
-          prompt,
-          image_size: { width: size, height: size },
-          num_inference_steps: 4,
-          num_images: 1,
-          enable_safety_checker: true,
-        }),
+        body: JSON.stringify(paint.body(prompt, size)),
       });
       if (res.status !== 429 || attempt >= IMAGE_RETRIES) break;
       updateRequest(entry, { text: `${tryMark(o)}${prompt}\n429, fal.ai at its limit: again in ${2 ** attempt} s` });
@@ -154,7 +193,7 @@ export async function drawImage(
     const body = (await res.json()) as { images?: { url?: string }[] };
     const url = body.images?.[0]?.url;
     if (!url) throw new Error('no image in the answer');
-    endRequest(entry, null, { cost: imageCost(size, size), text: `${tryMark(o)}${prompt}\n→ ${url}` });
+    endRequest(entry, null, { cost: paint.price(size), text: `${tryMark(o)}${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -415,10 +454,11 @@ async function imageAndMesh(
   scope: string,
   running?: () => void,
 ): Promise<{ image: string; glb: string; queuedMs: number; costUsd: number }> {
-  if (personMesher === 'meshy' && PERSON_SLOTS.includes(label)) {
-    const image = await drawImage(key, prompt, label, o);
-    const { glb, costUsd } = await buildPersonMesh(key, image, 'meshy', label, o, running);
-    return { image, glb, queuedMs: 0, costUsd: imageCost() + costUsd };
+  if ((personMesher === 'meshy' || personPainter !== 'schnell') && PERSON_SLOTS.includes(label)) {
+    const painter = personPainter;
+    const image = await drawImage(key, prompt, label, o, IMAGE_SIZE, undefined, painter);
+    const { glb, costUsd } = await buildPersonMesh(key, image, personMesher, label, o, running);
+    return { image, glb, queuedMs: 0, costUsd: PERSON_PAINTERS[painter].price(IMAGE_SIZE) + costUsd };
   }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);

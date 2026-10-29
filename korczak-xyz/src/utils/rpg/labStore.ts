@@ -4,16 +4,28 @@
  * comparison paid for once can be looked at again; nothing here reaches the game or the account.
  */
 
-import type { PersonMesher } from './landmark3d';
+import type { PersonMesher, PersonPainter } from './landmark3d';
 import type { LabSource } from './labSources';
 
-/** Which picture a model was made from: the game's own, or one redrawn in the wide pose (`widePose`). */
-export type LabPose = 'game' | 'wide';
+/**
+ * Which picture a model was made from: the game's own, the game's prompt drawn again by another
+ * painter (`redraw`), or redrawn in the wide pose (`widePose`).
+ */
+export type LabPose = 'game' | 'redraw' | 'wide';
+
+export interface LabPicture {
+  image: string;
+  prompt: string;
+  pose: LabPose;
+  painter: PersonPainter;
+}
 
 export interface LabVariant {
   id: string;
   method: PersonMesher;
   pose: LabPose;
+  /** Who drew the picture; absent on the game's own and on models from before the picker. */
+  painter?: PersonPainter;
   image: string;
   prompt: string;
   glb: string;
@@ -69,13 +81,27 @@ export function removeLabVariant(sourceId: string, id: string): void {
   write({ ...stored, variants });
 }
 
-export function labPicture(sourceId: string, pose: LabPose): { image: string; prompt: string } | null {
-  return read().pictures?.[`${sourceId}|${pose}`] ?? null;
+/** The pictures `painter` drew; the wide pose before the picker was FLUX schnell's, under `id|wide`. */
+const pictureKey = (sourceId: string, pose: LabPose, painter: PersonPainter) =>
+  pose === 'wide' && painter === 'schnell' ? `${sourceId}|wide` : `${sourceId}|${pose}|${painter}`;
+
+export function labPicture(sourceId: string, pose: LabPose, painter: PersonPainter): { image: string; prompt: string } | null {
+  return read().pictures?.[pictureKey(sourceId, pose, painter)] ?? null;
 }
 
-export function setLabPicture(sourceId: string, pose: LabPose, picture: { image: string; prompt: string }): void {
+export function setLabPicture(sourceId: string, pose: LabPose, painter: PersonPainter, picture: { image: string; prompt: string }): void {
   const stored = read();
-  write({ ...stored, pictures: { ...(stored.pictures ?? {}), [`${sourceId}|${pose}`]: picture } });
+  write({ ...stored, pictures: { ...(stored.pictures ?? {}), [pictureKey(sourceId, pose, painter)]: picture } });
+}
+
+/** Every picture redrawn for a person, oldest first. */
+export function labPictures(sourceId: string): LabPicture[] {
+  const out: LabPicture[] = [];
+  for (const [k, v] of Object.entries(read().pictures ?? {})) {
+    const [id, pose, painter = 'schnell'] = k.split('|');
+    if (id === sourceId && (pose === 'wide' || pose === 'redraw')) out.push({ ...v, pose, painter: painter as PersonPainter });
+  }
+  return out;
 }
 
 export function ownSources(): LabSource[] {

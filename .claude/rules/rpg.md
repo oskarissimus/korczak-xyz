@@ -670,7 +670,10 @@ content-hashed and immutable.
   - **Nothing stands there until the model is ready** (`PersonBody {wait}` in `RpgScene.ts`): the
     group is empty, `nearestNpc`, `attack` and `updateEnemies` skip an empty one. The kit appears
     only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
-    wider than 0.85× its height is refused as "not one standing person" — FLUX did once draw two).
+    with other than one head is refused as "not one standing person" — FLUX did once draw two).
+    `heads()` counts the separate lumps across 86–96 % of the height, above where T-pose arms
+    reach; it replaced "wider than 0.85× its height", which refused Nano Banana's T-pose and its
+    wide stance (0.99 and 0.55 of the height across), both one person.
   - **Or Meshy, and Meshy by default** (owner, 29 Oct 2026: "a toggle in the settings, our own rig
     or Meshy via fal.ai; ours is weak, maybe Meshy is better, I want to try; Meshy by default").
     *Character rig* in the settings (`rpg-rigger` in localStorage, absent = `meshy`, shown only with
@@ -712,6 +715,16 @@ content-hashed and immutable.
     hanging between the legs, $0.003 once). Each model shows its price, time, triangles, size and
     texture; `~` lists the fal requests with the session's total. What the lab made is kept in
     `rpg-model-lab` in localStorage only, so not on another device. `noindex`.
+  - **Who draws the picture** (owner, 29 Oct 2026: "a picker for those models in the lab and a
+    switch in the game's settings, and Nano Banana by default in the lab, because the pose matters
+    a lot here"). `PERSON_PAINTERS` in `landmark3d.ts`: FLUX schnell $0.003, FLUX dev $0.025,
+    FLUX 2 $0.012, Nano Banana $0.0398, Nano Banana 2 $0.08. The lab defaults to **Nano Banana**,
+    which follows a pose; it redraws the game's prompt (`redraw`) or the wide pose (`wide`), each
+    kept per person, pose and painter so it is paid for once. The game's *Character picture* setting
+    (`rpg-painter`, absent = FLUX schnell, the default because the game draws every person it
+    meets) applies to people only; anything but schnell is drawn in the browser, as Meshy's mesh
+    is, since the server's job only knows schnell. Measured on the blacksmith: Nano Banana's wide
+    pose through TRELLIS, $0.06 in all, one person with a gap at every limb.
     First result, the blacksmith (`rpg/pracownia-modeli/` in the project files): the wide-pose
     picture through TRELLIS ($0.023) comes back with the arms clear of the apron; on Meshy's rig
     (+$0.20) it moves about as cleanly as Meshy's own $0.80 model, while on our rig the spread arms

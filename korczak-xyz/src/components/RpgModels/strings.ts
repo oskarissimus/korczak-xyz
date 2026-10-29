@@ -1,4 +1,5 @@
-import type { PersonMesher } from '../../utils/rpg/landmark3d';
+import type { PersonMesher, PersonPainter } from '../../utils/rpg/landmark3d';
+import type { LabPose } from '../../utils/rpg/labStore';
 import type { LabRole } from '../../utils/rpg/labSources';
 
 const en = {
@@ -13,7 +14,7 @@ const en = {
   describeHint: 'a young herbalist in a green cloak, freckles, a satchel',
   woman: 'woman',
   man: 'man',
-  draw: 'Draw ($0.003)',
+  draw: 'Draw',
   roles: { hero: 'hero', person: 'person', enemy: 'enemy' } satisfies Record<LabRole, string>,
   fromGame: 'from the game',
   models: 'Models',
@@ -42,6 +43,17 @@ const en = {
   console: 'Requests',
   consoleHint: '~ shows the requests',
   total: 'Total',
+  painter: 'Drawn by',
+  painters: {
+    schnell: 'FLUX schnell · $0.003',
+    fluxDev: 'FLUX dev · $0.025',
+    flux2: 'FLUX 2 · $0.012',
+    nanoBanana: 'Nano Banana · $0.04',
+    nanoBanana2: 'Nano Banana 2 · $0.08',
+  } satisfies Record<PersonPainter, string>,
+  poses: { game: 'the game’s', redraw: 'same prompt, new picture', wide: 'wide pose' } satisfies Record<LabPose, string>,
+  pictureKept: 'already drawn, free',
+  pictureNew: (usd: string) => `a new picture, ${usd}`,
   methods: {
     trellis: 'TRELLIS · $0.02',
     trellis2: 'TRELLIS 2 · $0.25',
@@ -63,7 +75,7 @@ const pl: typeof en = {
   describeHint: 'a young herbalist in a green cloak, freckles, a satchel',
   woman: 'kobieta',
   man: 'mężczyzna',
-  draw: 'Narysuj ($0.003)',
+  draw: 'Narysuj',
   roles: { hero: 'bohater', person: 'postać', enemy: 'wróg' },
   fromGame: 'z gry',
   models: 'Modele',
@@ -92,6 +104,11 @@ const pl: typeof en = {
   console: 'Zapytania',
   consoleHint: '~ pokazuje zapytania',
   total: 'Razem',
+  painter: 'Rysuje',
+  painters: en.painters,
+  poses: { game: 'z gry', redraw: 'ten sam opis, nowy obrazek', wide: 'szeroka poza' },
+  pictureKept: 'już narysowany, za darmo',
+  pictureNew: (usd: string) => `nowy obrazek, ${usd}`,
   methods: en.methods,
 };
 

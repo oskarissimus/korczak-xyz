@@ -27,6 +27,7 @@ import {
   personLook,
   personPrompt,
   rigWithMeshy,
+  drawImage,
   withRetries,
 } from './landmark3d';
 
@@ -129,6 +130,18 @@ describe('landmark3d', () => {
     } finally {
       setPersonMesher('trellis');
     }
+  });
+
+  it('draws a person with another painter when asked, priced as that painter', async () => {
+    const asked: { url: string; body: Record<string, unknown> }[] = [];
+    const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      asked.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      return json({ images: [{ url: 'https://fal.media/banana.jpg' }], description: '' });
+    });
+    const url = await drawImage('k', 'a smith', 'person', { ...now, fetchImpl: f as typeof fetch }, 512, undefined, 'nanoBanana');
+    expect(url).toBe('https://fal.media/banana.jpg');
+    expect(asked).toEqual([{ url: 'https://fal.run/fal-ai/nano-banana', body: expect.objectContaining({ prompt: 'a smith', aspect_ratio: '1:1' }) }]);
+    expect(devRequests().map((e) => [e.model, e.cost])).toEqual([['fal-ai/nano-banana', 0.0398]]);
   });
 
   it('bills the picture by the megapixel, rounded up', () => {

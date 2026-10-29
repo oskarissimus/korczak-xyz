@@ -160,7 +160,7 @@ export const landmarkPrompt = (world: PromptWorld) => hubModelPrompt(world, 'lan
 
 const A_POSE = 'Standing straight in an A-pose, arms held a little away from the body, legs apart, hands empty and open,';
 const WIDE_POSE =
-  'Standing in a wide A-pose for rigging: arms straight and held out at about 45 degrees, a clear gap between each arm and the body, legs apart with a clear gap between them, clothes close to the body and nothing hanging between the legs, hands empty and open,';
+  'Standing in a wide A-pose for rigging (an A-pose, not a T-pose): arms straight and angled down about 45 degrees from the body, hands at hip height and well away from the thighs, a clear gap between each arm and the body, legs apart with a clear gap between them, clothes close to the body and nothing hanging between the legs, hands empty and open,';
 
 /**
  * The picture a person's model is made from (`components/Rpg/people.ts`): one person, whole, front-on,

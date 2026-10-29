@@ -18,9 +18,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, imageCost, PERSON_MESHERS, personPrompt, widePose, type PersonMesher } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
-import { addLabVariant, addOwnSource, labPicture, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
+import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
 import { PERSON_HEIGHT, type Rigger } from '../Rpg/people';
 import { LabStage, type ModelStats, type StageItem } from './labScene';
@@ -28,6 +28,7 @@ import { accountWorlds, localWorlds, mergeWorlds } from './loadWorlds';
 import { strings } from './strings';
 
 const METHODS = Object.keys(PERSON_MESHERS) as PersonMesher[];
+const PAINTERS = Object.keys(PERSON_PAINTERS) as PersonPainter[];
 /** As many side by side as still read on a laptop. */
 const MAX_SHOWN = 5;
 
@@ -68,6 +69,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [wire, setWire] = useState(false);
   const [method, setMethod] = useState<PersonMesher>('trellis');
   const [pose, setPose] = useState<LabPose>('wide');
+  // Nano Banana by default here (owner, 29 Oct 2026: "the pose matters a lot"); the game's default stays FLUX schnell.
+  const [painter, setPainter] = useState<PersonPainter>('nanoBanana');
   const [pending, setPending] = useState<{ id: string; label: string; since: number }[]>([]);
   const [stats, setStats] = useState<Record<string, { stats: ModelStats; ms: number } | { error: string }>>({});
   const [describe, setDescribe] = useState('');
@@ -109,7 +112,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
       out.push({
         key: v.id,
         glb: v.glb,
-        label: `${t.methods[v.method].split(' · ')[0]}${v.pose === 'wide' ? ` · ${t.pictureWide.split(' (')[0]}` : ''}`,
+        label: `${t.methods[v.method].split(' · ')[0]}${v.pose === 'game' ? '' : ` · ${t.poses[v.pose]}${v.painter ? `, ${t.painters[v.painter].split(' · ')[0]}` : ''}`}`,
         costUsd: v.costUsd,
         ms: v.ms,
         bytes: v.bytes,
@@ -213,21 +216,21 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const make = async () => {
     if (!source || !falKey) return;
     const id = `${method}-${pose}-${Date.now()}`;
-    const label = `${t.methods[method].split(' · ')[0]}${pose === 'wide' ? ' · wide' : ''}`;
+    const label = `${t.methods[method].split(' · ')[0]}${pose === 'game' ? '' : ` · ${t.poses[pose]}, ${t.painters[painter].split(' · ')[0]}`}`;
     setPending((p) => [...p, { id, label, since: Date.now() }]);
     const started = Date.now();
     let spent = 0;
     try {
-      let picture = pose === 'game' ? { image: source.model.image, prompt: source.model.prompt } : labPicture(source.id, 'wide');
+      let picture = pose === 'game' ? { image: source.model.image, prompt: source.model.prompt } : labPicture(source.id, pose, painter);
       if (!picture) {
-        const prompt = widePose(source.model.prompt);
-        picture = { image: await drawImage(falKey, prompt, 'person', {}), prompt };
-        spent += imageCost();
-        setLabPicture(source.id, 'wide', picture);
+        const prompt = pose === 'wide' ? widePose(source.model.prompt) : source.model.prompt;
+        picture = { image: await drawImage(falKey, prompt, 'person', {}, IMAGE_SIZE, undefined, painter), prompt };
+        spent += PERSON_PAINTERS[painter].price(IMAGE_SIZE);
+        setLabPicture(source.id, pose, painter, picture);
       }
       const made = await buildPersonMesh(falKey, picture.image, method, 'lab');
       spent += made.costUsd;
-      addLabVariant(source.id, { id, method, pose, image: picture.image, prompt: picture.prompt, glb: made.glb, costUsd: spent, ms: Date.now() - started, bytes: made.bytes, at: Date.now() });
+      addLabVariant(source.id, { id, method, pose, painter: pose === 'game' ? undefined : painter, image: picture.image, prompt: picture.prompt, glb: made.glb, costUsd: spent, ms: Date.now() - started, bytes: made.bytes, at: Date.now() });
       setShown((s) => [...s.slice(-(MAX_SHOWN - 1)), id]);
       setVersion((v) => v + 1);
     } catch (e) {
@@ -243,7 +246,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     try {
       const started = Date.now();
       const prompt = personPrompt(describe.trim(), { gender });
-      const image = await drawImage(falKey, prompt, 'person', {});
+      const image = await drawImage(falKey, prompt, 'person', {}, IMAGE_SIZE, undefined, painter);
       const s: LabSource = {
         id: image,
         worldId: 'lab',
@@ -252,7 +255,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
         name: describe.trim().slice(0, 48),
         role: 'person',
         body: gender,
-        model: { glb: '', image, prompt, costUsd: imageCost(), ms: Date.now() - started, at: Date.now() },
+        model: { glb: '', image, prompt, costUsd: PERSON_PAINTERS[painter].price(IMAGE_SIZE), ms: Date.now() - started, at: Date.now() },
       };
       addOwnSource(s);
       setOwn(ownSources());
@@ -265,7 +268,20 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     }
   };
 
-  const wide = source ? labPicture(source.id, 'wide') : null;
+  const redrawn = source ? labPictures(source.id) : [];
+  const drawn = source && pose !== 'game' ? labPicture(source.id, pose, painter) : null;
+  const painterPicker = (
+    <label>
+      {t.painter}:{' '}
+      <select value={painter} onChange={(e) => setPainter(e.target.value as PersonPainter)}>
+        {PAINTERS.map((p) => (
+          <option key={p} value={p}>
+            {t.painters[p]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
   const requests = devRequests().filter((r) => r.kind === 'fal');
   const sessionUsd = requests.reduce((sum, r) => sum + (r.status === 'ok' ? (r.cost ?? 0) : 0), 0);
 
@@ -297,6 +313,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   <option value="male">{t.man}</option>
                   <option value="female">{t.woman}</option>
                 </select>{' '}
+                {painterPicker}{' '}
                 <button type="submit" disabled={drawing || !describe.trim()}>
                   {drawing ? '…' : t.draw}
                 </button>
@@ -334,12 +351,14 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   <img src={source.model.image} alt="" width={128} height={128} />
                   <figcaption>{t.pictureGame}</figcaption>
                 </figure>
-                {wide && (
-                  <figure>
-                    <img src={wide.image} alt="" width={128} height={128} />
-                    <figcaption>{t.pictureWide.split(' (')[0]}</figcaption>
+                {redrawn.map((p) => (
+                  <figure key={p.image}>
+                    <img src={p.image} alt="" width={128} height={128} />
+                    <figcaption>
+                      {t.poses[p.pose]} · {t.painters[p.painter].split(' · ')[0]}
+                    </figcaption>
                   </figure>
-                )}
+                ))}
               </div>
 
               <h3>{t.models}</h3>
@@ -401,11 +420,14 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   </select>
                   <label>
                     {t.picture}:{' '}
-                    <select value={pose} onChange={(e) => setPose(e.target.value === 'game' ? 'game' : 'wide')}>
+                    <select value={pose} onChange={(e) => setPose(e.target.value as LabPose)}>
                       <option value="game">{t.pictureGame}</option>
-                      <option value="wide">{wide ? t.pictureWide.split(' (')[0] : t.pictureWide}</option>
+                      <option value="redraw">{t.poses.redraw}</option>
+                      <option value="wide">{t.poses.wide}</option>
                     </select>
                   </label>
+                  {pose !== 'game' && painterPicker}
+                  {pose !== 'game' && <small>{drawn ? t.pictureKept : t.pictureNew(formatUsd(PERSON_PAINTERS[painter].price(IMAGE_SIZE)))}</small>}
                   <button type="button" onClick={() => void make()}>
                     {t.make}
                   </button>
