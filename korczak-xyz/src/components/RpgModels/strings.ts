@@ -51,8 +51,10 @@ const en = {
     nanoBanana: 'Nano Banana · $0.04',
     nanoBanana2: 'Nano Banana 2 · $0.08',
   } satisfies Record<PersonPainter, string>,
-  poses: { game: 'the game’s', redraw: 'same prompt, new picture', wide: 'wide pose' } satisfies Record<LabPose, string>,
+  poses: { game: 'the game’s', redraw: 'same prompt, new picture', wide: 'wide A-pose', tpose: 'strict T-pose' } satisfies Record<LabPose, string>,
   pictureKept: 'already drawn, free',
+  promptSent: 'The prompt the picture is drawn from',
+  promptDrawn: 'The prompt it was drawn from',
   refused:
     'The painter refused this description (its content checker flagged it). Nano Banana refuses famous characters by name, such as Luke Skywalker: describe how they look instead, or pick FLUX.',
   pictureNew: (usd: string) => `a new picture, ${usd}`,
@@ -108,8 +110,10 @@ const pl: typeof en = {
   total: 'Razem',
   painter: 'Rysuje',
   painters: en.painters,
-  poses: { game: 'z gry', redraw: 'ten sam opis, nowy obrazek', wide: 'szeroka poza' },
+  poses: { game: 'z gry', redraw: 'ten sam opis, nowy obrazek', wide: 'szeroka poza A', tpose: 'dokładna T-poza' },
   pictureKept: 'już narysowany, za darmo',
+  promptSent: 'Prompt, z którego rysuje się obrazek',
+  promptDrawn: 'Prompt, z którego go narysowano',
   refused:
     'Model odmówił narysowania tego opisu (oflagował go filtr treści). Nano Banana nie rysuje znanych postaci z nazwy, np. Luke’a Skywalkera: opisz, jak wygląda, albo wybierz FLUX.',
   pictureNew: (usd: string) => `nowy obrazek, ${usd}`,

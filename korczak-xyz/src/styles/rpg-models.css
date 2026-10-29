@@ -83,6 +83,22 @@
   margin-bottom: 10px;
 }
 
+/* The prompt, word for word, folded until asked for. */
+.lab-prompt {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.lab-prompt pre {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+}
+
 /* Why a picture or a model did not come: in words, by the button that asked for it. */
 .lab-error {
   flex-basis: 100%;

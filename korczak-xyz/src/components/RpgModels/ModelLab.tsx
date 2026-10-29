@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
@@ -46,6 +46,16 @@ interface Row {
 
 const heightOf = (s: LabSource) => PERSON_HEIGHT[s.role === 'hero' ? 'hero' : s.role === 'enemy' ? 'enemy' : s.body];
 
+/** The prompt a redrawn picture is asked with: the game's own, moved into the chosen pose. */
+function posed(pose: LabPose, prompt: string): string {
+  return pose === 'tpose' ? tPose(prompt) : pose === 'wide' ? widePose(prompt) : prompt;
+}
+
+/** A person described in the lab is drawn in the strict T-pose from the start: the lab is for rigging. */
+function ownPrompt(describe: string, gender: 'male' | 'female'): string {
+  return tPose(personPrompt(describe.trim(), { gender }));
+}
+
 export default function ModelLab({ lang }: { lang: Lang }) {
   const t = strings[lang];
   const auth = useAuth();
@@ -68,7 +78,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [skeleton, setSkeleton] = useState(false);
   const [wire, setWire] = useState(false);
   const [method, setMethod] = useState<PersonMesher>('trellis');
-  const [pose, setPose] = useState<LabPose>('wide');
+  const [pose, setPose] = useState<LabPose>('tpose');
   // Nano Banana by default here (owner, 29 Oct 2026: "the pose matters a lot"); the game's default stays FLUX schnell.
   const [painter, setPainter] = useState<PersonPainter>('nanoBanana');
   const [pending, setPending] = useState<{ id: string; label: string; since: number }[]>([]);
@@ -230,7 +240,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     try {
       let picture = pose === 'game' ? { image: source.model.image, prompt: source.model.prompt } : labPicture(source.id, pose, painter);
       if (!picture) {
-        const prompt = pose === 'wide' ? widePose(source.model.prompt) : source.model.prompt;
+        const prompt = posed(pose, source.model.prompt);
         picture = { image: await drawImage(falKey, prompt, 'person', {}, IMAGE_SIZE, undefined, painter), prompt };
         spent += PERSON_PAINTERS[painter].price(IMAGE_SIZE);
         setLabPicture(source.id, pose, painter, picture);
@@ -254,7 +264,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     setProblem(null);
     try {
       const started = Date.now();
-      const prompt = personPrompt(describe.trim(), { gender });
+      const prompt = ownPrompt(describe, gender);
       const image = await drawImage(falKey, prompt, 'person', {}, IMAGE_SIZE, undefined, painter);
       const s: LabSource = {
         id: image,
@@ -329,6 +339,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                 </button>
               </div>
               {problem?.where === 'draw' && <p className="lab-error">{problem.text}</p>}
+              {describe.trim() && (
+                <details className="lab-prompt">
+                  <summary>{t.promptSent}</summary>
+                  <pre>{ownPrompt(describe, gender)}</pre>
+                </details>
+              )}
             </form>
           )}
           {worlds === null ? (
@@ -432,6 +448,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   <label>
                     {t.picture}:{' '}
                     <select value={pose} onChange={(e) => setPose(e.target.value as LabPose)}>
+                      <option value="tpose">{t.poses.tpose}</option>
                       <option value="game">{t.pictureGame}</option>
                       <option value="redraw">{t.poses.redraw}</option>
                       <option value="wide">{t.poses.wide}</option>
@@ -443,6 +460,10 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                     {t.make}
                   </button>
                   {problem?.where === 'make' && <p className="lab-error">{problem.text}</p>}
+                  <details className="lab-prompt">
+                    <summary>{pose === 'game' || drawn ? t.promptDrawn : t.promptSent}</summary>
+                    <pre>{pose === 'game' ? source.model.prompt : (drawn?.prompt ?? posed(pose, source.model.prompt))}</pre>
+                  </details>
                 </div>
               )}
             </>

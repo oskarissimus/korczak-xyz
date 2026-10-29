@@ -725,6 +725,14 @@ content-hashed and immutable.
     meets) applies to people only; anything but schnell is drawn in the browser, as Meshy's mesh
     is, since the server's job only knows schnell. Measured on the blacksmith: Nano Banana's wide
     pose through TRELLIS, $0.06 in all, one person with a gap at every limb.
+    **The strict T-pose** (owner, 29 Oct 2026: "the key to a good rig is a very exact T-pose in the
+    picture; the arms pointing exactly, no objects held; and let the prompt be seen in the lab") is
+    the lab's default picture (`tPose` in `falPrompts.ts`: arms horizontal in one line, palms down,
+    gaps to the armpit, hands empty with the objects named, carried things on the back or belt), and
+    people described in the lab are drawn in it from the start. The prompt sent, or the one a kept
+    picture was drawn from, is under the Make row and the describe form, word for word. Nano Banana
+    draws it cleanly on the blacksmith; on our rig the arms stay out (the donor stands in an A-pose),
+    so judge a T-pose on Meshy's rig. The game's own prompt is still the A-pose.
     A painter can refuse: Nano Banana's content checker turns down famous characters by name
     ("Luke Skywalker", `content_policy_violation`), where FLUX draws them. The lab says so in
     words by the button that asked (`refused`), rather than leaving the click to do nothing.
