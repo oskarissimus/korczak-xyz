@@ -53,6 +53,8 @@ const en = {
   } satisfies Record<PersonPainter, string>,
   poses: { game: 'the game’s', redraw: 'same prompt, new picture', wide: 'wide pose' } satisfies Record<LabPose, string>,
   pictureKept: 'already drawn, free',
+  refused:
+    'The painter refused this description (its content checker flagged it). Nano Banana refuses famous characters by name, such as Luke Skywalker: describe how they look instead, or pick FLUX.',
   pictureNew: (usd: string) => `a new picture, ${usd}`,
   methods: {
     trellis: 'TRELLIS · $0.02',
@@ -108,6 +110,8 @@ const pl: typeof en = {
   painters: en.painters,
   poses: { game: 'z gry', redraw: 'ten sam opis, nowy obrazek', wide: 'szeroka poza' },
   pictureKept: 'już narysowany, za darmo',
+  refused:
+    'Model odmówił narysowania tego opisu (oflagował go filtr treści). Nano Banana nie rysuje znanych postaci z nazwy, np. Luke’a Skywalkera: opisz, jak wygląda, albo wybierz FLUX.',
   pictureNew: (usd: string) => `nowy obrazek, ${usd}`,
   methods: en.methods,
 };

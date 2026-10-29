@@ -69,6 +69,8 @@ import {
   setPersonPainter,
   type PersonPainter,
   ensurePersonModel,
+  personCostNow,
+  personMakersNow,
   setPersonMesher,
   type Mesher,
   ensurePlaceModel,
@@ -123,7 +125,8 @@ import {
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { asideLabel, directions } from '../../utils/rpg/audioTags';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress } from './DevConsole';
+import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
+import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
 import { DEFAULT_RIGGER, type Rigger } from './people';
@@ -1288,6 +1291,88 @@ export default function Rpg({ lang }: { lang: Lang }) {
    */
   /** What the console's Dialogi tab reads: the beats so far and the decisions taken in them. */
   const questView = useCallback(() => ({ beats: beatsRef.current, history: historyRef.current }), []);
+
+  /**
+   * The console's remake (owner, 29 Oct 2026: "a button in the developer console to generate new
+   * characters, picture, model and rig, during the game by the new settings, so I can compare how it
+   * looks in the game"): whoever stands here as a generated model is made again as the switches now
+   * stand, and replaces their old model where it was kept (the character, the world's hero, the beat's
+   * enemy). Each is a new piece, so `ensurePiece`'s made-once does not stop it.
+   */
+  const remakingRef = useRef(0);
+  const remakePeople = useCallback(
+    (who: 'nearest' | 'all') => {
+      const world = worldRef.current;
+      const key = falKeyRef.current;
+      const scene = sceneRef.current;
+      if (!world || world.createdAt === 0 || !key || !scene) return;
+      const here = scene.generatedPeople();
+      const stamp = `#${Date.now().toString(36)}`;
+      const ask = (label: PersonSlot, id: string, prompt: string, onModel: (model: LandmarkModel) => void) => {
+        remakingRef.current++;
+        const done = () => remakingRef.current--;
+        const asked = ensurePersonModel(
+          key,
+          label,
+          id + stamp,
+          prompt,
+          (model) => {
+            done();
+            onModel(model);
+          },
+          (e) => {
+            done();
+            log.warn('rpg.remake.failed', { label, ...describeError(e) });
+          },
+        );
+        if (!asked) done();
+      };
+      for (const name of who === 'nearest' ? here.people.slice(0, 1) : here.people) {
+        const c = charactersRef.current.find((k) => k.name === name);
+        if (!c) continue;
+        ask('person', `${world.id}/${c.name}`, personPrompt(personLook(c, world), c), (model) => {
+          keepPerson(world.id, c.name, model);
+          if (worldRef.current?.id === world.id)
+            void sceneRef.current?.setNpcBody(c.name, { url: model.glb }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
+        });
+      }
+      if (who === 'nearest') return;
+      if (here.hero) ask('hero', world.id, personPrompt(heroLook(world), { gender: heroBody(heroLook(world)) }), (model) => keepHero(world.id, model));
+      const beat = beatRef.current;
+      const job = beat?.job;
+      if (here.enemy && beat && job?.kind === 'slay') {
+        const token = questTokenRef.current;
+        ask('enemy', `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`, personPrompt(job.prop ?? job.targetName, { color: job.look.color }), (model) => {
+          if (questTokenRef.current !== token) return;
+          const keep = (b: Beat): Beat => (b.index === beat.index && b.title === beat.title && b.job ? { ...b, job: { ...b.job, model } } : b);
+          beatsRef.current = beatsRef.current.map(keep);
+          if (beatRef.current) beatRef.current = keep(beatRef.current);
+          persistRef.current();
+          if (beatRef.current?.index === beat.index)
+            void sceneRef.current?.setEnemyBody({ url: model.glb }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
+        });
+      }
+    },
+    [keepHero, keepPerson],
+  );
+
+  /** What the console's remake button offers: how many, at what, as the switches stand. */
+  const remakeOffer = useCallback((): RemakeOffer | null => {
+    const scene = sceneRef.current;
+    const world = worldRef.current;
+    if (!scene || !world || world.createdAt === 0 || !falKeyRef.current) return null;
+    const here = scene.generatedPeople();
+    const { painter, mesher } = personMakersNow();
+    const rig = riggerRef.current === 'meshy' ? FAL_PRICES.rig : 0;
+    return {
+      nearest: here.people[0] ?? null,
+      count: here.people.length + (here.hero ? 1 : 0) + (here.enemy ? 1 : 0),
+      eachUsd: personCostNow() + rig,
+      makers: { painter, mesher, rigger: riggerRef.current },
+      running: remakingRef.current,
+      run: remakePeople,
+    };
+  }, [remakePeople]);
 
   const progressTasks = useCallback((): Task[] => {
     const line = timeline();
@@ -2689,6 +2774,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           lang={gameLang}
           tasks={progressTasks}
           quest={questView}
+          remake={remakeOffer}
           onClose={() => setDevOpen(false)}
           scene={sceneRef.current}
           badge={fpsBadge}

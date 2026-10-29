@@ -76,6 +76,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [describe, setDescribe] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [drawing, setDrawing] = useState(false);
+  /** Why the last picture or model did not come, shown where it was asked for. */
+  const [problem, setProblem] = useState<{ where: 'draw' | 'make'; text: string } | null>(null);
+  const explain = (e: unknown) => {
+    const message = e instanceof Error ? e.message : String(e);
+    return /content_policy_violation|flagged by a content checker/.test(message) ? t.refused : `${t.failed}: ${message.slice(0, 160)}`;
+  };
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [, tick] = useState(0);
 
@@ -218,6 +224,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     const id = `${method}-${pose}-${Date.now()}`;
     const label = `${t.methods[method].split(' · ')[0]}${pose === 'game' ? '' : ` · ${t.poses[pose]}, ${t.painters[painter].split(' · ')[0]}`}`;
     setPending((p) => [...p, { id, label, since: Date.now() }]);
+    setProblem(null);
     const started = Date.now();
     let spent = 0;
     try {
@@ -235,6 +242,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
       setVersion((v) => v + 1);
     } catch (e) {
       log.warn('rpgModels.make.failed', { method, ...describeError(e) });
+      setProblem({ where: 'make', text: explain(e) });
     } finally {
       setPending((p) => p.filter((x) => x.id !== id));
     }
@@ -243,6 +251,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const drawOwn = async () => {
     if (!falKey || !describe.trim()) return;
     setDrawing(true);
+    setProblem(null);
     try {
       const started = Date.now();
       const prompt = personPrompt(describe.trim(), { gender });
@@ -263,6 +272,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
       setDescribe('');
     } catch (e) {
       log.warn('rpgModels.draw.failed', describeError(e));
+      setProblem({ where: 'draw', text: explain(e) });
     } finally {
       setDrawing(false);
     }
@@ -318,6 +328,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   {drawing ? '…' : t.draw}
                 </button>
               </div>
+              {problem?.where === 'draw' && <p className="lab-error">{problem.text}</p>}
             </form>
           )}
           {worlds === null ? (
@@ -431,6 +442,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                   <button type="button" onClick={() => void make()}>
                     {t.make}
                   </button>
+                  {problem?.where === 'make' && <p className="lab-error">{problem.text}</p>}
                 </div>
               )}
             </>

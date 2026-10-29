@@ -371,6 +371,16 @@ export const PERSON_MESHERS = {
 } as const;
 export type PersonMesher = keyof typeof PERSON_MESHERS;
 
+/** What one person's picture and model cost as the game's switches stand, before any rig. */
+export function personCostNow(): number {
+  return PERSON_PAINTERS[personPainter].price(IMAGE_SIZE) + PERSON_MESHERS[personMesher].price;
+}
+
+/** The game's switches as the console names them: who draws, and what makes the model. */
+export function personMakersNow(): { painter: PersonPainter; mesher: Mesher } {
+  return { painter: personPainter, mesher: personMesher };
+}
+
 /** A person's model from its picture by `method`, in the browser (the server's runner only knows TRELLIS). */
 export async function buildPersonMesh(
   key: string,

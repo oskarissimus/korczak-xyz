@@ -83,6 +83,17 @@
   margin-bottom: 10px;
 }
 
+/* Why a picture or a model did not come: in words, by the button that asked for it. */
+.lab-error {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding: 4px 8px;
+  border: 2px solid #800000;
+  background: #fff0f0;
+  color: #800000;
+  font-size: 13px;
+}
+
 .lab-describe input {
   width: 100%;
   box-sizing: border-box;

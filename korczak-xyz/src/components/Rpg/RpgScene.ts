@@ -314,6 +314,9 @@ function humanoid(body: number, head: number, height = 1.8): THREE.Group {
   return group;
 }
 
+/** A body's want that is a model's URL, not nobody, a wait or the kit. */
+const isModel = (want: string) => want !== 'none' && want !== 'wait' && want !== 'kit';
+
 export class RpgScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -1657,20 +1660,29 @@ export class RpgScene {
     if (!npc) return;
     const want = wanted(body);
     if (want === npc.want) return;
+    // One model for another (the console's remake): the old one stands until the new one is rigged.
+    const swap = isModel(npc.want) && isModel(want);
     npc.want = want;
     const token = ++npc.token;
     const current = () => this.npcs.get(name) === npc && npc.token === token;
-    npc.group.clear();
-    npc.rig = null;
+    if (!swap) {
+      npc.group.clear();
+      npc.rig = null;
+    }
     if (want === 'wait') return;
     if (want !== 'kit') {
       try {
         const template = await this.people.template(want, npc.gender, HEIGHT[npc.gender], 'person');
-        if (current()) npc.rig = this.people.dress(npc.group, template);
+        if (current()) {
+          npc.group.clear();
+          npc.rig = this.people.dress(npc.group, template);
+        }
         return;
       } catch (err) {
         if (!current()) return;
         npc.want = 'kit';
+        npc.group.clear();
+        npc.rig = null;
         this.dressKitNpc(name, npc, token);
         throw err;
       }
@@ -1703,23 +1715,35 @@ export class RpgScene {
     this.people.rigger = rigger;
     this.people.falKey = falKey;
     if (was === (rigger === 'meshy' && !!falKey)) return;
-    const model = (want: string) => want !== 'none' && want !== 'wait' && want !== 'kit';
     for (const [name, npc] of this.npcs) {
-      if (!model(npc.want)) continue;
+      if (!isModel(npc.want)) continue;
       const url = npc.want;
       npc.want = 'none';
       this.setNpcBody(name, { url }).catch(() => {});
     }
-    if (model(this.heroWant)) {
+    if (isModel(this.heroWant)) {
       const url = this.heroWant;
       this.heroWant = 'none';
       void this.setHero({ url }, this.heroDescription).catch(() => {});
     }
-    if (model(this.enemyWant)) {
+    if (isModel(this.enemyWant)) {
       const url = this.enemyWant;
       this.enemyWant = 'none';
       void this.setEnemyBody({ url }).catch(() => {});
     }
+  }
+
+  /**
+   * Who stands here as a generated model, for the console's remake: the people (nearest first), and
+   * whether the hero and the job's enemies are.
+   */
+  generatedPeople(): { people: string[]; hero: boolean; enemy: boolean } {
+    const at = this.player.position;
+    const people = [...this.npcs]
+      .filter(([, npc]) => isModel(npc.want))
+      .sort(([, a], [, b]) => a.group.position.distanceTo(at) - b.group.position.distanceTo(at))
+      .map(([name]) => name);
+    return { people, hero: isModel(this.heroWant), enemy: isModel(this.enemyWant) && this.enemyLook?.shape === 'humanoid' };
   }
 
   /**
@@ -1730,21 +1754,27 @@ export class RpgScene {
     this.heroDescription = description;
     const want = wanted(body);
     if (want === this.heroWant) return;
+    const swap = isModel(this.heroWant) && isModel(want);
     this.heroWant = want;
     const token = ++this.heroToken;
-    this.player.clear();
-    this.playerRig = null;
+    if (!swap) {
+      this.player.clear();
+      this.playerRig = null;
+    }
     if (want === 'wait') return;
     if (want !== 'kit') {
       try {
         const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero');
         if (token !== this.heroToken) return;
+        this.player.clear();
         this.playerRig = this.people.dress(this.player, template);
         this.gripSword(this.playerRig);
         return;
       } catch (err) {
         if (token !== this.heroToken) return;
         this.heroWant = 'kit';
+        this.player.clear();
+        this.playerRig = null;
         this.dressKitHero(token);
         throw err;
       }

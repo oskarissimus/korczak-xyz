@@ -863,6 +863,32 @@ ul.rpg-source {
   padding: 4px 0;
 }
 
+/* The remake: who draws, what makes and what rigs, then the two buttons, one under the other. */
+.rpg-dev-remake {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #3a3326;
+}
+
+.rpg-dev-remake button {
+  font: inherit;
+  color: #f1e6cf;
+  background: #2a251c;
+  border: 1px solid #6b5d43;
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.rpg-dev-remake button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* The Start tab: when each awaited thing came, and a bar per request on one time axis. Running is
    striped and failed is hollow, so it reads on a black-and-white screen (see "On a phone"). */
 .rpg-dev-start dl {

@@ -25,6 +25,8 @@ import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } f
 import type { Beat, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
+import type { Mesher, PersonPainter } from '../../utils/rpg/landmark3d';
+import type { Rigger } from './people';
 import type { RpgScene } from './RpgScene';
 import { translations } from './translations';
 
@@ -135,7 +137,19 @@ export function FpsBadge({ scene }: { scene: RpgScene | null }) {
   return <div className="rpg-fps">{frameLine(scene.frameStats())}</div>;
 }
 
-function PerfTab({ lang, scene, badge, onBadge }: { lang: Lang; scene: RpgScene | null; badge: boolean; onBadge: (on: boolean) => void }) {
+function PerfTab({
+  lang,
+  scene,
+  badge,
+  onBadge,
+  remake,
+}: {
+  lang: Lang;
+  scene: RpgScene | null;
+  badge: boolean;
+  onBadge: (on: boolean) => void;
+  remake: (() => RemakeOffer | null) | null;
+}) {
   const t = translations[lang];
   useTick(true, 500);
   const [, setVersion] = useState(0);
@@ -189,6 +203,41 @@ function PerfTab({ lang, scene, badge, onBadge }: { lang: Lang; scene: RpgScene 
         </select>
       </label>
       <p className="rpg-dev-empty">{t.perfHint}</p>
+      <RemakeBox lang={lang} offer={remake?.() ?? null} />
+    </div>
+  );
+}
+
+/** The remake the Perf tab offers (`remakePeople` in `Rpg.tsx`): who stands here, and at what. */
+export interface RemakeOffer {
+  nearest: string | null;
+  /** Everyone standing as a generated model: the people, the hero, the job's enemy. */
+  count: number;
+  /** One person's picture, model and rig as the switches stand. */
+  eachUsd: number;
+  makers: { painter: PersonPainter; mesher: Mesher; rigger: Rigger };
+  /** Remakes still being made. */
+  running: number;
+  run: (who: 'nearest' | 'all') => void;
+}
+
+function RemakeBox({ lang, offer }: { lang: Lang; offer: RemakeOffer | null }) {
+  const t = translations[lang];
+  if (!offer) return <p className="rpg-dev-empty">{t.remakeNone}</p>;
+  const { painter, mesher, rigger } = offer.makers;
+  return (
+    <div className="rpg-dev-remake">
+      <strong>{t.remakeTitle}</strong>
+      <span>
+        {t.shortPainters[painter]} → {t.shortMeshers[mesher]} → {t.shortRiggers[rigger]} · {formatUsd(offer.eachUsd)} {t.remakeEach}
+      </span>
+      <button type="button" disabled={!offer.nearest} onClick={() => offer.run('nearest')}>
+        {offer.nearest ? t.remakeNearest(offer.nearest, formatUsd(offer.eachUsd)) : t.remakeNobody}
+      </button>
+      <button type="button" disabled={offer.count === 0} onClick={() => offer.run('all')}>
+        {t.remakeAll(offer.count, formatUsd(offer.count * offer.eachUsd))}
+      </button>
+      {offer.running > 0 && <span className="rpg-dev-pending">{t.remakeRunning(offer.running)}</span>}
     </div>
   );
 }
@@ -330,6 +379,7 @@ export function DevConsole({
   quest = null,
   badge = false,
   onBadge = () => {},
+  remake = null,
 }: {
   lang: Lang;
   onClose: () => void;
@@ -340,6 +390,8 @@ export function DevConsole({
   quest?: (() => QuestView | null) | null;
   badge?: boolean;
   onBadge?: (on: boolean) => void;
+  /** The Perf tab's remake of the people standing here, as the switches now stand. */
+  remake?: (() => RemakeOffer | null) | null;
 }) {
   const t = translations[lang];
   const requests = useDevlog();
@@ -431,7 +483,7 @@ export function DevConsole({
         </button>
       </div>
       {tab === 'perf' ? (
-        <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} />
+        <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} remake={remake} />
       ) : tab === 'costs' ? (
         <CostTab lang={lang} />
       ) : tab === 'start' ? (

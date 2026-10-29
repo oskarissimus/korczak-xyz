@@ -725,6 +725,20 @@ content-hashed and immutable.
     meets) applies to people only; anything but schnell is drawn in the browser, as Meshy's mesh
     is, since the server's job only knows schnell. Measured on the blacksmith: Nano Banana's wide
     pose through TRELLIS, $0.06 in all, one person with a gap at every limb.
+    A painter can refuse: Nano Banana's content checker turns down famous characters by name
+    ("Luke Skywalker", `content_policy_violation`), where FLUX draws them. The lab says so in
+    words by the button that asked (`refused`), rather than leaving the click to do nothing.
+  - **Remake in the console** (owner, 29 Oct 2026: "a button in the developer console to generate
+    new characters, picture, model and rig, during the game by the new settings, so I can compare
+    how it looks in the game"). The `~` console's Perf tab names the three switches as they stand
+    and prices one person by them (`personCostNow` + $0.20 for Meshy's rig); *Nearest* remakes the
+    generated person nearest the hero, *Everyone standing* every generated person in the scene
+    (`RpgScene.generatedPeople`) plus the hero and the job's humanoid enemy. Each is a new piece
+    (`#stamp` on its id, past `ensurePiece`'s made-once) and replaces the old model where it was
+    kept: the character on every copy (`keepPerson`), the world's hero, the beat's job. The old body
+    stands until the new one is rigged (`setNpcBody`/`setHero` swap a model for a model without
+    clearing first), so nobody blinks out for Meshy's minute and a half. The remakes queue behind
+    whatever the world is still making (`inTurn`).
     First result, the blacksmith (`rpg/pracownia-modeli/` in the project files): the wide-pose
     picture through TRELLIS ($0.023) comes back with the arms clear of the apron; on Meshy's rig
     (+$0.20) it moves about as cleanly as Meshy's own $0.80 model, while on our rig the spread arms
