@@ -693,8 +693,10 @@ content-hashed and immutable.
     polygons, **$0.80**, in the browser — the server's job runner only knows TRELLIS) instead of
     TRELLIS. People only (`person`, `hero`, `enemy`); the hub, places and clues stay on TRELLIS. A
     model is kept on the character as before, so the switch applies to people made from then on;
-    either rig then works on either mesh. Not yet seen on a real person: the fal balance ran out the
-    day it was written, so the A-pose, the facing and the scale are assumed from TRELLIS's.
+    either rig then works on either mesh. Measured the same day on the blacksmith's picture
+    (`rpg/postacie-3d/model-meshy-vs-trellis-kowal.gif`): 211 s, a 3.7 MB GLB (~14.7k vertices,
+    one 2k texture), facing +Z and standing like TRELLIS's; far cleaner than TRELLIS — a face, hands
+    with fingers, an apron that hangs — and both rigs move it well (Meshy's rig took 38 s on it).
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
