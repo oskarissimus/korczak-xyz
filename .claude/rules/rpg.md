@@ -697,6 +697,25 @@ content-hashed and immutable.
     (`rpg/postacie-3d/model-meshy-vs-trellis-kowal.gif`): 211 s, a 3.7 MB GLB (~14.7k vertices,
     one 2k texture), facing +Z and standing like TRELLIS's; far cleaner than TRELLIS — a face, hands
     with fingers, an apron that hangs — and both rigs move it well (Meshy's rig took 38 s on it).
+  - **The model lab, `/apps/rpg-models/`** (owner, 29 Oct 2026: "a viewer for those models … rotate,
+    zoom, move and switch between animations to assess the best bang for buck; a button to generate
+    a model from the same image with various methods"). `components/RpgModels/`: everyone the game
+    has made (`labSources` over this browser's library and, signed in, the account's
+    `rpgWorlds`/`rpgSaves`, read only — the lab never stamps or pushes a sync unit) and people
+    described in the lab itself (a FLUX picture, $0.003). For one person: their pictures, the models
+    made from them, and the stage (`labScene.ts`): the ticked models (up to 5) in a row on one floor
+    under OrbitControls, all on the same clip from the same moment, with a rig switch (our own free;
+    Meshy asks first with its price for the ones not rigged in this browser), speed, pause, the
+    skeleton and the wireframe. **Make** takes a method from `PERSON_MESHERS` (`landmark3d.ts`:
+    TRELLIS $0.02, TRELLIS 2 $0.25, Tripo 2.5 $0.30, Hunyuan3D 2 $0.48, Meshy 6 $0.80) and a
+    picture: the game's, or a redraw in the wide pose (`widePose`, arms out with gaps, nothing
+    hanging between the legs, $0.003 once). Each model shows its price, time, triangles, size and
+    texture; `~` lists the fal requests with the session's total. What the lab made is kept in
+    `rpg-model-lab` in localStorage only, so not on another device. `noindex`.
+    First result, the blacksmith (`rpg/pracownia-modeli/` in the project files): the wide-pose
+    picture through TRELLIS ($0.023) comes back with the arms clear of the apron; on Meshy's rig
+    (+$0.20) it moves about as cleanly as Meshy's own $0.80 model, while on our rig the spread arms
+    stay spread in the idle, the donor resting them lower.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

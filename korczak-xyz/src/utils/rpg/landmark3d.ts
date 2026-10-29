@@ -216,10 +216,10 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
 }
 
 /**
- * One of Meshy's jobs through fal's queue: submits `body`, follows it with a line in `entry`, and
+ * A job through fal's queue (Meshy's and the model lab's): submits `body`, follows it with a line in `entry`, and
  * answers the result. `started` is called when fal gives it a runner.
  */
-async function meshyJob<T>(key: string, model: string, body: object, entry: DevRequest, head: string, o: FalOptions, started?: () => void): Promise<T> {
+async function queueJob<T>(key: string, model: string, body: object, entry: DevRequest, head: string, o: FalOptions, started?: () => void): Promise<T> {
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
   const submit = await f(`https://queue.fal.run/${model}`, { method: 'POST', headers: headers(key), signal: o.signal, body: JSON.stringify(body) });
@@ -262,7 +262,7 @@ export async function rigWithMeshy(key: string, glb: string, height: number, lab
   const entry = startRequest('fal', FAL_RIG_MODEL, null, head, label);
   try {
     type Rigged = { rigged_character_glb?: { url?: string; file_size?: number } | null };
-    const body = await meshyJob<Rigged>(key, FAL_RIG_MODEL, { model_url: glb, height_meters: height, enable_animation: false }, entry, head, o);
+    const body = await queueJob<Rigged>(key, FAL_RIG_MODEL, { model_url: glb, height_meters: height, enable_animation: false }, entry, head, o);
     const rigged = body.rigged_character_glb?.url;
     if (!rigged) throw new Error('no rigged model in the answer');
     endRequest(entry, null, { cost: FAL_PRICES.rig, text: `${head}\n→ ${rigged}${kbOf(body.rigged_character_glb)}` });
@@ -288,25 +288,68 @@ export function setPersonMesher(m: Mesher) {
 
 const PERSON_SLOTS: readonly FalSlot[] = ['person', 'hero', 'enemy'];
 
-/** Step 2 for a person on Meshy: the textured GLB from the picture, in the browser (the server's runner only knows TRELLIS). */
-export async function buildMeshyMesh(key: string, image: string, label: FalSlot, o: FalOptions = {}, started?: () => void): Promise<string> {
+type FalFile = { url?: string; file_size?: number } | null | undefined;
+
+/**
+ * Every image-to-3D a person can be made with, for the game's switch (TRELLIS, Meshy) and the model
+ * lab at `/apps/rpg-models/`, which makes the same picture every way to see which is worth its price
+ * (owner, 29 Oct 2026: "a button to generate a model from the same image with various methods and
+ * view and assess animated results"). List prices on fal, Oct 2026; each asks for roughly the
+ * ~10k-triangle, one-texture model the game can carry.
+ */
+export const PERSON_MESHERS = {
+  trellis: {
+    model: FAL_MESH_MODEL,
+    price: FAL_PRICES.mesh,
+    body: (image: string) => ({ image_url: image, texture_size: 512, mesh_simplify: SIMPLIFY.person }),
+    pick: (r: { model_mesh?: FalFile }) => r.model_mesh,
+  },
+  trellis2: {
+    model: 'fal-ai/trellis-2',
+    price: 0.25,
+    body: (image: string) => ({ image_url: image, resolution: 512, texture_size: 1024, decimation_target: 10_000 }),
+    pick: (r: { model_glb?: FalFile }) => r.model_glb,
+  },
+  tripo: {
+    model: 'tripo3d/tripo/v2.5/image-to-3d',
+    price: 0.3,
+    body: (image: string) => ({ image_url: image, texture: 'standard', pbr: false, face_limit: 10_000, orientation: 'align_image' }),
+    pick: (r: { model_mesh?: FalFile }) => r.model_mesh,
+  },
+  hunyuan: {
+    model: 'fal-ai/hunyuan3d/v2',
+    // $0.16 a white mesh, three times that textured.
+    price: 0.48,
+    body: (image: string) => ({ input_image_url: image, textured_mesh: true }),
+    pick: (r: { model_mesh?: FalFile }) => r.model_mesh,
+  },
+  meshy: {
+    model: FAL_PERSON_MESH_MODEL,
+    price: FAL_PRICES.meshyMesh,
+    body: (image: string) => ({ image_url: image, pose_mode: 'a-pose', target_polycount: 10_000, should_texture: true, enable_pbr: false, enable_rigging: false }),
+    pick: (r: { model_glb?: FalFile }) => r.model_glb,
+  },
+} as const;
+export type PersonMesher = keyof typeof PERSON_MESHERS;
+
+/** A person's model from its picture by `method`, in the browser (the server's runner only knows TRELLIS). */
+export async function buildPersonMesh(
+  key: string,
+  image: string,
+  method: PersonMesher,
+  label: string,
+  o: FalOptions = {},
+  started?: () => void,
+): Promise<{ glb: string; costUsd: number; bytes: number | null }> {
+  const m = PERSON_MESHERS[method];
   const head = `${tryMark(o)}← ${image}`;
-  const entry = startRequest('fal', FAL_PERSON_MESH_MODEL, null, head, label);
+  const entry = startRequest('fal', m.model, null, head, label);
   try {
-    type Made = { model_glb?: { url?: string; file_size?: number } | null };
-    const body = await meshyJob<Made>(
-      key,
-      FAL_PERSON_MESH_MODEL,
-      { image_url: image, pose_mode: 'a-pose', target_polycount: 10_000, should_texture: true, enable_pbr: false, enable_rigging: false },
-      entry,
-      head,
-      o,
-      started,
-    );
-    const glb = body.model_glb?.url;
-    if (!glb) throw new Error('no model in the answer');
-    endRequest(entry, null, { cost: FAL_PRICES.meshyMesh, text: `${head}\n→ ${glb}${kbOf(body.model_glb)}` });
-    return glb;
+    const body = await queueJob<Record<string, FalFile>>(key, m.model, m.body(image), entry, head, o, started);
+    const file = (m.pick as (r: Record<string, FalFile>) => FalFile)(body);
+    if (!file?.url) throw new Error('no model in the answer');
+    endRequest(entry, null, { cost: m.price, text: `${head}\n→ ${file.url}${kbOf(file)}` });
+    return { glb: file.url, costUsd: m.price, bytes: file.file_size ?? null };
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
@@ -374,8 +417,8 @@ async function imageAndMesh(
 ): Promise<{ image: string; glb: string; queuedMs: number; costUsd: number }> {
   if (personMesher === 'meshy' && PERSON_SLOTS.includes(label)) {
     const image = await drawImage(key, prompt, label, o);
-    const glb = await buildMeshyMesh(key, image, label, o, running);
-    return { image, glb, queuedMs: 0, costUsd: imageCost() + FAL_PRICES.meshyMesh };
+    const { glb, costUsd } = await buildPersonMesh(key, image, 'meshy', label, o, running);
+    return { image, glb, queuedMs: 0, costUsd: imageCost() + costUsd };
   }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);

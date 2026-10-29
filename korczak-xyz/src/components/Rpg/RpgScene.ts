@@ -25,7 +25,7 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { People, type Body, type Rigger } from './people';
+import { People, PERSON_HEIGHT, type Body, type Rigger } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
@@ -54,8 +54,7 @@ export interface PersonBody {
 /** What a body asks for, as one string to compare: the model's URL, `wait` or `kit`. */
 const wanted = (body: PersonBody) => body.url ?? (body.wait ? 'wait' : 'kit');
 
-/** Heights a person is rigged at, feet to crown. */
-const HEIGHT = { male: 1.78, female: 1.68, hero: 1.85, enemy: 1.8 } as const;
+const HEIGHT = PERSON_HEIGHT;
 
 /** A hero described as a woman stands on the female donor; anyone else on the male one. */
 export function heroBody(description: string): Body {

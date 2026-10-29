@@ -1,0 +1,190 @@
+/* The RPG's model lab at /apps/rpg-models/: a list of people, their models, and a stage. */
+
+.lab-window {
+  margin-bottom: 20px;
+}
+
+.lab {
+  font-size: 14px;
+}
+
+.lab-intro {
+  margin: 0 0 8px;
+}
+
+.lab-warn {
+  color: var(--retro-red);
+}
+
+.lab-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .lab-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lab h3 {
+  margin: 4px 0 6px;
+  font-size: 15px;
+}
+
+.lab-people ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.lab-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.lab-person img {
+  flex: none;
+  object-fit: cover;
+  background: var(--retro-white);
+}
+
+.lab-person span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lab-person small {
+  opacity: 0.75;
+}
+
+.lab-person-on {
+  border-color: var(--retro-navy);
+  background: rgba(0, 0, 128, 0.08);
+}
+
+.lab-describe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.lab-describe input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lab-pictures {
+  display: flex;
+  gap: 8px;
+}
+
+.lab-pictures figure {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.lab-pictures img {
+  background: var(--retro-white);
+  border: 1px solid var(--retro-gray);
+}
+
+.lab-models {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.lab-models td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--retro-gray);
+  vertical-align: middle;
+}
+
+.lab-pending td {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.lab-make,
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 8px 0;
+}
+
+.lab-order {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+.lab-canvas {
+  display: block;
+  width: 100%;
+  height: min(62vh, 560px);
+  min-height: 320px;
+  touch-action: none;
+  border: 1px solid var(--retro-dark-gray);
+}
+
+.lab-spent {
+  margin: 4px 0 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.lab-console {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: rgba(12, 14, 20, 0.92);
+  color: #e8e8e8;
+  font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  z-index: 50;
+}
+
+.lab-console h4 {
+  margin: 0 0 6px;
+}
+
+.lab-console ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.lab-console pre {
+  margin: 2px 0 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  opacity: 0.75;
+}
+
+.lab-req-error {
+  color: #ff8a80;
+}
+
+.lab-req-waiting,
+.lab-req-streaming {
+  color: #ffe082;
+}

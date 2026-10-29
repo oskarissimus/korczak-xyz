@@ -1,0 +1,25 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ModelLab from '../../../components/RpgModels/ModelLab';
+import { useTranslations } from '../../../i18n';
+import '../../../styles/rpg-models.css';
+
+const lang = 'pl';
+const t = useTranslations(lang);
+---
+
+<Layout title={`${t('RpgModels')} | korczak.xyz`} description={t('rpgModels.desc')} lang={lang}>
+  <div class="window lab-window">
+    <div class="title-bar">
+      <span>{t('RpgModels')}</span>
+      <div class="title-buttons">
+        <div class="title-btn minimize-btn"></div>
+        <div class="title-btn maximize-btn"></div>
+        <div class="title-btn close-btn"></div>
+      </div>
+    </div>
+    <div class="window-content">
+      <ModelLab client:only="react" lang={lang} />
+    </div>
+  </div>
+</Layout>

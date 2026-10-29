@@ -42,6 +42,8 @@ const NOINDEX = new Set([
   '/apps/baby-sleep/config/',
   '/apps/baby-sleep/share/',
   '/apps/shopping/share/',
+  // The RPG's model lab: a developer's bench for comparing generated people, nothing to arrive at cold.
+  '/apps/rpg-models/',
 ]);
 
 /**

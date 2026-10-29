@@ -158,6 +158,10 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
 /** The landmark's picture prompt, as it was before the other pieces. */
 export const landmarkPrompt = (world: PromptWorld) => hubModelPrompt(world, 'landmark');
 
+const A_POSE = 'Standing straight in an A-pose, arms held a little away from the body, legs apart, hands empty and open,';
+const WIDE_POSE =
+  'Standing in a wide A-pose for rigging: arms straight and held out at about 45 degrees, a clear gap between each arm and the body, legs apart with a clear gap between them, clothes close to the body and nothing hanging between the legs, hands empty and open,';
+
 /**
  * The picture a person's model is made from (`components/Rpg/people.ts`): one person, whole, front-on,
  * in an A-pose with empty hands, on white. The pose is the rig's: every person is warped from the same
@@ -170,13 +174,22 @@ export function personPrompt(appearance: string, who: { gender?: 'male' | 'femal
     `A single full-body 3D game character, one person only: ${appearance.trim().replace(/[.\s]+$/, '')}.`,
     who.gender === 'female' ? 'A woman.' : who.gender === 'male' ? 'A man.' : '',
     who.color ? `Their clothes are mostly ${who.color}.` : '',
-    'Standing straight in an A-pose, arms held a little away from the body, legs apart, hands empty and open,',
+    A_POSE,
     'facing the viewer, the whole figure from head to feet, centred.',
     'Stylised low-poly game character, chunky proportions,',
     'isolated on a plain white background, no ground, no shadow, no text, soft even light.',
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/**
+ * A person's prompt in a wider pose, for the model lab (`/apps/rpg-models/`): the guess being tested
+ * is that TRELLIS fuses what touches in the picture (a hand to an apron), and no rig can part it
+ * after, so a picture with gaps rigs better at the same $0.023.
+ */
+export function widePose(prompt: string): string {
+  return prompt.includes(A_POSE) ? prompt.replace(A_POSE, WIDE_POSE) : `${prompt} ${WIDE_POSE.replace(/,$/, '.')}`;
 }
 
 /**

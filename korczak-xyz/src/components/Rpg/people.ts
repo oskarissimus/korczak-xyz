@@ -41,6 +41,9 @@ export type Body = 'male' | 'female';
 export type Rigger = 'meshy' | 'self';
 export const DEFAULT_RIGGER: Rigger = 'meshy';
 
+/** Heights a person is rigged at, feet to crown, by who they are. */
+export const PERSON_HEIGHT = { male: 1.78, female: 1.68, hero: 1.85, enemy: 1.8 } as const;
+
 /** A person rigged and stood on the origin, facing +Z; clone it for each copy (`dress`). */
 export interface PersonTemplate {
   group: THREE.Group;
@@ -196,6 +199,16 @@ export class People {
     })();
     this.loaded.catch(() => (this.loaded = null));
     return this.loaded;
+  }
+
+  /** Whether this browser already holds Meshy's rig of `url` at `height`, so asking for it again costs nothing. */
+  async meshyCached(url: string, height: number): Promise<boolean> {
+    try {
+      if (typeof caches === 'undefined') return false;
+      return Boolean(await (await caches.open(CACHE)).match(`${url}?meshy=1&height=${height}`));
+    } catch {
+      return false;
+    }
   }
 
   /**
