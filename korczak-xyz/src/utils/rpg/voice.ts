@@ -10,12 +10,21 @@
 
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
 import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
-import { endRequest, startRequest, voiceCredits } from './devlog';
+import { endRequest, startRequest, updateRequest, voiceCredits } from './devlog';
 import { DesignRefused, DESIGN_MODEL, designVoice, findDesigned, previewText, type DesignWho } from './voiceDesign';
+import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing as voicingOf } from './audioTags';
+import { voiceCreditsPerChar } from './cost';
 import type { Lang } from './quest';
 
-/** Their low-latency model; it speaks Polish and English with the same voices. */
-export const VOICE_MODEL = 'eleven_flash_v2_5';
+/** Flash for every line without an audio tag; a tagged line goes to `TAG_MODEL` (`audioTags.ts`). */
+export const VOICE_MODEL = FLASH_MODEL;
+
+/** v4 refused (the plan, the voice, a model gone): tags go unsaid for the session, the words still on Flash. */
+let tagsOff = false;
+
+function voicing(text: string): { model: string; text: string } {
+  return voicingOf(text, !tagsOff);
+}
 
 /**
  * Premade voices every ElevenLabs account has: George or Rachel for the quest giver, Brian for the
@@ -222,18 +231,8 @@ async function libraryVoice(key: string, line: SpokenLine, lang: Lang): Promise<
   }
 }
 
-/** 128 kbps: the same credits as 64, and no codec smear on top of whatever the voice already has. */
-function speak(key: string, voiceId: string, text: string, lang: Lang): Promise<Response> {
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      model_id: VOICE_MODEL,
-      language_code: lang,
-      voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-    }),
-  });
+function speak(key: string, voiceId: string, text: string, lang: Lang, model: string = VOICE_MODEL): Promise<Response> {
+  return fetch(...speechRequest(key, voiceId, text, lang, model));
 }
 
 /** 50ms of silence, the same clip the backseat driver primes with. */
@@ -279,26 +278,37 @@ export function stopVoice(): void {
 async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   // Into the developer console with what it cost: ElevenLabs' own `character-cost` header where the
   // browser is allowed to read it, else the list rate (`cost.ts`).
-  const entry = startRequest('voice', `${VOICE_MODEL} · ${line.who?.name ?? line.voice}`, null, line.text);
+  // The console shows what was sent, tags and all, under the model that spoke it.
+  let said = voicing(line.text);
+  const entry = startRequest('voice', `${said.model} · ${line.who?.name ?? line.voice}`, null, said.text);
   try {
     const demo = key === DEMO_VOICE_KEY;
     const demoUrl = demo ? rpgDemoUrl() : null;
     if (demo && !demoUrl) throw new Error('demo: no address');
-    const response = demoUrl
+    let response = demoUrl
       ? await fetch(demoUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang }),
         })
-      : await ownClip(key, line, lang);
+      : await ownClip(key, line, lang, said);
+    if (!demoUrl && !response.ok && said.model === TAG_MODEL && refusedModel(response.status)) {
+      // v4 would not: the same line without its tags, on Flash, and Flash from now on.
+      tagsOff = true;
+      said = voicing(line.text);
+      updateRequest(entry, { model: `${said.model} · ${line.who?.name ?? line.voice} (${TAG_MODEL} ${response.status})`, text: said.text });
+      response = await ownClip(key, line, lang, said);
+    }
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);
     }
     const url = URL.createObjectURL(await response.blob());
+    // The demo says which model it used (`x-demo-model`); the rate follows the model.
+    const model = response.headers.get('x-demo-model') ?? said.model;
     endRequest(entry, null, {
-      chars: line.text.length,
-      credits: voiceCredits(line.text.length, response.headers.get('character-cost')),
+      chars: said.text.length,
+      credits: voiceCredits(said.text.length, response.headers.get('character-cost'), voiceCreditsPerChar(model)),
     });
     return url;
   } catch (e) {
@@ -311,10 +321,12 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
  * On the reader's key: the character's library voice, and the premade one if the library has none
  * or will not speak it (a plan that may not use library voices through the API says so here).
  */
-async function ownClip(key: string, line: SpokenLine, lang: Lang): Promise<Response> {
+async function ownClip(key: string, line: SpokenLine, lang: Lang, said = voicing(line.text)): Promise<Response> {
   const own = await characterVoice(key, line, lang);
   if (own) {
-    const response = await speak(key, own.id, line.text, lang);
+    const response = await speak(key, own.id, said.text, lang, said.model);
+    // The model refused, not the voice: the caller falls back to Flash before blaming the voice.
+    if (said.model === TAG_MODEL && refusedModel(response.status)) return response;
     if (response.ok || response.status === 429 || response.status >= 500) return response;
     if (own.designed) {
       if ([400, 404].includes(response.status) && line.who) forgetDesigned(line.who);
@@ -323,7 +335,7 @@ async function ownClip(key: string, line: SpokenLine, lang: Lang): Promise<Respo
       libraryOff = true;
     }
   }
-  return speak(key, VOICES[line.voice], line.text, lang);
+  return speak(key, VOICES[line.voice], said.text, lang, said.model);
 }
 
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {

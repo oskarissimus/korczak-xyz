@@ -300,10 +300,10 @@ export function endRequest(entry: DevRequest, error: string | null, patch: Parti
   for (const l of endListeners) l(entry);
 }
 
-/** A clip's credits: ElevenLabs' own count where its response says, else the list rate. */
-export function voiceCredits(chars: number, header: string | null): number {
+/** A clip's credits: ElevenLabs' own count where its response says, else the model's list rate. */
+export function voiceCredits(chars: number, header: string | null, perChar = VOICE_CREDITS_PER_CHAR): number {
   const charged = header === null ? NaN : Number(header);
-  return Number.isFinite(charged) ? charged : chars * VOICE_CREDITS_PER_CHAR;
+  return Number.isFinite(charged) ? charged : chars * perChar;
 }
 
 /** Time spent writing: a beat's is the quest's, the genesis's the world's (kept on it instead). */

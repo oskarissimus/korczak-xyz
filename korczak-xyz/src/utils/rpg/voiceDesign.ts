@@ -34,6 +34,7 @@
  * No DOM: `fetch` is passed in.
  */
 
+import { spokenText } from './audioTags';
 import type { Lang } from './quest';
 
 export const DESIGN_MODEL = 'eleven_multilingual_ttv_v2';
@@ -94,7 +95,8 @@ export function description(who: DesignWho, lang: Lang): string {
 
 /** 100 to 1000 characters of the character's own words, as the design endpoint requires. */
 export function previewText(who: DesignWho, lang: Lang): string {
-  let t = (who.sample ?? '').trim().replace(/\s+/g, ' ');
+  // Their own words without the tags and asides (`audioTags.ts`): the design model would read them out.
+  let t = spokenText(who.sample ?? '', false);
   const filler =
     lang === 'pl'
       ? 'Słuchaj uważnie, bo nie będę powtarzać. Różne rzeczy się tu dzieją, a ja widziałem już dość, żeby wiedzieć, kiedy milczeć.'

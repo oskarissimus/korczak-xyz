@@ -235,11 +235,36 @@ describe('rpgDemo', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('audio/mpeg');
     expect(fetch.mock.calls[0][1].headers['xi-api-key']).toBe('sk_owner-0000000000');
-    expect(spent().all).toBeCloseTo(7 * 0.5 * 0.00022, 9);
+    expect(spent().all).toBeCloseTo(7 * 0.5 * (22 / 300_000), 9);
+    expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-speech/');
+    expect(JSON.parse(fetch.mock.calls[0][1].body).model_id).toBe('eleven_flash_v2_5');
 
     const long = response();
     await handleRpgDemo(request('POST', { kind: 'voice', text: 'x'.repeat(401), voice: 'female', lang: 'pl' }), long);
     expect(long.statusCode).toBe(400);
+  });
+
+  it('acts an audio tag on v4 at its own rate, and falls back to Flash without the tag if v4 refuses', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const res = response();
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Pył. [Kaszel].', voice: 'female', lang: 'pl' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-demo-model']).toBe('eleven_v4');
+    expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-dialogue');
+    const sent = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(sent).toMatchObject({ model_id: 'eleven_v4', inputs: [{ text: 'Pył. [coughs].' }] });
+    expect(spent().all).toBeCloseTo('Pył. [coughs].'.length * 1 * (22 / 300_000), 9);
+
+    fetch.mockReset();
+    fetch
+      .mockResolvedValueOnce(new Response('{}', { status: 422 }))
+      .mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+    const refused = response();
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Ja... (kaszle) Dobrze!', voice: 'male', lang: 'pl' }), refused);
+    expect(refused.statusCode).toBe(200);
+    expect(refused.headers['x-demo-model']).toBe('eleven_flash_v2_5');
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ model_id: 'eleven_flash_v2_5', text: 'Ja... Dobrze!' });
   });
 
   it('hands over every voice search of a language at once, and asks the library only once a week', async () => {

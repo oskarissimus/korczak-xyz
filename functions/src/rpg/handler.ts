@@ -51,6 +51,7 @@ import {
   type RpgDemoSettings,
 } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { beatPrompt } from '../../../korczak-xyz/src/utils/rpg/quest';
+import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing } from '../../../korczak-xyz/src/utils/rpg/audioTags';
 import { demoGenesis, genesisPrompt, genesisTemperature } from '../../../korczak-xyz/src/utils/rpg/genesis';
 import {
   asAge,
@@ -68,7 +69,7 @@ import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 
-const VOICE_MODEL = 'eleven_flash_v2_5';
+const VOICE_MODEL = FLASH_MODEL;
 
 function cors(req: Request, res: Response): boolean {
   const origin = req.headers.origin;
@@ -77,7 +78,7 @@ function cors(req: Request, res: Response): boolean {
     res.set('Access-Control-Allow-Origin', allowed);
     res.set('Vary', 'Origin');
     // The console reads what a clip cost from here, the way it reads ElevenLabs' own header.
-    res.set('Access-Control-Expose-Headers', 'x-demo-cost, x-demo-remaining');
+    res.set('Access-Control-Expose-Headers', 'x-demo-cost, x-demo-remaining, x-demo-model');
   }
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -398,17 +399,8 @@ function speaker(raw: unknown): VoiceWho | null {
   return { name, gender: r.gender === 'female' ? 'female' : 'male', ...(age && { age }) };
 }
 
-function speak(key: string, voiceId: string, text: string, lang: 'pl' | 'en'): Promise<globalThis.Response> {
-  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      model_id: VOICE_MODEL,
-      language_code: lang,
-      voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-    }),
-  });
+function speak(key: string, voiceId: string, text: string, lang: 'pl' | 'en', model: string): Promise<globalThis.Response> {
+  return fetch(...speechRequest(key, voiceId, text, lang, model));
 }
 
 async function clip(req: Request, res: Response, body: Record<string, unknown>): Promise<void> {
@@ -417,7 +409,10 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   const voice = (Object.keys(DEMO_VOICES) as DemoVoice[]).find((v) => v === body.voice);
   if (!voice) throw new BadRequest('Unknown voice');
   const lang = body.lang === 'pl' ? 'pl' : 'en';
-  const cost = clipCost(text.length);
+  // A line with an audio tag goes to v4 at its own rate, the rest to Flash (`audioTags.ts`); the
+  // reservation is the tagged price, and a fall back to Flash settles at Flash's.
+  let said = voicing(text);
+  const cost = clipCost(said.text.length, said.model);
 
   const settings = await readSettings();
   const day = dayKey();
@@ -452,13 +447,22 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
           },
         )
       : null;
-    let upstream = library ? await speak(elevenLabs, library, text, lang) : null;
+    // v4 refusing (not a rate limit, not an outage) is the model, not the voice: the same voice on Flash.
+    const send = async (voiceId: string) => {
+      const r = await speak(elevenLabs, voiceId, said.text, lang, said.model);
+      if (r.ok || said.model !== TAG_MODEL || !refusedModel(r.status)) return r;
+      reportError('rpgDemo.tagModel', new Error(`ElevenLabs ${r.status}`), { status: r.status });
+      said = voicing(text, false);
+      spent = clipCost(said.text.length, said.model);
+      return speak(elevenLabs, voiceId, said.text, lang, said.model);
+    };
+    let upstream = library ? await send(library) : null;
     if (upstream && !upstream.ok && upstream.status !== 429 && upstream.status < 500) {
       reportError('rpgDemo.libraryVoice', new Error(`ElevenLabs ${upstream.status}`), { status: upstream.status, voice: library });
       upstream = null;
     }
     const spoken = upstream ? 'library' : 'premade';
-    upstream ??= await speak(elevenLabs, DEMO_VOICES[voice], text, lang);
+    upstream ??= await send(DEMO_VOICES[voice]);
     if (!upstream.ok) {
       spent = 0;
       reportError('rpgDemo.voice', new Error(`ElevenLabs ${upstream.status}`), { status: upstream.status });
@@ -468,7 +472,8 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     const audio = Buffer.from(await upstream.arrayBuffer());
     res.status(200);
     res.set('Content-Type', 'audio/mpeg');
-    res.set('x-demo-cost', String(cost));
+    res.set('x-demo-cost', String(spent));
+    res.set('x-demo-model', said.model);
     res.set('x-demo-voice', spoken);
     res.set('x-demo-remaining', JSON.stringify(remainingUsd(settings, claimed.spent)));
     res.send(audio);

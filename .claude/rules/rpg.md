@@ -983,7 +983,8 @@ on Start, not on load, so the choice is what the model is asked for.
 
 ## Voice
 
-Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`)
+Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`,
+`eleven_v4` for a line with an audio tag — *Audio tags* below)
 when the store holds an ElevenLabs key: the option the hunter picks in Brian's voice, then the
 answer in **the character's own voice**.
 
@@ -1083,6 +1084,34 @@ it; a question (`ask`: story parts, small talk, clue questions, the witness's) i
 italic with a `✓` after it once asked in this quest, and can still be asked; goodbye and back are
 plain. The glyphs are there because the owner plays on a phone set to black and white: **nothing
 in this game may be told apart by colour alone.**
+
+**Audio tags: v4 for a tagged line, Flash for the rest** (owner, 29 Oct 2026: "ElevenLabs supports
+things like [cough], maybe we talk to it wrong?"). We did. The model had started writing sounds as
+Polish stage directions, "[Kaszel].", "(Kaszle pyłem)", "(Kliknięcie językiem)" (the quest in
+`rpgSaves/wmvsih7dt0`, beat 1, Magister Elara and Siostra Mirabella), and they went to Flash as they
+were. **Flash has no audio tags**: it read "Kaszel" out as a word, and the dialogue showed the
+brackets. Only v3 and v4 act a tag, and they are told in English. `utils/rpg/audioTags.ts` now:
+
+- The prompt offers a fixed list of English tags in square brackets (`TAGS`: `[coughs]`, `[sighs]`,
+  `[whispers]`…), one or two a line, nothing in round brackets; the `voice` it writes may not
+  describe sounds that are not the voice (Mirabella's "clicking tongue sound between sentences" is
+  where her "(Kliknięcie językiem)" came from).
+- `directions` splits a line. A known tag, or an old save's Polish one by `ALIASES`, is **spoken**
+  as its English tag and **shown** as a small italic aside in the game's language ("kaszle"). Any
+  other `[…]` or `(…)` is a stage direction: shown in italics as written, never spoken, on any model
+  — "(Cyriak freezes as a living statue…)" in Cyriak's voice was worse than silence.
+- `voicing` sends a line to `eleven_v4` **only when it has a tag to act**; everything else stays on
+  Flash. v4 is served through **Text to Dialogue** (`/v1/text-to-dialogue`, one input), not the TTS
+  endpoint, with stability 0.5. It costs **a credit a character, twice Flash** (`voiceCreditsPerChar`,
+  $0.08 against $0.04 per 1k on the API price list), and the console labels each clip with the model
+  that spoke it and its credits at that rate. A quest has a handful of tagged lines, so the bill
+  barely moves; the price of putting every line on v4 would be double the voice cost and slower clips.
+- **v4 refusing is not fatal**: any 4xx but a 429 from v4 sends the same line to Flash without its
+  tags and keeps tags off for the session (`tagsOff`); the demo does the same per clip, settles at
+  Flash's price and says which model spoke in `x-demo-model`.
+- Untested against the live API at the time of writing (the session could not read the key): the
+  request shape is ElevenLabs' reference. If tagged lines go silent or fall back every time, the
+  console's voice entry carries v4's status in its label.
 
 ## On a phone
 

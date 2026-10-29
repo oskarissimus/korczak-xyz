@@ -114,6 +114,7 @@ import {
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
+import { asideLabel, directions } from '../../utils/rpg/audioTags';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress } from './DevConsole';
 import { loadBadge, loadQuality, saveBadge } from './frames';
@@ -202,6 +203,21 @@ function clip(text: string, n: number): string {
 const EXOTIC_KEY = 'rpg-exotic';
 /** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self'. */
 const RIGGER_KEY = 'rpg-rigger';
+
+/**
+ * A line as the dialogue shows it: an audio tag ("[coughs]", or an old save's "[Kaszel]") as a short
+ * italic aside in the game's language, and any other bracketed stage direction the same way, as
+ * written — never the brackets (`audioTags.ts`).
+ */
+function LineText({ text, lang }: { text: string; lang: Lang }) {
+  return (
+    <>
+      {directions(text).map((p, i) =>
+        p.kind === 'say' ? p.text : <em key={i} className="rpg-aside">{asideLabel(p, lang)}</em>,
+      )}
+    </>
+  );
+}
 
 export default function Rpg({ lang }: { lang: Lang }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
@@ -2498,7 +2514,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
         return (
           <div className={`rpg-dialogue${held ? ' rpg-dialogue-held' : ''}`} role="dialog">
             <div className="rpg-dialogue-speaker">{shown.line.speaker}</div>
-            <p className="rpg-dialogue-text">{shown.line.text}</p>
+            <p className="rpg-dialogue-text">
+              <LineText text={shown.line.text} lang={gameLang} />
+            </p>
             <ol className="rpg-dialogue-choices">
               {shown.choices.map((c, i) => {
                 const asked = c.kind === 'ask' && askedRef.current.has(`${shown.line.speaker}|${c.label}`);
@@ -2515,7 +2533,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
                       disabled={held !== null}
                       onClick={() => choose(c)}
                     >
-                      <span className="rpg-choice-n">{i + 1}.</span> {c.label}
+                      <span className="rpg-choice-n">{i + 1}.</span> <LineText text={c.label} lang={gameLang} />
                     </button>
                   </li>
                 );

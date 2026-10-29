@@ -38,6 +38,9 @@ import {
 } from './place';
 import { classicWorld, firstObject, worldLines, type LandmarkModel, type WorldBrief } from './genesis';
 import { asAge, type VoiceAge } from './voicePick';
+import { TAGS } from './audioTags';
+
+const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
 export type Lang = 'en' | 'pl';
 
@@ -832,7 +835,10 @@ export function beatPrompt(ctx: BeatContext): string {
     'everything the witness says is that person’s own words to the hero, in the first person ("I", "my',
     'daughter"), addressing them as "you". Never narration, never stage directions, never the speaker in the third',
     'person, never "she says that…". Wrong: "Helena weeps and says her daughter-in-law hanged herself."',
-    'Right: "My Hania… she hanged herself. On the old willow, by the graves." A clue’s "text" is the',
+    'Right: "My Hania… she hanged herself. On the old willow, by the graves." A sound the voice actor makes',
+    `goes in as an audio tag, in English and square brackets whatever the language above, only one of: ${TAG_LIST}`,
+    '— at most one or two in a line, where it matters ("[coughs] The dust… it is everywhere."). No other tags,',
+    'nothing in round brackets, no gestures or sounds of anything else. A clue’s "text" is the',
     'hero’s own eye, first person ("Claw marks, and too high for a wolf.").',
     'Every "label" and "ask" is the hero’s own spoken line, short: at most 12 words, one sentence.',
     `Write everything the player reads in ${language}. Keep each line under 280 characters.`,
@@ -843,7 +849,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "title": string (the quest’s title),',
     '  "npc": {"name": string, "gender": "male" or "female", "age": "young", "middle_aged" or "old" (picks their voice),',
     '          "color": "#rrggbb" for their clothes,',
-    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk, never on how they sound recorded (no phone, radio, echo); for someone already met, what you were told),`,
+    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk, never on how they sound recorded (no phone, radio, echo) and never a sound that is not their voice (no ticking, clicking, rattling); for someone already met, what you were told),`,
     '          "appearance": string (IN ENGLISH whatever the language above, at most 20 words: how they look, for a 3D model of',
     '                        them: build, age, clothes, hair, nothing held — "a stooped old woman in a patched green wool dress and',
     '                        leather apron, grey braid"; for someone already met, what you were told)},',

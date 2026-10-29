@@ -22,7 +22,7 @@
  * beat before the game uses it, and a budget in dollars behind it.
  */
 
-import { tokenPrice, VOICE_CREDITS_PER_CHAR, USD_PER_VOICE_CREDIT } from './cost';
+import { tokenPrice, voiceCreditsPerChar, USD_PER_VOICE_CREDIT } from './cost';
 import { demoWorld } from './genesis';
 import { parsePlace } from './place';
 import { HEARD_MAX, parseMood, SITUATION_MAX, type BeatContext, type Meeting, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
@@ -145,9 +145,9 @@ export function beatReservation(model: string, promptChars: number): number | nu
   return (promptChars * price.input + MAX_OUTPUT_TOKENS * price.output) / 1_000_000;
 }
 
-/** A clip's cost is known before it is made: its length, at the list rate (`cost.ts`). */
-export function clipCost(chars: number): number {
-  return chars * VOICE_CREDITS_PER_CHAR * USD_PER_VOICE_CREDIT;
+/** A clip's cost is known before it is made: its length, at the list rate of its model (`cost.ts`). */
+export function clipCost(chars: number, model = 'eleven_flash_v2_5'): number {
+  return chars * voiceCreditsPerChar(model) * USD_PER_VOICE_CREDIT;
 }
 
 class BadContext extends Error {}

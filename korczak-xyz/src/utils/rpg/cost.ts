@@ -58,6 +58,15 @@ export function tokenCost(model: string, usage: Usage): number | null {
  * another rate, so the credits are the number to trust.
  */
 export const VOICE_CREDITS_PER_CHAR = 0.5;
+
+/**
+ * Every other speech model is a credit a character: v4 and v3, the ones that act audio tags
+ * (ElevenLabs' API pricing, Oct 2026: $0.08 per 1k characters against Flash's $0.04). A tagged line
+ * costs twice what it would on Flash (`voice.ts`, `TAG_MODEL`).
+ */
+export function voiceCreditsPerChar(model: string): number {
+  return model.startsWith('eleven_flash') || model.startsWith('eleven_turbo') ? VOICE_CREDITS_PER_CHAR : 1;
+}
 export const USD_PER_VOICE_CREDIT = 22 / 300_000;
 
 export function voiceCost(credits: number): number {
