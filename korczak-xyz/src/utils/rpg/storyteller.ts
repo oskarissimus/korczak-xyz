@@ -577,7 +577,10 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
         run.outcome = 'failed';
         run.error = describe(e);
       }
-      const background = hidden && (dropped(e) || (e instanceof ProviderError && e.timedOut));
+      // An empty answer too: iOS freezing a page mid-stream ends it with a 200 and no candidates
+      // ("200: empty answer (no candidates)", owner's screenshot, 29 Oct 2026).
+      const background =
+        hidden && (dropped(e) || (e instanceof ProviderError && (e.timedOut || /^empty answer/.test(e.message))));
       if (background && again < BACKGROUND_RETRIES) {
         again += 1;
         i -= 1;
