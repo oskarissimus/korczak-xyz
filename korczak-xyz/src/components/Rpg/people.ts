@@ -85,6 +85,97 @@ export function heads(geometry: THREE.BufferGeometry): number {
   return count;
 }
 
+/**
+ * Whether a model stands with its arms straight out, a T-pose (owner, 29 Oct 2026: "now that Nano
+ * Banana draws a good, repeatable T-pose, a procedural rig should be easier; the old one was for the
+ * A-pose"): across its shoulders' band, 72–86 % of its height, it is most of its height wide, where
+ * an A-pose is under half.
+ */
+export function armsOut(geometry: THREE.BufferGeometry): boolean {
+  const p = geometry.attributes.position;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const height = maxY - minY || 1;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (let i = 0; i < p.count; i++) {
+    const y = (p.getY(i) - minY) / height;
+    if (y < 0.72 || y > 0.86) continue;
+    const x = p.getX(i);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  return maxX - minX > height * 0.7;
+}
+
+const ARMS = [
+  ['LeftArm', 'LeftForeArm', 1],
+  ['LeftForeArm', 'LeftHand', 1],
+  ['RightArm', 'RightForeArm', -1],
+  ['RightForeArm', 'RightHand', -1],
+] as const;
+
+/**
+ * The donor stood in a T-pose: each upper arm and forearm turned to point straight out sideways, and
+ * its points carried with them by its own skin weights. Warping this onto a T-posed model is the same
+ * easy warp the A-posed donor has onto an A-posed one, where the A-posed donor's arms, hanging at its
+ * sides, could never find arms held out. The posed rotations become the rig's rest, so the skin is
+ * bound in the T-pose and a clip, which sets every bone's rotation outright, still lowers the arms.
+ */
+export function tPoseDonor(donor: Donor): Donor {
+  const n = donor.bones.length;
+  const index = new Map(donor.bones.map((b, i) => [b.name, i]));
+  const local = donor.bones.map((b) => new THREE.Quaternion().fromArray(b.quaternion));
+  const worldOf = (rot: THREE.Quaternion[]) => {
+    const m: THREE.Matrix4[] = [];
+    donor.bones.forEach((b, i) => {
+      const own = new THREE.Matrix4().compose(new THREE.Vector3().fromArray(b.position), rot[i], new THREE.Vector3(1, 1, 1));
+      m[i] = b.parent < 0 ? own : m[b.parent].clone().multiply(own);
+    });
+    return m;
+  };
+  const rest = worldOf(local);
+  const posed = local.map((q) => q.clone());
+  for (const [bone, child, side] of ARMS) {
+    const b = index.get(bone);
+    const c = index.get(child);
+    if (b === undefined || c === undefined) continue;
+    const m = worldOf(posed);
+    const from = new THREE.Vector3().setFromMatrixPosition(m[b]);
+    const dir = new THREE.Vector3().setFromMatrixPosition(m[c]).sub(from).normalize();
+    const turn = new THREE.Quaternion().setFromUnitVectors(dir, new THREE.Vector3(side, 0, 0));
+    const world = new THREE.Quaternion().setFromRotationMatrix(m[b]);
+    const parent = new THREE.Quaternion().setFromRotationMatrix(m[donor.bones[b].parent]);
+    posed[b] = parent.invert().multiply(turn.multiply(world));
+  }
+  const after = worldOf(posed);
+  const skin = after.map((m, i) => m.clone().multiply(rest[i].clone().invert()));
+  const positions = new Float32Array(donor.positions.length);
+  const v = new THREE.Vector3();
+  const sum = new THREE.Vector3();
+  for (let i = 0; i < donor.positions.length / 3; i++) {
+    sum.set(0, 0, 0);
+    for (let a = 0; a < 4; a++) {
+      const w = donor.skinWeight[i * 4 + a];
+      if (!w) continue;
+      v.fromArray(donor.positions, i * 3).applyMatrix4(skin[donor.skinIndex[i * 4 + a]]);
+      sum.addScaledVector(v, w);
+    }
+    sum.toArray(positions, i * 3);
+  }
+  const bones = donor.bones.map((b, i) => ({
+    ...b,
+    quaternion: posed[i].toArray() as [number, number, number, number],
+    world: new THREE.Vector3().setFromMatrixPosition(after[i]).toArray() as [number, number, number],
+  }));
+  return { bones: bones.slice(0, n), positions, skinIndex: donor.skinIndex, skinWeight: donor.skinWeight };
+}
+
 /** Bumped when `selfRig` changes what it answers, so no rig worked out before is reused. */
 const RIG_VERSION = 1;
 const CACHE = 'rpg-landmarks';
@@ -210,6 +301,7 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
 export class People {
   private loaded: Promise<{ donors: Record<Body, Donor>; clips: ClipData[] }> | null = null;
   private templates = new Map<string, Promise<PersonTemplate>>();
+  private tPosed: Partial<Record<Body, Donor>> = {};
   /** Who rigs the people asked for from now on; Meshy only with a fal key to pay with. */
   rigger: Rigger = DEFAULT_RIGGER;
   falKey: string | null = null;
@@ -331,13 +423,16 @@ export class People {
 
   private async build(url: string, key: string, body: Body, height: number, label: string): Promise<PersonTemplate> {
     const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
-    const donor = donors[body];
+    // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
+    const tPosed = armsOut(geometry);
+    const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
+    const pose = tPosed ? 'T-posed' : 'A-posed';
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
-    const { rig, ms } = await cachedRig(key, async () => {
-      const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${target.length / 3} vertices`, label);
+    const { rig, ms } = await cachedRig(tPosed ? `${key}&pose=t` : key, async () => {
+      const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
       try {
         const made = await rigOffThread(donor, target, height);
-        endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${target.length / 3} vertices → ${donor.bones.length} bones` });
+        endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
         return made;
       } catch (err) {
         endRequest(entry, err instanceof Error ? err.message : String(err));

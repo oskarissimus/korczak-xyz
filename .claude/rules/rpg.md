@@ -731,16 +731,24 @@ content-hashed and immutable.
     gaps to the armpit, hands empty with the objects named, carried things on the back or belt), and
     people described in the lab are drawn in it from the start. The prompt sent, or the one a kept
     picture was drawn from, is under the Make row and the describe form, word for word. Nano Banana
-    draws it cleanly on the blacksmith; on our rig the arms stay out (the donor stands in an A-pose),
-    so judge a T-pose on Meshy's rig. The game's own prompt is still the A-pose.
+    draws it cleanly on the blacksmith.
     **The pose is a setting since** (owner, 29 Oct 2026: "put the T-pose in the game, a setting for
     A-pose or T-pose, both prompts viewable and very precise"): *Character pose* (`rpg-pose`, absent
     = T-pose) in the game's settings, each pose's prompt folded out under it word for word
     (`PERSON_POSES` in `falPrompts.ts`: the strict T-pose, and the precise A-pose, which is the
     lab's "wide" picture too). `ensurePersonModel` puts the person's prompt in that pose
     (`posePerson`), so the kept prompt is the one sent, and Meshy's image-to-3D is told the same pose
-    (`pose_mode`). For people made from then on; the console's remake redoes the ones standing. On
-    our rig a T-pose keeps its arms out (the donor stands in an A-pose): T-pose goes with Meshy's rig.
+    (`pose_mode`). For people made from then on; the console's remake redoes the ones standing.
+  - **Our rig takes the T-pose too** (owner, same evening: "now that Nano Banana draws a good,
+    repeatable T-pose a procedural rig should be easier; the old one was for the A-pose"). The
+    donors stand with their arms nearly at their sides, so warped onto a T-posed model the arms
+    never met and stayed out in every clip. Now `armsOut` reads the pose off the model (its
+    shoulders' band wider than 0.7 of its height), and a T-posed one is rigged on the donor stood in
+    a T-pose (`tPoseDonor`: upper arms and forearms turned straight out, its points carried by its
+    own weights), whose posed rotations become the rest the skin is bound in; a clip sets rotations
+    outright, so the arms come down. Kept apart in the cache (`&pose=t`), so no A-pose rig is
+    reused. On the blacksmith in Nano Banana's T-pose through TRELLIS ($0.06 in all, no rig to pay)
+    the arms hang in the idle; the hands are still ragged at the wrist, the next thing to mend.
   - **In one go** (owner, same day: "an option in the lab to see the pipeline in one go: model,
     texture and rig"): `meshyRigged` in `PERSON_MESHERS`, Meshy 6 with `enable_rigging` and the
     person's height, **$1.00** ($0.80 + the $0.20 add-on), ~3 min. Its rigged GLB is kept in the Cache

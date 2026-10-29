@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { heads } from './people';
+import { readFileSync } from 'node:fs';
+
+import { parseDonor } from '../../utils/rpg/selfRig';
+import { armsOut, heads, tPoseDonor } from './people';
 
 /** Boxes merged into one geometry, each as [x, y, width, height] with y the bottom. */
 function body(...boxes: [number, number, number, number][]): THREE.BufferGeometry {
@@ -32,5 +35,37 @@ describe('heads', () => {
   it('counts two for two people side by side, even of different heights', () => {
     expect(heads(body(...person(-0.4), ...person(0.4)))).toBe(2);
     expect(heads(body(...person(-0.4), ...person(0.4, 1.65)))).toBe(2);
+  });
+});
+
+describe('tPoseDonor', () => {
+  const file = readFileSync(new URL('../../assets/rpg/people/donor_male.bin', import.meta.url));
+  const donor = parseDonor(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));
+  const at = (d: typeof donor, name: string) => d.bones.find((b) => b.name === name)!.world;
+
+  it('holds both arms straight out at the shoulders, and leaves the rest of the body where it was', () => {
+    const t = tPoseDonor(donor);
+    for (const [arm, hand, side] of [['LeftArm', 'LeftHand', 1], ['RightArm', 'RightHand', -1]] as const) {
+      const shoulder = at(t, arm);
+      const h = at(t, hand);
+      expect(Math.abs(h[1] - shoulder[1])).toBeLessThan(0.02);
+      expect((h[0] - shoulder[0]) * side).toBeGreaterThan(0.35);
+    }
+    for (const still of ['Head', 'Hips', 'LeftFoot'])
+      at(t, still).forEach((v, a) => expect(v).toBeCloseTo(at(donor, still)[a], 3));
+  });
+
+  it('carries the points with the arms: the posed body is most of its height across, and reads as arms out', () => {
+    const t = tPoseDonor(donor);
+    const width = (p: Float32Array) => {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < p.length; i += 3) (lo = Math.min(lo, p[i])), (hi = Math.max(hi, p[i]));
+      return hi - lo;
+    };
+    expect(width(t.positions)).toBeGreaterThan(1.3);
+    expect(width(donor.positions)).toBeLessThan(0.9);
+    const geometry = (p: Float32Array) => new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(p, 3));
+    expect(armsOut(geometry(t.positions))).toBe(true);
+    expect(armsOut(geometry(donor.positions))).toBe(false);
   });
 });
