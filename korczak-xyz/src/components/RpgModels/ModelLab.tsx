@@ -55,6 +55,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [own, setOwn] = useState<LabSource[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  /** Bumped when a Meshy rig may have been paid for, so the count of those still unpaid is read again. */
+  const [rigTick, setRigTick] = useState(0);
   const [shown, setShown] = useState<string[]>([]);
   const [rigger, setRigger] = useState<Rigger>('self');
   const [uncached, setUncached] = useState(0);
@@ -140,13 +142,13 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     };
   }, []);
 
-  const items: StageItem[] = useMemo(
-    () =>
-      source
-        ? rows.filter((r) => shown.includes(r.key)).map((r) => ({ key: r.key, glb: r.glb, body: source.body, height: heightOf(source), label: 'lab' }))
-        : [],
-    [rows, shown, source],
-  );
+  const wanted: StageItem[] = source
+    ? rows.filter((r) => shown.includes(r.key)).map((r) => ({ key: r.key, glb: r.glb, body: source.body, height: heightOf(source), label: 'lab' }))
+    : [];
+  // One array for as long as the same models are wanted: the stage is set up again only when they change.
+  const signature = wanted.map((i) => `${i.key}|${i.glb}|${i.body}|${i.height}`).join('\n');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const items = useMemo(() => wanted, [signature]);
 
   // How many of the shown would cost a Meshy rig: those not rigged by it in this browser before.
   useEffect(() => {
@@ -157,7 +159,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     return () => {
       live = false;
     };
-  }, [items, version]);
+  }, [items, rigTick]);
 
   const showOnStage = useCallback(
     (riggedBy: Rigger) => {
@@ -168,7 +170,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
         .then(() => {
           setClips(stage.clipNames());
           stage.play(clip);
-          setVersion((v) => v + 1);
+          if (riggedBy === 'meshy') setRigTick((n) => n + 1);
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
