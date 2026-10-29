@@ -50,12 +50,15 @@ export function tokenCost(model: string, usage: Usage): number | null {
 }
 
 /**
- * ElevenLabs bills credits, not dollars: `eleven_flash_v2_5` costs half a credit per character. The
- * dollar figure is the Creator plan's rate ($22 for 100k credits); on another plan it differs, so
- * the credits are the number to trust.
+ * ElevenLabs bills credits, not dollars: `eleven_flash_v2_5` costs half a credit per character
+ * (checked against the account's own history in Oct 2026: 200 characters moved the count by 100).
+ * The dollar figure is the owner's plan as `/v1/user/subscription` reports it — Creator, $22 a month
+ * before VAT for 300k credits, so about $0.07 per 1k. It is a subscription, so within the month's
+ * credits a clip costs nothing more; this is the share of the fee it used up. Another plan has
+ * another rate, so the credits are the number to trust.
  */
 export const VOICE_CREDITS_PER_CHAR = 0.5;
-export const USD_PER_VOICE_CREDIT = 22 / 100_000;
+export const USD_PER_VOICE_CREDIT = 22 / 300_000;
 
 export function voiceCost(credits: number): number {
   return credits * USD_PER_VOICE_CREDIT;

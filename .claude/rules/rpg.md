@@ -1217,7 +1217,9 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
 The record behind all three is `utils/rpg/devlog.ts`, cleared when a quest starts; prices are in
 `utils/rpg/cost.ts`, list prices as of Oct 2026 and marked approximate. Thinking tokens are billed
 as output. ElevenLabs is credits (`eleven_flash_v2_5` is 0.5 a character, or the response's own
-`character-cost` header when the browser may read it), priced at the Creator plan's rate. A model
+`character-cost` header when the browser may read it), priced as a share of the owner's Creator
+plan: $22 for 300k credits a month, per `/v1/user/subscription` (not the 100k it was once assumed
+to be, which tripled every voice figure). A save's voice dollars are recomputed from its credits. A model
 missing from the table shows `?`, never a guess. A new kind of request the game waits on gets a
 `startRequest` too, so this stays the whole picture.
 

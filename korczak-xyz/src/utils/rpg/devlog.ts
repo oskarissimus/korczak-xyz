@@ -144,7 +144,8 @@ export function validSpend(raw: unknown): Spend | null {
     unpriced: s.unpriced === true,
     voiceChars: n(s.voiceChars),
     voiceCredits: n(s.voiceCredits),
-    voiceCost: n(s.voiceCost),
+    // From the credits, at today's rate: a save from before Oct 2026 kept the old Creator guess.
+    voiceCost: voiceCost(n(s.voiceCredits)),
     falCost: n(s.falCost),
     falModels: n(s.falModels),
     falTextures: n(s.falTextures),

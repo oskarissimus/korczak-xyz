@@ -43,7 +43,7 @@ describe('the closing screen counts the whole quest and its world', () => {
   });
 
   it('adds what earlier sittings saved to this one', () => {
-    const before = { ...NO_SPEND, ms: 30_000, modelCost: 0.05, voiceChars: 500, voiceCredits: 250, voiceCost: 0.055 };
+    const before = { ...NO_SPEND, ms: 30_000, modelCost: 0.05, voiceChars: 500, voiceCredits: 250, voiceCost: (250 * 22) / 300_000 };
     beginQuestSpend(before);
     const clip = startRequest('voice', 'eleven_flash_v2_5 · Jagna', null, 'Dzień dobry');
     endRequest(clip, null, { chars: 11, credits: 5.5 });
@@ -52,7 +52,7 @@ describe('the closing screen counts the whole quest and its world', () => {
     expect(q.ms).toBe(32_000);
     expect(q.voiceChars).toBe(511);
     expect(q.voiceCredits).toBeCloseTo(255.5);
-    expect(spendUsd(q)).toBeCloseTo(0.05 + (255.5 * 22) / 100_000);
+    expect(spendUsd(q)).toBeCloseTo(0.05 + (255.5 * 22) / 300_000);
   });
 
   it('survives the trip through a save, and refuses nonsense', () => {

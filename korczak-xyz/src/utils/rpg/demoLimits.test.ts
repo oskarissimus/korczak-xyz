@@ -66,7 +66,7 @@ describe('beatReservation', () => {
   });
 
   it('prices a clip by its length', () => {
-    expect(clipCost(200)).toBeCloseTo(200 * 0.5 * 0.00022);
+    expect(clipCost(200)).toBeCloseTo((200 * 0.5 * 22) / 300_000);
   });
 });
 
