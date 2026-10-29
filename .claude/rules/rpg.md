@@ -547,7 +547,31 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   `piece`, outcome, ms, `costUsd`.
 
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
-deciding costs one.
+deciding costs one. The one exception is a line the reader types, below.
+
+**The hero may say it in their own words** (owner, 29 Oct 2026: "add a free-text option to the
+dialogue options"; `utils/rpg/freeLine.ts`). Under the decisions, where they are offered and only
+there, a field takes a line of up to `FREE_MAX` (200) characters, and one short request
+(`generateFree`) answers it as the character. The model says what the line was:
+- **talk** — a question, a remark, a joke: the character answers, the conversation goes on (`↵`
+  again, or Back), and the exchange is passed on with the step like a small-talk answer
+  (`heardAside`'s fourth argument, `SavedGame.freeTalk`).
+- **a decision** — it goes the way of one of the beat's offered decisions (`route`), so a typed
+  line ends the quest only where an offered one would and leads on only to a job the game drew; the
+  reply, consequence, `dies` and `meet` are the model's. It is appended to the beat with
+  `free: true`, so the autosave's `decision` index, `deadInSave` and `mendSave` find it as they find
+  a picked one, and it is never offered as an option.
+
+The prompt holds only what has been heard (the story, the clues examined, the witness and the
+questions asked, earlier typed lines) and the same rules as a beat's: spoken, first person, audio
+tags, no culprit nobody named. `parseFree` refuses narration and a route the beat lacks, and the
+next model in the chain is asked. It is asked **from the browser even when signed in** (`local` in
+`askChain`: a queued server job only delays a short answer the reader is waiting on), thinking
+`low`, `FAST_MODEL` first when quick start is on, else the chosen model. In the console it is a
+`model` row labelled `free line`, counted in the quest's tokens and generation time; a failure
+says why under the field and keeps the text. **Not on the demo or without a key**: the demo's
+function writes beats and worlds only, so the field is not shown there. Number keys and `~` are
+ignored while the field has focus.
 
 **A story is told, not summarised** (owner, Oct 2026: the lines "sounded like a condensed
 narrative, not a person telling their story or asking for something"; depth should come from

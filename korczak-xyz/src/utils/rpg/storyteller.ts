@@ -25,6 +25,7 @@
  */
 
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job, type QuestMood } from './quest';
+import { freePrompt, parseFree, type FreeAnswer, type FreeContext } from './freeLine';
 import {
   askedFor,
   genesisPrompt,
@@ -487,6 +488,8 @@ interface Ask<T> {
   onTry?: (at: number) => void;
   /** What the server checks the answer with when it asks instead (`serverJobs.ts`). */
   job: { parse: JobParse; ctx: unknown; pieces?: boolean };
+  /** Asked from the browser even when signed in: a short answer the reader is waiting on, which a queued job only delays. */
+  local?: boolean;
 }
 
 interface Asked<T> {
@@ -518,7 +521,7 @@ async function askChain<T>(keys: StoryKeys, chosen: string | null, ask: Ask<T>):
 
   // Signed in with the keys on the account: the server asks, and keeps asking with the phone in a
   // pocket (`jobs.ts`). Null is anything that means the browser should ask itself after all.
-  if (provider !== 'demo' && jobsOn()) {
+  if (provider !== 'demo' && !ask.local && jobsOn()) {
     const served = await askServer(provider, models, ask, run);
     if (served) {
       served.ms = Date.now() - started;
@@ -797,4 +800,33 @@ export async function generateHubSizes(
   });
   // The tries too: what they cost is the world's (`WorldBible.spent`).
   return { sizes: run.value, tries: run.tries, ms: run.ms };
+}
+
+export interface FreeAttempt extends Omit<Asked<FreeAnswer>, 'value'> {
+  prompt: string;
+  answer: FreeAnswer | null;
+}
+
+/**
+ * The character's answer to what the hero typed (`freeLine.ts`). Short, and the reader is waiting
+ * on it, so it is asked from the browser and thinking little; the demo's function has no such ask,
+ * so on the demo there is nothing to type into.
+ */
+export async function generateFree(keys: StoryKeys, ctx: FreeContext, chosen: string | null = null, how: Quick = {}): Promise<FreeAttempt> {
+  const prompt = freePrompt(ctx);
+  const run = await askChain(keys, chosen, {
+    thinking: 'low',
+    ...how,
+    prompt,
+    temperature: 0.9,
+    demo: null,
+    parse: (raw) => parseFree(raw, ctx),
+    beat: ctx.beat.index,
+    label: 'free line',
+    what: 'a playable answer',
+    job: { parse: 'beat', ctx: null },
+    local: true,
+  });
+  const { value, ...rest } = run;
+  return { ...rest, prompt, answer: value };
 }

@@ -18,7 +18,7 @@
  */
 
 import type { Spend } from './devlog';
-import { isDead, jobDone, slainBy, type Beat, type Lang, type QuestMood, type StepRecord } from './quest';
+import { isDead, jobDone, slainBy, type Beat, type DialogueOption, type Lang, type QuestMood, type StepRecord } from './quest';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
@@ -46,6 +46,8 @@ export interface SavedGame {
   witnessHeard?: boolean;
   /** The current beat's small-talk questions asked, by index; absent in older saves. */
   askedTalk?: number[];
+  /** What the hero said in their own words at the current beat, and was answered (`freeLine.ts`). */
+  freeTalk?: DialogueOption[];
   /** The current beat's decision, by index, once made. */
   decision: number | null;
   /** Time played on this quest so far; absent in saves from before it was kept. */
@@ -192,6 +194,7 @@ export function mendSave(game: SavedGame, dead: readonly string[]): SavedGame {
     heard: true,
     witnessHeard: false,
     askedTalk: [],
+    freeTalk: [],
     decision: chose,
   };
 }

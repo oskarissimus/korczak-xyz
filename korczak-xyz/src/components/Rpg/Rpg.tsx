@@ -35,6 +35,7 @@ import {
   type QuestMood,
   type ChronicleEntry,
   type Decision,
+  type DialogueOption,
   type Job,
   type Lang,
   type StepRecord,
@@ -101,7 +102,8 @@ import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import { setJobAccount } from '../../utils/rpg/serverJobs';
-import { FAST_MODEL, generateBeat, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
+import { FAST_MODEL, generateBeat, generateFree, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
+import { FREE_MAX, freeDecision } from '../../utils/rpg/freeLine';
 import {
   addToAtlas,
   clearPendingGenesis,
@@ -163,6 +165,14 @@ interface Choice {
 interface Dialogue {
   line: DialogueLine;
   choices: Choice[];
+  /** Where the hero's own typed line goes (`freeLine.ts`), when this dialogue takes one. */
+  free?: (said: string) => void;
+}
+
+/** A key pressed while writing in a field, which is the field's and not a shortcut's. */
+function typing(e: KeyboardEvent): boolean {
+  const target = e.target as HTMLElement | null;
+  return Boolean(target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 }
 
 /** A day's play across the site runs to hours, which `formatMs` would say in minutes. */
@@ -274,6 +284,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     !auth.loading &&
     (!auth.user || account.sync === 'synced' || account.sync === 'error');
   const ownStory = Boolean(account.keys.google || account.keys.openai);
+  const ownStoryRef = useRef(ownStory);
+  ownStoryRef.current = ownStory;
   // With no key of the reader's own, the demo on the owner's (`utils/rpg/demo.ts`), while it is open.
   const [demo, setDemo] = useState<RpgDemoStatus | null>(null);
   const storyProvider: QuestSource = account.keys.google
@@ -423,6 +435,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const witnessHeardRef = useRef(false);
   /** The current beat's small-talk questions asked, by index, which a decision may wait for. */
   const askedTalkRef = useRef(new Set<number>());
+  /** What the hero said in their own words at the current beat, and what they were answered. */
+  const freeTalkRef = useRef<DialogueOption[]>([]);
+  /** Bumped when a dialogue closes, so an answer to a typed line arriving after it is dropped. */
+  const freeAskRef = useRef(0);
+  /** A typed line being answered (`busy`), or why its answer failed. */
+  const [freeState, setFreeState] = useState<null | 'busy' | { error: string }>(null);
+  const [freeText, setFreeText] = useState('');
   /** The current beat has been decided; its character has nothing more to offer. */
   const decidedRef = useRef(false);
   /** The opening could not be written, so the whole quest is the hand-written one. */
@@ -750,6 +769,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       heard: heardRef.current,
       witnessHeard: witnessHeardRef.current,
       askedTalk: [...askedTalkRef.current],
+      freeTalk: freeTalkRef.current,
       decision: decisionRef.current,
       playMs: playedNow(),
       transcript: [...transcript()],
@@ -840,6 +860,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       heardRef.current = false;
       witnessHeardRef.current = false;
       askedTalkRef.current = new Set();
+      freeTalkRef.current = [];
       if (b.witness) {
         const w = b.witness;
         putNpc(w.npc, b.place?.name ?? null, 1);
@@ -1683,6 +1704,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const close = useCallback(() => {
     setDialogue(null);
+    freeAskRef.current += 1;
+    setFreeState(null);
     // Straight back to the world: the click that closed the dialogue is a user gesture.
     window.setTimeout(() => sceneRef.current?.requestLock(), 0);
   }, []);
@@ -1728,7 +1751,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   const decide = useCallback(
     (b: Beat, d: Decision) => {
-      const heard = heardAside(b, witnessHeardRef.current, askedTalkRef.current);
+      const heard = heardAside(b, witnessHeardRef.current, askedTalkRef.current, freeTalkRef.current);
       const step: StepRecord = {
         npcName: b.npc.name,
         placeName: b.place?.name ?? null,
@@ -1762,6 +1785,76 @@ export default function Rpg({ lang }: { lang: Lang }) {
     },
     [bury, close, finish, persist, proceed, t, writeBeat],
   );
+
+  /**
+   * What the hero typed, answered by the model as the character (`freeLine.ts`): talk, and the
+   * conversation goes back to `back`; or a decision, kept on the beat and carried out as a picked one.
+   */
+  const askFree = useCallback(
+    async (b: Beat, said: string, back: () => void) => {
+      const ask = ++freeAskRef.current;
+      const token = questTokenRef.current;
+      setFreeState('busy');
+      const keys = { google: account.keys.google, openai: account.keys.openai };
+      const attempt = await generateFree(
+        keys,
+        {
+          lang: gameLangRef.current,
+          ...(worldRef.current && { world: worldRef.current }),
+          title: b.title,
+          ...(moodRef.current && { mood: moodRef.current }),
+          history: historyRef.current,
+          beat: b,
+          heard: heardAside(b, witnessHeardRef.current, askedTalkRef.current, freeTalkRef.current),
+          seen: [...seenRef.current],
+          characters: charactersRef.current,
+          dead: deadRef.current,
+          said,
+        },
+        chosenModelRef.current,
+        fastStartRef.current ? { first: FAST_MODEL } : {},
+      ).catch((e: unknown) => {
+        log.error('rpg.free.crashed', describeError(e));
+        return null;
+      });
+      if (attempt) addGenerationTime(attempt.ms);
+      if (ask !== freeAskRef.current || token !== questTokenRef.current || beatRef.current !== b || decidedRef.current) return;
+      const answer = attempt?.answer;
+      if (!answer) {
+        const error = (attempt?.error ?? 'crashed').slice(0, 160);
+        log.warn('rpg.free.failed', { error, model: attempt?.model ?? null });
+        setFreeState({ error });
+        return;
+      }
+      setFreeState(null);
+      setFreeText('');
+      // Read in the hero's voice before the answer, as a picked line is.
+      chosenRef.current = said;
+      if (answer.kind === 'talk') {
+        recordLine({ kind: 'ask', beat: b.index, speaker: tRef.current.hunter, text: said });
+        freeTalkRef.current = [...freeTalkRef.current, { label: said, reply: answer.reply }];
+        lastLinesRef.current.set(b.npc.name, answer.reply);
+        persist();
+        setDialogue({
+          line: { speaker: b.npc.name, voice: b.npc.gender, text: answer.reply, who: b.npc },
+          choices: [{ label: tRef.current.back, action: back }],
+          free: (next) => void askFreeRef.current(b, next, back),
+        });
+        return;
+      }
+      recordLine({ kind: 'decision', beat: b.index, speaker: tRef.current.hunter, text: said });
+      // On the beat, so the autosave's index and every later reading of the step find it.
+      const d = freeDecision(b, said, answer);
+      const kept: Beat = { ...b, decisions: [...b.decisions, d] };
+      beatRef.current = kept;
+      beatsRef.current = beatsRef.current.map((x) => (x === b ? kept : x));
+      setBeat(kept);
+      decide(kept, d);
+    },
+    [account.keys.google, account.keys.openai, decide, persist],
+  );
+  const askFreeRef = useRef(askFree);
+  askFreeRef.current = askFree;
 
   const openTalk = useCallback(
     (name: string) => {
@@ -1847,11 +1940,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
           line: npc(b.story[last].say),
           choices: [
             ...b.decisions
-              .filter((d) => heardFor(d.after))
+              .filter((d) => !d.free && heardFor(d.after))
               .map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
             ...followUps(),
             bye,
           ],
+          // Only on the reader's own key: the demo's function writes beats and worlds, nothing else.
+          ...(ownStoryRef.current && !staticRef.current && { free: (said: string) => void askFree(b, said, ending) }),
         });
       };
       const part = (i: number): void => {
@@ -1877,7 +1972,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ],
       });
     },
-    [close, decide, persist, t],
+    [askFree, close, decide, persist, t],
   );
   openTalkRef.current = openTalk;
 
@@ -1935,12 +2030,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (!dialogue || held) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
+      // A digit typed into the hero's own line is part of it, and nothing is picked while it is answered.
+      if (typing(e) || freeState === 'busy') return;
       const n = Number(e.key);
       if (n >= 1 && n <= dialogue.choices.length) choose(dialogue.choices[n - 1]);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [choose, close, dialogue, held]);
+  }, [choose, close, dialogue, freeState, held]);
 
   // J opens the quest journal, as in every RPG since the nineties; Escape or J again closes it.
   useEffect(() => {
@@ -1956,7 +2053,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // `~` (the key under Escape, whatever the layout prints on it) opens the developer console.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code !== 'Backquote' && e.key !== '~' && e.key !== '`') return;
+      if ((e.code !== 'Backquote' && e.key !== '~' && e.key !== '`') || typing(e)) return;
       e.preventDefault();
       setDevOpen((open) => !open);
     };
@@ -2168,6 +2265,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     heardRef.current = game.heard;
     witnessHeardRef.current = game.witnessHeard ?? false;
     askedTalkRef.current = new Set(game.askedTalk ?? []);
+    freeTalkRef.current = game.freeTalk ?? [];
     const d = game.decision === null ? null : current.decisions[game.decision];
     decisionRef.current = d ? game.decision : null;
     persist();
@@ -2710,7 +2808,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
                     <button
                       type="button"
                       className={classes.join(' ') || undefined}
-                      disabled={held !== null}
+                      disabled={held !== null || freeState === 'busy'}
                       onClick={() => choose(c)}
                     >
                       <span className="rpg-choice-n">{i + 1}.</span> <LineText text={c.label} lang={gameLang} />
@@ -2719,6 +2817,39 @@ export default function Rpg({ lang }: { lang: Lang }) {
                 );
               })}
             </ol>
+            {shown.free && !held && (
+              <form
+                className="rpg-dialogue-free"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const said = freeText.trim();
+                  if (said && freeState !== 'busy') shown.free!(said);
+                }}
+              >
+                <input
+                  type="text"
+                  value={freeText}
+                  maxLength={FREE_MAX}
+                  placeholder={t.freePlaceholder}
+                  aria-label={t.freePlaceholder}
+                  disabled={freeState === 'busy'}
+                  enterKeyHint="send"
+                  onChange={(e) => setFreeText(e.target.value)}
+                />
+                <button type="submit" disabled={freeState === 'busy' || !freeText.trim()} aria-label={t.freeSend}>
+                  ↵
+                </button>
+              </form>
+            )}
+            {shown.free && freeState === 'busy' && (
+              <div className="rpg-dialogue-free-status">
+                ⏳ {t.freeThinking(shown.line.speaker)}
+                <StreamLine />
+              </div>
+            )}
+            {shown.free && freeState !== null && freeState !== 'busy' && (
+              <div className="rpg-dialogue-free-status rpg-dialogue-free-error">⚠ {t.freeFailed(freeState.error)}</div>
+            )}
           </div>
         );
       })()}

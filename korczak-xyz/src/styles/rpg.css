@@ -686,6 +686,56 @@ ul.rpg-source {
   cursor: default;
 }
 
+/* The hero's own words (`freeLine.ts`), under the offered ones. */
+.rpg-dialogue-free {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rpg-dialogue-free input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 211, 107, 0.35);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #e6dcc6;
+  /* 16px keeps iOS from zooming the page in when the field takes focus. */
+  font: inherit;
+  font-size: max(16px, 1em);
+}
+
+.rpg-dialogue-free input:focus {
+  outline: none;
+  border-color: #ffd36b;
+}
+
+.rpg-dialogue-free button {
+  padding: 0 12px;
+  border: 1px solid rgba(255, 211, 107, 0.35);
+  border-radius: 4px;
+  background: none;
+  color: #ffd36b;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpg-dialogue-free button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rpg-dialogue-free-status {
+  margin-top: 4px;
+  font-size: 0.85em;
+  color: #b8ad95;
+}
+
+.rpg-dialogue-free-error {
+  color: #ff9a7a;
+}
+
 .rpg-dialogue-held .rpg-dialogue-text {
   opacity: 0.55;
 }

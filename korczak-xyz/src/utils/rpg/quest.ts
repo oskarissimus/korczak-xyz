@@ -110,6 +110,11 @@ export interface Decision {
    * next beat had the witness himself waiting there).
    */
   meet?: Meeting;
+  /**
+   * The hero's own words, typed rather than picked (`freeLine.ts`): kept on the beat once said, so
+   * the autosave's index finds it, and never offered as an option.
+   */
+  free?: true;
 }
 
 /** Whom a talk step is with, as the decision before it set out. */
@@ -338,11 +343,17 @@ function nameWords(name: string): string[] {
 
 /**
  * What the hero heard at a beat besides the npc's story, in one string for `StepRecord.heard`: the
- * witness's greeting and answers once spoken to, and the follow-up questions asked. Only the story
- * used to be passed on, so "my friend from the tribe knows more" — the witness's line the decision
- * rested on — never reached the beat that followed it.
+ * witness's greeting and answers once spoken to, the follow-up questions asked, and what the hero
+ * said in their own words (`freeLine.ts`). Only the story used to be passed on, so "my friend from
+ * the tribe knows more" — the witness's line the decision rested on — never reached the beat that
+ * followed it.
  */
-export function heardAside(b: Beat, witnessHeard: boolean, askedTalk: Iterable<number>): string {
+export function heardAside(
+  b: Beat,
+  witnessHeard: boolean,
+  askedTalk: Iterable<number>,
+  free: readonly DialogueOption[] = [],
+): string {
   const parts: string[] = [];
   if (b.witness && witnessHeard) {
     const w = b.witness;
@@ -352,6 +363,7 @@ export function heardAside(b: Beat, witnessHeard: boolean, askedTalk: Iterable<n
     const o = b.smallTalk[i];
     if (o) parts.push(`asked "${o.label}", ${b.npc.name}: ${o.reply}`);
   }
+  for (const o of free) parts.push(`the hero said "${o.label}", ${b.npc.name}: ${o.reply}`);
   return parts.join(' | ').slice(0, HEARD_MAX);
 }
 
@@ -546,7 +558,7 @@ export function staticBeat(lang: Lang, index: number): Beat {
 
 const list = (items: readonly string[]) => items.map((i) => `"${i}"`).join(', ');
 
-function jobWords(job: Job): string {
+export function jobWords(job: Job): string {
   if (job.kind === 'talk') return 'going somewhere to meet and talk with someone (no fight, nothing to gather)';
   if (job.kind === 'slay') return job.count === 1 ? 'defeating a single dangerous foe' : `defeating ${job.count} hostile foes`;
   return `gathering ${job.count} things`;
@@ -1217,7 +1229,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
 }
 
 /** A decision's `meet`: a known person by their exact name, or someone new described. */
-function meeting(raw: unknown, known: readonly Character[]): Meeting | null {
+export function meeting(raw: unknown, known: readonly Character[]): Meeting | null {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
   const who = text(r?.who, 160);
   const name = text(r?.name, 60);
@@ -1227,7 +1239,7 @@ function meeting(raw: unknown, known: readonly Character[]): Meeting | null {
 }
 
 /** A model's list of names: strings only, short, at most six. */
-function names(raw: unknown): string[] {
+export function names(raw: unknown): string[] {
   return (Array.isArray(raw) ? raw : [])
     .map((n) => text(n, 60))
     .filter((n): n is string => n !== null)
