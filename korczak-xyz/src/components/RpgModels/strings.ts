@@ -64,6 +64,7 @@ const en = {
     tripo: 'Tripo 2.5 · $0.30',
     hunyuan: 'Hunyuan3D 2 · $0.48',
     meshy: 'Meshy 6 · $0.80',
+    meshyRigged: 'Meshy 6 + rig in one go · $1.00',
   } satisfies Record<PersonMesher, string>,
 };
 
@@ -117,7 +118,7 @@ const pl: typeof en = {
   refused:
     'Model odmówił narysowania tego opisu (oflagował go filtr treści). Nano Banana nie rysuje znanych postaci z nazwy, np. Luke’a Skywalkera: opisz, jak wygląda, albo wybierz FLUX.',
   pictureNew: (usd: string) => `nowy obrazek, ${usd}`,
-  methods: en.methods,
+  methods: { ...en.methods, meshyRigged: 'Meshy 6 + rig naraz · $1.00' },
 };
 
 export const strings = { en, pl };

@@ -733,6 +733,21 @@ content-hashed and immutable.
     picture was drawn from, is under the Make row and the describe form, word for word. Nano Banana
     draws it cleanly on the blacksmith; on our rig the arms stay out (the donor stands in an A-pose),
     so judge a T-pose on Meshy's rig. The game's own prompt is still the A-pose.
+    **The pose is a setting since** (owner, 29 Oct 2026: "put the T-pose in the game, a setting for
+    A-pose or T-pose, both prompts viewable and very precise"): *Character pose* (`rpg-pose`, absent
+    = T-pose) in the game's settings, each pose's prompt folded out under it word for word
+    (`PERSON_POSES` in `falPrompts.ts`: the strict T-pose, and the precise A-pose, which is the
+    lab's "wide" picture too). `ensurePersonModel` puts the person's prompt in that pose
+    (`posePerson`), so the kept prompt is the one sent, and Meshy's image-to-3D is told the same pose
+    (`pose_mode`). For people made from then on; the console's remake redoes the ones standing. On
+    our rig a T-pose keeps its arms out (the donor stands in an A-pose): T-pose goes with Meshy's rig.
+  - **In one go** (owner, same day: "an option in the lab to see the pipeline in one go: model,
+    texture and rig"): `meshyRigged` in `PERSON_MESHERS`, Meshy 6 with `enable_rigging` and the
+    person's height, **$1.00** ($0.80 + the $0.20 add-on), ~3 min. Its rigged GLB is kept in the Cache
+    API as Meshy's rig of the bare model (`People.keepMeshyRig`), and the lab switches to the Meshy
+    rig, so it shows at no further cost. On fal only Meshy does this; Tripo's rig is on Tripo's own
+    API. The blacksmith in the T-pose came back with the arms down in the idle, the clips fitting it
+    like the separate rig's.
     A painter can refuse: Nano Banana's content checker turns down famous characters by name
     ("Luke Skywalker", `content_policy_violation`), where FLUX draws them. The lab says so in
     words by the button that asked (`refused`), rather than leaving the click to do nothing.
@@ -740,7 +755,7 @@ content-hashed and immutable.
     new characters, picture, model and rig, during the game by the new settings, so I can compare
     how it looks in the game"). The `~` console's Perf tab names the three switches as they stand
     and prices one person by them (`personCostNow` + $0.20 for Meshy's rig); *Nearest* remakes the
-    generated person nearest the hero, *Everyone standing* every generated person in the scene
+    generated person nearest the hero, *The hero* the hero alone, *Everyone standing* every generated person in the scene
     (`RpgScene.generatedPeople`) plus the hero and the job's humanoid enemy. Each is a new piece
     (`#stamp` on its id, past `ensurePiece`'s made-once) and replaces the old model where it was
     kept: the character on every copy (`keepPerson`), the world's hero, the beat's job. The old body

@@ -211,6 +211,8 @@ function PerfTab({
 /** The remake the Perf tab offers (`remakePeople` in `Rpg.tsx`): who stands here, and at what. */
 export interface RemakeOffer {
   nearest: string | null;
+  /** The hero stands as a generated model. */
+  hero: boolean;
   /** Everyone standing as a generated model: the people, the hero, the job's enemy. */
   count: number;
   /** One person's picture, model and rig as the switches stand. */
@@ -218,7 +220,7 @@ export interface RemakeOffer {
   makers: { painter: PersonPainter; mesher: Mesher; rigger: Rigger };
   /** Remakes still being made. */
   running: number;
-  run: (who: 'nearest' | 'all') => void;
+  run: (who: 'nearest' | 'hero' | 'all') => void;
 }
 
 function RemakeBox({ lang, offer }: { lang: Lang; offer: RemakeOffer | null }) {
@@ -233,6 +235,9 @@ function RemakeBox({ lang, offer }: { lang: Lang; offer: RemakeOffer | null }) {
       </span>
       <button type="button" disabled={!offer.nearest} onClick={() => offer.run('nearest')}>
         {offer.nearest ? t.remakeNearest(offer.nearest, formatUsd(offer.eachUsd)) : t.remakeNobody}
+      </button>
+      <button type="button" onClick={() => offer.run('hero')}>
+        {t.remakeHero(formatUsd(offer.eachUsd))}
       </button>
       <button type="button" disabled={offer.count === 0} onClick={() => offer.run('all')}>
         {t.remakeAll(offer.count, formatUsd(offer.count * offer.eachUsd))}

@@ -159,9 +159,9 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
 export const landmarkPrompt = (world: PromptWorld) => hubModelPrompt(world, 'landmark');
 
 const A_POSE = 'Standing straight in an A-pose, arms held a little away from the body, legs apart, hands empty and open,';
+/** The precise A-pose: the game's A-pose setting and the lab's "wide" picture. */
 const WIDE_POSE =
-  'Standing in a wide A-pose for rigging (an A-pose, not a T-pose): arms straight and angled down about 45 degrees from the body, hands at hip height and well away from the thighs, a clear gap between each arm and the body, legs apart with a clear gap between them, clothes close to the body and nothing hanging between the legs, hands empty and open,';
-
+  'Standing in a precise A-pose for rigging (an A-pose, not a T-pose): both arms straight, angled down exactly 45 degrees from the shoulders, elbows and wrists straight, palms facing the thighs, fingers straight and together, hands at hip height and well away from the thighs, a clear gap between each arm and the body all the way to the armpit; both hands completely empty, holding nothing at all, no weapon, tool, staff, shield, lantern, bag, book or any other object in or near the hands (anything they carry is worn on the back or at the belt); legs straight and apart with a clear gap between them, feet flat on the ground, clothes close to the body, nothing hanging from the arms or between the legs,';
 /**
  * The picture a person's model is made from (`components/Rpg/people.ts`): one person, whole, front-on,
  * in an A-pose with empty hands, on white. The pose is the rig's: every person is warped from the same
@@ -192,6 +192,20 @@ const T_POSE =
  */
 export function tPose(prompt: string): string {
   return prompt.includes(A_POSE) ? prompt.replace(A_POSE, T_POSE) : `${prompt} ${T_POSE.replace(/,$/, '.')}`;
+}
+
+/**
+ * The pose a person is drawn in, the game's setting (owner, 29 Oct 2026: "put the T-pose in the
+ * game, and a setting for A-pose or T-pose, both prompts viewable and very precise about what we
+ * want"). The words of each, as sent, for the settings to show.
+ */
+export const PERSON_POSES = { tpose: T_POSE, apose: WIDE_POSE } as const;
+export type PersonPose = keyof typeof PERSON_POSES;
+export const DEFAULT_POSE: PersonPose = 'tpose';
+
+/** A person's prompt (`personPrompt`, in its loose A-pose) in `pose`. */
+export function posePerson(prompt: string, pose: PersonPose): string {
+  return pose === 'tpose' ? tPose(prompt) : widePose(prompt);
 }
 
 /**

@@ -39,7 +39,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
@@ -324,6 +324,11 @@ let personMesher: Mesher = DEFAULT_MESHER;
 export function setPersonMesher(m: Mesher) {
   personMesher = m;
 }
+let personPose: PersonPose = DEFAULT_POSE;
+/** The game's switch: the pose its people are drawn in from now on (`PERSON_POSES`). */
+export function setPersonPose(p: PersonPose) {
+  personPose = p;
+}
 
 const PERSON_SLOTS: readonly FalSlot[] = ['person', 'hero', 'enemy'];
 
@@ -365,11 +370,39 @@ export const PERSON_MESHERS = {
   meshy: {
     model: FAL_PERSON_MESH_MODEL,
     price: FAL_PRICES.meshyMesh,
-    body: (image: string) => ({ image_url: image, pose_mode: 'a-pose', target_polycount: 10_000, should_texture: true, enable_pbr: false, enable_rigging: false }),
+    body: (image: string, at: MeshAsk = {}) => ({ image_url: image, pose_mode: meshyPose(at), target_polycount: 10_000, should_texture: true, enable_pbr: false, enable_rigging: false }),
+    pick: (r: { model_glb?: FalFile }) => r.model_glb,
+  },
+  /**
+   * Meshy's model, texture and rig in one request (owner, 29 Oct 2026: "an option in the lab to see
+   * how the pipeline works in one go: model, texture and rig"): the same Meshy 6 with
+   * `enable_rigging`, its $0.20 add-on, answering the rigged GLB beside the bare one. On fal only
+   * Meshy does this; Tripo's rig is on Tripo's own API, not fal's.
+   */
+  meshyRigged: {
+    model: FAL_PERSON_MESH_MODEL,
+    price: FAL_PRICES.meshyMesh + FAL_PRICES.rig,
+    body: (image: string, at: MeshAsk = {}) => ({
+      image_url: image,
+      pose_mode: meshyPose(at),
+      target_polycount: 10_000,
+      should_texture: true,
+      enable_pbr: false,
+      enable_rigging: true,
+      rigging_height_meters: at.height ?? 1.75,
+    }),
     pick: (r: { model_glb?: FalFile }) => r.model_glb,
   },
 } as const;
 export type PersonMesher = keyof typeof PERSON_MESHERS;
+
+/** What a mesher may be told beyond the picture: the pose it is in, and how tall the person is. */
+export interface MeshAsk {
+  pose?: PersonPose;
+  height?: number;
+}
+
+const meshyPose = (at: MeshAsk) => (at.pose === 'tpose' ? 't-pose' : 'a-pose');
 
 /** What one person's picture and model cost as the game's switches stand, before any rig. */
 export function personCostNow(): number {
@@ -389,16 +422,19 @@ export async function buildPersonMesh(
   label: string,
   o: FalOptions = {},
   started?: () => void,
-): Promise<{ glb: string; costUsd: number; bytes: number | null }> {
+  at: MeshAsk = { pose: personPose },
+): Promise<{ glb: string; costUsd: number; bytes: number | null; rigged: string | null }> {
   const m = PERSON_MESHERS[method];
   const head = `${tryMark(o)}← ${image}`;
   const entry = startRequest('fal', m.model, null, head, label);
   try {
-    const body = await queueJob<Record<string, FalFile>>(key, m.model, m.body(image), entry, head, o, started);
+    const body = await queueJob<Record<string, FalFile>>(key, m.model, (m.body as (image: string, at: MeshAsk) => object)(image, at), entry, head, o, started);
     const file = (m.pick as (r: Record<string, FalFile>) => FalFile)(body);
     if (!file?.url) throw new Error('no model in the answer');
-    endRequest(entry, null, { cost: m.price, text: `${head}\n→ ${file.url}${kbOf(file)}` });
-    return { glb: file.url, costUsd: m.price, bytes: file.file_size ?? null };
+    const rigged = body.rigged_character_glb?.url ?? null;
+    if (method === 'meshyRigged' && !rigged) throw new Error('no rigged model in the answer');
+    endRequest(entry, null, { cost: m.price, text: `${head}\n→ ${file.url}${kbOf(file)}${rigged ? `\n→ rigged ${rigged}${kbOf(body.rigged_character_glb)}` : ''}` });
+    return { glb: file.url, costUsd: m.price, bytes: file.file_size ?? null, rigged };
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
@@ -699,7 +735,7 @@ export function ensurePersonModel(
   onError: (err: unknown) => void = () => {},
   o: FalOptions = {},
 ): boolean {
-  return ensurePiece(key, label, id, prompt, onModel, onError, o);
+  return ensurePiece(key, label, id, posePerson(prompt, personPose), onModel, onError, o);
 }
 
 function ensurePiece(

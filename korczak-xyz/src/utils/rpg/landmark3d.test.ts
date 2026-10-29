@@ -119,7 +119,9 @@ describe('landmark3d', () => {
       );
       expect(model.glb).toBe('https://fal.media/meshy.glb');
       expect(model.costUsd).toBeCloseTo(0.803);
-      expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 'a-pose' });
+      // The game's pose is the T-pose by default, and Meshy is told so.
+      expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 't-pose' });
+      expect(model.prompt).toContain('strict T-pose');
       expect(calls).not.toContain(`https://queue.fal.run/${FAL_MESH_MODEL}`);
       expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([
         [FAL_IMAGE_MODEL, 'ok', 0.003],

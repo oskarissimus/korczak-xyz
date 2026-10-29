@@ -67,6 +67,10 @@ import {
   DEFAULT_PAINTER,
   PERSON_PAINTERS,
   setPersonPainter,
+  setPersonPose,
+  DEFAULT_POSE,
+  PERSON_POSES,
+  type PersonPose,
   type PersonPainter,
   ensurePersonModel,
   personCostNow,
@@ -217,6 +221,7 @@ const RIGGER_KEY = 'rpg-rigger';
 const MESHER_KEY = 'rpg-mesher';
 /** What draws the generated people's pictures (`PersonPainter` in `landmark3d.ts`); FLUX schnell when absent. */
 const PAINTER_KEY = 'rpg-painter';
+const POSE_KEY = 'rpg-pose';
 
 /**
  * A line as the dialogue shows it: an audio tag ("[coughs]", or an old save's "[Kaszel]") as a short
@@ -323,6 +328,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   setPersonMesher(mesher);
   const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
   setPersonPainter(painter);
+  const [pose, setPose] = useState<PersonPose>(DEFAULT_POSE);
+  setPersonPose(pose);
   const fastStartRef = useRef(true);
   fastStartRef.current = fastStart;
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
@@ -1301,7 +1308,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
    */
   const remakingRef = useRef(0);
   const remakePeople = useCallback(
-    (who: 'nearest' | 'all') => {
+    (who: 'nearest' | 'hero' | 'all') => {
       const world = worldRef.current;
       const key = falKeyRef.current;
       const scene = sceneRef.current;
@@ -1327,7 +1334,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         );
         if (!asked) done();
       };
-      for (const name of who === 'nearest' ? here.people.slice(0, 1) : here.people) {
+      for (const name of who === 'nearest' ? here.people.slice(0, 1) : who === 'hero' ? [] : here.people) {
         const c = charactersRef.current.find((k) => k.name === name);
         if (!c) continue;
         ask('person', `${world.id}/${c.name}`, personPrompt(personLook(c, world), c), (model) => {
@@ -1337,7 +1344,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
         });
       }
       if (who === 'nearest') return;
-      if (here.hero) ask('hero', world.id, personPrompt(heroLook(world), { gender: heroBody(heroLook(world)) }), (model) => keepHero(world.id, model));
+      if (here.hero || who === 'hero') ask('hero', world.id, personPrompt(heroLook(world), { gender: heroBody(heroLook(world)) }), (model) => keepHero(world.id, model));
+      if (who === 'hero') return;
       const beat = beatRef.current;
       const job = beat?.job;
       if (here.enemy && beat && job?.kind === 'slay') {
@@ -1366,6 +1374,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const rig = riggerRef.current === 'meshy' ? FAL_PRICES.rig : 0;
     return {
       nearest: here.people[0] ?? null,
+      hero: here.hero,
       count: here.people.length + (here.hero ? 1 : 0) + (here.enemy ? 1 : 0),
       eachUsd: personCostNow() + rig,
       makers: { painter, mesher, rigger: riggerRef.current },
@@ -1964,6 +1973,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const keptPainter = localStorage.getItem(PAINTER_KEY);
       setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : DEFAULT_PAINTER);
+      setPose(localStorage.getItem(POSE_KEY) === 'apose' ? 'apose' : DEFAULT_POSE);
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
     } catch {
@@ -1992,6 +2002,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (value === DEFAULT_RIGGER) localStorage.removeItem(RIGGER_KEY);
       else localStorage.setItem(RIGGER_KEY, value);
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickPose = (value: PersonPose) => {
+    setPose(value);
+    try {
+      if (value === DEFAULT_POSE) localStorage.removeItem(POSE_KEY);
+      else localStorage.setItem(POSE_KEY, value);
     } catch {
       /* forgotten on reload */
     }
@@ -2428,6 +2447,24 @@ export default function Rpg({ lang }: { lang: Lang }) {
             ))}
           </select>
         </label>
+      )}
+      {keysReady && falKey && (
+        <div className="rpg-model">
+          <label>
+            {t.pose}:{' '}
+            <select value={pose} onChange={(e) => pickPose(e.target.value === 'apose' ? 'apose' : 'tpose')}>
+              <option value="tpose">{t.poses.tpose}</option>
+              <option value="apose">{t.poses.apose}</option>
+            </select>
+          </label>
+          <small> {t.mesherNote}</small>
+          {(['tpose', 'apose'] as const).map((p) => (
+            <details key={p} className="rpg-pose-prompt">
+              <summary>{t.posePrompt(t.poses[p])}</summary>
+              <p>{PERSON_POSES[p]}</p>
+            </details>
+          ))}
+        </div>
       )}
       {keysReady ? (
         <ul className="rpg-source">

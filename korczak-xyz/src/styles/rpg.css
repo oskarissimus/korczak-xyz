@@ -1027,6 +1027,24 @@ ul.rpg-source {
   font: inherit;
 }
 
+/* Each pose's prompt, word for word, folded until asked for. */
+.rpg-pose-prompt {
+  margin-top: 4px;
+  font-size: 0.85em;
+}
+
+.rpg-pose-prompt summary {
+  cursor: pointer;
+}
+
+.rpg-pose-prompt p {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  max-width: 60ch;
+  background: rgba(0, 0, 0, 0.35);
+  line-height: 1.4;
+}
+
 .rpg-summary {
   display: grid;
   grid-template-columns: auto auto;

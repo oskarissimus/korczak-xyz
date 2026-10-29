@@ -245,7 +245,13 @@ export default function ModelLab({ lang }: { lang: Lang }) {
         spent += PERSON_PAINTERS[painter].price(IMAGE_SIZE);
         setLabPicture(source.id, pose, painter, picture);
       }
-      const made = await buildPersonMesh(falKey, picture.image, method, 'lab');
+      const at = { pose: picture.prompt.includes('strict T-pose') ? ('tpose' as const) : ('apose' as const), height: heightOf(source) };
+      const made = await buildPersonMesh(falKey, picture.image, method, 'lab', {}, undefined, at);
+      // In one go: Meshy's rig came with the model, so the Meshy rig shows it for nothing.
+      if (made.rigged) {
+        await stageRef.current?.people.keepMeshyRig(made.glb, at.height, made.rigged);
+        setRigger('meshy');
+      }
       spent += made.costUsd;
       addLabVariant(source.id, { id, method, pose, painter: pose === 'game' ? undefined : painter, image: picture.image, prompt: picture.prompt, glb: made.glb, costUsd: spent, ms: Date.now() - started, bytes: made.bytes, at: Date.now() });
       setShown((s) => [...s.slice(-(MAX_SHOWN - 1)), id]);

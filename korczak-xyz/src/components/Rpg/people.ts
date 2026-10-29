@@ -227,6 +227,15 @@ export class People {
     return this.loaded;
   }
 
+  /** Keeps a rig Meshy answered along with the model (`meshyRigged`), as if `buildMeshy` had asked for it. */
+  async keepMeshyRig(url: string, height: number, rigged: string): Promise<void> {
+    try {
+      if (typeof caches !== 'undefined') await (await caches.open(CACHE)).put(`${url}?meshy=1&height=${height}`, new Response(rigged));
+    } catch {
+      /* rigged again, and paid again, if asked */
+    }
+  }
+
   /** Whether this browser already holds Meshy's rig of `url` at `height`, so asking for it again costs nothing. */
   async meshyCached(url: string, height: number): Promise<boolean> {
     try {
