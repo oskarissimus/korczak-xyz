@@ -226,10 +226,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const account = useAccountKeys(auth.user);
   const uidRef = useRef<string | null>(null);
   uidRef.current = auth.user?.uid ?? null;
-  // The server writes the quest and the world for a reader whose keys it can read: signed in, with
-  // the key sync done (`utils/rpg/jobs.ts`). Anyone else is written for by this browser, as before.
-  const jobUid = auth.user && account.sync === 'synced' ? auth.user.uid : null;
-  setJobAccount(jobUid);
+  // The server writes the quest and the world for any signed-in reader (`utils/rpg/jobs.ts`). Not
+  // only once the key sync says `synced`: it goes back to `syncing` whenever the account is read
+  // again and to `error` on a flaky connection, and on 29 Oct 2026 a beat asked in one of those
+  // windows went to the browser and died in the background. The server says when the account
+  // has no key (`noKey`), and then the browser asks, so nothing is lost by asking it first.
+  setJobAccount(auth.user?.uid ?? null);
   // A signed-in reader's keys may be in the account and not yet in this browser, so nothing decides
   // "no key" before the account has answered — or failed to.
   const keysReady =

@@ -764,7 +764,8 @@ its first try until Oct 2026) moves to the next;
 so does an answer `parseBeat` cannot play. Anything else — a rejected key above all — ends it.
 **The background is not a failure** (owner, Oct 2026: a new world asked for on the phone, the app
 put away, and on return no world). Nothing is asked while the page is hidden (`whenVisible` before
-every try), and a cut or a timeout during a try the page spent partly hidden asks the **same**
+every try), and a cut, a timeout or an empty answer (iOS ends a frozen stream with a 200 and no candidates)
+during a try the page spent partly hidden asks the **same**
 model again once it is back, up to `BACKGROUND_RETRIES` (3), instead of burning down the chain.
 And because iOS often reloads a backgrounded page outright, an installed app above all, a genesis
 in flight is written down (`savePendingGenesis`, localStorage `rpg-genesis`, its seeds and slider,
@@ -776,8 +777,10 @@ hand-written quest; no usable answer puts up the retry panel above, with **the r
 switch apps, the quest stops generating in the background; the server should do it and I should come
 back to it finished — the same with the world"). Waiting for the page to be visible only stopped the
 background from *failing* a request; it still did nothing while the phone was in a pocket, and iOS
-often reloads the page on return. So a reader who is signed in and whose key sync is `synced`
-(`setJobAccount` in `Rpg.tsx`) has every model request and every fal.ai piece made by **`rpgJob`**
+often reloads the page on return. So any signed-in reader (`setJobAccount` in `Rpg.tsx`; not
+only once the key sync says `synced` — it falls back to `syncing` on every re-read and to `error` on a
+weak signal, and a beat asked in such a window on 29 Oct 2026 went to the browser and died in the
+background; the server's `noKey` hands an account without the key back to the browser) has every model request and every fal.ai piece made by **`rpgJob`**
 (`functions/src/rpg/jobs.ts`), a Firestore-triggered gen-2 function on `users/{uid}/rpgJobs/{id}`:
 - **The browser writes a job, the function claims it** in a transaction (a redelivered event does
   nothing) and runs it on the account's own keys from `users/{uid}/keys/config` — the store every
