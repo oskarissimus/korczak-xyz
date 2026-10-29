@@ -748,6 +748,14 @@ content-hashed and immutable.
     rig, so it shows at no further cost. On fal only Meshy does this; Tripo's rig is on Tripo's own
     API. The blacksmith in the T-pose came back with the arms down in the idle, the clips fitting it
     like the separate rig's.
+  - **From text, in one go** (owner, same evening: "can the model, texture and rig be made at once
+    from text rather than a picture? — add it to the lab"): *Model + rig from text* by the describe
+    form, `textToRiggedPerson` on `fal-ai/meshy/v6/text-to-3d` with `pose_mode: t-pose`,
+    `enable_rigging` and the height, priced $1.00 ($0.80 listed, the rig's $0.20 assumed as on
+    image-to-3D; fal's page does not say). The bare model becomes the described person's own, its
+    rig kept as Meshy's rig of it, and Meshy's thumbnail stands in for the picture. There is no
+    picture to turn down first. A herbalist in a green cloak: 4 min 44 s, 10.3k triangles, a 2k
+    texture, idling cleanly on the clips.
     A painter can refuse: Nano Banana's content checker turns down famous characters by name
     ("Luke Skywalker", `content_policy_violation`), where FLUX draws them. The lab says so in
     words by the button that asked (`refused`), rather than leaving the click to do nothing.

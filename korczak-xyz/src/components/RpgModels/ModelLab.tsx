@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
@@ -264,6 +264,42 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     }
   };
 
+  /** A described person made by Meshy's text-to-3D in one go: the model is the person's own, rigged already. */
+  const makeFromText = async () => {
+    if (!falKey || !describe.trim()) return;
+    const id = `text-${Date.now()}`;
+    const words = describe.trim();
+    setPending((p) => [...p, { id, label: t.fromText, since: Date.now() }]);
+    setProblem(null);
+    setDescribe('');
+    try {
+      const started = Date.now();
+      const height = PERSON_HEIGHT[gender];
+      const made = await textToRiggedPerson(falKey, words, gender, height, 'lab');
+      await stageRef.current?.people.keepMeshyRig(made.glb, height, made.rigged);
+      const s: LabSource = {
+        id: made.glb,
+        worldId: 'lab',
+        world: 'lab',
+        lang,
+        name: words.slice(0, 48),
+        role: 'person',
+        body: gender,
+        model: { glb: made.glb, image: made.image, prompt: made.prompt, costUsd: made.costUsd, ms: Date.now() - started, at: Date.now() },
+      };
+      addOwnSource(s);
+      setOwn(ownSources());
+      setSelected(s.id);
+      setRigger('meshy');
+    } catch (e) {
+      log.warn('rpgModels.text.failed', describeError(e));
+      setProblem({ where: 'draw', text: explain(e) });
+      setDescribe(words);
+    } finally {
+      setPending((p) => p.filter((x) => x.id !== id));
+    }
+  };
+
   const drawOwn = async () => {
     if (!falKey || !describe.trim()) return;
     setDrawing(true);
@@ -342,6 +378,9 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                 {painterPicker}{' '}
                 <button type="submit" disabled={drawing || !describe.trim()}>
                   {drawing ? '…' : t.draw}
+                </button>{' '}
+                <button type="button" disabled={!describe.trim()} onClick={() => void makeFromText()} title={t.fromTextHint}>
+                  {t.fromTextButton(formatUsd(TEXT_PERSON_PRICE))}
                 </button>
               </div>
               {problem?.where === 'draw' && <p className="lab-error">{problem.text}</p>}

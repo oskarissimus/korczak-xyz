@@ -119,5 +119,7 @@ export function labSpent(): number {
   const stored = read();
   let sum = 0;
   for (const list of Object.values(stored.variants ?? {})) for (const v of list) sum += v.costUsd;
+  // The people described here: their picture, or their whole model made from the words.
+  for (const s of stored.own ?? []) sum += s.model.costUsd ?? 0;
   return sum;
 }

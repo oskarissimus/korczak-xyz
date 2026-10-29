@@ -441,6 +441,54 @@ export async function buildPersonMesh(
   }
 }
 
+/** Meshy's text-to-3D, as the lab asks it: model, texture and rig in one request, from words alone. */
+export const FAL_TEXT_PERSON_MODEL = 'fal-ai/meshy/v6/text-to-3d';
+/** $0.80 a generation on fal's page, Oct 2026, plus the $0.20 its image-to-3D charges to rig (the page does not say). */
+export const TEXT_PERSON_PRICE = FAL_PRICES.meshyMesh + FAL_PRICES.rig;
+
+/** The words Meshy's text-to-3D is asked with (at most 600 characters); the T-pose is its own field. */
+export function textPersonPrompt(description: string, gender: 'male' | 'female'): string {
+  const tail = ` ${gender === 'female' ? 'A woman' : 'A man'}, one person, full body, stylised low-poly game character, chunky proportions, both hands empty and holding nothing, clothes close to the body.`;
+  return `${description.trim().replace(/[.\s]+$/, '').slice(0, 600 - tail.length - 1)}.${tail}`;
+}
+
+/**
+ * A person from a description, by Meshy's text-to-3D (owner, 29 Oct 2026: "is there a way to make
+ * the model, texture and rig at once from text rather than a picture? — add it to the lab"): no
+ * picture to look at and turn down first, so about a dollar is spent before anything is seen.
+ */
+export async function textToRiggedPerson(
+  key: string,
+  description: string,
+  gender: 'male' | 'female',
+  height: number,
+  label: string,
+  o: FalOptions = {},
+): Promise<{ glb: string; rigged: string; image: string; prompt: string; costUsd: number; bytes: number | null }> {
+  const prompt = textPersonPrompt(description, gender);
+  const head = `${tryMark(o)}${prompt}\nt-pose, ${height} m`;
+  const entry = startRequest('fal', FAL_TEXT_PERSON_MODEL, null, head, label);
+  try {
+    const body = await queueJob<Record<string, FalFile>>(
+      key,
+      FAL_TEXT_PERSON_MODEL,
+      { prompt, mode: 'full', pose_mode: 't-pose', target_polycount: 10_000, enable_pbr: false, enable_rigging: true, rigging_height_meters: height },
+      entry,
+      head,
+      o,
+    );
+    const glb = body.model_glb?.url;
+    const rigged = body.rigged_character_glb?.url;
+    if (!glb || !rigged) throw new Error('no rigged model in the answer');
+    const image = body.thumbnail?.url ?? '';
+    endRequest(entry, null, { cost: TEXT_PERSON_PRICE, text: `${head}\n→ ${glb}${kbOf(body.model_glb)}\n→ rigged ${rigged}${kbOf(body.rigged_character_glb)}` });
+    return { glb, rigged, image, prompt, costUsd: TEXT_PERSON_PRICE, bytes: body.model_glb?.file_size ?? null };
+  } catch (err) {
+    endRequest(entry, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
 /**
  * A piece made by the server's job runner (`serverJobs.ts`) rather than this browser: the same two
  * steps, in the console the same way as they happen there, and `running` told when fal.ai gives the
