@@ -39,7 +39,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
@@ -216,46 +216,97 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
 }
 
 /**
- * A person's TRELLIS model rigged by Meshy (owner, 29 Oct 2026: "a toggle to choose our own rig or
- * Meshy via fal.ai, our own is weak, maybe Meshy will be better; Meshy by default"). The same queue
- * as the mesh, 1–3 minutes, $0.20; the answer is the rigged GLB's URL, with Meshy's 24 bones under
- * the names the donors have, so the one clip library moves it (`people.ts`). Not retried: a body
- * Meshy will not rig does not become one on a second ask, and the browser's own rig stands in.
+ * One of Meshy's jobs through fal's queue: submits `body`, follows it with a line in `entry`, and
+ * answers the result. `started` is called when fal gives it a runner.
  */
-export async function rigWithMeshy(key: string, glb: string, height: number, label: string, o: FalOptions = {}): Promise<string> {
+async function meshyJob<T>(key: string, model: string, body: object, entry: DevRequest, head: string, o: FalOptions, started?: () => void): Promise<T> {
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
-  const entry = startRequest('fal', FAL_RIG_MODEL, null, `← ${glb}\n${height} m`, label);
-  try {
-    const submit = await f(`https://queue.fal.run/${FAL_RIG_MODEL}`, {
-      method: 'POST',
-      headers: headers(key),
-      signal: o.signal,
-      body: JSON.stringify({ model_url: glb, height_meters: height, enable_animation: false }),
-    });
-    if (!submit.ok) throw await failure(submit);
-    const queued = (await submit.json()) as { status_url?: string; response_url?: string };
-    if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
-    const auth = { Authorization: `Key ${key}` };
-    const deadline = Date.now() + (o.timeoutMs ?? 360_000);
-    for (;;) {
-      await sleep(o.pollMs ?? 3000);
-      if (Date.now() > deadline) throw new Error('timed out in the queue');
-      const res = await f(queued.status_url, { headers: auth, signal: o.signal });
-      if (!res.ok) throw await failure(res);
-      const s = (await res.json()) as { status?: string; queue_position?: number };
-      const line = s.status === 'IN_QUEUE' ? `IN_QUEUE #${s.queue_position ?? '?'}` : (s.status ?? '?');
-      updateRequest(entry, { text: `← ${glb}\n${height} m · ${line}` });
-      if (s.status === 'COMPLETED') break;
-    }
-    const res = await f(queued.response_url, { headers: auth, signal: o.signal });
+  const submit = await f(`https://queue.fal.run/${model}`, { method: 'POST', headers: headers(key), signal: o.signal, body: JSON.stringify(body) });
+  if (!submit.ok) throw await failure(submit);
+  const queued = (await submit.json()) as { status_url?: string; response_url?: string };
+  if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
+  const auth = { Authorization: `Key ${key}` };
+  const deadline = Date.now() + (o.timeoutMs ?? 420_000);
+  let running = false;
+  for (;;) {
+    await sleep(o.pollMs ?? 3000);
+    if (Date.now() > deadline) throw new Error('timed out in the queue');
+    const res = await f(queued.status_url, { headers: auth, signal: o.signal });
     if (!res.ok) throw await failure(res);
-    const body = (await res.json()) as { rigged_character_glb?: { url?: string; file_size?: number } | null };
+    const s = (await res.json()) as { status?: string; queue_position?: number };
+    const line = s.status === 'IN_QUEUE' ? `IN_QUEUE #${s.queue_position ?? '?'}` : (s.status ?? '?');
+    updateRequest(entry, { text: `${head} · ${line}` });
+    if (!running && s.status !== 'IN_QUEUE') {
+      running = true;
+      started?.();
+    }
+    if (s.status === 'COMPLETED') break;
+  }
+  const res = await f(queued.response_url, { headers: auth, signal: o.signal });
+  if (!res.ok) throw await failure(res);
+  return (await res.json()) as T;
+}
+
+const kbOf = (file?: { file_size?: number } | null) => (file?.file_size ? ` (${Math.round(file.file_size / 1024)} KB)` : '');
+
+/**
+ * A person's model rigged by Meshy (owner, 29 Oct 2026: "a toggle to choose our own rig or Meshy via
+ * fal.ai, our own is weak, maybe Meshy will be better; Meshy by default"). The same queue as the
+ * mesh, 1–3 minutes, $0.20; the answer is the rigged GLB's URL, with Meshy's 24 bones under the names
+ * the donors have, so the one clip library moves it (`people.ts`). Not retried: a body Meshy will not
+ * rig does not become one on a second ask, and the browser's own rig stands in.
+ */
+export async function rigWithMeshy(key: string, glb: string, height: number, label: string, o: FalOptions = {}): Promise<string> {
+  const head = `← ${glb}\n${height} m`;
+  const entry = startRequest('fal', FAL_RIG_MODEL, null, head, label);
+  try {
+    type Rigged = { rigged_character_glb?: { url?: string; file_size?: number } | null };
+    const body = await meshyJob<Rigged>(key, FAL_RIG_MODEL, { model_url: glb, height_meters: height, enable_animation: false }, entry, head, o);
     const rigged = body.rigged_character_glb?.url;
     if (!rigged) throw new Error('no rigged model in the answer');
-    const kb = body.rigged_character_glb?.file_size ? ` (${Math.round(body.rigged_character_glb.file_size / 1024)} KB)` : '';
-    endRequest(entry, null, { cost: FAL_PRICES.rig, text: `← ${glb}\n${height} m\n→ ${rigged}${kb}` });
+    endRequest(entry, null, { cost: FAL_PRICES.rig, text: `${head}\n→ ${rigged}${kbOf(body.rigged_character_glb)}` });
     return rigged;
+  } catch (err) {
+    endRequest(entry, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
+/**
+ * Who makes a person's model from its picture (owner, 29 Oct 2026, after the rig's switch: "one more
+ * toggle so the models are made by Meshy too, maybe it will be better"): TRELLIS ($0.02, ~30 s, the
+ * default) or Meshy's image-to-3D ($0.80, a few minutes), asked for an A-pose at ~10k polygons so
+ * either rig gets the pose it expects. Only people; the hub, places and clues stay on TRELLIS.
+ */
+export type Mesher = 'trellis' | 'meshy';
+export const DEFAULT_MESHER: Mesher = 'trellis';
+let personMesher: Mesher = DEFAULT_MESHER;
+export function setPersonMesher(m: Mesher) {
+  personMesher = m;
+}
+
+const PERSON_SLOTS: readonly FalSlot[] = ['person', 'hero', 'enemy'];
+
+/** Step 2 for a person on Meshy: the textured GLB from the picture, in the browser (the server's runner only knows TRELLIS). */
+export async function buildMeshyMesh(key: string, image: string, label: FalSlot, o: FalOptions = {}, started?: () => void): Promise<string> {
+  const head = `${tryMark(o)}← ${image}`;
+  const entry = startRequest('fal', FAL_PERSON_MESH_MODEL, null, head, label);
+  try {
+    type Made = { model_glb?: { url?: string; file_size?: number } | null };
+    const body = await meshyJob<Made>(
+      key,
+      FAL_PERSON_MESH_MODEL,
+      { image_url: image, pose_mode: 'a-pose', target_polycount: 10_000, should_texture: true, enable_pbr: false, enable_rigging: false },
+      entry,
+      head,
+      o,
+      started,
+    );
+    const glb = body.model_glb?.url;
+    if (!glb) throw new Error('no model in the answer');
+    endRequest(entry, null, { cost: FAL_PRICES.meshyMesh, text: `${head}\n→ ${glb}${kbOf(body.model_glb)}` });
+    return glb;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
@@ -321,6 +372,11 @@ async function imageAndMesh(
   scope: string,
   running?: () => void,
 ): Promise<{ image: string; glb: string; queuedMs: number; costUsd: number }> {
+  if (personMesher === 'meshy' && PERSON_SLOTS.includes(label)) {
+    const image = await drawImage(key, prompt, label, o);
+    const glb = await buildMeshyMesh(key, image, label, o, running);
+    return { image, glb, queuedMs: 0, costUsd: imageCost() + FAL_PRICES.meshyMesh };
+  }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);
     if (made?.glb) return { ...made, glb: made.glb };

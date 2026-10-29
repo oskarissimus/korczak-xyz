@@ -686,6 +686,15 @@ content-hashed and immutable.
     leather apron (`rpg/postacie-3d/meshy-vs-wlasny-kowal.gif` in the project files), same clips:
     Meshy frees the arms from the body and splits the legs cleanly in the walk; ours keeps the apron
     on the body but glues the hands to it, and Meshy's apron splays into spikes in the idle and swing.
+  - **And the model itself can be Meshy's** (owner, 29 Oct 2026: "one more toggle so the models
+    are made by Meshy too, maybe it will be better"). *Character model* in the settings
+    (`rpg-mesher`, absent = TRELLIS, the default because Meshy is 40× the price): with Meshy, a
+    person's picture goes to `fal-ai/meshy/v6/image-to-3d` (`buildMeshyMesh`, A-pose, ~10k
+    polygons, **$0.80**, in the browser — the server's job runner only knows TRELLIS) instead of
+    TRELLIS. People only (`person`, `hero`, `enemy`); the hub, places and clues stay on TRELLIS. A
+    model is kept on the character as before, so the switch applies to people made from then on;
+    either rig then works on either mesh. Not yet seen on a real person: the fal balance ran out the
+    day it was written, so the A-pose, the facing and the scale are assumed from TRELLIS's.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

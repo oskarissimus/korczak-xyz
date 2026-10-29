@@ -63,7 +63,10 @@ import {
   cluePrompt,
   ensureClueModel,
   ensureHubModels,
+  DEFAULT_MESHER,
   ensurePersonModel,
+  setPersonMesher,
+  type Mesher,
   ensurePlaceModel,
   falPending,
   heroLook,
@@ -203,6 +206,8 @@ function clip(text: string, n: number): string {
 const EXOTIC_KEY = 'rpg-exotic';
 /** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self'. */
 const RIGGER_KEY = 'rpg-rigger';
+/** What makes the generated people's models (`Mesher` in `landmark3d.ts`); TRELLIS unless 'meshy'. */
+const MESHER_KEY = 'rpg-mesher';
 
 /**
  * A line as the dialogue shows it: an audio tag ("[coughs]", or an old save's "[Kaszel]") as a short
@@ -305,6 +310,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [rigger, setRigger] = useState<Rigger>(DEFAULT_RIGGER);
   const riggerRef = useRef(rigger);
   riggerRef.current = rigger;
+  const [mesher, setMesher] = useState<Mesher>(DEFAULT_MESHER);
+  setPersonMesher(mesher);
   const fastStartRef = useRef(true);
   fastStartRef.current = fastStart;
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
@@ -1861,6 +1868,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
       setRigger(localStorage.getItem(RIGGER_KEY) === 'self' ? 'self' : DEFAULT_RIGGER);
+      setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
     } catch {
@@ -1889,6 +1897,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (value === DEFAULT_RIGGER) localStorage.removeItem(RIGGER_KEY);
       else localStorage.setItem(RIGGER_KEY, value);
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickMesher = (value: Mesher) => {
+    setMesher(value);
+    try {
+      if (value === DEFAULT_MESHER) localStorage.removeItem(MESHER_KEY);
+      else localStorage.setItem(MESHER_KEY, value);
     } catch {
       /* forgotten on reload */
     }
@@ -2284,6 +2301,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
             <option value="meshy">{t.riggerMeshy}</option>
             <option value="self">{t.riggerSelf}</option>
           </select>
+        </label>
+      )}
+      {keysReady && falKey && (
+        <label className="rpg-model">
+          {t.mesher}:{' '}
+          <select value={mesher} onChange={(e) => pickMesher(e.target.value === 'meshy' ? 'meshy' : 'trellis')}>
+            <option value="trellis">{t.mesherTrellis}</option>
+            <option value="meshy">{t.mesherMeshy}</option>
+          </select>
+          <small> {t.mesherNote}</small>
         </label>
       )}
       {keysReady ? (

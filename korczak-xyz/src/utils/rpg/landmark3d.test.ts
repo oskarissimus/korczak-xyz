@@ -8,7 +8,10 @@ import {
   ensureHubModels,
   FAL_IMAGE_MODEL,
   FAL_MESH_MODEL,
+  FAL_PERSON_MESH_MODEL,
   FAL_RIG_MODEL,
+  ensurePersonModel,
+  setPersonMesher,
   FOREST_SLOTS,
   generateHubModel,
   generateLandmark,
@@ -90,6 +93,42 @@ describe('landmark3d', () => {
     await expect(rigWithMeshy('k', 'https://fal.media/model.glb', 1.8, 'enemy', { ...now, fetchImpl: f as typeof fetch })).rejects.toThrow(/^422/);
     const [entry] = devRequests();
     expect([entry.status, entry.error]).toEqual(['error', expect.stringContaining('not a humanoid')]);
+  });
+
+  it('makes a person on Meshy when asked, the picture first, and leaves everyone else on TRELLIS', async () => {
+    const calls: string[] = [];
+    const bodies: Record<string, unknown> = {};
+    let polls = 0;
+    const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push(url);
+      if (url === `https://fal.run/${FAL_IMAGE_MODEL}`) return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
+      if (url === `https://queue.fal.run/${FAL_PERSON_MESH_MODEL}`) {
+        bodies.mesh = JSON.parse(String(init?.body));
+        return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
+      }
+      if (url === 'https://q/status') return json({ status: polls++ ? 'COMPLETED' : 'IN_PROGRESS' });
+      if (url === 'https://q/result') return json({ model_glb: { url: 'https://fal.media/meshy.glb', file_size: 900_000 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    setPersonMesher('meshy');
+    try {
+      const model = await new Promise<LandmarkModel>((resolve, reject) =>
+        ensurePersonModel('k', 'person', 'w1/Jagna', 'a woman', resolve, reject, { ...now, fetchImpl: f as typeof fetch }),
+      );
+      expect(model.glb).toBe('https://fal.media/meshy.glb');
+      expect(model.costUsd).toBeCloseTo(0.803);
+      expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 'a-pose' });
+      expect(calls).not.toContain(`https://queue.fal.run/${FAL_MESH_MODEL}`);
+      expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([
+        [FAL_IMAGE_MODEL, 'ok', 0.003],
+        [FAL_PERSON_MESH_MODEL, 'ok', 0.8],
+      ]);
+      const hub = await generateLandmark('k', world(), { ...now, fetchImpl: falFetch([]) as typeof fetch });
+      expect(hub.glb).toBe('https://fal.media/model.glb');
+    } finally {
+      setPersonMesher('trellis');
+    }
   });
 
   it('bills the picture by the megapixel, rounded up', () => {
