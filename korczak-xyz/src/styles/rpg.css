@@ -449,6 +449,23 @@ ul.rpg-source {
   right: 136px;
 }
 
+/* How much of the track has come while ElevenLabs composes it: a strip under the note. */
+.rpg-music-bar {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 2px;
+  height: 3px;
+  background: rgba(241, 230, 207, 0.25);
+}
+
+.rpg-music-bar > span {
+  display: block;
+  height: 100%;
+  background: #f1e6cf;
+  transition: width 0.4s linear;
+}
+
 .rpg-toast {
   white-space: normal;
   text-align: center;

@@ -1330,10 +1330,13 @@ owner's credits for strangers. No sound effects yet.
   dialogue, no drops, no fade-out, a loop that ends as it began. A world from before the line is
   described from its look in English (weather, water, flora, time of day) and its tone, tech and
   climate as written (`worldMusic`). The Willowlands have a line of their own (dark folk, hurdy-gurdy).
-- **`POST /v1/music`**, `music_v2_5`, `force_instrumental`, `music_length_ms` 120 000 (`MUSIC_MS`),
-  mp3. A 400/403/422 from v2.5 asks `music_v1` instead and stays on it for the session; a
-  401/402/403 on both stops asking for the session. CORS answers `*` (checked 30 Oct 2026). **Not yet
-  run against the live API** (the session could not read a key): the shape is ElevenLabs' reference.
+- **`POST /v1/music/stream`**, `music_v2_5`, `force_instrumental`, `music_length_ms` 120 000
+  (`MUSIC_MS`), mp3 at 128 kb/s (48 kHz for v2 models, 44.1 for v1: `musicFormat`), so the bytes
+  say how many seconds have come. Streamed rather than one silent two-minute request (the first
+  build used `/v1/music` at 44.1 kHz and failed on the owner's phone the first day, reason unseen).
+  Any 4xx but 401 and 429 from v2.5 asks `music_v1` instead and stays on it for the session, v2.5's
+  reason kept in the console row. CORS answers `*` (checked 30 Oct 2026). **Not yet run against the
+  live API from here** (the session could not read a key): the shape is ElevenLabs' reference.
 - **Once per world and tone**: up to four tracks a world, the bytes in the Cache API (`rpg-music`,
   keyed by world, tone and length). A new quest of a tone the world has had plays at once and
   costs nothing. This browser only; another device composes its own. Nothing waits for a track:
@@ -1348,6 +1351,15 @@ owner's credits for strangers. No sound effects yet.
   while the page is hidden. A new tone or world fades the old track out under the new one.
 - **🎵 switches it** (`🎵✕` off, never told by colour), left of 🔊 and `~` (at the top on a phone),
   kept in localStorage `rpg-music`. Off composes nothing.
+- **It shows where it is** (owner, 30 Oct 2026, after the first failure: "it should be in the loading
+  bar, or have its own bar where the note is, and a retry"). `musicState` in `music.ts` is a small
+  store: `🎵⏳` with a strip under it filling as the seconds stream in, `🎵` playing, `🎵↻` failed —
+  tapped, it composes again (a failure is never kept, `musicTry` in `Rpg.tsx`). The start's progress
+  has a **Muzyka (ElevenLabs)** row (task kind `music`, on its own line like the ground, queued
+  after the world while one is invented; usual time 60 s in `rpg-typical`). The toast says
+  ElevenLabs' own reason (`musicError`: status and `detail.message`), so a key without the music
+  permission or a plan without the Music API says so. A track that came but would not decode is
+  dropped from the cache too.
 - **In the console** as kind `music` (`devlog.ts`), shown without the ElevenLabs checkbox: `♪ music
   (tone)`, the model (with v2.5's status if it fell back), the prompt, the time it took, the error,
   seconds and credits. The Koszty tab and the closing screen have **ElevenLabs muzyka** on its own

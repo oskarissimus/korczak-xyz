@@ -23,6 +23,7 @@ import type { WorldBible } from './genesis';
 import type { Tone } from './quest';
 import { endRequest, startRequest, updateRequest } from './devlog';
 import { MUSIC_CREDITS_PER_MINUTE } from './cost';
+import { rememberTiming } from './progress';
 
 /** The newest model first; a key or plan that may not use it falls back to v1 for the session. */
 export const MUSIC_MODEL = 'music_v2_5';
@@ -96,14 +97,78 @@ export function musicCredits(ms: number, header: string | null): number {
   return Number.isFinite(charged) && charged > 0 ? charged : (ms / 60_000) * MUSIC_CREDITS_PER_MINUTE;
 }
 
-/** Statuses that say this model is not for this key or plan, rather than that the request was bad. */
-function refused(status: number): boolean {
-  return status === 400 || status === 403 || status === 422;
+/**
+ * Statuses that may be about the model rather than the request (a plan without v2.5, a parameter v2.5
+ * takes differently): v1 is asked before giving up. Not 401, which is the key, nor 429 or a 5xx,
+ * which are the moment.
+ */
+export function tryFallback(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 401 && status !== 429;
+}
+
+/**
+ * The format asked for: 128 kb/s, so the bytes say how many seconds have come (`BYTES_PER_SECOND`),
+ * at the rate each model writes natively — v2 models at 48 kHz, v1 at 44.1 (the reference's "auto").
+ */
+export function musicFormat(m: string): string {
+  return m === 'music_v1' ? 'mp3_44100_128' : 'mp3_48000_128';
+}
+const BYTES_PER_SECOND = 128_000 / 8;
+
+/** ElevenLabs' error as a sentence: `detail` is a string, an object with `message`, or a list. */
+export function musicError(status: number, body: unknown): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  const said =
+    typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? (detail[0] as { msg?: string } | undefined)?.msg
+        : (detail as { message?: string; code?: string } | undefined)?.message ??
+          (detail as { code?: string } | undefined)?.code;
+  return said ? `${status}: ${said}` : `ElevenLabs ${status}`;
 }
 
 let model = MUSIC_MODEL;
-/** A refusal that will hold all session (no key, no paid plan, no credits): no more asking. */
-let musicOff = false;
+
+/*
+ * What the score is doing, for the 🎵 button's own bar and the start's progress (owner, 30 Oct 2026:
+ * "the music should be in the loading bar, or have its own bar where the note is, and a retry when
+ * it did not generate"). One track at a time is wanted; this is the one.
+ */
+export type MusicStatus = 'idle' | 'composing' | 'ready' | 'failed';
+export interface MusicState {
+  status: MusicStatus;
+  /** The world and tone (`musicId`) it is about. */
+  id: string | null;
+  /** When composing began. */
+  since: number | null;
+  /** Seconds of audio come so far, of `total`. */
+  seconds: number;
+  total: number;
+  error: string | null;
+}
+
+let state: MusicState = { status: 'idle', id: null, since: null, seconds: 0, total: MUSIC_MS / 1000, error: null };
+const listeners = new Set<() => void>();
+
+function setState(patch: Partial<MusicState>): void {
+  state = { ...state, ...patch };
+  for (const l of listeners) l();
+}
+
+export function subscribeMusic(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function musicState(): MusicState {
+  return state;
+}
+
+/** Back to nothing wanted: back at the intro, or the music switched off. */
+export function forgetMusicState(): void {
+  if (state.status !== 'composing') setState({ status: 'idle', id: null, since: null, seconds: 0, error: null });
+}
 
 const CACHE = 'rpg-music';
 const tracks = new Map<string, Promise<ArrayBuffer>>();
@@ -132,35 +197,61 @@ async function keep(url: string, bytes: ArrayBuffer): Promise<void> {
   }
 }
 
-/** Into the console like a clip, under its own kind so its price stands apart from the voices. */
-async function compose(key: string, prompt: string, label: string): Promise<ArrayBuffer> {
+/** The body as it streams, telling `onSeconds` how much audio has come. */
+async function readAll(response: Response, onSeconds: (s: number) => void): Promise<ArrayBuffer> {
+  const reader = response.body?.getReader();
+  if (!reader) return response.arrayBuffer();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+    onSeconds(size / BYTES_PER_SECOND);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out.buffer;
+}
+
+/**
+ * Streamed (`/v1/music/stream`), so its seconds can be counted as they come and no gateway waits on a
+ * silent two-minute request. Into the console like a clip, under its own kind so its price stands
+ * apart from the voices.
+ */
+async function compose(key: string, prompt: string, label: string, onSeconds: (s: number) => void): Promise<ArrayBuffer> {
   const entry = startRequest('music', model, null, prompt, label);
   try {
     const ask = (m: string) =>
-      fetch('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
+      fetch(`https://api.elevenlabs.io/v1/music/stream?output_format=${musicFormat(m)}`, {
         method: 'POST',
         headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, music_length_ms: MUSIC_MS, model_id: m, force_instrumental: true }),
       });
     let response = await ask(model);
-    if (!response.ok && model !== MUSIC_FALLBACK && refused(response.status)) {
-      // v2.5 would not: v1, for this track and the rest of the session.
-      const was = `${model} ${response.status}`;
+    if (!response.ok && model !== MUSIC_FALLBACK && tryFallback(response.status)) {
+      // v2.5 would not: v1, for this track and the rest of the session. Its reason stays in the console.
+      const was = musicError(response.status, await response.json().catch(() => null));
       model = MUSIC_FALLBACK;
-      updateRequest(entry, { model: `${model} (${was})` });
+      updateRequest(entry, { model: `${model} (music_v2_5 ${was})` });
       response = await ask(model);
     }
-    if (!response.ok) {
-      if ([401, 402, 403].includes(response.status)) musicOff = true;
-      const error = await response.json().catch(() => ({}));
-      const detail = error?.detail;
-      throw new Error(
-        (typeof detail === 'string' ? detail : detail?.message ?? (Array.isArray(detail) ? detail[0]?.msg : null)) ||
-          `ElevenLabs ${response.status}`,
-      );
-    }
-    updateRequest(entry, { text: `${prompt}\n\n♪ downloading…` });
-    const bytes = await response.arrayBuffer();
+    if (!response.ok) throw new Error(musicError(response.status, await response.json().catch(() => null)));
+    let shown = 0;
+    const bytes = await readAll(response, (s) => {
+      onSeconds(s);
+      // The console every few seconds of audio, not every chunk.
+      if (s - shown >= 5) {
+        shown = s;
+        updateRequest(entry, { text: `${prompt}\n\n♪ ${Math.round(s)} / ${MUSIC_MS / 1000} s` });
+      }
+    });
+    if (bytes.byteLength < BYTES_PER_SECOND) throw new Error(`only ${bytes.byteLength} bytes came`);
     endRequest(entry, null, {
       text: prompt,
       chars: Math.round(MUSIC_MS / 1000),
@@ -168,28 +259,59 @@ async function compose(key: string, prompt: string, label: string): Promise<Arra
     });
     return bytes;
   } catch (e) {
-    endRequest(entry, e instanceof Error ? e.message : String(e));
-    throw e;
+    // Safari says only "Load failed" for a cut connection: say what it was doing.
+    const message = e instanceof Error ? e.message : String(e);
+    endRequest(entry, message);
+    throw e instanceof Error ? e : new Error(message);
   }
 }
 
-/** The world's track for this tone: from this browser's cache, else composed once and kept. */
+/**
+ * The world's track for this tone: from this browser's cache, else composed once and kept. Its
+ * progress is `musicState`; a failure is not kept, so asking again (the retry) composes again.
+ */
 export function musicFor(key: string, world: WorldBible, tone: Tone | null): Promise<ArrayBuffer> {
   const url = cacheUrl(world.id, tone);
+  const id = musicId(world.id, tone);
   let track = tracks.get(url);
   if (track) return track;
   track = (async () => {
     const hit = await cached(url);
-    if (hit) return hit;
-    if (musicOff) throw new Error('ElevenLabs refused music this session');
-    const bytes = await compose(key, musicPrompt(world, tone), tone ?? 'music');
-    await keep(url, bytes.slice(0));
-    return bytes;
+    if (hit) {
+      setState({ status: 'ready', id, since: null, seconds: MUSIC_MS / 1000, error: null });
+      return hit;
+    }
+    setState({ status: 'composing', id, since: Date.now(), seconds: 0, error: null });
+    try {
+      const bytes = await compose(key, musicPrompt(world, tone), tone ?? 'music', (s) => {
+        if (state.id === id) setState({ seconds: Math.min(s, MUSIC_MS / 1000) });
+      });
+      if (state.since !== null && state.id === id) rememberTiming('music', Date.now() - state.since);
+      await keep(url, bytes.slice(0));
+      if (state.id === id) setState({ status: 'ready', seconds: MUSIC_MS / 1000 });
+      return bytes;
+    } catch (e) {
+      if (state.id === id) setState({ status: 'failed', error: e instanceof Error ? e.message : String(e) });
+      throw e;
+    }
   })();
   tracks.set(url, track);
-  // A failure is not kept: the next quest may well get its music.
   track.catch(() => tracks.delete(url));
   return track;
+}
+
+/** A track that came but would not play (it would not decode): failed, with the reason, and not kept. */
+export function musicUnplayable(worldId: string, tone: Tone | null, error: unknown): void {
+  const url = cacheUrl(worldId, tone);
+  tracks.delete(url);
+  void (async () => {
+    try {
+      if (typeof caches !== 'undefined') await (await caches.open(CACHE)).delete(url);
+    } catch {
+      /* composed again anyway: the promise is gone */
+    }
+  })();
+  if (state.id === musicId(worldId, tone)) setState({ status: 'failed', error: `decode: ${error instanceof Error ? error.message : String(error)}` });
 }
 
 /* ---- Playing it ---- */

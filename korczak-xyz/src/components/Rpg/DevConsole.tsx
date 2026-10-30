@@ -615,16 +615,26 @@ function eta(ms: number, lang: Lang): string {
 function progressHeadline(list: readonly Task[], lang: Lang): string {
   const t = translations[lang];
   const open = (kinds: TaskKind[]) => list.some((x) => kinds.includes(x.kind) && (x.state === 'running' || x.state === 'queued'));
-  return open(['world', 'ground', 'model']) ? t.progressTitle : open(['quest']) ? t.progressQuestTitle : t.progressPiecesTitle;
+  return open(['world', 'ground', 'model'])
+    ? t.progressTitle
+    : open(['quest'])
+      ? t.progressQuestTitle
+      : open(['piece'])
+        ? t.progressPiecesTitle
+        : t.progressMusicTitle;
 }
 
 /** The rows of the start's progress, one per kind of work, in the order they usually end. */
-const PROGRESS_ROWS: { kinds: TaskKind[]; key: 'progressWorld' | 'progressQuest' | 'progressGround' | 'progressModels' | 'progressPieces' }[] = [
+const PROGRESS_ROWS: {
+  kinds: TaskKind[];
+  key: 'progressWorld' | 'progressQuest' | 'progressGround' | 'progressModels' | 'progressPieces' | 'progressMusic';
+}[] = [
   { kinds: ['world'], key: 'progressWorld' },
   { kinds: ['quest'], key: 'progressQuest' },
   { kinds: ['ground'], key: 'progressGround' },
   { kinds: ['model'], key: 'progressModels' },
   { kinds: ['piece'], key: 'progressPieces' },
+  { kinds: ['music'], key: 'progressMusic' },
 ];
 
 /**

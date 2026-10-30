@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classicWorld, parseWorlds } from './genesis';
-import { MUSIC_MS, musicCredits, musicId, musicPrompt, worldMusic } from './music';
+import { MUSIC_MS, musicCredits, musicError, musicFormat, musicId, musicPrompt, tryFallback, worldMusic } from './music';
 import { NO_SPEND, addSpend, spendUsd, validSpend } from './devlog';
 
 describe('the score', () => {
@@ -25,6 +25,25 @@ describe('the score', () => {
     expect(musicCredits(MUSIC_MS, null)).toBe(1800);
     expect(musicCredits(60_000, '750')).toBe(750);
     expect(musicCredits(60_000, 'nope')).toBe(900);
+  });
+
+  it('says ElevenLabs’ error in whichever shape it comes', () => {
+    expect(musicError(401, { detail: { code: 'missing_permissions', message: 'The API key is missing the permission music_generation' } })).toBe(
+      '401: The API key is missing the permission music_generation',
+    );
+    expect(musicError(422, { detail: [{ msg: 'field required' }] })).toBe('422: field required');
+    expect(musicError(400, { detail: 'bad prompt' })).toBe('400: bad prompt');
+    expect(musicError(500, null)).toBe('ElevenLabs 500');
+  });
+
+  it('asks v1 for a refusal that may be the model, not for the key or the moment', () => {
+    expect([400, 402, 403, 404, 422].every(tryFallback)).toBe(true);
+    expect([401, 429, 500, 503].some(tryFallback)).toBe(false);
+  });
+
+  it('asks each model for 128 kb/s at its own sample rate', () => {
+    expect(musicFormat('music_v2_5')).toBe('mp3_48000_128');
+    expect(musicFormat('music_v1')).toBe('mp3_44100_128');
   });
 
   it('keeps one track per world and tone', () => {

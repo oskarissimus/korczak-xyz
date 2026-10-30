@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_TYPICAL, learnTypical, progressOf, remainingMs, roughly, type Task } from './progress';
 
-const t = { world: 10_000, quest: 10_000, ground: 4_000, model: 50_000 };
+const t = { world: 10_000, quest: 10_000, ground: 4_000, model: 50_000, music: 60_000 };
 const now = 1_000_000;
 
 describe('remainingMs', () => {
+  it('runs the music on its own line, after the world when it waits for it', () => {
+    expect(remainingMs([{ kind: 'music', state: 'running', since: now - 20_000 }], now, t)).toBe(40_000);
+    const waiting = [
+      { kind: 'world', state: 'running', since: now },
+      { kind: 'music', state: 'queued', since: null, afterWorld: true },
+    ] as const;
+    expect(remainingMs(waiting, now, t)).toBe(70_000);
+  });
+
   it('is nothing once everything has ended', () => {
     expect(remainingMs([{ kind: 'world', state: 'done', since: null }, { kind: 'model', state: 'failed', since: null }], now, t)).toBe(0);
   });

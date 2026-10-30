@@ -11,7 +11,7 @@
  * No DOM beyond localStorage, so it can be tested.
  */
 
-export type TaskKind = 'world' | 'quest' | 'ground' | 'model' | 'piece';
+export type TaskKind = 'world' | 'quest' | 'ground' | 'model' | 'piece' | 'music';
 export type TaskState = 'done' | 'running' | 'queued' | 'failed';
 
 export interface Task {
@@ -32,13 +32,15 @@ export interface Typical {
   quest: number;
   ground: number;
   model: number;
+  /** ElevenLabs composing a world's score (`music.ts`), on its own line beside everything else. */
+  music: number;
 }
 
 /**
  * Before this browser has timed anything: quick start's world and opening, and fal.ai's usual 3D
  * model with a runner (27 Oct 2026, 36 pieces: a picture in 1–6 s, a mesh in 14–37 s, ~22 s).
  */
-export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 25_000 };
+export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 25_000, music: 60_000 };
 
 /**
  * Meshes fal.ai runs at once for the owner's account, the rest held in its queue: 6–7 at most
@@ -58,6 +60,7 @@ export function loadTypical(): Typical {
       quest: ok(raw?.quest, DEFAULT_TYPICAL.quest),
       ground: ok(raw?.ground, DEFAULT_TYPICAL.ground),
       model: ok(raw?.model, DEFAULT_TYPICAL.model),
+      music: ok(raw?.music, DEFAULT_TYPICAL.music),
     };
   } catch {
     return { ...DEFAULT_TYPICAL };
@@ -106,7 +109,7 @@ export function remainingMs(tasks: readonly Task[], now: number, t: Typical, par
   const quest = open.find((x) => x.kind === 'quest');
   const storyEnd = quest ? (quest.state === 'running' ? left(quest, now, t) : worldEnd + t.quest) : worldEnd;
   let end = storyEnd;
-  for (const g of open.filter((x) => x.kind === 'ground')) {
+  for (const g of open.filter((x) => x.kind === 'ground' || x.kind === 'music')) {
     end = Math.max(end, (g.state === 'queued' && g.afterWorld ? worldEnd : 0) + left(g, now, t));
   }
   const fal = open.filter((x) => x.kind === 'model' || x.kind === 'piece');

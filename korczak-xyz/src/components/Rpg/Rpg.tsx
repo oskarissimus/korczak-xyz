@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
@@ -132,7 +132,22 @@ import {
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { asideLabel, directions } from '../../utils/rpg/audioTags';
-import { duckMusic, loadMusicOn, musicFor, musicId, pauseMusic, playMusic, playingMusic, primeMusic, saveMusicOn, stopMusic } from '../../utils/rpg/music';
+import {
+  duckMusic,
+  forgetMusicState,
+  loadMusicOn,
+  musicFor,
+  musicId,
+  musicState,
+  musicUnplayable,
+  pauseMusic,
+  playMusic,
+  playingMusic,
+  primeMusic,
+  saveMusicOn,
+  stopMusic,
+  subscribeMusic,
+} from '../../utils/rpg/music';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
@@ -312,6 +327,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const musicKey = account.keys.elevenLabs ?? null;
   const [musicOn, setMusicOn] = useState(loadMusicOn);
   const [score, setScore] = useState<{ world: WorldBible; tone: Tone | null } | null>(null);
+  // Where the score is: its bar beside 🎵, its row in the start's progress, the retry when it failed.
+  const music = useSyncExternalStore(subscribeMusic, musicState, musicState);
+  const [musicTry, setMusicTry] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1437,6 +1455,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (generating) tasks.push({ kind: 'quest', state: 'running', since: writingSinceRef.current || null });
     else if (creating) tasks.push({ kind: 'quest', state: 'queued', since: null });
     else if (line && line.stages.quest !== undefined) tasks.push({ kind: 'quest', state: 'done', since: null });
+    // The score, once it is being composed in this start (`music.ts`): on its own line, like the ground.
+    if (music.status !== 'idle' && music.since !== null && (!line || music.since >= line.since)) {
+      tasks.push({
+        kind: 'music',
+        state: music.status === 'composing' ? 'running' : music.status === 'failed' ? 'failed' : 'done',
+        since: music.since,
+      });
+    } else if (creating && musicKey && musicOn) {
+      // Composed for the world's first quest, once the world is written.
+      tasks.push({ kind: 'music', state: 'queued', since: null, afterWorld: true });
+    }
     if (!falKey) return tasks;
     const pending = falPending();
     const aw = creating ? previewRef.current : world;
@@ -1485,7 +1514,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       else if (r.status === 'error') tasks.push({ kind: 'piece', state: 'failed', since: null });
     }
     return tasks;
-  }, [creating, generating, falKey, world]);
+  }, [creating, generating, falKey, world, music, musicKey, musicOn]);
   falKeyRef.current = falKey;
   useEffect(() => sceneRef.current?.setRigger(rigger, falKey), [rigger, falKey]);
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
@@ -2213,21 +2242,29 @@ export default function Rpg({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (!started || !musicOn || !musicKey || !score) {
       stopMusic();
+      forgetMusicState();
       return;
     }
-    const id = musicId(score.world.id, score.tone);
+    const { world: w, tone } = score;
+    const id = musicId(w.id, tone);
     if (playingMusic() === id) return;
     let stale = false;
-    musicFor(musicKey, score.world, score.tone)
-      .then((bytes) => (stale ? undefined : playMusic(id, bytes)))
+    musicFor(musicKey, w, tone)
+      .then((bytes) => {
+        if (stale) return;
+        return playMusic(id, bytes).catch((e) => {
+          musicUnplayable(w.id, tone, e);
+          throw e;
+        });
+      })
       .catch((e) => {
         log.warn('rpg.music.failed', describeError(e));
-        if (!stale) flash(tRef.current.musicFailed);
+        if (!stale) flash(tRef.current.musicFailed(musicState().error ?? (e instanceof Error ? e.message : String(e))), 8000);
       });
     return () => {
       stale = true;
     };
-  }, [flash, musicKey, musicOn, score, started]);
+  }, [flash, musicKey, musicOn, musicTry, score, started]);
   // Under a voice the score steps back; a hidden page stops it where it is.
   useEffect(() => duckMusic(Boolean(dialogue)), [dialogue]);
   useEffect(() => {
@@ -3010,15 +3047,33 @@ export default function Rpg({ lang }: { lang: Lang }) {
           className="rpg-music"
           onClick={() => {
             primeMusic();
+            // A track that failed is asked for again; otherwise the switch.
+            if (musicOn && music.status === 'failed') {
+              setMusicTry((n) => n + 1);
+              return;
+            }
             setMusicOn((on) => {
               saveMusicOn(!on);
               return !on;
             });
           }}
-          title={musicOn ? t.musicOff : t.musicOn}
+          title={
+            !musicOn
+              ? t.musicOn
+              : music.status === 'failed'
+                ? `${t.musicRetry} (${music.error ?? '?'})`
+                : music.status === 'composing'
+                  ? t.musicComposing(Math.round((music.seconds / music.total) * 100))
+                  : t.musicOff
+          }
           aria-pressed={musicOn}
         >
-          {musicOn ? '🎵' : '🎵✕'}
+          {!musicOn ? '🎵✕' : music.status === 'failed' ? '🎵↻' : music.status === 'composing' ? '🎵⏳' : '🎵'}
+          {musicOn && music.status === 'composing' && (
+            <span className="rpg-music-bar" aria-hidden="true">
+              <span style={{ width: `${Math.max(4, Math.round((music.seconds / music.total) * 100))}%` }} />
+            </span>
+          )}
         </button>
       )}
 
