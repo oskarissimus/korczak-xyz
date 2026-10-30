@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { describeError, log } from '../../lib/logger';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { LANDMARK_REACH, placePosition, type PlaceSpec, type TargetLook } from '../../utils/rpg/place';
 import type { ObjectiveKind } from '../../utils/rpg/quest';
@@ -2654,12 +2655,15 @@ export class RpgScene {
       this.frame = requestAnimationFrame(tick);
       const started = this.frames.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
-      if (!this.paused) this.update(dt);
+      // A step that throws is reported once and the frame is still drawn: before this, one thrown
+      // every frame stopped the drawing, and the canvas kept the last picture with the HUD alive
+      // over it — the previous world, a hero who would not move (owner, 30 Oct 2026).
+      this.step('update', () => !this.paused && this.update(dt));
       // The people move even while a dialogue holds the world: whoever is talking talks.
-      this.animate(dt);
-      this.updateSenses(dt);
+      this.step('animate', () => this.animate(dt));
+      this.step('senses', () => this.updateSenses(dt));
       this.updateCamera();
-      this.updateNameTag();
+      this.step('nameTag', () => this.updateNameTag());
       this.sky.update(dt, this.camera.position);
       this.cullFar();
       this.renderer.render(this.scene, this.camera);
@@ -2667,6 +2671,19 @@ export class RpgScene {
     };
     this.clock.start();
     tick();
+  }
+
+  /** Which of the loop's steps have thrown already: each goes to Sentry once a scene, not sixty times a second. */
+  private thrown = new Set<string>();
+
+  private step(name: string, run: () => unknown) {
+    try {
+      run();
+    } catch (e) {
+      if (this.thrown.has(name)) return;
+      this.thrown.add(name);
+      log.error('rpg.frame.threw', { step: name, ...describeError(e) });
+    }
   }
 
   private animate(dt: number) {
@@ -2742,8 +2759,10 @@ export class RpgScene {
       else if (moving) this.playerRig.play('Jog_Fwd_Loop', { speed: running ? 2.1 : 1.4 });
       else this.playerRig.play('Sword_Idle');
     } else {
-      // The capsule: a little bob while walking, and the sword's quick arc on a swing.
-      this.player.children[0].position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
+      // The capsule: a little bob while walking, and the sword's quick arc on a swing. Nobody at all
+      // while the world's own hero is being made (`setHero`, 'wait'), and the hunter walks anyway.
+      const capsule = this.player.children[0];
+      if (capsule) capsule.position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
       this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
     }
 

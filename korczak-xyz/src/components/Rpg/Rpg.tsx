@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
@@ -269,6 +269,24 @@ function LineText({ text, lang }: { text: string; lang: Lang }) {
   );
 }
 
+/** What fal.ai made for a world before it was saved (`earlyRef` in `Rpg`). */
+interface EarlyMade {
+  models: [HubSlot, LandmarkModel][];
+  ground?: GroundTexture;
+  cover?: GroundTexture[];
+  hero?: LandmarkModel;
+}
+
+/** `w` with what was made for it early put on it. */
+function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
+  if (!kept) return w;
+  let next = kept.models.reduce((acc, [slot, model]) => withModel(acc, slot, model), w);
+  if (kept.ground) next = { ...next, groundTexture: kept.ground };
+  if (kept.cover) next = { ...next, coverSprites: kept.cover };
+  if (kept.hero) next = { ...next, heroModel: kept.hero };
+  return next;
+}
+
 export default function Rpg({ lang }: { lang: Lang }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
   const [gameLang, setGameLang] = useState<Lang>(lang);
@@ -288,6 +306,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   worldRef.current = world;
   /** A world is being invented, from these seeds (empty while they are drawn). */
   const [creating, setCreating] = useState<string[] | null>(null);
+  /** The world being invented, as far as its stream has said (`previewWorld`), and a count of what fal.ai made for it so far. */
+  const [preview, setPreview] = useState<WorldBible | null>(null);
+  const [earlyMade, setEarlyMade] = useState(0);
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
   const uidRef = useRef<string | null>(null);
@@ -1044,7 +1065,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * What fal.ai made for a world before the world existed to keep it (`previewWorld`): held here
    * by its id until the world is born and saved with it (`withEarly`).
    */
-  const earlyRef = useRef(new Map<string, { models: [HubSlot, LandmarkModel][]; ground?: GroundTexture; cover?: GroundTexture[]; hero?: LandmarkModel }>());
+  const earlyRef = useRef(new Map<string, EarlyMade>());
   const earlyFor = (id: string) => {
     let kept = earlyRef.current.get(id);
     if (!kept) earlyRef.current.set(id, (kept = { models: [] }));
@@ -1058,6 +1079,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     markStage('firstModel');
     if (!findWorld(id)) {
       earlyFor(id).models.push([slot, model]);
+      setEarlyMade((n) => n + 1);
       return;
     }
     setWorldModel(id, slot, model);
@@ -1075,6 +1097,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     markStage('ground');
     if (!findWorld(id)) {
       earlyFor(id).ground = texture;
+      setEarlyMade((n) => n + 1);
       return;
     }
     setWorldGround(id, texture);
@@ -1086,6 +1109,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const keepHero = useCallback((id: string, model: LandmarkModel) => {
     if (!findWorld(id)) {
       earlyFor(id).hero = model;
+      setEarlyMade((n) => n + 1);
       return;
     }
     setWorldHero(id, model);
@@ -1098,6 +1122,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     markStage('cover');
     if (!findWorld(id)) {
       earlyFor(id).cover = sprites;
+      setEarlyMade((n) => n + 1);
       return;
     }
     setWorldCover(id, sprites);
@@ -1108,13 +1133,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** A world just born, with whatever was made for it while it was still being written. */
   const withEarly = useCallback((w: WorldBible): WorldBible => {
     const kept = earlyRef.current.get(w.id);
-    if (!kept) return w;
     earlyRef.current.delete(w.id);
-    let next = kept.models.reduce((acc, [slot, model]) => withModel(acc, slot, model), w);
-    if (kept.ground) next = { ...next, groundTexture: kept.ground };
-    if (kept.cover) next = { ...next, coverSprites: kept.cover };
-    if (kept.hero) next = { ...next, heroModel: kept.hero };
-    return next;
+    return withMade(w, kept);
   }, []);
 
   /** Asks fal.ai for whatever of the world's ground and hub it lacks; each piece once, however often asked. */
@@ -1161,8 +1181,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
     resetDevlog();
     beginTimeline('world');
     previewRef.current = null;
+    setPreview(null);
     setCreating([]);
     setPendingGenesis(null);
+    // The last world goes at once: its places, its people and its quest's marks. The board stays
+    // empty until the new world's own pieces come (`shown`).
+    const scene = sceneRef.current;
+    scene?.clearObjective();
+    scene?.clearClues();
+    scene?.clearPlaces();
+    scene?.clearNpcs();
+    scene?.setMarker(null);
+    scene?.teleport('spawn');
     // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
     const asked = wishRef.current;
     const own = !again && wished(asked);
@@ -1185,6 +1215,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (token !== questTokenRef.current) return;
       markStage('assets');
       previewRef.current = preview;
+      setPreview(preview);
+      // Its sky and light at once, the first thing about it there is to see.
+      sceneRef.current?.applyWorld(preview.look);
       startWorldAssets(preview);
     };
     let attempt;
@@ -1213,6 +1246,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // Answered, one way or the other: a reload now has nothing to finish.
     clearPendingGenesis();
     previewRef.current = null;
+    setPreview(null);
     if (attempt) {
       addGenerationTime(attempt.ms, 'world');
       if (attempt.world) rememberTiming('world', attempt.ms);
@@ -1541,8 +1575,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
       ensureNpcModel(c);
     }
   }, [falKey, keysReady, world, creating, bodyFor, ensureNpcModel]);
-  // The hero: the world's own once made, nobody while it is (and while a world is being invented),
-  // the kit's ranger in the classic world and without a key.
+  const inventing = creating !== null;
+  /**
+   * What the scene draws: the world, or while one is invented its preview with whatever fal.ai has
+   * made for it so far (`earlyRef`), and nothing before the preview. The last world is not this one
+   * (owner, 30 Oct 2026: "an emptiness in which the new things appear as they are generated").
+   */
+  const shown = useMemo(
+    () => (inventing ? (preview ? withMade(preview, earlyRef.current.get(preview.id)) : null) : world),
+    [inventing, preview, earlyMade, world],
+  );
+  // The hero: the world's own once made, nobody while it is (a world being invented too, until its
+  // own has come), the kit's ranger in the classic world and without a key.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -1550,43 +1594,48 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const look = world ? heroLook(world) : '';
     const body: PersonBody =
       creating !== null
-        ? { wait: true }
+        ? { url: shown?.heroModel?.glb, wait: true }
         : { url: invented ? world!.heroModel?.glb : undefined, wait: invented && (!!world!.heroModel || !keysReady || !!falKey) };
-    void scene.setHero(body, look).catch((e) => log.warn('rpg.hero.load.failed', describeError(e)));
-  }, [world, creating, falKey, keysReady]);
+    void scene.setHero(body, creating !== null && shown ? heroLook(shown) : look).catch((e) => log.warn('rpg.hero.load.failed', describeError(e)));
+  }, [world, creating, shown, falKey, keysReady]);
   const sizesAskedRef = useRef(new Set<string>());
   // Where it all stands is the world's own (`utils/rpg/hubLayout.ts`), and nothing stands there until
   // its model has come: an empty board, filling in. The board is empty while a world is invented,
   // the last world's village not being this one's. The kit's village only where no model will ever
   // come — the classic world, and a world with none made and no key to make them (until the keys have
   // loaded one is assumed, so the kit does not flash up first).
-  const inventing = creating !== null;
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene || !world) return;
-    if (inventing) return scene.setLayout(EMPTY_LAYOUT);
+    if (!scene) return;
+    if (inventing) return scene.setLayout(preview ? hubLayout(preview.id, preview.sizes) : EMPTY_LAYOUT);
+    if (!world) return;
     const made = world.createdAt > 0 && HUB_SLOTS.some((slot) => hubModel(world, slot)?.glb);
     const ownModels = world.createdAt > 0 && (!keysReady || !!falKey || made);
     scene.setLayout(ownModels ? hubLayout(world.id, world.sizes) : null);
-  }, [world, inventing, falKey, keysReady]);
+  }, [world, inventing, preview, falKey, keysReady]);
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene || !world) return;
+    if (!scene || (!shown && !inventing)) return;
+    // Nothing yet of a world being invented whose preview has not come.
+    const made = shown && shown.createdAt > 0 ? shown : null;
     const urls: Partial<Record<HubSlot, string>> = {};
-    if (world.createdAt > 0) for (const slot of HUB_SLOTS) {
-      const glb = hubModel(world, slot)?.glb;
+    if (made) for (const slot of HUB_SLOTS) {
+      const glb = hubModel(made, slot)?.glb;
       if (glb) urls[slot] = glb;
     }
-    void scene.setHubModels(urls, world.sizes, (slot, e) => log.warn('rpg.landmark.load.failed', { slot, ...describeError(e) }));
+    void scene.setHubModels(urls, made?.sizes, (slot, e) => log.warn('rpg.landmark.load.failed', { slot, ...describeError(e) }));
     // The same tree, and its young and old ones, across the whole map, as big as the world says its tree is.
     const forest = FOREST_SLOTS.flatMap((slot) => (urls[slot] ? [urls[slot]] : []));
-    void scene.setForest(forest, world.sizes?.tree, (url, e) => log.warn('rpg.forest.load.failed', { url, ...describeError(e) }));
+    void scene.setForest(forest, made?.sizes?.tree, (url, e) => log.warn('rpg.forest.load.failed', { url, ...describeError(e) }));
     // And the ground it all stands on, painted for the world (`utils/rpg/groundTexture.ts`).
-    const groundImage = world.createdAt > 0 ? (world.groundTexture?.image ?? null) : null;
+    const groundImage = made?.groundTexture?.image ?? null;
     void scene.setGroundTexture(groundImage, (e) => log.warn('rpg.ground.load.failed', describeError(e)));
     // And what grows on it (`utils/rpg/groundCover.ts`); under a layout nothing grows until it has come.
-    const cover = world.createdAt > 0 ? (world.coverSprites ?? []).map((s) => s.image) : [];
+    const cover = (made?.coverSprites ?? []).map((s) => s.image);
     void scene.setGroundCover(cover, (url, e) => log.warn('rpg.cover.load.failed', { url, ...describeError(e) }));
+  }, [shown, inventing]);
+  useEffect(() => {
+    if (!world || inventing) return;
     // A world described before genesis gave sizes asks for them once, so its pieces stand as big as
     // what they are rather than as big as their slot (`hubFit`).
     if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {
@@ -1609,7 +1658,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     }
     if (!falKey || world.createdAt === 0) return;
     startWorldAssets(world);
-  }, [world, falKey, keysReady, startWorldAssets]);
+  }, [world, inventing, falKey, keysReady, startWorldAssets]);
 
   // A beat's clues as real things (owner, 26 Oct 2026: "generated assets to examine"): each made
   // once by fal.ai from the English `prop` the beat wrote for it, on the reader's own key, while the

@@ -62,6 +62,21 @@ of the wait as the thinking. Four things, each kept:
 - **Flash at low thinking sometimes closes the object and keeps writing `}`**, so both JSON readers
   fall back to the first balanced object (`firstObject`).
 
+**A new world starts on an empty board** (owner, 30 Oct 2026: "the old things are still visible
+before the new ones appear — there should be an emptiness in which the new things appear as they are
+generated"). `createWorld` clears the last world's places, people, clues and marker at the click, and
+the scene draws `shown`: while a world is invented, its preview with whatever fal.ai has made for it
+so far (`earlyRef`, `withMade`, re-read on `earlyMade`), and nothing before the preview. The preview's
+sky is applied the moment it comes, its layout stands, and its ground, models and hero appear behind
+the genesis screen one by one.
+
+**The loop never stops drawing** (same day: "there is a joystick but I cannot move, a half-generated
+freeze"). A hero who is `wait` has no body, and the capsule's bob read `player.children[0]` — so
+from the click on *New world* until the world's hero had loaded, `update` threw on every frame, before
+the render: the canvas kept the old world's last picture while the HUD went on over it, the new
+quest's objective included. Each step of the loop now runs in `step`, which reports a throw to
+Sentry once (`rpg.frame.threw`) and still draws the frame.
+
 **The console's Start tab** shows where the time went: from the click (*New world* or *New quest*),
 when each awaited thing came (`markStage`: assets described, world ready, first step, ground, landmark,
 first 3D model, whole hub), and a bar per request on one time axis — running striped, failed hollow.
