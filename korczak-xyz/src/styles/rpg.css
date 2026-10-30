@@ -176,6 +176,27 @@
   color: #ffd36b;
 }
 
+/* The name over a character's head as the hunter nears (`updateNameTag` in RpgScene.ts): placed by
+   transform every frame, so it starts at the corner and never animates its position. */
+.rpg-name-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid #6b5b3e;
+  border-radius: 3px;
+  color: #ffe6a8;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.rpg-name-tag[hidden] {
+  display: none;
+}
+
 /* The witcher's senses (`senses.ts`): the edge of the view darkens while they last, so it is plain
    that the world is being read rather than looked at. Darkness, not a tint: it must show on a phone
    set to black and white. */

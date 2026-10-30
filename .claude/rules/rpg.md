@@ -695,6 +695,13 @@ content-hashed and immutable.
   picks the body; their clothes colour is multiplied into the outfit at 55%, so "a woman in red"
   still reads as red. The hunter is the male ranger with a beard; the sword sits in the right
   hand, placed from the hand's own finger bones (`gripSword`), not tuned by eye.
+- **A name over the head** (owner, 30 Oct 2026: "the name should show as you walk up to an NPC").
+  The nearest character within `NAME_RANGE` (6 m, a step before E's `TALK_RANGE`) gets their name
+  over their head, fading in over the last two metres (`updateNameTag`). It is one HTML element
+  over the canvas, not a sprite in the scene: text a phone draws sharp, and nothing in the NPC's
+  group, which `group.clear()` empties on every redress. It is placed every frame *after*
+  `updateCamera`, from `npc.group.position`, so it follows a character that walks; it hides while
+  the world is held (a dialogue names the speaker already) and when the head is behind the camera.
 - **Generated people** (owner, 28 Oct 2026: "it is always the same few models and it breaks
   immersion", then "no Quaternius characters: nothing until it is generated, then it is there").
   In an invented world with a fal key, every person is made for them: the hero once per world

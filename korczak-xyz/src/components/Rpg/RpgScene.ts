@@ -110,6 +110,8 @@ const COVER_HALF = 115;
 const WALK = 6;
 const RUN = 12;
 const TALK_RANGE = 3.2;
+/** A character's name shows over their head from this near, a step before E would reach them. */
+const NAME_RANGE = 6;
 const PICKUP_RANGE = 2.2;
 /** A clue's model from fal.ai: something lying on the ground, knee-high at most. */
 const CLUE_FIT = { height: 0.8, width: 1.2 };
@@ -360,6 +362,12 @@ export class RpgScene {
   private swing = 0;
   private paused = false;
   private lastPrompt: Prompt | null = null;
+  /**
+   * The name over the nearest character's head: one element over the canvas, moved every frame
+   * after the camera, so it follows whoever walks. HTML rather than a sprite, for text a phone draws sharp.
+   */
+  private nameTag: HTMLDivElement;
+  private nameTagFor: string | null = null;
   /** Things to examine, by id, with a glint so they can be found. */
   private clues = new Map<string, THREE.Object3D>();
   private compassTimer = 0;
@@ -415,6 +423,11 @@ export class RpgScene {
     this.marker.visible = false;
     this.scene.add(this.marker);
     this.senses = new SensesView(this.scene);
+
+    this.nameTag = document.createElement('div');
+    this.nameTag.className = 'rpg-name-tag';
+    this.nameTag.hidden = true;
+    canvas.parentElement?.appendChild(this.nameTag);
 
     this.bindInput();
   }
@@ -2432,6 +2445,7 @@ export class RpgScene {
       this.animate(dt);
       this.updateSenses(dt);
       this.updateCamera();
+      this.updateNameTag();
       this.sky.update(dt, this.camera.position);
       this.cullFar();
       this.renderer.render(this.scene, this.camera);
@@ -2612,6 +2626,42 @@ export class RpgScene {
     this.camera.lookAt(target);
   }
 
+  /** The nearest character within `NAME_RANGE`, named over their head; nobody while the world is held. */
+  private updateNameTag() {
+    let who: string | null = null;
+    let npc: Npc | null = null;
+    let bestD = NAME_RANGE;
+    if (!this.paused) {
+      for (const [name, n] of this.npcs) {
+        if (n.group.children.length === 0) continue;
+        const d = n.group.position.distanceTo(this.player.position);
+        if (d < bestD) {
+          bestD = d;
+          who = name;
+          npc = n;
+        }
+      }
+    }
+    const head = npc && npc.group.position.clone().setY(npc.group.position.y + HEIGHT[npc.gender] + 0.2).project(this.camera);
+    // Behind the camera, or off the edge of the view, there is no head to name.
+    if (!npc || !head || head.z > 1 || Math.abs(head.x) > 1.1 || Math.abs(head.y) > 1.1) {
+      if (!this.nameTag.hidden) this.nameTag.hidden = true;
+      return;
+    }
+    if (who !== this.nameTagFor) {
+      this.nameTagFor = who;
+      this.nameTag.textContent = who;
+    }
+    this.nameTag.hidden = false;
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    const x = (head.x + 1) * 0.5 * w;
+    const y = (1 - head.y) * 0.5 * h;
+    this.nameTag.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    // Fades in over the last two metres of the approach.
+    this.nameTag.style.opacity = String(Math.min(1, (NAME_RANGE - bestD) / 2));
+  }
+
   /**
    * Past the fog nothing can be seen, but three still draws it: the squares of trees and cover and
    * the places of earlier quests that stand beyond it are switched off until the camera nears.
@@ -2672,6 +2722,7 @@ export class RpgScene {
   dispose() {
     cancelAnimationFrame(this.frame);
     this.senses.dispose();
+    this.nameTag.remove();
     // A forest tree still loading is not planted in a scene that is gone.
     this.forestToken++;
     this.ownCoverToken++;
