@@ -865,6 +865,8 @@ content-hashed and immutable.
     picture; the arms pointing exactly, no objects held; and let the prompt be seen in the lab") is
     the lab's default picture (`tPose` in `falPrompts.ts`: arms horizontal in one line, palms forward
     with the thumbs up since 30 Oct 2026 (owner: "palms to the front, not down, for the rig"),
+    and in the lab both, *palms forward* and *palms down* (`tPose(prompt, 'down')`, owner the same
+    evening: "it may be TRELLIS making the hands so, not the rig; let me test both"),
     gaps to the armpit, hands empty with the objects named, carried things on the back or belt), and
     people described in the lab are drawn in it from the start. A kept picture is used again only while
     its prompt is the one its pose sends now (`keptPicture`), so a changed pose is drawn afresh. The prompt sent, or the one a kept

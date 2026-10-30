@@ -207,9 +207,17 @@ const T_POSE =
  * Palms forward rather than down (owner, 30 Oct 2026: "palms should face the front, not down, to make
  * the rig work just right").
  */
-export function tPose(prompt: string): string {
-  return prompt.includes(A_POSE) ? prompt.replace(A_POSE, T_POSE) : `${prompt} ${T_POSE.replace(/,$/, '.')}`;
+export function tPose(prompt: string, palms: 'forward' | 'down' = 'forward'): string {
+  const pose = palms === 'down' ? T_POSE_PALMS_DOWN : T_POSE;
+  return prompt.includes(A_POSE) ? prompt.replace(A_POSE, pose) : `${prompt} ${pose.replace(/,$/, '.')}`;
 }
+
+/**
+ * The same T-pose with the palms down, as it was before 30 Oct 2026: the lab's second T-pose (owner:
+ * "two T-pose variants in the lab, palms forward and palms down; it may be TRELLIS making the hands
+ * the way they look, not the rig"), so the two are compared on one person.
+ */
+const T_POSE_PALMS_DOWN = T_POSE.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'palms facing down');
 
 /**
  * The pose a person is drawn in, the game's setting (owner, 29 Oct 2026: "put the T-pose in the

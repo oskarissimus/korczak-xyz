@@ -48,7 +48,7 @@ const heightOf = (s: LabSource) => PERSON_HEIGHT[s.role === 'hero' ? 'hero' : s.
 
 /** The prompt a redrawn picture is asked with: the game's own, moved into the chosen pose. */
 function posed(pose: LabPose, prompt: string): string {
-  return pose === 'tpose' ? tPose(prompt) : pose === 'wide' ? widePose(prompt) : prompt;
+  return pose === 'tpose' ? tPose(prompt) : pose === 'tposeDown' ? tPose(prompt, 'down') : pose === 'wide' ? widePose(prompt) : prompt;
 }
 
 /** A picture redrawn before, only while it was asked with the prompt the pose sends now: a changed pose is drawn again. */
@@ -501,6 +501,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                     {t.picture}:{' '}
                     <select value={pose} onChange={(e) => setPose(e.target.value as LabPose)}>
                       <option value="tpose">{t.poses.tpose}</option>
+                      <option value="tposeDown">{t.poses.tposeDown}</option>
                       <option value="game">{t.pictureGame}</option>
                       <option value="redraw">{t.poses.redraw}</option>
                       <option value="wide">{t.poses.wide}</option>

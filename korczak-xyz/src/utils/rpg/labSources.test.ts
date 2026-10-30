@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { classicWorld, type LandmarkModel, type WorldBible } from './genesis';
-import { personPrompt, widePose } from './falPrompts';
+import { personPrompt, tPose, widePose } from './falPrompts';
 import { labSources, type LabWorld } from './labSources';
 import type { Character } from './quest';
 import type { SavedGame } from './save';
@@ -44,5 +44,15 @@ describe('labSources', () => {
     expect(w).toContain('a clear gap between each arm and the body');
     expect(w).not.toContain('arms held a little away');
     expect(widePose('a knight')).toContain('a clear gap between each arm and the body');
+  });
+
+  it('draws the T-pose with the palms forward, or down for the lab’s second variant, and nothing else changed', () => {
+    const p = personPrompt('a blacksmith', { gender: 'male' });
+    const forward = tPose(p);
+    const down = tPose(p, 'down');
+    expect(forward).toContain('thumbs pointing up');
+    expect(down).toContain('palms facing down');
+    expect(down).not.toContain('thumbs');
+    expect(down.replace('palms facing down', 'X')).toBe(forward.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'X'));
   });
 });

@@ -11,7 +11,7 @@ import type { LabSource } from './labSources';
  * Which picture a model was made from: the game's own, the game's prompt drawn again by another
  * painter (`redraw`), or redrawn in the wide pose (`widePose`) or a strict T-pose (`tPose`).
  */
-export type LabPose = 'game' | 'redraw' | 'wide' | 'tpose';
+export type LabPose = 'game' | 'redraw' | 'wide' | 'tpose' | 'tposeDown';
 
 export interface LabPicture {
   image: string;
@@ -99,7 +99,7 @@ export function labPictures(sourceId: string): LabPicture[] {
   const out: LabPicture[] = [];
   for (const [k, v] of Object.entries(read().pictures ?? {})) {
     const [id, pose, painter = 'schnell'] = k.split('|');
-    if (id === sourceId && (pose === 'wide' || pose === 'redraw' || pose === 'tpose')) out.push({ ...v, pose, painter: painter as PersonPainter });
+    if (id === sourceId && (pose === 'wide' || pose === 'redraw' || pose === 'tpose' || pose === 'tposeDown')) out.push({ ...v, pose, painter: painter as PersonPainter });
   }
   return out;
 }
