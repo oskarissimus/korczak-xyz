@@ -79,28 +79,84 @@ export function surfaceMat(
 }
 
 /**
- * Hides a tiled ground's repeat: the map is sampled twice, at its own scale and at a third of it
- * turned and offset, and a very large, slow sample of the same map decides which shows where and
- * how light the patch is. Seventy tiles of one 512 px scan read as a chessboard from a hill
- * (owner, Oct 2026: "the grass makes a strange effect, you can see how repetitive it is").
+ * Hides a tiled ground's repeat by hex-tiling it (Mikkelsen, "Practical Real-Time Hex-Tiling",
+ * 2022): the plane is cut into hexagons about a tile across, each shows the map turned by its own
+ * random angle and shifted by its own random offset, and neighbours blend across a narrow band
+ * weighted by brightness, so the seam follows the picture's own light and dark rather than a line.
+ * No two neighbouring patches line up, so no row or column survives to be seen from a hill. Over
+ * it, slow value noise tens of metres across lifts and darkens the land, so there is no even
+ * texture to the horizon either.
+ *
+ * Seventy tiles of one 512 px scan read as a chessboard (owner, Oct 2026: "you can see how
+ * repetitive it is"); the fix then — the map at two scales, chosen between by a slow sample of
+ * itself — was still periodic, and a generated ground with big shapes on it (ice floes, slabs)
+ * still drew its grid to the horizon, the `seamless` crossfade bands lining up as stripes (owner,
+ * 30 Oct 2026: "repeating patterns laid out like this look bad"). Three samples per pixel with
+ * explicit gradients (`textureGrad`), as a turned sample at a hex's edge would otherwise pick the
+ * smallest mipmap and sparkle.
  */
 export function breakTiling(material: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
   material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      `#ifdef USE_MAP
-        vec2 uvA = vMapUv;
-        vec2 uvB = mat2(0.8, -0.6, 0.6, 0.8) * vMapUv * 0.37 + vec2(0.31, 0.77);
-        float macro = texture2D(map, vMapUv * 0.031).g;
-        float macro2 = texture2D(map, vMapUv * 0.0071 + vec2(0.5)).r;
-        vec4 a = texture2D(map, uvA);
-        vec4 b = texture2D(map, uvB);
-        float k = smoothstep(0.35, 0.65, macro * 0.6 + macro2 * 0.8 - 0.2);
-        vec4 sampledDiffuseColor = mix(a, b, k);
-        sampledDiffuseColor.rgb *= 0.82 + 0.36 * macro2;
-        diffuseColor *= sampledDiffuseColor;
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        vec2 hexHash(vec2 p) {
+          return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+        }
+        float hexNoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hexHash(i).x, hexHash(i + vec2(1.0, 0.0)).x, u.x), mix(hexHash(i + vec2(0.0, 1.0)).x, hexHash(i + vec2(1.0, 1.0)).x, u.x), u.y);
+        }
+        // One hexagon's view of the map: turned about the hexagon's centre by its own angle, moved
+        // by its own offset, sampled with the pixel's gradients turned the same way.
+        vec4 hexSample(sampler2D tex, vec2 st, vec2 vertex, vec2 dx, vec2 dy) {
+          vec2 h = hexHash(vertex);
+          float a = h.x * 6.2831853;
+          float c = cos(a);
+          float s = sin(a);
+          mat2 rot = mat2(c, s, -s, c);
+          vec2 centre = vec2(vertex.x + 0.5 * vertex.y, vertex.y * 0.8660254) / 3.4641016;
+          return textureGrad(tex, rot * (st - centre) + centre + h, rot * dx, rot * dy);
+        }`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#ifdef USE_MAP
+        {
+          vec2 st = vMapUv;
+          vec2 dx = dFdx(st);
+          vec2 dy = dFdy(st);
+          // The triangle of hexagon centres this pixel lies in, and how near it is to each.
+          vec2 g = st * 3.4641016;
+          vec2 skewed = vec2(g.x - 0.57735027 * g.y, 1.15470054 * g.y);
+          vec2 base = floor(skewed);
+          vec3 t = vec3(fract(skewed), 0.0);
+          t.z = 1.0 - t.x - t.y;
+          float sgn = step(0.0, -t.z);
+          float s2 = 2.0 * sgn - 1.0;
+          vec3 w = vec3(-t.z * s2, sgn - t.y * s2, sgn - t.x * s2);
+          vec2 v1 = base + vec2(sgn, sgn);
+          vec2 v2 = base + vec2(sgn, 1.0 - sgn);
+          vec2 v3 = base + vec2(1.0 - sgn, sgn);
+          vec4 c1 = hexSample(map, st, v1, dx, dy);
+          vec4 c2 = hexSample(map, st, v2, dx, dy);
+          vec4 c3 = hexSample(map, st, v3, dx, dy);
+          // Sharpened weights, leaning to whichever sample is brighter there, so the blend band is
+          // narrow and wanders with the picture.
+          vec3 lum = vec3(dot(c1.rgb, vec3(0.299, 0.587, 0.114)), dot(c2.rgb, vec3(0.299, 0.587, 0.114)), dot(c3.rgb, vec3(0.299, 0.587, 0.114)));
+          w = mix(vec3(1.0), lum, 0.6) * pow(w, vec3(7.0));
+          w /= w.x + w.y + w.z;
+          vec4 sampledDiffuseColor = c1 * w.x + c2 * w.y + c3 * w.z;
+          // Patches of lighter and darker land, ~45 m and ~12 m across.
+          float macro = hexNoise(st * 0.083) * 0.7 + hexNoise(st * 0.31 + 17.0) * 0.3;
+          sampledDiffuseColor.rgb *= 0.8 + 0.4 * macro;
+          diffuseColor *= sampledDiffuseColor;
+        }
       #endif`,
-    );
+      );
   };
   material.customProgramCacheKey = () => 'break-tiling';
   return material;

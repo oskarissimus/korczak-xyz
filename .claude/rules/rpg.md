@@ -841,9 +841,13 @@ content-hashed and immutable.
   loaded and primitives otherwise. The well is still hand-built (inner and outer walls — a single
   open cylinder had its far side culled and read as a hole), and so are graves and campfires.
 - **The ground hides its tiling** (`breakTiling` in `surfaces.ts`): one 512 px scan repeated 70×
-  read as a chessboard (owner: "you can see how repetitive the texture is"), so the shader samples
-  it at two scales, turned, and lets a very slow sample of the same map choose between them and
-  shade the patch.
+  read as a chessboard (owner: "you can see how repetitive the texture is"). It is **hex-tiled**
+  (Mikkelsen 2022): hexagons about a tile across, each with the map turned by a random angle and
+  shifted by a random offset, blended over a narrow band weighted by brightness, sampled with
+  `textureGrad` so the turned samples keep their mipmaps; slow value noise (~45 m and ~12 m) lifts
+  and darkens the land over it. The earlier shader — the map at two scales, chosen between by a slow
+  sample of itself — was still periodic, and a generated ground with big shapes (ice floes) drew its
+  grid to the horizon, the `seamless` crossfade bands lining up as stripes (owner, 30 Oct 2026).
 - **Shadow bias** (`-0.0004`, normal bias `0.04`) is what keeps the kit's flat walls free of
   saw-tooth acne; drop it and every house is striped.
 
