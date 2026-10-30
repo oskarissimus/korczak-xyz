@@ -30,6 +30,8 @@ describe('heads', () => {
     expect(heads(body(...person(0)))).toBe(1);
     const tPose: [number, number, number, number] = [0, 1.8 * 0.76, 1.8, 0.1];
     expect(heads(body(...person(0), tPose, [-0.6, 0, 0.12, 0.85], [0.6, 0, 0.12, 0.85]))).toBe(1);
+    // Palms forward, thumbs up: the thumbs at the ends of the arms rise into the head's band.
+    expect(heads(body(...person(0), tPose, [-0.88, 1.8 * 0.8, 0.04, 0.2], [0.88, 1.8 * 0.8, 0.04, 0.2]))).toBe(1);
   });
 
   it('counts two for two people side by side, even of different heights', () => {

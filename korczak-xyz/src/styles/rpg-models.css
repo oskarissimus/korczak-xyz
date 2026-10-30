@@ -99,6 +99,15 @@
   font-size: 12px;
 }
 
+/* The Meshy rig under way, or done: the same words in the same place as when it fails. */
+.lab-rigging {
+  padding: 4px 8px;
+  border: 2px solid var(--retro-navy, #000080);
+  background: #f0f4ff;
+  color: #000080;
+  font-size: 13px;
+}
+
 /* Why a picture or a model did not come: in words, by the button that asked for it. */
 .lab-error {
   flex-basis: 100%;

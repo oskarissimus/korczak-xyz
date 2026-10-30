@@ -32,6 +32,10 @@ const en = {
   rigSelf: 'our own, A- or T-pose (free)',
   rigMeshy: 'Meshy',
   rigRaw: 'none: the bare model, still',
+  rigRunning: (n: number, time: string) => `Meshy is rigging ${n}… ${time}`,
+  rigDone: (n: number, time: string) => `Rigged by Meshy: ${n}, in ${time}`,
+  rigFailed: (failed: number, ok: number, time: string, why: string | null) =>
+    `Meshy failed on ${failed}${ok ? ` (rigged ${ok})` : ''} after ${time}; shown on our rig instead${why ? `: ${why.slice(0, 160)}` : ''}`,
   rigMeshyPay: (n: number) => `Rig ${n} with Meshy ($${(n * 0.2).toFixed(2)})`,
   clip: 'Animation',
   speed: 'Speed',
@@ -103,6 +107,10 @@ const pl: typeof en = {
   rig: 'Rig',
   rigSelf: 'nasz, A- lub T-poza (za darmo)',
   rigRaw: 'brak: sam model, bez ruchu',
+  rigRunning: (n: number, time: string) => `Meshy riguje ${n}… ${time}`,
+  rigDone: (n: number, time: string) => `Zrigowane przez Meshy: ${n}, w ${time}`,
+  rigFailed: (failed: number, ok: number, time: string, why: string | null) =>
+    `Meshy nie dał rady z ${failed}${ok ? ` (zrigował ${ok})` : ''} po ${time}; pokazuję na naszym rigu${why ? `: ${why.slice(0, 160)}` : ''}`,
   rigMeshy: 'Meshy',
   rigMeshyPay: (n: number) => `Zrób rig Meshy dla ${n} ($${(n * 0.2).toFixed(2)})`,
   clip: 'Animacja',

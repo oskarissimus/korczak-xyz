@@ -68,16 +68,23 @@ export function heads(geometry: THREE.BufferGeometry): number {
   const p = geometry.attributes.position;
   let minY = Infinity;
   let maxY = -Infinity;
+  let minX = Infinity;
+  let maxX = -Infinity;
   for (let i = 0; i < p.count; i++) {
     const y = p.getY(i);
+    const x = p.getX(i);
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
   }
   const height = maxY - minY || 1;
+  const mid = (minX + maxX) / 2;
   const xs: number[] = [];
   for (let i = 0; i < p.count; i++) {
     const y = (p.getY(i) - minY) / height;
-    if (y >= 0.86 && y <= 0.96) xs.push(p.getX(i));
+    // Only near the middle: a T-pose's thumbs, held up at the ends of the arms, reach the band too.
+    if (y >= 0.86 && y <= 0.96 && Math.abs(p.getX(i) - mid) <= height * 0.35) xs.push(p.getX(i));
   }
   xs.sort((a, b) => a - b);
   let count = xs.length ? 1 : 0;

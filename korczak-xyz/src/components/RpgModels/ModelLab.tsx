@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, FAL_RIG_MODEL, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
@@ -191,16 +191,45 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     };
   }, [items, rigTick]);
 
+  /** The Meshy rig asked for by the button: running since when, or how it ended, in words. */
+  const [rigging, setRigging] = useState<{ since: number; n: number } | { ok: number; failed: number; ms: number; why: string | null } | null>(null);
+  useEffect(() => {
+    if (!rigging || !('since' in rigging)) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [rigging]);
+  // An ended rig's word goes when other models are shown.
+  useEffect(() => setRigging((r) => (r && 'ok' in r ? null : r)), [items]);
+  /** Rigs the shown with Meshy, then counts which came back rigged by it: a failed one falls back to our rig. */
+  const rigWithMeshyNow = async () => {
+    const stage = stageRef.current;
+    if (!stage || (rigging && 'since' in rigging)) return;
+    const since = Date.now();
+    const wanted = (await Promise.all(items.map(async (i) => ((await stage.people.meshyCached(i.glb, i.height)) ? null : i)))).filter((i) => i !== null);
+    setRigging({ since, n: wanted.length });
+    const errors = await showOnStage('meshy');
+    const rigged = await Promise.all(wanted.map((i) => stage.people.meshyCached(i.glb, i.height)));
+    const failed = rigged.filter((r) => !r).length;
+    // Meshy's own refusal, else why the model would not stand at all (a picture of more than one person is not sent).
+    const why = devRequests().filter((r) => r.startedAt >= since && r.model === FAL_RIG_MODEL && r.error).at(-1)?.error ?? errors.at(-1) ?? null;
+    setRigging({ ok: rigged.length - failed, failed, ms: Date.now() - since, why });
+  };
+
   const showOnStage = useCallback(
     (riggedBy: StageRig) => {
       const stage = stageRef.current;
-      if (!stage) return;
-      void stage
-        .show(items, riggedBy, riggedBy === 'meshy' ? falKey : null, (key, result) => setStats((s) => ({ ...s, [`${key}|${riggedBy}`]: result })))
+      const errors: string[] = [];
+      if (!stage) return Promise.resolve(errors);
+      return stage
+        .show(items, riggedBy, riggedBy === 'meshy' ? falKey : null, (key, result) => {
+          if ('error' in result) errors.push(result.error);
+          setStats((s) => ({ ...s, [`${key}|${riggedBy}`]: result }));
+        })
         .then(() => {
           setClips(stage.clipNames());
           stage.play(clip);
           if (riggedBy === 'meshy') setRigTick((n) => n + 1);
+          return errors;
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -537,10 +566,16 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                 </option>
               </select>
             </label>
-            {rigger === 'meshy' && uncached > 0 && (
-              <button type="button" onClick={() => showOnStage('meshy')}>
+            {rigger === 'meshy' && uncached > 0 && !(rigging && 'since' in rigging) && (
+              <button type="button" onClick={() => void rigWithMeshyNow()}>
                 {t.rigMeshyPay(uncached)}
               </button>
+            )}
+            {rigging && 'since' in rigging && <span className="lab-rigging">{t.rigRunning(rigging.n, formatMs(Date.now() - rigging.since))}</span>}
+            {rigging && 'ok' in rigging && (
+              <span className={rigging.failed ? 'lab-error' : 'lab-rigging'}>
+                {rigging.failed ? t.rigFailed(rigging.failed, rigging.ok, formatMs(rigging.ms), rigging.why) : t.rigDone(rigging.ok, formatMs(rigging.ms))}
+              </span>
             )}
             <label>
               {t.clip}:{' '}

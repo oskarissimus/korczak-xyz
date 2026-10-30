@@ -793,7 +793,8 @@ content-hashed and immutable.
     only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
     with other than one head is refused as "not one standing person" — FLUX did once draw two).
     `heads()` counts the separate lumps across 86–96 % of the height, above where T-pose arms
-    reach; it replaced "wider than 0.85× its height", which refused Nano Banana's T-pose and its
+    reach, and within 0.35 of the height of the middle, since the palms-forward T-pose's thumbs rise
+    into that band at the arms' ends (it refused one as "3 heads", 30 Oct 2026); it replaced "wider than 0.85× its height", which refused Nano Banana's T-pose and its
     wide stance (0.99 and 0.55 of the height across), both one person.
   - **Or Meshy, and Meshy by default** (owner, 29 Oct 2026: "a toggle in the settings, our own rig
     or Meshy via fal.ai; ours is weak, maybe Meshy is better, I want to try; Meshy by default").
@@ -842,6 +843,10 @@ content-hashed and immutable.
     rig's. A model taken off the stage hands its GPU memory back (`release`), and a lost WebGL
     context makes a new stage on a new canvas: before both, a phone that had looked at a few models,
     Meshy's 2k textures among them, stopped drawing until the page was reloaded.
+    *Rig with Meshy* says what it is doing: how many and for how long while it runs, then how many
+    Meshy rigged, or how many it did not and why (Meshy's error, or the model refused before it was
+    sent), shown on our rig instead (owner: "feedback that it is working, how long so far, and
+    success or fail").
   - **Who draws the picture** (owner, 29 Oct 2026: "a picker for those models in the lab and a
     switch in the game's settings, and Nano Banana by default in the lab, because the pose matters
     a lot here"). `PERSON_PAINTERS` in `landmark3d.ts`: FLUX schnell $0.003, FLUX dev $0.025,
