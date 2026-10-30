@@ -624,6 +624,25 @@ waiting line or replies open with the character's name as the subject or report 
 ("mówi, że", "says that") — the next model is asked instead. Decision labels are the hunter's
 spoken line, at most 12 words.
 
+**Every character has a personality type** (owner, 30 Oct 2026: "make the characters have a
+personality type assigned, Jung/MBTI, or an archetype too, optionally"; `utils/rpg/persona.ts`).
+One of the sixteen MBTI types, and for two in three of them one of the twelve Jungian archetypes
+(Innocent, Sage, Jester, Ruler…). **The game draws them, not the model** — the same reason as the
+jobs and the mood: asked to invent a personality, a model writes the same wise, wounded introvert.
+`drawPersonas` runs per beat beside `planDecisions` (`BeatContext.personas`): one for a new npc, and
+one for a new witness at least two letters away and never the same archetype, since the prompt
+already demands the two never sound alike. The prompt (`personaLines`) describes each type as
+behaviour you can hear (`MBTI_MANNER`: "quick and argumentative; plays devil's advocate…") and each
+archetype as a drive (`ARCHETYPE_DRIVE`), asks for the voice, the lines and the reactions to the
+hero's decisions to follow them, and forbids naming them — nobody says "as an introvert". `parseBeat`
+puts the drawn persona on whoever is new (`Character.persona`), and on someone met before types who
+comes back without one; anyone who has one keeps it for good, and `PEOPLE ALREADY IN THIS WORLD`
+lists it beside their voice. The typed-line prompt (`freePrompt`) gets the npc's too. It crosses to
+the demo's function in the context (`demoContext`, `parsePersona`), so `persona.ts` is in the
+functions' tsconfig and deploy paths. **In the console**: a 🎭 line under each step in *Dialogue*
+(the npc and the witness with their types), and a *People* tab with everyone met, type, archetype
+and the voice the model wrote; a dash is someone from before 30 Oct 2026 who has none yet.
+
 ## The witcher's senses, the traces and the trail
 
 Owner, 26 Oct 2026: "generated assets to examine, and a button for hints like witcher senses to

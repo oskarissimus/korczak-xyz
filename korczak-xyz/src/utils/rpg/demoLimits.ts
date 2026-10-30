@@ -25,6 +25,7 @@
 import { tokenPrice, voiceCreditsPerChar, USD_PER_VOICE_CREDIT } from './cost';
 import { demoWorld } from './genesis';
 import { parsePlace } from './place';
+import { parsePersona } from './persona';
 import { HEARD_MAX, parseMood, SITUATION_MAX, type BeatContext, type Meeting, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
 
 /** The Google models the demo may be asked for: the game's picker, less what is not Google. */
@@ -217,6 +218,7 @@ export function demoContext(value: unknown): BeatContext {
       color: typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#666666',
       // Told back to the model so someone who returns keeps their manner (`quest.ts`).
       ...(text(c.voice, 300) && { voice: text(c.voice, 300) }),
+      ...(parsePersona(c.persona) && { persona: parsePersona(c.persona)! }),
     };
   }).filter((c) => c.name);
   return {
@@ -233,5 +235,14 @@ export function demoContext(value: unknown): BeatContext {
     world: demoWorld(r.world),
     dead: list(r.dead, 40, (v) => text(v, 60)).filter(Boolean),
     ...(parseMood(r.mood) && { mood: parseMood(r.mood)! }),
+    ...(personas(r.personas) && { personas: personas(r.personas)! }),
   };
+}
+
+/** The beat's drawn personas, both of them or neither. */
+function personas(value: unknown): BeatContext['personas'] | null {
+  const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const npc = parsePersona(r.npc);
+  const witness = parsePersona(r.witness);
+  return npc && witness ? { npc, witness } : null;
 }

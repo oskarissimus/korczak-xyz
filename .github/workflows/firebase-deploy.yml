@@ -61,15 +61,16 @@ on:
       # spends. Same tsconfig argument, same directory rule.
       - "korczak-xyz/src/utils/accountKeys/keys.ts"
       - "korczak-xyz/src/utils/accountKeys/tsconfig.json"
-      # The RPG demo's six: the prompts the function builds (a beat's, a world's), the place grammar
-      # it validates, the prices it reserves at, the limits it keeps and how it picks a voice. The
-      # rest of `utils/rpg/` is the browser's.
+      # The RPG demo's seven: the prompts the function builds (a beat's, a world's), the place grammar
+      # it validates, the prices it reserves at, the limits it keeps, how it picks a voice and the
+      # personality types a beat's people are written by. The rest of `utils/rpg/` is the browser's.
       - "korczak-xyz/src/utils/rpg/quest.ts"
       - "korczak-xyz/src/utils/rpg/genesis.ts"
       - "korczak-xyz/src/utils/rpg/place.ts"
       - "korczak-xyz/src/utils/rpg/cost.ts"
       - "korczak-xyz/src/utils/rpg/demoLimits.ts"
       - "korczak-xyz/src/utils/rpg/voicePick.ts"
+      - "korczak-xyz/src/utils/rpg/persona.ts"
       # And the generation jobs the `rpgJob` function runs: their shape and ids, and the fal.ai prompts it
       # builds for a world it has just born.
       - "korczak-xyz/src/utils/rpg/jobs.ts"

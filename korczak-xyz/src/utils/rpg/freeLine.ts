@@ -20,6 +20,7 @@
 
 import { TAGS } from './audioTags';
 import { classicWorld, worldLines, type WorldBrief } from './genesis';
+import { personaWords } from './persona';
 import {
   extractJson,
   isDead,
@@ -99,6 +100,9 @@ export function freePrompt(ctx: FreeContext): string {
   if (ctx.dead?.length) lines.push(`THE DEAD, for good: ${ctx.dead.map((n) => `"${n}"`).join(', ')}.`, '');
   lines.push(
     `NOW, at ${b.place?.name ?? world.hub}${b.job ? `, where the hero has just finished ${jobWords(b.job)}` : ''}.`,
+    ...(npc.persona
+      ? [`${npc.name} is ${personaWords(npc.persona)}; they answer like it, without ever naming it.`]
+      : []),
     `${npc.name}${npc.voice ? ` (${npc.voice})` : ''} has told the hero, in this order:`,
   );
   if (b.greeting) lines.push(`- "${b.greeting}"`);

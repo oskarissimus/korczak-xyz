@@ -853,6 +853,31 @@ ul.rpg-source {
   cursor: pointer;
 }
 
+/* Who a step is with, and their personality type and archetype. */
+.rpg-dev-cast {
+  margin: 2px 0;
+  color: #c9b8e8;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* The People tab: a name, its type in the cast's violet, the voice dimmed beneath. */
+.rpg-dev-person {
+  padding: 3px 0;
+  border-bottom: 1px solid #2a251c;
+  overflow-wrap: anywhere;
+}
+
+.rpg-dev-persona {
+  color: #c9b8e8;
+}
+
+.rpg-dev-voice {
+  display: block;
+  color: #8f8674;
+  font-size: 11px;
+}
+
 /* The transcript reads as a script: who says it in bold, the hunter's lines in the journal's gold. */
 .rpg-dev-lines {
   font-family: Georgia, 'Times New Roman', serif;

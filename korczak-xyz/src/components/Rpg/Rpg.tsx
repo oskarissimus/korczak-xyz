@@ -41,6 +41,7 @@ import {
   type StepRecord,
   type Tone,
 } from '../../utils/rpg/quest';
+import { drawPersonas } from '../../utils/rpg/persona';
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
 import {
@@ -686,6 +687,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
     [modelOf],
   );
 
+  /**
+   * Someone a beat brings in, into the quest's people: added if new; someone met before their type
+   * was drawn takes the one `parseBeat` gave them now, and keeps it (`persona.ts`).
+   */
+  const meetPerson = useCallback((person: Character) => {
+    const known = charactersRef.current.find((c) => c.name === person.name);
+    if (!known) charactersRef.current = [...charactersRef.current, person];
+    else if (!known.persona && person.persona) {
+      charactersRef.current = charactersRef.current.map((c) => (c === known ? { ...c, persona: person.persona } : c));
+    }
+  }, []);
+
   /** A character's model has come: on every copy of them — the quest's people, its beats, the atlas. */
   const keepPerson = useCallback((worldId: string, name: string, model: LandmarkModel) => {
     if (worldRef.current?.id !== worldId) return;
@@ -822,6 +835,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           seed: seedRef.current,
           job,
           plan: planDecisions(index),
+          personas: drawPersonas(),
           title,
           history: steps,
           chronicle: chronicleRef.current,
@@ -859,7 +873,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       putNpc(b.npc, b.place?.name ?? null, 0);
       whereRef.current.set(b.npc.name, b.place?.name ?? null);
-      if (!charactersRef.current.some((c) => c.name === b.npc.name)) charactersRef.current = [...charactersRef.current, b.npc];
+      meetPerson(b.npc);
       scene?.clearClues();
       b.clues.forEach((clue, i) => scene?.placeClue(`clue-${b.index}-${i}`, clue.look, b.npc.name));
       seenRef.current = new Set();
@@ -872,7 +886,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         const w = b.witness;
         putNpc(w.npc, b.place?.name ?? null, 1);
         whereRef.current.set(w.npc.name, b.place?.name ?? null);
-        if (!charactersRef.current.some((c) => c.name === w.npc.name)) charactersRef.current = [...charactersRef.current, w.npc];
+        meetPerson(w.npc);
       }
       // Each character's voice speaks once before they do (`voice.ts`, `warmVoices`).
       if (voiceRef.current) {
@@ -901,7 +915,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       if (b.index === 0) notify(tt.noticeQuest, b.title, b.job ? b.objectiveText : tt.talkTo(b.npc.name));
       else notify(tt.nextStep, b.objectiveText);
     },
-    [bury, notify, persist],
+    [bury, meetPerson, notify, persist],
   );
 
   /** Makes `w` the world being played: the beats are written in it and the scene drawn from it. */
@@ -1326,7 +1340,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * genesis still streams, every slot assumed until even that has come), and the quest's own pieces.
    */
   /** What the console's Dialogi tab reads: the beats so far and the decisions taken in them. */
-  const questView = useCallback(() => ({ beats: beatsRef.current, history: historyRef.current }), []);
+  const questView = useCallback(
+    () => ({ beats: beatsRef.current, history: historyRef.current, people: charactersRef.current }),
+    [],
+  );
 
   /**
    * The console's remake (owner, 29 Oct 2026: "a button in the developer console to generate new

@@ -39,6 +39,7 @@ import {
 import { classicWorld, firstObject, worldLines, type LandmarkModel, type WorldBrief } from './genesis';
 import { asAge, type VoiceAge } from './voicePick';
 import { TAGS } from './audioTags';
+import { personaWords, type Persona } from './persona';
 
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
@@ -83,6 +84,11 @@ export interface Character {
   appearance?: string;
   /** Their model from fal.ai once made (`ensurePersonModel`), kept wherever they are, so it is made once. */
   model?: LandmarkModel;
+  /**
+   * Their personality type, and maybe an archetype (`persona.ts`), drawn by the game when they first
+   * appear and kept for good. Absent in characters from before 30 Oct 2026 until they appear again.
+   */
+  persona?: Persona;
 }
 
 export interface Decision {
@@ -264,6 +270,11 @@ export interface BeatContext {
   dead?: string[];
   /** What kind of quest this is and how it touches the world's past (`drawMood`); absent is a grim one of its own. */
   mood?: QuestMood;
+  /**
+   * Who a new npc and a new witness are (`drawPersonas`), drawn per beat like the plan; someone who
+   * returns keeps their own. Absent: the model is told no type and nobody gets one.
+   */
+  personas?: { npc: Persona; witness: Persona };
 }
 
 /*
@@ -755,7 +766,10 @@ export function beatPrompt(ctx: BeatContext): string {
   if (living.length) {
     lines.push(
       `PEOPLE ALREADY IN THIS WORLD (whoever of them takes part is written with this exact name, in the same voice and manner): ${living
-        .map((c) => (c.voice ? `"${c.name}" (${c.voice})` : `"${c.name}"`))
+        .map((c) => {
+          const about = [c.voice, c.persona && personaWords(c.persona)].filter(Boolean).join('; ');
+          return about ? `"${c.name}" (${about})` : `"${c.name}"`;
+        })
         .join(', ')}.`,
       '',
     );
@@ -842,6 +856,7 @@ export function beatPrompt(ctx: BeatContext): string {
     'What matters most to them comes out sideways, and some of it only when the hero presses. The npc and the',
     'witness never sound alike. The player must still be able to follow: the facts a decision needs are said',
     'somewhere, just not tidily.',
+    ...personaLines(ctx.personas),
     '',
     'IT IS SPOKEN DIALOGUE, read aloud by a voice actor. Every "greeting", "say", "waitingLine", every "reply" and',
     'everything the witness says is that person’s own words to the hero, in the first person ("I", "my',
@@ -861,7 +876,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '  "title": string (the quest’s title),',
     '  "npc": {"name": string, "gender": "male" or "female", "age": "young", "middle_aged" or "old" (picks their voice),',
     '          "color": "#rrggbb" for their clothes,',
-    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk, never on how they sound recorded (no phone, radio, echo) and never a sound that is not their voice (no ticking, clicking, rattling); for someone already met, what you were told),`,
+    `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk${ctx.personas ? ' as their personality type' : ''}, never on how they sound recorded (no phone, radio, echo) and never a sound that is not their voice (no ticking, clicking, rattling); for someone already met, what you were told),`,
     '          "appearance": string (IN ENGLISH whatever the language above, at most 20 words: how they look, for a 3D model of',
     '                        them: build, age, clothes, hair, nothing held — "a stooped old woman in a patched green wool dress and',
     '                        leather apron, grey braid"; for someone already met, what you were told)},',
@@ -1036,7 +1051,24 @@ const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLow
 
 const CLOTHES = ['#7a5230', '#4a5d6b', '#6b3a4a', '#3f5a3a', '#5b4a7a', '#8a6a3a', '#3a4a5b'];
 
-function character(raw: unknown, known: readonly Character[]): Character | null {
+/**
+ * The personality types the game drew for this beat (`drawPersonas`), told as given. Shown in how
+ * they talk and choose, never said: a villager who announces "as an introvert…" is a quiz, not a person.
+ */
+function personaLines(drawn: BeatContext['personas']): string[] {
+  if (!drawn) return [];
+  return [
+    'WHO THEY ARE is drawn by the game, like the decisions, and given:',
+    `- a NEW npc is ${personaWords(drawn.npc)}.`,
+    `- a NEW witness is ${personaWords(drawn.witness)}.`,
+    'Someone already met keeps the type listed with them above. The type and the archetype shape everything about',
+    'the person: their "voice", how they talk, what they notice, what they want and fear, how they answer pressure,',
+    'and how they take each of the hero’s decisions. Shown, never named: nobody says a type, a letter or an archetype',
+    'aloud, and nobody is a caricature of one.',
+  ];
+}
+
+function character(raw: unknown, known: readonly Character[], drawn?: Persona): Character | null {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const name = text(r.name, 60);
   if (!name) return null;
@@ -1047,7 +1079,11 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
   const met = known.find((c) => same(c.name, name)) ?? known.find((c) => samePerson(c.name, name));
   // Someone met before voices (or looks) were described keeps everything else, and gets one now.
   if (met) {
-    const more = { ...(!met.voice && voice ? { voice } : {}), ...(!met.appearance && appearance ? { appearance } : {}) };
+    const more = {
+      ...(!met.voice && voice ? { voice } : {}),
+      ...(!met.appearance && appearance ? { appearance } : {}),
+      ...(!met.persona && drawn ? { persona: drawn } : {}),
+    };
     return Object.keys(more).length ? { ...met, ...more } : met;
   }
   const color = typeof r.color === 'string' && /^#[0-9a-f]{6}$/i.test(r.color.trim()) ? r.color.trim().toLowerCase() : null;
@@ -1061,6 +1097,7 @@ function character(raw: unknown, known: readonly Character[]): Character | null 
     ...(age && { age }),
     ...(voice && { voice }),
     ...(appearance && { appearance }),
+    ...(drawn && { persona: drawn }),
   };
 }
 
@@ -1088,7 +1125,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
 
-  const npc = character(r.npc, ctx.characters);
+  const npc = character(r.npc, ctx.characters, ctx.personas?.npc);
   if (!npc) return null;
   // The dead do not come back; a beat written around one cannot be played, the next model may do better.
   if (isDead(npc.name, ctx.dead)) return null;
@@ -1176,7 +1213,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     .slice(0, 2);
   let witness: Witness | null = null;
   const w = r.witness && typeof r.witness === 'object' ? (r.witness as Record<string, unknown>) : null;
-  const wnpc = w ? character(w, ctx.characters) : null;
+  const wnpc = w ? character(w, ctx.characters, ctx.personas?.witness) : null;
   if (w && wnpc && !same(wnpc.name, npc.name) && !isDead(wnpc.name, ctx.dead)) {
     const wGreeting = text(w.greeting);
     const talk = options(w.talk, 2);

@@ -22,7 +22,8 @@ import {
 } from '../../utils/rpg/devlog';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
-import type { Beat, Lang, StepRecord } from '../../utils/rpg/quest';
+import { personaLabel } from '../../utils/rpg/persona';
+import type { Beat, Character, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
 import type { Mesher, PersonPainter } from '../../utils/rpg/landmark3d';
@@ -97,6 +98,46 @@ function pretty(text: string): string {
 export interface QuestView {
   beats: readonly Beat[];
   history: readonly StepRecord[];
+  /** Everyone met in this world and quest so far, with their personality types. */
+  people?: readonly Character[];
+}
+
+/** "ENTP Dyskutant · Błazen", or a dash for someone met before types were drawn. */
+function personaOf(c: Character, lang: Lang): string {
+  return c.persona ? personaLabel(c.persona, lang) : '—';
+}
+
+/** Who a step is with and who they are (owner, 30 Oct 2026: the personality type, shown in the console). */
+function BeatCast({ lang, beat }: { lang: Lang; beat: Beat }) {
+  const t = translations[lang];
+  return (
+    <div className="rpg-dev-cast">
+      🎭 {beat.npc.name}: {personaOf(beat.npc, lang)}
+      {beat.witness && (
+        <>
+          {' · '}
+          {t.devWitness} {beat.witness.npc.name}: {personaOf(beat.witness.npc, lang)}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Everyone met so far, with their type, archetype and the voice the model wrote for them. */
+function PeopleTab({ lang, people }: { lang: Lang; people: readonly Character[] }) {
+  const t = translations[lang];
+  if (people.length === 0) return <div className="rpg-dev-list rpg-dev-empty">{t.devNoPeople}</div>;
+  return (
+    <div className="rpg-dev-list rpg-dev-people">
+      {people.map((c) => (
+        <div key={c.name} className="rpg-dev-person">
+          <b>{c.name}</b> <span className="rpg-dev-persona">{personaOf(c, lang)}</span>
+          {c.voice && <span className="rpg-dev-voice">{c.voice}</span>}
+        </div>
+      ))}
+      <div className="rpg-dev-empty">{t.devPeopleHint}</div>
+    </div>
+  );
 }
 
 /**
@@ -404,7 +445,7 @@ export function DevConsole({
   const t = translations[lang];
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
-  const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'costs' | 'perf'>('requests');
+  const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'people' | 'costs' | 'perf'>('requests');
   // Over the whole screen, to read a long stream or a transcript (owner, 28 Oct 2026). Not the
   // Fullscreen API: iOS Safari has none for anything but a video, so this is CSS, the same on every device.
   const [full, setFull] = useState(loadFull);
@@ -427,7 +468,7 @@ export function DevConsole({
     else next.add(id);
     setOpen(next);
   };
-  const view = tab === 'lines' ? (quest?.() ?? null) : null;
+  const view = tab === 'lines' || tab === 'people' ? (quest?.() ?? null) : null;
   const beats = view?.beats ?? [];
   const steps = [...new Set([...lines.map((l) => l.beat), ...beats.map((b) => b.index)])].sort((a, b) => a - b);
 
@@ -462,6 +503,9 @@ export function DevConsole({
           <button type="button" role="tab" aria-selected={tab === 'lines'} onClick={() => setTab('lines')}>
             {t.devLines}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}>
+            {t.devPeople}
+          </button>
           <button type="button" role="tab" aria-selected={tab === 'costs'} onClick={() => setTab('costs')}>
             {t.devCosts} ≈ {formatUsd(totalUsd)}
             {totals.unpriced ? '+?' : ''}
@@ -494,6 +538,8 @@ export function DevConsole({
         <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} remake={remake} />
       ) : tab === 'costs' ? (
         <CostTab lang={lang} />
+      ) : tab === 'people' ? (
+        <PeopleTab lang={lang} people={view?.people ?? []} />
       ) : tab === 'start' ? (
         <StartTab lang={lang} requests={requests} tasks={tasks} />
       ) : tab === 'lines' ? (
@@ -523,6 +569,7 @@ export function DevConsole({
                     <span>{beat.objectiveText}</span>
                   </div>
                 )}
+                {beat && <BeatCast lang={lang} beat={beat} />}
                 {beat && beat.decisions.length > 0 && <BeatDecisions lang={lang} beat={beat} chose={view?.history[n]?.chose ?? null} />}
               </React.Fragment>
             );
