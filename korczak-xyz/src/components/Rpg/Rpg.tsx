@@ -106,6 +106,7 @@ import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import { setJobAccount } from '../../utils/rpg/serverJobs';
 import { FAST_MODEL, generateBeat, generateFree, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
 import { FREE_MAX, freeDecision } from '../../utils/rpg/freeLine';
+import { decisionOpen, knownBefore } from '../../utils/rpg/unlock';
 import {
   addToAtlas,
   clearPendingGenesis,
@@ -1979,13 +1980,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
             action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }] }),
           })),
       ];
-      const heardFor = (after: Decision['after']): boolean =>
-        after === undefined ||
-        (after === 'witness'
-          ? witnessHeardRef.current
-          : typeof after === 'number'
-            ? seenRef.current.has(after)
-            : askedTalkRef.current.has(after.ask));
+      // A decision waits for what it rests on: the gate the model set, and any word of its label
+      // that only something not yet heard here says (`unlock.ts`).
+      const before = knownBefore(beatsRef.current, b.index);
+      const open = (d: Decision): boolean =>
+        decisionOpen(
+          b,
+          d,
+          { witness: witnessHeardRef.current, seen: seenRef.current, asked: askedTalkRef.current, free: freeTalkRef.current },
+          before,
+        );
       const ending = (): void => {
         if (!heardRef.current) {
           heardRef.current = true;
@@ -1995,7 +1999,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           line: npc(b.story[last].say),
           choices: [
             ...b.decisions
-              .filter((d) => !d.free && heardFor(d.after))
+              .filter((d) => !d.free && open(d))
               .map((d) => ({ label: d.label, kind: 'plot' as const, action: () => decide(b, d) })),
             ...followUps(),
             bye,

@@ -619,6 +619,19 @@ So it is fixed twice over:
   witness and the clues was not enough.
 - At least one decision must need neither. `parseBeat` drops a gate on a witness or clue the beat
   lacks, and drops every gate if all of them wait, so a beat can always be finished.
+- **The game gates by the words too, not only by `after`** (owner, 30 Oct 2026; `utils/rpg/unlock.ts`).
+  The model forgets `after` as often as it sets it: in `rpgSaves/wmvtzzd421`, beat 2, "Zbiorę filtry i
+  odczynniki do twojej odtrutki" carried none though only Suchy's answer to "Jak zamierzasz uratować
+  tych skażonych ludzi?" spoke of the antidote, and "Zoya ma rację. Zawalimy to wejście" none though
+  only Zoya's answer spoke of blowing the entrance — both on screen before either was heard.
+  `decisionOpen` holds a decision back while a word of its label (first five letters, so Polish
+  endings match; four-letter capitalised words count as names; a stop list for the rest) appears in
+  nothing heard so far — this beat's greeting, story, the questions on offer, what was asked,
+  examined, the witness once spoken to, typed lines, and every earlier beat (`knownBefore`) — but
+  does appear in something still unheard at this beat. **Any** source that says it opens it. A word
+  nobody says anywhere gates nothing. It is checked when the options are drawn, so saves from before
+  it are gated too. Unlike `after`, it may leave no decision open until something has been asked:
+  every source it waits for is reachable at the beat, so the beat can still always be finished.
 
 **E reaches the nearest thing**, character, clue or thing to pick up (`nearestThing`): with a
 witness and clues at a place, a character standing among the herbs swallowed every press.
