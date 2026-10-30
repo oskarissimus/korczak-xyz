@@ -949,6 +949,11 @@ background; the server's `noKey` hands an account without the key back to the br
   console as if it had asked itself — a request per model's turn, `☁ server` in its headline, the
   stream, the tokens, the price — so the `~` console, the progress panel and the closing screen's
   costs are unchanged. The answer is parsed again here, against the game's own context.
+  **The listener is not trusted alone.** On 30 Oct 2026 a beat finished on the server at 06:59:12
+  and the phone, back from the background, still showed it generating half a minute later: an iOS
+  page thawed from a freeze can keep a listener on the last version it heard. So the document is
+  also read with `getDocFromServer` the moment the page is visible again and every 9 s while
+  waiting, through the same handler. Do not drop that for the listener alone.
 - **The id is the work** (`jobs.ts`): a model request's is a hash of provider, models, prompt,
   temperature and thinking; a piece's is what it is for (`world/slot`, `world/ground`,
   `world/cover/i`, `clue/…`, `place/…`). A page that comes back from a reload and asks for the same

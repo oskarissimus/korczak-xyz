@@ -9,7 +9,7 @@
  * Firestore saying no. Nothing here is the only way to a beat or a model.
  */
 
-import { doc, onSnapshot, runTransaction, Timestamp } from 'firebase/firestore';
+import { doc, getDocFromServer, onSnapshot, runTransaction, Timestamp, type DocumentSnapshot } from 'firebase/firestore';
 import { getDb } from '../../lib/firebase';
 import { describeError, log } from '../../lib/logger';
 import { DEAD_MS, JOBS, KEEP_MS, reuse, UNCLAIMED_MS, type JobDoc, type JobSpec } from './jobs';
@@ -81,43 +81,55 @@ export async function runServerJob(id: string, spec: JobSpec, onDoc: (job: JobDo
       settled = true;
       off();
       clearInterval(timer);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
       resolve(value);
     };
-    const off = onSnapshot(
-      ref,
-      { includeMetadataChanges: true },
-      (snap) => {
-        if (!snap.exists()) return;
-        const job = snap.data() as JobDoc;
-        last = job;
-        fresh = !snap.metadata.fromCache;
-        onDoc(job);
-        if (job.status === 'done') finish(job);
-        else if (job.status === 'failed') finish(job.noKey || job.crashed ? null : job);
-        else if (job.status === 'abandoned' || job.createdAt !== createdAt) {
-          // Abandoned, or replaced by another tab's or the server's newer one: follow that instead.
-          if (job.status === 'abandoned') finish(null);
-          else createdAt = job.createdAt;
-        }
-      },
-      (e) => {
-        log.warn('rpg.job.watch-failed', { id, ...describeError(e) });
-        finish(null);
-      },
-    );
+    const seen = (snap: DocumentSnapshot) => {
+      if (settled || !snap.exists()) return;
+      const job = snap.data() as JobDoc;
+      last = job;
+      fresh = !snap.metadata.fromCache;
+      onDoc(job);
+      if (job.status === 'done') finish(job);
+      else if (job.status === 'failed') finish(job.noKey || job.crashed ? null : job);
+      else if (job.status === 'abandoned' || job.createdAt !== createdAt) {
+        // Abandoned, or replaced by another tab's or the server's newer one: follow that instead.
+        if (job.status === 'abandoned') finish(null);
+        else createdAt = job.createdAt;
+      }
+    };
+    const off = onSnapshot(ref, { includeMetadataChanges: true }, seen, (e) => {
+      log.warn('rpg.job.watch-failed', { id, ...describeError(e) });
+      finish(null);
+    });
+    /*
+     * The listener alone is not enough (owner, 30 Oct 2026: "I came back after a long while and it
+     * was still generating"). iOS freezes a backgrounded page, and on return its listener can sit on
+     * the last version it heard for a long time without delivering the `done` the server wrote
+     * meanwhile. So the document is also read from the server itself: the moment the page comes back
+     * to the front, and every few seconds while waiting. A failed read changes nothing.
+     */
+    const reread = () => {
+      if (settled || (typeof document !== 'undefined' && document.visibilityState !== 'visible')) return;
+      void getDocFromServer(ref).then(seen, () => undefined);
+    };
+    const onVisible = () => reread();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+    let ticks = 0;
     // A job nobody picked up, or whose runner stopped writing, is given up on — but only judged on
     // a page that has been in front long enough to have heard from the server since.
     const timer = setInterval(() => {
+      if (++ticks % 3 === 0) reread();
       if (!last || !fresh || !lookedLongEnough()) return;
       const now = Date.now();
       const unclaimed = last.status === 'queued' && now - last.createdAt > UNCLAIMED_MS;
       const dead = last.status === 'running' && now - (last.heartbeat ?? last.createdAt) > DEAD_MS;
       if (!unclaimed && !dead) return;
-      const seen = last.createdAt;
+      const judged = last.createdAt;
       void runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
         const now2 = snap.data() as JobDoc | undefined;
-        if (now2 && now2.createdAt === seen && (now2.status === 'queued' || now2.status === 'running')) {
+        if (now2 && now2.createdAt === judged && (now2.status === 'queued' || now2.status === 'running')) {
           tx.update(ref, { status: 'abandoned', error: unclaimed ? 'nobody picked it up' : 'its runner went quiet' });
         }
       })
