@@ -29,7 +29,9 @@ import {
   rigWithMeshy,
   drawImage,
   withRetries,
+  ensurePlaceModel,
 } from './landmark3d';
+import { box, crossed, makeGlb } from './meshShape.fixtures';
 
 const world = (over: Partial<WorldBible> = {}): WorldBible => ({
   ...classicWorld('en'),
@@ -67,6 +69,34 @@ describe('landmark3d', () => {
     const old = landmarkPrompt(world({ landmark: undefined }));
     expect(old).toContain(classicWorld('en').hub);
     expect(old).toContain('white background');
+  });
+
+  it('asks again from a new picture when TRELLIS makes crossed cards, and says so in the console', async () => {
+    let meshes = 0;
+    let pictures = 0;
+    const f = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `https://fal.run/${FAL_IMAGE_MODEL}`) return json({ images: [{ url: `https://fal.media/img${++pictures}.jpg` }] });
+      if (url === `https://queue.fal.run/${FAL_MESH_MODEL}`)
+        return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
+      if (url === 'https://q/status') return json({ status: 'COMPLETED' });
+      if (url === 'https://q/result') return json({ model_mesh: { url: `https://fal.media/model${++meshes}.glb` } });
+      if (url === 'https://fal.media/model1.glb') return new Response(makeGlb(crossed));
+      if (url === 'https://fal.media/model2.glb') return new Response(makeGlb(box));
+      throw new Error(`unexpected ${url}`);
+    });
+    const model = await new Promise<LandmarkModel>((resolve, reject) =>
+      ensurePlaceModel('k', 'w1/oak', 'an old oak', resolve, reject, { ...now, fetchImpl: f as typeof fetch }),
+    );
+    expect(model.glb).toBe('https://fal.media/model2.glb');
+    expect(model.image).toBe('https://fal.media/img2.jpg');
+    expect(devRequests().map((e) => [e.model, e.status, e.error ?? null])).toEqual([
+      [FAL_IMAGE_MODEL, 'ok', null],
+      [FAL_MESH_MODEL, 'ok', null],
+      [FAL_MESH_MODEL, 'error', 'came back as a flat card, not a model'],
+      [FAL_IMAGE_MODEL, 'ok', null],
+      [FAL_MESH_MODEL, 'ok', null],
+    ]);
   });
 
   it('rigs a person with Meshy through the queue, at its height, priced in the console', async () => {

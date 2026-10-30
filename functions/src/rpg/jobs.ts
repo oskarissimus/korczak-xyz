@@ -34,6 +34,7 @@ import {
   type GenesisContext,
 } from '../../../korczak-xyz/src/utils/rpg/genesis';
 import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, imageCost } from '../../../korczak-xyz/src/utils/rpg/falPrompts';
+import { CARD_ERROR, isCard } from '../../../korczak-xyz/src/utils/rpg/meshShape';
 import {
   JOB_BUDGET_MS,
   JOBS,
@@ -430,6 +431,10 @@ async function runFal(ref: DocumentReference, spec: FalSpec, key: string | null)
     const glb = body.model_mesh?.url;
     if (!glb) throw new Error('no model in the answer');
     cost += FAL_PRICES.mesh;
+    // Crossed cards rather than a model (`meshShape.ts`): failed, so the browser's next try is a new
+    // job with a new picture rather than this one taken again. Unreadable bytes are let through.
+    const bytes = await fetch(glb).then((g) => (g.ok ? g.arrayBuffer() : null)).catch(() => null);
+    if (bytes && isCard(bytes)) throw new Error(CARD_ERROR);
     const queuedMs = fal.mesh.queuedMs ?? 0;
     fal.mesh = {
       ...fal.mesh,

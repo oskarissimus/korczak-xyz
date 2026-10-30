@@ -36,12 +36,14 @@
  * and adds to its own fal.ai total there, apart from the tokens and ElevenLabs.
  */
 
+import { log } from '../../lib/logger';
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
+import { CARD_ERROR, isCard } from './meshShape';
 import { jobsOn, runServerJob } from './serverJobs';
 
 export * from './falPrompts';
@@ -556,11 +558,37 @@ async function imageAndMesh(
   }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);
-    if (made?.glb) return { ...made, glb: made.glb };
+    // A card the server made before it checked (a job is kept 14 days) is made here instead.
+    if (made?.glb && !(await isCardAt(made.glb, label, o))) return { ...made, glb: made.glb };
   }
   const image = await drawImage(key, prompt, label, o);
   const { glb, queuedMs } = await buildMesh(key, image, label, o, running);
+  if (await isCardAt(glb, label, o)) throw new Error(CARD_ERROR);
   return { image, glb, queuedMs, costUsd: imageCost() + FAL_PRICES.mesh };
+}
+
+/** A model's bytes, through the Cache API the scene loads it from, or `fetchImpl` where one is given. */
+async function modelBytes(glb: string, o: FalOptions): Promise<ArrayBuffer> {
+  if (!o.fetchImpl) return loadLandmarkBytes(glb);
+  const res = await o.fetchImpl(glb, { signal: o.signal });
+  if (!res.ok) throw new Error(`${res.status} fetching the model`);
+  return res.arrayBuffer();
+}
+
+/**
+ * Whether TRELLIS made crossed cards instead of a model (`meshShape.ts`); the caller throws, so the
+ * piece is tried again from a new picture (`withRetries`) rather than planted as black walls. A row
+ * in the console says so, under the mesh's own. A model whose bytes cannot be had is let through:
+ * the check never costs a piece that is fine.
+ */
+async function isCardAt(glb: string, label: FalSlot, o: FalOptions): Promise<boolean> {
+  try {
+    if (!isCard(await modelBytes(glb, o))) return false;
+  } catch {
+    return false;
+  }
+  endRequest(startRequest('fal', FAL_MESH_MODEL, null, `${tryMark(o)}shape check ← ${glb}`, label), CARD_ERROR);
+  return true;
 }
 
 /** Picture, then model. Throws with the step's error; both steps are in the console either way. */
@@ -647,6 +675,29 @@ const failed = new Set<string>();
 const refused = new Set<string>();
 
 /**
+ * A world kept before the shape check (`rejectCard`) may hold crossed cards for good (owner, 30 Oct
+ * 2026: a world's old oak, planted across the forest as black walls). Each kept model is looked at
+ * once a session, from the bytes the scene loads anyway, and a card is made again as if the slot
+ * were empty; the new model replaces it on arrival, everywhere the world is kept.
+ */
+const checkedKept = new Set<string>();
+const cards = new Set<string>();
+
+function checkKept(id: string, glb: string, again: () => void): void {
+  if (checkedKept.has(glb)) return;
+  checkedKept.add(glb);
+  loadLandmarkBytes(glb).then(
+    (bytes) => {
+      if (!isCard(bytes)) return;
+      log.warn('rpg.landmark.card', { id, glb });
+      cards.add(id);
+      again();
+    },
+    () => {},
+  );
+}
+
+/**
  * Starts whatever of the hub this world lacks, the landmark first, and calls `onModel` with each
  * piece as it arrives, so the village changes a piece at a time. A slot already being made or
  * already failed is left alone, so calling it again on every change of the world is safe.
@@ -662,7 +713,12 @@ export function ensureHubModels(
   if (refused.has(world.id)) return started;
   for (const slot of hubSlots(world)) {
     const id = `${world.id}/${slot}`;
-    if (hubModel(world, slot) || made.has(id) || failed.has(id) || inFlight.has(id)) continue;
+    if (made.has(id) || failed.has(id) || inFlight.has(id)) continue;
+    const kept = hubModel(world, slot);
+    if (kept && !cards.has(id)) {
+      checkKept(id, kept.glb, () => ensureHubModels(key, world, onModel, onError, o));
+      continue;
+    }
     const p = inTurn(id, async (started) => {
       if (refused.has(world.id)) throw new Error('skipped: fal.ai refused the key');
       try {
@@ -718,6 +774,7 @@ export function cluePrompt(prop: string, look?: Pick<WorldBible['look'], 'accent
     look ? `A touch of ${look.accent} somewhere on it.` : '',
     'The whole object in view, three-quarter view from slightly above.',
     'Chunky, thick proportions with no thin or spindly parts,',
+    FRAMED,
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
   ]
     .filter(Boolean)
@@ -752,6 +809,7 @@ export function placeAssetPrompt(what: string, role: 'landmark' | 'scatter', loo
     role === 'landmark'
       ? 'Seen from the front and slightly above, its entrance or face toward the viewer, the whole of it in view, standing on a small base,'
       : 'The whole object in view, three-quarter view from slightly above, chunky, thick proportions with no thin or spindly parts,',
+    FRAMED,
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
   ]
     .filter(Boolean)

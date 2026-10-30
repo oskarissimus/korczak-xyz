@@ -71,7 +71,7 @@ export const SIMPLIFY: Record<FalSlot, number> = {
 /** How each of the forest's other trees differs from the hub's, appended to its line. */
 const VARIANT: Record<ForestVariant, string> = {
   tree2: 'a young one of the same kind, smaller and lighter, with fewer branches',
-  tree3: 'an old one of the same kind, larger, wider and more gnarled',
+  tree3: 'an old one of the same kind, with a thicker, more gnarled trunk',
 };
 
 /** What a tree is in a world that wrote no `kit`, from its flora; `none` grows nothing to make. */
@@ -118,6 +118,16 @@ export function hubSlots(world: PromptWorld): HubSlot[] {
 }
 
 /**
+ * Where the thing sits in the picture (owner, 30 Oct 2026, a world's forest planted with black
+ * walls): an old oak asked for "larger, wider" and "sprawling" filled the frame and ran off both
+ * sides, and TRELLIS made the picture into two crossed sheets rather than a tree (`meshShape.ts`).
+ * Every piece's picture says to keep a white margin all round; how big it stands in the game is the
+ * game's to decide (`hubFit`), never the picture's.
+ */
+export const FRAMED =
+  'Small in the frame and centred, with a wide empty white margin on every side, nothing cut off or touching the edges of the picture,';
+
+/**
  * The picture a 3D model is made from: one object, whole, on white, so TRELLIS sees all of it.
  * Buildings face the camera with their door, since TRELLIS keeps the picture's front as the model's
  * +Z and the game turns +Z to the square. Thin parts are asked away: a lamp on a slender pole came
@@ -136,6 +146,7 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
       `A single stylised low-poly game asset: ${subject}.`,
       `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.`,
       'The whole object in view, three-quarter view from slightly above, standing on a small base,',
+      FRAMED,
       'isolated on a plain white background, no ground, no people, no text, soft even light.',
     ].join(' ');
   }
@@ -154,6 +165,7 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
       : 'The whole object in view, three-quarter view from slightly above.',
     'Chunky, thick proportions with no thin or spindly parts,',
     ...(tree ? ['a few thick limbs and one solid, compact silhouette, no twigs, simple faceted shapes like a mobile game asset,'] : []),
+    FRAMED,
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
   ].join(' ');
 }

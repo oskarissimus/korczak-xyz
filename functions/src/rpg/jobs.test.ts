@@ -44,7 +44,9 @@ vi.mock('../runtime', () => ({
 }));
 
 import { runJob } from './jobs';
-import { falJobId, hubScope, llmJobId, type LlmSpec } from '../../../korczak-xyz/src/utils/rpg/jobs';
+import { falJobId, hubScope, llmJobId, reuse, type LlmSpec } from '../../../korczak-xyz/src/utils/rpg/jobs';
+import { CARD_ERROR } from '../../../korczak-xyz/src/utils/rpg/meshShape';
+import { crossed, makeGlb } from '../../../korczak-xyz/src/utils/rpg/meshShape.fixtures';
 import { parseWorlds } from '../../../korczak-xyz/src/utils/rpg/genesis';
 
 const UID = 'u1';
@@ -176,5 +178,28 @@ describe('runJob', () => {
     expect(job.result).toMatchObject({ image: 'https://img/1.png', glb: 'https://glb/1.glb' });
     expect(job.result.costUsd).toBeCloseTo(0.023);
     expect(job.fal.mesh).toMatchObject({ state: 'done', kb: 2 });
+  });
+
+  it('fails a piece TRELLIS made into crossed cards, so the next ask is a new picture', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.startsWith('https://fal.run/')) return Response.json({ images: [{ url: 'https://img/1.png' }] });
+        if (url.startsWith('https://queue.fal.run/')) return Response.json({ status_url: 'https://q/status', response_url: 'https://q/response' });
+        if (url === 'https://q/status') return Response.json({ status: 'COMPLETED' });
+        if (url === 'https://glb/1.glb') return new Response(makeGlb(crossed));
+        return Response.json({ model_mesh: { url: 'https://glb/1.glb', file_size: 2048 } });
+      }),
+    );
+    queue({ kind: 'fal', label: 'tree3', prompt: 'an old oak', size: 512, simplify: 0.98 }, 'f');
+    const done = runJob(UID, 'f');
+    await vi.runAllTimersAsync();
+    await done;
+    vi.useRealTimers();
+    const job = store.get(path('f'))!;
+    expect(job.status).toBe('failed');
+    expect(job.error).toBe(CARD_ERROR);
+    expect(reuse(job, Date.now())).toBe('replace');
   });
 });

@@ -434,7 +434,18 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     compact silhouette, no twigs"): FLUX draws dead trees with a hundred bare twigs whatever "chunky"
     says, and TRELLIS made two of three such pictures into a flat card or a cylinder with the picture
     on it — planted four hundred times. With the line, four kinds of tree all came back as trees.
-    Nothing checks a model's shape after the fact, so a world that did get a card keeps it.
+  - **And a card is refused** (owner, 30 Oct 2026, a screenshot of black walls in a forest with a
+    tree faintly on them: "these models came out weird"). A world's old oak (`tree3`, then asked
+    for "larger, wider") was drawn running off both sides of the picture, and TRELLIS made it two
+    sheets crossed through the middle of its box, black from every side but the front. `meshShape.ts`
+    measures that shape — a vertical sheet through the middle as big as the box's cross-section:
+    1.27 on that oak, at most 0.18 on twenty real models of two worlds — and `isCard` is checked on
+    every TRELLIS model, by the server's job (failed, so the next ask is a new job) and in the browser
+    (`isCardAt`: a console row `came back as a flat card`, then the piece's next try from a new
+    picture). A world kept before the check is looked at once a session (`checkKept` in
+    `ensureHubModels`) and a card in it is made again. Every piece's picture also says `FRAMED` —
+    small, centred, a white margin all round — and `tree3` no longer asks to be larger, since how big
+    a thing stands is `hubFit`'s, not the picture's.
 - **And the ground** (owner, 27 Oct 2026: "the ground texture should be generated too; now it seems
   to be always grass"). The one Poly Haven scan, dyed the world's ground colour, read as grass in a
   desert, in snow and on a scrapyard alike. Now genesis writes `terrain` (English, ≤14 words, a
