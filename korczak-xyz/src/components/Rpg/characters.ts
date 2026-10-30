@@ -56,7 +56,10 @@ export type Clip =
   | 'Sword_Attack'
   | 'Punch_Jab'
   | 'Hit_Chest'
-  | 'Death01';
+  | 'Death01'
+  | 'Jump_Start'
+  | 'Jump_Loop'
+  | 'Jump_Land';
 
 export interface Look {
   outfit: Outfit;

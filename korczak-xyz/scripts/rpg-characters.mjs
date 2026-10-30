@@ -57,6 +57,9 @@ const CLIPS = [
   'Punch_Jab',
   'Hit_Chest',
   'Death01',
+  'Jump_Start',
+  'Jump_Loop',
+  'Jump_Land',
 ];
 
 async function shrink(doc) {

@@ -723,6 +723,15 @@ content-hashed and immutable.
     beside the GLB under `?rig=N&body=…&height=…` — **a query, not a fragment**: the Cache API
     drops fragments, and a `#` key once handed back the GLB's own bytes as a rig. Bump
     `RIG_VERSION` in `people.ts` when `selfRig` changes what it answers.
+  - **The jump is Quaternius's, retargeted** (owner, 30 Oct 2026: "make it possible to jump").
+    Meshy's library was bought clip by clip and has no jump, so `scripts/rpg-people-jump.mjs` moves
+    *Universal Animation Library*'s `Jump_Start`/`Jump_Loop`/`Jump_Land` onto the donor and appends
+    them to `people_clips.json`: each bone's **world** rotation is carried across, measured from a
+    pose both rigs share (both at rest, the donor's limbs turned bone by bone to point where
+    Quaternius's do). Calibrating on the two idles was tried first and is wrong: Meshy's idle
+    stands turned 42° at the hips, and that turn came out as a twist in every bone mid-air.
+    `rpg-people.mjs` rewrites `people_clips.json` without them, so run the jump script after it.
+    The kit people take the same three clips straight from the pack (`rpg-characters.mjs`).
   - **Nothing stands there until the model is ready** (`PersonBody {wait}` in `RpgScene.ts`): the
     group is empty, `nearestNpc`, `attack` and `updateEnemies` skip an empty one. The kit appears
     only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
@@ -1353,8 +1362,15 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
 - **The controls** (`TouchControls.tsx`): a stick under the left thumb (camera-relative like WASD,
   `RpgScene.setStick`; pushed to its rim it runs, as Shift does), a finger dragged anywhere else on
   the canvas turns the camera (pointer events on the canvas, `touch-action: none`), and under the
-  right thumb `⚔ Cios` and, only while something is in reach, a larger light button saying what E
-  would do (talk, examine, pick up). Pointer lock is never asked for on a phone.
+  right thumb `⚔ Cios` with `⇧ Skok` beside it, `👁 Zmysły` above, and, only while something is in
+  reach, a larger light button saying what E would do (talk, examine, pick up). Pointer lock is
+  never asked for on a phone.
+- **The jump** (`RpgScene.jump`, Space or `⇧`): only from the ground, up at 6 m/s against 20 m/s²,
+  ~0.9 m and ~0.6 s in the air; the ground is flat at 0, so no terrain is consulted. `Jump_Start`
+  is squeezed into 0.45 s (its own 1.3 s is mostly the air pose settling), `Jump_Loop` holds until
+  the feet touch, and `Jump_Land` plays only when landing standing still: landing on the move runs
+  straight on, since a crouch there reads as sliding. A dialogue opened in the air lands the hero
+  first (`setPaused`). Obstacles still block in the air: it is a hop, not a way over fences.
 - **The whole screen while playing** (`rpg-immersive`: fixed, `100dvh`, the page's scroll locked).
   iOS has no Fullscreen API for anything but video, so the ⛶ button is hidden there; a `✕` at the
   top left goes back to the intro, the quest autosaved and offered as Continue.

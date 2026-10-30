@@ -122,6 +122,13 @@ const ITEM_FIT = { height: 0.7, width: 0.8 };
 const SPOT_SIZE: Partial<Record<SpotKind, number>> = { stall: 1.8, cart: 2.2, goods: 0.8, landmark: 1.6 };
 const ATTACK_RANGE = 3;
 const ATTACK_COOLDOWN = 0.55;
+/** Up at this many m/s and down at `GRAVITY`: about 0.9 m high and 0.6 s in the air. */
+const JUMP_SPEED = 6;
+const GRAVITY = 20;
+/** Jump_Start squeezed into the take-off (its own 1.3 s is mostly the pose settling in the air). */
+const JUMP_START_SECONDS = 0.45;
+/** Jump_Land from standing; a hunter landing on the move runs straight on. */
+const JUMP_LAND_SECONDS = 0.6;
 const MAX_HP = 100;
 
 interface Tree {
@@ -364,6 +371,9 @@ export class RpgScene {
   private markerTarget: THREE.Vector3 | null = null;
   private hp = MAX_HP;
   private attackTimer = 0;
+  /** Upward speed in the air, m/s; the ground is flat at 0, so off it means airborne. */
+  private vy = 0;
+  private airborne = false;
   private swing = 0;
   private paused = false;
   private lastPrompt: Prompt | null = null;
@@ -2346,6 +2356,8 @@ export class RpgScene {
   setPaused(paused: boolean) {
     this.paused = paused;
     if (paused && this.sensesLeft > 0) this.toggleSenses(false);
+    // A dialogue opened mid-jump (E in the air) is not had hanging there.
+    if (paused && this.airborne) this.land();
     // Nobody walks on the spot while the world holds; the one talked to lingers a little after.
     for (const [name, npc] of this.npcs) {
       if (paused && name !== this.talking) npc.rig?.play('Idle_Loop', { fade: 0.4 });
@@ -2380,6 +2392,7 @@ export class RpgScene {
         : where === 'marker' && this.markerTarget
           ? this.markerTarget.clone().add(new THREE.Vector3(0, 0, npc ? 2 : 0))
           : SPAWN;
+    this.land();
     this.player.position.set(p.x, 0, p.z);
   }
 
@@ -2431,6 +2444,20 @@ export class RpgScene {
     }
   }
 
+  /** Leaves the ground, as Space does; only from the ground, so there is no climbing on air. */
+  jump() {
+    if (this.paused || this.airborne) return;
+    this.airborne = true;
+    this.vy = JUMP_SPEED;
+    this.playerRig?.once('Jump_Start', JUMP_START_SECONDS);
+  }
+
+  private land() {
+    this.airborne = false;
+    this.vy = 0;
+    this.player.position.y = 0;
+  }
+
   interact() {
     if (this.paused) return;
     const thing = this.nearestThing();
@@ -2472,6 +2499,7 @@ export class RpgScene {
     }
     if (code === 'KeyE' || code === 'KeyF') this.interact();
     if (code === 'KeyQ' && !e.repeat) this.toggleSenses();
+    if (code === 'Space' && !e.repeat) this.jump();
     this.keys.add(code);
   };
 
@@ -2617,12 +2645,22 @@ export class RpgScene {
       const diff = Math.atan2(Math.sin(targetRot - this.player.rotation.y), Math.cos(targetRot - this.player.rotation.y));
       this.player.rotation.y += diff * Math.min(1, dt * 12);
     }
+    if (this.airborne) {
+      this.vy -= GRAVITY * dt;
+      this.player.position.y += this.vy * dt;
+      if (this.player.position.y <= 0) {
+        this.land();
+        if (!moving) this.playerRig?.once('Jump_Land', JUMP_LAND_SECONDS);
+      }
+    }
     const t = this.clock.elapsedTime;
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.swing = Math.max(0, this.swing - dt * 4);
     if (this.playerRig) {
       // The hunter covers ground faster than anyone walks, so both paces are the jog, sped up.
-      if (moving) this.playerRig.play('Jog_Fwd_Loop', { speed: running ? 2.1 : 1.4 });
+      // In the air the legs stay tucked (Jump_Start hands over to this when it ends).
+      if (this.airborne) this.playerRig.play('Jump_Loop', { fade: 0.15 });
+      else if (moving) this.playerRig.play('Jog_Fwd_Loop', { speed: running ? 2.1 : 1.4 });
       else this.playerRig.play('Sword_Idle');
     } else {
       // The capsule: a little bob while walking, and the sword's quick arc on a swing.

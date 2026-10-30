@@ -1,9 +1,9 @@
 /*
  * The phone's controls (owner, Oct 2026: "make it play well on a smartphone, an iPhone SE 3 above
  * all — a small screen, and I have the display set to black and white"). A stick under the left
- * thumb, the camera under a finger dragged anywhere else on the view (`RpgScene`), and two round
- * buttons under the right thumb: the sword, and whatever is in reach — talk, examine, pick up —
- * which only appears when there is something to do, with the word on it.
+ * thumb, the camera under a finger dragged anywhere else on the view (`RpgScene`), and round buttons
+ * under the right thumb: the sword with the jump beside it, the senses, and whatever is in reach —
+ * talk, examine, pick up — which only appears when there is something to do, with the word on it.
  *
  * Nothing here is told apart by colour: the buttons carry a glyph and a word, and the stick is a
  * ring with a knob, light on dark.
@@ -20,16 +20,18 @@ interface Props {
   prompt: Prompt | null;
   promptLabel: string | null;
   attackLabel: string;
+  jumpLabel: string;
   /** The witcher's senses (`senses.ts`): the eye, pressed while they last. */
   sensesLabel: string;
   sensesOn: boolean;
   onSenses: () => void;
   onStick: (x: number, y: number) => void;
   onAttack: () => void;
+  onJump: () => void;
   onAct: () => void;
 }
 
-export function TouchControls({ prompt, promptLabel, attackLabel, sensesLabel, sensesOn, onSenses, onStick, onAttack, onAct }: Props) {
+export function TouchControls({ prompt, promptLabel, attackLabel, jumpLabel, sensesLabel, sensesOn, onSenses, onStick, onAttack, onJump, onAct }: Props) {
   const base = useRef<HTMLDivElement>(null);
   const finger = useRef<number | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -100,17 +102,31 @@ export function TouchControls({ prompt, promptLabel, attackLabel, sensesLabel, s
           <span aria-hidden="true">👁</span>
           {sensesLabel}
         </button>
-        <button
-          type="button"
-          className="rpg-act rpg-act-attack"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onAttack();
-          }}
-        >
-          <span aria-hidden="true">⚔</span>
-          {attackLabel}
-        </button>
+        {/* The jump sits left of the sword, where the thumb rolls to without leaving the corner. */}
+        <div className="rpg-act-row">
+          <button
+            type="button"
+            className="rpg-act rpg-act-jump"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onJump();
+            }}
+          >
+            <span aria-hidden="true">⇧</span>
+            {jumpLabel}
+          </button>
+          <button
+            type="button"
+            className="rpg-act rpg-act-attack"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onAttack();
+            }}
+          >
+            <span aria-hidden="true">⚔</span>
+            {attackLabel}
+          </button>
+        </div>
       </div>
     </>
   );

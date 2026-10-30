@@ -2677,6 +2677,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li>{t.touchMove}</li>
           <li>{t.touchLook}</li>
           <li>{t.touchAct}</li>
+          <li>{t.touchJump}</li>
           <li>{t.touchSenses}</li>
           <li>{t.touchJournal}</li>
         </ul>
@@ -2686,6 +2687,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li><kbd>Shift</kbd> {t.run}</li>
           <li>{t.mouse}</li>
           <li><kbd>LMB</kbd> {t.attack}</li>
+          <li><kbd>Space</kbd> {t.jumpHelp}</li>
           <li><kbd>E</kbd> {t.interact}</li>
           <li><kbd>Q</kbd> {t.sensesHelp}</li>
           <li><kbd>J</kbd> {t.journal}</li>
@@ -2833,11 +2835,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
               prompt={prompt}
               promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}
               attackLabel={t.strike}
+              jumpLabel={t.jump}
               sensesLabel={t.senses}
               sensesOn={senses}
               onSenses={() => sceneRef.current?.toggleSenses()}
               onStick={(x, y) => sceneRef.current?.setStick(x, y)}
               onAttack={() => sceneRef.current?.attack()}
+              onJump={() => sceneRef.current?.jump()}
               onAct={() => sceneRef.current?.interact()}
             />
           )}
