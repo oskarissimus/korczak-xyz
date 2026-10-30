@@ -10,7 +10,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import { loadLandmarkBytes } from '../../utils/rpg/landmark3d';
 import { People, type Body, type PersonTemplate, type Rigger } from '../Rpg/people';
+
+/** How the stage stands a model: rigged by one of the game's two rigs, or `raw`, as the GLB came, still. */
+export type StageRig = Rigger | 'raw';
 
 /** What a model weighs, worked out from the loaded template. */
 export interface ModelStats {
@@ -31,7 +37,7 @@ export interface StageItem {
 
 interface Standing {
   item: StageItem;
-  rigger: Rigger;
+  rigger: StageRig;
   group: THREE.Group;
   mixer: THREE.AnimationMixer;
   clips: Map<string, THREE.AnimationClip>;
@@ -56,9 +62,18 @@ export class LabStage {
   speed = 1;
   playing = true;
   private skeletons = false;
+  private lost: () => void;
   private wire = false;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  /**
+   * `onLost`: the browser took the GPU context back, which iOS does when a page holds too much on it;
+   * nothing draws again on this canvas, so the caller makes a new stage.
+   */
+  constructor(
+    private canvas: HTMLCanvasElement,
+    onLost: () => void = () => {},
+  ) {
+    canvas.addEventListener('webglcontextlost', this.lost = () => onLost());
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
@@ -101,7 +116,7 @@ export class LabStage {
    */
   async show(
     items: readonly StageItem[],
-    rigger: Rigger,
+    rigger: StageRig,
     falKey: string | null,
     onItem: (key: string, result: { stats: ModelStats; ms: number } | { error: string }) => void,
   ): Promise<void> {
@@ -115,9 +130,13 @@ export class LabStage {
         let s = keep.get(id);
         if (!s) {
           try {
-            this.people.rigger = rigger;
             const started = performance.now();
-            const template = await this.people.template(item.glb, item.body, item.height, item.label);
+            let template: PersonTemplate;
+            if (rigger === 'raw') template = await rawTemplate(item.glb, item.height);
+            else {
+              this.people.rigger = rigger;
+              template = await this.people.template(item.glb, item.body, item.height, item.label);
+            }
             s = this.stand(item, rigger, template);
             onItem(item.key, { stats: statsOf(template), ms: template.ms || performance.now() - started });
           } catch (err) {
@@ -129,7 +148,11 @@ export class LabStage {
       }),
     );
     if (token !== this.token) return;
-    for (const s of this.standing) if (!next.includes(s)) this.scene.remove(s.group, s.helper);
+    for (const s of this.standing)
+      if (!next.includes(s)) {
+        this.scene.remove(s.group, s.helper);
+        release(s);
+      }
     this.standing = next.filter(Boolean);
     const n = this.standing.length;
     this.standing.forEach((s, i) => {
@@ -140,17 +163,23 @@ export class LabStage {
     this.frame(n);
   }
 
-  private stand(item: StageItem, rigger: Rigger, template: PersonTemplate): Standing {
+  private stand(item: StageItem, rigger: StageRig, template: PersonTemplate): Standing {
     const group = new THREE.Group();
-    const rig = this.people.dress(group, template);
-    rig.mixer.stopAllAction();
+    let mixer: THREE.AnimationMixer;
+    if (rigger === 'raw') {
+      group.add(template.group.clone());
+      mixer = new THREE.AnimationMixer(group);
+    } else {
+      mixer = this.people.dress(group, template).mixer;
+      mixer.stopAllAction();
+    }
     const helper = new THREE.SkeletonHelper(group);
     helper.visible = this.skeletons;
     group.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) for (const mat of [m.material].flat()) (mat as THREE.MeshStandardMaterial).wireframe = this.wire;
     });
-    return { item, rigger, group, mixer: rig.mixer, clips: template.clips, helper };
+    return { item, rigger, group, mixer, clips: template.clips, helper };
   }
 
   /** Frames a row of `n` people. */
@@ -163,7 +192,7 @@ export class LabStage {
   }
 
   clipNames(): string[] {
-    return [...(this.standing[0]?.clips.keys() ?? [])];
+    return [...(this.standing.find((s) => s.clips.size)?.clips.keys() ?? [])];
   }
 
   /** Every person on `clip`, from its start. */
@@ -207,9 +236,59 @@ export class LabStage {
 
   dispose() {
     cancelAnimationFrame(this.raf);
+    this.canvas.removeEventListener('webglcontextlost', this.lost);
+    for (const s of this.standing) release(s);
     this.controls.dispose();
     this.renderer.dispose();
+    // Handed back now rather than when collected: a browser keeps only so many contexts.
+    this.renderer.forceContextLoss();
   }
+}
+
+/**
+ * The model as fal.ai answered it, with no rig and no clip (owner, 30 Oct 2026: "an option in the lab
+ * to look at the model alone, without animation"): the GLB's own meshes, stood on the floor at the
+ * person's height, facing as it came, its material made non-metallic as the game's are.
+ */
+async function rawTemplate(url: string, height: number): Promise<PersonTemplate> {
+  const gltf = await new GLTFLoader().parseAsync(await loadLandmarkBytes(url), '');
+  const model = gltf.scene;
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const s = height / (size.y || 1);
+  model.scale.multiplyScalar(s);
+  const centre = box.getCenter(new THREE.Vector3());
+  model.position.set(-centre.x * s, -box.min.y * s, -centre.z * s);
+  model.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    m.castShadow = true;
+    for (const mat of [m.material].flat()) if (typeof (mat as THREE.MeshStandardMaterial).metalness === 'number') (mat as THREE.MeshStandardMaterial).metalness = 0;
+  });
+  const group = new THREE.Group();
+  group.add(model);
+  return { group, clips: new Map(), ms: 0 };
+}
+
+/**
+ * What a person off the stage holds on the GPU, handed back. The template keeps the data, so they
+ * are uploaded again if shown again; without this every model ever looked at stayed on the GPU — a
+ * Meshy one is a 2k texture — until a phone took the context back and nothing more was drawn
+ * (owner, 30 Oct 2026: "after looking at a few models I have to reload, the next ones do not show").
+ */
+function release(s: Standing) {
+  s.helper.dispose();
+  s.group.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isMesh) return;
+    m.geometry.dispose();
+    for (const mat of [m.material].flat()) {
+      for (const value of Object.values(mat)) if ((value as THREE.Texture | null)?.isTexture) (value as THREE.Texture).dispose();
+      mat.dispose();
+    }
+    if (m.isSkinnedMesh) m.skeleton.dispose();
+  });
 }
 
 export function statsOf(template: PersonTemplate): ModelStats {

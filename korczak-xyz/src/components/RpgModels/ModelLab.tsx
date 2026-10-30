@@ -22,8 +22,8 @@ import { buildPersonMesh, drawImage, TEXT_PERSON_PRICE, textToRiggedPerson, IMAG
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
-import { PERSON_HEIGHT, type Rigger } from '../Rpg/people';
-import { LabStage, type ModelStats, type StageItem } from './labScene';
+import { PERSON_HEIGHT } from '../Rpg/people';
+import { LabStage, type ModelStats, type StageItem, type StageRig } from './labScene';
 import { accountWorlds, localWorlds, mergeWorlds } from './loadWorlds';
 import { strings } from './strings';
 
@@ -76,7 +76,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   /** Bumped when a Meshy rig may have been paid for, so the count of those still unpaid is read again. */
   const [rigTick, setRigTick] = useState(0);
   const [shown, setShown] = useState<string[]>([]);
-  const [rigger, setRigger] = useState<Rigger>('self');
+  const [rigger, setRigger] = useState<StageRig>('self');
   const [uncached, setUncached] = useState(0);
   const [clip, setClip] = useState('Idle_Loop');
   const [clips, setClips] = useState<string[]>([]);
@@ -151,11 +151,15 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source?.id]);
 
-  // The stage itself, once.
+  // The stage itself, once, and again on a fresh canvas if the browser takes its GPU context back.
+  const [stageGen, setStageGen] = useState(0);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const stage = new LabStage(canvas);
+    const stage = new LabStage(canvas, () => {
+      log.warn('rpgModels.context.lost', {});
+      setStageGen((n) => n + 1);
+    });
     stageRef.current = stage;
     const fit = () => stage.resize(canvas.clientWidth, canvas.clientHeight);
     fit();
@@ -166,7 +170,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
       stage.dispose();
       stageRef.current = null;
     };
-  }, []);
+  }, [stageGen]);
 
   const wanted: StageItem[] = source
     ? rows.filter((r) => shown.includes(r.key)).map((r) => ({ key: r.key, glb: r.glb, body: source.body, height: heightOf(source), label: 'lab' }))
@@ -188,7 +192,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   }, [items, rigTick]);
 
   const showOnStage = useCallback(
-    (riggedBy: Rigger) => {
+    (riggedBy: StageRig) => {
       const stage = stageRef.current;
       if (!stage) return;
       void stage
@@ -200,12 +204,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, falKey],
+    [items, falKey, stageGen],
   );
 
   // Our own rig costs nothing, so it follows the ticks at once; Meshy's waits for a click while any would be paid for.
   useEffect(() => {
-    if (rigger === 'self' || uncached === 0) showOnStage(rigger);
+    if (rigger !== 'meshy' || uncached === 0) showOnStage(rigger);
   }, [showOnStage, rigger, uncached]);
 
   useEffect(() => stageRef.current?.play(clip), [clip]);
@@ -525,8 +529,9 @@ export default function ModelLab({ lang }: { lang: Lang }) {
           <div className="lab-controls">
             <label>
               {t.rig}:{' '}
-              <select value={rigger} onChange={(e) => setRigger(e.target.value === 'meshy' ? 'meshy' : 'self')}>
+              <select value={rigger} onChange={(e) => setRigger(e.target.value === 'meshy' ? 'meshy' : e.target.value === 'raw' ? 'raw' : 'self')}>
                 <option value="self">{t.rigSelf}</option>
+                <option value="raw">{t.rigRaw}</option>
                 <option value="meshy" disabled={!falKey}>
                   {t.rigMeshy}
                 </option>
@@ -572,7 +577,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
               {t.leftToRight}: {rows.filter((r) => shown.includes(r.key)).map((r) => r.label).join(' · ')}
             </p>
           )}
-          <canvas ref={canvasRef} className="lab-canvas" />
+          <canvas key={stageGen} ref={canvasRef} className="lab-canvas" />
           <p className="lab-spent">
             {t.spent(formatUsd(labSpent()))} · {t.consoleHint}
           </p>

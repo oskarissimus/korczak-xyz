@@ -836,6 +836,12 @@ content-hashed and immutable.
     hanging between the legs, $0.003 once). Each model shows its price, time, triangles, size and
     texture; `~` lists the fal requests with the session's total. What the lab made is kept in
     `rpg-model-lab` in localStorage only, so not on another device. `noindex`.
+    The rig switch has a third choice, *none* (owner, 30 Oct 2026: "an option to look at the model
+    alone, without animation"): `rawTemplate` in `labScene.ts` stands the GLB as fal.ai answered it,
+    at the person's height, still, so a mesher's own faults (hands, above all) are told apart from a
+    rig's. A model taken off the stage hands its GPU memory back (`release`), and a lost WebGL
+    context makes a new stage on a new canvas: before both, a phone that had looked at a few models,
+    Meshy's 2k textures among them, stopped drawing until the page was reloaded.
   - **Who draws the picture** (owner, 29 Oct 2026: "a picker for those models in the lab and a
     switch in the game's settings, and Nano Banana by default in the lab, because the pose matters
     a lot here"). `PERSON_PAINTERS` in `landmark3d.ts`: FLUX schnell $0.003, FLUX dev $0.025,
