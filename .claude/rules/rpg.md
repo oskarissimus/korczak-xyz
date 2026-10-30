@@ -1237,6 +1237,45 @@ brackets. Only v3 and v4 act a tag, and they are told in English. `utils/rpg/aud
   request shape is ElevenLabs' reference. If tagged lines go silent or fall back every time, the
   console's voice entry carries v4's status in its label.
 
+## Music
+
+Owner, 30 Oct 2026: "a generated soundtrack in ElevenLabs — music only for now, fitted to the
+world's climate and the RPG". `utils/rpg/music.ts`, on the reader's **own** ElevenLabs key only:
+the demo never composes, since a track costs ~25 times a line of dialogue and would come off the
+owner's credits for strangers. No sound effects yet.
+
+- **What is asked for**: the world's `music` line — genesis writes it in English beside the
+  landmark and the terrain (≤25 words: genre, instruments, tempo, era, feel; no artist or franchise
+  names, which ElevenLabs refuses) — then the quest's tone (`TONE_MUSIC`: light warm, comic playful,
+  adventure wonder, grim sparse drones), then the same rules for every track: instrumental, under
+  dialogue, no drops, no fade-out, a loop that ends as it began. A world from before the line is
+  described from its look in English (weather, water, flora, time of day) and its tone, tech and
+  climate as written (`worldMusic`). The Willowlands have a line of their own (dark folk, hurdy-gurdy).
+- **`POST /v1/music`**, `music_v2_5`, `force_instrumental`, `music_length_ms` 120 000 (`MUSIC_MS`),
+  mp3. A 400/403/422 from v2.5 asks `music_v1` instead and stays on it for the session; a
+  401/402/403 on both stops asking for the session. CORS answers `*` (checked 30 Oct 2026). **Not yet
+  run against the live API** (the session could not read a key): the shape is ElevenLabs' reference.
+- **Once per world and tone**: up to four tracks a world, the bytes in the Cache API (`rpg-music`,
+  keyed by world, tone and length). A new quest of a tone the world has had plays at once and
+  costs nothing. This browser only; another device composes its own. Nothing waits for a track:
+  the quest starts in silence and the music fades in when it comes.
+- **What it costs**: ~900 credits a minute (ElevenLabs' pricing page, Oct 2026; $0.15 a minute on
+  the API list), so **~1,800 credits a track, ≈ $0.13 on the owner's Creator rate**, or the
+  response's `character-cost` where the browser may read it (`musicCredits`).
+- **Played through Web Audio, not `<audio>`**: iOS ignores `volume` on a media element, so the
+  score could not sit under the voices. One `AudioContext`, resumed inside every click that primes
+  the voice (`primeMusic`); two buffer sources crossfading 4 s at each pass, so the seam is never
+  heard; a master gain at 0.32 that ducks to 0.12 while a dialogue is open (`duckMusic`); suspended
+  while the page is hidden. A new tone or world fades the old track out under the new one.
+- **🎵 switches it** (`🎵✕` off, never told by colour), left of 🔊 and `~` (at the top on a phone),
+  kept in localStorage `rpg-music`. Off composes nothing.
+- **In the console** as kind `music` (`devlog.ts`), shown without the ElevenLabs checkbox: `♪ music
+  (tone)`, the model (with v2.5's status if it fell back), the prompt, the time it took, the error,
+  seconds and credits. The Koszty tab and the closing screen have **ElevenLabs muzyka** on its own
+  line, apart from the voices (`Spend.musicSeconds`, `musicCredits`, `musicCost`, in the autosave
+  like the rest), and it counts in the total and in today's spend. A failure is a toast and a
+  `rpg.music.failed` breadcrumb; the game goes on without music.
+
 ## On a phone
 
 Owner, Oct 2026: "make it play well on a smartphone, an iPhone SE 3 above all — a small screen,
@@ -1328,7 +1367,8 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   every model request of this quest with the model asked and the one that answered
   (`modelVersion` — the `-latest` aliases resolve, e.g. `gemini-flash-latest` was `gemini-3.8-flash`
   in Oct 2026), status, time, time to first byte, the last lines of its thoughts and of its answer
-  as they stream, its error, tokens and cost; the ElevenLabs clips behind a checkbox. The sitting's
+  as they stream, its error, tokens and cost; the ElevenLabs clips behind a checkbox (the music
+  is always shown, *Music* above). The sitting's
   totals are the **Koszty** tab (owner, 28 Oct 2026: the strip along the bottom "grew too big"),
   its running total and error count printed on the tab itself so they stay in sight from any other
   tab. **⛶ puts the console over the whole screen** (Escape or ▭ goes back, remembered in

@@ -69,6 +69,13 @@ export function voiceCreditsPerChar(model: string): number {
 }
 export const USD_PER_VOICE_CREDIT = 22 / 300_000;
 
+/**
+ * Music is billed per generation by its length, ~900 credits a minute on a plan (ElevenLabs' pricing
+ * page, Oct 2026; $0.15 a minute on the API price list), from the same credits as the voices
+ * (`music.ts`).
+ */
+export const MUSIC_CREDITS_PER_MINUTE = 900;
+
 export function voiceCost(credits: number): number {
   return credits * USD_PER_VOICE_CREDIT;
 }

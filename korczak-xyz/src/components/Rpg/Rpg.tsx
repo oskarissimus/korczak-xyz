@@ -39,6 +39,7 @@ import {
   type Job,
   type Lang,
   type StepRecord,
+  type Tone,
 } from '../../utils/rpg/quest';
 import { DEMO_VOICE_KEY, fetchRpgDemoStatus, type RpgDemoStatus } from '../../utils/rpg/demo';
 import { DEMO_MODELS } from '../../utils/rpg/demoLimits';
@@ -130,6 +131,7 @@ import {
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
 import { asideLabel, directions } from '../../utils/rpg/audioTags';
+import { duckMusic, loadMusicOn, musicFor, musicId, pauseMusic, playMusic, playingMusic, primeMusic, saveMusicOn, stopMusic } from '../../utils/rpg/music';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
@@ -304,6 +306,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [gameLang, voiceKey, voiceOn]);
   const voiceRef = useRef<string | null>(null);
   voiceRef.current = voiceOn ? voiceKey : null;
+  // The score (`utils/rpg/music.ts`): composed on the reader's own ElevenLabs key only, never the
+  // demo's, for the world and tone of the quest being played. Its switch is remembered.
+  const musicKey = account.keys.elevenLabs ?? null;
+  const [musicOn, setMusicOn] = useState(loadMusicOn);
+  const [score, setScore] = useState<{ world: WorldBible; tone: Tone | null } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -948,6 +955,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // Drawn against what the world already has: a quest can only cross a past there is.
     const mood = drawMood({ places: placesRef.current.length, people: charactersRef.current.length });
     moodRef.current = mood;
+    if (worldRef.current) setScore({ world: worldRef.current, tone: mood.tone });
     seedRef.current = seedFor(mood.tone);
     log.info('rpg.quest.mood', { ...mood, seed: seedRef.current });
 
@@ -2182,6 +2190,37 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [dialogue, flash, gameLang, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
 
+  // The score: the world and tone's track, composed once and kept (`music.ts`), fading in when it
+  // is ready; nothing waits for it. Off, back at the intro or without a key of the reader's own: silence.
+  useEffect(() => {
+    if (!started || !musicOn || !musicKey || !score) {
+      stopMusic();
+      return;
+    }
+    const id = musicId(score.world.id, score.tone);
+    if (playingMusic() === id) return;
+    let stale = false;
+    musicFor(musicKey, score.world, score.tone)
+      .then((bytes) => (stale ? undefined : playMusic(id, bytes)))
+      .catch((e) => {
+        log.warn('rpg.music.failed', describeError(e));
+        if (!stale) flash(tRef.current.musicFailed);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [flash, musicKey, musicOn, score, started]);
+  // Under a voice the score steps back; a hidden page stops it where it is.
+  useEffect(() => duckMusic(Boolean(dialogue)), [dialogue]);
+  useEffect(() => {
+    const change = () => pauseMusic(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', change);
+    return () => {
+      document.removeEventListener('visibilitychange', change);
+      stopMusic();
+    };
+  }, []);
+
   /** Rebuilds a saved quest: its places and characters, the current beat as it was, the decision. */
   const resume = (saved: SavedGame) => {
     questTokenRef.current += 1;
@@ -2198,6 +2237,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     playFlushedRef.current = playMsRef.current;
     reportLaunch();
     primeVoice();
+    primeMusic();
     setStarted(true);
     setEnding(null);
     setDialogue(null);
@@ -2205,6 +2245,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setUnfolding(false);
     seedRef.current = game.seed;
     moodRef.current = game.mood;
+    // A quest from before moods is written as a grim one, and scored as one.
+    setScore({ world: into, tone: game.mood?.tone ?? 'grim' });
     staticRef.current = game.static;
     if (kept && loadWorld(game.lang)?.id !== kept.id) saveWorld(kept);
     else playedWorld(into.id);
@@ -2283,6 +2325,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** Start, New quest or New world: a world first when there is none yet, or a new one is asked for. */
   const finishGenesis = (pending: PendingGenesis) => {
     primeVoice();
+    primeMusic();
     setStarted(true);
     void createWorld(pending);
   };
@@ -2290,6 +2333,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const begin = (fresh = false) => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
     primeVoice();
+    primeMusic();
     setStarted(true);
     if (storyProvider === 'static') {
       // Nothing to invent a world with: the hand-written quest, in the world it was written for.
@@ -2317,6 +2361,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const openWorld = async (id: string, cont: boolean) => {
     // Inside the tap, for iOS: whatever starts after the fetch has lost the gesture.
     primeVoice();
+    primeMusic();
     if (uidRef.current) {
       try {
         await fetchWorld(uidRef.current, id);
@@ -2934,6 +2979,24 @@ export default function Rpg({ lang }: { lang: Lang }) {
           aria-pressed={voiceOn}
         >
           {voiceOn ? '🔊' : '🔇'}
+        </button>
+      )}
+
+      {started && musicKey && (
+        <button
+          type="button"
+          className="rpg-music"
+          onClick={() => {
+            primeMusic();
+            setMusicOn((on) => {
+              saveMusicOn(!on);
+              return !on;
+            });
+          }}
+          title={musicOn ? t.musicOff : t.musicOn}
+          aria-pressed={musicOn}
+        >
+          {musicOn ? '🎵' : '🎵✕'}
         </button>
       )}
 

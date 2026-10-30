@@ -411,7 +411,8 @@ ul.rpg-source {
   line-height: 1.6;
 }
 
-.rpg-voice {
+.rpg-voice,
+.rpg-music {
   position: absolute;
   bottom: 10px;
   right: 52px;
@@ -419,6 +420,12 @@ ul.rpg-source {
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);
   cursor: pointer;
+}
+
+/* The score's own switch, left of the voice's and the console's (`utils/rpg/music.ts`). Off is a
+   crossed note, not a dimmer one: the owner's phone is black and white. */
+.rpg-music {
+  right: 136px;
 }
 
 .rpg-toast {
@@ -1298,6 +1305,7 @@ body:has(.rpg-immersive) .safe-top-band {
 
 /* The small buttons go to the top on a phone: the bottom corners are the thumbs'. */
 .rpg-touch .rpg-voice,
+.rpg-touch .rpg-music,
 .rpg-touch .rpg-devtoggle {
   top: calc(44px + var(--safe-top, 0px));
   bottom: auto;
@@ -1314,6 +1322,11 @@ body:has(.rpg-immersive) .safe-top-band {
 
 .rpg-touch .rpg-devtoggle {
   left: calc(56px + var(--safe-left, 0px));
+  right: auto;
+}
+
+.rpg-touch .rpg-music {
+  left: calc(104px + var(--safe-left, 0px));
   right: auto;
 }
 

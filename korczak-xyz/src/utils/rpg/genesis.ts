@@ -163,6 +163,12 @@ export interface WorldBible extends WorldBrief {
   hero?: string;
   /** That hero made by fal.ai and rigged in the browser (`people.ts`), once; kept like the hub's models. */
   heroModel?: LandmarkModel;
+  /**
+   * What this world sounds like, in ENGLISH like the landmark: genre, instruments, tempo and feel of
+   * its background score, for ElevenLabs' music model (`music.ts`). Worlds from before 30 Oct 2026
+   * have none and are described from their look and bible.
+   */
+  music?: string;
 }
 
 /** A world's ground texture as fal.ai drew it; the scene makes it seamless when it loads it. */
@@ -419,6 +425,7 @@ export function classicWorld(lang: Lang): WorldBible {
     hub: pl ? 'Wierzbowo' : 'Willowby',
     words: [],
     look: CLASSIC_LOOK,
+    music: 'slow dark folk, hurdy-gurdy, frame drum, low fiddle drones and a lone wooden flute, 70 BPM, misty autumn marshes',
   };
 }
 
@@ -644,6 +651,9 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "hero": string (IN ENGLISH too, at most 20 words: how the player looks, for a 3D model of them — build,',
     '    clothes and gear worn on the body, hair, nothing held; "a lean scarred hunter in a long oiled leather coat,',
     '    boots and a hood"),',
+    '  "music": string (IN ENGLISH too, at most 25 words: this world\'s background score for a music model —',
+    '    genre, instruments, tempo, era and feel, no artist or franchise names; "slow dark folk, hurdy-gurdy,',
+    '    frame drum and low fiddle drones, 70 BPM, misty and earthy"),',
     `  "sizes": {"landmark", "house", "hall", "tree", "stall", "cart", "lamp", "goods": each [height, length], ${SIZE_RULE}},`,
     '  "kit": {IN ENGLISH too, at most 18 words each, one object each, sturdy and chunky, same materials as',
     '    the architecture: "house" (a small home, ~6 m wide), "hall" (the hub’s bigger building, ~8 m wide),',
@@ -878,6 +888,7 @@ function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBi
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
     ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
     ...(text(r.hero, 200) ? { hero: text(r.hero, 200)! } : {}),
+    ...(text(r.music, 240) ? { music: text(r.music, 240)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }

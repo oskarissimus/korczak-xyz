@@ -68,10 +68,12 @@ function headline(r: DevRequest): string {
   if (r.beat !== null) parts.unshift(r.label ? `beat ${r.beat + 1} (${r.label})` : `beat ${r.beat + 1}`);
   else if (r.kind === 'model') parts.unshift('world');
   else if (r.kind === 'fal') parts.unshift(r.label ?? 'landmark');
+  else if (r.kind === 'music') parts.unshift(`♪ music${r.label ? ` (${r.label})` : ''}`);
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);
   if (r.firstMs !== null && r.kind === 'model') parts.push(`1st byte ${formatMs(r.firstMs)}`);
   if (r.usage) parts.push(`in ${tokens(r.usage.input)} out ${tokens(r.usage.output)} think ${tokens(r.usage.thoughts)}`);
   if (r.kind === 'voice' && r.status === 'ok') parts.push(`${r.chars} chars ≈ ${Math.round(r.credits)} cr`);
+  if (r.kind === 'music' && r.status === 'ok') parts.push(`${r.chars} s ≈ ${Math.round(r.credits)} cr`);
   if (r.kind === 'model' ? r.usage : r.status === 'ok') parts.push(formatUsd(r.cost));
   // Asked by the server's job runner (`utils/rpg/serverJobs.ts`), which goes on with the page in the background.
   if (r.server) parts.push('☁ server');
@@ -333,8 +335,9 @@ function CostTab({ lang }: { lang: Lang }) {
       `in ${tokens(totals.tokens.input)} out ${tokens(totals.tokens.output)} think ${tokens(totals.tokens.thoughts)} ≈ ${formatUsd(totals.modelCost)}${totals.unpriced ? '+?' : ''}`,
     ],
     ['ElevenLabs', `${totals.voiceChars} ${t.chars} ≈ ${Math.round(totals.voiceCredits)} cr ≈ ${formatUsd(totals.voiceCost)}`],
+    [t.musicLine, `${totals.musicSeconds} s ≈ ${Math.round(totals.musicCredits)} cr ≈ ${formatUsd(totals.musicCost)}`],
     ['fal.ai', `${totals.falModels}× 3D${totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ ${formatUsd(totals.falCost)}`],
-    [t.total, `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.falCost)}${totals.unpriced ? '+?' : ''}`],
+    [t.total, `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost)}${totals.unpriced ? '+?' : ''}`],
     [t.devRequestCount, String(totals.requests)],
   ];
   return (
@@ -411,7 +414,7 @@ export function DevConsole({
   };
   useTick(running);
   const totals = questTotals();
-  const totalUsd = totals.modelCost + totals.voiceCost + totals.falCost;
+  const totalUsd = totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost;
   const listRef = useRef<HTMLDivElement>(null);
   const [showVoice, setShowVoice] = useState(false);
   const lines = useTranscript();
@@ -695,6 +698,14 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
           {q.voiceChars} {t.chars} ≈ {Math.round(q.voiceCredits)} cr ≈ {formatUsd(q.voiceCost)}
           {floor(Boolean(q.partial))}
         </dd>
+        {q.musicSeconds > 0 && (
+          <>
+            <dt>{t.musicLine}</dt>
+            <dd>
+              {q.musicSeconds} s ≈ {Math.round(q.musicCredits)} cr ≈ {formatUsd(q.musicCost)}
+            </dd>
+          </>
+        )}
         {q.falCost > 0 && (
           <>
             <dt>fal.ai</dt>

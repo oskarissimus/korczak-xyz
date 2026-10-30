@@ -1,7 +1,7 @@
 /*
  * The developer console's record (`~` in the game): every request this quest made — each model asked
  * for a beat, each ElevenLabs clip and each fal.ai step of the hub's models (`landmark3d.ts`) — with what streamed back so far, its error, its tokens and
- * what it cost. The game is in active development and the owner wants to watch it work (Oct 2026:
+ * what it cost. ElevenLabs' music (`music.ts`) is a kind of its own, priced apart from the voices. The game is in active development and the owner wants to watch it work (Oct 2026:
  * "show the tokens streaming, show the errors, the cost of the quest, and the total time it took").
  *
  * A module-level store rather than React state: the storyteller and the voice write to it from deep
@@ -29,7 +29,7 @@ export type SpendScope = 'quest' | 'world';
 
 export interface DevRequest {
   id: number;
-  kind: 'model' | 'voice' | 'fal';
+  kind: 'model' | 'voice' | 'fal' | 'music';
   /** The model asked for, or the voice, or the fal.ai endpoint. */
   model: string;
   /** The model that answered, when the provider says (`modelVersion`); what is priced. */
@@ -50,7 +50,7 @@ export interface DevRequest {
   thoughts: string;
   error: string | null;
   usage: Usage | null;
-  /** Characters spoken and credits charged, for a clip. */
+  /** Characters spoken and credits charged, for a clip; seconds composed, for music. */
   chars: number;
   credits: number;
   /** Dollars, approximately; null when the model has no price. */
@@ -69,6 +69,10 @@ export interface QuestTotals {
   voiceChars: number;
   voiceCredits: number;
   voiceCost: number;
+  /** ElevenLabs' music (`music.ts`): seconds composed, credits, dollars — apart from the voices. */
+  musicSeconds: number;
+  musicCredits: number;
+  musicCost: number;
   /** fal.ai, at its list prices: each hub model's picture and its 3D model. */
   falCost: number;
   /** 3D models fal.ai finished. */
@@ -90,6 +94,10 @@ export interface Spend {
   voiceChars: number;
   voiceCredits: number;
   voiceCost: number;
+  /** ElevenLabs' music, apart from the voices; absent from a save before Oct 30 2026. */
+  musicSeconds: number;
+  musicCredits: number;
+  musicCost: number;
   falCost: number;
   falModels: number;
   /** Pictures fal.ai painted for the ground and what grows on it (`groundTexture.ts`, `groundCover.ts`). */
@@ -106,6 +114,9 @@ export const NO_SPEND: Spend = {
   voiceChars: 0,
   voiceCredits: 0,
   voiceCost: 0,
+  musicSeconds: 0,
+  musicCredits: 0,
+  musicCost: 0,
   falCost: 0,
   falModels: 0,
   falTextures: 0,
@@ -120,6 +131,9 @@ export function addSpend(a: Spend, b: Spend): Spend {
     voiceChars: a.voiceChars + b.voiceChars,
     voiceCredits: a.voiceCredits + b.voiceCredits,
     voiceCost: a.voiceCost + b.voiceCost,
+    musicSeconds: a.musicSeconds + b.musicSeconds,
+    musicCredits: a.musicCredits + b.musicCredits,
+    musicCost: a.musicCost + b.musicCost,
     falCost: a.falCost + b.falCost,
     falModels: a.falModels + b.falModels,
     falTextures: a.falTextures + b.falTextures,
@@ -129,7 +143,7 @@ export function addSpend(a: Spend, b: Spend): Spend {
 
 /** Everything in dollars, approximately. */
 export function spendUsd(s: Spend): number {
-  return s.modelCost + s.voiceCost + s.falCost;
+  return s.modelCost + s.voiceCost + s.musicCost + s.falCost;
 }
 
 /** A saved spend as far as it can be trusted: a save edited by hand or from an older build. */
@@ -146,6 +160,9 @@ export function validSpend(raw: unknown): Spend | null {
     voiceCredits: n(s.voiceCredits),
     // From the credits, at today's rate: a save from before Oct 2026 kept the old Creator guess.
     voiceCost: voiceCost(n(s.voiceCredits)),
+    musicSeconds: n(s.musicSeconds),
+    musicCredits: n(s.musicCredits),
+    musicCost: voiceCost(n(s.musicCredits)),
     falCost: n(s.falCost),
     falModels: n(s.falModels),
     falTextures: n(s.falTextures),
@@ -282,7 +299,7 @@ export function updateRequest(entry: DevRequest, patch: Partial<DevRequest>): vo
     if (entry.status === 'waiting') entry.status = 'streaming';
   }
   if (entry.kind === 'model' && entry.usage) entry.cost = tokenCost(entry.servedBy ?? entry.model, entry.usage);
-  if (entry.kind === 'voice') entry.cost = voiceCost(entry.credits);
+  if (entry.kind === 'voice' || entry.kind === 'music') entry.cost = voiceCost(entry.credits);
   requests = [...requests];
   changed();
 }
@@ -333,6 +350,11 @@ export function questSpend(): Spend {
       now.voiceChars += r.chars;
       now.voiceCredits += r.credits;
       now.voiceCost += r.cost ?? 0;
+    } else if (r.kind === 'music') {
+      if (r.status !== 'ok') continue;
+      now.musicSeconds += r.chars;
+      now.musicCredits += r.credits;
+      now.musicCost += r.cost ?? 0;
     } else if (r.kind === 'fal') {
       now.falCost += r.cost ?? 0;
       if (r.status === 'ok' && r.model.includes('trellis')) now.falModels += 1;
@@ -367,6 +389,9 @@ export function questTotals(): QuestTotals {
     voiceChars: 0,
     voiceCredits: 0,
     voiceCost: 0,
+    musicSeconds: 0,
+    musicCredits: 0,
+    musicCost: 0,
     falCost: 0,
     falModels: 0,
     falTextures: 0,
@@ -379,6 +404,13 @@ export function questTotals(): QuestTotals {
       totals.voiceChars += r.chars;
       totals.voiceCredits += r.credits;
       totals.voiceCost += r.cost ?? 0;
+      continue;
+    }
+    if (r.kind === 'music') {
+      if (r.status !== 'ok') continue;
+      totals.musicSeconds += r.chars;
+      totals.musicCredits += r.credits;
+      totals.musicCost += r.cost ?? 0;
       continue;
     }
     if (r.kind === 'fal') {
