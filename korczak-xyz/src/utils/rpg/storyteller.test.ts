@@ -191,7 +191,8 @@ describe('generateBeat', () => {
   });
 
   it('asks the chosen model first, then the usual order', () => {
-    expect(modelChain('google', 'gemini-3.8-flash')).toEqual(['gemini-3.8-flash', ...GOOGLE_MODELS]);
+    expect(modelChain('google', 'gemini-4-argon')).toEqual(['gemini-4-argon', ...GOOGLE_MODELS]);
+    expect(modelChain('google', null)[0]).toBe('gemini-3.8-flash');
     expect(modelChain('google', GOOGLE_MODELS[2])[0]).toBe(GOOGLE_MODELS[2]);
     expect(modelChain('google', GOOGLE_MODELS[2])).toHaveLength(GOOGLE_MODELS.length);
     expect(modelChain('google', 'gpt-4.1')).toEqual(GOOGLE_MODELS);

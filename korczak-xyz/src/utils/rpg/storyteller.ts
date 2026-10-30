@@ -3,7 +3,7 @@
  * `.claude/rules/account-keys.md`), straight from the browser like every other app here.
  *
  * Google first, OpenAI only without a Google key. On Google the models are tried in order
- * (`modelChain`: the one chosen on the intro screen, then `GOOGLE_MODELS`), strongest first, in
+ * (`modelChain`: the one chosen on the intro screen, then `GOOGLE_MODELS`), 3.8 Flash first, in
  * JSON mode, because availability is per project (see `backseat.md`, the demo's "no longer
  * available to new users"); then Gemma, which has no JSON mode. A model that is not on offer (404,
  * a 400 naming the model), out of quota (429), overloaded (503), silent or too slow moves to the
@@ -47,12 +47,18 @@ import { DEMO_MODELS, type RpgDemoReason } from './demoLimits';
 import { llmJobId, textRandom, type JobDoc, type JobParse, type LlmSpec } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
 
-// The strongest first (owner, Oct 2026: "the better model first, and a fallback; we will move to a
-// cheaper one when we optimise for cost"). Flash-Lite, first until then, wrote briefings and slid
-// into third-person narration where a line should be spoken. Named versions rather than the
-// `-latest` aliases where one exists, so the console says which model wrote a beat; the aliases are
-// still on the picker. `gemma-3-27b-it` was withdrawn (404) in Oct 2026.
+// 3.8 Flash first, Pro behind it (owner, 30 Oct 2026: "switch the default to 3.8 flash"). Pro was
+// first until then ("the better model first, and a fallback; we will move to a cheaper one when we
+// optimise for cost"), and its thinking was most of a quest's bill: a late beat $0.094 and 55 s, 5.3k
+// of its tokens thought. The same final beat run twice on each model that day: 3.8 Flash $0.014,
+// 25 s, both parsed, the writing close to Pro's;
+// 3 Flash and Flash-Lite thinking little were cheaper still and wrote decisions that decide the
+// outcome. Flash-Lite, first before Pro, wrote briefings and slid into third-person narration where
+// a line should be spoken. Named versions rather than the `-latest` aliases where one exists, so the
+// console says which model wrote a beat; the aliases are still on the picker. `gemma-3-27b-it` was
+// withdrawn (404) in Oct 2026.
 export const GOOGLE_MODELS = [
+  'gemini-3.8-flash',
   'gemini-3.1-pro-preview',
   'gemini-3-flash-preview',
   'gemini-flash-latest',

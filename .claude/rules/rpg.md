@@ -1031,9 +1031,13 @@ Read from the shared account store (`useAccountKeys`, see `account-keys.md`); th
 them. `account.keys.fal` (fal.ai, pasted on the account page) makes the hub's models (*The hub is
 built from real models*, above) and nothing else. Google first, OpenAI `gpt-4.1` only without a Google key. On Google the models are tried
 in order (`modelChain` in `storyteller.ts`): the one picked on the intro screen (`MODEL_CHOICES`,
-kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **strongest first** (owner, Oct 2026: "the
-better model first and a fallback; we switch to a cheaper one when we optimise for cost"):
-`gemini-3.1-pro-preview`, `gemini-3-flash-preview`, `gemini-flash-latest`,
+kept in localStorage `rpg-model`), then `GOOGLE_MODELS`, **`gemini-3.8-flash` first** (owner, 30 Oct 2026: "switch the default
+to 3.8 flash"; Pro was first until then, "the better model first and a fallback; we switch to a
+cheaper one when we optimise for cost"). Pro's thinking was most of the bill: a late beat $0.094 and
+55 s, against $0.014 and ~25 s on 3.8 Flash with the writing close to Pro's in a side-by-side run of
+the same final beat that day (3 Flash and Flash-Lite thinking little were cheaper and wrote
+decisions that decide the outcome). Then `gemini-3.1-pro-preview` as the fallback,
+`gemini-3-flash-preview`, `gemini-flash-latest`,
 `gemini-flash-lite-latest`, all in JSON mode, then `gemma-4-31b-it` (no JSON mode;
 `gemma-3-27b-it` was withdrawn, 404, Oct 2026). Flash-Lite was first until it wrote briefings and
 narration. The genesis and the opening beat ask `FAST_MODEL` before this chain unless the quick start is
