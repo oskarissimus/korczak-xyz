@@ -64,6 +64,7 @@ import { coverState, ensureGroundCover, hasCover } from '../../utils/rpg/groundC
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
 import {
   cluePrompt,
+  creaturePrompt,
   ensureClueModel,
   ensureHubModels,
   DEFAULT_MESHER,
@@ -75,6 +76,7 @@ import {
   PERSON_POSES,
   type PersonPose,
   type PersonPainter,
+  ensureCreatureModel,
   ensurePersonModel,
   personCostNow,
   personMakersNow,
@@ -159,7 +161,7 @@ import { heroBody, RpgScene, type PersonBody, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
 
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
-const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy']);
+const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature']);
 import { translations } from './translations';
 
 interface DialogueLine {
@@ -1754,6 +1756,42 @@ export default function Rpg({ lang }: { lang: Lang }) {
       (e) => {
         log.warn('rpg.enemy.failed', describeError(e));
         // Nobody would ever come: the kit's body, so the step can still be done.
+        if (beatRef.current?.index === beat.index) void scene.setEnemyBody({});
+      },
+    );
+  }, [beat, falKey, persist]);
+
+  // The beat's enemies that do not walk on two legs, a beast or a blob: a creature made once from the
+  // same English `prop`, moved by the game rather than rigged (`utils/rpg/creature.ts`), kept on the beat.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const job = beat?.job;
+    if (!scene || !beat || job?.kind !== 'slay' || job.model) return;
+    const shape = job.look.shape;
+    if (shape !== 'beast' && shape !== 'blob') return;
+    const world = worldRef.current;
+    if (!falKey || !world || world.createdAt === 0) return;
+    const token = questTokenRef.current;
+    ensureCreatureModel(
+      falKey,
+      `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`,
+      creaturePrompt(job.prop ?? job.targetName, shape, job.look.color),
+      (model) => {
+        if (questTokenRef.current !== token) return;
+        const keep = (b: Beat): Beat =>
+          b.index === beat.index && b.title === beat.title && b.job ? { ...b, job: { ...b.job, model } } : b;
+        beatsRef.current = beatsRef.current.map(keep);
+        if (beatRef.current) beatRef.current = keep(beatRef.current);
+        persist();
+        if (beatRef.current?.index === beat.index)
+          void scene.setEnemyBody({ url: model.glb }).catch((e) => {
+            log.warn('rpg.creature.load.failed', describeError(e));
+            void scene.setEnemyBody({});
+          });
+      },
+      (e) => {
+        log.warn('rpg.creature.failed', describeError(e));
+        // Nothing would ever come: the block, so the step can still be done.
         if (beatRef.current?.index === beat.index) void scene.setEnemyBody({});
       },
     );

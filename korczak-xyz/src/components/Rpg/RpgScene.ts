@@ -28,6 +28,7 @@ import {
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
 import { People, PERSON_HEIGHT, type Body, type Rigger } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
+import { dressCreature, disposeCreature, moveCreature, prepareCreature, type CreatureBody } from './creatureBody';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
@@ -40,6 +41,7 @@ import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
 import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
 import { HALT, Routine, type Spot, type SpotKind } from '../../utils/rpg/routine';
 import { CRAFT_SPECS, type Craft } from '../../utils/rpg/craft';
+import { DEATH_SECONDS, RUN_SPEED, type CreatureShape } from '../../utils/rpg/creature';
 import { buildStation, buildTool, disposeCraft, holdTool } from './crafts';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
@@ -121,6 +123,8 @@ const PICKUP_RANGE = 2.2;
 const CLUE_FIT = { height: 0.8, width: 1.2 };
 /** A thing to gather from fal.ai, floating: about the block's size, times the look's own size. */
 const ITEM_FIT = { height: 0.7, width: 0.8 };
+/** A beast's or a blob's model at the look's size 1, about the blocks' size; `Enemy.size` scales it. */
+const CREATURE_FIT = { beast: { height: 1.1, width: 1.8 }, blob: { height: 0.9, width: 1.5 } };
 /** How far out a village piece reaches when its spot says nothing: the kit's stall and cart, barrels, the well. */
 const SPOT_SIZE: Partial<Record<SpotKind, number>> = { stall: 1.8, cart: 2.2, goods: 0.8, landmark: 1.6 };
 const ATTACK_RANGE = 3;
@@ -194,8 +198,12 @@ function showTree(tree: Tree, visible: boolean) {
 
 interface Enemy {
   mesh: THREE.Group;
-  /** Set once the people's models have loaded, for a humanoid; the others stay primitives. */
+  /** Set once the people's models have loaded, for a humanoid. */
   rig: Rig | null;
+  /** A beast's or a blob's generated model and how it moves (`creatureBody.ts`). */
+  creature: CreatureBody | null;
+  /** Ground speed this frame, for the creature's gait. */
+  speed: number;
   /** The look's size, so a hit's flash can grow it from there. */
   size: number;
   hp: number;
@@ -360,8 +368,8 @@ export class RpgScene {
   private houseObstacles: Obstacle[] = [];
   /** Null until the models load, and for good if they fail (the hunter is then a capsule). */
   private playerRig: Rig | null = null;
-  /** Killed humanoids playing their death before they are taken away, seconds left. */
-  private dying: { mesh: THREE.Group; rig: Rig; left: number }[] = [];
+  /** Killed enemies playing their death before they are taken away, seconds left. */
+  private dying: { mesh: THREE.Group; rig: Rig | null; creature: CreatureBody | null; left: number }[] = [];
   private npcs = new Map<string, Npc>();
   private marker: THREE.Mesh;
   private yaw = 0;
@@ -2240,48 +2248,77 @@ export class RpgScene {
         this.pickups.push({ mesh, phase: rand() * 6 });
         this.dressPickup(mesh);
       } else {
-        const enemy: Enemy = { mesh: new THREE.Group(), rig: null, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 };
+        const enemy: Enemy = { mesh: new THREE.Group(), rig: null, creature: null, speed: 0, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 };
         enemy.mesh.position.copy(pos);
         this.scene.add(enemy.mesh);
         this.enemies.push(enemy);
-        if (look.shape !== 'humanoid') {
-          enemy.mesh.add(buildEnemy({ ...look, size: 1 }));
-          continue;
-        }
         void this.dressEnemy(enemy, this.enemyToken).catch(() => {});
       }
     }
   }
 
-  /** What the humanoid enemies are drawn as (`PersonBody`), and a count that makes an older load stale. */
+  /** What the enemies are drawn as (`PersonBody`), and a count that makes an older load stale. */
   private enemyWant = 'kit';
   private enemyToken = 0;
   private enemyLook: TargetLook | null = null;
 
   /**
-   * The job's enemies as their generated body, once made (`ensurePersonModel`, the beat's English
-   * `prop`); null for the kit's bare body washed in their colour (no key, a failed model).
+   * The job's enemies as their generated body, once made: a person on two legs (`ensurePersonModel`),
+   * a beast or a blob otherwise (`ensureCreatureModel`), from the beat's English `prop`. `{}` for the
+   * kit's bare body washed in their colour, or the block for a creature (no key, a failed model).
    */
   async setEnemyBody(body: PersonBody): Promise<void> {
     const want = wanted(body);
     if (want === this.enemyWant) return;
     this.enemyWant = want;
     const token = ++this.enemyToken;
-    if (this.enemyLook?.shape !== 'humanoid') return;
     await Promise.all(this.enemies.map((e) => this.dressEnemy(e, token)));
+  }
+
+  /** The beat's creature model, loaded and prepared once and cloned for each of them. */
+  private creatureModel: { key: string; template: Promise<{ group: THREE.Group; height: number }> } | null = null;
+
+  private creatureTemplate(url: string, shape: CreatureShape): Promise<{ group: THREE.Group; height: number }> {
+    const key = `${url} ${shape}`;
+    if (this.creatureModel?.key === key) return this.creatureModel.template;
+    const old = this.creatureModel;
+    if (old) void old.template.then((t) => disposeHubModel(t.group), () => {});
+    const template = loadHubModel(url, CREATURE_FIT[shape]).then(({ group }) => ({ group, height: prepareCreature(group, shape) }));
+    this.creatureModel = { key, template };
+    template.catch(() => {
+      if (this.creatureModel?.key === key) this.creatureModel = null;
+    });
+    return template;
+  }
+
+  private undressEnemy(enemy: Enemy) {
+    enemy.mesh.clear();
+    enemy.rig = null;
+    if (enemy.creature) disposeCreature(enemy.creature);
+    enemy.creature = null;
   }
 
   private async dressEnemy(enemy: Enemy, token: number): Promise<void> {
     const look = this.enemyLook;
     if (!look) return;
     const want = this.enemyWant;
-    enemy.mesh.clear();
-    enemy.rig = null;
-    if (want === 'wait') return;
+    // The body it has stays until the new one is ready, as a person's does (`setNpcBody`).
+    if (want === 'wait') return this.undressEnemy(enemy);
     if (want !== 'kit') {
       try {
+        if (look.shape === 'beast' || look.shape === 'blob') {
+          const shape = look.shape;
+          const template = await this.creatureTemplate(want, shape);
+          if (token !== this.enemyToken || enemy.hp <= 0) return;
+          this.undressEnemy(enemy);
+          enemy.creature = dressCreature(template.group, shape, template.height, Math.random() * 6);
+          enemy.mesh.add(enemy.creature.body);
+          return;
+        }
         const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy');
-        if (token === this.enemyToken && enemy.hp > 0) enemy.rig = this.people.dress(enemy.mesh, template);
+        if (token !== this.enemyToken || enemy.hp <= 0) return;
+        this.undressEnemy(enemy);
+        enemy.rig = this.people.dress(enemy.mesh, template);
         return;
       } catch (err) {
         if (token !== this.enemyToken) return;
@@ -2293,8 +2330,13 @@ export class RpgScene {
     this.dressKitEnemy(enemy, look, token);
   }
 
-  /** Something that was a man once: the bare base body, washed in the target's colour. */
+  /** Something that was a man once: the bare base body, washed in the target's colour; or the block. */
   private dressKitEnemy(enemy: Enemy, look: TargetLook, token: number) {
+    this.undressEnemy(enemy);
+    if (look.shape !== 'humanoid') {
+      enemy.mesh.add(buildEnemy({ ...look, size: 1 }));
+      return;
+    }
     this.chars.ready.then(
       () => {
         if (token === this.enemyToken && enemy.hp > 0)
@@ -2355,7 +2397,10 @@ export class RpgScene {
 
   clearObjective() {
     for (const p of this.pickups) this.scene.remove(p.mesh);
-    for (const e of [...this.enemies, ...this.dying]) this.scene.remove(e.mesh);
+    for (const e of [...this.enemies, ...this.dying]) {
+      this.scene.remove(e.mesh);
+      if (e.creature) disposeCreature(e.creature);
+    }
     this.pickups = [];
     this.enemies = [];
     this.dying = [];
@@ -2509,13 +2554,17 @@ export class RpgScene {
         if (enemy.rig) {
           // It falls before it goes; it stops being a target at once.
           enemy.rig.once('Death01', 1.4, { final: true });
-          this.dying.push({ mesh: enemy.mesh, rig: enemy.rig, left: 2.2 });
+          this.dying.push({ mesh: enemy.mesh, rig: enemy.rig, creature: null, left: 2.2 });
+        } else if (enemy.creature) {
+          enemy.creature.state.death = 0;
+          this.dying.push({ mesh: enemy.mesh, rig: null, creature: enemy.creature, left: DEATH_SECONDS });
         } else {
           this.scene.remove(enemy.mesh);
         }
         this.cb.onProgress();
       } else {
         enemy.rig?.once('Hit_Chest', 0.3);
+        if (enemy.creature) enemy.creature.state.flinch = 0;
       }
     }
   }
@@ -2690,11 +2739,18 @@ export class RpgScene {
     this.weather?.update(dt, this.player.position);
     this.playerRig?.update(dt);
     for (const npc of this.npcs.values()) npc.rig?.update(dt);
-    for (const enemy of this.enemies) enemy.rig?.update(dt);
+    for (const enemy of this.enemies) {
+      enemy.rig?.update(dt);
+      if (enemy.creature) moveCreature(enemy.creature, dt, this.paused ? 0 : enemy.speed);
+    }
     for (const d of this.dying) {
-      d.rig.update(dt);
+      d.rig?.update(dt);
+      if (d.creature) moveCreature(d.creature, dt, 0);
       d.left -= dt;
-      if (d.left <= 0) this.scene.remove(d.mesh);
+      if (d.left <= 0) {
+        this.scene.remove(d.mesh);
+        if (d.creature) disposeCreature(d.creature);
+      }
     }
     this.dying = this.dying.filter((d) => d.left > 0);
   }
@@ -2816,14 +2872,17 @@ export class RpgScene {
       const dist = toPlayer.length();
       enemy.hitCooldown = Math.max(0, enemy.hitCooldown - dt);
       let gait: 'Idle_Loop' | 'Walk_Loop' | 'Jog_Fwd_Loop' = 'Idle_Loop';
+      enemy.speed = 0;
       if (dist < 14 && dist > 1.2) {
-        pos.addScaledVector(toPlayer.normalize(), 3.2 * dt);
+        pos.addScaledVector(toPlayer.normalize(), RUN_SPEED * dt);
         gait = 'Jog_Fwd_Loop';
+        enemy.speed = RUN_SPEED;
       } else if (dist >= 14) {
         const home = enemy.home.clone().sub(pos).setY(0);
         if (home.length() > 0.5) {
           pos.addScaledVector(home.normalize(), 2 * dt);
           gait = 'Walk_Loop';
+          enemy.speed = 2;
         }
       }
       enemy.rig?.play(gait);
@@ -2834,6 +2893,7 @@ export class RpgScene {
       if (dist <= 1.5 && enemy.hitCooldown === 0) {
         enemy.hitCooldown = 1.2;
         enemy.rig?.once('Punch_Jab', 0.5);
+        if (enemy.creature) enemy.creature.state.bite = 0;
         this.hp = Math.max(0, this.hp - 12);
         this.cb.onHealth(this.hp);
         if (this.hp === 0) {

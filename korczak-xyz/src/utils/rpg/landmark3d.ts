@@ -771,6 +771,41 @@ export function ensurePlaceModel(
 }
 
 /**
+ * A quest's enemy that does not walk on two legs (owner, 30 Oct 2026: "generate the enemies like the
+ * other NPCs"): a beast or a blob, as the beat described it in English (`BeatJob.prop`). Drawn facing
+ * the viewer, because TRELLIS keeps the picture's front as +Z and the game turns +Z to the hero: a
+ * creature drawn side-on came out charging sideways. Thick legs set apart, because what is below
+ * `LEG_TOP` of its height swings as legs (`utils/rpg/creature.ts`) and a leg fused to its neighbour
+ * drags the belly with it; nothing long and thin, which TRELLIS loses at this simplification.
+ */
+export function creaturePrompt(prop: string, shape: 'beast' | 'blob', color?: string): string {
+  return [
+    `A single stylised low-poly game creature, one monster only: ${prop.trim().replace(/[.\s]+$/, '')}.`,
+    color ? `Mostly ${color}.` : '',
+    shape === 'blob'
+      ? 'A squat rounded body sitting on the ground, no legs, facing the viewer with its eyes or mouth toward us,'
+      : 'Standing on all its legs in a neutral stance, thick sturdy legs set apart with a clear gap between them and under the belly, facing the viewer with its head toward us,',
+    'seen from the front and a little above so its back shows, the whole body in view, centred.',
+    'Chunky, thick proportions, no thin or spindly parts, wings folded, tail short or curled against the body,',
+    'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A creature's model, made once per beat whose job it is: `id` names the world, the quest, the beat and its target. */
+export function ensureCreatureModel(
+  key: string,
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void = () => {},
+  o: FalOptions = {},
+): boolean {
+  return ensurePiece(key, 'creature', id, prompt, onModel, onError, o);
+}
+
+/**
  * A person's model (`personPrompt`), made once: a quest's character by world and name, the hero by
  * world, an enemy by the beat whose job it is. Rigged in the browser when it loads (`people.ts`).
  */
@@ -788,7 +823,7 @@ export function ensurePersonModel(
 
 function ensurePiece(
   key: string,
-  label: 'clue' | 'place' | PersonSlot,
+  label: 'clue' | 'place' | 'creature' | PersonSlot,
   id: string,
   prompt: string,
   onModel: (model: LandmarkModel) => void,

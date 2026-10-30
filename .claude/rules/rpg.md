@@ -882,9 +882,31 @@ content-hashed and immutable.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
     having no finger bones to place it by.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
-  flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once). Beasts
-  and blobs are still primitives: Quaternius's monster packs were behind a Google Drive quota the
-  day this was done.
+  flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once).
+- **Beasts and blobs are generated too** (owner, 30 Oct 2026: "generate the enemies like the other
+  NPCs", over a screenshot of four black blocks with red eyes as the quest's pests). In an invented
+  world with a fal key, a `slay` job whose look is `beast` or `blob` gets a model made once from the
+  beat's English `targetProp` (`creaturePrompt`, `ensureCreatureModel` in `landmark3d.ts`, slot
+  `creature`, FLUX schnell + TRELLIS at 0.96, **~$0.023 a beat**, on the server's job runner like a
+  clue), kept on the beat as `job.model` like a humanoid's; until it comes nobody stands there (as
+  for people), and on a failure the old block does, so the step can still be done.
+  - **Not rigged, on purpose.** Meshy's rigging and `selfRig` both fit a human skeleton; a rat, a
+    wolf, a beetle and a slime share no bones with it or with each other. So a creature moves from
+    outside (`utils/rpg/creature.ts`, plain numbers, tested; `components/Rpg/creatureBody.ts`): what
+    is below `LEG_TOP` (45 %) of its height swings in the vertex shader along its front, linearly
+    more toward the ground, in diagonal pairs and lifted on the forward swing (a trot), at a cadence
+    from its speed and size; the body bobs and rocks with the footfalls and breathes when still. A
+    blob swings nothing and hops instead, squashing and stretching. The bite is a lunge nose down,
+    a hit throws it back nose up, and it dies rolling onto its side and sinking into the ground over
+    `DEATH_SECONDS`. The leg attribute is worked out once per model (`prepareCreature`); each
+    creature clones the materials for its own stride, sharing geometry and textures. The shadow
+    does not swing (the depth pass has no hook), which nobody will see at that size.
+  - **Drawn facing the viewer**, since TRELLIS keeps the picture's front as +Z and the scene turns
+    +Z to the hero; legs thick and apart (a leg fused to its neighbour drags the belly), tail and
+    wings against the body. The `targetProp` instruction has a beast among its examples now, and
+    says the prop must be the look's shape.
+  - Checked in a headless page on the block beast and blob (fal's account was locked for a top-up
+    that day, so not yet on a TRELLIS rat).
 - **Surfaces** (`components/Rpg/surfaces.ts`): ten Poly Haven colour maps at 512 px, tiled per
   material and cached per tiling (each tiling is its own GPU texture, so taking a place down
   disposes none). A biome's ground colour becomes a tint at full brightness (`hueTint`), because

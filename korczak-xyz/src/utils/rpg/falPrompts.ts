@@ -34,10 +34,11 @@ export function isForestVariant(slot: HubSlot): slot is ForestVariant {
 }
 /**
  * Everything fal.ai is asked to make: the hub's pieces, the forest, a quest's clues (`ensureClueModel`),
- * what stands at a quest's places (`ensurePlaceModel`), and the people (`ensurePersonModel`): the
- * quest's characters, the hero, and the enemies that walk on two legs.
+ * what stands at a quest's places (`ensurePlaceModel`), the people (`ensurePersonModel`): the
+ * quest's characters, the hero, and the enemies that walk on two legs; and the enemies that do not
+ * (`ensureCreatureModel`).
  */
-export type FalSlot = HubSlot | 'clue' | 'place' | PersonSlot;
+export type FalSlot = HubSlot | 'clue' | 'place' | 'creature' | PersonSlot;
 export type PersonSlot = 'person' | 'hero' | 'enemy';
 
 /**
@@ -51,6 +52,8 @@ export const SIMPLIFY: Record<FalSlot, number> = {
   person: 0.95,
   hero: 0.95,
   enemy: 0.95,
+  // A beast or a blob: bent only by its legs' swing in the shader, and there are several at once.
+  creature: 0.96,
   // A place's landmark and the things copied around it, between the hub's landmark and its pieces.
   place: 0.97,
   landmark: 0.95,

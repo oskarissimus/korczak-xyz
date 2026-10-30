@@ -907,7 +907,7 @@ export function beatPrompt(ctx: BeatContext): string {
     ctx.job?.kind === 'collect'
       ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 12 words: one of the things alone as it looks, for a 3D model — "a cracked green glowing reactor core"),'
       : ctx.job?.kind === 'slay'
-        ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 20 words: one of them alone as it looks, for a 3D model — "a gaunt drowned man with grey-green skin, rags and weeds in his hair"),'
+        ? '  "targetProp": string (IN ENGLISH whatever the language above, at most 20 words: one of them alone as it looks, for a 3D model — "a gaunt drowned man with grey-green skin, rags and weeds in his hair", "a fat grey rat the size of a dog with yellow teeth and a bald tail"; it must be the look\'s shape),'
         : '',
     '  "objectiveText": string (one line for the journal: what to do in this step),',
     ctx.job && ctx.job.kind !== 'talk'
