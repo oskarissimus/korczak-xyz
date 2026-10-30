@@ -37,6 +37,7 @@ import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
 import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
+import { HALT, Routine, type Spot, type SpotKind } from '../../utils/rpg/routine';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -117,6 +118,8 @@ const PICKUP_RANGE = 2.2;
 const CLUE_FIT = { height: 0.8, width: 1.2 };
 /** A thing to gather from fal.ai, floating: about the block's size, times the look's own size. */
 const ITEM_FIT = { height: 0.7, width: 0.8 };
+/** How far out a village piece reaches when its spot says nothing: the kit's stall and cart, barrels, the well. */
+const SPOT_SIZE: Partial<Record<SpotKind, number>> = { stall: 1.8, cart: 2.2, goods: 0.8, landmark: 1.6 };
 const ATTACK_RANGE = 3;
 const ATTACK_COOLDOWN = 0.55;
 const MAX_HP = 100;
@@ -210,6 +213,8 @@ interface Npc {
   obstacle: Obstacle;
   /** The village spot it holds, if it stands in the village. */
   spot: number | null;
+  /** What they do with themselves between talks (`utils/rpg/routine.ts`): where they walk, what they work at. */
+  routine: Routine;
 }
 
 interface Place {
@@ -1627,16 +1632,18 @@ export class RpgScene {
 
   /**
    * Puts a character at a place (by name) or, with null, on a free spot in the village square;
-   * one already standing somewhere walks over. Their clothes are `color`.
+   * one already standing somewhere walks over. Their clothes are `color`; `about` is how the quest
+   * describes them, which their trade, and so what they busy themselves with, is read from.
    */
-  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male', body: PersonBody = {}) {
+  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male', body: PersonBody = {}, about = '') {
     let npc = this.npcs.get(name);
     if (!npc) {
       const group = new THREE.Group();
       const obstacle: Obstacle = { x: 0, z: 0, r: 0.6 };
       this.obstacles.push(obstacle);
       this.scene.add(group);
-      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), css: color, gender, want: 'none', token: 0, obstacle, spot: null };
+      const routine = new Routine(name, about, { x: 0, z: 0 });
+      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), css: color, gender, want: 'none', token: 0, obstacle, spot: null, routine };
       npc = created;
       this.npcs.set(name, created);
     }
@@ -1662,6 +1669,96 @@ export class RpgScene {
     npc.group.position.copy(pos);
     npc.obstacle.x = pos.x;
     npc.obstacle.z = pos.z;
+    npc.routine.setHome(pos);
+  }
+
+  /** Who the hero is talking to, so that one alone talks while the dialogue holds the world. */
+  private talking: string | null = null;
+
+  /** Everything within `reach` of `home` a character could work at, by what it is. */
+  private spotsNear(home: Ground, reach: number): Spot[] {
+    const spots: Spot[] = [];
+    const add = (x: number, z: number, r: number, kind: SpotKind) => {
+      // Standing beside it may take them a little past their reach (`Routine.job` allows that much).
+      if (Math.hypot(x - home.x, z - home.z) <= reach + r + 2) spots.push({ x, z, r, kind });
+    };
+    for (const slot of HUB_SLOTS) {
+      const kind: SpotKind = slot === 'landmark' || slot === 'house' || slot === 'hall' || slot === 'goods' || slot === 'stall' || slot === 'cart' || slot === 'lamp' ? slot : 'tree';
+      // An empty spot (a world's model not come yet) is bare ground: nothing to work at. The classic
+      // village's barrels, stall and cart block nothing as spots, but they stand there all the same.
+      const kit = this.layout === null && (this.kitPieces[slot] ?? []).some((o) => o.visible);
+      for (const s of this.hubSpots[slot] ?? []) {
+        if (s.obstacle.off && !kit) continue;
+        add(s.obstacle.x, s.obstacle.z, Math.max(s.obstacle.r, SPOT_SIZE[kind] ?? 0.5), kind);
+      }
+    }
+    for (const tree of this.trees) if (!tree.obstacle.off && !tree.hidden) add(tree.obstacle.x, tree.obstacle.z, tree.obstacle.r, 'tree');
+    for (const place of this.places.values()) {
+      if (place.keepOut) add(place.keepOut.x, place.keepOut.z, place.keepOut.r, 'landmark');
+      const trees = new Set(place.bare?.treeObstacles ?? []);
+      for (const o of place.obstacles) if (!o.off) add(o.x, o.z, o.r, trees.has(o) ? 'tree' : 'thing');
+    }
+    return spots;
+  }
+
+  /**
+   * Whether a character can walk straight from one point to the other: no wall, tree or rock across
+   * the way. The other people do not count (they step round each other), nor whatever the walker is
+   * already in or is walking up to.
+   */
+  private clearWay(from: Ground, to: Ground): boolean {
+    const people = new Set([...this.npcs.values()].map((n) => n.obstacle));
+    const all = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)];
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const len2 = dx * dx + dz * dz || 1;
+    for (const o of all.flat()) {
+      if (o.off || people.has(o)) continue;
+      const r = o.r + 0.35;
+      if (Math.hypot(from.x - o.x, from.z - o.z) < r || Math.hypot(to.x - o.x, to.z - o.z) < r + 0.4) continue;
+      const t = Math.max(0, Math.min(1, ((o.x - from.x) * dx + (o.z - from.z) * dz) / len2));
+      if (Math.hypot(from.x + dx * t - o.x, from.z + dz * t - o.z) < r) return false;
+    }
+    return Math.abs(to.x) < WORLD_HALF && Math.abs(to.z) < WORLD_HALF;
+  }
+
+  private surroundings = {
+    spots: (home: Ground, reach: number) => this.spotsNear(home, reach),
+    clear: (from: Ground, to: Ground) => this.clearWay(from, to),
+  };
+
+  /**
+   * Everyone about their day: walking, working, standing. A walker the hero comes up to stops and
+   * faces them, so whoever they came to talk to is not walking off; a worker carries on, on the spot.
+   */
+  private updateNpcs(dt: number) {
+    const hero = this.player.position;
+    for (const npc of this.npcs.values()) {
+      const r = npc.routine;
+      const g = npc.group;
+      const d = Math.hypot(hero.x - r.x, hero.z - r.z);
+      let face = r.facing;
+      if (d < HALT && !r.working) {
+        npc.rig?.play('Idle_Loop', { fade: 0.4 });
+        face = Math.atan2(hero.x - r.x, hero.z - r.z);
+      } else {
+        const act = r.tick(dt, this.surroundings);
+        npc.rig?.play(act.clip, { speed: act.speed ?? 1, fade: 0.35 });
+        if (act.strike) npc.rig?.once(act.strike.clip, act.strike.seconds, { fade: 0.2 });
+        face = r.facing;
+        g.position.set(r.x, 0, r.z);
+        npc.obstacle.x = r.x;
+        npc.obstacle.z = r.z;
+      }
+      const turn = Math.atan2(Math.sin(face - g.rotation.y), Math.cos(face - g.rotation.y));
+      g.rotation.y += turn * Math.min(1, dt * 6);
+    }
+    // The beam stays over the one it marks, wherever they have walked to.
+    const marked = this.markerNpc ? this.npcs.get(this.markerNpc) : undefined;
+    if (marked && this.markerTarget) {
+      this.markerTarget.copy(marked.group.position);
+      this.marker.position.set(this.markerTarget.x, 30, this.markerTarget.z);
+    }
   }
 
   /**
@@ -2249,7 +2346,12 @@ export class RpgScene {
   setPaused(paused: boolean) {
     this.paused = paused;
     if (paused && this.sensesLeft > 0) this.toggleSenses(false);
-    if (!paused) for (const npc of this.npcs.values()) npc.rig?.play('Idle_Loop', { fade: 0.6 });
+    // Nobody walks on the spot while the world holds; the one talked to lingers a little after.
+    for (const [name, npc] of this.npcs) {
+      if (paused && name !== this.talking) npc.rig?.play('Idle_Loop', { fade: 0.4 });
+      if (!paused && name === this.talking) npc.routine.linger(3 + Math.random() * 3);
+    }
+    if (!paused) this.talking = null;
     this.keys.clear();
     this.stick = { x: 0, y: 0 };
     this.lookTouch = null;
@@ -2334,7 +2436,12 @@ export class RpgScene {
     const thing = this.nearestThing();
     if (!thing) return;
     if ('talk' in thing) {
-      this.npcs.get(thing.talk)?.rig?.play('Idle_Talking_Loop', { fade: 0.4 });
+      const npc = this.npcs.get(thing.talk);
+      if (npc) {
+        this.talking = thing.talk;
+        npc.group.rotation.y = Math.atan2(this.player.position.x - npc.routine.x, this.player.position.z - npc.routine.z);
+        npc.rig?.play('Idle_Talking_Loop', { fade: 0.4 });
+      }
       this.cb.onTalk(thing.talk);
       return;
     }
@@ -2530,11 +2637,7 @@ export class RpgScene {
     }
 
     this.updateEnemies(dt);
-    for (const npc of this.npcs.values()) {
-      if (npc.group.position.distanceTo(this.player.position) < 12) {
-        npc.group.lookAt(this.player.position.x, 0, this.player.position.z);
-      }
-    }
+    this.updateNpcs(dt);
 
     for (const place of this.places.values()) {
       for (const s of place.spinners) s.object.rotation[s.axis] += s.speed * dt;

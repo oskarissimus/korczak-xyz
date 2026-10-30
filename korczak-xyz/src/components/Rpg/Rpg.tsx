@@ -741,7 +741,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** A character into the scene, drawn as `bodyFor` says, and their model asked for if it is missing. */
   const putNpc = useCallback(
     (c: Character, at: string | null, nth: number) => {
-      sceneRef.current?.placeNpc(c.name, c.color, at, nth, c.gender, bodyFor(c));
+      sceneRef.current?.placeNpc(c.name, c.color, at, nth, c.gender, bodyFor(c), `${c.appearance ?? ''}\n${c.voice ?? ''}`);
       ensureNpcModel(c);
     },
     [bodyFor, ensureNpcModel],

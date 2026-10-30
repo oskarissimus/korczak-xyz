@@ -889,6 +889,37 @@ cut to head and neck, all but the needed clips and pieces; both read through `sc
 which repairs the packs' misnamed texture URIs) and `scripts/rpg-textures.mjs` regenerate the
 committed files.
 
+## The people go about their day
+
+Owner, 30 Oct 2026: "NPCs should walk around the place and do something, not just stand still and
+look around". Each character has a `Routine` (`utils/rpg/routine.ts`, plain numbers, tested), made
+in `placeNpc` and driven by `RpgScene.updateNpcs`:
+
+- **A trade, read off the description.** `tradeOf` matches English words in the `appearance`, then
+  the `voice` (`Rpg.tsx` passes both, appearance first): guard, smith (and carpenters, masons…),
+  woodcutter, gatherer (farmers, herbalists, shepherds…), trader (merchants, innkeepers, cooks…),
+  holy (priests, witches, sages…), and anyone else an idler. No LLM field was added: the
+  description already says it. "Hunter" is deliberately not a word: it is what everyone calls the
+  hero.
+- **Work is the clips everyone has**, since no person holds a tool: the sword swing without a sword
+  is a hammer's or an axe's stroke (smith at a house, the goods or the cart; woodcutter at a tree),
+  the jab is a hand reaching to pick (gatherer at trees, the cart, the well), the talking loop a
+  trader's patter by the stall, standing still before the landmark a priest's devotion. A guard
+  walks four corners round home in `Sword_Idle`, looking outward, now and then drilling a swing.
+  Everyone else strolls and sometimes chats at the well or a house.
+- **Spots are what stands** (`spotsNear`): the hub's slots whose obstacle is on, the classic
+  village's barrels, stall and cart (which block nothing as spots but are there), the forest's
+  trees, a place's landmark and things. An empty slot of a world whose model has not come is bare
+  ground and is never worked at.
+- **Nobody goes further than `REACH` (9 m) from where the quest put them**, so the one the marker
+  points at is still there; the marker's beam follows them anyway. A walk is taken only if
+  `clearWay` finds no wall, tree or rock across the straight line (people do not count).
+- **The hero stops a walker.** Within `HALT` (4.2 m, a little past `TALK_RANGE`) a walking or
+  standing character stops and turns to face the hero, so whoever you came to talk to does not
+  walk off as you reach them; a worker keeps working on the spot. On E they turn to you and talk;
+  while the dialogue holds the world everyone else stands in `Idle_Loop` (the update loop is what
+  moves people, and it stops), and after it the one talked to lingers 3–6 s before going back.
+
 ## Keys
 
 Read from the shared account store (`useAccountKeys`, see `account-keys.md`); the game never edits
