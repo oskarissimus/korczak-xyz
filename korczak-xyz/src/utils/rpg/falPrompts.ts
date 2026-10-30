@@ -208,8 +208,19 @@ const T_POSE =
  * the rig work just right").
  */
 export function tPose(prompt: string, palms: 'forward' | 'down' = 'forward'): string {
-  const pose = palms === 'down' ? T_POSE_PALMS_DOWN : T_POSE;
-  return prompt.includes(A_POSE) ? prompt.replace(A_POSE, pose) : `${prompt} ${pose.replace(/,$/, '.')}`;
+  return inPose(prompt, palms === 'down' ? T_POSE_PALMS_DOWN : T_POSE);
+}
+
+/**
+ * `prompt` with whatever pose it was in replaced by `pose`. Not only the loose A-pose: the game's
+ * prompts are drawn in a pose already (`posePerson`), and the lab redraws them in another — asked for
+ * palms down on a prompt already palms forward, it once appended the second pose after the first,
+ * and the painters drew the first (owner, 30 Oct 2026: "I asked for palms down and still get
+ * palms forward").
+ */
+function inPose(prompt: string, pose: string): string {
+  for (const was of [A_POSE, WIDE_POSE, T_POSE, T_POSE_PALMS_DOWN]) if (prompt.includes(was)) return prompt.replace(was, pose);
+  return `${prompt} ${pose.replace(/,$/, '.')}`;
 }
 
 /**
@@ -239,7 +250,7 @@ export function posePerson(prompt: string, pose: PersonPose): string {
  * after, so a picture with gaps rigs better at the same $0.023.
  */
 export function widePose(prompt: string): string {
-  return prompt.includes(A_POSE) ? prompt.replace(A_POSE, WIDE_POSE) : `${prompt} ${WIDE_POSE.replace(/,$/, '.')}`;
+  return inPose(prompt, WIDE_POSE);
 }
 
 /**

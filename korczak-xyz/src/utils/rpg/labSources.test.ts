@@ -55,4 +55,16 @@ describe('labSources', () => {
     expect(down).not.toContain('thumbs');
     expect(down.replace('palms facing down', 'X')).toBe(forward.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'X'));
   });
+
+  it('moves a prompt already in one pose into another, rather than adding the second after the first', () => {
+    const game = tPose(personPrompt('a smith', { gender: 'male' }));
+    const down = tPose(game, 'down');
+    expect(down).toContain('palms facing down');
+    expect(down).not.toContain('thumbs');
+    expect(down.match(/strict T-pose/g)).toHaveLength(1);
+    expect(tPose(down)).toBe(game);
+    const wide = widePose(game);
+    expect(wide).toContain('precise A-pose');
+    expect(wide).not.toContain('T-pose for rigging');
+  });
 });

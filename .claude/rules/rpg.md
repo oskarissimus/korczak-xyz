@@ -878,6 +878,8 @@ content-hashed and immutable.
     with the thumbs up since 30 Oct 2026 (owner: "palms to the front, not down, for the rig"),
     and in the lab both, *palms forward* and *palms down* (`tPose(prompt, 'down')`, owner the same
     evening: "it may be TRELLIS making the hands so, not the rig; let me test both"),
+    each pose replacing whichever the prompt was in (`inPose`): the game's prompts are T-posed already,
+    and palms down was once appended after their palms forward, so the painters drew palms forward,
     gaps to the armpit, hands empty with the objects named, carried things on the back or belt), and
     people described in the lab are drawn in it from the start. A kept picture is used again only while
     its prompt is the one its pose sends now (`keptPicture`), so a changed pose is drawn afresh. The prompt sent, or the one a kept
