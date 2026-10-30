@@ -2933,17 +2933,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
           {senses && !dialogue && !ending && <div className="rpg-senses" aria-hidden="true" />}
 
-          {!touch && !dialogue && !ending && (
-            <button
-              type="button"
-              className={`rpg-senses-key${senses ? ' rpg-senses-key-on' : ''}`}
-              aria-pressed={senses}
-              onClick={() => sceneRef.current?.toggleSenses()}
-            >
-              <kbd>Q</kbd> 👁 {t.senses}
-            </button>
-          )}
-
           {!touch && prompt && !dialogue && !ending && (
             <div className="rpg-prompt">
               <kbd>E</kbd> {prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : t.pickUp}
@@ -3147,6 +3136,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </div>
       )}
 
+      {/* The bottom-right corner, one row (owner, 30 Oct 2026, a screenshot: senses, ~, the note and ⛶
+          on top of one another, each placed by a hand-counted `right:`). On a phone the row dissolves
+          (`display: contents`) and the small buttons go to the top, where they always were. */}
+      <div className="rpg-corner">
+      {started && !touch && !dialogue && !ending && (
+        <button
+          type="button"
+          className={`rpg-senses-key${senses ? ' rpg-senses-key-on' : ''}`}
+          aria-pressed={senses}
+          onClick={() => sceneRef.current?.toggleSenses()}
+        >
+          <kbd>Q</kbd> 👁 {t.senses}
+        </button>
+      )}
+
       {started && voiceKey && (
         <button
           type="button"
@@ -3195,6 +3199,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
         </button>
       )}
 
+      {(!touch || started) && (
+        <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>
+          ~
+        </button>
+      )}
+
+      {!immersive && (
+        <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
+          ⛶
+        </button>
+      )}
+      </div>
+
       <FundsBanner lang={gameLang} />
 
       {devOpen && (
@@ -3213,18 +3230,6 @@ export default function Rpg({ lang }: { lang: Lang }) {
         />
       )}
       {fpsBadge && started && <FpsBadge scene={sceneRef.current} />}
-
-      {(!touch || started) && (
-        <button type="button" className="rpg-devtoggle" onClick={() => setDevOpen((open) => !open)} title={t.devConsole}>
-          ~
-        </button>
-      )}
-
-      {!immersive && (
-        <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
-          ⛶
-        </button>
-      )}
     </div>
   );
 }

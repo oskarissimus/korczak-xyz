@@ -270,16 +270,12 @@
 }
 
 .rpg-senses-key {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  padding: 6px 12px;
+  padding: 0 12px;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid #6b5b3e;
   color: #f3ead7;
   font: 14px Georgia, serif;
   cursor: pointer;
-  z-index: 2;
 }
 
 /* On: light, not merely another colour. */
@@ -454,10 +450,7 @@
 }
 
 .rpg-fullscreen {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  padding: 2px 8px;
+  padding: 0 8px;
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);
   color: #f1e6cf;
@@ -495,20 +488,15 @@ ul.rpg-source {
 
 .rpg-voice,
 .rpg-music {
-  position: absolute;
-  bottom: 10px;
-  right: 52px;
-  padding: 2px 8px;
+  position: relative;
+  padding: 0 8px;
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);
   cursor: pointer;
 }
 
-/* The score's own switch, left of the voice's and the console's (`utils/rpg/music.ts`). Off is a
-   crossed note, not a dimmer one: the owner's phone is black and white. */
-.rpg-music {
-  right: 136px;
-}
+/* The score's own switch (`utils/rpg/music.ts`). Off is a crossed note, not a dimmer one: the
+   owner's phone is black and white. */
 
 /* How much of the track has come while ElevenLabs composes it: a strip under the note. */
 .rpg-music-bar {
@@ -1182,10 +1170,7 @@ ul.rpg-source {
 
 
 .rpg-devtoggle {
-  position: absolute;
-  bottom: 10px;
-  right: 94px;
-  padding: 2px 8px;
+  padding: 0 8px;
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);
   color: #f1e6cf;
@@ -1431,6 +1416,44 @@ body:has(.rpg-immersive) .safe-top-band {
 .rpg-immersive .rpg-journal {
   top: calc(8px + var(--safe-top, 0px));
   right: calc(10px + var(--safe-right, 0px));
+}
+
+/* The bottom-right corner on a desktop: one flex row, so a button that grows (senses in Polish, the
+   note with ⏳ while it composes) pushes the next one along rather than landing on it. Every button
+   the same height, so the row reads as a row. */
+.rpg-corner {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  z-index: 2;
+}
+
+.rpg-corner > button {
+  height: 32px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* On a phone the row dissolves, and each button is placed on its own as before. */
+.rpg-touch .rpg-corner {
+  display: contents;
+}
+
+.rpg-touch .rpg-corner > button {
+  position: absolute;
+}
+
+.rpg-touch .rpg-fullscreen {
+  bottom: 10px;
+  right: 10px;
 }
 
 /* The small buttons go to the top on a phone: the bottom corners are the thumbs'. */
