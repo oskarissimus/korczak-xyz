@@ -20,7 +20,8 @@ interface Props {
   prompt: Prompt | null;
   promptLabel: string | null;
   attackLabel: string;
-  jumpLabel: string;
+  /** Null while jumping is off in the settings: no button. */
+  jumpLabel: string | null;
   /** The witcher's senses (`senses.ts`): the eye, pressed while they last. */
   sensesLabel: string;
   sensesOn: boolean;
@@ -104,17 +105,19 @@ export function TouchControls({ prompt, promptLabel, attackLabel, jumpLabel, sen
         </button>
         {/* The jump sits left of the sword, where the thumb rolls to without leaving the corner. */}
         <div className="rpg-act-row">
-          <button
-            type="button"
-            className="rpg-act rpg-act-jump"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              onJump();
-            }}
-          >
-            <span aria-hidden="true">⇧</span>
-            {jumpLabel}
-          </button>
+          {jumpLabel && (
+            <button
+              type="button"
+              className="rpg-act rpg-act-jump"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onJump();
+              }}
+            >
+              <span aria-hidden="true">⇧</span>
+              {jumpLabel}
+            </button>
+          )}
           <button
             type="button"
             className="rpg-act rpg-act-attack"

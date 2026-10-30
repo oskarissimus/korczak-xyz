@@ -246,6 +246,8 @@ function clip(text: string, n: number): string {
 const EXOTIC_KEY = 'rpg-exotic';
 /** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self'. */
 const RIGGER_KEY = 'rpg-rigger';
+/** Whether the hero can jump (Space, the ⇧ button); off unless '1' (owner, 30 Oct 2026). */
+const JUMP_KEY = 'rpg-jump';
 /** What makes the generated people's models (`Mesher` in `landmark3d.ts`); TRELLIS unless 'meshy'. */
 const MESHER_KEY = 'rpg-mesher';
 /** What draws the generated people's pictures (`PersonPainter` in `landmark3d.ts`); FLUX schnell when absent. */
@@ -361,6 +363,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** The world and the opening on the fast model, thinking little; the later beats keep the chosen one. */
   const [fastStart, setFastStart] = useState(true);
   const [rigger, setRigger] = useState<Rigger>(DEFAULT_RIGGER);
+  const [jumping, setJumping] = useState(false);
+  const jumpingRef = useRef(jumping);
+  jumpingRef.current = jumping;
   const riggerRef = useRef(rigger);
   riggerRef.current = rigger;
   const [mesher, setMesher] = useState<Mesher>(DEFAULT_MESHER);
@@ -1301,6 +1306,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     });
     sceneRef.current = scene;
     scene.setRigger(riggerRef.current, falKeyRef.current);
+    scene.setJumping(jumpingRef.current);
     scene.setPaused(true);
     scene.resize(container.clientWidth, container.clientHeight);
     scene.setQuality(loadQuality());
@@ -1518,6 +1524,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   }, [creating, generating, falKey, world, music, musicKey, musicOn]);
   falKeyRef.current = falKey;
   useEffect(() => sceneRef.current?.setRigger(rigger, falKey), [rigger, falKey]);
+  useEffect(() => sceneRef.current?.setJumping(jumping), [jumping]);
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
   useEffect(() => {
     if (!falKey || !world || world.createdAt === 0 || creating) return;
@@ -2126,6 +2133,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
       setRigger(localStorage.getItem(RIGGER_KEY) === 'self' ? 'self' : DEFAULT_RIGGER);
+      setJumping(localStorage.getItem(JUMP_KEY) === '1');
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const keptPainter = localStorage.getItem(PAINTER_KEY);
       setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : DEFAULT_PAINTER);
@@ -2149,6 +2157,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (on) localStorage.removeItem(FAST_KEY);
       else localStorage.setItem(FAST_KEY, '0');
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickJumping = (on: boolean) => {
+    setJumping(on);
+    try {
+      if (on) localStorage.setItem(JUMP_KEY, '1');
+      else localStorage.removeItem(JUMP_KEY);
     } catch {
       /* forgotten on reload */
     }
@@ -2601,6 +2618,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
           </button>
         ))}
       </div>
+      <label className="rpg-model">
+        <input type="checkbox" checked={jumping} onChange={(e) => pickJumping(e.target.checked)} /> {t.jumpSetting}
+      </label>
       {keysReady && models.length > 0 && (
         <label className="rpg-model">
           {t.model}:{' '}
@@ -2718,7 +2738,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li>{t.touchMove}</li>
           <li>{t.touchLook}</li>
           <li>{t.touchAct}</li>
-          <li>{t.touchJump}</li>
+          {jumping && <li>{t.touchJump}</li>}
           <li>{t.touchSenses}</li>
           <li>{t.touchJournal}</li>
         </ul>
@@ -2728,7 +2748,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <li><kbd>Shift</kbd> {t.run}</li>
           <li>{t.mouse}</li>
           <li><kbd>LMB</kbd> {t.attack}</li>
-          <li><kbd>Space</kbd> {t.jumpHelp}</li>
+          {jumping && <li><kbd>Space</kbd> {t.jumpHelp}</li>}
           <li><kbd>E</kbd> {t.interact}</li>
           <li><kbd>Q</kbd> {t.sensesHelp}</li>
           <li><kbd>J</kbd> {t.journal}</li>
@@ -2876,7 +2896,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
               prompt={prompt}
               promptLabel={prompt === 'talk' ? t.talk : prompt === 'examine' ? t.examine : prompt ? t.pickUp : null}
               attackLabel={t.strike}
-              jumpLabel={t.jump}
+              jumpLabel={jumping ? t.jump : null}
               sensesLabel={t.senses}
               sensesOn={senses}
               onSenses={() => sceneRef.current?.toggleSenses()}

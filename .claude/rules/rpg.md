@@ -1408,7 +1408,10 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   right thumb `⚔ Cios` with `⇧ Skok` beside it, `👁 Zmysły` above, and, only while something is in
   reach, a larger light button saying what E would do (talk, examine, pick up). Pointer lock is
   never asked for on a phone.
-- **The jump** (`RpgScene.jump`, Space or `⇧`): only from the ground, up at 6 m/s against 20 m/s²,
+- **The jump** (`RpgScene.jump`, Space or `⇧`) is **off by default** (owner, 30 Oct 2026: "make
+  jumping a toggle in the settings, off by default"): *Jumping* in the settings, `rpg-jump` = `'1'`
+  in localStorage, `RpgScene.setJumping`. Off, Space does nothing, the `⇧` button is not drawn and
+  the controls list leaves it out. On: only from the ground, up at 6 m/s against 20 m/s²,
   ~0.9 m and ~0.6 s in the air; the ground is flat at 0, so no terrain is consulted. `Jump_Start`
   is squeezed into 0.45 s (its own 1.3 s is mostly the air pose settling), `Jump_Loop` holds until
   the feet touch, and `Jump_Land` plays only when landing standing still: landing on the move runs

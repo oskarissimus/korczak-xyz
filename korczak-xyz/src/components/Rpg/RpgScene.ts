@@ -381,6 +381,8 @@ export class RpgScene {
   /** Upward speed in the air, m/s; the ground is flat at 0, so off it means airborne. */
   private vy = 0;
   private airborne = false;
+  /** Off unless the settings turn it on (`rpg-jump` in `Rpg.tsx`). */
+  private canJump = false;
   private swing = 0;
   private paused = false;
   private lastPrompt: Prompt | null = null;
@@ -2519,10 +2521,14 @@ export class RpgScene {
 
   /** Leaves the ground, as Space does; only from the ground, so there is no climbing on air. */
   jump() {
-    if (this.paused || this.airborne) return;
+    if (!this.canJump || this.paused || this.airborne) return;
     this.airborne = true;
     this.vy = JUMP_SPEED;
     this.playerRig?.once('Jump_Start', JUMP_START_SECONDS);
+  }
+
+  setJumping(on: boolean) {
+    this.canJump = on;
   }
 
   private land() {
