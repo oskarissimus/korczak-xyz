@@ -90,6 +90,18 @@ describe('parseBeat', () => {
     expect(met?.npc.appearance).toBe(look);
   });
 
+  it('keeps a craft from the closed list, drops one outside it, and asks for it', () => {
+    const smith = parseBeat(JSON.stringify({ ...good, npc: { ...good.npc, craft: 'Smith' } }), ctx);
+    expect(smith?.npc.craft).toBe('smith');
+    expect(parseBeat(JSON.stringify({ ...good, npc: { ...good.npc, craft: 'juggler' } }), ctx)?.npc.craft).toBeUndefined();
+    expect(parseBeat(JSON.stringify(good), ctx)?.npc.craft).toBeUndefined();
+    // Someone met with a craft keeps it, and the model is told it.
+    const met = parseBeat(JSON.stringify({ ...good, npc: { ...good.npc, craft: 'cook' } }), { ...ctx, characters: [smith!.npc] });
+    expect(met?.npc.craft).toBe('smith');
+    expect(beatPrompt(ctx)).toContain('"craft": one of "smith"');
+    expect(beatPrompt({ ...ctx, characters: [smith!.npc] })).toContain('craft: smith');
+  });
+
   it('plays a good beat, with the job and the plan the game drew', () => {
     const beat = parseBeat('```json\n' + JSON.stringify(good) + '\n```', ctx);
     expect(beat).toMatchObject({

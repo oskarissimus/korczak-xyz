@@ -943,6 +943,22 @@ in `placeNpc` and driven by `RpgScene.updateNpcs`:
   walk off as you reach them; a worker keeps working on the spot. On E they turn to you and talk;
   while the dialogue holds the world everyone else stands in `Idle_Loop` (the update loop is what
   moves people, and it stops), and after it the one talked to lingers 3–6 s before going back.
+- **Some have a craft: a workplace and a tool** (owner, same day: "some NPCs should have their own
+  assets and actions, like the blacksmith with an anvil, beating it with a hammer. Not every NPC —
+  for some walking about is enough — but let the model say so"). The beat's `npc` and `witness`
+  may carry `"craft"`, one word from the closed list in `utils/rpg/craft.ts` (`CRAFTS`: smith,
+  carpenter, woodcutter, miner, farmer, cook, alchemist, trader, priest, guard, scribe) or null,
+  and the prompt says most people have none. It is kept on the character like `appearance` (given
+  once, kept; someone met is told theirs). `CRAFT_SPECS` says what each implies: the trade the rest
+  of their day follows, the tool, the loop and the stroke. `components/Rpg/crafts.ts` builds the
+  station from primitives (anvil and glowing forge, chopping block and logs, cauldron on a tripod,
+  a stall with an awning, a shrine with candles…) a couple of metres from where the character
+  stands, on the first free side (`putStation`), its working side turned to them, as an obstacle;
+  it moves with them and goes with them. They spend ~80% of their free moments at it (a guard
+  45%, by the brazier, the rest on the round), standing inside its ring at a stroke's reach. The
+  tool is built with the fist at the origin and the handle along +Z and put in the right hand by
+  `holdTool`, aimed from the hand's bones as the hero's sword is; it shows only while they work at
+  the station, and is put in again when the body changes (a remake, the kit's look).
 
 ## Keys
 

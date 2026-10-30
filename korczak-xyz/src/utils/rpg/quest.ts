@@ -40,6 +40,7 @@ import { classicWorld, firstObject, worldLines, type LandmarkModel, type WorldBr
 import { asAge, type VoiceAge } from './voicePick';
 import { TAGS } from './audioTags';
 import { personaWords, type Persona } from './persona';
+import { asCraft, craftLines, type Craft } from './craft';
 
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
@@ -89,6 +90,11 @@ export interface Character {
    * appear and kept for good. Absent in characters from before 30 Oct 2026 until they appear again.
    */
   persona?: Persona;
+  /**
+   * Their workplace and tool, if the model gave them one (`craft.ts`): the engine builds the station
+   * beside them and they work at it. Most people have none and only walk about. Kept once given.
+   */
+  craft?: Craft;
 }
 
 export interface Decision {
@@ -769,7 +775,7 @@ export function beatPrompt(ctx: BeatContext): string {
     lines.push(
       `PEOPLE ALREADY IN THIS WORLD (whoever of them takes part is written with this exact name, in the same voice and manner): ${living
         .map((c) => {
-          const about = [c.voice, c.persona && personaWords(c.persona)].filter(Boolean).join('; ');
+          const about = [c.voice, c.persona && personaWords(c.persona), c.craft && `craft: ${c.craft}`].filter(Boolean).join('; ');
           return about ? `"${c.name}" (${about})` : `"${c.name}"`;
         })
         .join(', ')}.`,
@@ -889,7 +895,11 @@ export function beatPrompt(ctx: BeatContext): string {
     `          "voice": string (in English, to design their voice: "Native ${language}. Male or Female, <age range>. Persona: <2–5 words>. Emotion: <2–3 adjectives>." then one sentence on timbre, pace and how they talk${ctx.personas ? ' as their personality type' : ''}, never on how they sound recorded (no phone, radio, echo) and never a sound that is not their voice (no ticking, clicking, rattling); for someone already met, what you were told),`,
     '          "appearance": string (IN ENGLISH whatever the language above, at most 20 words: how they look, for a 3D model of',
     '                        them: build, age, clothes, hair, nothing held — "a stooped old woman in a patched green wool dress and',
-    '                        leather apron, grey braid"; for someone already met, what you were told)},',
+    '                        leather apron, grey braid"; for someone already met, what you were told),',
+    `          "craft": one of ${craftLines()}, or null — a workplace the game builds beside them and a tool they work`,
+    '                   with; only for someone whose trade is plainly one of these and who would be at work where they',
+    '                   stand. Most people have none and just walk about: leave it null unless it fits. For someone',
+    '                   already met, what you were told},',
     ctx.job ? '  "place": {...} or {"name": string}' + (ctx.job.kind === 'talk' ? ' or "village",' : ',') : '  "place": "village",',
     ctx.job && ctx.job.kind !== 'talk'
       ? '  "targetName": string (singular noun for one of the things), "look": {"shape": string, "color": string, "size": number},'
@@ -910,6 +920,7 @@ export function beatPrompt(ctx: BeatContext): string {
     '             "prop": string (IN ENGLISH whatever the language above, at most 12 words: the object alone as it',
     '                     looks, for a 3D model — "a torn blue wool shawl caught on a thorn branch")}],',
     '  "witness": {"name": string, "gender": string, "age": string, "color": string, "voice": string, "appearance": string,',
+    '              "craft": as for the npc, or null,',
     '              "greeting": string,',
     '              "talk": [{"label": string, "reply": string}]} or null,',
     '  "decisions": [{"label": string (what the hero says, first person, at most 12 words),',
@@ -1084,6 +1095,7 @@ function character(raw: unknown, known: readonly Character[], drawn?: Persona): 
   if (!name) return null;
   const voice = text(r.voice, 400);
   const appearance = text(r.appearance, 200);
+  const craft = asCraft(r.craft);
   // A name inside a known one is that person ("Takeda" is "Ronin Takeda"): a new character may not
   // take an old one's name (owner, 28 Oct 2026: "no new characters with old characters' names").
   const met = known.find((c) => same(c.name, name)) ?? known.find((c) => samePerson(c.name, name));
@@ -1093,6 +1105,7 @@ function character(raw: unknown, known: readonly Character[], drawn?: Persona): 
       ...(!met.voice && voice ? { voice } : {}),
       ...(!met.appearance && appearance ? { appearance } : {}),
       ...(!met.persona && drawn ? { persona: drawn } : {}),
+      ...(!met.craft && craft ? { craft } : {}),
     };
     return Object.keys(more).length ? { ...met, ...more } : met;
   }
@@ -1108,6 +1121,7 @@ function character(raw: unknown, known: readonly Character[], drawn?: Persona): 
     ...(voice && { voice }),
     ...(appearance && { appearance }),
     ...(drawn && { persona: drawn }),
+    ...(craft && { craft }),
   };
 }
 

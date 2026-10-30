@@ -78,3 +78,32 @@ describe('Routine', () => {
     expect(HALT).toBeGreaterThan(3.2);
   });
 });
+
+describe('Routine with a craft', () => {
+  it('works at its own station, from the side facing home, with the craft’s stroke', () => {
+    const r = new Routine('Borys', 'a quiet man', { x: 0, z: 0 }, 'smith');
+    expect(r.trade).toBe('smith');
+    r.setStation({ x: 3, z: 0, r: 0.9 });
+    let crafting = 0;
+    const strikes: string[] = [];
+    for (let t = 0; t < 120; t += 1 / 30) {
+      const act = r.tick(1 / 30, open());
+      if (r.crafting) {
+        crafting++;
+        expect(Math.hypot(r.x - 2.05, r.z)).toBeLessThan(0.01);
+      }
+      if (act.strike) strikes.push(act.strike.clip);
+    }
+    // Most of the day at the anvil, and hammering there.
+    expect(crafting / (120 * 30)).toBeGreaterThan(0.5);
+    expect(strikes.length).toBeGreaterThan(20);
+    expect(new Set(strikes)).toEqual(new Set(['Sword_Attack']));
+  });
+
+  it('a craft without its station walks about by its trade', () => {
+    const r = new Routine('Ola', 'someone', { x: 0, z: 0 }, 'trader');
+    const { at } = run(r, open([{ x: 3, z: 0, r: 1.2, kind: 'stall' }]), 60);
+    expect(r.crafting).toBe(false);
+    expect(at.some((p) => p.x !== 0 || p.z !== 0)).toBe(true);
+  });
+});

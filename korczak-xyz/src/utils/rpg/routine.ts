@@ -16,6 +16,7 @@
  */
 
 import type { Clip } from '../../components/Rpg/characters';
+import { CRAFT_SPECS, type Craft } from './craft';
 
 export interface Ground {
   x: number;
@@ -97,7 +98,7 @@ const STRIDE = 1.25;
 type Step =
   | { kind: 'rest'; left: number; face: number | null }
   | { kind: 'walk'; to: Ground; after: Step }
-  | { kind: 'work'; left: number; face: number; next: number };
+  | { kind: 'work'; left: number; face: number; next: number; craft?: true };
 
 function seeded(seed: string): () => number {
   let h = 2166136261;
@@ -126,9 +127,13 @@ export class Routine {
   private step: Step;
   /** The guard's round: the next of four corners. */
   private corner = 0;
+  /** Their own workplace (`craft.ts`), once the scene has built it beside home. */
+  private station: (Ground & { r: number }) | null = null;
+  private craft: Craft | null;
 
-  constructor(name: string, about: string, home: Ground) {
-    this.trade = tradeOf(about);
+  constructor(name: string, about: string, home: Ground, craft: Craft | null = null) {
+    this.craft = craft;
+    this.trade = craft ? CRAFT_SPECS[craft].trade : tradeOf(about);
     this.habit = HABITS[this.trade];
     this.rand = seeded(name);
     this.home = { ...home };
@@ -143,6 +148,16 @@ export class Routine {
     this.x = home.x;
     this.z = home.z;
     this.step = this.rest();
+  }
+
+  /** Where their station stands, or null when it is gone: the scene builds it, and moves it with home. */
+  setStation(station: (Ground & { r: number }) | null) {
+    this.station = station && { ...station };
+  }
+
+  /** At their own station, working: the scene puts the tool in their hand. */
+  get crafting(): boolean {
+    return this.step.kind === 'work' && !!this.step.craft;
   }
 
   /** Stand a while before going back to it: after a talk, nobody walks off mid-farewell. */
@@ -190,6 +205,14 @@ export class Routine {
       this.step = this.rest();
       return { clip: this.habit.rest };
     }
+    if (step.craft && this.craft) {
+      const spec = CRAFT_SPECS[this.craft];
+      if (!spec.stroke) return { clip: spec.loop };
+      step.next -= dt;
+      if (step.next > 0) return { clip: spec.loop };
+      step.next = this.between(spec.stroke.every);
+      return { clip: spec.loop, strike: { clip: spec.stroke.clip, seconds: spec.stroke.seconds } };
+    }
     const work = this.habit.work;
     if (!work.strike || !this.habit.every) return { clip: work.clip };
     step.next -= dt;
@@ -209,6 +232,11 @@ export class Routine {
   /** What a free moment goes to: work at a spot that suits them if there is one in reach, or a stroll. */
   private decide(around: Surroundings): Step {
     const here = { x: this.x, z: this.z };
+    // Somebody with a workplace spends most of the day at it; a guard half of it, by the brazier.
+    if (this.station && this.rand() < (this.trade === 'guard' ? 0.45 : 0.8)) {
+      const job = this.atStation(around, here, this.station);
+      if (job) return job;
+    }
     if (this.trade === 'guard') return this.round(around, here);
     if (this.rand() < this.habit.busy) {
       const job = this.job(around, here);
@@ -234,6 +262,19 @@ export class Routine {
       }
     }
     return null;
+  }
+
+  /** To the station's working side, the one facing home, and to work there a good while. */
+  private atStation(around: Surroundings, here: Ground, station: Ground & { r: number }): Step | null {
+    // Inside the station's own ring: the ring keeps walkers off its far corners (the forge, the log
+    // pile), while the anvil or the block it is worked at sits at its middle, within a stroke's reach.
+    const side = angleTo(station, this.home);
+    const reach = station.r * 0.5 + 0.5;
+    const stand = { x: station.x + Math.sin(side) * reach, z: station.z + Math.cos(side) * reach };
+    const work: Step = { kind: 'work', left: this.between([14, 26]), face: angleTo(stand, station), next: this.between([0.3, 0.9]), craft: true };
+    if (Math.hypot(stand.x - here.x, stand.z - here.z) < 0.3) return work;
+    if (!around.clear(here, stand)) return null;
+    return { kind: 'walk', to: stand, after: work };
   }
 
   private stroll(around: Surroundings, here: Ground): Step {

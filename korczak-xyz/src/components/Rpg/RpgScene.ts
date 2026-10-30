@@ -38,6 +38,8 @@ import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
 import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
 import { HALT, Routine, type Spot, type SpotKind } from '../../utils/rpg/routine';
+import { CRAFT_SPECS, type Craft } from '../../utils/rpg/craft';
+import { buildStation, buildTool, disposeCraft, holdTool } from './crafts';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -222,6 +224,11 @@ interface Npc {
   spot: number | null;
   /** What they do with themselves between talks (`utils/rpg/routine.ts`): where they walk, what they work at. */
   routine: Routine;
+  /** Their workplace and tool, if the quest gave them a craft (`utils/rpg/craft.ts`). */
+  craft: Craft | null;
+  station: { group: THREE.Group; obstacle: Obstacle } | null;
+  /** The tool in hand, and the body it was put in: a new body (a remake, the kit) needs it again. */
+  tool: { object: THREE.Object3D; rig: Rig } | null;
 }
 
 interface Place {
@@ -1645,17 +1652,22 @@ export class RpgScene {
    * one already standing somewhere walks over. Their clothes are `color`; `about` is how the quest
    * describes them, which their trade, and so what they busy themselves with, is read from.
    */
-  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male', body: PersonBody = {}, about = '') {
+  placeNpc(name: string, color: string, at: string | null, nth = 0, gender: 'male' | 'female' = 'male', body: PersonBody = {}, about = '', craft: Craft | null = null) {
     let npc = this.npcs.get(name);
     if (!npc) {
       const group = new THREE.Group();
       const obstacle: Obstacle = { x: 0, z: 0, r: 0.6 };
       this.obstacles.push(obstacle);
       this.scene.add(group);
-      const routine = new Routine(name, about, { x: 0, z: 0 });
-      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), css: color, gender, want: 'none', token: 0, obstacle, spot: null, routine };
+      const routine = new Routine(name, about, { x: 0, z: 0 }, craft);
+      const created: Npc = { group, rig: null, color: new THREE.Color(color).getHex(), css: color, gender, want: 'none', token: 0, obstacle, spot: null, routine, craft, station: null, tool: null };
       npc = created;
       this.npcs.set(name, created);
+    } else if (craft && craft !== npc.craft) {
+      // Someone met before crafts were asked for, given one now.
+      npc.craft = craft;
+      npc.routine = new Routine(name, about, { x: 0, z: 0 }, craft);
+      this.dropTool(npc);
     }
     // A failure has already put the kit's look up; the caller hears of it through `setNpcBody`.
     this.setNpcBody(name, body).catch(() => {});
@@ -1680,6 +1692,64 @@ export class RpgScene {
     npc.obstacle.x = pos.x;
     npc.obstacle.z = pos.z;
     npc.routine.setHome(pos);
+    this.putStation(name, npc);
+  }
+
+  /**
+   * Their station beside where they stand, a couple of metres off on whichever side is free, its
+   * working side toward them; moved with them when the quest puts them somewhere else.
+   */
+  private putStation(name: string, npc: Npc) {
+    this.dropStation(npc);
+    if (!npc.craft) return;
+    const spec = CRAFT_SPECS[npc.craft];
+    const home = { x: npc.routine.x, z: npc.routine.z };
+    const all = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)].flat();
+    const start = (hashString(name) % 360) * (Math.PI / 180);
+    for (let k = 0; k < 12; k++) {
+      const a = start + k * 2.39996;
+      const d = 2 + spec.r + (k % 3) * 0.6;
+      const at = { x: home.x + Math.sin(a) * d, z: home.z + Math.cos(a) * d };
+      if (all.some((o) => !o.off && o !== npc.obstacle && Math.hypot(o.x - at.x, o.z - at.z) < o.r + spec.r + 0.4)) continue;
+      if (!this.clearWay(home, at)) continue;
+      const group = buildStation(npc.craft);
+      group.position.set(at.x, 0, at.z);
+      group.rotation.y = Math.atan2(home.x - at.x, home.z - at.z);
+      this.scene.add(group);
+      const obstacle: Obstacle = { x: at.x, z: at.z, r: spec.r };
+      this.obstacles.push(obstacle);
+      npc.station = { group, obstacle };
+      npc.routine.setStation(obstacle);
+      return;
+    }
+    // Hemmed in on every side: they do without, and walk about by their trade.
+  }
+
+  private dropStation(npc: Npc) {
+    if (!npc.station) return;
+    disposeCraft(npc.station.group);
+    npc.station.obstacle.off = true;
+    this.obstacles = this.obstacles.filter((o) => o !== npc.station!.obstacle);
+    npc.station = null;
+    npc.routine.setStation(null);
+  }
+
+  private dropTool(npc: Npc) {
+    if (npc.tool) disposeCraft(npc.tool.object);
+    npc.tool = null;
+  }
+
+  /** The tool in hand while they work at the station, and out of sight otherwise. */
+  private showTool(npc: Npc) {
+    const tool = npc.craft && CRAFT_SPECS[npc.craft].tool;
+    if (!tool || !npc.rig) return;
+    if (npc.tool?.rig !== npc.rig) {
+      this.dropTool(npc);
+      const object = buildTool(tool);
+      if (!holdTool(npc.rig, object)) return;
+      npc.tool = { object, rig: npc.rig };
+    }
+    npc.tool.object.visible = npc.routine.crafting;
   }
 
   /** Who the hero is talking to, so that one alone talks while the dialogue holds the world. */
@@ -1762,6 +1832,7 @@ export class RpgScene {
       }
       const turn = Math.atan2(Math.sin(face - g.rotation.y), Math.cos(face - g.rotation.y));
       g.rotation.y += turn * Math.min(1, dt * 6);
+      this.showTool(npc);
     }
     // The beam stays over the one it marks, wherever they have walked to.
     const marked = this.markerNpc ? this.npcs.get(this.markerNpc) : undefined;
@@ -2013,6 +2084,7 @@ export class RpgScene {
     this.scene.remove(npc.group);
     npc.obstacle.off = true;
     this.obstacles = this.obstacles.filter((o) => o !== npc.obstacle);
+    this.dropStation(npc);
     this.npcs.delete(name);
   }
 
@@ -2021,6 +2093,7 @@ export class RpgScene {
     for (const npc of this.npcs.values()) {
       this.scene.remove(npc.group);
       npc.obstacle.off = true;
+      this.dropStation(npc);
     }
     this.obstacles = this.obstacles.filter((o) => !o.off || this.trees.some((t) => t.obstacle === o));
     this.npcs.clear();
