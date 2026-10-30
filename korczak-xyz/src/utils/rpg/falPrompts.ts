@@ -184,11 +184,13 @@ export function personPrompt(appearance: string, who: { gender?: 'male' | 'femal
 }
 
 const T_POSE =
-  'Standing in a strict T-pose for rigging: both arms stretched straight out to the sides, exactly horizontal at shoulder height, in one straight line from fingertip to fingertip, elbows and wrists straight, palms facing down, fingers straight and together, a clear gap between each arm and the body all the way to the armpit; both hands completely empty, holding nothing at all, no weapon, tool, staff, shield, lantern, bag, book or any other object in or near the hands (anything they carry is worn on the back or at the belt); legs straight and slightly apart with a clear gap between them, feet flat on the ground, clothes close to the body, nothing hanging from the arms or between the legs,';
+  'Standing in a strict T-pose for rigging: both arms stretched straight out to the sides, exactly horizontal at shoulder height, in one straight line from fingertip to fingertip, elbows and wrists straight, palms open and facing forward toward the viewer with the thumbs pointing up, fingers straight and together, a clear gap between each arm and the body all the way to the armpit; both hands completely empty, holding nothing at all, no weapon, tool, staff, shield, lantern, bag, book or any other object in or near the hands (anything they carry is worn on the back or at the belt); legs straight and slightly apart with a clear gap between them, feet flat on the ground, clothes close to the body, nothing hanging from the arms or between the legs,';
 
 /**
  * A person's prompt in a strict T-pose, for the model lab (owner, 29 Oct 2026: "the key to a good
  * rig is a very exact T-pose in the picture; the arms pointing exactly, no objects held in them").
+ * Palms forward rather than down (owner, 30 Oct 2026: "palms should face the front, not down, to make
+ * the rig work just right").
  */
 export function tPose(prompt: string): string {
   return prompt.includes(A_POSE) ? prompt.replace(A_POSE, T_POSE) : `${prompt} ${T_POSE.replace(/,$/, '.')}`;

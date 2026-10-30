@@ -51,6 +51,12 @@ function posed(pose: LabPose, prompt: string): string {
   return pose === 'tpose' ? tPose(prompt) : pose === 'wide' ? widePose(prompt) : prompt;
 }
 
+/** A picture redrawn before, only while it was asked with the prompt the pose sends now: a changed pose is drawn again. */
+function keptPicture(source: LabSource, pose: LabPose, painter: PersonPainter): { image: string; prompt: string } | null {
+  const kept = labPicture(source.id, pose, painter);
+  return kept && kept.prompt === posed(pose, source.model.prompt) ? kept : null;
+}
+
 /** A person described in the lab is drawn in the strict T-pose from the start: the lab is for rigging. */
 function ownPrompt(describe: string, gender: 'male' | 'female'): string {
   return tPose(personPrompt(describe.trim(), { gender }));
@@ -238,7 +244,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     const started = Date.now();
     let spent = 0;
     try {
-      let picture = pose === 'game' ? { image: source.model.image, prompt: source.model.prompt } : labPicture(source.id, pose, painter);
+      let picture = pose === 'game' ? { image: source.model.image, prompt: source.model.prompt } : keptPicture(source, pose, painter);
       if (!picture) {
         const prompt = posed(pose, source.model.prompt);
         picture = { image: await drawImage(falKey, prompt, 'person', {}, IMAGE_SIZE, undefined, painter), prompt };
@@ -331,7 +337,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   };
 
   const redrawn = source ? labPictures(source.id) : [];
-  const drawn = source && pose !== 'game' ? labPicture(source.id, pose, painter) : null;
+  const drawn = source && pose !== 'game' ? keptPicture(source, pose, painter) : null;
   const painterPicker = (
     <label>
       {t.painter}:{' '}
