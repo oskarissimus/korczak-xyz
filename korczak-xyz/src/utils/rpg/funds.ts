@@ -54,7 +54,8 @@ const SIGNS: Record<FundsProvider, RegExp> = {
 
 /** Whose request a console entry is, by its kind and the model asked. */
 export function providerOf(kind: 'model' | 'voice' | 'fal' | 'music', model: string): FundsProvider {
-  if (kind === 'fal') return 'fal';
+  // A person's picture from Google's own API is logged with fal's steps, but billed by Google.
+  if (kind === 'fal') return model.startsWith('gemini-') ? 'google' : 'fal';
   if (kind === 'voice' || kind === 'music') return 'elevenlabs';
   return /^(?:gpt|o\d|chatgpt)/i.test(model) ? 'openai' : 'google';
 }

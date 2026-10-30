@@ -842,10 +842,25 @@ content-hashed and immutable.
     FLUX 2 $0.012, Nano Banana $0.0398, Nano Banana 2 $0.08. The lab defaults to **Nano Banana**,
     which follows a pose; it redraws the game's prompt (`redraw`) or the wide pose (`wide`), each
     kept per person, pose and painter so it is paid for once. The game's *Character picture* setting
-    (`rpg-painter`, absent = FLUX schnell, the default because the game draws every person it
-    meets) applies to people only; anything but schnell is drawn in the browser, as Meshy's mesh
+    (`rpg-painter`, absent = FLUX schnell until 30 Oct 2026, Nano Banana Lite since) applies to
+    people only; anything but schnell is drawn in the browser, as Meshy's mesh
     is, since the server's job only knows schnell. Measured on the blacksmith: Nano Banana's wide
     pose through TRELLIS, $0.06 in all, one person with a gap at every limb.
+    **Nano Banana Lite is the game's default since 30 Oct 2026** (owner: "nb2.1 minimal and Flash
+    Lite are fine — add both to the settings, Flash Lite Image the default"), and the lab's too.
+    Six people in the strict T-pose, two pictures each, judged at full size: Nano Banana drew the
+    palms down in 12 of 12 whatever the prompt says; `nanoBanana21` (Gemini's
+    `gemini-nano-banana-2.1` at `minimal` thinking) held the whole pose in 12 of 12, ~8 s;
+    `nanoBananaLite` (`gemini-3.1-flash-lite-image`) in 10 of 12 (once a thumbs-up fist, once a
+    palm down), ~3 s. Through fal both cost *more* than Nano Banana ($0.042 and ~$0.040, fal's
+    `X-Fal-Billable-Units`) and take ~9 s, so with a Gemini key on the account
+    (`setGoogleImageKey`) they are asked at Google itself: $0.034 and ~$0.037, priced from the
+    answer's own token counts (`GEMINI_IMAGE_RATES`, `geminiImageCost`). Google answers with the
+    picture's bytes, so `drawWithGemini` puts them on fal's storage (`keepOnFal`, the
+    initiate-then-PUT that fal's own client does) and everything after it still gets a URL. The
+    console logs it as a `fal` step under the Gemini model's name; `providerOf` makes an empty
+    balance there Google's, not fal's. Without a Gemini key, fal draws them. The measurement, the
+    sheets and the scripts are in the project files, `rpg/obrazy-postaci-modele/`.
     **The strict T-pose** (owner, 29 Oct 2026: "the key to a good rig is a very exact T-pose in the
     picture; the arms pointing exactly, no objects held; and let the prompt be seen in the lab") is
     the lab's default picture (`tPose` in `falPrompts.ts`: arms horizontal in one line, palms forward

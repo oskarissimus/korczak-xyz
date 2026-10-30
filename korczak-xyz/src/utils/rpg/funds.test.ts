@@ -27,6 +27,8 @@ describe('an account out of money is said once, by provider', () => {
 
   it('knows whose request an entry is', () => {
     expect(providerOf('fal', 'fal-ai/flux/schnell')).toBe('fal');
+    // A person's picture drawn at Google is a fal step in the console, but Google's money.
+    expect(providerOf('fal', 'gemini-3.1-flash-lite-image')).toBe('google');
     expect(providerOf('voice', 'eleven_v3 · Jagna')).toBe('elevenlabs');
     expect(providerOf('music', 'music_v2')).toBe('elevenlabs');
     expect(providerOf('model', 'gpt-4.1')).toBe('openai');

@@ -124,9 +124,18 @@ const IMAGE_RETRIES = 5;
 /**
  * What can draw a person's picture (owner, 29 Oct 2026: "a picker for those models in the lab and a
  * switch in the game's settings, Nano Banana by default in the lab, because the pose matters a lot
- * here"). FLUX schnell is the game's default and everything else's only painter: the cheapest and
- * fastest, and the loosest about a pose. The others are asked for a square picture and priced as
- * fal bills them, Oct 2026. Every one answers `images[0].url`.
+ * here"). FLUX schnell is everything else's only painter: the cheapest and fastest, and the loosest
+ * about a pose. The others are asked for a square picture and priced as fal bills them, Oct 2026.
+ * Every one answers `images[0].url`.
+ *
+ * Nano Banana 2.1 and Nano Banana Lite (Gemini 3.1 Flash Lite Image) since 30 Oct 2026 (owner:
+ * "add both to the settings, Flash Lite Image the default"). Measured on six people in the strict
+ * T-pose, two pictures each: Nano Banana drew the palms down in 12 of 12 whatever the prompt said,
+ * 2.1 at `minimal` thinking held the whole pose in 12 of 12, Lite in 10 of 12 (once a fist with the
+ * thumb up, once a palm down) in 2.8 s. Through fal they cost more than Nano Banana and take ~9 s,
+ * so with a Gemini key on the account (`setGoogleImageKey`) they go to Google itself: $0.034 for
+ * Lite, ~$0.037 for 2.1, priced from the answer's own token counts (`GEMINI_IMAGE_RATES`), and the
+ * picture is put on fal's storage for the mesher to read. Without one, fal draws them.
  */
 export const PERSON_PAINTERS = {
   schnell: {
@@ -154,10 +163,27 @@ export const PERSON_PAINTERS = {
     price: () => 0.08,
     body: (prompt: string) => ({ prompt, aspect_ratio: '1:1', output_format: 'jpeg', num_images: 1 }),
   },
+  nanoBanana21: {
+    model: 'fal-ai/nano-banana-2.1',
+    gemini: { model: 'gemini-nano-banana-2.1', thinking: 'minimal' },
+    price: () => (googleKey ? 0.037 : 0.04),
+    body: (prompt: string) => ({ prompt, aspect_ratio: '1:1', output_format: 'jpeg', num_images: 1, thinking_level: 'minimal' }),
+  },
+  nanoBananaLite: {
+    model: 'fal-ai/nano-banana-lite',
+    gemini: { model: 'gemini-3.1-flash-lite-image', thinking: null },
+    price: () => (googleKey ? 0.034 : 0.042),
+    body: (prompt: string) => ({ prompt, aspect_ratio: '1:1', output_format: 'jpeg', num_images: 1 }),
+  },
 } as const;
 export type PersonPainter = keyof typeof PERSON_PAINTERS;
-export const DEFAULT_PAINTER: PersonPainter = 'schnell';
+export const DEFAULT_PAINTER: PersonPainter = 'nanoBananaLite';
 let personPainter: PersonPainter = DEFAULT_PAINTER;
+let googleKey: string | null = null;
+/** The account's Gemini key, if it has one: Google's own painters are then asked at Google rather than through fal. */
+export function setGoogleImageKey(key: string | null | undefined) {
+  googleKey = key || null;
+}
 /** The game's switch: what draws its people's pictures from now on. */
 export function setPersonPainter(p: PersonPainter) {
   personPainter = p;
@@ -180,6 +206,7 @@ export async function drawImage(
     const made = await serverPiece(scope, falSpec(label, prompt, size, false));
     if (made) return made.image;
   }
+  if ('gemini' in paint && googleKey) return drawWithGemini(googleKey, key, paint.gemini, prompt, label, o);
   const f = o.fetchImpl ?? fetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', paint.model, null, `${tryMark(o)}${prompt}`, label);
@@ -206,6 +233,103 @@ export async function drawImage(
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
   }
+}
+
+/** Gemini's list prices for its image models, US dollars per million tokens, Oct 2026 (ai.google.dev/gemini-api/docs/pricing). */
+export const GEMINI_IMAGE_RATES: Record<string, { input: number; text: number; image: number }> = {
+  'gemini-3.1-flash-lite-image': { input: 0.25, text: 1.5, image: 30 },
+  'gemini-nano-banana-2.1': { input: 1.5, text: 7.5, image: 30 },
+};
+
+interface GeminiImageUsage {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
+  candidatesTokensDetails?: { modality?: string; tokenCount?: number }[];
+}
+
+/** What a picture cost, from the answer's token counts: the picture's own tokens at the image rate, the rest of the answer and the thinking at the text rate. */
+export function geminiImageCost(model: string, u: GeminiImageUsage): number {
+  const rate = GEMINI_IMAGE_RATES[model];
+  if (!rate) return 0;
+  const image = (u.candidatesTokensDetails ?? []).filter((d) => d.modality === 'IMAGE').reduce((n, d) => n + (d.tokenCount ?? 0), 0);
+  const text = (u.candidatesTokenCount ?? 0) - image + (u.thoughtsTokenCount ?? 0);
+  return ((u.promptTokenCount ?? 0) * rate.input + text * rate.text + image * rate.image) / 1_000_000;
+}
+
+/**
+ * A picture from Google's own API (`PERSON_PAINTERS`, `gemini`), then put on fal's storage: the
+ * answer is the picture's bytes, and the mesher, the console and the kept world all want a URL.
+ * A 429 is waited out as fal's is; a picture refused (`PROHIBITED_CONTENT`) says so.
+ */
+async function drawWithGemini(
+  google: string,
+  fal: string,
+  gemini: { model: string; thinking: string | null },
+  prompt: string,
+  label: FalSlot | 'ground' | 'cover',
+  o: FalOptions,
+): Promise<string> {
+  const f = o.fetchImpl ?? fetch;
+  const sleep = o.sleep ?? wait;
+  const entry = startRequest('fal', gemini.model, null, `${tryMark(o)}${prompt}`, label);
+  try {
+    let res: Response;
+    for (let attempt = 0; ; attempt++) {
+      res = await f(`https://generativelanguage.googleapis.com/v1beta/models/${gemini.model}:generateContent`, {
+        method: 'POST',
+        headers: { 'x-goog-api-key': google, 'Content-Type': 'application/json' },
+        signal: o.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+            imageConfig: { aspectRatio: '1:1' },
+            ...(gemini.thinking ? { thinkingConfig: { thinkingLevel: gemini.thinking } } : {}),
+          },
+        }),
+      });
+      if (res.status !== 429 || attempt >= IMAGE_RETRIES) break;
+      updateRequest(entry, { text: `${tryMark(o)}${prompt}\n429, Google at its limit: again in ${2 ** attempt} s` });
+      await sleep(1000 * 2 ** attempt);
+    }
+    if (!res.ok) throw await failure(res);
+    const body = (await res.json()) as {
+      candidates?: { finishReason?: string; content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
+      promptFeedback?: { blockReason?: string };
+      usageMetadata?: GeminiImageUsage;
+    };
+    const picture = body.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+    if (!picture?.data) {
+      const why = body.promptFeedback?.blockReason ?? body.candidates?.[0]?.finishReason ?? 'no image in the answer';
+      throw new Error(/PROHIBITED|SAFETY|BLOCK/.test(why) ? `${why}: flagged by a content checker` : why);
+    }
+    const cost = geminiImageCost(gemini.model, body.usageMetadata ?? {});
+    const url = await keepOnFal(fal, picture.data, picture.mimeType ?? 'image/png', o);
+    endRequest(entry, null, { cost, text: `${tryMark(o)}${prompt}\n→ ${url}` });
+    return url;
+  } catch (err) {
+    endRequest(entry, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
+/** Bytes (base64) onto fal's storage, as fal's own client uploads a file: a signed URL to PUT to, and the URL it is read at after. */
+async function keepOnFal(key: string, base64: string, type: string, o: FalOptions): Promise<string> {
+  const f = o.fetchImpl ?? fetch;
+  const init = await f('https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3', {
+    method: 'POST',
+    headers: headers(key),
+    signal: o.signal,
+    body: JSON.stringify({ content_type: type, file_name: `person.${type.includes('png') ? 'png' : 'jpg'}` }),
+  });
+  if (!init.ok) throw await failure(init);
+  const { upload_url, file_url } = (await init.json()) as { upload_url?: string; file_url?: string };
+  if (!upload_url || !file_url) throw new Error('fal storage gave no URL to upload to');
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const put = await f(upload_url, { method: 'PUT', headers: { 'Content-Type': type }, signal: o.signal, body: bytes });
+  if (!put.ok) throw await failure(put);
+  return file_url;
 }
 
 /**

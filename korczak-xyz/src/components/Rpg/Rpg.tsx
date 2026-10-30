@@ -72,6 +72,7 @@ import {
   DEFAULT_PAINTER,
   PERSON_PAINTERS,
   setPersonPainter,
+  setGoogleImageKey,
   setPersonPose,
   DEFAULT_POSE,
   PERSON_POSES,
@@ -254,7 +255,7 @@ const RIGGER_KEY = 'rpg-rigger';
 const JUMP_KEY = 'rpg-jump';
 /** What makes the generated people's models (`Mesher` in `landmark3d.ts`); TRELLIS unless 'meshy'. */
 const MESHER_KEY = 'rpg-mesher';
-/** What draws the generated people's pictures (`PersonPainter` in `landmark3d.ts`); FLUX schnell when absent. */
+/** What draws the generated people's pictures (`PersonPainter` in `landmark3d.ts`); Nano Banana Lite when absent. */
 const PAINTER_KEY = 'rpg-painter';
 const POSE_KEY = 'rpg-pose';
 
@@ -397,6 +398,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   setPersonMesher(mesher);
   const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
   setPersonPainter(painter);
+  setGoogleImageKey(account.keys.google);
   const [pose, setPose] = useState<PersonPose>(DEFAULT_POSE);
   setPersonPose(pose);
   const fastStartRef = useRef(true);

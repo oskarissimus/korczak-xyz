@@ -53,6 +53,8 @@ const en = {
     flux2: 'FLUX 2 · $0.012',
     nanoBanana: 'Nano Banana · $0.04',
     nanoBanana2: 'Nano Banana 2 · $0.08',
+    nanoBanana21: 'Nano Banana 2.1 · $0.037',
+    nanoBananaLite: 'Nano Banana Lite · $0.034',
   } satisfies Record<PersonPainter, string>,
   poses: { game: 'the game’s', redraw: 'same prompt, new picture', wide: 'wide A-pose', tpose: 'strict T-pose' } satisfies Record<LabPose, string>,
   pictureKept: 'already drawn, free',

@@ -12,6 +12,8 @@ import {
   FAL_RIG_MODEL,
   ensurePersonModel,
   setPersonMesher,
+  setGoogleImageKey,
+  geminiImageCost,
   FOREST_SLOTS,
   generateHubModel,
   generateLandmark,
@@ -133,7 +135,8 @@ describe('landmark3d', () => {
     const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       calls.push(url);
-      if (url === `https://fal.run/${FAL_IMAGE_MODEL}`) return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
+      // The game's painter, Nano Banana Lite, through fal while the account has no Gemini key.
+      if (url === 'https://fal.run/fal-ai/nano-banana-lite') return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
       if (url === `https://queue.fal.run/${FAL_PERSON_MESH_MODEL}`) {
         bodies.mesh = JSON.parse(String(init?.body));
         return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
@@ -148,13 +151,13 @@ describe('landmark3d', () => {
         ensurePersonModel('k', 'person', 'w1/Jagna', 'a woman', resolve, reject, { ...now, fetchImpl: f as typeof fetch }),
       );
       expect(model.glb).toBe('https://fal.media/meshy.glb');
-      expect(model.costUsd).toBeCloseTo(0.803);
+      expect(model.costUsd).toBeCloseTo(0.842);
       // The game's pose is the T-pose by default, and Meshy is told so.
       expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 't-pose' });
       expect(model.prompt).toContain('strict T-pose');
       expect(calls).not.toContain(`https://queue.fal.run/${FAL_MESH_MODEL}`);
       expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([
-        [FAL_IMAGE_MODEL, 'ok', 0.003],
+        ['fal-ai/nano-banana-lite', 'ok', 0.042],
         [FAL_PERSON_MESH_MODEL, 'ok', 0.8],
       ]);
       const hub = await generateLandmark('k', world(), { ...now, fetchImpl: falFetch([]) as typeof fetch });
@@ -174,6 +177,55 @@ describe('landmark3d', () => {
     expect(url).toBe('https://fal.media/banana.jpg');
     expect(asked).toEqual([{ url: 'https://fal.run/fal-ai/nano-banana', body: expect.objectContaining({ prompt: 'a smith', aspect_ratio: '1:1' }) }]);
     expect(devRequests().map((e) => [e.model, e.cost])).toEqual([['fal-ai/nano-banana', 0.0398]]);
+  });
+
+  it('draws a Google painter at Google with a Gemini key, priced by its tokens, and keeps the picture on fal', async () => {
+    const asked: { url: string; init?: RequestInit }[] = [];
+    const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      asked.push({ url, init });
+      if (url.includes('generativelanguage.googleapis.com'))
+        return json({
+          candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/jpeg', data: btoa('jpeg!') } }] } }],
+          usageMetadata: { promptTokenCount: 400, candidatesTokenCount: 1120, candidatesTokensDetails: [{ modality: 'IMAGE', tokenCount: 1120 }] },
+        });
+      if (url.startsWith('https://rest.alpha.fal.ai/storage/upload/initiate'))
+        return json({ upload_url: 'https://fal.media/up?sig=1', file_url: 'https://fal.media/person.jpg' });
+      if (url === 'https://fal.media/up?sig=1') return new Response(null, { status: 200 });
+      throw new Error(`unexpected ${url}`);
+    });
+    setGoogleImageKey('g');
+    try {
+      const url = await drawImage('k', 'a smith', 'person', { ...now, fetchImpl: f as typeof fetch }, 1024, undefined, 'nanoBananaLite');
+      expect(url).toBe('https://fal.media/person.jpg');
+      expect(asked[0].url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-image:generateContent');
+      expect((asked[0].init?.headers as Record<string, string>)['x-goog-api-key']).toBe('g');
+      expect(JSON.parse(String(asked[0].init?.body)).generationConfig).toEqual({ responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } });
+      expect(new TextDecoder().decode(asked[2].init?.body as Uint8Array)).toBe('jpeg!');
+      // 400 prompt tokens at $0.25/M and 1120 image tokens at $30/M.
+      expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([['gemini-3.1-flash-lite-image', 'ok', 0.0001 + 0.0336]]);
+    } finally {
+      setGoogleImageKey(null);
+    }
+  });
+
+  it('says a picture Google refused was flagged, so the lab can say so in words', async () => {
+    const f = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => json({ candidates: [{ finishReason: 'PROHIBITED_CONTENT' }] }));
+    setGoogleImageKey('g');
+    try {
+      await expect(drawImage('k', 'Luke Skywalker', 'person', { ...now, fetchImpl: f as typeof fetch }, 1024, undefined, 'nanoBanana21')).rejects.toThrow(
+        'PROHIBITED_CONTENT: flagged by a content checker',
+      );
+      expect(JSON.parse(String(f.mock.calls[0][1]?.body)).generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+    } finally {
+      setGoogleImageKey(null);
+    }
+  });
+
+  it('prices a Gemini picture with its thinking at the text rate', () => {
+    // Nano Banana 2.1: 1120 image tokens at $30/M, 200 answer and 500 thinking tokens at $7.50/M.
+    expect(geminiImageCost('gemini-nano-banana-2.1', { candidatesTokenCount: 1320, thoughtsTokenCount: 500, candidatesTokensDetails: [{ modality: 'IMAGE', tokenCount: 1120 }] })).toBeCloseTo(0.0336 + 0.00525);
+    expect(geminiImageCost('gemini-unknown', { candidatesTokenCount: 1000 })).toBe(0);
   });
 
   it('bills the picture by the megapixel, rounded up', () => {

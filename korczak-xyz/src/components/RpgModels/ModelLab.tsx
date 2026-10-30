@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
@@ -67,6 +67,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
   const falKey = account.ready ? account.keys.fal || null : null;
+  setGoogleImageKey(account.ready ? account.keys.google : null);
 
   const [worlds, setWorlds] = useState<LabWorld[] | null>(null);
   const [own, setOwn] = useState<LabSource[]>([]);
@@ -85,8 +86,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [wire, setWire] = useState(false);
   const [method, setMethod] = useState<PersonMesher>('trellis');
   const [pose, setPose] = useState<LabPose>('tpose');
-  // Nano Banana by default here (owner, 29 Oct 2026: "the pose matters a lot"); the game's default stays FLUX schnell.
-  const [painter, setPainter] = useState<PersonPainter>('nanoBanana');
+  // The game's painter by default here too, Nano Banana Lite (owner, 30 Oct 2026); it was Nano Banana, whose palms are always down.
+  const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
   const [pending, setPending] = useState<{ id: string; label: string; since: number }[]>([]);
   const [stats, setStats] = useState<Record<string, { stats: ModelStats; ms: number } | { error: string }>>({});
   const [describe, setDescribe] = useState('');
