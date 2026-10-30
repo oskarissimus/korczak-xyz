@@ -58,6 +58,7 @@ import {
   triesSpend,
   validSpend,
 } from '../../utils/rpg/devlog';
+import { outOfFunds } from '../../utils/rpg/funds';
 import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture, groundState } from '../../utils/rpg/groundTexture';
 import { coverState, ensureGroundCover, hasCover } from '../../utils/rpg/groundCover';
@@ -153,7 +154,7 @@ import {
   subscribeMusic,
 } from '../../utils/rpg/music';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DevConsole, FpsBadge, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
+import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
@@ -2344,7 +2345,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     })
       .catch((e) => {
         log.warn('rpg.voice.failed', describeError(e));
-        flash(tRef.current.voiceFailed);
+        // An empty account is said once, by the banner, not on every line.
+        if (!outOfFunds('elevenlabs')) flash(tRef.current.voiceFailed);
       })
       .finally(release);
   }, [dialogue, flash, gameLang, voiceKey, voiceOn]);
@@ -3192,6 +3194,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
           )}
         </button>
       )}
+
+      <FundsBanner lang={gameLang} />
 
       {devOpen && (
         <DevConsole

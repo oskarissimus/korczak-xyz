@@ -20,6 +20,7 @@
 import type { ModelSpend, WorldBible } from './genesis';
 import type { ModelTry } from './storyteller';
 import { tokenCost, voiceCost, VOICE_CREDITS_PER_CHAR, type Usage } from './cost';
+import { noteResult, providerOf } from './funds';
 import { reportSpend } from './stats';
 
 export type DevStatus = 'waiting' | 'streaming' | 'ok' | 'error';
@@ -314,6 +315,9 @@ export function endRequest(entry: DevRequest, error: string | null, patch: Parti
   updateRequest(entry, { ...patch, ms: Date.now() - entry.startedAt, status: error ? 'error' : 'ok', error });
   // Today's spend for the whole site (`stats.ts`). An unpriced model counts as nothing, a floor.
   if (entry.kind === 'model' ? entry.usage !== null : entry.status === 'ok') reportSpend(entry.cost ?? 0);
+  // An empty balance is said once, by provider (`funds.ts`); a paid answer says the money is back.
+  // Only what was paid for clears it: the self-rig is a `fal` entry that never asks fal.ai.
+  if (error !== null || (entry.cost ?? 0) > 0) noteResult(providerOf(entry.kind, entry.model), error);
   for (const l of endListeners) l(entry);
 }
 

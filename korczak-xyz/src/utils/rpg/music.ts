@@ -22,6 +22,7 @@
 import type { WorldBible } from './genesis';
 import type { Tone } from './quest';
 import { endRequest, startRequest, updateRequest } from './devlog';
+import { outOfFunds } from './funds';
 import { MUSIC_CREDITS_PER_MINUTE } from './cost';
 import { rememberTiming } from './progress';
 
@@ -280,6 +281,12 @@ export function musicFor(key: string, world: WorldBible, tone: Tone | null): Pro
     if (hit) {
       setState({ status: 'ready', id, since: null, seconds: MUSIC_MS / 1000, error: null });
       return hit;
+    }
+    // No credits left (`funds.ts`): failed at once, without asking, until a reload.
+    if (outOfFunds('elevenlabs')) {
+      const error = 'no credits left on ElevenLabs';
+      setState({ status: 'failed', id, since: null, seconds: 0, error });
+      throw new Error(error);
     }
     setState({ status: 'composing', id, since: Date.now(), seconds: 0, error: null });
     try {

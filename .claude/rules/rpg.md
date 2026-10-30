@@ -1580,6 +1580,17 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
   yet, and the beat itself as JSON behind a toggle. Read from `beatsRef`/`historyRef`, not the
   transcript, so a save from before this shows them as well. In **Zapytania** a model request's
   answer unfolds whole (indented, once it parses as JSON) instead of its last eight lines.
+- **An account out of money is said once, over the game** (owner, 30 Oct 2026: "errors saying the
+  money ran out should be more apparent" — fal.ai's `403 User is locked. Reason: TOP_UP` had shown
+  only as a red entry per place in `Zapytania`). Every request ends in `endRequest`, which hands its
+  error to `utils/rpg/funds.ts`; a provider's own words for an empty balance (`SIGNS`, narrow on
+  purpose: Google's per-model 429 also says "billing details" and is not one) mark that provider.
+  Then a banner over the game and the intro (`FundsBanner`, hidden by ×) names it, says what stops
+  and links its top-up page, the console carries the same line over every tab, and Sentry gets one
+  `rpg.funds` error — not one per request. fal.ai (`withRetries` and the `ensure*` in
+  `landmark3d.ts`) and ElevenLabs (clips, voice designs, music) are **not asked again this
+  sitting**, and the voice's per-line toast stays quiet; the story's chain is left to move on as it
+  does. A paid answer from the same provider clears it; otherwise a reload, which the banner says.
 - **The waiting screens show the stream**: the last few lines of what the model is writing, and the
   models that already failed for this beat, under "Losy się ważą…" and the opening's overlay.
 - **The closing screen says what the quest cost**: the time played (Start or Continue to the

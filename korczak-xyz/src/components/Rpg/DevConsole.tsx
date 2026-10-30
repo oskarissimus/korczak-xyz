@@ -20,6 +20,15 @@ import {
   worldSpend,
   type DevRequest,
 } from '../../utils/rpg/devlog';
+import {
+  bannerAlerts,
+  dismissFunds,
+  fundsAlerts,
+  fundsVersion,
+  subscribeFunds,
+  TOP_UP,
+  type FundsAlert,
+} from '../../utils/rpg/funds';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
 import { personaLabel } from '../../utils/rpg/persona';
@@ -34,6 +43,51 @@ import { translations } from './translations';
 function useDevlog(): readonly DevRequest[] {
   useSyncExternalStore(subscribeDevlog, devlogVersion, devlogVersion);
   return devRequests();
+}
+
+function useFunds(): void {
+  useSyncExternalStore(subscribeFunds, fundsVersion, fundsVersion);
+}
+
+/** One provider out of money: who, what stops, where to top up, and the provider's own words. */
+function FundsNotice({ lang, alert, onHide }: { lang: Lang; alert: FundsAlert; onHide?: () => void }) {
+  const t = translations[lang];
+  const { name, url } = TOP_UP[alert.provider];
+  return (
+    <div className="rpg-funds-notice" role="alert">
+      <strong>💸 {t.fundsTitle(name)}</strong> {t.fundsWhat(alert.provider)}{' '}
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {t.fundsTopUp} ({url.replace(/^https:\/\//, '').split('/')[0]})
+      </a>
+      , {t.fundsThenReload}
+      <span className="rpg-funds-said">
+        {t.fundsRefused(alert.count)}: {alert.error}
+      </span>
+      {onHide && (
+        <button type="button" className="rpg-funds-hide" onClick={onHide} aria-label={t.fundsHide} title={t.fundsHide}>
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Over the game, from the intro on: an account out of money is said once here, by provider, rather
+ * than as a red entry per refused request in the console (`funds.ts`). Hidden by its ×; the console
+ * keeps the line.
+ */
+export function FundsBanner({ lang }: { lang: Lang }) {
+  useFunds();
+  const alerts = bannerAlerts();
+  if (alerts.length === 0) return null;
+  return (
+    <div className="rpg-funds">
+      {alerts.map((a) => (
+        <FundsNotice key={a.provider} lang={lang} alert={a} onHide={() => dismissFunds(a.provider)} />
+      ))}
+    </div>
+  );
 }
 
 function useTranscript(): readonly TranscriptLine[] {
@@ -454,6 +508,8 @@ export function DevConsole({
     saveFull(!full);
   };
   useTick(running);
+  useFunds();
+  const broke = fundsAlerts();
   const totals = questTotals();
   const totalUsd = totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost;
   const listRef = useRef<HTMLDivElement>(null);
@@ -534,6 +590,13 @@ export function DevConsole({
           ×
         </button>
       </div>
+      {broke.length > 0 && (
+        <div className="rpg-dev-funds">
+          {broke.map((a) => (
+            <FundsNotice key={a.provider} lang={lang} alert={a} />
+          ))}
+        </div>
+      )}
       {tab === 'perf' ? (
         <PerfTab lang={lang} scene={scene} badge={badge} onBadge={onBadge} remake={remake} />
       ) : tab === 'costs' ? (

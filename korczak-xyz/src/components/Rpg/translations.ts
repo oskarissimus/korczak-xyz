@@ -1,4 +1,5 @@
 import type { RpgDemoReason } from '../../utils/rpg/demoLimits';
+import type { FundsProvider } from '../../utils/rpg/funds';
 import type { QuestSource } from '../../utils/rpg/storyteller';
 
 function usd(n: number): string {
@@ -54,6 +55,17 @@ const en = {
         : 'The demo is closed right now.',
   ownKey: 'With your own key there is no limit: keys are set on your account page.',
   voiceFailed: 'ElevenLabs did not answer, the line is text only.',
+  fundsTitle: (name: string) => `${name}: out of money`,
+  fundsWhat: (p: FundsProvider): string =>
+    p === 'fal'
+      ? 'No more 3D models or pictures this sitting; the game goes on with the built-in ones.'
+      : p === 'elevenlabs'
+        ? 'No more voices or music this sitting; the game goes on as text.'
+        : 'The story cannot be written on this key until it is topped up.',
+  fundsTopUp: 'Top up',
+  fundsThenReload: 'then reload the page.',
+  fundsRefused: (n: number) => (n > 1 ? `${n} requests refused` : 'request refused'),
+  fundsHide: 'Hide',
   language: 'Language',
   mute: 'Mute the voice',
   unmute: 'Turn the voice on',
@@ -313,6 +325,18 @@ const pl: typeof en = {
         : 'Tryb demo jest teraz wyłączony.',
   ownKey: 'Z własnym kluczem nie ma limitu: klucze ustawiasz na stronie konta.',
   voiceFailed: 'ElevenLabs nie odpowiedział, kwestia jest tylko tekstem.',
+  fundsTitle: (name: string) => `${name}: skończyły się środki`,
+  fundsWhat: (p: FundsProvider): string =>
+    p === 'fal'
+      ? 'Do końca tego posiedzenia bez nowych modeli 3D i obrazów; gra idzie dalej na wbudowanych.'
+      : p === 'elevenlabs'
+        ? 'Do końca tego posiedzenia bez głosów i muzyki; gra idzie dalej jako tekst.'
+        : 'Na tym kluczu nie da się pisać opowieści, dopóki konto nie zostanie doładowane.',
+  fundsTopUp: 'Doładuj',
+  fundsThenReload: 'potem odśwież stronę.',
+  fundsRefused: (n: number) =>
+    n === 1 ? 'odrzucono zapytanie' : `odrzucono ${n} ${n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'zapytania' : 'zapytań'}`,
+  fundsHide: 'Ukryj',
   language: 'Język',
   mute: 'Wycisz głos',
   unmute: 'Włącz głos',

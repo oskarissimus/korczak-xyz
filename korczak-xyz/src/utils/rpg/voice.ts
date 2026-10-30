@@ -11,6 +11,7 @@
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
 import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, updateRequest, voiceCredits } from './devlog';
+import { outOfFunds } from './funds';
 import { DesignRefused, DESIGN_MODEL, designVoice, findDesigned, previewText, type DesignWho } from './voiceDesign';
 import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing as voicingOf } from './audioTags';
 import { voiceCreditsPerChar } from './cost';
@@ -184,6 +185,8 @@ function designedVoice(key: string, who: DesignWho, lang: Lang): Promise<string 
       storeDesign(id, existing);
       return existing;
     }
+    // The account has no credits left (`funds.ts`): the library's voice instead, as on a refusal.
+    if (outOfFunds('elevenlabs')) return null;
     // Into the console like a clip: a design is charged for its preview text, about a credit a character.
     const sample = previewText(who, lang);
     const entry = startRequest('voice', `${DESIGN_MODEL} · ${who.name}`, null, who.voice);
@@ -341,6 +344,9 @@ async function ownClip(key: string, line: SpokenLine, lang: Lang, said = voicing
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   const cacheKey = `${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
   let clip = clips.get(cacheKey);
+  // No credits left on the reader's account (`funds.ts`): every line would fail the same way, so
+  // none is asked and the game reads in silence. The demo speaks on the owner's account, not theirs.
+  if (!clip && key !== DEMO_VOICE_KEY && outOfFunds('elevenlabs')) return Promise.reject(new Error('skipped: no credits left on ElevenLabs'));
   if (!clip) {
     clip = fetchClip(key, line, lang);
     clips.set(cacheKey, clip);

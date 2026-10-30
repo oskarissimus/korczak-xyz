@@ -39,6 +39,7 @@
 import { log } from '../../lib/logger';
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
+import { outOfFunds } from './funds';
 import type { LandmarkModel, WorldBible } from './genesis';
 import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
@@ -74,11 +75,15 @@ function tryMark(o: FalOptions): string {
   return o.attempt && o.attempt > 1 ? `retry ${o.attempt}/${PIECE_TRIES} · ` : '';
 }
 
+/** fal.ai's balance is empty (`funds.ts`): nothing more is asked of it this sitting, whatever it is for. */
+const NO_FUNDS = 'skipped: no money left on fal.ai';
+
 /** Runs a piece up to `PIECE_TRIES` times, a pause between, passing each try its number. */
 export async function withRetries<T>(run: (o: FalOptions) => Promise<T>, o: FalOptions = {}): Promise<T> {
   const sleep = o.sleep ?? wait;
   for (let attempt = 1; ; attempt++) {
     try {
+      if (outOfFunds('fal')) throw new Error(NO_FUNDS);
       return await run({ ...o, attempt });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -710,7 +715,7 @@ export function ensureHubModels(
   o: FalOptions = {},
 ): HubSlot[] {
   const started: HubSlot[] = [];
-  if (refused.has(world.id)) return started;
+  if (refused.has(world.id) || outOfFunds('fal')) return started;
   for (const slot of hubSlots(world)) {
     const id = `${world.id}/${slot}`;
     if (made.has(id) || failed.has(id) || inFlight.has(id)) continue;
@@ -721,6 +726,7 @@ export function ensureHubModels(
     }
     const p = inTurn(id, async (started) => {
       if (refused.has(world.id)) throw new Error('skipped: fal.ai refused the key');
+      if (outOfFunds('fal')) throw new Error(NO_FUNDS);
       try {
         const model = await withRetries((each) => generateHubModel(key, world, slot, each, started), o);
         made.add(id);
@@ -755,7 +761,7 @@ export function falPending(): { id: string; since: number | null }[] {
 
 /** A hub slot of this world that failed this session and will not be asked again until a reload. */
 export function hubSlotFailed(worldId: string, slot: HubSlot): boolean {
-  return failed.has(`${worldId}/${slot}`) || refused.has(worldId);
+  return failed.has(`${worldId}/${slot}`) || refused.has(worldId) || outOfFunds('fal');
 }
 
 /** A model fal.ai was asked to make for a hub slot and has not answered yet. */
@@ -884,7 +890,7 @@ export function ensurePersonModel(
  * refused the key for people. When it cannot, whoever waits for it is drawn as the kit instead.
  */
 export function personModelMayCome(label: PersonSlot, id: string): boolean {
-  return !refused.has(label) && !failed.has(`${label}/${id}`);
+  return !refused.has(label) && !outOfFunds('fal') && !failed.has(`${label}/${id}`);
 }
 
 function ensurePiece(
@@ -897,9 +903,10 @@ function ensurePiece(
   o: FalOptions,
 ): boolean {
   const slot = `${label}/${id}`;
-  if (refused.has(label) || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
+  if (refused.has(label) || outOfFunds('fal') || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
   const p = inTurn(slot, async (running) => {
     if (refused.has(label)) throw new Error('skipped: fal.ai refused the key');
+    if (outOfFunds('fal')) throw new Error(NO_FUNDS);
     const started = Date.now();
     let spent = 0;
     try {
