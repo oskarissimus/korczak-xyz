@@ -1689,7 +1689,7 @@ export class RpgScene {
       // On the village side of the place's middle, where the hunter walks in, clear of the targets.
       // A second character stands a little round the middle from the first.
       const toVillage = place.center.clone().negate().setLength(8).applyAxisAngle(new THREE.Vector3(0, 1, 0), nth * 0.8);
-      pos = place.center.clone().add(toVillage);
+      pos = this.standingSpot(place.center.clone().add(toVillage), npc.obstacle);
     } else {
       if (npc.spot === null) {
         const used = new Set([...this.npcs.values()].map((n) => n.spot));
@@ -1697,13 +1697,46 @@ export class RpgScene {
         while (used.has(free)) free++;
         npc.spot = free;
       }
-      pos = villageSpot(npc.spot);
+      pos = this.standingSpot(villageSpot(npc.spot), npc.obstacle);
     }
     npc.group.position.copy(pos);
     npc.obstacle.x = pos.x;
     npc.obstacle.z = pos.z;
     npc.routine.setHome(pos);
     this.putStation(name, npc);
+  }
+
+  /**
+   * Where someone can stand at or near `want`: the spot itself, or the nearest one outward in rings
+   * that no wall, tree, rock, thing or other person stands on. A bare place's trees and pieces count
+   * before they have loaded, since they come up round whoever is already standing there.
+   */
+  private standingSpot(want: THREE.Vector3, self: Obstacle): THREE.Vector3 {
+    const blocks: { x: number; z: number; r: number }[] = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)]
+      .flat()
+      .filter((o) => o !== self && !o.off);
+    for (const place of this.places.values()) {
+      const { x, z } = place.center;
+      if (place.keepOut) blocks.push(place.keepOut);
+      for (const t of place.bare?.treeSpots ?? []) blocks.push({ x: t.x + x, z: t.z + z, r: t.r });
+      for (const [index, piece] of place.bare?.pieces ?? []) {
+        const r = (place.spec.assets?.[index]?.size.width ?? 1) / 2 + 0.2;
+        for (const s of piece.spots) blocks.push({ x: s.x + x, z: s.z + z, r });
+      }
+    }
+    const free = (px: number, pz: number) => blocks.every((o) => Math.hypot(o.x - px, o.z - pz) >= o.r + 0.8);
+    if (free(want.x, want.z)) return want;
+    for (let ring = 1; ring <= 6; ring++) {
+      const d = ring * 1.5;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        const x = want.x + Math.sin(a) * d;
+        const z = want.z + Math.cos(a) * d;
+        if (free(x, z)) return new THREE.Vector3(x, 0, z);
+      }
+    }
+    // Hemmed in everywhere within 9 m: where the quest said, as before.
+    return want;
   }
 
   /**
@@ -2192,8 +2225,9 @@ export class RpgScene {
     let best: string | null = null;
     let bestD = TALK_RANGE;
     for (const [name, npc] of this.npcs) {
-      // Nobody to talk to until they are there to be seen.
-      if (npc.group.children.length === 0) continue;
+      // Anyone the quest has put here, with or without a body yet: someone whose model is still
+      // being made, or will never come, is still who the marker points at (owner, 30 Oct 2026:
+      // Malina waited unseen for a model fal.ai never sent, and the beat could not be finished).
       const d = npc.group.position.distanceTo(this.player.position);
       if (d < bestD) {
         bestD = d;

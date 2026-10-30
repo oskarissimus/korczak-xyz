@@ -78,6 +78,7 @@ import {
   type PersonPainter,
   ensureCreatureModel,
   ensurePersonModel,
+  personModelMayCome,
   personCostNow,
   personMakersNow,
   setPersonMesher,
@@ -727,9 +728,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const modelOf = useCallback((c: Character) => c.model ?? charactersRef.current.find((k) => k.name === c.name)?.model, []);
   const bodyFor = useCallback(
     (c: Character): PersonBody => {
-      const invented = (worldRef.current?.createdAt ?? 0) > 0;
+      const world = worldRef.current;
+      const invented = (world?.createdAt ?? 0) > 0;
       const model = modelOf(c);
-      return { url: model?.glb, wait: invented && (!!model || !keysReadyRef.current || !!falKeyRef.current) };
+      // A model that failed, or a key fal.ai refused, is never coming: waiting would leave them unseen
+      // for good (Malina, 30 Oct 2026).
+      const coming = !!world && personModelMayCome('person', `${world.id}/${c.name}`);
+      return { url: model?.glb, wait: invented && (!!model || !keysReadyRef.current || (!!falKeyRef.current && coming)) };
     },
     [modelOf],
   );

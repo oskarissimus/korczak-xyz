@@ -739,6 +739,23 @@ content-hashed and immutable.
   its `targetProp`. `personPrompt` (`falPrompts.ts`) asks FLUX schnell for one person, A-pose, hands
   empty, on white; TRELLIS makes the mesh at `mesh_simplify` 0.95 (~6k vertices). **~$0.023 a
   person**, ~30–60 s.
+  - **Waiting for a model never makes someone unreachable** (owner, 30 Oct 2026: "Malina is
+    bodiless, I can't talk to her" — the save had no `model` on her, nor on the three people met
+    before her, nor on any place or clue since the first beat: fal.ai stopped answering mid-quest).
+    Two things had to hold and neither did. *Talking needs no body*: `nearestNpc` used to skip a
+    character whose group was empty, so whoever stood waiting for their model could not be spoken
+    to and the beat could not end; now anyone the quest has put there can be, and the marker's beam
+    says where. *Waiting ends when the model cannot come*: `bodyFor` waits only while
+    `personModelMayCome` (`landmark3d.ts`) — not when this session's try for that person failed, and
+    not when fal.ai refused the key for people. Both cases made `ensurePersonModel` return without
+    calling anyone back, so the first person refused got the kit through `onError` and everyone
+    after them waited, unseen, for good; and someone who had fallen back to the kit vanished again
+    the next time a beat put them somewhere. Now they stand as the kit.
+  - **Nobody is put inside something** (`standingSpot`, `RpgScene.ts`): where `placeNpc` would put
+    someone — 8 m from a place's middle toward the village, or a village spot — is checked against
+    every obstacle, a landmark's keep-out, other people and their stations, and a bare place's tree
+    and piece spots *before they have loaded* (they come up round whoever already stands there).
+    Blocked, they take the nearest free point on rings 1.5 m apart, out to 9 m.
   - **The rig costs nothing.** Meshy's rigging was used once, to rig two donor bodies (a guard and
     a wanderer) and make the clip library on the male one; `scripts/rpg-people.mjs` turns those
     into `src/assets/rpg/people/` (two ~70 KB donors, clips ~110 KB gzipped) and regenerates them

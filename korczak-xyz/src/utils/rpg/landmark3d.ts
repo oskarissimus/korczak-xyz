@@ -821,6 +821,14 @@ export function ensurePersonModel(
   return ensurePiece(key, label, id, posePerson(prompt, personPose), onModel, onError, o);
 }
 
+/**
+ * Whether a person's model can still come this session: it has not failed, and fal.ai has not
+ * refused the key for people. When it cannot, whoever waits for it is drawn as the kit instead.
+ */
+export function personModelMayCome(label: PersonSlot, id: string): boolean {
+  return !refused.has(label) && !failed.has(`${label}/${id}`);
+}
+
 function ensurePiece(
   key: string,
   label: 'clue' | 'place' | 'creature' | PersonSlot,
