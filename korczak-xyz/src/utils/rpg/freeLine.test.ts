@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { freeDecision, freePrompt, parseFree, routes, type FreeContext } from './freeLine';
-import { heardAside, staticBeat, type Beat } from './quest';
+import { freeDecision, freePrompt, ownLeads, parseFree, routes, type FreeContext } from './freeLine';
+import { beatPrompt, heardAside, staticBeat, type Beat, type BeatContext } from './quest';
 
 const beat: Beat = {
   ...staticBeat('en', 0),
@@ -48,10 +48,10 @@ describe('parseFree', () => {
 
   it('reads a decision and goes the way of its route', () => {
     const c = ctx('Fine, I will deal with the drowners.');
-    const a = parseFree('{"kind": "decision", "route": 1, "reply": "Gods bless you.", "consequence": "The hunter set out for the lake."}', c);
+    const a = parseFree('{"kind": "decision", "lead": 1, "reply": "Gods bless you.", "consequence": "The hunter set out for the lake."}', c);
     expect(a).toMatchObject({ kind: 'decision', route: 0 });
     if (a?.kind !== 'decision') throw new Error('not a decision');
-    const d = freeDecision(beat, c.said, a);
+    const d = freeDecision(c.said, a);
     expect(d).toEqual({
       label: 'Fine, I will deal with the drowners.',
       reply: 'Gods bless you.',
@@ -59,6 +59,25 @@ describe('parseFree', () => {
       next: { kind: 'slay', count: 3 },
       free: true,
     });
+  });
+
+  it('reads a course of the hero’s own, with the count drawn by the game', () => {
+    const c = ctx('I will hunt the pike that drags them down instead.');
+    const a = parseFree('{"kind": "decision", "lead": "slay", "reply": "The pike? Gods…", "consequence": "The hunter went after the giant pike."}', c, () => 0);
+    expect(a).toMatchObject({ kind: 'decision', route: null, next: { kind: 'slay', count: 1 } });
+    const end = parseFree('{"kind": "decision", "lead": "end", "reply": "So be it.", "consequence": "c"}', c);
+    expect(end).toMatchObject({ next: null, route: null });
+    const talk = parseFree('{"kind": "decision", "lead": "talk", "reply": "Go.", "consequence": "c", "meet": {"who": "the miller"}}', c);
+    expect(talk).toMatchObject({ next: { kind: 'talk', count: 0 }, meet: { who: 'the miller' } });
+  });
+
+  it('ends the quest only where an offered decision would, and goes on only where one does', () => {
+    const last = { ...beat, decisions: beat.decisions.filter((d) => !d.next) };
+    expect(ownLeads(last)).toEqual(['end']);
+    expect(parseFree('{"kind": "decision", "lead": "slay", "reply": "Go.", "consequence": "c"}', ctx('x', last))).toBeNull();
+    const on = { ...beat, decisions: beat.decisions.filter((d) => d.next) };
+    expect(ownLeads(on)).toEqual(['slay', 'collect', 'talk']);
+    expect(parseFree('{"kind": "decision", "lead": "end", "reply": "Go.", "consequence": "c"}', ctx('x', on))).toBeNull();
   });
 
   it('keeps a meeting only on a route that leads to a talk', () => {
@@ -75,6 +94,19 @@ describe('parseFree', () => {
     expect(parseFree(`{"kind": "talk", "reply": "${beat.npc.name} says that it is ten crowns."}`, ctx('x'))).toBeNull();
     expect(parseFree('{"kind": "shrug", "reply": "Hm."}', ctx('x'))).toBeNull();
     expect(parseFree('no json', ctx('x'))).toBeNull();
+  });
+});
+
+describe('beatPrompt', () => {
+  it('tells the next beat the player steered it', () => {
+    const base: BeatContext = {
+      lang: 'en', index: 1, seed: 's', job: { kind: 'slay', count: 1 }, plan: [null, null], title: 't',
+      history: [{ npcName: 'A', placeName: null, situation: 's', chose: 'I hunt the pike.', consequence: 'c', own: true }],
+      chronicle: [], places: [], characters: [],
+    };
+    expect(beatPrompt(base)).toContain('THE PLAYER STEERED THE QUEST');
+    expect(beatPrompt(base)).toContain('The hero decided in their own words');
+    expect(beatPrompt({ ...base, history: [{ ...base.history[0], own: undefined }] })).not.toContain('STEERED');
   });
 });
 

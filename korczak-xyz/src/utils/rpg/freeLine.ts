@@ -8,10 +8,12 @@
  * - talk: a question, a remark, a joke, a line that settles nothing. The character answers and the
  *   conversation goes on; the exchange is passed on with the step (`heardAside`), so a later beat
  *   knows it was said.
- * - a decision: the hero commits to something. It goes the way one of the beat's own decisions goes
- *   (`route`), because the branching's shape is the game's, not the model's (`planDecisions`): a
- *   typed line can end the quest only where an offered decision would, and lead on only to a job the
- *   game drew. The reply and the consequence are the model's, written as those decisions' are.
+ * - a decision: the hero commits to something, and the player steers the quest by it (owner, 30 Oct
+ *   2026: "with free text there should also be a way to steer the quest, not only to chat and ask").
+ *   It leads where one of the beat's offered decisions leads, or, for a course of the hero's own, to
+ *   a step of the kind the model names (`ownLeads`): any kind where the quest goes on here, the end
+ *   only where an offered decision ends it, the count still drawn by the game (`pickJob`). The next
+ *   beat is written from the hero's words (`StepRecord.own`).
  *
  * The character knows only what this step has said, and the prompt holds only what the hero has
  * heard: the story, the clues examined, the witness if talked to, the questions asked. A typed line
@@ -28,9 +30,11 @@ import {
   meeting,
   names,
   narrated,
+  pickJob,
   type Beat,
   type Character,
   type Decision,
+  type Job,
   type Lang,
   type QuestMood,
   type StepRecord,
@@ -64,8 +68,10 @@ export type FreeAnswer =
       kind: 'decision';
       reply: string;
       consequence: string;
-      /** Which of the beat's offered decisions this one goes the way of, by index. */
-      route: number;
+      /** What the next step asks of the hero; null ends the quest. */
+      next: Job | null;
+      /** The offered decision it goes the way of, by index in the beat; null for a course of the hero's own. */
+      route: number | null;
       dies?: string[];
       meet?: Decision['meet'];
     };
@@ -74,6 +80,25 @@ export type FreeAnswer =
 export function routes(b: Beat): Decision[] {
   return b.decisions.filter((d) => !d.free);
 }
+
+/**
+ * Where a course of the hero's own may lead: any kind of step where the quest goes on here, the end
+ * where an offered decision ends it. The count is still the game's (`pickJob`).
+ */
+export function ownLeads(b: Beat): ('slay' | 'collect' | 'talk' | 'end')[] {
+  const offered = routes(b);
+  return [
+    ...(offered.some((d) => d.next) ? (['slay', 'collect', 'talk'] as const) : []),
+    ...(offered.some((d) => !d.next) ? (['end'] as const) : []),
+  ];
+}
+
+const LEAD_WORDS: Record<'slay' | 'collect' | 'talk' | 'end', string> = {
+  slay: 'a fight: the next step has the hero defeat a foe or foes',
+  collect: 'a search: the next step has the hero gather things',
+  talk: 'a meeting: the next step has the hero go and talk with someone',
+  end: 'the end: the quest ENDS here, and the "reply" is the epilogue',
+};
 
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
@@ -124,12 +149,18 @@ export function freePrompt(ctx: FreeContext): string {
     '',
     'Decide what that is:',
     '- "decision": the hero commits to a course of action that settles what happens next — takes the job, refuses,',
-    '  sets out somewhere, sides with someone, attacks, gives up, ends it. Then "route" is the number of the offered',
-    '  decision whose outcome it is closest to (where it leads: on to that step, or the end), and you write the',
-    `  rest as that decision's is written. Its "reply" is ${npc.name}'s answer, and for a route that ENDS the quest, the`,
-    '  epilogue, how it ends for everyone involved. Its "consequence" is one sentence on what the hero set out to do,',
-    '  never what doing it will uncover: the truth is found in the next step.',
-    '- "talk": anything else — a question, a remark, a joke, a threat that is only words, a line that is unclear.',
+    '  sets out somewhere, sides with someone, attacks, gives up, ends it, or proposes a plan of their own ("I will…",',
+    '  "Let us…", "I would rather…", "First I go to…"), even one phrased as a question. THE PLAYER IS STEERING THE',
+    "  QUEST: the next step is written from the hero's words, wherever they lead, not from an offered decision.",
+    '  "lead" says what kind of step comes next:',
+    "  - the number of an offered decision, when the hero's course is essentially that one;",
+    `  - otherwise, for a course of the hero's own, one of: ${ownLeads(b).map((l) => `"${l}" (${LEAD_WORDS[l]})`).join(', ')}.`,
+    '    Pick the one that fits what the hero said: setting out to find someone is "talk", to hunt or fight is "slay",',
+    '    to fetch, gather or search for things is "collect".',
+    `  Its "reply" is ${npc.name}'s answer to the hero's plan, and for a decision that ENDS the quest, the epilogue, how`,
+    '  it ends for everyone involved. Its "consequence" is one sentence on what the hero set out to do, in their own',
+    '  terms, never what doing it will uncover: the truth is found in the next step.',
+    '- "talk": a question, a remark, a joke, a threat that is only words, a line that is unclear. Not a plan.',
     `  ${npc.name} answers and the conversation goes on.`,
     '',
     `${npc.name} KNOWS ONLY THIS STEP: what they said above, and what a person like them would know. They may answer,`,
@@ -146,10 +177,10 @@ export function freePrompt(ctx: FreeContext): string {
     'Answer with ONE JSON object and nothing else, no markdown fence:',
     '{"kind": "talk", "reply": string}',
     'or',
-    '{"kind": "decision", "route": number, "reply": string, "consequence": string,',
+    '{"kind": "decision", "lead": number or string, "reply": string, "consequence": string,',
     ' "dies": [names of anyone who dies because of it], only when someone does,',
     ' "meet": {"name": exact name of someone already met, or null for someone new, "who": who they are in a few words},',
-    '         only when the route leads on to meeting and talking with someone}',
+    '         only when the next step is meeting and talking with someone}',
   );
   return lines.join('\n');
 }
@@ -165,7 +196,7 @@ function line(value: unknown, max: number): string | null {
  * The model's answer as the game can play it, or null: a reply that is narrated rather than spoken
  * is not, nor a decision whose route is not one of the beat's.
  */
-export function parseFree(raw: string, ctx: FreeContext): FreeAnswer | null {
+export function parseFree(raw: string, ctx: FreeContext, random: () => number = Math.random): FreeAnswer | null {
   const r = extractJson(raw) as Record<string, unknown> | null;
   if (!r || typeof r !== 'object') return null;
   const reply = line(r.reply, 400);
@@ -173,32 +204,42 @@ export function parseFree(raw: string, ctx: FreeContext): FreeAnswer | null {
   const kind = typeof r.kind === 'string' ? r.kind.toLowerCase() : '';
   if (kind === 'talk') return { kind: 'talk', reply };
   if (kind !== 'decision') return null;
-  const offered = routes(ctx.beat);
-  const n = typeof r.route === 'number' ? r.route : Number(String(r.route ?? '').match(/\d+/)?.[0]);
-  if (!Number.isInteger(n) || n < 1 || n > offered.length) return null;
   const consequence = line(r.consequence, 300);
   if (!consequence) return null;
-  const route = offered[n - 1];
+  const offered = routes(ctx.beat);
+  // "route" is what the first version asked for; an answer that still writes it plays.
+  const lead = r.lead ?? r.route;
+  const own = typeof lead === 'string' ? ownLeads(ctx.beat).find((l) => l === lead.trim().toLowerCase()) : undefined;
+  let route: Decision | null = null;
+  let next: Job | null;
+  if (own) next = own === 'end' ? null : pickJob(random, [own]);
+  else {
+    const n = typeof lead === 'number' ? lead : Number(String(lead ?? '').match(/\d+/)?.[0]);
+    if (!Number.isInteger(n) || n < 1 || n > offered.length) return null;
+    route = offered[n - 1];
+    next = route.next;
+  }
   // Nobody standing here dies of words unless the line says so; the model's list is the story's.
   const dies = names(r.dies).filter((d) => !isDead(d, ctx.dead));
-  const meet = route.next?.kind === 'talk' ? (meeting(r.meet, ctx.characters) ?? route.meet) : undefined;
+  const meet = next?.kind === 'talk' ? (meeting(r.meet, ctx.characters) ?? route?.meet) : undefined;
   return {
     kind: 'decision',
     reply,
     consequence,
-    route: ctx.beat.decisions.indexOf(route),
+    next,
+    route: route ? ctx.beat.decisions.indexOf(route) : null,
     ...(dies.length > 0 && { dies }),
     ...(meet && { meet }),
   };
 }
 
-/** The typed line as a decision of the beat, going where its route goes. */
-export function freeDecision(b: Beat, said: string, a: Extract<FreeAnswer, { kind: 'decision' }>): Decision {
+/** The typed line as a decision of the beat, going where the model said it leads. */
+export function freeDecision(said: string, a: Extract<FreeAnswer, { kind: 'decision' }>): Decision {
   return {
     label: said,
     reply: a.reply,
     consequence: a.consequence,
-    next: b.decisions[a.route].next,
+    next: a.next,
     ...(a.dies && { dies: a.dies }),
     ...(a.meet && { meet: a.meet }),
     free: true,

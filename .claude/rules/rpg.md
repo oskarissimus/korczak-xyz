@@ -556,9 +556,15 @@ there, a field takes a line of up to `FREE_MAX` (200) characters, and one short 
 - **talk** — a question, a remark, a joke: the character answers, the conversation goes on (`↵`
   again, or Back), and the exchange is passed on with the step like a small-talk answer
   (`heardAside`'s fourth argument, `SavedGame.freeTalk`).
-- **a decision** — it goes the way of one of the beat's offered decisions (`route`), so a typed
-  line ends the quest only where an offered one would and leads on only to a job the game drew; the
-  reply, consequence, `dies` and `meet` are the model's. It is appended to the beat with
+- **a decision**, and the player steers the quest by it (owner, 30 Oct 2026: "with free text there
+  should also be a way to steer the quest further, not only to chat and ask"). A plan of the hero's
+  own ("first I'll go to the smith's wife", "I'll search the reeds for what draws them") is a
+  decision even phrased as a question. Its `lead` is an offered decision's number when it is that
+  one, or for a course of its own a kind of step (`ownLeads`): slay, collect or talk wherever the
+  quest goes on here, `end` only where an offered decision ends it; the count is still `pickJob`'s.
+  The step carries `own: true`, and the next beat's prompt says THE PLAYER STEERED THE QUEST: carry
+  out what the hero said, bend the story to the plan and not the plan to the story. The reply,
+  consequence, `dies` and `meet` are the model's. It is appended to the beat with
   `free: true`, so the autosave's `decision` index, `deadInSave` and `mendSave` find it as they find
   a picked one, and it is never offered as an option.
 

@@ -234,6 +234,8 @@ export interface StepRecord {
   witnessName?: string;
   /** Whom the chosen decision sent the hero to meet (`Decision.meet`). */
   meet?: Meeting;
+  /** The hero decided in their own words, not from the offered decisions (`freeLine.ts`). */
+  own?: true;
 }
 
 /** A finished quest, as every later quest is told it. */
@@ -799,10 +801,18 @@ export function beatPrompt(ctx: BeatContext): string {
       lines.push(
         `${i + 1}. At ${s.placeName ?? world.hub}${s.done ? `, where the hero ${s.done}` : ''}, ${s.npcName}: ${s.situation}`,
         ...(s.heard ? [`   Also heard there: ${s.heard}`] : []),
-        `   The hero decided (said to ${s.npcName}): "${s.chose}" — ${s.consequence}`,
+        `   The hero decided${s.own ? ' in their own words' : ''} (said to ${s.npcName}): "${s.chose}" — ${s.consequence}`,
         ...(s.meet ? [`   and set out to meet: ${meetingWords(s.meet)}`] : []),
       );
     });
+    if (ctx.history.at(-1)?.own) {
+      lines.push(
+        'THE PLAYER STEERED THE QUEST: the last decision was typed by the player, not picked from the ones offered.',
+        'This step carries out exactly what the hero said — where they go, whom they seek, how they go about it —',
+        'even where it leaves the path the story seemed to lay out. Bend the story to the hero’s plan, never the plan',
+        'back to the story.',
+      );
+    }
     lines.push(
       `Now write step ${ctx.index + 1} of at most ${MAX_BEATS}. It follows directly from the last decision and honours it.`,
       '',

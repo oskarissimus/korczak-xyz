@@ -179,6 +179,7 @@ function step(value: unknown): StepRecord {
     ...(text(r.heard, HEARD_MAX) && { heard: text(r.heard, HEARD_MAX) }),
     ...(text(r.witnessName, 60) && { witnessName: text(r.witnessName, 60) }),
     ...(meet(r.meet) && { meet: meet(r.meet)! }),
+    ...(r.own === true && { own: true as const }),
   };
 }
 

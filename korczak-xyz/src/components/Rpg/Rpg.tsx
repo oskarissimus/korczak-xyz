@@ -1787,6 +1787,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ...(heard && { heard }),
         ...(b.witness && { witnessName: b.witness.npc.name }),
         ...(d.meet && { meet: d.meet }),
+        ...(d.free && { own: true as const }),
       };
       // A single foe killed by name, and whoever this choice kills. The one answering stays on screen.
       bury([slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);
@@ -1869,7 +1870,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
       recordLine({ kind: 'decision', beat: b.index, speaker: tRef.current.hunter, text: said });
       // On the beat, so the autosave's index and every later reading of the step find it.
-      const d = freeDecision(b, said, answer);
+      const d = freeDecision(said, answer);
       const kept: Beat = { ...b, decisions: [...b.decisions, d] };
       beatRef.current = kept;
       beatsRef.current = beatsRef.current.map((x) => (x === b ? kept : x));
