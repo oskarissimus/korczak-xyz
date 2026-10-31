@@ -44,6 +44,9 @@ const en = {
   play: 'Play',
   skeleton: 'Skeleton',
   wireframe: 'Wireframe',
+  xray: 'X-ray',
+  weights: 'Weights',
+  restPose: 'rest pose (the rig, still)',
   leftToRight: 'Left to right',
   stats: (tri: number, kb: number | null, tex: number | null) =>
     `${(tri / 1000).toFixed(1)}k triangles${kb ? ` · ${kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`}` : ''}${tex ? ` · ${tex}px texture` : ''}`,
@@ -121,6 +124,9 @@ const pl: typeof en = {
   play: 'Graj',
   skeleton: 'Szkielet',
   wireframe: 'Siatka',
+  xray: 'Prześwietlenie',
+  weights: 'Wagi',
+  restPose: 'poza spoczynkowa (sam rig, bez ruchu)',
   leftToRight: 'Od lewej',
   stats: (tri: number, kb: number | null, tex: number | null) =>
     `${(tri / 1000).toFixed(1)} tys. trójkątów${kb ? ` · ${kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`}` : ''}${tex ? ` · tekstura ${tex}px` : ''}`,

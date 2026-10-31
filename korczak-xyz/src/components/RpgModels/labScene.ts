@@ -42,9 +42,50 @@ interface Standing {
   mixer: THREE.AnimationMixer;
   clips: Map<string, THREE.AnimationClip>;
   helper: THREE.SkeletonHelper;
+  /** A dot at every joint, drawn through the body like the helper's lines. */
+  joints: THREE.Points | null;
 }
 
 const SPACING = 1.3;
+
+/**
+ * The "clip" that stands everyone in the pose their skin was bound in, still (owner, 31 Oct 2026:
+ * "let me look at the rig inside the character with no animation, since the problems can be there").
+ */
+export const REST = '__rest';
+
+/** Each stage mesh's own material, and its weights view once asked for (kept off `userData`, which clones copy as JSON). */
+const ownMaterial = new WeakMap<THREE.Mesh, THREE.Material | THREE.Material[]>();
+const weightMaterials = new WeakMap<THREE.Mesh, THREE.Material>();
+
+/** A colour per bone, far apart for neighbours, for the weights view. */
+function boneColour(i: number): THREE.Color {
+  return new THREE.Color().setHSL((i * 0.618034) % 1, 0.8, 0.52);
+}
+
+/**
+ * The mesh painted by its skin weights: each vertex the blend of its bones' colours by weight, so a
+ * clean limb is one flat colour, a joint a short gradient, and a stray weight a speck of the wrong one.
+ */
+function weightMaterial(mesh: THREE.SkinnedMesh): THREE.Material {
+  const g = mesh.geometry;
+  const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+  if (!si || !sw) return mesh.material as THREE.Material;
+  const colours = new Float32Array(si.count * 3);
+  const palette = mesh.skeleton.bones.map((_, i) => boneColour(i));
+  for (let v = 0; v < si.count; v++)
+    for (let a = 0; a < 4; a++) {
+      const w = sw.getComponent(v, a);
+      if (!w) continue;
+      const c = palette[si.getComponent(v, a)] ?? new THREE.Color(0x000000);
+      colours[v * 3] += c.r * w;
+      colours[v * 3 + 1] += c.g * w;
+      colours[v * 3 + 2] += c.b * w;
+    }
+  g.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+  // Unlit: the colours are the reading, and TRELLIS meshes carry no normals to light them by.
+  return new THREE.MeshBasicMaterial({ vertexColors: true });
+}
 
 export class LabStage {
   readonly people = new People();
@@ -64,6 +105,8 @@ export class LabStage {
   private skeletons = false;
   private lost: () => void;
   private wire = false;
+  private xray = false;
+  private weights = false;
 
   /**
    * `onLost`: the browser took the GPU context back, which iOS does when a page holds too much on it;
@@ -158,6 +201,7 @@ export class LabStage {
     this.standing.forEach((s, i) => {
       s.group.position.x = (i - (n - 1) / 2) * SPACING;
       if (!s.group.parent) this.scene.add(s.group, s.helper);
+      if (s.joints && !s.joints.parent) this.scene.add(s.joints);
     });
     this.play(this.clip);
     this.frame(n);
@@ -175,11 +219,54 @@ export class LabStage {
     }
     const helper = new THREE.SkeletonHelper(group);
     helper.visible = this.skeletons;
-    group.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) for (const mat of [m.material].flat()) (mat as THREE.MeshStandardMaterial).wireframe = this.wire;
+    const bones = (helper as unknown as { bones: THREE.Bone[] }).bones;
+    let joints: THREE.Points | null = null;
+    if (bones.length) {
+      joints = new THREE.Points(
+        new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(bones.length * 3), 3)),
+        new THREE.PointsMaterial({ color: 0xff2d55, size: 7, sizeAttenuation: false, depthTest: false, transparent: true }),
+      );
+      joints.renderOrder = 999;
+      joints.frustumCulled = false;
+      joints.visible = this.skeletons;
+    }
+    const s: Standing = { item, rigger, group, mixer, clips: template.clips, helper, joints };
+    this.look(s);
+    return s;
+  }
+
+  /** Puts the views ticked now (weights, x-ray, wireframe) on one person's meshes. */
+  private look(s: Standing) {
+    s.group.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isMesh) return;
+      if (!ownMaterial.has(m)) ownMaterial.set(m, m.material);
+      const own = ownMaterial.get(m)!;
+      if (this.weights && m.isSkinnedMesh) {
+        if (!weightMaterials.has(m)) weightMaterials.set(m, weightMaterial(m));
+        m.material = weightMaterials.get(m)!;
+      } else m.material = own;
+      for (const mat of [m.material].flat() as THREE.MeshStandardMaterial[]) {
+        mat.wireframe = this.wire;
+        mat.transparent = this.xray;
+        mat.opacity = this.xray ? 0.3 : 1;
+        mat.depthWrite = !this.xray;
+        mat.needsUpdate = true;
+      }
     });
-    return { item, rigger, group, mixer, clips: template.clips, helper };
+  }
+
+  /** Each joint's dot where its bone is now. */
+  private placeJoints(s: Standing) {
+    if (!s.joints?.visible) return;
+    const bones = (s.helper as unknown as { bones: THREE.Bone[] }).bones;
+    const at = s.joints.geometry.attributes.position as THREE.BufferAttribute;
+    const v = new THREE.Vector3();
+    bones.forEach((b, i) => {
+      b.getWorldPosition(v);
+      at.setXYZ(i, v.x, v.y, v.z);
+    });
+    at.needsUpdate = true;
   }
 
   /** Frames a row of `n` people. */
@@ -201,6 +288,13 @@ export class LabStage {
     this.time = 0;
     for (const s of this.standing) {
       s.mixer.stopAllAction();
+      if (clip === REST) {
+        // The bind pose: every bone where the skin was bound to it, so the joints sit as the rig put them.
+        s.group.traverse((o) => {
+          if ((o as THREE.SkinnedMesh).isSkinnedMesh) (o as THREE.SkinnedMesh).skeleton.pose();
+        });
+        continue;
+      }
       const c = s.clips.get(clip);
       if (c) s.mixer.clipAction(c).play();
       s.mixer.setTime(0);
@@ -209,16 +303,27 @@ export class LabStage {
 
   setSkeletons(on: boolean) {
     this.skeletons = on;
-    for (const s of this.standing) s.helper.visible = on;
+    for (const s of this.standing) {
+      s.helper.visible = on;
+      if (s.joints) s.joints.visible = on;
+    }
   }
 
   setWireframe(on: boolean) {
     this.wire = on;
-    for (const s of this.standing)
-      s.group.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.isMesh) for (const mat of [m.material].flat()) (mat as THREE.MeshStandardMaterial).wireframe = on;
-      });
+    for (const s of this.standing) this.look(s);
+  }
+
+  /** The body at a third of its opacity, so the skeleton inside it shows (owner, 31 Oct 2026). */
+  setXray(on: boolean) {
+    this.xray = on;
+    for (const s of this.standing) this.look(s);
+  }
+
+  /** The body painted by its skin weights, a colour a bone (`weightMaterial`). */
+  setWeights(on: boolean) {
+    this.weights = on;
+    for (const s of this.standing) this.look(s);
   }
 
   private loop = () => {
@@ -228,8 +333,9 @@ export class LabStage {
     this.last = now;
     if (this.playing) {
       this.time += dt * this.speed;
-      for (const s of this.standing) s.mixer.setTime(this.time);
+      if (this.clip !== REST) for (const s of this.standing) s.mixer.setTime(this.time);
     }
+    for (const s of this.standing) this.placeJoints(s);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };
@@ -279,11 +385,15 @@ async function rawTemplate(url: string, height: number): Promise<PersonTemplate>
  */
 function release(s: Standing) {
   s.helper.dispose();
+  s.joints?.removeFromParent();
+  s.joints?.geometry.dispose();
+  (s.joints?.material as THREE.Material | undefined)?.dispose();
   s.group.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isMesh) return;
     m.geometry.dispose();
-    for (const mat of [m.material].flat()) {
+    const all = new Set([m.material, ownMaterial.get(m), weightMaterials.get(m)].flat().filter(Boolean) as THREE.Material[]);
+    for (const mat of all) {
       for (const value of Object.values(mat)) if ((value as THREE.Texture | null)?.isTexture) (value as THREE.Texture).dispose();
       mat.dispose();
     }

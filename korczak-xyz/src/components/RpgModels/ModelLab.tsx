@@ -23,7 +23,7 @@ import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSo
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
 import { PERSON_HEIGHT } from '../Rpg/people';
-import { LabStage, type ModelStats, type StageItem, type StageRig } from './labScene';
+import { LabStage, REST, type ModelStats, type StageItem, type StageRig } from './labScene';
 import { accountWorlds, localWorlds, mergeWorlds } from './loadWorlds';
 import { strings } from './strings';
 
@@ -86,6 +86,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const [playing, setPlaying] = useState(true);
   const [skeleton, setSkeleton] = useState(false);
   const [wire, setWire] = useState(false);
+  const [xray, setXray] = useState(false);
+  const [weights, setWeights] = useState(false);
   const [method, setMethod] = useState<PersonMesher>('trellis');
   const [pose, setPose] = useState<LabPose>('tpose');
   // The game's painter by default here too, Nano Banana Lite (owner, 30 Oct 2026); it was Nano Banana, whose palms are always down.
@@ -250,8 +252,10 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (stageRef.current) stageRef.current.playing = playing;
   }, [playing]);
-  useEffect(() => stageRef.current?.setSkeletons(skeleton), [skeleton]);
-  useEffect(() => stageRef.current?.setWireframe(wire), [wire]);
+  useEffect(() => stageRef.current?.setSkeletons(skeleton), [skeleton, stageGen]);
+  useEffect(() => stageRef.current?.setWireframe(wire), [wire, stageGen]);
+  useEffect(() => stageRef.current?.setXray(xray), [xray, stageGen]);
+  useEffect(() => stageRef.current?.setWeights(weights), [weights, stageGen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -586,7 +590,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
             <label>
               {t.clip}:{' '}
               <select value={clip} onChange={(e) => setClip(e.target.value)}>
-                {(clips.length ? clips : [clip]).map((c) => (
+                <option value={REST}>{t.restPose}</option>
+                {(clips.length ? clips : [clip]).filter((c) => c !== REST).map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -611,6 +616,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
             </label>
             <label>
               <input type="checkbox" checked={wire} onChange={(e) => setWire(e.target.checked)} /> {t.wireframe}
+            </label>
+            <label>
+              <input type="checkbox" checked={xray} onChange={(e) => setXray(e.target.checked)} /> {t.xray}
+            </label>
+            <label>
+              <input type="checkbox" checked={weights} onChange={(e) => setWeights(e.target.checked)} /> {t.weights}
             </label>
           </div>
           {items.length > 1 && (

@@ -843,6 +843,12 @@ content-hashed and immutable.
     rig's. A model taken off the stage hands its GPU memory back (`release`), and a lost WebGL
     context makes a new stage on a new canvas: before both, a phone that had looked at a few models,
     Meshy's 2k textures among them, stopped drawing until the page was reloaded.
+    To look at a rig itself (owner, 31 Oct 2026: "let me see the rig inside the character with no
+    animation, the problems may be there"): *rest pose* heads the clip list (`REST`, the skin's bind
+    pose, still), *X-ray* draws the body at 30 % so the skeleton's lines and a dot at every joint
+    show through it, and *Weights* paints each vertex the blend of its bones' colours (unlit: TRELLIS
+    has no normals). The first look at a maid in a long dress showed her left knee joint at the hem's
+    edge, outside the leg: the warp finds legs by the dress's outline.
     *Rig with Meshy* says what it is doing: how many and for how long while it runs, then how many
     Meshy rigged, or how many it did not and why (Meshy's error, or the model refused before it was
     sent), shown on our rig instead (owner: "feedback that it is working, how long so far, and
