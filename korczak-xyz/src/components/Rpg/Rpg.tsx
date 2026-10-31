@@ -249,7 +249,7 @@ function clip(text: string, n: number): string {
 
 /** The exotic slider's last position (`GenesisContext.exotic`). */
 const EXOTIC_KEY = 'rpg-exotic';
-/** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self'. */
+/** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'self' or 'voxel'. */
 const RIGGER_KEY = 'rpg-rigger';
 /** Whether the hero can jump (Space, the ⇧ button); off unless '1' (owner, 30 Oct 2026). */
 const JUMP_KEY = 'rpg-jump';
@@ -2227,7 +2227,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
-      setRigger(localStorage.getItem(RIGGER_KEY) === 'self' ? 'self' : DEFAULT_RIGGER);
+      const keptRigger = localStorage.getItem(RIGGER_KEY);
+      setRigger(keptRigger === 'self' || keptRigger === 'voxel' ? keptRigger : DEFAULT_RIGGER);
       setJumping(localStorage.getItem(JUMP_KEY) === '1');
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const keptPainter = localStorage.getItem(PAINTER_KEY);
@@ -2738,9 +2739,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {keysReady && falKey && (
         <label className="rpg-model">
           {t.rigger}:{' '}
-          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'self' ? 'self' : 'meshy')}>
+          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'self' || e.target.value === 'voxel' ? e.target.value : 'meshy')}>
             <option value="meshy">{t.riggerMeshy}</option>
             <option value="self">{t.riggerSelf}</option>
+            <option value="voxel">{t.riggerVoxel}</option>
           </select>
         </label>
       )}

@@ -21,6 +21,8 @@
  * body better than Meshy's. Pure, so it runs in a worker and in the tests.
  */
 
+import { skinBones, voxelSkin } from './voxelSkin';
+
 /** One bone of a donor's skeleton, in metres; parents come before their children. */
 export interface DonorBone {
   name: string;
@@ -150,8 +152,20 @@ const NODE_CELL = 0.04;
 const NODE_REACH = 0.13;
 const ROUNDS = 40;
 
+/**
+ * Where a rigged vertex's weights come from: copied from the nearest warped donor point (`donor`, the
+ * first way), or measured through the body from the joints (`voxel`, `voxelSkin`; owner, 31 Oct 2026).
+ */
+export type SkinWeights = 'donor' | 'voxel';
+
+export interface SelfRigOptions {
+  weights?: SkinWeights;
+  /** The target's triangles, for `voxel`: without them only its vertices are voxelised. */
+  index?: ArrayLike<number> | null;
+}
+
 /** Rigs `target` (a mesh's vertices, xyz, in any frame with +y up and the face toward +z) at `height` metres. */
-export function selfRig(donor: Donor, target: ArrayLike<number>, height: number): SelfRig {
+export function selfRig(donor: Donor, target: ArrayLike<number>, height: number, o: SelfRigOptions = {}): SelfRig {
   const nT = target.length / 3, nD = donor.positions.length / 3, nB = donor.bones.length;
 
   // The target at its height, feet at 0, centred; the donor stretched to the same box.
@@ -222,34 +236,37 @@ export function selfRig(donor: Donor, target: ArrayLike<number>, height: number)
   }
   place();
 
-  // Each target vertex copies the four weights of the nearest warped donor point...
-  const fGrid = new Grid(cur, 0.03);
-  let w = new Float32Array(nT * nB);
-  for (let t = 0; t < nT; t++) {
-    const i = fGrid.nearest(tPts[t * 3], tPts[t * 3 + 1], tPts[t * 3 + 2]);
-    for (let a = 0; a < 4; a++) w[t * nB + donor.skinIndex[i * 4 + a]] += donor.skinWeight[i * 4 + a];
-  }
-  // ...smoothed twice over its own neighbours, so the seam between two copied regions blends.
-  const near = new Grid(tPts, 0.02);
-  const around = Array.from({ length: nT }, (_, t) => near.within(tPts[t * 3], tPts[t * 3 + 1], tPts[t * 3 + 2], 0.025));
-  for (let pass = 0; pass < 2; pass++) {
-    const next = new Float32Array(w.length);
+  const copied = (): { skinIndex: Uint16Array; skinWeight: Float32Array } => {
+    // Each target vertex copies the four weights of the nearest warped donor point...
+    const fGrid = new Grid(cur, 0.03);
+    let w = new Float32Array(nT * nB);
     for (let t = 0; t < nT; t++) {
-      const list = around[t];
-      for (const q of list) for (let b = 0; b < nB; b++) next[t * nB + b] += w[q * nB + b] / list.length;
+      const i = fGrid.nearest(tPts[t * 3], tPts[t * 3 + 1], tPts[t * 3 + 2]);
+      for (let a = 0; a < 4; a++) w[t * nB + donor.skinIndex[i * 4 + a]] += donor.skinWeight[i * 4 + a];
     }
-    w = next;
-  }
-  const skinIndex = new Uint16Array(nT * 4), skinWeight = new Float32Array(nT * 4);
-  const order = Array.from({ length: nB }, (_, b) => b);
-  for (let t = 0; t < nT; t++) {
-    const top = order.slice().sort((a, b) => w[t * nB + b] - w[t * nB + a]).slice(0, 4);
-    const sum = top.reduce((acc, b) => acc + w[t * nB + b], 0) || 1;
-    top.forEach((b, a) => {
-      skinIndex[t * 4 + a] = b;
-      skinWeight[t * 4 + a] = w[t * nB + b] / sum;
-    });
-  }
+    // ...smoothed twice over its own neighbours, so the seam between two copied regions blends.
+    const near = new Grid(tPts, 0.02);
+    const around = Array.from({ length: nT }, (_, t) => near.within(tPts[t * 3], tPts[t * 3 + 1], tPts[t * 3 + 2], 0.025));
+    for (let pass = 0; pass < 2; pass++) {
+      const next = new Float32Array(w.length);
+      for (let t = 0; t < nT; t++) {
+        const list = around[t];
+        for (const q of list) for (let b = 0; b < nB; b++) next[t * nB + b] += w[q * nB + b] / list.length;
+      }
+      w = next;
+    }
+    const skinIndex = new Uint16Array(nT * 4), skinWeight = new Float32Array(nT * 4);
+    const order = Array.from({ length: nB }, (_, b) => b);
+    for (let t = 0; t < nT; t++) {
+      const top = order.slice().sort((a, b) => w[t * nB + b] - w[t * nB + a]).slice(0, 4);
+      const sum = top.reduce((acc, b) => acc + w[t * nB + b], 0) || 1;
+      top.forEach((b, a) => {
+        skinIndex[t * 4 + a] = b;
+        skinWeight[t * 4 + a] = w[t * nB + b] / sum;
+      });
+    }
+    return { skinIndex, skinWeight };
+  };
 
   // Each joint moves as the donor points bound to its bone, or to its parent, near it moved.
   const radius = 0.12 * (height / 1.7);
@@ -275,5 +292,15 @@ export function selfRig(donor: Donor, target: ArrayLike<number>, height: number)
     for (let a = 0; a < 3; a++) joints[b * 3 + a] = p[a] + (total > 0 ? sum[a] / total : 0);
   });
 
-  return { positions: tPts, skinIndex, skinWeight, joints };
+  if (o.weights === 'voxel') {
+    const bones = skinBones(
+      donor.bones.map((b) => b.name),
+      donor.bones.map((b) => b.parent),
+      joints,
+      height,
+    );
+    const skin = voxelSkin(tPts, o.index ?? null, bones, { voxel: 0.018 * (height / 1.8), falloff: 0.05 * (height / 1.8) });
+    return { positions: tPts, skinIndex: skin.skinIndex, skinWeight: skin.skinWeight, joints };
+  }
+  return { positions: tPts, ...copied(), joints };
 }

@@ -2090,10 +2090,11 @@ export class RpgScene {
    * with. A change re-rigs everyone already standing, so the two can be compared on the spot.
    */
   setRigger(rigger: Rigger, falKey: string | null) {
-    const was = this.people.rigger === 'meshy' && !!this.people.falKey;
+    const mode = (r: Rigger, key: string | null) => (r === 'meshy' ? (key ? 'meshy' : 'self') : r);
+    const was = mode(this.people.rigger, this.people.falKey);
     this.people.rigger = rigger;
     this.people.falKey = falKey;
-    if (was === (rigger === 'meshy' && !!falKey)) return;
+    if (was === mode(rigger, falKey)) return;
     for (const [name, npc] of this.npcs) {
       if (!isModel(npc.want)) continue;
       const url = npc.want;

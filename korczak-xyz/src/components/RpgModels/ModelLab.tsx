@@ -76,7 +76,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   /** Bumped when a Meshy rig may have been paid for, so the count of those still unpaid is read again. */
   const [rigTick, setRigTick] = useState(0);
   const [shown, setShown] = useState<string[]>([]);
-  const [rigger, setRigger] = useState<StageRig>('self');
+  const [rigger, setRigger] = useState<StageRig>('voxel');
   const [uncached, setUncached] = useState(0);
   const [clip, setClip] = useState('Idle_Loop');
   const [clips, setClips] = useState<string[]>([]);
@@ -558,8 +558,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
           <div className="lab-controls">
             <label>
               {t.rig}:{' '}
-              <select value={rigger} onChange={(e) => setRigger(e.target.value === 'meshy' ? 'meshy' : e.target.value === 'raw' ? 'raw' : 'self')}>
+              <select
+                value={rigger}
+                onChange={(e) => setRigger(e.target.value === 'meshy' || e.target.value === 'raw' || e.target.value === 'voxel' ? e.target.value : 'self')}
+              >
                 <option value="self">{t.rigSelf}</option>
+                <option value="voxel">{t.rigVoxel}</option>
                 <option value="raw">{t.rigRaw}</option>
                 <option value="meshy" disabled={!falKey}>
                   {t.rigMeshy}

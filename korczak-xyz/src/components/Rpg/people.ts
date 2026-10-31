@@ -32,13 +32,18 @@ import donorFemaleUrl from '../../assets/rpg/people/donor_female.bin?url';
 import donorMaleUrl from '../../assets/rpg/people/donor_male.bin?url';
 import { endRequest, startRequest } from '../../utils/rpg/devlog';
 import { loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
-import { parseDonor, selfRig, type Donor, type SelfRig } from '../../utils/rpg/selfRig';
+import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
+import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
 
-/** Who gives a generated person their skeleton: Meshy on fal.ai, or the browser (`selfRig`). */
-export type Rigger = 'meshy' | 'self';
+/**
+ * Who gives a generated person their skeleton: Meshy on fal.ai, or the browser (`selfRig`) — with
+ * the donor's weights copied (`self`), or weighed through the body from the joints (`voxel`,
+ * `voxelSkin`; owner, 31 Oct 2026: "SOTA non-AI rigging methods we could use").
+ */
+export type Rigger = 'meshy' | 'self' | 'voxel';
 export const DEFAULT_RIGGER: Rigger = 'meshy';
 
 /** Heights a person is rigged at, feet to crown, by who they are. */
@@ -206,6 +211,35 @@ async function cachedMeshy(key: string, make: () => Promise<string>): Promise<st
   return url;
 }
 
+/**
+ * The clip library carried onto a skeleton Meshy rigged (`retargetClips`): from the donor the clips
+ * were made on, stood the way this rig rests (`aimedLike`), so a bone's own axes no longer have to be
+ * the donor's. Copied as they were, a T-posed model's arms bent in the wrong plane and its hands
+ * turned over (owner, 31 Oct 2026: "the arms bend unnaturally when walking, the hands the strangest").
+ */
+function meshyClips(clips: ClipData[], donor: Donor, hips: THREE.Bone): ClipData[] {
+  const bones: THREE.Bone[] = [];
+  hips.traverse((o) => {
+    if ((o as THREE.Bone).isBone) bones.push(o as THREE.Bone);
+  });
+  const target: PoseSkeleton = {
+    names: bones.map((b) => b.name),
+    parent: bones.map((b) => bones.indexOf(b.parent as THREE.Bone)),
+    local: bones.map((b) => b.quaternion.toArray() as [number, number, number, number]),
+    offset: bones.map((b) => b.position.toArray() as [number, number, number]),
+  };
+  const source: PoseSkeleton = {
+    names: donor.bones.map((b) => b.name),
+    parent: donor.bones.map((b) => b.parent),
+    local: donor.bones.map((b) => b.quaternion),
+    offset: donor.bones.map((b) => b.position),
+  };
+  const holder = hips.parent ?? new THREE.Object3D();
+  holder.updateMatrixWorld(true);
+  const reference = aimedLike(source, target, holder.matrixWorld);
+  return retargetClips(clips, source, reference, target, holder.getWorldQuaternion(new THREE.Quaternion()));
+}
+
 /** Clips fitted to a rig whose hips rest at `hips` (in the hips' parent's units). */
 function fitClips(clips: ClipData[], hips: THREE.Vector3): Map<string, THREE.AnimationClip> {
   const fitted = new Map<string, THREE.AnimationClip>();
@@ -226,7 +260,7 @@ let nextJob = 0;
 const jobs = new Map<number, { resolve: (r: SelfRig) => void; reject: (e: Error) => void }>();
 
 /** In a worker where there is one, else here: a frame frozen for a few seconds beats no person. */
-function rigOffThread(donor: Donor, target: Float32Array, height: number): Promise<SelfRig> {
+function rigOffThread(donor: Donor, target: Float32Array, height: number, options: SelfRigOptions = {}): Promise<SelfRig> {
   if (worker === undefined) {
     try {
       worker = new Worker(new URL('./selfRig.worker.ts', import.meta.url), { type: 'module' });
@@ -245,11 +279,11 @@ function rigOffThread(donor: Donor, target: Float32Array, height: number): Promi
       worker = null;
     }
   }
-  if (!worker) return Promise.resolve(selfRig(donor, target, height));
+  if (!worker) return Promise.resolve(selfRig(donor, target, height, options));
   const id = nextJob++;
   return new Promise((resolve, reject) => {
     jobs.set(id, { resolve, reject });
-    worker!.postMessage({ id, donor, target, height });
+    worker!.postMessage({ id, donor, target, height, options });
   });
 }
 
@@ -352,14 +386,14 @@ export class People {
    */
   template(url: string, body: Body, height: number, label = 'person'): Promise<PersonTemplate> {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
-    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}`;
+    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}${this.rigger === 'voxel' ? '&w=voxel' : ''}`;
     const falKey = this.rigger === 'meshy' ? this.falKey : null;
     const key = falKey ? `${url}?meshy=1&height=${height}` : own;
     let t = this.templates.get(key);
     if (!t) {
       t = falKey
         ? this.buildMeshy(falKey, url, key, height, label).catch(() => this.build(url, own, body, height, label))
-        : this.build(url, key, body, height, label);
+        : this.build(url, key, body, height, label, this.rigger === 'voxel' ? 'voxel' : 'donor');
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
     }
@@ -394,7 +428,7 @@ export class People {
    * person first, so a picture of two is not paid for.
    */
   private async buildMeshy(falKey: string, url: string, key: string, height: number, label: string): Promise<PersonTemplate> {
-    const [{ clips }] = await Promise.all([this.load(), this.standing(url)]);
+    const [{ clips, donors }] = await Promise.all([this.load(), this.standing(url)]);
     const started = performance.now();
     const rigged = await cachedMeshy(key, () => rigWithMeshy(falKey, url, height, label));
     const gltf = await new GLTFLoader().parseAsync(await loadLandmarkBytes(rigged), '');
@@ -414,6 +448,7 @@ export class People {
     });
     if (!skinned || !hips) throw new Error('Meshy answered a model with no skeleton');
     model.updateMatrixWorld(true);
+    const moved = meshyClips(clips, donors.male, hips);
     const box = new THREE.Box3().setFromObject(model, true);
     const s = height / Math.max(box.max.y - box.min.y, 1e-3);
     const centre = box.getCenter(new THREE.Vector3());
@@ -425,20 +460,21 @@ export class People {
     group.add(stand);
     group.updateMatrixWorld(true);
     const ms = performance.now() - started;
-    return { group, clips: fitClips(clips, (hips as THREE.Bone).position.clone()), ms };
+    return { group, clips: fitClips(moved, (hips as THREE.Bone).position.clone()), ms };
   }
 
-  private async build(url: string, key: string, body: Body, height: number, label: string): Promise<PersonTemplate> {
+  private async build(url: string, key: string, body: Body, height: number, label: string, weights: 'donor' | 'voxel' = 'donor'): Promise<PersonTemplate> {
     const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
     const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
-    const pose = tPosed ? 'T-posed' : 'A-posed';
+    const pose = `${tPosed ? 'T-posed' : 'A-posed'}${weights === 'voxel' ? ', voxel weights' : ''}`;
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
+    const index = geometry.index ? new Uint32Array(geometry.index.array as ArrayLike<number>) : null;
     const { rig, ms } = await cachedRig(tPosed ? `${key}&pose=t` : key, async () => {
       const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
       try {
-        const made = await rigOffThread(donor, target, height);
+        const made = await rigOffThread(donor, target, height, { weights, index });
         endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
         return made;
       } catch (err) {

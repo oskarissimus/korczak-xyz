@@ -935,6 +935,35 @@ content-hashed and immutable.
     picture through TRELLIS ($0.023) comes back with the arms clear of the apron; on Meshy's rig
     (+$0.20) it moves about as cleanly as Meshy's own $0.80 model, while on our rig the spread arms
     stay spread in the idle, the donor resting them lower.
+  - **The clips are carried onto Meshy's rig, not copied** (owner, 31 Oct 2026: "even with Meshy's
+    paid rig the arms bend unnaturally when walking, the hands the strangest"). It was never Meshy's
+    weights. A clip sets each bone's local rotation outright, which means the same thing on two rigs
+    only if each bone's rest frame is the same, roll about the bone included; Meshy picks a rig's
+    frames from the mesh, and on a blacksmith it rigged in a palms-down T-pose the upper arms came
+    out rolled ~60° against the donor the clips were made on (stood in the same T-pose), the forearms
+    ~70°, the hands 80–115°: every elbow bent in a plane turned that far, every hand turned over.
+    `meshyClips` (`people.ts`) now moves the library through `utils/rpg/retarget.ts`: the donor is
+    stood the way the rig rests (`aimedLike`, limb bones turned by the shortest arc onto the rig's,
+    so an A-pose, a T-pose or bent elbows all work) and each bone's world turn from that pose is put
+    on the rig's own rest. Compared against Meshy's own walk of the same rig (`basic_animations`, which
+    `rigWithMeshy` does not ask for): the same arms. Our own rig never had this, its bones being the
+    donor's. The comparison sheets are in the project files, `rpg/rig-za-darmo/`.
+    **Palms forward costs a twist**: a palms-down T-pose lowers to palms facing the thighs by the
+    shoulder alone, which is how every clip hangs the arm; palms forward needs the forearm turned 90°
+    as well, and with one forearm bone that is either the hands walking palms forward (what the
+    retarget does) or a candy-wrapper elbow. Palms down is the rig-friendly pose.
+  - **Our rig can weigh through the body** (`voxel`, owner the same day: "SOTA non-AI rigging methods
+    we could use?"). `utils/rpg/voxelSkin.ts` is geodesic voxel binding (Dionne & de Lasa, SCA 2013;
+    Maya's default bind): the mesh voxelised at 1.8 cm and filled (thickened once if a hole leaks the
+    flood), each bone a segment between the joints `selfRig` warped into place (`skinBones`), a
+    Dijkstra per bone over body voxels only, and a vertex weighted by those distances with a falloff
+    that widens past 8 cm from any bone, so cloth hanging clear of the body blends over its width.
+    Seam-split vertices are welded first, or a seam opens where their best four bones differ; the
+    smoothing walks only edges under 3 voxels. Replaces copying the nearest donor point's weights,
+    measured through the air, which tore shards off the sleeves and split the apron. ~3–4 s in the
+    worker. *Character rig* has it as a third choice (`rpg-rigger` = `voxel`), keyed apart in the
+    cache (`&w=voxel`); the lab's rig switch too, and it is the lab's default. The game still
+    defaults to Meshy until it is judged there.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
