@@ -11,6 +11,10 @@
     {
       "bucket": "korczak-xyz-501720-backseat",
       "rules": "storage.rules"
+    },
+    {
+      "bucket": "korczak-xyz-501720-rpg",
+      "rules": "storage.rules"
     }
   ],
   "functions": [

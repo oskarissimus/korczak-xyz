@@ -123,11 +123,13 @@ describe('the bucket and the assembler agree about origins', () => {
       'utf8',
     );
 
-    const block = /\bcors\s*\{[\s\S]*?\borigin\s*=\s*\[([\s\S]*?)\]/.exec(hcl);
-    expect(block, 'no cors { origin = [...] } block in terraform/storage.tf').not.toBeNull();
+    // Every bucket a page reads by URL: the sloper's, and the RPG's kept assets.
+    const blocks = [...hcl.matchAll(/\bcors\s*\{[\s\S]*?\borigin\s*=\s*\[([\s\S]*?)\]/g)];
+    expect(blocks.length, 'no cors { origin = [...] } block in terraform/storage.tf').toBeGreaterThanOrEqual(2);
 
-    const declared = [...block![1].matchAll(/"([^"]+)"/g)].map(([, origin]) => origin);
-
-    expect([...declared].sort()).toEqual([...ALLOWED_ORIGINS].sort());
+    for (const block of blocks) {
+      const declared = [...block[1].matchAll(/"([^"]+)"/g)].map(([, origin]) => origin);
+      expect([...declared].sort()).toEqual([...ALLOWED_ORIGINS].sort());
+    }
   });
 });

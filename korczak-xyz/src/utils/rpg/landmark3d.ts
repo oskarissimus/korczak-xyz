@@ -40,6 +40,7 @@ import { log } from '../../lib/logger';
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import { apiFetch, serverCost } from './gateway';
+import { FRESH_HEADER, meshyRigBody } from './assetStore';
 import { geminiImageCost, type GeminiImageUsage } from './gatewayRoutes';
 import { outOfFunds } from './funds';
 import type { LandmarkModel, WorldBible } from './genesis';
@@ -61,6 +62,11 @@ export interface FalOptions {
   pollMs?: number;
   /** Which try of the piece this is (`withRetries`), from 1; said in the console from the second. */
   attempt?: number;
+  /**
+   * A new result even where the account has kept one for the same request (`assetStore.ts`): the
+   * console's remake. A retry is always fresh, since the kept answer is the one that failed.
+   */
+  fresh?: boolean;
 }
 
 /**
@@ -95,13 +101,19 @@ export async function withRetries<T>(run: (o: FalOptions) => Promise<T>, o: FalO
   }
 }
 
-function headers(key: string): Record<string, string> {
+function headers(key: string, o: FalOptions = {}): Record<string, string> {
   return {
     Authorization: `Key ${key}`,
     'Content-Type': 'application/json',
     // Keep the outputs: the URL is the cache, and fal's default retention is theirs to change.
     'X-Fal-Object-Lifecycle-Preference': JSON.stringify({ expiration_duration_seconds: null }),
+    ...freshHeader(o),
   };
+}
+
+/** Asks the gateway for a new answer rather than the account's kept one: a remake, or any retry. */
+function freshHeader(o: FalOptions): Record<string, string> {
+  return o.fresh || (o.attempt ?? 1) > 1 ? { [FRESH_HEADER]: '1' } : {};
 }
 
 async function failure(res: Response): Promise<Error> {
@@ -217,7 +229,7 @@ export async function drawImage(
     for (let attempt = 0; ; attempt++) {
       res = await f(`https://fal.run/${paint.model}`, {
         method: 'POST',
-        headers: headers(key),
+        headers: headers(key, o),
         signal: o.signal,
         body: JSON.stringify(paint.body(prompt, size)),
       });
@@ -260,7 +272,7 @@ async function drawWithGemini(
     for (let attempt = 0; ; attempt++) {
       res = await f(`https://generativelanguage.googleapis.com/v1beta/models/${gemini.model}:generateContent`, {
         method: 'POST',
-        headers: { 'x-goog-api-key': google, 'Content-Type': 'application/json' },
+        headers: { 'x-goog-api-key': google, 'Content-Type': 'application/json', ...freshHeader(o) },
         signal: o.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
@@ -280,6 +292,8 @@ async function drawWithGemini(
       candidates?: { finishReason?: string; content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
       promptFeedback?: { blockReason?: string };
       usageMetadata?: GeminiImageUsage;
+      /** The picture as the account's bucket keeps it (`assetStore.ts`), when the gateway kept it. */
+      rpgAsset?: { id?: string; url?: string };
     };
     const picture = body.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
     if (!picture?.data) {
@@ -287,7 +301,8 @@ async function drawWithGemini(
       throw new Error(/PROHIBITED|SAFETY|BLOCK/.test(why) ? `${why}: flagged by a content checker` : why);
     }
     const cost = geminiImageCost(gemini.model, body.usageMetadata ?? {});
-    const url = await keepOnFal(fal, picture.data, picture.mimeType ?? 'image/png', o);
+    // Kept in the account's bucket already, and readable by URL there; else onto fal's storage.
+    const url = body.rpgAsset?.url ?? (await keepOnFal(fal, picture.data, picture.mimeType ?? 'image/png', o));
     endRequest(entry, null, { cost, serverCost: serverCost(res), text: `${tryMark(o)}${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
@@ -326,18 +341,19 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
   try {
     const submit = await f(`https://queue.fal.run/${FAL_MESH_MODEL}`, {
       method: 'POST',
-      headers: headers(key),
+      headers: headers(key, o),
       signal: o.signal,
       body: JSON.stringify({ image_url: image, texture_size: 512, mesh_simplify: SIMPLIFY[label] }),
     });
     if (!submit.ok) throw await failure(submit);
-    const queued = (await submit.json()) as { status_url?: string; response_url?: string };
+    const queued = (await submit.json()) as { status_url?: string; response_url?: string; status?: string };
     if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
     const auth = { Authorization: `Key ${key}` };
     const asked = Date.now();
     const deadline = asked + (o.timeoutMs ?? 300_000);
     let queuedMs: number | null = null;
-    for (;;) {
+    // Answered from the account's kept assets: complete already, nothing to wait for.
+    while (queued.status !== 'COMPLETED') {
       await sleep(o.pollMs ?? 2000);
       if (Date.now() > deadline) throw new Error('timed out in the queue');
       const res = await f(queued.status_url, { headers: auth, signal: o.signal });
@@ -351,6 +367,7 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
       }
       if (s.status === 'COMPLETED') break;
     }
+    if (queuedMs === null) started?.();
     const res = await f(queued.response_url, { headers: auth, signal: o.signal });
     if (!res.ok) throw await failure(res);
     const body = (await res.json()) as { model_mesh?: { url?: string; file_size?: number } };
@@ -374,14 +391,16 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
 async function queueJob<T>(key: string, model: string, body: object, entry: DevRequest, head: string, o: FalOptions, started?: () => void): Promise<T> {
   const f = o.fetchImpl ?? apiFetch;
   const sleep = o.sleep ?? wait;
-  const submit = await f(`https://queue.fal.run/${model}`, { method: 'POST', headers: headers(key), signal: o.signal, body: JSON.stringify(body) });
+  const submit = await f(`https://queue.fal.run/${model}`, { method: 'POST', headers: headers(key, o), signal: o.signal, body: JSON.stringify(body) });
   if (!submit.ok) throw await failure(submit);
-  const queued = (await submit.json()) as { status_url?: string; response_url?: string };
+  // The server's price for it, $0 when the account had it kept already: the console shows that one.
+  updateRequest(entry, { serverCost: serverCost(submit) });
+  const queued = (await submit.json()) as { status_url?: string; response_url?: string; status?: string };
   if (!queued.status_url || !queued.response_url) throw new Error('the queue gave no request to follow');
   const auth = { Authorization: `Key ${key}` };
   const deadline = Date.now() + (o.timeoutMs ?? 420_000);
   let running = false;
-  for (;;) {
+  while (queued.status !== 'COMPLETED') {
     await sleep(o.pollMs ?? 3000);
     if (Date.now() > deadline) throw new Error('timed out in the queue');
     const res = await f(queued.status_url, { headers: auth, signal: o.signal });
@@ -395,6 +414,7 @@ async function queueJob<T>(key: string, model: string, body: object, entry: DevR
     }
     if (s.status === 'COMPLETED') break;
   }
+  if (!running) started?.();
   const res = await f(queued.response_url, { headers: auth, signal: o.signal });
   if (!res.ok) throw await failure(res);
   return (await res.json()) as T;
@@ -414,7 +434,7 @@ export async function rigWithMeshy(key: string, glb: string, height: number, lab
   const entry = startRequest('fal', FAL_RIG_MODEL, null, head, label);
   try {
     type Rigged = { rigged_character_glb?: { url?: string; file_size?: number } | null };
-    const body = await queueJob<Rigged>(key, FAL_RIG_MODEL, { model_url: glb, height_meters: height, enable_animation: false }, entry, head, o);
+    const body = await queueJob<Rigged>(key, FAL_RIG_MODEL, meshyRigBody(glb, height), entry, head, o);
     const rigged = body.rigged_character_glb?.url;
     if (!rigged) throw new Error('no rigged model in the answer');
     endRequest(entry, null, { cost: FAL_PRICES.rig, text: `${head}\n→ ${rigged}${kbOf(body.rigged_character_glb)}` });
@@ -1009,6 +1029,8 @@ function ensurePiece(
   o: FalOptions,
 ): boolean {
   const slot = `${label}/${id}`;
+  // A stamped id is the console's remake: a new person, not the account's kept one.
+  if (id.includes('#')) o = { ...o, fresh: true };
   if (refused.has(label) || outOfFunds('fal') || made.has(slot) || failed.has(slot) || inFlight.has(slot)) return false;
   const p = inTurn(slot, async (running) => {
     if (refused.has(label)) throw new Error('skipped: fal.ai refused the key');

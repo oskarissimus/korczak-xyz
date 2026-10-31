@@ -266,6 +266,18 @@ service cloud.firestore {
      */
 
     /*
+     * The RPG's kept assets (`korczak-xyz/src/utils/rpg/assetStore.ts`): what made each picture,
+     * model, rig, line and track in the account's bucket — prompt, model, parameters, cost — and
+     * which request each one answers (`requests/{fingerprint}`). The gateway answers a request from
+     * here instead of paying for it again, so these are written by the functions only: a reader who
+     * could write a fingerprint could point it at anything and have the gateway serve it as theirs.
+     * Read by the owner, so the lab can tell a rig already paid for from one that would be bought.
+     */
+    match /rpgAssets/{uid}/{document=**} {
+      allow read: if approved() && request.auth.uid == uid;
+    }
+
+    /*
      * The public-transport corpus: the parsed communiqués, the raw feed archive, and how each of
      * WTP's two feeds last answered.
      *

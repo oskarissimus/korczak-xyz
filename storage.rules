@@ -7,6 +7,11 @@ rules_version = '2';
 // this one file; the per-account subtree below is the whole of what either app needs. The songbook's
 // video inbox at the bottom is the one exception, and it is admins-only.
 //
+// A third bucket shares the file, `korczak-xyz-501720-rpg`: the RPG's kept assets, under
+// `users/{uid}/rpg/` (`korczak-xyz/src/utils/rpg/assetStore.ts`). Only the functions write there,
+// on the Admin SDK, which these rules do not reach; the owner may read, and no page may write, since
+// the gateway serves those files back as answers somebody paid for.
+//
 // The shape deliberately mirrors `firestore.rules`: a per-account subtree, owner-only, with the
 // path itself carrying the authorization. What it does NOT mirror is the household share — there
 // is no `hasShare()` here and there should not be one. The sleep log and the shopping list are
@@ -62,6 +67,7 @@ service firebase.storage {
       // direction, so it cannot refuse anything the app can legitimately produce, while still
       // being a number rather than no number.
       allow write: if approved()
+        && bucket != 'korczak-xyz-501720-rpg'
         && request.auth.uid == uid
         && request.resource.size < 64 * 1024 * 1024;
 
@@ -69,7 +75,7 @@ service firebase.storage {
       // delete there is no `request.resource`, so the size clause above evaluates to an error and
       // denies — and rules are a permissive union, so this second block is what grants it back.
       // Nothing in the app deletes yet; the alternative is a bucket that can only ever grow.
-      allow delete: if approved() && request.auth.uid == uid;
+      allow delete: if approved() && bucket != 'korczak-xyz-501720-rpg' && request.auth.uid == uid;
     }
 
     /*

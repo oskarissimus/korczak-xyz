@@ -30,6 +30,7 @@ import {
   WORLD_HEADER,
 } from './gatewayRoutes';
 import { ACCOUNT_KEY } from '../accountKeys/keys';
+import { KEEP_HEADER, keepsAssets } from './assetStore';
 
 export { ACCOUNT_KEY };
 
@@ -111,6 +112,8 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   const { world, quest } = context();
   if (world) headers.set(WORLD_HEADER, world.slice(0, 120));
   if (quest) headers.set(QUEST_HEADER, quest.slice(0, 120));
+  // The RPG's pages keep what they generate, and are answered from it (`assetStore.ts`); no other app's are.
+  if (typeof location !== 'undefined' && keepsAssets(location.pathname)) headers.set(KEEP_HEADER, '1');
   return fetch(`${base}/${url.host}${url.pathname}${url.search}`, { ...init, headers });
 }
 

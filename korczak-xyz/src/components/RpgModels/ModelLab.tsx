@@ -182,7 +182,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const items = useMemo(() => wanted, [signature]);
 
-  // How many of the shown would cost a Meshy rig: those not rigged by it in this browser before.
+  // How many of the shown would cost a Meshy rig: those not rigged by it before, in this browser or anywhere on the account (`meshyCached`).
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;

@@ -32,6 +32,7 @@ import donorFemaleUrl from '../../assets/rpg/people/donor_female.bin?url';
 import donorMaleUrl from '../../assets/rpg/people/donor_male.bin?url';
 import { endRequest, startRequest } from '../../utils/rpg/devlog';
 import { loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
+import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/accountAssets';
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { Rig } from './characters';
@@ -318,6 +319,11 @@ function unpackRig(buf: ArrayBuffer): SelfRig {
   return { positions, skinIndex, skinWeight, joints };
 }
 
+/**
+ * A rig from this browser's cache, else the account's (worked out on another device, kept in the
+ * bucket by `keepSelfRig`), else worked out here and kept in both. Owner, 31 Oct 2026: "every
+ * generated asset in the bucket", our own rigs included.
+ */
 async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ rig: SelfRig; ms: number }> {
   let cache: Cache | null = null;
   try {
@@ -327,14 +333,26 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
   } catch {
     cache = null;
   }
+  const kept = await fetchSelfRig(key);
+  if (kept) {
+    try {
+      const rig = unpackRig(kept);
+      await cache?.put(key, new Response(kept)).catch(() => undefined);
+      return { rig, ms: 0 };
+    } catch {
+      /* not a rig after all: worked out again */
+    }
+  }
   const started = performance.now();
   const rig = await make();
   const ms = performance.now() - started;
+  const packed = packRig(rig);
   try {
-    await cache?.put(key, new Response(packRig(rig)));
+    await cache?.put(key, new Response(packed));
   } catch {
     /* worked out again next time */
   }
+  void keepSelfRig(key, packed, { cacheKey: key, version: RIG_VERSION, weights: /&w=voxel/.test(key) ? 'voxel' : 'donor', ms: Math.round(ms) });
   return { rig, ms };
 }
 
@@ -369,14 +387,18 @@ export class People {
     }
   }
 
-  /** Whether this browser already holds Meshy's rig of `url` at `height`, so asking for it again costs nothing. */
+  /**
+   * Whether Meshy's rig of `url` at `height` is already paid for, so asking for it again costs
+   * nothing: held by this browser, or kept on the account (`accountAssets.ts`) — rigged in the game,
+   * in the lab, or on another device, which the gateway then answers from the bucket.
+   */
   async meshyCached(url: string, height: number): Promise<boolean> {
     try {
-      if (typeof caches === 'undefined') return false;
-      return Boolean(await (await caches.open(CACHE)).match(`${url}?meshy=1&height=${height}`));
+      if (typeof caches !== 'undefined' && (await (await caches.open(CACHE)).match(`${url}?meshy=1&height=${height}`))) return true;
     } catch {
-      return false;
+      /* asked of the account instead */
     }
+    return accountHasMeshyRig(url, height);
   }
 
   /**

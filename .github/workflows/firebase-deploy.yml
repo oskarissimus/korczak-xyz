@@ -87,6 +87,7 @@ on:
       - "korczak-xyz/src/utils/rpg/jobs.ts"
       - "korczak-xyz/src/utils/rpg/falPrompts.ts"
       - "korczak-xyz/src/utils/rpg/gatewayRoutes.ts"
+      - "korczak-xyz/src/utils/rpg/assetStore.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
       - "audio-guide-function/**"

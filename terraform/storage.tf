@@ -179,3 +179,52 @@ resource "google_firebase_storage_bucket" "backseat" {
   project   = local.project_id
   bucket_id = google_storage_bucket.backseat.name
 }
+
+/*
+ * Every asset /apps/rpg/ pays a provider for: fal.ai's pictures, models and Meshy's rigs, Google's
+ * pictures, ElevenLabs' lines, music and voice previews, and the rigs the browser works out itself
+ * (korczak-xyz/src/utils/rpg/assetStore.ts). Added Oct 2026 (owner: "every generated asset should be
+ * saved in the bucket together with the prompt that made it").
+ *
+ * The only writer is the `rpgApi` and `rpgJob` functions, on the Admin SDK, under
+ * `users/{uid}/rpg/{assetId}/`; what made each file is in Firestore (`rpgAssets/{uid}`) and again
+ * in a `meta.json` beside it. The page reads the files by their download-token URL, and fal.ai does
+ * too when it is asked to rig a model kept here.
+ *
+ * CORS like the sloper bucket's and for the same reason: the game `fetch()`es a GLB to put it in the
+ * Cache API and to check it is not crossed cards, and that 200 needs the bucket's own ACAO header.
+ * The origins are `ALLOWED_ORIGINS` in functions/src/sloper/metadata.ts, which the gateway serves.
+ *
+ * No lifecycle rule: these are the only copy of things somebody paid for, which is the point.
+ */
+resource "google_storage_bucket" "rpg" {
+  project  = local.project_id
+  name     = "${local.project_id}-rpg"
+  location = local.region
+
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  cors {
+    origin = [
+      "https://korczak.xyz",
+      "https://www.korczak.xyz",
+      # `astro dev` and `astro preview`.
+      "http://localhost:4321",
+      "http://localhost:4322",
+    ]
+    method          = ["GET", "HEAD"]
+    response_header = ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
+    max_age_seconds = 3600
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_firebase_storage_bucket" "rpg" {
+  provider  = google-beta
+  project   = local.project_id
+  bucket_id = google_storage_bucket.rpg.name
+}

@@ -23,6 +23,7 @@
 
 import { FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore';
 import { db } from '../runtime';
+import { keepJobFile } from './assets';
 import { keysFrom } from '../../../korczak-xyz/src/utils/accountKeys/keys';
 import { parseBeat, type BeatContext } from '../../../korczak-xyz/src/utils/rpg/quest';
 import {
@@ -356,7 +357,7 @@ async function falFailure(res: Response): Promise<Error> {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-async function runFal(ref: DocumentReference, spec: FalSpec, key: string | null): Promise<void> {
+async function runFal(uid: string, ref: DocumentReference, spec: FalSpec, key: string | null): Promise<void> {
   const progress = new Progress(ref);
   if (!key) {
     await progress.set({ status: 'failed', noKey: true, error: 'no fal.ai key on the account', finishedAt: Date.now() }, true);
@@ -385,8 +386,14 @@ async function runFal(ref: DocumentReference, spec: FalSpec, key: string | null)
       await sleep(1000 * 2 ** attempt);
     }
     if (!res.ok) throw Object.assign(await falFailure(res), { step: 'image' });
-    const image = ((await res.json()) as { images?: { url?: string }[] }).images?.[0]?.url;
-    if (!image) throw Object.assign(new Error('no image in the answer'), { step: 'image' });
+    const drawn = ((await res.json()) as { images?: { url?: string }[] }).images?.[0]?.url;
+    if (!drawn) throw Object.assign(new Error('no image in the answer'), { step: 'image' });
+    // Kept in the account's bucket with its prompt (`assets.ts`); the bucket's URL from here on.
+    const image = await keepJobFile(
+      uid,
+      { model: FAL_IMAGE_MODEL, prompt: spec.prompt, params: { prompt: spec.prompt, image_size: { width: spec.size, height: spec.size }, label: spec.label }, usd: imageCost(spec.size, spec.size), world: null, quest: null },
+      { role: 'images.0', url: drawn, contentType: null },
+    );
     cost += imageCost(spec.size, spec.size);
     fal.image = { url: image, ms: Date.now() - started, error: null, retry: null };
     if (spec.simplify === null) {
@@ -428,13 +435,18 @@ async function runFal(ref: DocumentReference, spec: FalSpec, key: string | null)
     const r = await fetch(queued.response_url, { headers: auth });
     if (!r.ok) throw await falFailure(r);
     const body = (await r.json()) as { model_mesh?: { url?: string; file_size?: number } };
-    const glb = body.model_mesh?.url;
-    if (!glb) throw new Error('no model in the answer');
+    const meshed = body.model_mesh?.url;
+    if (!meshed) throw new Error('no model in the answer');
     cost += FAL_PRICES.mesh;
     // Crossed cards rather than a model (`meshShape.ts`): failed, so the browser's next try is a new
     // job with a new picture rather than this one taken again. Unreadable bytes are let through.
-    const bytes = await fetch(glb).then((g) => (g.ok ? g.arrayBuffer() : null)).catch(() => null);
+    const bytes = await fetch(meshed).then((g) => (g.ok ? g.arrayBuffer() : null)).catch(() => null);
     if (bytes && isCard(bytes)) throw new Error(CARD_ERROR);
+    const glb = await keepJobFile(
+      uid,
+      { model: FAL_MESH_MODEL, prompt: spec.prompt, params: { image_url: image, texture_size: 512, mesh_simplify: spec.simplify, label: spec.label }, usd: FAL_PRICES.mesh, world: null, quest: null },
+      { role: 'model_mesh', url: meshed, bytes: bytes ? Buffer.from(bytes) : undefined, contentType: 'model/gltf-binary' },
+    );
     const queuedMs = fal.mesh.queuedMs ?? 0;
     fal.mesh = {
       ...fal.mesh,
@@ -470,7 +482,7 @@ export async function runJob(uid: string, jobId: string): Promise<void> {
     const keySnap = await db.doc(`users/${uid}/keys/config`).get();
     const keys = keysFrom(keySnap.exists ? keySnap.data() : {});
     if (job.spec.kind === 'llm') await runLlm(uid, ref, job.spec, keys);
-    else await runFal(ref, job.spec, keys.fal);
+    else await runFal(uid, ref, job.spec, keys.fal);
   } catch (e) {
     await ref.update({ status: 'failed', crashed: true, error: describe(e), finishedAt: Date.now(), heartbeat: Date.now() }).catch(() => undefined);
     throw e;

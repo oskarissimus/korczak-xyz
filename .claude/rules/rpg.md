@@ -803,8 +803,8 @@ content-hashed and immutable.
     (`rigWithMeshy` in `landmark3d.ts`, the queue, **$0.20 a person**, ~1.5 min measured) and loads
     the rigged GLB it answers: Meshy's own 24 bones under the names the donors have, so the same
     clips fit with only the hips' height (`fitClips`), stood on the origin at the role's height. The
-    rigged URL is kept in the Cache API under `?meshy=1&height=…` beside the GLB, so a model is paid
-    for once per browser (not per account: it is not on the world). The one-person check runs first,
+    rigged URL is kept in the Cache API under `?meshy=1&height=…` beside the GLB, and since 31 Oct 2026
+    on the account too (*Every generated asset is kept*, under *Keys*), so a model is paid for once. The one-person check runs first,
     so a picture of two is not paid for; a refusal or a failed request falls back to the browser's
     rig, both in the console. Switching re-rigs everyone standing (`RpgScene.setRigger`). Meshy's
     GLB is ~2 MB and ~22k vertices against the self-rig's ~5.5k. Compared on a blacksmith in a
@@ -1180,6 +1180,54 @@ shared by both runtimes and tested on both).
 - Not moved: the demo (`rpgDemo`) and the server's own jobs (`rpgJob`) were already on the server.
   The account page itself still syncs the keys into this browser for the other apps that read them
   (`account-keys.md`); the game no longer sends them anywhere.
+
+**Every generated asset is kept, and nothing is paid for twice** (owner, 31 Oct 2026, after the lab
+offered to buy a Meshy rig the game had already bought: "every generated asset should be saved in the
+bucket with the prompt that made it — ElevenLabs lines, sounds, music, whatever comes from fal.ai and
+Google's models"). The gateway is where it happens, so no call site had to learn it
+(`functions/src/rpg/assets.ts`, the shared half in `utils/rpg/assetStore.ts`).
+- **What**: fal.ai's pictures, models, rigs and thumbnails (every file URL in the answer), Google's
+  pictures (`responseModalities: IMAGE`), ElevenLabs' lines, dialogue, music and designed-voice
+  previews, the job runner's FLUX pictures and TRELLIS models (`keepJobFile` in `jobs.ts`), and the
+  rigs the browser works out itself (`/_assets/self-rig/{id}` on the gateway, `accountAssets.ts`).
+  **Not** any model's text: beats and worlds are the saves already, and the same words asked again
+  must not give the same story. Only for a signed-in reader on the account's key; a signed-out
+  reader's request has no account to keep anything under. And only the RPG's: the gateway is every
+  app's now, so `apiFetch` marks a request from the game or the lab with `x-rpg-keep: 1`
+  (`keepsAssets`, by the page's path) and the server keeps and reuses nothing without it — the video
+  wizard's pictures and the passenger's lines are not the game's.
+- **Where**: the bytes in the bucket `korczak-xyz-501720-rpg` (terraform/storage.tf, CORS like the
+  sloper's), `users/{uid}/rpg/{assetId}/{role}.{ext}` with a `meta.json` beside them; the record in
+  Firestore, `rpgAssets/{uid}/items/{assetId}`: kind, provider, model, route, `prompt`, `params` (the
+  whole request, inline base64 cut to its length), `usd`, `at`, world, quest, the files with their
+  download-token URLs and where the provider had them. **The prompt is in Firestore**, and again in
+  `meta.json`: the bucket can only be read an object at a time and its own metadata is 8 KiB and not
+  queryable, while the lab needs "is this rig kept?" in one read. Firestore rule: the owner reads,
+  nobody writes — the gateway serves these as paid answers.
+- **The answer names the bucket**: a kept fal.ai answer has its URLs replaced by the bucket's before
+  it goes back, so the world bible, the lab and the Cache API all hold the kept copy from then on;
+  Google's picture comes back with `rpgAsset.url`, and `drawWithGemini` uses that instead of
+  uploading the bytes to fal. The files are copied **before** the answer goes out (a rigged GLB in a
+  second or two): on Cloud Run work after `res.end()` may be frozen half done. A copy that fails is a
+  Sentry event (`rpgAssets.*`) and the original answer, never a failed request.
+- **Reuse** is by fingerprint: SHA-256 of host, path, ElevenLabs' `output_format` and the body with
+  its keys sorted (`requestFingerprint`), pointing from `rpgAssets/{uid}/requests/{fingerprint}` at
+  the asset. The same request again is answered from the bucket at $0 (`x-rpg-reused`,
+  `x-rpg-cost-usd: 0`, `character-cost: 0`, so the console shows nothing spent) on any device, the
+  lab and the game alike. A fal.ai queue submit is answered with a request id of the gateway's own,
+  `rpgasset-{assetId}`, already `COMPLETED`, whose status and result the gateway answers too;
+  `buildMesh` and `queueJob` skip the polling when the submit says `COMPLETED`. A submit's request is
+  kept under `rpgAssets/{uid}/pending/{request_id}` until its result is fetched, which is when the
+  files are copied. A Meshy 6 model made **with** its rig also points the fingerprint of rigging that
+  bare model at the rig it came with (`rigAliasOf`), so asking Meshy to rig it later costs nothing.
+- **Fresh** (`x-rpg-fresh: 1`, `FalOptions.fresh`): the console's remake (a `#stamp` id) and **every
+  retry** (`attempt > 1`), since the kept answer is the one that failed — crossed cards, two heads.
+  What a fresh request makes becomes the one its fingerprint points at.
+- **The Meshy rig in the lab**: `People.meshyCached` asks this browser's Cache API and then the account
+  (`accountHasMeshyRig`), so *Rig with Meshy* no longer offers to buy a rig the game made on another
+  device or before Safari evicted the cache; asked anyway, the gateway answers it from the bucket.
+- **Our own rigs**: `cachedRig` tries the Cache API, then the account (3 s at most — working it out
+  takes about as long), then works it out and keeps it in both.
 
 **Pro is slow, not broken.** Measured Oct 2026: its first token takes 3–40s even on a one-line
 prompt, and a whole beat can run past a minute. The first version had one 90s limit for the whole

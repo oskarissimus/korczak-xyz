@@ -67,7 +67,9 @@ import {
   type GatewayProvider,
   type GatewayTarget,
 } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
+import { ASSET_HEADER, FRESH_HEADER, KEEP_HEADER, REUSED_HEADER } from '../../../korczak-xyz/src/utils/rpg/assetStore';
 import { dayKey } from '../demo/limits';
+import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
@@ -104,10 +106,10 @@ function cors(req: Request, res: Response): boolean {
   if (allowed) {
     res.set('Access-Control-Allow-Origin', allowed);
     res.set('Vary', 'Origin');
-    res.set('Access-Control-Expose-Headers', EXPOSED_HEADERS.join(', '));
+    res.set('Access-Control-Expose-Headers', [...EXPOSED_HEADERS, ASSET_HEADER, REUSED_HEADER].join(', '));
   }
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', `Content-Type, Accept, Authorization, ${BYOK_HEADER}, ${WORLD_HEADER}, ${QUEST_HEADER}, X-Fal-Object-Lifecycle-Preference, X-Fal-Queue-Priority, X-Google-Key, X-OpenAI-Key, X-ElevenLabs-Key`);
+  res.set('Access-Control-Allow-Headers', `Content-Type, Accept, Authorization, ${BYOK_HEADER}, ${WORLD_HEADER}, ${QUEST_HEADER}, ${FRESH_HEADER}, ${KEEP_HEADER}, X-Fal-Object-Lifecycle-Preference, X-Fal-Queue-Priority, X-Rpg-Asset-Meta, X-Google-Key, X-OpenAI-Key, X-ElevenLabs-Key`);
   res.set('Access-Control-Max-Age', '3600');
   return allowed !== null;
 }
@@ -380,6 +382,11 @@ async function pass(
 ): Promise<void> {
   const body = bodyOf(req);
   const json = jsonOf(body);
+  const header = (name: string) => (typeof req.headers[name] === 'string' ? (req.headers[name] as string) : null);
+  // The RPG's kept assets (`assets.ts`): a request made before is answered from the bucket, for nothing.
+  if (await serveReusedQueue(who.uid, target, req.method, res)) return;
+  const assets: AssetContext | null = await assetContext(who.uid, target, req.method, json, query, header, who.kind);
+  if (assets && (await serveReused(assets, res))) return;
   const headers: Record<string, string> = {};
   for (const h of FORWARDED_HEADERS) {
     const v = req.headers[h];
@@ -409,7 +416,6 @@ async function pass(
     return;
   }
 
-  const header = (name: string) => (typeof req.headers[name] === 'string' ? (req.headers[name] as string) : null);
   const spend = (usd: number | null, model: string): Spend => ({
     provider: target.provider,
     model,
@@ -458,7 +464,9 @@ async function pass(
     }
     await record(who.uid, spend(usd, asked));
     if (usd !== null) res.set(COST_HEADER, costText(usd));
-    res.send(bytes);
+    const kept = assets ? await keepJson(assets, bytes, usd) : null;
+    if (kept?.assetId) res.set(ASSET_HEADER, kept.assetId);
+    res.send(kept?.bytes ?? bytes);
     return;
   }
 
@@ -466,11 +474,16 @@ async function pass(
   if (upfront !== null) res.set(COST_HEADER, costText(upfront));
   await record(who.uid, spend(upfront, typeof json.model_id === 'string' ? json.model_id : asked));
   const reader = upstream.body.getReader();
+  const chunks: Buffer[] = [];
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    res.write(Buffer.from(value));
+    const chunk = Buffer.from(value);
+    if (assets) chunks.push(chunk);
+    res.write(chunk);
   }
+  // Kept before the end, while the request still holds the instance's CPU (`assets.ts`).
+  if (assets) await keepAudio(assets, Buffer.concat(chunks), type, upfront);
   res.end();
 }
 
@@ -485,6 +498,27 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     return;
   }
   const { path, query } = gatewayPathOf(req.url);
+  // A rig the RPG's page worked out itself, kept on the account (`people.ts`): `/_assets/self-rig/{id}`.
+  const selfRig = /^\/_assets\/self-rig\/([^/]+)$/.exec(path);
+  if (selfRig) {
+    try {
+      const uid = await uidOf(req);
+      if (!uid) {
+        res.status(401).json({ reason: 'auth', error: { message: 'rpg assets: sign in to keep a rig' } });
+        return;
+      }
+      const meta = req.headers['x-rpg-asset-meta'];
+      await handleSelfRig(uid, selfRig[1], req.method.toUpperCase(), bodyOf(req), typeof meta === 'string' ? meta : null, res);
+    } catch (e) {
+      if (e instanceof GatewayRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.selfRig', e);
+      if (!res.headersSent) res.status(502).json({ reason: 'failed' });
+    }
+    return;
+  }
   if ((path === ACCOUNT_STATUS_PATH && req.method === 'GET') || (path === LIVE_TOKEN_PATH && req.method === 'POST')) {
     try {
       await (path === ACCOUNT_STATUS_PATH ? accountStatus(req, res) : liveToken(req, res));
