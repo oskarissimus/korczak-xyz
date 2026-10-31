@@ -92,6 +92,11 @@ SDK. That is not a shortcut — `dist/sw.js` is a classic script assembled by co
 is the safest thing to hand iOS, and importing an npm package would make it a module and put a
 bundler in the middle of `generate-sw.mjs`.
 
+**A headless browser reports nothing.** `navigator.webdriver` drops every event and log on the
+page side (`automated()` in `src/lib/sentry.ts`), and the service worker files anything off
+korczak.xyz as `preview`. Until Oct 2026 a coding session's own Playwright check on localhost
+landed in Sentry like a real crash, and was half of what was open there.
+
 **Releases are the commit hash** — the same `git rev-parse --short HEAD` the navbar's status bar
 prints, so an issue and the hash on the page name the same deploy.
 

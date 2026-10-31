@@ -145,7 +145,9 @@ async function collectAssets(file, seen, resolveRelative = false) {
   }
 
   const found = new Set();
-  for (const [url] of source.matchAll(new RegExp(`${ASSET_DIR}[A-Za-z0-9._-]+\\.${ASSET_EXT}`, 'g'))) {
+  // The lookahead is not decoration: without it `/_astro/people_clips.X.json` matched as
+  // `people_clips.X.js`, a URL that does not exist, and every install of the RPG asked for it.
+  for (const [url] of source.matchAll(new RegExp(`${ASSET_DIR}[A-Za-z0-9._-]+\\.${ASSET_EXT}(?![A-Za-z0-9])`, 'g'))) {
     found.add(url);
   }
   if (resolveRelative) {

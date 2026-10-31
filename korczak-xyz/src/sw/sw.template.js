@@ -48,12 +48,18 @@ async function cachePut(cache, key, response) {
 async function precache(cache, urls) {
   const results = await Promise.allSettled(
     urls.map(async (url) => {
-      const response = await fetch(url, { cache: 'reload' });
-      if (!response.ok) throw new Error(`${response.status} ${url}`);
+      let response;
+      try {
+        response = await fetch(url, { cache: 'reload' });
+      } catch (error) {
+        // No answer at all: the network, not the build. Marked so the caller can tell them apart.
+        throw { url, network: true };
+      }
+      if (!response.ok) throw { url, status: response.status };
       await cachePut(cache, url, response);
     }),
   );
-  return results.filter((result) => result.status === 'rejected').length;
+  return results.filter((result) => result.status === 'rejected').map((result) => result.reason);
 }
 
 /**
@@ -78,7 +84,7 @@ async function precacheTier(name) {
   const cache = await caches.open(cacheName(name, BUILD_ID));
   const already = await cache.keys();
   if (already.length >= urls.length) return;
-  const failed = await precache(cache, urls);
+  const failures = await precache(cache, urls);
 
   /*
    * A partial tier is the failure this worker is least able to notice and most damaged by: the
@@ -86,14 +92,24 @@ async function precacheTier(name) {
    * one chunk never arrived. `precache` deliberately tolerates it (an atomic addAll would be
    * worse), so tolerating it silently is the part worth fixing.
    *
+   * Only answers count: a URL the server refused means the build and the precache list disagree,
+   * which is a bug. A fetch that got no answer is the network — an installed app opened in a car
+   * or a lift — and the next launch tops the tier up anyway (`already.length < urls.length`
+   * above), so reporting those filled Sentry with "7/10 failed" from phones on a bad signal and
+   * said nothing about the site. The refused URLs ride along, because a count alone left nothing
+   * to look up.
+   *
    * Reported only when a tier is meaningfully incomplete. One 404 on a stale URL is noise; a
-   * tenth of the tier missing means the build and the precache list disagree.
+   * tenth of the tier missing is not.
    */
-  if (failed > 0 && failed >= Math.max(2, Math.ceil(urls.length * 0.1))) {
-    sentryReport('sw.precache.incomplete', new Error(`${failed}/${urls.length} failed`), {
+  const refused = failures.filter((failure) => failure && typeof failure.status === 'number');
+  if (refused.length > 0 && refused.length >= Math.max(2, Math.ceil(urls.length * 0.1))) {
+    sentryReport('sw.precache.incomplete', new Error(`${refused.length}/${urls.length} refused`), {
       tier: name,
-      failed,
+      refused: refused.length,
+      unreachable: failures.length - refused.length,
       total: urls.length,
+      urls: refused.slice(0, 10).map((failure) => `${failure.status} ${failure.url}`),
     });
   }
 }

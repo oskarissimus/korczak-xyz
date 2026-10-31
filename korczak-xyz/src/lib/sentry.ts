@@ -92,6 +92,10 @@ const IGNORED_MESSAGES = [
   /NetworkError when attempting to fetch resource/i,
   // Safari/iOS webview noise with no stack and no reproduction.
   /^Script error\.?$/i,
+  // Safari closes IndexedDB under a page it has put in the background, and the Firestore SDK's
+  // next write to its cache throws this from native code. The SDK reopens the database on its
+  // own; nothing in the app can catch it, and nothing is lost.
+  /The database connection is closing/i,
 ];
 
 /*
@@ -114,6 +118,22 @@ function onSite(): boolean {
     return typeof location === 'undefined' || /(^|\.)korczak\.xyz$/.test(location.hostname);
   } catch {
     return true;
+  }
+}
+
+/*
+ * A browser driven by automation — Playwright, Puppeteer, anything speaking WebDriver — sets
+ * `navigator.webdriver`. On this site that is only ever a coding session checking its own change
+ * in headless Chromium on localhost, and its crashes are a work in progress, not a bug anybody
+ * hit: half the issues open in Oct 2026 were that, filed as `preview` and `development`, each one
+ * a notification that looked like the site breaking. Dropped before they leave, errors and logs
+ * alike. A real browser on localhost still reports, tagged by environment as before.
+ */
+function automated(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && navigator.webdriver === true;
+  } catch {
+    return false;
   }
 }
 
@@ -180,6 +200,7 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
 
       beforeSend,
       beforeBreadcrumb,
+      beforeSendLog: (entry) => (automated() ? null : entry),
     });
 
     setTag('context', context);
@@ -197,6 +218,7 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
  * `request.url` and in every navigation breadcrumb.
  */
 function beforeSend(event: SentryErrorEvent, _hint: EventHint): SentryErrorEvent | null {
+  if (automated()) return null;
   try {
     if (event.request?.url) event.request.url = scrubUrl(event.request.url);
     if (event.breadcrumbs) {

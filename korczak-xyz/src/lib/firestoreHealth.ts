@@ -61,7 +61,10 @@ export function recoverFirestore(reason: string): void {
   }
   lastRecycleAt = now;
   const replaced = recycleDb();
-  log.error('firestore.recycle', { reason, replaced });
+  // A warning, not an error: this is the recovery working, and it rides as a breadcrumb on
+  // whatever does fail afterwards. As an error it was a Sentry issue every time an iPhone woke the
+  // RPG from the background, about a page that then went on to load.
+  log.warn('firestore.recycle', { reason, replaced });
 }
 
 /**
@@ -80,7 +83,9 @@ export async function runCloud<T>(label: string, run: () => Promise<T>): Promise
     ]);
   } catch (e) {
     if (e instanceof FirestoreStalledError) {
-      log.error('firestore.stalled', { label, ms: DEADLINE_MS });
+      // Warn for the same reason as `firestore.recycle`: the caller gets the error and decides
+      // whether it is a failure (every caller here retries), so it is reported there if at all.
+      log.warn('firestore.stalled', { label, ms: DEADLINE_MS });
       recoverFirestore(`stalled:${label}`);
     } else if (isClientPanic(e)) {
       recoverFirestore(`panic:${label}`);

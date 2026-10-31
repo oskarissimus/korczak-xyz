@@ -31,6 +31,19 @@ const SENTRY_MAX_EVENTS = 20;
 let sentryEventCount = 0;
 const sentrySeen = new Set();
 
+/*
+ * Named the way the page names it (src/lib/sentry.ts): `production` only on korczak.xyz. This
+ * used to be `production` everywhere, so a worker under `astro preview` on localhost filed its
+ * failures among the real ones.
+ */
+function sentryEnvironment() {
+  try {
+    return /(^|\.)korczak\.xyz$/.test(self.location.hostname) ? 'production' : 'preview';
+  } catch {
+    return 'production';
+  }
+}
+
 function sentryUuid() {
   // The envelope wants 32 hex characters, no dashes.
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -72,7 +85,7 @@ function sentryReport(where, error, extra) {
       level: 'error',
       logger: 'sw',
       release: COMMIT_HASH,
-      environment: 'production',
+      environment: sentryEnvironment(),
       fingerprint: [where],
       tags: { context: 'sw', build_id: BUILD_ID, sw_event: where },
       extra: Object.assign({ where: where }, extra || {}),
