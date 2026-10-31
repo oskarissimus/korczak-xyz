@@ -301,7 +301,10 @@ export class Renderer {
     ctx.rect(tx, ty, tw, th);
     ctx.clip();
     for (let i = 0; i < rows; i++) {
-      const line = TERMINAL[(first + i) % TERMINAL.length];
+      // `?? ''` and the double modulo because a clock that was ever negative or NaN made this an
+      // undefined line, and `startsWith` on it stopped the whole frame (Sentry KORCZAK-XYZ-7).
+      const n = TERMINAL.length;
+      const line = TERMINAL[(((first + i) % n) + n) % n] ?? '';
       ctx.fillStyle = line.startsWith('✻') ? '#e08a5a' : '#7cd67c';
       ctx.fillText(line, tx + 6, ty + lineH * (i + 1));
     }
