@@ -139,7 +139,7 @@ export function retargetClips<C extends ClipLike>(
     }
     const times = [...new Set([...rot.values()].flatMap((t) => t.times))].sort((a, b) => a - b);
     const sample = new Map(
-      [...rot].map(([i, t]) => [i, new THREE.QuaternionKeyframeTrack(t.name, t.times, t.values).createInterpolant()]),
+      [...rot].map(([i, t]) => [i, new THREE.QuaternionLinearInterpolant(t.times, t.values, 4, new Float32Array(4))]),
     );
     const out = target.names.map(() => [] as number[]);
     const animated = target.names.map((_, ti) => {
