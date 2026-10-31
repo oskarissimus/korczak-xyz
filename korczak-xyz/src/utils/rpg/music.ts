@@ -22,6 +22,7 @@
 import type { WorldBible } from './genesis';
 import type { Tone } from './quest';
 import { endRequest, startRequest, updateRequest } from './devlog';
+import { apiFetch, serverCost } from './gateway';
 import { outOfFunds } from './funds';
 import { MUSIC_CREDITS_PER_MINUTE } from './cost';
 import { rememberTiming } from './progress';
@@ -229,7 +230,7 @@ async function compose(key: string, prompt: string, label: string, onSeconds: (s
   const entry = startRequest('music', model, null, prompt, label);
   try {
     const ask = (m: string) =>
-      fetch(`https://api.elevenlabs.io/v1/music/stream?output_format=${musicFormat(m)}`, {
+      apiFetch(`https://api.elevenlabs.io/v1/music/stream?output_format=${musicFormat(m)}`, {
         method: 'POST',
         headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, music_length_ms: MUSIC_MS, model_id: m, force_instrumental: true }),
@@ -257,6 +258,7 @@ async function compose(key: string, prompt: string, label: string, onSeconds: (s
       text: prompt,
       chars: Math.round(MUSIC_MS / 1000),
       credits: musicCredits(MUSIC_MS, response.headers.get('character-cost')),
+      serverCost: serverCost(response),
     });
     return bytes;
   } catch (e) {

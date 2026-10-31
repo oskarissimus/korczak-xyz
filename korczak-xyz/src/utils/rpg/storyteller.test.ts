@@ -183,6 +183,22 @@ describe('generateBeat', () => {
     expect(attempt.model).toBe(GOOGLE_MODELS[1]);
   });
 
+  it('goes through the gateway, and counts what the server says the beat cost', async () => {
+    const streamed = await answer(JSON.stringify(beat), 'gemini-3.8-flash').text();
+    const priced = new Response(`${streamed}\n: rpg-cost {"usd":0.0421,"model":"gemini-3.8-flash"}\n\n`, { status: 200 });
+    const fetch = vi.fn().mockResolvedValueOnce(priced);
+    vi.stubGlobal('fetch', fetch);
+    const attempt = await generateBeat({ google: 'k', openai: null }, ctx);
+    expect(attempt.outcome).toBe('generated');
+    const url = String(fetch.mock.calls[0][0]);
+    expect(url).toContain('/rpgApi/generativelanguage.googleapis.com/v1beta/models/');
+    expect(url).not.toContain('key=');
+    expect(new Headers(fetch.mock.calls[0][1].headers).get('x-rpg-key')).toBe('k');
+    const entry = devRequests().find((r) => r.kind === 'model')!;
+    expect(entry.serverCost).toBe(0.0421);
+    expect(entry.cost).toBe(0.0421);
+  });
+
   it('reads an answer that came back whole rather than streamed', async () => {
     const whole = new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(beat) }] } }] }), { status: 200 });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(whole));

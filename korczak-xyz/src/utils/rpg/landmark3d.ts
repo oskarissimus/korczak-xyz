@@ -39,6 +39,8 @@
 import { log } from '../../lib/logger';
 import { recordMeasurement } from '../../lib/sentry';
 import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
+import { apiFetch, serverCost } from './gateway';
+import { geminiImageCost, type GeminiImageUsage } from './gatewayRoutes';
 import { outOfFunds } from './funds';
 import type { LandmarkModel, WorldBible } from './genesis';
 import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
@@ -207,7 +209,7 @@ export async function drawImage(
     if (made) return made.image;
   }
   if ('gemini' in paint && googleKey) return drawWithGemini(googleKey, key, paint.gemini, prompt, label, o);
-  const f = o.fetchImpl ?? fetch;
+  const f = o.fetchImpl ?? apiFetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', paint.model, null, `${tryMark(o)}${prompt}`, label);
   try {
@@ -227,7 +229,7 @@ export async function drawImage(
     const body = (await res.json()) as { images?: { url?: string }[] };
     const url = body.images?.[0]?.url;
     if (!url) throw new Error('no image in the answer');
-    endRequest(entry, null, { cost: paint.price(size), text: `${tryMark(o)}${prompt}\n→ ${url}` });
+    endRequest(entry, null, { cost: paint.price(size), serverCost: serverCost(res), text: `${tryMark(o)}${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -235,27 +237,7 @@ export async function drawImage(
   }
 }
 
-/** Gemini's list prices for its image models, US dollars per million tokens, Oct 2026 (ai.google.dev/gemini-api/docs/pricing). */
-export const GEMINI_IMAGE_RATES: Record<string, { input: number; text: number; image: number }> = {
-  'gemini-3.1-flash-lite-image': { input: 0.25, text: 1.5, image: 30 },
-  'gemini-nano-banana-2.1': { input: 1.5, text: 7.5, image: 30 },
-};
-
-interface GeminiImageUsage {
-  promptTokenCount?: number;
-  candidatesTokenCount?: number;
-  thoughtsTokenCount?: number;
-  candidatesTokensDetails?: { modality?: string; tokenCount?: number }[];
-}
-
-/** What a picture cost, from the answer's token counts: the picture's own tokens at the image rate, the rest of the answer and the thinking at the text rate. */
-export function geminiImageCost(model: string, u: GeminiImageUsage): number {
-  const rate = GEMINI_IMAGE_RATES[model];
-  if (!rate) return 0;
-  const image = (u.candidatesTokensDetails ?? []).filter((d) => d.modality === 'IMAGE').reduce((n, d) => n + (d.tokenCount ?? 0), 0);
-  const text = (u.candidatesTokenCount ?? 0) - image + (u.thoughtsTokenCount ?? 0);
-  return ((u.promptTokenCount ?? 0) * rate.input + text * rate.text + image * rate.image) / 1_000_000;
-}
+export { GEMINI_IMAGE_RATES, geminiImageCost } from './gatewayRoutes';
 
 /**
  * A picture from Google's own API (`PERSON_PAINTERS`, `gemini`), then put on fal's storage: the
@@ -270,7 +252,7 @@ async function drawWithGemini(
   label: FalSlot | 'ground' | 'cover',
   o: FalOptions,
 ): Promise<string> {
-  const f = o.fetchImpl ?? fetch;
+  const f = o.fetchImpl ?? apiFetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', gemini.model, null, `${tryMark(o)}${prompt}`, label);
   try {
@@ -306,7 +288,7 @@ async function drawWithGemini(
     }
     const cost = geminiImageCost(gemini.model, body.usageMetadata ?? {});
     const url = await keepOnFal(fal, picture.data, picture.mimeType ?? 'image/png', o);
-    endRequest(entry, null, { cost, text: `${tryMark(o)}${prompt}\n→ ${url}` });
+    endRequest(entry, null, { cost, serverCost: serverCost(res), text: `${tryMark(o)}${prompt}\n→ ${url}` });
     return url;
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -316,7 +298,7 @@ async function drawWithGemini(
 
 /** Bytes (base64) onto fal's storage, as fal's own client uploads a file: a signed URL to PUT to, and the URL it is read at after. */
 async function keepOnFal(key: string, base64: string, type: string, o: FalOptions): Promise<string> {
-  const f = o.fetchImpl ?? fetch;
+  const f = o.fetchImpl ?? apiFetch;
   const init = await f('https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3', {
     method: 'POST',
     headers: headers(key),
@@ -338,7 +320,7 @@ async function keepOnFal(key: string, base64: string, type: string, o: FalOption
  * account's limit the queue holds it, and that wait comes back as `queuedMs`.
  */
 async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptions, started?: () => void): Promise<{ glb: string; queuedMs: number }> {
-  const f = o.fetchImpl ?? fetch;
+  const f = o.fetchImpl ?? apiFetch;
   const sleep = o.sleep ?? wait;
   const entry = startRequest('fal', FAL_MESH_MODEL, null, `${tryMark(o)}← ${image}`, label);
   try {
@@ -377,7 +359,7 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
     const kb = body.model_mesh?.file_size ? ` (${Math.round(body.model_mesh.file_size / 1024)} KB)` : '';
     const waited = queuedMs ?? 0;
     const held = waited >= 1000 ? `, ${Math.round(waited / 1000)} s of it in fal's queue` : '';
-    endRequest(entry, null, { cost: FAL_PRICES.mesh, text: `${tryMark(o)}← ${image}\n→ ${glb}${kb}${held}` });
+    endRequest(entry, null, { cost: FAL_PRICES.mesh, serverCost: serverCost(submit), text: `${tryMark(o)}← ${image}\n→ ${glb}${kb}${held}` });
     return { glb, queuedMs: waited };
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
@@ -390,7 +372,7 @@ async function buildMesh(key: string, image: string, label: FalSlot, o: FalOptio
  * answers the result. `started` is called when fal gives it a runner.
  */
 async function queueJob<T>(key: string, model: string, body: object, entry: DevRequest, head: string, o: FalOptions, started?: () => void): Promise<T> {
-  const f = o.fetchImpl ?? fetch;
+  const f = o.fetchImpl ?? apiFetch;
   const sleep = o.sleep ?? wait;
   const submit = await f(`https://queue.fal.run/${model}`, { method: 'POST', headers: headers(key), signal: o.signal, body: JSON.stringify(body) });
   if (!submit.ok) throw await failure(submit);

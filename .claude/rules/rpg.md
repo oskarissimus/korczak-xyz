@@ -1138,6 +1138,47 @@ decisions that decide the outcome). Then `gemini-3.1-pro-preview` as the fallbac
 narration. The genesis and the opening beat ask `FAST_MODEL` before this chain unless the quick start is
 switched off (*The start is quick*, above).
 
+**Every provider request goes through the server** (owner, 31 Oct 2026: "do the refactor so that
+everything goes through the server, the requests to fal, Google and so on"), ahead of prepaid
+credits, which cannot exist while the page holds a key it can spend outside any budget. `rpgApi`
+(`functions/src/rpg/gateway.ts`, gen-2, 540 s) is a key-holding proxy for exactly the requests the
+game makes — Google's `generateContent`/`streamGenerateContent`, OpenAI's chat completions,
+ElevenLabs' speech, dialogue, music, library search and voice design, fal.ai's `fal.run`, queue
+(submit, status, result, cancel) and storage upload, Meshy included since the game reaches it
+through fal. Anything else is a 404 from the gateway (`ROUTES` in `utils/rpg/gatewayRoutes.ts`,
+shared by both runtimes and tested on both).
+- **The call sites did not change shape.** Each still builds the provider's own request and hands
+  it to `apiFetch` (`utils/rpg/gateway.ts`) instead of `fetch`; `apiFetch` sends it to
+  `{rpgApi}/{host}/{path}` and turns whatever key it carried into who pays. Signed in (and the key
+  sync not `error`), the keys the game passes around are **handles** (`gatewayKeys`, `ACCOUNT_KEY`):
+  the request carries the reader's Firebase ID token and the server reads the key from
+  `users/{uid}/keys/config` itself, cached a minute per instance because a fal.ai model is polled
+  every two seconds. Signed out, or the account unreachable, a key that is only in this browser goes
+  in `x-rpg-key` for that one request — the bring-your-own-key path; the server keeps nothing. A
+  host that is not a provider's (fal's signed upload URL, its CDN) is fetched directly.
+- **The answer comes back byte for byte**, event streams as they arrive, so the `~` console still
+  shows the tokens as they are written; a provider's refusal comes back with the provider's status
+  and words, so the model chain still moves on a 429 and the funds banner still reads fal's
+  `User is locked`.
+- **The server prices every request** (`costUpfront` for a clip by its characters, the score by its
+  length, a fal.ai job at submit by its model; `UsageMeter` for a model's tokens, by the model that
+  answered) at the same list prices the console uses, and says so: `x-rpg-cost-usd`, or on a stream
+  a last SSE comment, `: rpg-cost {"usd":…}`, which every event reader skips. The console shows that
+  figure with *(server)* (`DevRequest.serverCost`, which then wins over the page's estimate).
+- **The ledger** is `rpgLedger/{uid}` (running total — where a balance will go), `…/days/{day}`,
+  `…/worlds/{worldId}` and `…/quests/{questId}`, each split `byProvider` and `byModel`; the page
+  says which world and quest a request is for in `x-rpg-world`/`x-rpg-quest`
+  (`setGatewayContext`), and a quest has its own id since this change (`SavedGame.questId`). Top
+  level with no Firestore rule, like `demoUsage`: a ledger its reader could write would be no ledger
+  once it is money. A signed-out key writes nothing.
+- **Nobody pays → 402** `{reason:'no-credits'}` with `rpg-credits` in the message, which `funds.ts`
+  reads as an empty balance for every provider. That branch of `payer` is where credits plug in:
+  the owner's key, a reservation before the call and a settlement after it, as `rpgDemo` already
+  does in dollars.
+- Not moved: the demo (`rpgDemo`) and the server's own jobs (`rpgJob`) were already on the server.
+  The account page itself still syncs the keys into this browser for the other apps that read them
+  (`account-keys.md`); the game no longer sends them anywhere.
+
 **Pro is slow, not broken.** Measured Oct 2026: its first token takes 3–40s even on a one-line
 prompt, and a whole beat can run past a minute. The first version had one 90s limit for the whole
 attempt, and a timeout ended it — no Flash asked, the hand-written quest, after a minute and a

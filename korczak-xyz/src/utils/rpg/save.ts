@@ -61,7 +61,8 @@ export interface SavedGame {
   /** The quest's tone and tie to the past (`drawMood`); absent in saves from before 28 Oct 2026. */
   mood?: QuestMood;
   /** What the quest has cost so far, every sitting (`devlog.ts`); absent in saves from before 27 Oct 2026. */
-  spent?: Spend;
+  spent?: Spend;  /** The quest's own id, for the server's ledger (`gateway.ts`); absent in saves from before 31 Oct 2026. */
+  questId?: string;
 }
 
 function valid(saved: unknown): saved is SavedGame {

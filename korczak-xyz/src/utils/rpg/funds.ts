@@ -43,13 +43,14 @@ export const TOP_UP: Record<FundsProvider, { name: string; url: string }> = {
  * What each provider says when the money is gone, as of Oct 2026. Narrow on purpose: Google's
  * per-model 429 ends "please check your plan and billing details" too, and is only a quota the chain
  * moves past, so for Google only the prepayment and billing wording counts. OpenAI's same sentence is
- * `insufficient_quota`, which is the balance.
+ * `insufficient_quota`, which is the balance. And for every provider the RPG's own gateway, when
+ * nobody pays for a request (`NO_CREDITS` in `gatewayRoutes.ts`: no key, and later no credits).
  */
 const SIGNS: Record<FundsProvider, RegExp> = {
-  fal: /user is locked|top_?up|exhausted balance|insufficient (?:balance|credits|funds)|^402\b/i,
-  elevenlabs: /quota_exceeded|exceeds your quota|payment_required|insufficient[_ ](?:credits|funds)|^(?:ElevenLabs )?402\b/i,
-  google: /credits are depleted|prepayment|requires billing|billing_disabled|billing (?:is )?(?:not enabled|disabled)/i,
-  openai: /insufficient_quota|exceeded your current quota|billing_hard_limit/i,
+  fal: /user is locked|top_?up|exhausted balance|insufficient (?:balance|credits|funds)|^402\b|rpg-credits/i,
+  elevenlabs: /quota_exceeded|exceeds your quota|payment_required|insufficient[_ ](?:credits|funds)|^(?:ElevenLabs )?402\b|rpg-credits/i,
+  google: /credits are depleted|prepayment|requires billing|billing_disabled|billing (?:is )?(?:not enabled|disabled)|rpg-credits/i,
+  openai: /insufficient_quota|exceeded your current quota|billing_hard_limit|rpg-credits/i,
 };
 
 /** Whose request a console entry is, by its kind and the model asked. */

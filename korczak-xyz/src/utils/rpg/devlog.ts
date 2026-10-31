@@ -58,6 +58,11 @@ export interface DevRequest {
   cost: number | null;
   /** Asked by the server's job runner rather than this browser (`serverJobs.ts`). */
   server?: boolean;
+  /**
+   * Dollars as the RPG's gateway priced it (`gateway.ts`) — what goes in the reader's ledger. When
+   * it is known it is the cost shown and counted; the browser's own estimate is the fallback.
+   */
+  serverCost?: number | null;
 }
 
 export interface QuestTotals {
@@ -301,6 +306,7 @@ export function updateRequest(entry: DevRequest, patch: Partial<DevRequest>): vo
   }
   if (entry.kind === 'model' && entry.usage) entry.cost = tokenCost(entry.servedBy ?? entry.model, entry.usage);
   if (entry.kind === 'voice' || entry.kind === 'music') entry.cost = voiceCost(entry.credits);
+  if (typeof entry.serverCost === 'number') entry.cost = entry.serverCost;
   requests = [...requests];
   changed();
 }

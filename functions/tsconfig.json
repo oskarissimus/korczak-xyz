@@ -34,6 +34,7 @@
     "../korczak-xyz/src/utils/rpg/voicePick.ts",
     "../korczak-xyz/src/utils/rpg/persona.ts",
     "../korczak-xyz/src/utils/rpg/falPrompts.ts",
+    "../korczak-xyz/src/utils/rpg/gatewayRoutes.ts",
     "../korczak-xyz/src/utils/rpg/jobs.ts"
   ],
   "exclude": [

@@ -8,6 +8,7 @@
  * walking back through a dialogue does not pay for the same line twice.
  */
 
+import { apiFetch, serverCost } from './gateway';
 import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
 import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, updateRequest, voiceCredits } from './devlog';
@@ -120,7 +121,7 @@ function listVoices(key: string, url: string): Promise<SharedVoice[]> {
     if (stored && Date.now() - stored.at < LISTS_MS) return stored.voices;
     const handed = await servedList(url);
     if (handed) return handed;
-    const response = await fetch(url, { headers: { 'xi-api-key': key } });
+    const response = await apiFetch(url, { headers: { 'xi-api-key': key } });
     if (response.status === 401 || response.status === 403) libraryOff = true;
     if (!response.ok) throw new Error(`ElevenLabs ${response.status}`);
     const voices = sharedVoicesOf(await response.json()).map(({ voice_id, rate, fiat_rate, verified_languages }) => ({
@@ -180,7 +181,7 @@ function designedVoice(key: string, who: DesignWho, lang: Lang): Promise<string 
   found = (async () => {
     const stored = storedDesigns()[id];
     if (stored) return stored;
-    const existing = await findDesigned(fetch, key, voiceWorld, who.name).catch(() => null);
+    const existing = await findDesigned(apiFetch, key, voiceWorld, who.name).catch(() => null);
     if (existing) {
       storeDesign(id, existing);
       return existing;
@@ -191,7 +192,7 @@ function designedVoice(key: string, who: DesignWho, lang: Lang): Promise<string 
     const sample = previewText(who, lang);
     const entry = startRequest('voice', `${DESIGN_MODEL} · ${who.name}`, null, who.voice);
     try {
-      const voiceId = await designVoice(fetch, key, voiceWorld, who, lang);
+      const voiceId = await designVoice(apiFetch, key, voiceWorld, who, lang);
       endRequest(entry, null, { chars: sample.length, credits: sample.length });
       storeDesign(id, voiceId);
       return voiceId;
@@ -235,7 +236,7 @@ async function libraryVoice(key: string, line: SpokenLine, lang: Lang): Promise<
 }
 
 function speak(key: string, voiceId: string, text: string, lang: Lang, model: string = VOICE_MODEL): Promise<Response> {
-  return fetch(...speechRequest(key, voiceId, text, lang, model));
+  return apiFetch(...speechRequest(key, voiceId, text, lang, model));
 }
 
 /** 50ms of silence, the same clip the backseat driver primes with. */
@@ -312,6 +313,7 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
     endRequest(entry, null, {
       chars: said.text.length,
       credits: voiceCredits(said.text.length, response.headers.get('character-cost'), voiceCreditsPerChar(model)),
+      serverCost: serverCost(response),
     });
     return url;
   } catch (e) {

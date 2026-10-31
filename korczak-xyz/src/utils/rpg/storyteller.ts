@@ -24,6 +24,8 @@
  * the hand-written quest, every time.
  */
 
+import { apiFetch } from './gateway';
+import { readCostEvent } from './gatewayRoutes';
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job, type QuestMood } from './quest';
 import { freePrompt, parseFree, type FreeAnswer, type FreeContext } from './freeLine';
 import {
@@ -219,6 +221,9 @@ class Watchdog {
  * Reads a server-sent event stream, handing each `data:` payload over parsed. Both providers stream
  * this way; a line that is not JSON (OpenAI's closing `[DONE]`) is skipped.
  */
+/** The field a stream's closing cost line is handed over under (`handleLine`). */
+const SERVER_COST = '__rpgServerCost';
+
 async function readEvents(response: Response, dog: Watchdog, onData: (data: any) => void): Promise<void> {
   // A body that turns out not to be a stream at all (a proxy that buffered it, a test double) is one
   // JSON payload, read whole at the end.
@@ -259,6 +264,12 @@ async function readEvents(response: Response, dog: Watchdog, onData: (data: any)
 
 /** True when the line was an event; an error inside one is the caller's to throw. */
 function handleLine(line: string, onData: (data: any) => void): boolean {
+  // The gateway's last line: what the server says the answer cost. Not an event of the provider's.
+  const usd = readCostEvent(line);
+  if (usd !== null) {
+    onData({ [SERVER_COST]: usd });
+    return false;
+  }
   const trimmed = line.trim();
   if (!trimmed.startsWith('data:')) return false;
   let data: unknown;
@@ -285,7 +296,7 @@ async function askGoogle(
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}` +
     `:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`;
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: dog.controller.signal,
@@ -346,6 +357,7 @@ async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest, 
   let text = '';
   let why: string | null = null;
   await readEvents(response, dog, (data) => {
+    if (typeof data?.[SERVER_COST] === 'number') return updateRequest(entry, { serverCost: data[SERVER_COST] });
     if (data?.error) throw new ProviderError(data.error.message ?? 'stream error', data.error.code ?? null);
     if (data?.modelVersion && !entry.servedBy) updateRequest(entry, { servedBy: data.modelVersion });
     const candidate = data?.candidates?.[0];
@@ -377,7 +389,7 @@ async function askOpenAi(
   entry: DevRequest,
   onText?: (soFar: string) => void,
 ): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await apiFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     signal: dog.controller.signal,
@@ -394,6 +406,7 @@ async function askOpenAi(
   if (!response.ok) throw new ProviderError(await errorText(response), response.status);
   let text = '';
   await readEvents(response, dog, (data) => {
+    if (typeof data?.[SERVER_COST] === 'number') return updateRequest(entry, { serverCost: data[SERVER_COST] });
     if (data?.model && !entry.servedBy) updateRequest(entry, { servedBy: data.model });
     const delta = data?.choices?.[0]?.delta?.content ?? data?.choices?.[0]?.message?.content;
     if (typeof delta === 'string') {

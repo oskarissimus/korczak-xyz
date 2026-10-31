@@ -130,7 +130,9 @@ function headline(r: DevRequest): string {
   if (r.usage) parts.push(`in ${tokens(r.usage.input)} out ${tokens(r.usage.output)} think ${tokens(r.usage.thoughts)}`);
   if (r.kind === 'voice' && r.status === 'ok') parts.push(`${r.chars} chars ≈ ${Math.round(r.credits)} cr`);
   if (r.kind === 'music' && r.status === 'ok') parts.push(`${r.chars} s ≈ ${Math.round(r.credits)} cr`);
-  if (r.kind === 'model' ? r.usage : r.status === 'ok') parts.push(formatUsd(r.cost));
+  // Priced by the gateway (`utils/rpg/gateway.ts`), the figure the reader's ledger holds; else the page's estimate.
+  const priced = typeof r.serverCost === 'number';
+  if (r.kind === 'model' ? r.usage || priced : r.status === 'ok') parts.push(priced ? `${formatUsd(r.cost)} (server)` : formatUsd(r.cost));
   // Asked by the server's job runner (`utils/rpg/serverJobs.ts`), which goes on with the page in the background.
   if (r.server) parts.push('☁ server');
   return parts.join(' · ');

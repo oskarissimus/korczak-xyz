@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
+import { gatewayKeys, setGatewayContext } from '../../utils/rpg/gateway';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
@@ -330,19 +331,27 @@ export default function Rpg({ lang }: { lang: Lang }) {
     account.ready &&
     !auth.loading &&
     (!auth.user || account.sync === 'synced' || account.sync === 'error');
-  const ownStory = Boolean(account.keys.google || account.keys.openai);
+  // Every provider request goes through the server (`utils/rpg/gateway.ts`). Signed in, the keys
+  // passed around are handles: the server reads the key itself from the account, and the page sends
+  // only the reader's ID token. Signed out — or with the account unreachable — the key in this
+  // browser goes with each request, the reader's own and kept nowhere.
+  const onAccount = Boolean(auth.user) && account.sync !== 'error' && account.sync !== 'local';
+  const apiKeys = useMemo(() => gatewayKeys(account.keys, onAccount), [account.keys, onAccount]);
+  // What the server's ledger counts each request under: this world, and this quest once there is one.
+  setGatewayContext(() => ({ world: worldRef.current?.createdAt ? worldRef.current.id : null, quest: questIdRef.current }));
+  const ownStory = Boolean(apiKeys.google || apiKeys.openai);
   const ownStoryRef = useRef(ownStory);
   ownStoryRef.current = ownStory;
   // With no key of the reader's own, the demo on the owner's (`utils/rpg/demo.ts`), while it is open.
   const [demo, setDemo] = useState<RpgDemoStatus | null>(null);
-  const storyProvider: QuestSource = account.keys.google
+  const storyProvider: QuestSource = apiKeys.google
     ? 'google'
-    : account.keys.openai
+    : apiKeys.openai
       ? 'openai'
       : demo?.available
         ? 'demo'
         : 'static';
-  const voiceKey = account.keys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
+  const voiceKey = apiKeys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
   const [voiceOn, setVoiceOn] = useState(true);
   // The library searches for the reader's own key, so no character's first line waits on one
   // (`voice.ts`); the demo voice picks on the function's side and needs nothing here.
@@ -353,7 +362,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   voiceRef.current = voiceOn ? voiceKey : null;
   // The score (`utils/rpg/music.ts`): composed on the reader's own ElevenLabs key only, never the
   // demo's, for the world and tone of the quest being played. Its switch is remembered.
-  const musicKey = account.keys.elevenLabs ?? null;
+  const musicKey = apiKeys.elevenLabs ?? null;
   const [musicOn, setMusicOn] = useState(loadMusicOn);
   const [score, setScore] = useState<{ world: WorldBible; tone: Tone | null } | null>(null);
   // Where the score is: its bar beside 🎵, its row in the start's progress, the retry when it failed.
@@ -398,7 +407,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   setPersonMesher(mesher);
   const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
   setPersonPainter(painter);
-  setGoogleImageKey(account.keys.google);
+  setGoogleImageKey(apiKeys.google);
   const [pose, setPose] = useState<PersonPose>(DEFAULT_POSE);
   setPersonPose(pose);
   const fastStartRef = useRef(true);
@@ -506,6 +515,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
   /** The opening could not be written, so the whole quest is the hand-written one. */
   const staticRef = useRef(false);
   const seedRef = useRef(SEEDS[0]);
+  /** The quest in progress, by an id of its own: what the server's ledger counts its spend under. */
+  const questIdRef = useRef<string | null>(null);
   const pendingRef = useRef<Promise<Written> | null>(null);
   /** Every beat of this quest so far, for the autosave. */
   const beatsRef = useRef<Beat[]>([]);
@@ -852,6 +863,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       dead: deadRef.current,
       ...(moodRef.current && { mood: moodRef.current }),
       spent: questSpend(),
+      ...(questIdRef.current && { questId: questIdRef.current }),
     });
   }, []);
   persistRef.current = persist;
@@ -880,7 +892,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const writeBeat = useCallback(
     async (index: number, job: Job | null, steps: StepRecord[], title: string | null): Promise<Written> => {
       if (staticRef.current) return { beat: staticBeat(gameLang, index), failure: null };
-      const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
+      const keys = { google: apiKeys.google, openai: apiKeys.openai, demo: storyProvider === 'demo' };
       const chosen = chosenModelRef.current;
       const done = watchBeat(index, gameLang, chosen);
       try {
@@ -912,7 +924,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         done();
       }
     },
-    [account.keys.google, account.keys.openai, gameLang, storyProvider],
+    [apiKeys.google, apiKeys.openai, gameLang, storyProvider],
   );
 
   const writeBeatRef = useRef(writeBeat);
@@ -1026,6 +1038,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     moodRef.current = mood;
     if (worldRef.current) setScore({ world: worldRef.current, tone: mood.tone });
     seedRef.current = seedFor(mood.tone);
+    questIdRef.current = `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     log.info('rpg.quest.mood', { ...mood, seed: seedRef.current });
 
     // A world just invented is still being built around the hero; an old one only waits for its quest.
@@ -1217,7 +1230,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const avoid = again?.avoid ?? pastWorlds();
     const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText, nth, avoid };
     savePendingGenesis({ ...pending, at: Date.now() });
-    const keys = { google: account.keys.google, openai: account.keys.openai, demo: storyProvider === 'demo' };
+    const keys = { google: apiKeys.google, openai: apiKeys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
     // The hub's models start from the stream, the moment what they are made of has been written,
     // rather than a minute later when the whole bible has (`previewWorld`).
@@ -1291,7 +1304,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         void startQuest(true);
       },
     });
-  }, [account.keys.google, account.keys.openai, enterWorld, flash, gameLang, startQuest, startWorldAssets, storyProvider, withEarly]);
+  }, [apiKeys.google, apiKeys.openai, enterWorld, flash, gameLang, startQuest, startWorldAssets, storyProvider, withEarly]);
   // A genesis a reload interrupted, offered on the intro to finish with the same seeds.
   const [pendingGenesis, setPendingGenesis] = useState<PendingGenesis | null>(null);
   useEffect(() => {
@@ -1401,7 +1414,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   // The hub (`utils/rpg/landmark3d.ts`): an invented world's own landmark, houses, tree and the
   // things in its square, from fal.ai, each made once and kept on the world, and the forest's trees
   // across the map; each stands the moment it has loaded, and nothing stands in for it before.
-  const falKey = keysReady ? account.keys.fal : null;
+  const falKey = keysReady ? apiKeys.fal : null;
 
   /**
    * Everything the start is making, for the progress in the corner (`WorldProgress`): the world and
@@ -1650,7 +1663,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     // what they are rather than as big as their slot (`hubFit`).
     if (keysReady && world.createdAt > 0 && !world.sizes && (world.kit || world.landmark) && !sizesAskedRef.current.has(world.id)) {
       sizesAskedRef.current.add(world.id);
-      const keys = { google: account.keys.google, openai: account.keys.openai, demo: false };
+      const keys = { google: apiKeys.google, openai: apiKeys.openai, demo: false };
       void generateHubSizes(keys, world, chosenModelRef.current)
         .then(({ sizes, tries, ms }) => {
           const spent = triesSpend(tries, ms);
@@ -1953,7 +1966,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       const ask = ++freeAskRef.current;
       const token = questTokenRef.current;
       setFreeState('busy');
-      const keys = { google: account.keys.google, openai: account.keys.openai };
+      const keys = { google: apiKeys.google, openai: apiKeys.openai };
       const attempt = await generateFree(
         keys,
         {
@@ -2009,7 +2022,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       setBeat(kept);
       decide(kept, d);
     },
-    [account.keys.google, account.keys.openai, decide, persist],
+    [apiKeys.google, apiKeys.openai, decide, persist],
   );
   const askFreeRef = useRef(askFree);
   askFreeRef.current = askFree;
@@ -2316,8 +2329,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     storyProvider === 'demo'
       ? (DEMO_MODELS as readonly string[]).includes(m.id)
       : m.provider === 'google'
-        ? account.keys.google
-        : !account.keys.google && account.keys.openai,
+        ? apiKeys.google
+        : !apiKeys.google && apiKeys.openai,
   );
 
   // Both sides speak, when there is an ElevenLabs key: the hunter's choice, then the answer. A line
@@ -2417,6 +2430,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setGenerating(false);
     setUnfolding(false);
     seedRef.current = game.seed;
+    questIdRef.current = game.questId ?? `q-${game.at.toString(36)}`;
     moodRef.current = game.mood;
     // A quest from before moods is written as a grim one, and scored as one.
     setScore({ world: into, tone: game.mood?.tone ?? 'grim' });

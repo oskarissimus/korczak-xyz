@@ -24,6 +24,7 @@ import { configureWebPush, sendTo } from './push';
 import { handleAssembleVideo } from './sloper/handler';
 import { handleRoastDemo } from './demo/handler';
 import { handleRpgDemo } from './rpg/handler';
+import { handleRpgApi } from './rpg/gateway';
 import { runJob } from './rpg/jobs';
 import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
@@ -285,6 +286,23 @@ export const rpgDemo = onRequest(
     cors: false,
   },
   handleRpgDemo,
+);
+
+// The RPG's gateway (`rpg/gateway.ts`): every provider request the game makes from the page —
+// Google, OpenAI, ElevenLabs, fal.ai — goes through here, the key put on it by the server and the
+// cost written to the reader's ledger. Nine minutes because a Pro beat is streamed through it and a
+// fal.ai picture can wait out a queue; concurrency high because nearly all of it is waiting.
+export const rpgApi = onRequest(
+  {
+    region: REGION,
+    memory: '512MiB',
+    cpu: 1,
+    timeoutSeconds: 540,
+    concurrency: 80,
+    maxInstances: 10,
+    cors: false,
+  },
+  handleRpgApi,
 );
 
 /**
