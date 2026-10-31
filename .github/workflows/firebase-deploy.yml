@@ -71,6 +71,17 @@ on:
       - "korczak-xyz/src/utils/rpg/demoLimits.ts"
       - "korczak-xyz/src/utils/rpg/voicePick.ts"
       - "korczak-xyz/src/utils/rpg/persona.ts"
+      # And what those import in turn, which tsc follows whether or not tsconfig lists them: the
+      # audio tags and the crafts `quest.ts` names, the day a craft implies, the clip names both of
+      # those use, and the relief `genesis.ts` asks for with the ground it is drawn over. `clips.ts`
+      # exists so that none of them reaches into `components/Rpg/`, which is three.js and `?url`
+      # imports — the one time a type crossed that line, every deploy from 30 Oct 2026 failed at `tsc`.
+      - "korczak-xyz/src/utils/rpg/audioTags.ts"
+      - "korczak-xyz/src/utils/rpg/craft.ts"
+      - "korczak-xyz/src/utils/rpg/routine.ts"
+      - "korczak-xyz/src/utils/rpg/clips.ts"
+      - "korczak-xyz/src/utils/rpg/terrain.ts"
+      - "korczak-xyz/src/utils/rpg/trail.ts"
       # And the generation jobs the `rpgJob` function runs: their shape and ids, and the fal.ai prompts it
       # builds for a world it has just born.
       - "korczak-xyz/src/utils/rpg/jobs.ts"

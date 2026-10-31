@@ -46,20 +46,8 @@ const PARTS = {
 export type Part = keyof typeof PARTS;
 export type Outfit = 'male_ranger' | 'male_peasant' | 'female_ranger' | 'female_peasant' | 'body_male';
 
-/** The clips `scripts/rpg-characters.mjs` keeps. */
-export type Clip =
-  | 'Idle_Loop'
-  | 'Idle_Talking_Loop'
-  | 'Walk_Loop'
-  | 'Jog_Fwd_Loop'
-  | 'Sword_Idle'
-  | 'Sword_Attack'
-  | 'Punch_Jab'
-  | 'Hit_Chest'
-  | 'Death01'
-  | 'Jump_Start'
-  | 'Jump_Loop'
-  | 'Jump_Land';
+export type { Clip } from '../../utils/rpg/clips';
+import type { Clip } from '../../utils/rpg/clips';
 
 export interface Look {
   outfit: Outfit;

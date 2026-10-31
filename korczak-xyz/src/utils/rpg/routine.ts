@@ -15,7 +15,7 @@
  * is still where the marker says.
  */
 
-import type { Clip } from '../../components/Rpg/characters';
+import type { Clip } from './clips';
 import { CRAFT_SPECS, type Craft } from './craft';
 
 export interface Ground {

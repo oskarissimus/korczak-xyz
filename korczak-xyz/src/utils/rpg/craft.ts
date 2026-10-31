@@ -12,7 +12,7 @@
  * Plain data, no Three.js, so the parser and the routine can be tested.
  */
 
-import type { Clip } from '../../components/Rpg/characters';
+import type { Clip } from './clips';
 import type { Trade } from './routine';
 
 export const CRAFTS = ['smith', 'carpenter', 'woodcutter', 'miner', 'farmer', 'cook', 'alchemist', 'trader', 'priest', 'guard', 'scribe'] as const;
