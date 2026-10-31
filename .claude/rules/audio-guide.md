@@ -238,6 +238,11 @@ the diagnosis.** A network error or timeout says only that, never our own plumbi
 
 ### The keys are the reader's, typed in the app like sloper's
 
+> **31 Oct 2026:** a signed-in reader's keys never reach the page any more. The request goes through
+> the site's gateway (`rpgApi`, `account-keys.md`), which fills a `X-*-Key` header holding the
+> `ACCOUNT_KEY` handle from the account before passing it to the Go function; a signed-out reader's
+> own key is passed on as it came. The function is unchanged.
+
 > **Oct 2026:** the keys and the writer choice (Google or OpenAI) are now the account's shared store
 > (`account-keys.md`); `keyStorage.ts`, `keyCloud.ts` and the borrow are gone, and the sheet sends
 > only the chosen writer's header. What follows is the history.

@@ -20,6 +20,7 @@
 
 import { ConcurrencyLimiter } from './concurrency';
 import type { ImageQuality } from './types';
+import { apiFetch } from '../rpg/gateway';
 
 export interface ImageResult {
   data: Blob;
@@ -81,7 +82,7 @@ export async function generateImage(
   if (model === 'dall-e-3') body.quality = options.quality === 'high' ? 'hd' : 'standard';
   if (model === 'dall-e-3' || model === 'dall-e-2') body.response_format = 'b64_json';
 
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
+  const response = await apiFetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal,
@@ -157,7 +158,7 @@ async function generateImagenImage(
   options: GoogleImageGenerationOptions,
   signal?: AbortSignal,
 ): Promise<ImageResult> {
-  const response = await fetch(
+  const response = await apiFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:predict`,
     {
       method: 'POST',
@@ -186,7 +187,7 @@ async function generateGeminiImage(
   options: GoogleImageGenerationOptions,
   signal?: AbortSignal,
 ): Promise<ImageResult> {
-  const response = await fetch(
+  const response = await apiFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent`,
     {
       method: 'POST',

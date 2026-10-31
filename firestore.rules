@@ -313,8 +313,17 @@ service cloud.firestore {
     // write nothing at all under its own uid — which used to cost us the diagnostic log of the
     // first sign-in of a person about to be turned away. Sentry does not go through these rules,
     // so that session is now reported like any other, and the cost is gone.
+    //
+    // The one thing under users/{uid} the owner may write and never read back: `keys`, the account's
+    // API keys (owner, 31 Oct 2026: "the key should never go from Firebase to the browser"). A page
+    // writes a key there with a merge; only the Admin SDK reads it — the site's gateway (`rpgApi`),
+    // which puts the key on each request, `rpgJob`, and the two demos. What a page may know about
+    // the keys it gets from the gateway (which exist, their last four characters). Written as a
+    // condition on the catch-all rather than as a rule of its own because rules are a permissive
+    // union: a `keys` rule saying `allow read: if false` would be ignored beside this one.
     match /users/{uid}/{document=**} {
-      allow read, write: if approved() && request.auth.uid == uid;
+      allow read: if approved() && request.auth.uid == uid && document[0] != 'keys';
+      allow write: if approved() && request.auth.uid == uid;
     }
 
     // The shared baby sleep log. This sits *beside* the catch-all above rather than replacing it,

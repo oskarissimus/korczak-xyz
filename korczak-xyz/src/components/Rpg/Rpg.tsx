@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
-import { gatewayKeys, setGatewayContext } from '../../utils/rpg/gateway';
+import { setGatewayContext } from '../../utils/rpg/gateway';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
@@ -332,11 +332,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     !auth.loading &&
     (!auth.user || account.sync === 'synced' || account.sync === 'error');
   // Every provider request goes through the server (`utils/rpg/gateway.ts`). Signed in, the keys
-  // passed around are handles: the server reads the key itself from the account, and the page sends
-  // only the reader's ID token. Signed out — or with the account unreachable — the key in this
-  // browser goes with each request, the reader's own and kept nowhere.
-  const onAccount = Boolean(auth.user) && account.sync !== 'error' && account.sync !== 'local';
-  const apiKeys = useMemo(() => gatewayKeys(account.keys, onAccount), [account.keys, onAccount]);
+  // `useAccountKeys` hands over are handles — the account's keys never reach the page — and the
+  // server reads the key itself; the page sends only the reader's ID token. Signed out, the key in
+  // this browser goes with each request, the reader's own and kept nowhere.
+  const apiKeys = account.keys;
   // What the server's ledger counts each request under: this world, and this quest once there is one.
   setGatewayContext(() => ({ world: worldRef.current?.createdAt ? worldRef.current.id : null, quest: questIdRef.current }));
   const ownStory = Boolean(apiKeys.google || apiKeys.openai);

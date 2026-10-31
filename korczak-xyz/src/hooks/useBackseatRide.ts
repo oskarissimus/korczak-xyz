@@ -57,6 +57,7 @@ import { prepareLive, primeLiveAudio, sessionFits, type LiveSession } from '../u
 import type { BackseatConfig, Remark, RemarkLanguage, RideStatus } from '../utils/backseat/types';
 import { RELEASE, rideIdFor, saveRound, type RoundRecord } from '../utils/backseat/rideLog';
 import { askForRemark, VisionError } from '../utils/backseat/vision';
+import { apiFetch } from '../utils/rpg/gateway';
 import { createWakeLock } from '../utils/wakeLock';
 
 /** Six on screen, fifty in memory: enough to scroll back over the last quarter of an hour. */
@@ -695,6 +696,7 @@ export function useBackseatRide(
           frame,
           signal: visionController.signal,
           onMark: mark,
+          fetch: apiFetch,
         });
       }
       record.raw = raw;

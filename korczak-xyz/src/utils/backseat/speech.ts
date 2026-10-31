@@ -44,6 +44,7 @@
  */
 
 import type { BackseatConfig } from './types';
+import { apiFetch } from '../rpg/gateway';
 
 export interface SpeakOptions {
   text: string;
@@ -323,7 +324,7 @@ async function speakWithElevenLabs(
   const { speed, playbackRate } = splitSpeed(options.rate);
 
   options.onMark?.('tts.sent');
-  const response = await fetch(
+  const response = await apiFetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}` +
       `?output_format=${ELEVENLABS_OUTPUT_FORMAT}`,
     {
@@ -438,7 +439,7 @@ export async function fetchElevenLabsVoices(apiKey: string): Promise<VoiceListRe
   if (!apiKey.trim()) return { success: false, voices: [], error: 'API key is required' };
 
   try {
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+    const response = await apiFetch('https://api.elevenlabs.io/v1/voices', {
       headers: { 'xi-api-key': apiKey },
     });
 

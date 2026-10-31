@@ -16,11 +16,22 @@ import {
 } from './gatewayRoutes';
 
 describe('gatewayTarget', () => {
+  it('lets through what the other apps send, each on the right key', () => {
+    expect(gatewayTarget('/api.deepseek.com/v1/chat/completions', 'POST')).toMatchObject({ provider: 'deepseek', key: 'deepseek' });
+    expect(gatewayTarget('/api.openai.com/v1/images/generations', 'POST')?.key).toBe('openai');
+    expect(gatewayTarget('/generativelanguage.googleapis.com/v1beta/models/imagen-4:predict', 'POST')?.key).toBe('google');
+    expect(gatewayTarget('/api.openai.com/v1/organization/costs', 'GET')?.key).toBe('openaiAdmin');
+    expect(gatewayTarget('/api.elevenlabs.io/v1/user/subscription', 'GET')?.key).toBe('elevenLabs');
+    expect(gatewayTarget('/europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio', 'POST')?.provider).toBe('audioguide');
+    expect(gatewayTarget('/europe-central2-korczak-xyz-501720.cloudfunctions.net/rpgApi', 'POST')).toBeNull();
+  });
+
   it('lets through what the game sends', () => {
     expect(gatewayTarget('/generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent', 'POST')).toEqual({
       provider: 'google',
       host: 'generativelanguage.googleapis.com',
       path: '/v1beta/models/gemini-3.8-flash:streamGenerateContent',
+      key: 'google',
     });
     expect(gatewayTarget('/api.openai.com/v1/chat/completions', 'POST')?.provider).toBe('openai');
     expect(gatewayTarget('/api.elevenlabs.io/v1/text-to-speech/abc123', 'POST')?.provider).toBe('elevenlabs');
@@ -38,7 +49,7 @@ describe('gatewayTarget', () => {
     expect(gatewayTarget('/evil.example.com/v1/anything', 'POST')).toBeNull();
     expect(gatewayTarget('/generativelanguage.googleapis.com/v1beta/files', 'POST')).toBeNull();
     expect(gatewayTarget('/generativelanguage.googleapis.com/v1beta/models/x:generateContent', 'GET')).toBeNull();
-    expect(gatewayTarget('/api.elevenlabs.io/v1/user/subscription', 'GET')).toBeNull();
+    expect(gatewayTarget('/api.elevenlabs.io/v1/user/subscription', 'POST')).toBeNull();
     expect(gatewayTarget('/api.elevenlabs.io/v1/voices/abc', 'POST')).toBeNull();
     expect(gatewayTarget('/api.openai.com/v1/files', 'POST')).toBeNull();
     expect(gatewayTarget('/fal.run/fal-ai/../../admin', 'POST')).toBeNull();

@@ -15,7 +15,7 @@
 import { useEffect, useId, useState } from 'react';
 
 import type { AudioGuideKeysApi } from '../../hooks/useAudioGuideKeys';
-import { accountPath } from '../../utils/accountKeys/keys';
+import { accountPath, isAccountKey } from '../../utils/accountKeys/keys';
 import { missingKeys, requiredKeys, type KeyName } from '../../utils/audioGuide/keys';
 import type { Translation } from './translations';
 
@@ -30,13 +30,17 @@ interface KeyFieldProps {
 function KeyField({ label, value, placeholder, onCommit, t }: KeyFieldProps) {
   const id = useId();
   const [visible, setVisible] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
+  // A key the account holds is a handle here (`useAccountKeys`): never shown, only said to be there.
+  const onAccount = isAccountKey(value);
+  const [draft, setDraft] = useState(onAccount ? '' : (value ?? ''));
 
   // A key arriving from the account, or cleared, after the first render.
-  useEffect(() => setDraft(value ?? ''), [value]);
+  useEffect(() => setDraft(isAccountKey(value) ? '' : (value ?? '')), [value]);
 
   const commit = () => {
     const next = draft.trim() || null;
+    // An empty field over the account's key means "leave it": clearing is the Clear button.
+    if (next === null && onAccount) return;
     if (next !== value) onCommit(next);
   };
 
@@ -54,7 +58,7 @@ function KeyField({ label, value, placeholder, onCommit, t }: KeyFieldProps) {
           className="ag-input ag-key-input"
           type={visible ? 'text' : 'password'}
           value={draft}
-          placeholder={placeholder}
+          placeholder={onAccount ? '••••••••••••' : placeholder}
           autoComplete="off"
           spellCheck={false}
           onChange={(e) => setDraft(e.target.value)}

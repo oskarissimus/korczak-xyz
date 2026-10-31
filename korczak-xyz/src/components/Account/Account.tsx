@@ -31,7 +31,7 @@ import {
   type ElevenLabsUsage,
   type Reading,
 } from '../../utils/accountKeys/balance';
-import type { KeyName } from '../../utils/accountKeys/keys';
+import { isAccountKey, type KeyName } from '../../utils/accountKeys/keys';
 import { requiredKeys as backseatKeys } from '../../utils/backseat/defaults';
 import { pullConfig as pullBackseat } from '../../utils/backseat/cloud';
 import { loadConfig as loadBackseat } from '../../utils/backseat/storage';
@@ -96,21 +96,27 @@ function day(ms: number, lang: Lang): string {
 interface KeyFieldProps {
   label: string;
   value: string | null;
+  /** The last four characters of the account's copy, when the account holds one. */
+  hint?: string | null;
   placeholder: string;
   onCommit: (value: string | null) => void;
   t: Translation;
 }
 
 /** Masked, a Show toggle, commits on blur and Enter — each commit is a Firestore write. */
-function KeyField({ label, value, placeholder, onCommit, t }: KeyFieldProps) {
+function KeyField({ label, value, hint, placeholder, onCommit, t }: KeyFieldProps) {
   const id = useId();
   const [visible, setVisible] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
+  // A key the account holds is a handle here (`useAccountKeys`): never shown, only said to be there.
+  const onAccount = isAccountKey(value);
+  const [draft, setDraft] = useState(onAccount ? '' : (value ?? ''));
 
-  useEffect(() => setDraft(value ?? ''), [value]);
+  useEffect(() => setDraft(isAccountKey(value) ? '' : (value ?? '')), [value]);
 
   const commit = () => {
     const next = draft.trim() || null;
+    // An empty field over the account's key means "leave it": clearing is the Clear button.
+    if (next === null && onAccount) return;
     if (next !== value) onCommit(next);
   };
 
@@ -122,7 +128,7 @@ function KeyField({ label, value, placeholder, onCommit, t }: KeyFieldProps) {
           id={id}
           type={visible ? 'text' : 'password'}
           value={draft}
-          placeholder={placeholder}
+          placeholder={onAccount ? `••••••••${hint ?? ''}` : placeholder}
           autoComplete="off"
           spellCheck={false}
           onChange={(e) => setDraft(e.target.value)}
@@ -278,6 +284,7 @@ function GoogleCard({ api, usedBy, refresh, t }: CardProps) {
       <KeyField
         label={t.key}
         value={api.keys.google}
+        hint={api.hints.google}
         placeholder={PLACEHOLDER.google}
         onCommit={(v) => api.setKey('google', v)}
         t={t}
@@ -311,6 +318,7 @@ function ElevenLabsCard({ api, usedBy, refresh, t, lang }: CardProps) {
       <KeyField
         label={t.key}
         value={api.keys.elevenLabs}
+        hint={api.hints.elevenLabs}
         placeholder={PLACEHOLDER.elevenLabs}
         onCommit={(v) => api.setKey('elevenLabs', v)}
         t={t}
@@ -357,6 +365,7 @@ function DeepSeekCard({ api, usedBy, refresh, t, lang }: CardProps) {
       <KeyField
         label={t.key}
         value={api.keys.deepseek}
+        hint={api.hints.deepseek}
         placeholder={PLACEHOLDER.deepseek}
         onCommit={(v) => api.setKey('deepseek', v)}
         t={t}
@@ -410,6 +419,7 @@ function FalCard({ api, usedBy, t }: CardProps) {
       <KeyField
         label={t.key}
         value={api.keys.fal}
+        hint={api.hints.fal}
         placeholder={PLACEHOLDER.fal}
         onCommit={(v) => api.setKey('fal', v)}
         t={t}
@@ -457,6 +467,7 @@ function OpenAiCard({ api, usedBy, refresh, t, lang }: CardProps) {
       <KeyField
         label={t.key}
         value={api.keys.openai}
+        hint={api.hints.openai}
         placeholder={PLACEHOLDER.openai}
         onCommit={(v) => api.setKey('openai', v)}
         t={t}
@@ -506,6 +517,7 @@ function OpenAiCard({ api, usedBy, refresh, t, lang }: CardProps) {
         <KeyField
           label={t.adminKey}
           value={api.keys.openaiAdmin}
+          hint={api.hints.openaiAdmin}
           placeholder={PLACEHOLDER.openaiAdmin}
           onCommit={(v) => api.setKey('openaiAdmin', v)}
           t={t}

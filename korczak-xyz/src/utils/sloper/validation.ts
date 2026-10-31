@@ -10,6 +10,8 @@
  * a phone that lost signal is how somebody comes to re-paste a key that was fine.
  */
 
+import { apiFetch } from '../rpg/gateway';
+
 export interface ModelFetchResult {
   success: boolean;
   models: string[];
@@ -55,7 +57,7 @@ async function fetchBearerModels(
   if (!apiKey.trim()) return { success: false, models: [], error: 'API key is required' };
 
   try {
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    const response = await apiFetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -110,7 +112,7 @@ export async function fetchGeminiImageModels(apiKey: string): Promise<ModelFetch
   if (!apiKey.trim()) return { success: false, models: [], error: 'API key is required' };
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
     );
 
@@ -152,7 +154,7 @@ export async function validateElevenLabsKey(apiKey: string): Promise<ValidationR
   if (!apiKey.trim()) return { valid: false, error: 'ElevenLabs API key is required' };
 
   try {
-    const response = await fetch('https://api.elevenlabs.io/v1/user', {
+    const response = await apiFetch('https://api.elevenlabs.io/v1/user', {
       headers: { 'xi-api-key': apiKey },
     });
 

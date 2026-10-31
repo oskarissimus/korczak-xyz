@@ -1,5 +1,13 @@
 /*
- * `rpgApi`: every request the RPG makes to a provider — Google, OpenAI, ElevenLabs, fal.ai (Meshy
+ * `rpgApi`, the site's gateway. Named for the game it was built for; since 31 Oct 2026 every app on
+ * the site that spends an account's key goes through it — sloper, the backseat driver and the
+ * roaster, the audio guide, the account page's readings — because the account's keys no longer reach
+ * the page at all (owner: "the key should never go from Firebase to the browser"; `firestore.rules`
+ * denies every read under `users/{uid}/keys`). The page knows only that a key exists (`ACCOUNT_KEY`)
+ * and asks `/account/keys` for which ones and their last four characters (`accountStatus`). Gemini
+ * Live, a WebSocket, is opened with a single-use token minted here (`liveToken`).
+ *
+ * What follows was written for the RPG and holds for all of it: every request the RPG makes to a provider — Google, OpenAI, ElevenLabs, fal.ai (Meshy
  * included, which the game reaches through fal) — passes through here, so the provider's key never
  * has to be in the page (owner, 31 Oct 2026: "everything goes through the server, the requests to
  * fal, Google and so on").
@@ -29,14 +37,26 @@ import type { Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
-import { keysFrom } from '../../../korczak-xyz/src/utils/accountKeys/keys';
+import { GoogleGenAI } from '@google/genai';
+
 import {
+  ACCOUNT_KEY,
+  KEY_NAMES,
+  keyHint,
+  keysFrom,
+  normalizeAccountKeys,
+  stampOf,
+  type KeyName,
+} from '../../../korczak-xyz/src/utils/accountKeys/keys';
+import {
+  ACCOUNT_STATUS_PATH,
+  AUDIO_GUIDE_KEY_HEADERS,
   BYOK_HEADER,
+  LIVE_TOKEN_PATH,
   COST_EVENT,
   COST_HEADER,
   costUpfront,
   credentialHeaders,
-  GATEWAY_KEY_NAME,
   gatewayTarget,
   ledgerId,
   NO_CREDITS,
@@ -53,9 +73,20 @@ import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 
 /** Response headers worth passing on: what the page reads besides the body. */
-const PASSED_HEADERS = ['content-type', 'character-cost', 'retry-after', 'request-id', 'x-fal-request-id'];
+const PASSED_HEADERS = [
+  'content-type',
+  'character-cost',
+  'retry-after',
+  'request-id',
+  'x-fal-request-id',
+  // The audio guide's own: the location warning, the sources, and its stage timings.
+  'x-location-warning',
+  'x-guide-sources',
+  'server-timing',
+];
 /** Request headers worth passing on, besides the key this function adds. */
 const FORWARDED_HEADERS = ['content-type', 'accept', 'x-fal-object-lifecycle-preference', 'x-fal-queue-priority'];
+const EXPOSED_HEADERS = [COST_HEADER, ...PASSED_HEADERS.filter((h) => h !== 'content-type')];
 
 export class GatewayRefusal extends Error {
   constructor(
@@ -73,10 +104,10 @@ function cors(req: Request, res: Response): boolean {
   if (allowed) {
     res.set('Access-Control-Allow-Origin', allowed);
     res.set('Vary', 'Origin');
-    res.set('Access-Control-Expose-Headers', [COST_HEADER, 'character-cost', 'retry-after', 'request-id', 'x-fal-request-id'].join(', '));
+    res.set('Access-Control-Expose-Headers', EXPOSED_HEADERS.join(', '));
   }
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', `Content-Type, Accept, Authorization, ${BYOK_HEADER}, ${WORLD_HEADER}, ${QUEST_HEADER}, X-Fal-Object-Lifecycle-Preference, X-Fal-Queue-Priority`);
+  res.set('Access-Control-Allow-Headers', `Content-Type, Accept, Authorization, ${BYOK_HEADER}, ${WORLD_HEADER}, ${QUEST_HEADER}, X-Fal-Object-Lifecycle-Preference, X-Fal-Queue-Priority, X-Google-Key, X-OpenAI-Key, X-ElevenLabs-Key`);
   res.set('Access-Control-Max-Age', '3600');
   return allowed !== null;
 }
@@ -107,6 +138,11 @@ async function uidOf(req: Request): Promise<string | null> {
 const KEYS_MS = 60_000;
 const keyCache = new Map<string, { at: number; data: Record<string, unknown> }>();
 
+/** For tests: forget every cached account. */
+export function forgetCachedKeys(): void {
+  keyCache.clear();
+}
+
 async function accountKeys(uid: string): Promise<Record<string, unknown>> {
   const hit = keyCache.get(uid);
   if (hit && Date.now() - hit.at < KEYS_MS) return hit.data;
@@ -119,18 +155,138 @@ async function accountKeys(uid: string): Promise<Record<string, unknown>> {
 /** Who pays for this request, and with which key. See the top of this file. */
 export async function payer(
   req: Request,
-  provider: GatewayProvider,
+  keyName: KeyName,
   readKeys: (uid: string) => Promise<Record<string, unknown>> = accountKeys,
 ): Promise<Payer> {
   const uid = await uidOf(req);
   if (uid) {
-    const key = keysFrom(await readKeys(uid))[GATEWAY_KEY_NAME[provider]];
+    const key = keysFrom(await readKeys(uid))[keyName];
     if (key) return { key, uid, kind: 'account' };
   }
   const own = req.headers[BYOK_HEADER];
-  if (typeof own === 'string' && own.trim()) return { key: own.trim(), uid, kind: 'byok' };
+  if (typeof own === 'string' && own.trim() && own.trim() !== ACCOUNT_KEY) return { key: own.trim(), uid, kind: 'byok' };
   // Prepaid credits are this branch: the owner's key, reserved and settled against `uid`'s balance.
-  throw new GatewayRefusal(402, 'no-credits', `${NO_CREDITS} (no ${provider} key on this account)`);
+  throw new GatewayRefusal(402, 'no-credits', `${NO_CREDITS} (no ${keyName} key on this account)`);
+}
+
+/**
+ * The audio guide's keys, each in its own header: `ACCOUNT_KEY` in one is filled from the account,
+ * anything else is the reader's own and goes on as it came. A header the page did not send stays
+ * unsent — which of the two writers' keys is present is how the Go function picks its path.
+ */
+export async function audioGuideKeys(
+  req: Request,
+  readKeys: (uid: string) => Promise<Record<string, unknown>> = accountKeys,
+): Promise<{ headers: Record<string, string>; who: Payer }> {
+  const headers: Record<string, string> = {};
+  const wanted = Object.entries(AUDIO_GUIDE_KEY_HEADERS).filter(([h]) => typeof req.headers[h] === 'string' && (req.headers[h] as string).trim());
+  const fromAccount = wanted.some(([h]) => (req.headers[h] as string).trim() === ACCOUNT_KEY);
+  const uid = fromAccount ? await uidOf(req) : null;
+  if (fromAccount && !uid) throw new GatewayRefusal(401, 'auth', 'gateway: sign in to use the account’s keys');
+  const keys = uid ? keysFrom(await readKeys(uid)) : null;
+  for (const [h, name] of wanted) {
+    const v = (req.headers[h] as string).trim();
+    if (v !== ACCOUNT_KEY) headers[h] = v;
+    else if (keys?.[name]) headers[h] = keys[name]!;
+    else throw new GatewayRefusal(402, 'no-credits', `${NO_CREDITS} (no ${name} key on this account)`);
+  }
+  return { headers, who: { key: '', uid, kind: uid ? 'account' : 'byok' } };
+}
+
+/** The apps' own copies from before the shared store, which seeded it and should have been emptied. */
+const LEGACY_DOCS = ['audioGuide', 'backseat', 'sloper', 'roaster'];
+
+/**
+ * The legacy copies, finished off: any key the shared store lacks is moved into it, then every one
+ * of them is emptied. Those documents are readable by the page (they hold each app's settings), so a
+ * key left in one is a key in the browser; the browser-side scrub that should have emptied them was
+ * best effort and, for the audio guide's, never ran. Idempotent and cheap — four reads, and writes
+ * only while something is left — so it simply runs with every status request.
+ */
+export async function retireLegacyCopies(uid: string, current: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const store = keysFrom(current);
+  const missing: Partial<Record<KeyName, string>> = {};
+  const toEmpty: { path: string; names: string[] }[] = [];
+  for (const app of LEGACY_DOCS) {
+    const path = `users/${uid}/${app}/config`;
+    const data = (await db.doc(path).get()).data();
+    const keys = keysFrom(data);
+    const present = KEY_NAMES.filter((n) => keys[n]);
+    if (present.length === 0) continue;
+    for (const n of present) if (!store[n] && !missing[n]) missing[n] = keys[n]!;
+    toEmpty.push({ path, names: present });
+  }
+  if (toEmpty.length === 0) return current;
+  const batch = db.batch();
+  if (Object.keys(missing).length > 0) batch.set(db.doc(`users/${uid}/keys/config`), { apiKeys: missing }, { merge: true });
+  for (const { path, names } of toEmpty) {
+    batch.set(db.doc(path), { apiKeys: Object.fromEntries(names.map((n) => [n, null])) }, { merge: true });
+  }
+  await batch.commit();
+  keyCache.delete(uid);
+  return { ...current, apiKeys: { ...((current.apiKeys as object) ?? {}), ...missing } };
+}
+
+/** What the page may know of the account's keys: which exist and their last four characters, and the settings beside them. */
+export function statusOf(data: Record<string, unknown>) {
+  const value = normalizeAccountKeys(data);
+  const hints = Object.fromEntries(KEY_NAMES.map((n) => [n, keyHint(value.apiKeys[n])]));
+  return {
+    keys: hints,
+    openaiCredit: value.openaiCredit,
+    audioGuideWriter: value.audioGuideWriter,
+    updatedAt: stampOf(data),
+  };
+}
+
+async function accountStatus(req: Request, res: Response): Promise<void> {
+  const uid = await uidOf(req);
+  if (!uid) throw new GatewayRefusal(401, 'auth', 'gateway: sign in first');
+  let data = (await db.doc(`users/${uid}/keys/config`).get()).data() ?? {};
+  try {
+    data = await retireLegacyCopies(uid, data);
+  } catch (e) {
+    reportError('rpgApi.legacyKeys', e);
+  }
+  keyCache.set(uid, { at: Date.now(), data });
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json(statusOf(data));
+}
+
+/** How long a Live token may wait to be opened, and how long its one session may last. */
+const LIVE_OPEN_WITHIN_MS = 60_000;
+const LIVE_LIVES_MS = 30 * 60_000;
+
+/**
+ * One Gemini Live session on the account's Google key: a single-use ephemeral token, unconstrained
+ * — unlike the demo's, the reader's own ride sets its own prompt — opened within a minute.
+ */
+async function liveToken(req: Request, res: Response): Promise<void> {
+  const uid = await uidOf(req);
+  if (!uid) throw new GatewayRefusal(401, 'auth', 'gateway: sign in first');
+  const key = keysFrom(await accountKeys(uid)).google;
+  if (!key) throw new GatewayRefusal(402, 'no-credits', `${NO_CREDITS} (no google key on this account)`);
+  const now = Date.now();
+  const ai = new GoogleGenAI({ apiKey: key, httpOptions: { apiVersion: 'v1alpha' } });
+  let token: string | undefined;
+  try {
+    token = (
+      await ai.authTokens.create({
+        config: {
+          uses: 1,
+          expireTime: new Date(now + LIVE_LIVES_MS).toISOString(),
+          newSessionExpireTime: new Date(now + LIVE_OPEN_WITHIN_MS).toISOString(),
+          httpOptions: { apiVersion: 'v1alpha' },
+        },
+      })
+    ).name;
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    throw new GatewayRefusal(typeof status === 'number' && status >= 400 && status < 500 ? status : 502, 'provider', e instanceof Error ? e.message : 'Google refused the token');
+  }
+  if (!token) throw new GatewayRefusal(502, 'provider', 'Google returned no token');
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ token });
 }
 
 function bodyOf(req: Request): Buffer | undefined {
@@ -214,7 +370,14 @@ function costText(usd: number | null): string {
   return usd === null ? '' : usd.toFixed(6);
 }
 
-async function pass(req: Request, res: Response, target: GatewayTarget, query: string, who: Payer): Promise<void> {
+async function pass(
+  req: Request,
+  res: Response,
+  target: GatewayTarget,
+  query: string,
+  who: Payer,
+  extraHeaders: Record<string, string> = {},
+): Promise<void> {
   const body = bodyOf(req);
   const json = jsonOf(body);
   const headers: Record<string, string> = {};
@@ -222,7 +385,7 @@ async function pass(req: Request, res: Response, target: GatewayTarget, query: s
     const v = req.headers[h];
     if (typeof v === 'string') headers[h] = v;
   }
-  Object.assign(headers, credentialHeaders(target.provider, who.key));
+  Object.assign(headers, extraHeaders, credentialHeaders(target.provider, who.key));
 
   const controller = new AbortController();
   // The reader went away (a page closed mid-stream): stop paying for an answer nobody reads.
@@ -284,7 +447,7 @@ async function pass(req: Request, res: Response, target: GatewayTarget, query: s
   if (type.includes('json')) {
     const bytes = Buffer.from(await upstream.arrayBuffer());
     let usd = upfront;
-    if (usd === null && (target.provider === 'google' || target.provider === 'openai')) {
+    if (usd === null && (target.provider === 'google' || target.provider === 'openai' || target.provider === 'deepseek')) {
       const meter = new UsageMeter(target.provider, asked);
       try {
         meter.feed(JSON.parse(bytes.toString('utf8')));
@@ -322,14 +485,32 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     return;
   }
   const { path, query } = gatewayPathOf(req.url);
+  if ((path === ACCOUNT_STATUS_PATH && req.method === 'GET') || (path === LIVE_TOKEN_PATH && req.method === 'POST')) {
+    try {
+      await (path === ACCOUNT_STATUS_PATH ? accountStatus(req, res) : liveToken(req, res));
+    } catch (e) {
+      if (e instanceof GatewayRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.account', e, { path });
+      await flushSentry();
+      if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'gateway: account unavailable' } });
+    }
+    return;
+  }
   const target = gatewayTarget(path, req.method);
   if (!target) {
     res.status(404).json({ reason: 'route', error: { message: `rpg gateway: ${req.method} ${path.split('/')[1] ?? ''} is not a request the game makes` } });
     return;
   }
   try {
-    const who = await payer(req, target.provider);
-    await pass(req, res, target, query, who);
+    if (target.provider === 'audioguide') {
+      const { headers, who } = await audioGuideKeys(req);
+      await pass(req, res, target, query, who, headers);
+    } else {
+      await pass(req, res, target, query, await payer(req, target.key));
+    }
   } catch (e) {
     if (e instanceof GatewayRefusal) {
       if (!res.headersSent) res.status(e.status).json({ reason: e.reason, error: { message: e.message } });

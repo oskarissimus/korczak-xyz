@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ACCOUNT_KEY, apiFetch, gatewayKeys, gatewayUrl, serverCost, setGatewayContext, setTokenSource } from './gateway';
-import { NO_KEYS } from '../accountKeys/keys';
+import { ACCOUNT_KEY, apiFetch, gatewayUrl, serverCost, setGatewayContext, setTokenSource } from './gateway';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -61,11 +60,20 @@ describe('apiFetch', () => {
   });
 });
 
-describe('gatewayKeys', () => {
-  it('turns the account’s keys into handles, and leaves a browser’s own alone', () => {
-    const keys = { ...NO_KEYS, google: 'AIza-real', fal: 'fal-real' };
-    expect(gatewayKeys(keys, true)).toMatchObject({ google: ACCOUNT_KEY, fal: ACCOUNT_KEY, openai: null });
-    expect(gatewayKeys(keys, false)).toEqual(keys);
+describe('the audio guide through the gateway', () => {
+  it('sends the function’s own key headers on, and adds the ID token for a handle in one', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+    vi.stubGlobal('fetch', fetch);
+    setTokenSource(async () => 'id-token');
+    await apiFetch('https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio', {
+      method: 'POST',
+      headers: { 'X-Google-Key': ACCOUNT_KEY, 'X-ElevenLabs-Key': 'sk_own' },
+    });
+    const { url, headers } = lastCall(fetch);
+    expect(url).toMatch(/\/rpgApi\/europe-central2-korczak-xyz-501720\.cloudfunctions\.net\/generate-audio$/);
+    expect(headers.get('authorization')).toBe('Bearer id-token');
+    expect(headers.get('x-google-key')).toBe(ACCOUNT_KEY);
+    expect(headers.get('x-elevenlabs-key')).toBe('sk_own');
   });
 });
 

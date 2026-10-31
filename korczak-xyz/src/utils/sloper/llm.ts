@@ -18,6 +18,7 @@
 
 import { LLM_PRICING } from './pricing';
 import type { LlmProvider, TokenUsage } from './types';
+import { apiFetch } from '../rpg/gateway';
 
 export interface StreamChunk {
   content?: string;
@@ -108,7 +109,7 @@ export async function* streamLLM(
   temperature: number,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamChunk> {
-  const response = await fetch(ENDPOINTS[provider], {
+  const response = await apiFetch(ENDPOINTS[provider], {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,

@@ -259,6 +259,11 @@ getting its own, so the answer was never to put a sitting in it. The answer was 
 
 ### The keys, and the trade being made
 
+> **31 Oct 2026, superseded where it says the page calls the provider with the key.** A signed-in
+> reader's keys no longer reach the page: requests go through the site's gateway (`rpgApi`), which
+> holds the key — see `account-keys.md`, *The account's keys never reach the browser*. A signed-out
+> reader's own key still lives in this browser only and is sent per request.
+
 > Since Oct 2026 the four keys live in the account's shared store (`account-keys.md`), not in
 > `sloper-config`; that document keeps the settings and an emptied `apiKeys`. The trade below is
 > unchanged and is why the store is still in the browser.

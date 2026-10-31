@@ -110,6 +110,16 @@ maybe('firestore.rules', () => {
     it('cannot reach another account’s subtree', async () => {
       await assertFails(getDoc(doc(wife(), 'users/owner/progress/p1')));
     });
+
+    it('writes its own API keys and can never read them back', async () => {
+      const keys = doc(owner(), 'users/owner/keys/config');
+      await assertSucceeds(setDoc(keys, { apiKeys: { google: 'AIza-x' } }, { merge: true }));
+      await assertSucceeds(setDoc(keys, { apiKeys: { google: null } }, { merge: true }));
+      await assertFails(getDoc(keys));
+      await assertFails(getDocs(collection(owner(), 'users/owner/keys')));
+      await assertFails(getDoc(doc(wife(), 'users/owner/keys/config')));
+      await assertFails(setDoc(doc(wife(), 'users/owner/keys/config'), { apiKeys: { google: 'x' } }));
+    });
   });
 
   describe('the household share', () => {

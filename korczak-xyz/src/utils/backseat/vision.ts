@@ -48,6 +48,12 @@ export interface VisionRequest {
   signal?: AbortSignal;
   /** Stage marks for the round's timeline (`rideLog.ts`): sent, headers, body. */
   onMark?: (name: string) => void;
+  /**
+   * How the request is sent. The page passes the gateway's `apiFetch` (the account's key is a handle
+   * there, and only the gateway holds the real one); the demo function, which holds the owner's key
+   * itself, leaves it as `fetch`. Not imported here because this file is compiled into the functions.
+   */
+  fetch?: typeof fetch;
 }
 
 /**
@@ -84,7 +90,7 @@ async function errorFrom(response: Response): Promise<VisionError> {
 
 async function askOpenAi(request: VisionRequest): Promise<string> {
   request.onMark?.('vision.sent');
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await (request.fetch ?? fetch)('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${request.apiKey}`,
@@ -203,7 +209,7 @@ async function askGoogleOnce(request: VisionRequest): Promise<string> {
   const gemma = isGemma(request.model);
 
   request.onMark?.('vision.sent');
-  const response = await fetch(url, {
+  const response = await (request.fetch ?? fetch)(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: request.signal,
@@ -321,12 +327,13 @@ function networkFailure(err: unknown): ModelListResult {
 export async function fetchVisionModels(
   provider: VisionProvider,
   apiKey: string,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<ModelListResult> {
   if (!apiKey.trim()) return { success: false, models: [], error: 'API key is required' };
 
   try {
     if (provider === 'google') {
-      const response = await fetch(
+      const response = await fetchImpl(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
       );
       if (!response.ok) {
@@ -345,7 +352,7 @@ export async function fetchVisionModels(
       return { success: true, models: filterGoogleVisionModels(data?.models ?? []) };
     }
 
-    const response = await fetch('https://api.openai.com/v1/models', {
+    const response = await fetchImpl('https://api.openai.com/v1/models', {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!response.ok) {

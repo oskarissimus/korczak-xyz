@@ -18,6 +18,7 @@
 import { keyHeaders, type ApiKeys } from './keys';
 import { parseServerTiming } from './telemetry';
 import type { Attraction } from './types';
+import { apiFetch } from '../rpg/gateway';
 
 const BACKEND_URL = 'https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio';
 
@@ -95,7 +96,7 @@ export async function requestNarration(
   keys: ApiKeys,
   signal: AbortSignal,
 ): Promise<Narration> {
-  const response = await fetch(BACKEND_URL, {
+  const response = await apiFetch(BACKEND_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

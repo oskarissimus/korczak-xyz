@@ -34,7 +34,7 @@ vi.mock('../runtime', () => ({
 }));
 vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () => {}) }));
 
-import { gatewayPathOf, handleRpgApi, ledgerWrites } from './gateway';
+import { forgetCachedKeys, gatewayPathOf, handleRpgApi, ledgerWrites } from './gateway';
 
 interface FakeRes {
   statusCode: number;
@@ -112,6 +112,7 @@ function req(url: string, init: { method?: string; headers?: Record<string, stri
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  forgetCachedKeys();
   store.clear();
   written.length = 0;
   store.set('users/u1/keys/config', { apiKeys: { google: 'AIza-account', fal: 'fal-account', elevenLabs: 'el-account' } });
@@ -185,7 +186,7 @@ describe('rpgApi', () => {
 
   it('refuses what the game never sends, another origin and a bad token', async () => {
     let res = fakeRes();
-    await handleRpgApi(req('/api.elevenlabs.io/v1/user/subscription', { method: 'GET', headers: { authorization: 'Bearer good' } }), res as any);
+    await handleRpgApi(req('/api.elevenlabs.io/v1/history', { method: 'GET', headers: { authorization: 'Bearer good' } }), res as any);
     expect(res.statusCode).toBe(404);
     res = fakeRes();
     await handleRpgApi(req('/fal.run/fal-ai/flux/schnell', { headers: { origin: 'https://evil.example', 'x-rpg-key': 'k' } }), res as any);
@@ -209,6 +210,72 @@ describe('rpgApi', () => {
     await handleRpgApi(req('/queue.fal.run/fal-ai/trellis/requests/abc/status', { method: 'GET', headers: { authorization: 'Bearer good' } }), res as any);
     expect(res.headers['x-rpg-cost-usd']).toBeUndefined();
     expect(written.length).toBe(after);
+  });
+});
+
+describe('the account’s keys, as the page may know them', () => {
+  it('answers which keys exist and their last four characters — never a key', async () => {
+    const res = fakeRes();
+    await handleRpgApi(req('/account/keys', { method: 'GET', headers: { authorization: 'Bearer good' } }), res as any);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body());
+    expect(body.keys).toMatchObject({ google: 'ount', fal: 'ount', elevenLabs: 'ount', openai: null });
+    expect(res.body()).not.toContain('AIza-account');
+    expect(res.body()).not.toContain('fal-account');
+  });
+
+  it('refuses a signed-out page', async () => {
+    const res = fakeRes();
+    await handleRpgApi(req('/account/keys', { method: 'GET' }), res as any);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('moves a key left in an app’s old copy into the store, and empties every old copy', async () => {
+    store.set('users/u1/audioGuide/config', { apiKeys: { google: 'AIza-old', openai: 'sk-old' }, language: 'pl' });
+    const res = fakeRes();
+    await handleRpgApi(req('/account/keys', { method: 'GET', headers: { authorization: 'Bearer good' } }), res as any);
+    expect(written).toContainEqual({ path: 'users/u1/keys/config', data: { apiKeys: { openai: 'sk-old' } } });
+    expect(written).toContainEqual({ path: 'users/u1/audioGuide/config', data: { apiKeys: { google: null, openai: null } } });
+    expect(JSON.parse(res.body()).keys.openai).toBe('-old');
+  });
+});
+
+describe('the other apps through the gateway', () => {
+  it('fills the audio guide’s key headers from the account, and passes a reader’s own on', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('mp3', { headers: { 'content-type': 'audio/mpeg', 'x-guide-sources': 'a b' } }));
+    const res = fakeRes();
+    await handleRpgApi(
+      req('/europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio', {
+        headers: { authorization: 'Bearer good', 'x-google-key': 'account:key', 'x-elevenlabs-key': 'sk_own' },
+        body: { name: 'x' },
+      }),
+      res as any,
+    );
+    const sent = fetchMock.mock.calls[0][1].headers;
+    expect(fetchMock.mock.calls[0][0]).toBe('https://europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio');
+    expect(sent['x-google-key']).toBe('AIza-account');
+    expect(sent['x-elevenlabs-key']).toBe('sk_own');
+    expect(sent['x-openai-key']).toBeUndefined();
+    expect(res.headers['x-guide-sources']).toBe('a b');
+  });
+
+  it('will not fill a handle for a signed-out page', async () => {
+    const res = fakeRes();
+    await handleRpgApi(
+      req('/europe-central2-korczak-xyz-501720.cloudfunctions.net/generate-audio', { headers: { 'x-google-key': 'account:key' }, body: {} }),
+      res as any,
+    );
+    expect(res.statusCode).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('spends the admin key on OpenAI’s costs, and the plain one on its models', async () => {
+    store.set('users/u1/keys/config', { apiKeys: { openai: 'sk-plain', openaiAdmin: 'sk-admin' } });
+    fetchMock.mockResolvedValue(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+    await handleRpgApi(req('/api.openai.com/v1/organization/costs?bucket_width=1d', { method: 'GET', headers: { authorization: 'Bearer good' } }), fakeRes() as any);
+    await handleRpgApi(req('/api.openai.com/v1/models', { method: 'GET', headers: { authorization: 'Bearer good' } }), fakeRes() as any);
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-admin');
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer sk-plain');
   });
 });
 

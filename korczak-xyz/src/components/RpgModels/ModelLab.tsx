@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
-import { gatewayKeys } from '../../utils/rpg/gateway';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
@@ -67,8 +66,8 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   const t = strings[lang];
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
-  // Handles, not keys, for a signed-in reader: every request goes through the server (`utils/rpg/gateway.ts`).
-  const apiKeys = gatewayKeys(account.keys, Boolean(auth.user) && account.sync !== 'error' && account.sync !== 'local');
+  // Handles, not keys, for a signed-in reader (`useAccountKeys`): every request goes through the server (`utils/rpg/gateway.ts`).
+  const apiKeys = account.keys;
   const falKey = account.ready ? apiKeys.fal || null : null;
   setGoogleImageKey(account.ready ? apiKeys.google : null);
 

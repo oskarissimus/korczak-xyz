@@ -1,11 +1,12 @@
 /*
- * The browser's half of the RPG's gateway (`functions/src/rpg/gateway.ts`, `gatewayRoutes.ts`):
- * every request the game makes to Google, OpenAI, ElevenLabs or fal.ai goes through `apiFetch`,
- * which sends it to the server instead, without the key.
+ * The browser's half of the site's gateway (born as the RPG's; every app's since 31 Oct 2026 — see
+ * the top of `functions/src/rpg/gateway.ts`, and `gatewayRoutes.ts`): every request an app makes to
+ * Google, OpenAI, DeepSeek, ElevenLabs or fal.ai, and the audio guide's to its own function, goes
+ * through `apiFetch`, which sends it to the server instead, without the account's key.
  *
  * The call sites still build the provider's own request, key and all, and hand it here in place of
  * `fetch`: what the key IS decides how it travels.
- * - `ACCOUNT_KEY` (`gatewayKeys`, a signed-in reader whose key is on the account) is not a key at
+ * - `ACCOUNT_KEY` (what `useAccountKeys` hands a signed-in reader for a key the account holds) is not a key at
  *   all. The request carries the reader's Firebase ID token and the server reads the key itself out
  *   of `users/{uid}/keys/config`. The account's key is never sent from the page.
  * - Anything else is a key that exists only in this browser — a signed-out reader's own, or a
@@ -18,11 +19,19 @@
  * the stream's last line (`readCostEvent`), and is what the `~` console shows.
  */
 
-import { BYOK_HEADER, COST_HEADER, GATEWAY_HOSTS, QUEST_HEADER, WORLD_HEADER } from './gatewayRoutes';
-import type { ApiKeys } from '../accountKeys/keys';
+import {
+  ACCOUNT_STATUS_PATH,
+  AUDIO_GUIDE_KEY_HEADERS,
+  BYOK_HEADER,
+  COST_HEADER,
+  GATEWAY_HOSTS,
+  LIVE_TOKEN_PATH,
+  QUEST_HEADER,
+  WORLD_HEADER,
+} from './gatewayRoutes';
+import { ACCOUNT_KEY } from '../accountKeys/keys';
 
-/** Stands in for a key the account holds: "the server has it". Never a real key. */
-export const ACCOUNT_KEY = 'account:rpg';
+export { ACCOUNT_KEY };
 
 /** The site's own project when the build names none (a local `astro dev` without `.env`, the tests), as `functions/src/runtime.ts` does. */
 const DEFAULT_PROJECT = 'korczak-xyz-501720';
@@ -32,18 +41,6 @@ export function gatewayUrl(): string {
   if (override) return override.replace(/\/$/, '');
   const project = (import.meta.env.PUBLIC_FIREBASE_PROJECT_ID as string | undefined) || DEFAULT_PROJECT;
   return `https://europe-central2-${project}.cloudfunctions.net/rpgApi`;
-}
-
-/**
- * The keys the game passes around, as handles: on the account → `ACCOUNT_KEY`, only here → the key.
- * `onAccount` is whether the account's copy is the one in force (signed in and synced); until then a
- * key only in this browser travels as BYOK rather than being lost.
- */
-export function gatewayKeys(keys: ApiKeys, onAccount: boolean): ApiKeys {
-  if (!onAccount) return keys;
-  const out = { ...keys };
-  for (const name of Object.keys(out) as (keyof ApiKeys)[]) if (out[name]) out[name] = ACCOUNT_KEY;
-  return out;
 }
 
 const KEY_HEADERS = ['authorization', 'x-goog-api-key', 'xi-api-key'];
@@ -99,7 +96,12 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   }
 
   const base = gatewayUrl();
-  if (key === ACCOUNT_KEY) {
+  // The audio guide's function takes its keys in its own headers; the gateway fills a handle in any
+  // of them from the account, so only the ID token has to be added for those.
+  const handleInOwnHeader =
+    GATEWAY_HOSTS[url.host] === 'audioguide' &&
+    Object.keys(AUDIO_GUIDE_KEY_HEADERS).some((h) => headers.get(h) === ACCOUNT_KEY);
+  if (key === ACCOUNT_KEY || handleInOwnHeader) {
     const token = await idToken();
     if (!token) throw new Error('rpg gateway: signed out — sign in again to use the account\'s keys');
     headers.set('Authorization', `Bearer ${token}`);
@@ -110,6 +112,34 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   if (world) headers.set(WORLD_HEADER, world.slice(0, 120));
   if (quest) headers.set(QUEST_HEADER, quest.slice(0, 120));
   return fetch(`${base}/${url.host}${url.pathname}${url.search}`, { ...init, headers });
+}
+
+async function signedInCall(path: string, method: string, signal?: AbortSignal): Promise<Response> {
+  const token = await idToken();
+  if (!token) throw new Error('gateway: signed out');
+  return fetch(`${gatewayUrl()}${path}`, { method, headers: { Authorization: `Bearer ${token}` }, signal });
+}
+
+/** What the gateway says of the account's keys — never a key, only which exist and their last four characters. */
+export interface AccountKeyStatus {
+  keys: Record<string, string | null>;
+  openaiCredit: { amount: number; at: number } | null;
+  audioGuideWriter: string;
+  updatedAt: number;
+}
+
+export async function fetchAccountKeyStatus(signal?: AbortSignal): Promise<AccountKeyStatus> {
+  const response = await signedInCall(ACCOUNT_STATUS_PATH, 'GET', signal);
+  if (!response.ok) throw new Error(`gateway: account keys ${response.status}`);
+  return (await response.json()) as AccountKeyStatus;
+}
+
+/** A single-use Gemini Live token minted from the account's Google key (a socket cannot go through the gateway). */
+export async function fetchLiveToken(): Promise<string> {
+  const response = await signedInCall(LIVE_TOKEN_PATH, 'POST');
+  const body = (await response.json().catch(() => null)) as { token?: string; error?: { message?: string } } | null;
+  if (!response.ok || !body?.token) throw new Error(body?.error?.message ?? `gateway: live token ${response.status}`);
+  return body.token;
 }
 
 /** What the server said a request cost, or null (no header: unpriced, or not through the gateway). */

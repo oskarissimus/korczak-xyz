@@ -48,6 +48,7 @@ import type {
 import { accountPath } from '../../utils/accountKeys/keys';
 import { FLAVOURS, type FlavourId } from '../../utils/backseat/flavour';
 import { fetchVisionModels } from '../../utils/backseat/vision';
+import { apiFetch } from '../../utils/rpg/gateway';
 import { fetchLiveModels, LIVE_VOICES, prepareLive, primeLiveAudio } from '../../utils/backseat/live';
 import { Fieldset, KeyField, Row, Select, Slider } from './fields';
 import { fill, forFlavour, type Translation } from './translations';
@@ -141,7 +142,7 @@ export default function SetupScreen({
     const timer = setTimeout(() => {
       setModels({ loading: true, items: [], error: null });
 
-      void fetchVisionModels(provider, visionKey).then((result) => {
+      void fetchVisionModels(provider, visionKey, apiFetch).then((result) => {
         if (cancelled) return;
         setModels({
           loading: false,

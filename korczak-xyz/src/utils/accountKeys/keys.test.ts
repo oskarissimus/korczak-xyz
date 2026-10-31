@@ -56,3 +56,19 @@ describe('shouldSeed', () => {
     expect(shouldSeed(NO_KEYS, true)).toBe(false);
   });
 });
+
+describe('the account’s keys as a page holds them', () => {
+  it('reads a handle as no key, so it can never stand in for one', async () => {
+    const { ACCOUNT_KEY, keysFrom } = await import('./keys');
+    expect(keysFrom({ apiKeys: { google: ACCOUNT_KEY, openai: 'sk-real' } })).toMatchObject({ google: null, openai: 'sk-real' });
+  });
+
+  it('turns the gateway’s answer into handles and hints, and never a key', async () => {
+    const { ACCOUNT_KEY, viewOf } = await import('./keys');
+    const view = viewOf({ keys: { google: 'duA1', openai: null }, audioGuideWriter: 'openai', updatedAt: 5 });
+    expect(view.value.apiKeys).toMatchObject({ google: ACCOUNT_KEY, openai: null, fal: null });
+    expect(view.hints.google).toBe('duA1');
+    expect(view.value.audioGuideWriter).toBe('openai');
+    expect(view.updatedAt).toBe(5);
+  });
+});

@@ -6,12 +6,17 @@
  * here before the store existed, stamped `updatedAt: 0` — "never edited" — so it loses to any copy
  * the account already holds. That seed is written straight away, and only once it is safely
  * written are the apps' own copies scrubbed: a key must never exist nowhere, even for a moment.
+ *
+ * Since 31 Oct 2026 the keys here are only ever this browser's own: a signed-out reader's, which
+ * they brought. Signed in, `useAccountKeys` moves them into the account (write-only) and empties
+ * them here, and the account's keys never come back — see `cloud.ts`.
  */
 
 import { isQuotaError } from '../../lib/localStorage';
 import { describeError, log } from '../../lib/logger';
 import {
   DEFAULT_ACCOUNT_KEYS,
+  NO_KEYS,
   anyKey,
   keysFrom,
   normalizeAccountKeys,
@@ -21,6 +26,8 @@ import {
   type AccountKeys,
   type KeySource,
   type StampedAccountKeys,
+  viewOf,
+  type AccountKeyView,
 } from './keys';
 
 export const ACCOUNT_KEYS_STORAGE_KEY = 'account-keys';
@@ -130,4 +137,47 @@ export function loadAccountKeys(): { stored: StampedAccountKeys; localSources: K
   }
 
   return { stored, localSources };
+}
+
+/*
+ * What the page last heard about a signed-in account's keys, per uid — presence and last four
+ * characters, never a key — so a reload has its handles at once rather than after a round trip to
+ * the gateway, and an app does not pop its keys sheet for a key the account has.
+ */
+const VIEW_STORAGE_KEY = 'account-keys-view';
+
+export function saveKeyView(uid: string, view: AccountKeyView): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify({ uid, hints: view.hints, value: { ...view.value, apiKeys: NO_KEYS }, updatedAt: view.updatedAt }));
+  } catch (e) {
+    log.warn('accountKeys.view.save.failed', describeError(e));
+  }
+}
+
+export function loadKeyView(uid: string): AccountKeyView | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.uid !== uid) return null;
+    return viewOf({
+      keys: parsed.hints,
+      openaiCredit: parsed.value?.openaiCredit,
+      audioGuideWriter: parsed.value?.audioGuideWriter,
+      updatedAt: parsed.updatedAt,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function clearKeyView(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(VIEW_STORAGE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
 }

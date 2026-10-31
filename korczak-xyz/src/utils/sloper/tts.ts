@@ -17,6 +17,7 @@
 
 import { ConcurrencyLimiter } from './concurrency';
 import type { WordTiming } from './types';
+import { apiFetch } from '../rpg/gateway';
 
 export interface TtsOptions {
   text: string;
@@ -44,7 +45,7 @@ export async function generateTtsAudio(
   options: TtsOptions,
   signal?: AbortSignal,
 ): Promise<TtsResult> {
-  const response = await fetch(
+  const response = await apiFetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(options.voiceId)}/with-timestamps`,
     {
       method: 'POST',

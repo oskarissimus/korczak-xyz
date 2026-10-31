@@ -129,8 +129,10 @@ describe('fetchElevenLabsVoices', () => {
 
     expect(result.success).toBe(true);
     expect(result.voices.map((v) => v.name)).toEqual(['Adam', 'Zosia']);
-    // Not a bearer token: ElevenLabs takes its key in `xi-api-key` and answers 401 otherwise.
-    expect(fetchMock.mock.calls[0][1].headers['xi-api-key']).toBe('el-key');
+    // Through the site's gateway, a reader's own key in the gateway's BYOK header; the gateway puts
+    // it in `xi-api-key`, the only place ElevenLabs takes it.
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/rpgApi\/api\.elevenlabs\.io\/v1\/voices$/);
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('x-rpg-key')).toBe('el-key');
   });
 
   it('says a key is required before spending a request finding out', async () => {

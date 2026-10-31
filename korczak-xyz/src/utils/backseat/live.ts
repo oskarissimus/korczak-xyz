@@ -38,6 +38,8 @@ import { liveGenerationConfig, wantsThinkingOff } from './liveConfig';
 export { DEFAULT_LIVE_MODEL, DEFAULT_LIVE_VOICE } from './defaults';
 export { wantsThinkingOff } from './liveConfig';
 import type { Frame } from './types';
+import { apiFetch, fetchLiveToken } from '../rpg/gateway';
+import { isAccountKey } from '../accountKeys/keys';
 
 /** Google's prebuilt voices, which every Live model takes. */
 export const LIVE_VOICES = [
@@ -132,7 +134,7 @@ export async function fetchLiveModels(
 ): Promise<{ success: boolean; models: string[]; error?: string }> {
   if (!apiKey.trim()) return { success: false, models: [], error: 'API key is required' };
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`,
     );
     if (!response.ok) {
@@ -406,7 +408,15 @@ export class LiveSession {
 
   /** Open and set up; resolves on `setupComplete`. */
   private async open(withThinkingConfig: boolean): Promise<void> {
-    const token = this.settings.getToken ? await this.settings.getToken() : null;
+    // A key the account holds never reaches the page (`useAccountKeys`), and a socket cannot go
+    // through the gateway: the gateway mints a single-use token from it instead, as the demo does.
+    const token = this.settings.getToken
+      ? await this.settings.getToken()
+      : isAccountKey(this.settings.apiKey)
+        ? await fetchLiveToken().catch((e) => {
+            throw new VisionError(e instanceof Error ? e.message : 'Live token refused', null);
+          })
+        : null;
     return new Promise<void>((resolve, reject) => {
       const { apiKey, model, voice, system } = this.settings;
       let socket: WebSocket;

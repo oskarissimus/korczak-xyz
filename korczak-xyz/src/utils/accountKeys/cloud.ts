@@ -1,109 +1,66 @@
 /*
- * The account's keys, in the account: `users/{uid}/keys/config`.
+ * The account's keys, in the account: `users/{uid}/keys/config` — written from here, never read.
  *
- * Under the `users/{uid}/{document=**}` catch-all in firestore.rules, so no rules change was needed
- * and none should be added — it is exactly as private as the three per-app documents it replaces.
+ * Since 31 Oct 2026 the page cannot read that document back (`firestore.rules` denies every read
+ * under `users/{uid}/keys`; owner: "the key should never go from Firebase to the browser"). A key
+ * typed here is written with a merge and from then on exists for this page only as `ACCOUNT_KEY`;
+ * what the page may know about the account's keys comes from the gateway's `/account/keys`
+ * (`fetchAccountKeyStatus`): which exist, the last four characters of each, and the two settings
+ * beside them. The legacy per-app copies (`users/{uid}/{audioGuide,backseat,sloper}/config`) are
+ * no longer read here at all; the gateway moves anything left in them into this store and empties
+ * them (`retireLegacyCopies`).
  *
- * Every call reads `getDb()` afresh and goes through `runCloud`, as everywhere else on the site.
+ * Every write reads `getDb()` afresh and goes through `runCloud`, as everywhere else on the site.
  */
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 
 import { getDb } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
-import { describeError, log } from '../../lib/logger';
+import { fetchAccountKeyStatus } from '../rpg/gateway';
 import {
-  anyKey,
-  keysFrom,
-  normalizeAccountKeys,
-  stampOf,
+  ACCOUNT_KEY,
+  asKey,
+  viewOf,
   type AccountKeys,
-  type KeySource,
-  type StampedAccountKeys,
+  type AccountKeyView,
+  type ApiKeys,
 } from './keys';
 
 function keysDoc(uid: string) {
   return doc(getDb()!, 'users', uid, 'keys', 'config');
 }
 
-/** The apps that kept their own copy before this store existed, by their document's name. */
-const APP_DOCS = ['audioGuide', 'backseat', 'sloper'] as const;
-
-/** The account's copy, or null when there is none yet (or Firebase is switched off). */
-export async function pullAccountKeys(uid: string): Promise<StampedAccountKeys | null> {
+/** The account's keys as the gateway describes them, or null when Firebase is switched off. */
+export async function pullAccountKeyView(signal?: AbortSignal): Promise<AccountKeyView | null> {
   if (!getDb()) return null;
+  return viewOf(await fetchAccountKeyStatus(signal));
+}
 
-  const snap = await runCloud('accountKeys.pull', () => getDoc(keysDoc(uid)));
-  if (!snap.exists()) return null;
-
-  const data = snap.data();
-  return {
-    value: normalizeAccountKeys(data),
-    updatedAt: stampOf(data),
-    settled: data.settled === true,
-  };
+/** What a write may carry: some keys, and either setting. A handle is never written. */
+export interface AccountKeysPatch {
+  apiKeys?: Partial<ApiKeys>;
+  openaiCredit?: AccountKeys['openaiCredit'];
+  audioGuideWriter?: AccountKeys['audioGuideWriter'];
 }
 
 export async function pushAccountKeys(
   uid: string,
-  value: AccountKeys,
+  patch: AccountKeysPatch,
   updatedAt: number,
-  settled: boolean,
 ): Promise<void> {
   if (!getDb()) return;
-  await runCloud('accountKeys.push', () =>
-    setDoc(keysDoc(uid), { ...value, updatedAt, settled }),
-  );
-}
-
-/**
- * The apps' old copies in the account, for a store that starts empty and undecided — a phone
- * signing in for the first time has them there and nothing beside it in localStorage.
- *
- * It never fails the caller: a missing document or a refusal is simply not a source.
- */
-export async function pullAppCopies(uid: string): Promise<{ app: string; source: KeySource }[]> {
-  if (!getDb()) return [];
-
-  const found: { app: string; source: KeySource }[] = [];
-  for (const app of APP_DOCS) {
-    try {
-      const snap = await runCloud(`accountKeys.seed.${app}`, () =>
-        getDoc(doc(getDb()!, 'users', uid, app, 'config')),
-      );
-      if (snap.exists()) {
-        const data = snap.data();
-        found.push({ app, source: { keys: keysFrom(data), updatedAt: stampOf(data) } });
-      }
-    } catch (e) {
-      log.warn('accountKeys.seed.pull.failed', { app, ...describeError(e) });
+  const data: Record<string, unknown> = { updatedAt, settled: true };
+  if (patch.apiKeys) {
+    const apiKeys: Record<string, string | null> = {};
+    for (const [name, key] of Object.entries(patch.apiKeys)) {
+      // `asKey` reads a handle as no key; one must never overwrite the real key it stands for.
+      if (key === ACCOUNT_KEY) continue;
+      apiKeys[name] = asKey(key);
     }
+    data.apiKeys = apiKeys;
   }
-  return found;
-}
-
-/**
- * Empties the keys out of the apps' old documents once the store holds them, so there is one copy
- * of each key in the account and revoking it here is revoking it everywhere.
- *
- * A merge of `apiKeys` alone: `updatedAt` is left as it was, so no app's own sync sees an edit,
- * and every other setting in those documents is untouched. Best effort — the apps no longer read
- * these fields, so one that fails to empty is a stale duplicate, not a live key.
- */
-export async function scrubAppCopies(
-  uid: string,
-  copies: { app: string; source: KeySource }[],
-): Promise<void> {
-  if (!getDb()) return;
-  for (const { app, source } of copies) {
-    if (!anyKey(source.keys)) continue;
-    const emptied = Object.fromEntries(Object.keys(source.keys).map((k) => [k, null]));
-    try {
-      await runCloud(`accountKeys.scrub.${app}`, () =>
-        setDoc(doc(getDb()!, 'users', uid, app, 'config'), { apiKeys: emptied }, { merge: true }),
-      );
-    } catch (e) {
-      log.warn('accountKeys.scrub.cloud.failed', { app, ...describeError(e) });
-    }
-  }
+  if ('openaiCredit' in patch) data.openaiCredit = patch.openaiCredit ?? null;
+  if (patch.audioGuideWriter) data.audioGuideWriter = patch.audioGuideWriter;
+  await runCloud('accountKeys.push', () => setDoc(keysDoc(uid), data, { merge: true }));
 }

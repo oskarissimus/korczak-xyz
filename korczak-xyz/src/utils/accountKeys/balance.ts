@@ -19,6 +19,8 @@
  * The parsers are pure and tested; the fetchers are thin.
  */
 
+import { apiFetch } from '../rpg/gateway';
+
 /** How a provider answered a key. */
 export type KeyCheck = 'ok' | 'refused' | 'failed';
 
@@ -148,7 +150,7 @@ async function get<T>(
   signal?: AbortSignal,
 ): Promise<Reading<T>> {
   try {
-    const response = await fetch(url, { headers, signal });
+    const response = await apiFetch(url, { headers, signal });
     if (!response.ok) return { check: checkOf(response.status), reason: await reasonOf(response) };
     return { check: 'ok', data: parse(await response.json()) };
   } catch (e) {

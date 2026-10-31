@@ -10,13 +10,15 @@
  * that note said was the better one: `users/{uid}/keys/config`, read by every app, edited from the
  * account page or from any app's own key fields, which now write here.
  *
- * WHERE THE KEYS LIVE IS UNCHANGED, AND DELIBERATELY. In this browser's localStorage and in the
- * account's own Firestore document, under the `users/{uid}/{document=**}` catch-all — not in
- * Secret Manager behind a function of ours. The reasoning is sloper's and still holds: the keys are
- * in the clear in the page's memory every time it calls a provider, and the only design that keeps
- * them out of the browser is a server of ours making every call with them, which is a much larger
- * thing to own and puts this site on the hook for the bill. Moving them into one document changes
- * how many copies there are, not who can read them.
+ * THE ACCOUNT'S COPY NEVER COMES BACK TO THE BROWSER (owner, 31 Oct 2026: "the key should never go
+ * from Firebase to the browser"). A signed-in page writes a key into `users/{uid}/keys/config` and
+ * can never read it again — `firestore.rules` denies every read under `users/{uid}/keys`. What the
+ * page holds instead is `ACCOUNT_KEY`, a handle that means "the account has one", and every request
+ * that would spend it goes through the site's gateway (`rpgApi`, `functions/src/rpg/gateway.ts`),
+ * which puts the real key on it with the Admin SDK. What the page may know about the account's keys
+ * is the gateway's `/account/keys` answer: which exist, the last four characters of each, and the
+ * two settings beside them. A key that is only in this browser — somebody signed out who brought
+ * their own — stays in localStorage and is the page's to send (bring your own key).
  *
  * LAST WRITE WINS, WHOLESALE, ON ONE `updatedAt`, and `settled` written on purpose — the two rules
  * every per-app copy was built on, for the same two bugs (a cleared key resurrected from another
@@ -87,11 +89,30 @@ export interface StampedAccountKeys {
   settled: boolean;
 }
 
+/**
+ * Stands in for a key the account holds: "the gateway has it". Never a real key, and never written
+ * anywhere — `keysFrom` reads it as no key at all, so a handle that strayed into a document or into
+ * localStorage cannot be mistaken for one.
+ */
+export const ACCOUNT_KEY = 'account:key';
+
+export function isAccountKey(value: string | null | undefined): boolean {
+  return value === ACCOUNT_KEY;
+}
+
+/** What the page may know of a key the account holds: its last four characters. */
+export function keyHint(key: string | null): string | null {
+  return key ? key.slice(-4) : null;
+}
+
+/** Per key, the last four characters of the account's copy, or null where it has none. */
+export type KeyHints = Record<KeyName, string | null>;
+
 /** A trimmed non-empty string, or null. The rule every app has written keys with. */
 export function asKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
+  return trimmed === '' || trimmed === ACCOUNT_KEY ? null : trimmed;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -163,6 +184,45 @@ export function seedKeys(sources: KeySource[]): ApiKeys {
 export function stampOf(value: unknown): number {
   const updatedAt = record(value).updatedAt;
   return typeof updatedAt === 'number' && Number.isFinite(updatedAt) ? updatedAt : 0;
+}
+
+/*
+ * The page's view of a signed-in account's keys, built from the gateway's `/account/keys` answer.
+ */
+export interface AccountKeyView {
+  /** The account's keys as this page may hold them: `ACCOUNT_KEY` where one exists, else null. */
+  value: AccountKeys;
+  hints: KeyHints;
+  updatedAt: number;
+}
+
+export const NO_HINTS: KeyHints = { ...NO_KEYS };
+
+/** The status the gateway answered, as the page's view of it. Never contains a key. */
+export function viewOf(status: {
+  keys?: Record<string, unknown>;
+  openaiCredit?: unknown;
+  audioGuideWriter?: unknown;
+  updatedAt?: unknown;
+}): AccountKeyView {
+  const settings = normalizeAccountKeys({
+    openaiCredit: status.openaiCredit,
+    audioGuideWriter: status.audioGuideWriter,
+  });
+  const hints = { ...NO_HINTS };
+  const apiKeys: ApiKeys = { ...NO_KEYS };
+  for (const name of KEY_NAMES) {
+    const hint = status.keys?.[name];
+    if (typeof hint === 'string') {
+      hints[name] = hint;
+      apiKeys[name] = ACCOUNT_KEY;
+    }
+  }
+  return {
+    value: { ...settings, apiKeys },
+    hints,
+    updatedAt: typeof status.updatedAt === 'number' ? status.updatedAt : 0,
+  };
 }
 
 /** The account page, where every key and what is left on it is shown. */

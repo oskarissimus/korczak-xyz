@@ -8,7 +8,9 @@
  */
 
 import type { ReactNode } from 'react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+
+import { isAccountKey } from '../../utils/accountKeys/keys';
 
 import type { Translation } from './translations';
 
@@ -172,6 +174,17 @@ interface KeyFieldProps {
 export function KeyField({ label, value, placeholder, onChange, t, hint, error }: KeyFieldProps) {
   const [visible, setVisible] = useState(false);
   const id = useId();
+  // A key the account holds is a handle here (`useAccountKeys`) — it is never shown, only said to
+  // be there. What is typed is kept as a draft and committed on blur: a per-keystroke commit would
+  // turn the first character into the account's key and empty the field under the reader's fingers.
+  const onAccount = isAccountKey(value);
+  const [draft, setDraft] = useState(onAccount ? '' : (value ?? ''));
+  useEffect(() => setDraft(isAccountKey(value) ? '' : (value ?? '')), [value]);
+  const commit = () => {
+    const next = draft.trim() || null;
+    if (next === null && onAccount) return;
+    if (next !== value) onChange(next);
+  };
 
   return (
     <div className="slp-row">
@@ -186,11 +199,15 @@ export function KeyField({ label, value, placeholder, onChange, t, hint, error }
           id={id}
           className="slp-input"
           type={visible ? 'text' : 'password'}
-          value={value ?? ''}
-          placeholder={placeholder}
+          value={draft}
+          placeholder={onAccount ? '••••••••••••' : placeholder}
           autoComplete="off"
           spellCheck={false}
-          onChange={(e) => onChange(e.target.value.trim() || null)}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+          }}
         />
         <button type="button" className="slp-key-toggle" onClick={() => setVisible(!visible)}>
           {visible ? t.keyHide : t.keyShow}

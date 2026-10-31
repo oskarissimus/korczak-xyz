@@ -1,5 +1,5 @@
 /*
- * The RPG's gateway, the half both runtimes share (`functions/src/rpg/gateway.ts` serves it,
+ * The site's gateway — born as the RPG's, and since 31 Oct 2026 every app's — the half both runtimes share (`functions/src/rpg/gateway.ts` serves it,
  * `gateway.ts` beside this file is the browser's side): which provider requests may pass through it,
  * how the key is put on them, and what each one costs.
  *
@@ -27,8 +27,15 @@ import {
   type Usage,
 } from './cost';
 import { FAL_PRICES, imageCost } from './falPrompts';
+import type { KeyName } from '../accountKeys/keys';
 
-export type GatewayProvider = 'google' | 'openai' | 'elevenlabs' | 'fal';
+/**
+ * `audioguide` is not a provider but the audio guide's own Go function (`audio-guide-function/`),
+ * which takes up to three keys in its own headers (`AUDIO_GUIDE_KEY_HEADERS`). The gateway fills
+ * those from the account the way it fills a provider's one, so the guide's keys never reach the page
+ * either; the function itself is unchanged and still answers anybody who brings their own.
+ */
+export type GatewayProvider = 'google' | 'openai' | 'elevenlabs' | 'fal' | 'deepseek' | 'audioguide';
 
 /** The account's key for each provider (`users/{uid}/keys/config`, `accountKeys/keys.ts`). */
 export const GATEWAY_KEY_NAME = {
@@ -36,7 +43,19 @@ export const GATEWAY_KEY_NAME = {
   openai: 'openai',
   elevenlabs: 'elevenLabs',
   fal: 'fal',
-} as const satisfies Record<GatewayProvider, string>;
+  deepseek: 'deepseek',
+  // Several keys, one per header: see `AUDIO_GUIDE_KEY_HEADERS`. Named here only to satisfy the type.
+  audioguide: 'google',
+} as const satisfies Record<GatewayProvider, KeyName>;
+
+/** The audio guide function's key headers (lower case, as Node hands them over) → the account's key. */
+export const AUDIO_GUIDE_KEY_HEADERS = {
+  'x-google-key': 'google',
+  'x-openai-key': 'openai',
+  'x-elevenlabs-key': 'elevenLabs',
+} as const satisfies Record<string, KeyName>;
+
+export const AUDIO_GUIDE_HOST = 'europe-central2-korczak-xyz-501720.cloudfunctions.net';
 
 export const GATEWAY_HOSTS: Record<string, GatewayProvider> = {
   'generativelanguage.googleapis.com': 'google',
@@ -45,7 +64,18 @@ export const GATEWAY_HOSTS: Record<string, GatewayProvider> = {
   'fal.run': 'fal',
   'queue.fal.run': 'fal',
   'rest.alpha.fal.ai': 'fal',
+  'api.deepseek.com': 'deepseek',
+  [AUDIO_GUIDE_HOST]: 'audioguide',
 };
+
+/**
+ * The gateway's own two answers, beside the provider routes, both for a signed-in reader only:
+ * which keys the account holds (presence and last four characters, never a key), and a single-use
+ * Gemini Live token minted from the account's Google key — Live is a WebSocket, which no proxy of
+ * ours carries, and an ephemeral token is Google's own way of opening one without the key.
+ */
+export const ACCOUNT_STATUS_PATH = '/account/keys';
+export const LIVE_TOKEN_PATH = '/account/live-token';
 
 /** The header the page sends its own key in when the key is only in this browser (signed out). */
 export const BYOK_HEADER = 'x-rpg-key';
@@ -74,6 +104,8 @@ interface Route {
   host: string;
   methods: readonly string[];
   path: RegExp;
+  /** The account's key this route spends, where it is not the provider's usual one. */
+  key?: KeyName;
 }
 
 const MODEL = '[\\w.-]+';
@@ -95,6 +127,24 @@ const ROUTES: readonly Route[] = [
   { host: 'fal.run', methods: ['POST'], path: new RegExp(`^/${FAL_APP}$`) },
   { host: 'queue.fal.run', methods: ['POST', 'GET', 'PUT'], path: new RegExp(`^/${FAL_APP}$`) },
   { host: 'rest.alpha.fal.ai', methods: ['POST'], path: /^\/storage\/upload\/initiate$/ },
+
+  // Sloper: the script (OpenAI or DeepSeek, streamed), the pictures (OpenAI, Imagen, Gemini), the
+  // narration (ElevenLabs, already above), and the model lists its form fills in.
+  { host: 'api.openai.com', methods: ['POST'], path: /^\/v1\/images\/generations$/ },
+  { host: 'generativelanguage.googleapis.com', methods: ['POST'], path: new RegExp(`^/v1beta/models/${MODEL}:predict$`) },
+  { host: 'api.deepseek.com', methods: ['POST'], path: /^\/v1\/chat\/completions$/ },
+  { host: 'api.deepseek.com', methods: ['GET'], path: /^\/v1\/models$/ },
+  // The model lists and key checks (sloper, the backseat driver, the account page): free, and the
+  // only way a form can say whether a key works.
+  { host: 'api.openai.com', methods: ['GET'], path: /^\/v1\/models$/ },
+  { host: 'generativelanguage.googleapis.com', methods: ['GET'], path: /^\/v1beta\/models$/ },
+  { host: 'api.elevenlabs.io', methods: ['GET'], path: /^\/v1\/voices$/ },
+  { host: 'api.elevenlabs.io', methods: ['GET'], path: /^\/v1\/user(?:\/subscription)?$/ },
+  // The account page's readings: DeepSeek's balance, and OpenAI's costs on the admin key.
+  { host: 'api.deepseek.com', methods: ['GET'], path: /^\/user\/balance$/ },
+  { host: 'api.openai.com', methods: ['GET'], path: /^\/v1\/organization\/costs$/, key: 'openaiAdmin' },
+  // The audio guide: one request, the whole guide, the keys in the function's own headers.
+  { host: AUDIO_GUIDE_HOST, methods: ['POST'], path: /^\/generate-audio$/ },
 ];
 
 export interface GatewayTarget {
@@ -102,6 +152,8 @@ export interface GatewayTarget {
   host: string;
   /** The provider's path, from its first slash. */
   path: string;
+  /** The account's key the request is paid with. */
+  key: KeyName;
 }
 
 /** `/{host}/{path}` on the gateway → what it stands for, or null when it is not a request the game makes. */
@@ -111,8 +163,8 @@ export function gatewayTarget(gatewayPath: string, method: string): GatewayTarge
   const [, host, path] = m;
   const provider = GATEWAY_HOSTS[host];
   if (!provider || path.includes('..') || path.includes('//')) return null;
-  const ok = ROUTES.some((r) => r.host === host && r.methods.includes(method.toUpperCase()) && r.path.test(path));
-  return ok ? { provider, host, path } : null;
+  const route = ROUTES.find((r) => r.host === host && r.methods.includes(method.toUpperCase()) && r.path.test(path));
+  return route ? { provider, host, path, key: route.key ?? GATEWAY_KEY_NAME[provider] } : null;
 }
 
 /** The key, the way each provider wants it. */
@@ -121,7 +173,11 @@ export function credentialHeaders(provider: GatewayProvider, key: string): Recor
     case 'google':
       return { 'x-goog-api-key': key };
     case 'openai':
+    case 'deepseek':
       return { Authorization: `Bearer ${key}` };
+    case 'audioguide':
+      // Its keys travel in its own headers, each filled separately (`AUDIO_GUIDE_KEY_HEADERS`).
+      return {};
     case 'elevenlabs':
       return { 'xi-api-key': key };
     case 'fal':
@@ -271,7 +327,7 @@ export class UsageMeter {
         this.usage = { input: num(u.promptTokenCount), output: num(u.candidatesTokenCount), thoughts: num(u.thoughtsTokenCount) };
         if (Array.isArray(u.candidatesTokensDetails) && u.candidatesTokensDetails.some((d: any) => d?.modality === 'IMAGE')) this.image = u;
       }
-    } else if (this.provider === 'openai') {
+    } else if (this.provider === 'openai' || this.provider === 'deepseek') {
       if (typeof data.model === 'string' && data.model) this.model = data.model;
       const u = data.usage;
       if (u) this.usage = { input: num(u.prompt_tokens), output: num(u.completion_tokens), thoughts: 0 };
