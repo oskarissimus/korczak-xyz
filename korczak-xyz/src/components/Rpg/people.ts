@@ -522,7 +522,11 @@ export class People {
     group.updateMatrixWorld(true);
     skinned.bind(new THREE.Skeleton(bones));
 
-    return { group, clips: fitClips(clips, bones[0].position), ms };
+    // The clips were made on the male donor; the female one's bones point their axes other ways (her
+    // head 121° off, her upper spine 82°), so copied as they are her head went back and her arms
+    // twisted (owner, 31 Oct 2026, over a maid in a dress). Carried across like Meshy's (`meshyClips`).
+    const fitted = body === 'male' ? clips : meshyClips(clips, donors.male, bones[0]);
+    return { group, clips: fitClips(fitted, bones[0].position), ms };
   }
 
   /** A copy of the person into `group` (emptied first), idling somewhere in the loop. */

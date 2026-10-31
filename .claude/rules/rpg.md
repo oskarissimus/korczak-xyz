@@ -946,8 +946,10 @@ content-hashed and immutable.
     stood the way the rig rests (`aimedLike`, limb bones turned by the shortest arc onto the rig's,
     so an A-pose, a T-pose or bent elbows all work) and each bone's world turn from that pose is put
     on the rig's own rest. Compared against Meshy's own walk of the same rig (`basic_animations`, which
-    `rigWithMeshy` does not ask for): the same arms. Our own rig never had this, its bones being the
-    donor's. The comparison sheets are in the project files, `rpg/rig-za-darmo/`.
+    `rigWithMeshy` does not ask for): the same arms. Our own rig had it too, for women only: the clips were made on the male donor and the female
+    donor's bones point other ways (head 121°, upper spine 82°), so a maid in a dress walked with
+    her head thrown back and her arms twisted (owner, 31 Oct 2026). `build` carries them across the
+    same way when the body is `female`; the male donor is the clips' own skeleton. The comparison sheets are in the project files, `rpg/rig-za-darmo/`.
     **Palms forward costs a twist**: a palms-down T-pose lowers to palms facing the thighs by the
     shoulder alone, which is how every clip hangs the arm; palms forward needs the forearm turned 90°
     as well, and with one forearm bone that is either the hands walking palms forward (what the
