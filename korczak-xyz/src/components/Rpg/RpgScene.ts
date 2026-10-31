@@ -43,6 +43,7 @@ import { HALT, Routine, type Spot, type SpotKind } from '../../utils/rpg/routine
 import { CRAFT_SPECS, type Craft } from '../../utils/rpg/craft';
 import { DEATH_SECONDS, RUN_SPEED, type CreatureShape } from '../../utils/rpg/creature';
 import { buildStation, buildTool, disposeCraft, holdTool } from './crafts';
+import { PLACE_FLAT, Terrain, VILLAGE_FLAT, reliefFor, terrainSeed, type Clearing, type Relief } from '../../utils/rpg/terrain';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
@@ -61,6 +62,9 @@ export interface PersonBody {
 const wanted = (body: PersonBody) => body.url ?? (body.wait ? 'wait' : 'kit');
 
 const HEIGHT = PERSON_HEIGHT;
+
+/** How far apart two things are over the ground, whatever the hills put between their heights. */
+const across = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /** A hero described as a woman stands on the female donor; anyone else on the male one. */
 export function heroBody(description: string): Body {
@@ -387,7 +391,7 @@ export class RpgScene {
   private markerTarget: THREE.Vector3 | null = null;
   private hp = MAX_HP;
   private attackTimer = 0;
-  /** Upward speed in the air, m/s; the ground is flat at 0, so off it means airborne. */
+  /** Upward speed in the air, m/s; above the ground under him (`groundAt`) is airborne. */
   private vy = 0;
   private airborne = false;
   /** Off unless the settings turn it on (`rpg-jump` in `Rpg.tsx`). */
@@ -414,6 +418,28 @@ export class RpgScene {
   private sensesLeft = 0;
   private trailTimer = 0;
   private senseTargets: SenseTarget[] = [];
+
+  /**
+   * The lie of the land (`utils/rpg/terrain.ts`): hills between the places, drawn from the world's
+   * id and its relief; flat before any world and under a flood. Everything that stands, walks or
+   * lies on the ground is put at `groundAt`.
+   */
+  private terrain = Terrain.flat();
+  private terrainKey = 'none';
+  /** The world the land is drawn for, by id: `applyWorld` is told. */
+  private terrainWorld = '';
+  /** The console's relief in place of the world's, to compare (`setReliefOverride`); not kept. */
+  private reliefOverride: Relief | null = null;
+  /**
+   * A place went up or came down: the land is cut again at the next frame, once for however many
+   * places a beat or a load has put up together, rather than once each.
+   */
+  private terrainDirty = false;
+
+  /** The height of the ground at (x, z), as drawn. */
+  groundAt(x: number, z: number): number {
+    return this.terrain.heightAt(x, z);
+  }
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
     this.canvas = canvas;
@@ -455,7 +481,7 @@ export class RpgScene {
     );
     this.marker.visible = false;
     this.scene.add(this.marker);
-    this.senses = new SensesView(this.scene);
+    this.senses = new SensesView(this.scene, (x, z) => this.groundAt(x, z));
 
     this.nameTag = document.createElement('div');
     this.nameTag.className = 'rpg-name-tag';
@@ -494,11 +520,12 @@ export class RpgScene {
   private sunOffset = new THREE.Vector3(40, 70, 25);
 
   private buildWorld() {
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(WORLD_HALF * 2 + 40, WORLD_HALF * 2 + 40),
-      breakTiling(surfaceMat('ground', 96, 96, { roughness: 1 })),
-    );
-    ground.rotation.x = -Math.PI / 2;
+    // A vertex every 2 m for the hills (`terrain.ts` lays its heights on exactly this grid), turned
+    // flat in the geometry rather than by the mesh, so a vertex's y is its height.
+    const half = WORLD_HALF + 20;
+    const plane = new THREE.PlaneGeometry(half * 2, half * 2, half, half);
+    plane.rotateX(-Math.PI / 2);
+    const ground = new THREE.Mesh(plane, breakTiling(surfaceMat('ground', 96, 96, { roughness: 1 })));
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.ground = ground;
@@ -654,7 +681,7 @@ export class RpgScene {
       trees.forEach((tree, i) => {
         const scale = tree.r / 0.5;
         const base = new THREE.Matrix4().compose(
-          new THREE.Vector3(tree.obstacle.x, 0, tree.obstacle.z),
+          new THREE.Vector3(tree.obstacle.x, this.groundAt(tree.obstacle.x, tree.obstacle.z), tree.obstacle.z),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
           new THREE.Vector3(scale, scale, scale),
         );
@@ -855,7 +882,7 @@ export class RpgScene {
         } while (Math.hypot(x, z) < 14);
         const s = minS + rand() * (maxS - minS);
         const base = new THREE.Matrix4().compose(
-          new THREE.Vector3(x, 0, z),
+          new THREE.Vector3(x, this.groundAt(x, z), z),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
           new THREE.Vector3(s, s, s),
         );
@@ -966,9 +993,12 @@ export class RpgScene {
    * how much of it, the colour of the ground, the leaves, the walls and the roofs, and water over
    * everything for a flooded one. The classic look is the scene exactly as it was before worlds.
    */
-  applyWorld(look: WorldLook) {
+  applyWorld(look: WorldLook, id = this.terrainWorld) {
     this.look = look;
+    this.terrainWorld = id;
     const classic = this.isClassic();
+    // The land first, so the trees and the cover planted below stand on it.
+    this.refreshTerrain();
     const day = DAYLIGHT[look.time];
     this.scene.background = new THREE.Color(look.sky);
     const [near, far] = HAZE[look.haze];
@@ -1044,6 +1074,116 @@ export class RpgScene {
     if (this.kit.loaded) this.dressWorld();
     else if (!classic && (look.flora === 'fungi' || look.flora === 'spires' || look.flora === 'none')) this.plantTrees();
     this.refreshCover();
+  }
+
+  /**
+   * The land for the world being drawn: its id is the seed and its relief how tall the hills grow
+   * (`terrain.ts`), or the console's relief while one is chosen there. Flat under a flood, whose sea
+   * is a plane at 0. Worked out again only when one of those changes, and then everything that
+   * stands still on it is moved up or down to it; whatever moves is put on it every frame.
+   */
+  private refreshTerrain() {
+    const world = this.worldRelief();
+    const relief: Relief | 'none' = world === 'none' ? 'none' : (this.reliefOverride ?? world);
+    // Level under the village, every place standing and the road to each.
+    const places = [...this.places.values()];
+    const clearing: Clearing = {
+      spots: [{ x: 0, z: 0, r: VILLAGE_FLAT }, ...places.map((p) => ({ x: p.center.x, z: p.center.z, r: PLACE_FLAT }))],
+      roads: places.map((p) => p.road),
+    };
+    const names = places.map((p) => p.spec.name).sort();
+    const key = relief === 'none' ? 'none' : `${this.terrainWorld}|${relief}|${names.join('|')}`;
+    this.terrainDirty = false;
+    if (key === this.terrainKey) return;
+    this.terrainKey = key;
+    const before = this.terrain;
+    this.terrain = relief === 'none' ? Terrain.flat() : new Terrain(terrainSeed(this.terrainWorld), relief, clearing, WORLD_HALF + 20, 2);
+    const geo = this.ground.geometry;
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const flat = relief === 'none';
+    for (let i = 0; i < pos.count; i++) pos.setY(i, flat ? 0 : this.terrain.heights[i]);
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+    geo.computeBoundingBox();
+    this.reground(before);
+    const info = this.terrain.info;
+    log.info('rpg.terrain', {
+      world: this.terrainWorld,
+      relief: info.relief,
+      override: this.reliefOverride !== null,
+      seed: info.seed,
+      places: names.length,
+      max: Math.round(info.max * 10) / 10,
+      hilly: Math.round(info.hilly * 100) / 100,
+      ms: Math.round(info.ms),
+    });
+  }
+
+  /** The world's relief: its own, or one from its id; none before any world and under a flood. */
+  private worldRelief(): Relief | 'none' {
+    const flooded = this.look.water === 'flooded' && !this.isClassic();
+    return flooded || !this.terrainWorld ? 'none' : reliefFor(this.terrainWorld, this.look.relief);
+  }
+
+  /** What stands still, moved from the land it was put on (`before`) onto the land now. */
+  private reground(before: Terrain) {
+    const delta = (x: number, z: number) => this.terrain.heightAt(x, z) - before.heightAt(x, z);
+    const m = new THREE.Matrix4();
+    for (const { mesh } of [...this.cover, ...this.ownTufts]) {
+      // The hidden ones too (past `count`): `refreshCover` shows more of them later.
+      for (let i = 0; i < mesh.instanceMatrix.count; i++) {
+        mesh.getMatrixAt(i, m);
+        m.elements[13] += delta(m.elements[12], m.elements[14]);
+        mesh.setMatrixAt(i, m);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+    // The stopgap trees standing until the kit has come; the instanced ones are planted again.
+    for (const tree of this.trees) for (const mesh of tree.meshes) mesh.position.y += delta(mesh.position.x, mesh.position.z);
+    for (const npc of this.npcs.values()) {
+      const g = npc.group.position;
+      g.y = this.groundAt(g.x, g.z);
+      const st = npc.station?.group.position;
+      if (st) st.y = this.groundAt(st.x, st.z);
+    }
+    for (const mesh of this.clues.values()) {
+      mesh.position.y = this.groundAt(mesh.position.x, mesh.position.z) + (mesh.userData.still ? 0 : 0.5);
+    }
+    if (!this.airborne) this.land();
+    this.plantTrees();
+  }
+
+  /** The console's relief in place of the world's, to see another on the same world; null gives the world's back. */
+  setReliefOverride(relief: Relief | null) {
+    this.reliefOverride = relief;
+    this.refreshTerrain();
+  }
+
+  /** The land as the console shows it: what it is, and the ground under the hero. */
+  terrainReport(): {
+    relief: Relief | 'none';
+    /** The world's own, whatever the console has put in its place. */
+    worldRelief: Relief | 'none';
+    world: string;
+    override: Relief | null;
+    seed: number;
+    max: number;
+    hilly: number;
+    ms: number;
+    heroY: number;
+    heroSlope: number;
+  } {
+    const { x, z } = this.player.position;
+    return {
+      ...this.terrain.info,
+      worldRelief: this.worldRelief(),
+      world: this.terrainWorld,
+      override: this.reliefOverride,
+      heroY: this.groundAt(x, z),
+      heroSlope: this.terrain.slopeAt(x, z),
+    };
   }
 
   /** What needs the kit: its leaves, walls and roofs recoloured, its trees replanted, its ground cover thinned. */
@@ -1168,7 +1308,7 @@ export class RpgScene {
       } while (Math.hypot(x, z) < 14);
       const s = minH + rand() * (maxH - minH);
       const base = new THREE.Matrix4().compose(
-        new THREE.Vector3(x, 0, z),
+        new THREE.Vector3(x, this.groundAt(x, z), z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2),
         new THREE.Vector3(s, s, s),
       );
@@ -1452,10 +1592,11 @@ export class RpgScene {
       new THREE.CylinderGeometry(0.25 * scale, 0.35 * scale, 2 * scale, 6),
       this.trunkMat,
     );
-    trunk.position.set(x, scale, z);
+    const y = this.groundAt(x, z);
+    trunk.position.set(x, y + scale, z);
     trunk.castShadow = true;
     const crown = new THREE.Mesh(new THREE.ConeGeometry(1.8 * scale, 5 * scale, 7), this.leafMat);
-    crown.position.set(x, 2 * scale + 2.2 * scale, z);
+    crown.position.set(x, y + 2 * scale + 2.2 * scale, z);
     crown.castShadow = true;
     this.scene.add(trunk, crown);
     const obstacle = { x, z, r: 0.5 * scale };
@@ -1557,6 +1698,7 @@ export class RpgScene {
     const keepOut = built.keepOut ? { x: built.keepOut.x + x, z: built.keepOut.z + z, r: built.keepOut.r } : null;
     const place: Place = { spec, group: built.group, path, road, obstacles, center, arrived: false, spinners: built.spinners, keepOut, bare: bareParts };
     this.places.set(spec.name, place);
+    this.terrainDirty = true;
     if (bareParts) {
       this.plantPlaceTrees(place);
       for (const [index, piece] of this.placeModels.get(spec.name) ?? []) void this.putUpPiece(place, index, piece.url, piece.fit);
@@ -1639,6 +1781,7 @@ export class RpgScene {
     const standing = [...this.places.values()];
     for (const place of standing) this.takeDown(place);
     this.places.clear();
+    this.terrainDirty = true;
     for (const place of standing) {
       this.addPlace(place.spec);
       const again = this.places.get(place.spec.name);
@@ -1650,6 +1793,7 @@ export class RpgScene {
   clearPlaces() {
     for (const place of this.places.values()) this.takeDown(place);
     this.places.clear();
+    this.terrainDirty = true;
     for (const tree of this.trees) {
       tree.obstacle.off = false;
       showTree(tree, true);
@@ -1699,7 +1843,7 @@ export class RpgScene {
       }
       pos = this.standingSpot(villageSpot(npc.spot), npc.obstacle);
     }
-    npc.group.position.copy(pos);
+    npc.group.position.set(pos.x, this.groundAt(pos.x, pos.z), pos.z);
     npc.obstacle.x = pos.x;
     npc.obstacle.z = pos.z;
     npc.routine.setHome(pos);
@@ -1757,7 +1901,7 @@ export class RpgScene {
       if (all.some((o) => !o.off && o !== npc.obstacle && Math.hypot(o.x - at.x, o.z - at.z) < o.r + spec.r + 0.4)) continue;
       if (!this.clearWay(home, at)) continue;
       const group = buildStation(npc.craft);
-      group.position.set(at.x, 0, at.z);
+      group.position.set(at.x, this.groundAt(at.x, at.z), at.z);
       group.rotation.y = Math.atan2(home.x - at.x, home.z - at.z);
       this.scene.add(group);
       const obstacle: Obstacle = { x: at.x, z: at.z, r: spec.r };
@@ -1870,7 +2014,7 @@ export class RpgScene {
         npc.rig?.play(act.clip, { speed: act.speed ?? 1, fade: 0.35 });
         if (act.strike) npc.rig?.once(act.strike.clip, act.strike.seconds, { fade: 0.2 });
         face = r.facing;
-        g.position.set(r.x, 0, r.z);
+        g.position.set(r.x, this.groundAt(r.x, r.z), r.z);
         npc.obstacle.x = r.x;
         npc.obstacle.z = r.z;
       }
@@ -1976,7 +2120,7 @@ export class RpgScene {
     const at = this.player.position;
     const people = [...this.npcs]
       .filter(([, npc]) => isModel(npc.want))
-      .sort(([, a], [, b]) => a.group.position.distanceTo(at) - b.group.position.distanceTo(at))
+      .sort(([, a], [, b]) => across(a.group.position, at) - across(b.group.position, at))
       .map(([name]) => name);
     return { people, hero: isModel(this.heroWant), enemy: isModel(this.enemyWant) && this.enemyLook?.shape === 'humanoid' };
   }
@@ -2154,7 +2298,9 @@ export class RpgScene {
     const a = rand() * Math.PI * 2;
     const d = 6 + rand() * 3;
     const mesh = buildItem(look);
-    mesh.position.set(anchor.x + Math.sin(a) * d, 0.5, anchor.z + Math.cos(a) * d);
+    const cx = anchor.x + Math.sin(a) * d;
+    const cz = anchor.z + Math.cos(a) * d;
+    mesh.position.set(cx, this.groundAt(cx, cz) + 0.5, cz);
     this.scene.add(mesh);
     this.clues.set(id, mesh);
   }
@@ -2178,7 +2324,7 @@ export class RpgScene {
       disposeHubModel(model.group);
       return;
     }
-    model.group.position.set(now.position.x, 0, now.position.z);
+    model.group.position.set(now.position.x, this.groundAt(now.position.x, now.position.z), now.position.z);
     model.group.rotation.y = rng(hashString(id))() * Math.PI * 2;
     model.group.userData.model = url;
     model.group.userData.still = true;
@@ -2191,7 +2337,7 @@ export class RpgScene {
     let best: string | null = null;
     let bestD = PICKUP_RANGE + 0.5;
     for (const [id, mesh] of this.clues) {
-      const d = mesh.position.clone().setY(0).distanceTo(this.player.position);
+      const d = across(mesh.position, this.player.position);
       if (d < bestD) {
         bestD = d;
         best = id;
@@ -2209,12 +2355,12 @@ export class RpgScene {
     const at = this.player.position;
     const options: { d: number; thing: { talk: string } | { examine: string } | { pickup: Pickup } }[] = [];
     const npc = this.nearestNpc();
-    if (npc) options.push({ d: this.npcs.get(npc)!.group.position.distanceTo(at), thing: { talk: npc } });
+    if (npc) options.push({ d: across(this.npcs.get(npc)!.group.position, at), thing: { talk: npc } });
     const clue = this.nearestClue();
-    if (clue) options.push({ d: this.clues.get(clue)!.position.clone().setY(0).distanceTo(at), thing: { examine: clue } });
+    if (clue) options.push({ d: across(this.clues.get(clue)!.position, at), thing: { examine: clue } });
     for (const p of this.pickups) {
       if (!p.mesh.visible) continue;
-      const d = p.mesh.position.clone().setY(0).distanceTo(at);
+      const d = across(p.mesh.position, at);
       if (d < PICKUP_RANGE) options.push({ d, thing: { pickup: p } });
     }
     options.sort((a, b) => a.d - b.d);
@@ -2228,7 +2374,7 @@ export class RpgScene {
       // Anyone the quest has put here, with or without a body yet: someone whose model is still
       // being made, or will never come, is still who the marker points at (owner, 30 Oct 2026:
       // Malina waited unseen for a model fal.ai never sent, and the beat could not be finished).
-      const d = npc.group.position.distanceTo(this.player.position);
+      const d = across(npc.group.position, this.player.position);
       if (d < bestD) {
         bestD = d;
         best = name;
@@ -2277,13 +2423,13 @@ export class RpgScene {
       }
       if (kind === 'collect') {
         const mesh = new THREE.Group();
-        mesh.position.copy(pos).setY(0.8);
+        mesh.position.copy(pos).setY(this.groundAt(pos.x, pos.z) + 0.8);
         this.scene.add(mesh);
         this.pickups.push({ mesh, phase: rand() * 6 });
         this.dressPickup(mesh);
       } else {
         const enemy: Enemy = { mesh: new THREE.Group(), rig: null, creature: null, speed: 0, size: look.size, hp: 3, home: pos.clone(), hitCooldown: 1, flash: 0 };
-        enemy.mesh.position.copy(pos);
+        enemy.mesh.position.copy(pos).setY(this.groundAt(pos.x, pos.z));
         this.scene.add(enemy.mesh);
         this.enemies.push(enemy);
         void this.dressEnemy(enemy, this.enemyToken).catch(() => {});
@@ -2547,14 +2693,16 @@ export class RpgScene {
         : where === 'marker' && this.markerTarget
           ? this.markerTarget.clone().add(new THREE.Vector3(0, 0, npc ? 2 : 0))
           : SPAWN;
-    this.land();
     this.player.position.set(p.x, 0, p.z);
+    this.land();
   }
 
   /** For tests: beside a clue. */
   teleportToClue(id: string) {
     const mesh = this.clues.get(id);
-    if (mesh) this.player.position.set(mesh.position.x + 1, 0, mesh.position.z);
+    if (!mesh) return;
+    this.player.position.set(mesh.position.x + 1, 0, mesh.position.z);
+    this.land();
   }
 
   /** Turns the hunter and the camera toward the marker. */
@@ -2618,7 +2766,7 @@ export class RpgScene {
   private land() {
     this.airborne = false;
     this.vy = 0;
-    this.player.position.y = 0;
+    this.player.position.y = this.groundAt(this.player.position.x, this.player.position.z);
   }
 
   interact() {
@@ -2738,6 +2886,7 @@ export class RpgScene {
       this.frame = requestAnimationFrame(tick);
       const started = this.frames.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
+      if (this.terrainDirty) this.step('terrain', () => this.refreshTerrain());
       // A step that throws is reported once and the frame is still drawn: before this, one thrown
       // every frame stopped the drawing, and the canvas kept the last picture with the HUD alive
       // over it — the previous world, a hero who would not move (owner, 30 Oct 2026).
@@ -2834,10 +2983,14 @@ export class RpgScene {
     if (this.airborne) {
       this.vy -= GRAVITY * dt;
       this.player.position.y += this.vy * dt;
-      if (this.player.position.y <= 0) {
+      // Down onto whatever the ground is where he comes down: up a slope he lands sooner.
+      if (this.player.position.y <= this.groundAt(this.player.position.x, this.player.position.z)) {
         this.land();
         if (!moving) this.playerRig?.once('Jump_Land', JUMP_LAND_SECONDS);
       }
+    } else {
+      // On foot he walks the hills: up and down with the ground under him.
+      this.player.position.y = this.groundAt(this.player.position.x, this.player.position.z);
     }
     const t = this.clock.elapsedTime;
     this.attackTimer = Math.max(0, this.attackTimer - dt);
@@ -2859,7 +3012,7 @@ export class RpgScene {
     for (const mesh of this.clues.values()) if (!mesh.userData.still) mesh.rotation.y += dt * 0.8;
     for (const p of this.pickups) {
       p.mesh.rotation.y += dt * 2;
-      p.mesh.position.y = 0.8 + Math.sin(t * 2 + p.phase) * 0.15;
+      p.mesh.position.y = this.groundAt(p.mesh.position.x, p.mesh.position.z) + 0.8 + Math.sin(t * 2 + p.phase) * 0.15;
     }
 
     this.updateEnemies(dt);
@@ -2867,7 +3020,7 @@ export class RpgScene {
 
     for (const place of this.places.values()) {
       for (const s of place.spinners) s.object.rotation[s.axis] += s.speed * dt;
-      if (!place.arrived && this.player.position.distanceTo(place.center) < PLACE_RADIUS) {
+      if (!place.arrived && across(this.player.position, place.center) < PLACE_RADIUS) {
         place.arrived = true;
         this.cb.onArrive(place.spec.name);
       }
@@ -2921,7 +3074,9 @@ export class RpgScene {
       }
       enemy.rig?.play(gait);
       this.collide(pos, 0.4);
-      enemy.mesh.lookAt(this.player.position.x, 0, this.player.position.z);
+      pos.y = this.groundAt(pos.x, pos.z);
+      // Turned on the level toward him, not tipped up a hill at him.
+      enemy.mesh.lookAt(this.player.position.x, pos.y, this.player.position.z);
       enemy.flash = Math.max(0, enemy.flash - dt);
       enemy.mesh.scale.setScalar(enemy.size * (enemy.flash > 0 ? 1.12 : 1));
       if (dist <= 1.5 && enemy.hitCooldown === 0) {
@@ -2932,6 +3087,7 @@ export class RpgScene {
         this.cb.onHealth(this.hp);
         if (this.hp === 0) {
           this.player.position.copy(SPAWN);
+          this.land();
           this.hp = MAX_HP;
           this.cb.onDeath();
           this.cb.onHealth(this.hp);
@@ -2939,7 +3095,7 @@ export class RpgScene {
       }
     }
     // Slow regeneration out of combat.
-    if (this.hp < MAX_HP && this.enemies.every((e) => e.hitCooldown === 0 || e.mesh.position.distanceTo(this.player.position) > 6)) {
+    if (this.hp < MAX_HP && this.enemies.every((e) => e.hitCooldown === 0 || across(e.mesh.position, this.player.position) > 6)) {
       const before = Math.floor(this.hp);
       this.hp = Math.min(MAX_HP, this.hp + dt * 4);
       if (Math.floor(this.hp) !== before) this.cb.onHealth(Math.floor(this.hp));
@@ -2955,7 +3111,9 @@ export class RpgScene {
       Math.cos(this.yaw) * Math.cos(this.pitch),
     ).multiplyScalar(distance);
     this.camera.position.copy(target).add(offset);
-    if (this.camera.position.y < 0.4) this.camera.position.y = 0.4;
+    // Never into a hill behind him: the camera rides up over the ground it would have gone under.
+    const floor = this.groundAt(this.camera.position.x, this.camera.position.z) + 0.4;
+    if (this.camera.position.y < floor) this.camera.position.y = floor;
     this.camera.lookAt(target);
   }
 
@@ -2967,7 +3125,7 @@ export class RpgScene {
     if (!this.paused) {
       for (const [name, n] of this.npcs) {
         if (n.group.children.length === 0) continue;
-        const d = n.group.position.distanceTo(this.player.position);
+        const d = across(n.group.position, this.player.position);
         if (d < bestD) {
           bestD = d;
           who = name;

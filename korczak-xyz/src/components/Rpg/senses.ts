@@ -111,8 +111,12 @@ export class SensesView {
   private dummy = new THREE.Object3D();
   private color = new THREE.Color();
 
-  constructor(scene: THREE.Scene) {
+  /** The height of the ground at (x, z): the prints and the halos lie on the hills (`terrain.ts`). */
+  private groundAt: (x: number, z: number) => number;
+
+  constructor(scene: THREE.Scene, groundAt: (x: number, z: number) => number = () => 0) {
     this.scene = scene;
+    this.groundAt = groundAt;
     const foot = new THREE.PlaneGeometry(0.24, 0.46);
     foot.rotateX(-Math.PI / 2);
     // Footprints lie on the ground and are hidden by what stands on it: depth-tested, unlike the halos.
@@ -162,7 +166,7 @@ export class SensesView {
     this.prints.count = this.printList.length;
     for (let i = 0; i < this.printList.length; i++) {
       const p = this.printList[i];
-      this.dummy.position.set(p.x, 0.12, p.z);
+      this.dummy.position.set(p.x, this.groundAt(p.x, p.z) + 0.12, p.z);
       this.dummy.rotation.set(0, p.angle, 0);
       this.dummy.updateMatrix();
       this.prints.setMatrixAt(i, this.dummy.matrix);
@@ -196,7 +200,7 @@ export class SensesView {
       const target = visible ? targets[i] : undefined;
       halo.group.visible = !!target;
       if (!target) continue;
-      halo.group.position.set(target.position.x, 0, target.position.z);
+      halo.group.position.set(target.position.x, this.groundAt(target.position.x, target.position.z), target.position.z);
       const pulse = (now * 0.9 + i * 0.37) % 1;
       const strength = target.clue ? 1 : 0.6;
       halo.ring.scale.setScalar(0.8 + pulse * 1.4);

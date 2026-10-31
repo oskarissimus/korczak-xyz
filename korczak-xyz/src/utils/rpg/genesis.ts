@@ -45,6 +45,7 @@
  */
 
 import type { Lang } from './quest';
+import { RELIEFS, type Relief } from './terrain';
 
 /** A world's colours, light, air, water and growth: what `RpgScene.applyWorld` draws. */
 export interface WorldLook {
@@ -67,6 +68,11 @@ export interface WorldLook {
   flora: (typeof FLORAS)[number];
   wallSurface: (typeof WALL_SURFACES)[number];
   roofSurface: (typeof ROOF_SURFACES)[number];
+  /**
+   * How tall the hills between the places grow (`terrain.ts`). Absent in a world kept before it was
+   * asked for, and in the classic look: the land then takes one from the world's id.
+   */
+  relief?: Relief;
 }
 
 export const TIMES = ['dawn', 'day', 'dusk', 'night'] as const;
@@ -77,6 +83,7 @@ export const GROWTHS = ['barren', 'sparse', 'lush'] as const;
 export const FLORAS = ['pines', 'broadleaf', 'dead', 'fungi', 'spires', 'none'] as const;
 export const WALL_SURFACES = ['plaster', 'stone', 'planks', 'rock'] as const;
 export const ROOF_SURFACES = ['thatch', 'planks', 'stone', 'leaves'] as const;
+
 
 /** The words of a world every beat's prompt is given. */
 export interface WorldBrief {
@@ -634,6 +641,8 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     `    "haze": one of ${list(HAZES)},`,
     `    "weather": one of ${list(WEATHERS)},`,
     `    "water": one of ${list(WATERS)} (flooded: shallow water everywhere but the paths and places),`,
+    `    "relief": one of ${list(RELIEFS)} (the lie of the land between the places: flat as a salt pan or a plain,`,
+    '      rolling low hills, hilly, or rugged with steep tall hills; a flooded world is drawn flat whatever this says),',
     `    "growth": one of ${list(GROWTHS)},`,
     `    "flora": one of ${list(FLORAS)} (what stands where a forest would; fungi: giant mushrooms; spires: tall`,
     '      crystal or metal spikes),',
@@ -728,6 +737,7 @@ export function parseLook(raw: unknown): WorldLook {
     flora: oneOf(r.flora, FLORAS, c.flora),
     wallSurface: oneOf(r.wallSurface, WALL_SURFACES, c.wallSurface),
     roofSurface: oneOf(r.roofSurface, ROOF_SURFACES, c.roofSurface),
+    ...(RELIEFS.includes(r.relief as Relief) ? { relief: r.relief as Relief } : {}),
   };
 }
 

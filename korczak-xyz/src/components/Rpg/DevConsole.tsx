@@ -38,6 +38,7 @@ import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
 import type { Mesher, PersonPainter } from '../../utils/rpg/landmark3d';
 import type { Rigger } from './people';
 import type { RpgScene } from './RpgScene';
+import { RELIEFS, type Relief } from '../../utils/rpg/terrain';
 import { translations } from './translations';
 
 function useDevlog(): readonly DevRequest[] {
@@ -259,6 +260,7 @@ function PerfTab({
     saveQuality(next);
     setVersion((n) => n + 1);
   };
+  const land = scene.terrainReport();
   const device = Math.min(window.devicePixelRatio, 2);
   const rows: [string, string][] = [
     ['FPS', Math.round(f.fps).toString()],
@@ -269,6 +271,8 @@ function PerfTab({
     ['points', thousands(f.points)],
     ['px', `${f.width}×${f.height} @ ${f.pixelRatio}×`],
     [t.perfPlaces, String(scene.placeCount())],
+    [t.perfTerrain, t.perfTerrainLine(t.reliefName[land.relief] ?? land.relief, land.max.toFixed(1), Math.round(land.hilly * 100), Math.round(land.ms))],
+    [t.perfGround, t.perfGroundLine(land.heroY.toFixed(1), Math.round(land.heroSlope * 100))],
   ];
   return (
     <div className="rpg-dev-list rpg-dev-perf">
@@ -295,6 +299,23 @@ function PerfTab({
           {PIXEL_RATIOS.map((r) => (
             <option key={String(r)} value={String(r)}>
               {r === null ? t.perfDevice(device) : `${r}×`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {t.perfRelief}{' '}
+        <select
+          value={land.override ?? ''}
+          onChange={(e) => {
+            scene.setReliefOverride((e.target.value || null) as Relief | null);
+            setVersion((n) => n + 1);
+          }}
+        >
+          <option value="">{t.perfReliefWorld(t.reliefName[land.worldRelief] ?? land.worldRelief)}</option>
+          {RELIEFS.map((r) => (
+            <option key={r} value={r}>
+              {t.reliefName[r]}
             </option>
           ))}
         </select>

@@ -222,6 +222,9 @@ describe('lift', () => {
 
   it('leaves the classic look as it is', () => {
     expect(parseLook(CLASSIC_LOOK)).toEqual(CLASSIC_LOOK);
+    // The relief is kept when it is one the land knows, and left out otherwise (the land takes one from the id).
+    expect(parseLook({ relief: 'rugged' }).relief).toBe('rugged');
+    expect('relief' in parseLook({ relief: 'alpine' })).toBe(false);
   });
 });
 

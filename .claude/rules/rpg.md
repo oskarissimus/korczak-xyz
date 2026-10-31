@@ -977,6 +977,42 @@ content-hashed and immutable.
   mottle leaves patches of each ground in the other, and the place's name seeds the noise so no two
   places fray alike. Under a flood the coast is as ragged but hard (`sharp`), starting further out,
   since a faded island is land under the sea.
+- **The land has hills** (owner, 31 Oct 2026: "let's make some generated terrain"). `utils/rpg/terrain.ts`
+  draws a heightmap from the world's id (value-noise fbm: hills ~70 m across with ~30 m shoulders and
+  a few metres of roughness, cut to level lowland where the noise is low) plus a ridge round the
+  map's edge from 138 m out; how tall is the world's **`relief`** (`flat` 1.2/4 m, `rolling` 6/12,
+  `hilly` 12/20, `rugged` 20/30 — hills/ridge), a field of the genesis look. A world kept before
+  there was one, and the classic world, get `rolling` or `hilly` from their id (`reliefFor`); a
+  flooded world is flat, its sea being a plane at 0. `relief` is optional on `WorldLook` and absent
+  from `CLASSIC_LOOK` on purpose, since `isClassic` compares looks as JSON.
+  - **Everything the game builds stands at 0, so 0 is kept wherever it builds** (`Clearing`): the
+    village (40 m), each place standing (`PLACE_FLAT`, 26 m — `PLACE_RADIUS` and a step) and the road
+    to each (3 m either side of its middle), with the noise let in 3 m further out so the 2 m grid's
+    cells are level to the edge, rising to full height over `RISE` (14 m). So a road runs through the
+    hills as a level way between banks. **The land never goes below 0**: a place's disc, its frayed
+    edge and its road are at 0, and a hill rising over a disc's edge hides it where a dip would have
+    left it hanging. Placing everything at 0 is what let nothing in `placeBuilder`, `hubLayout`, the
+    roads or the places change.
+  - **Cut again when a place goes up or comes down** (`RpgScene.refreshTerrain`, keyed on the world,
+    the relief and the places' names, debounced to the next frame by `terrainDirty` so a load that
+    puts up ten places cuts once; ~50 ms in Node). A new place only ever brings the land *down* to 0
+    (a test pins it), so nothing already standing moves. What stands still is then moved by the
+    difference (`reground`: the kit's and the world's cover, matrix by matrix, the stopgap trees, the
+    NPCs and their stations, the clues) and the instanced trees are planted again; whatever moves —
+    the hero, the people, the enemies, the floating pickups, the senses' prints and halos — is put on
+    `groundAt` every frame.
+  - **`heightAt` is the drawn mesh's height, not the noise's**: the ground is a
+    `PlaneGeometry(360, 360, 180, 180)` turned flat in its geometry (not by the mesh, so a vertex's y
+    is its height), and between grid points `heightAt` interpolates on the same two triangles a
+    PlaneGeometry cell is split into (the diagonal from (ix, iz+1) to (ix+1, iz)). A test raycasts
+    the real geometry to hold that, so a boot never sinks into a slope or floats over it.
+  - Distances between things are measured over the ground (`across`), not in 3D: with the hero on a
+    hill, `distanceTo` added the height to every talk, pickup and arrival range. The jump lands on
+    the ground where he comes down; the camera rides up over a hill behind him instead of going in.
+  - **In the `~` console** (Perf tab): *Terrain* (relief, the highest point, how much of the map is
+    raised, ms to cut it), *Ground under the hero* (height and slope), and a *Relief* picker that
+    puts another relief on the same world to compare (not kept; the world's own is the first option).
+    Each cut is a `rpg.terrain` breadcrumb with the same numbers and the count of places.
 - **No environment map**, so anything fully metallic renders black: `dress` caps the outfits'
   metalness at 0.3 and the sword is 0.35.
 - **The models never block the game.** A character is an empty `THREE.Group` until the files

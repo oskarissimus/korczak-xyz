@@ -977,7 +977,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const enterWorld = useCallback((w: WorldBible) => {
     worldRef.current = w;
     setWorld(w);
-    sceneRef.current?.applyWorld(w.look);
+    sceneRef.current?.applyWorld(w.look, w.id);
   }, []);
 
   const startQuest = useCallback(async (keepLog = false) => {
@@ -1227,7 +1227,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       previewRef.current = preview;
       setPreview(preview);
       // Its sky and light at once, the first thing about it there is to see.
-      sceneRef.current?.applyWorld(preview.look);
+      sceneRef.current?.applyWorld(preview.look, preview.id);
       startWorldAssets(preview);
     };
     let attempt;
