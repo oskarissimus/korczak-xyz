@@ -71,7 +71,7 @@ project you open to ask whether the typing trainer is broken.
 reasoning is at the top of `src/lib/sentry.ts` and is worth reading before switching either on —
 the short version is that every span this site could produce would be a client-only span, and
 Replay records the DOM of apps that hold somebody's actual life (the sleep log, the shopping
-list). The bundle is 27KB gzipped as configured; Replay would roughly triple it.
+list). The bundle is 31KB gzipped as configured (27KB on SDK v10); Replay would roughly triple it.
 
 The one exception is **Sentry Logs**, enabled Sep 2026 for `recordMeasurement` in
 `src/lib/sentry.ts`: an explicit, structured record of how long something took, sent only where a

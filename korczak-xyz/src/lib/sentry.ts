@@ -43,7 +43,7 @@ import {
   globalHandlersIntegration,
   httpContextIntegration,
   init,
-  inboundFiltersIntegration,
+  eventFiltersIntegration,
   linkedErrorsIntegration,
   logger,
   setTag,
@@ -161,10 +161,12 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
        * a diff rather than silent in a dependency bump.
        */
       integrations: [
-        inboundFiltersIntegration(),
+        eventFiltersIntegration(),
         functionToStringIntegration(),
         breadcrumbsIntegration({
-          console: false, // the logger feeds breadcrumbs directly; console would double every one
+          // No console breadcrumbs: the logger feeds breadcrumbs directly, and console would
+          // double every one. v11 moved them out of this integration into `consoleIntegration`,
+          // which is deliberately not in this list.
           dom: true,
           fetch: true,
           history: true,
@@ -177,16 +179,32 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
       ],
 
       /*
-       * No automatic PII. `sendDefaultPii` would attach IP addresses and request headers; the
-       * only identity this site attaches is the Firebase uid, set explicitly by `setSentryUser`
-       * when somebody signs in, because that is the one field that makes "did this happen to a
-       * real account or only on my laptop" answerable.
+       * No automatic PII. The only identity this site attaches is the Firebase uid, set
+       * explicitly by `setSentryUser` when somebody signs in, because that is the one field that
+       * makes "did this happen to a real account or only on my laptop" answerable.
+       *
+       * Every category is named and switched off rather than left to the SDK. Until v11 this was
+       * one flag, `sendDefaultPii: false`; v11 removed it, and the `dataCollection` that replaced
+       * it defaults every category to ON — so the bump that drops the old line without adding
+       * this one quietly starts sending IP addresses, cookies and query strings.
        */
-      sendDefaultPii: false,
+      dataCollection: {
+        userInfo: false, // no inferred IP address
+        cookies: false,
+        httpHeaders: false,
+        httpBodies: [],
+        urlQueryParams: false,
+        graphQL: { document: false, variables: false },
+        genAI: { inputs: false, outputs: false },
+        mcp: { inputs: false, outputs: false },
+        databaseQueryData: false,
+        queues: false,
+        stackFrameVariables: false,
+      },
 
-      // For `recordMeasurement` only; nothing else here writes a Sentry log. Said explicitly
-      // because the SDK's default for it has changed between versions.
-      enableLogs: true,
+      // Sentry Logs, for `recordMeasurement` only, need no switch: v11 dropped `enableLogs` and
+      // a log is sent whenever something calls `logger.*`. Nothing else here does — the console
+      // integration that would turn every console line into one is not in the list above.
 
       ignoreErrors: IGNORED_MESSAGES,
       denyUrls: DENY_URLS,

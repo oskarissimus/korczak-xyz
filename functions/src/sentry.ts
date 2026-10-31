@@ -51,10 +51,26 @@ export function initSentry(): void {
 
     /*
      * Off. The collectors handle other people's push subscriptions and Firestore documents, and
-     * `sendDefaultPii` would attach request bodies and headers to events. The uid is set
-     * explicitly where it is genuinely useful (sendTestPush, assembleVideo) and nowhere else.
+     * would otherwise attach request bodies and headers to events. The uid is set explicitly
+     * where it is genuinely useful (sendTestPush, assembleVideo) and nowhere else.
+     *
+     * Every category is named, not left to the SDK: until v11 this was `sendDefaultPii: false`,
+     * and the `dataCollection` that replaced it defaults every category to ON — including genAI
+     * inputs and outputs, which the SDK records on its own for the `@google/genai` calls here.
      */
-    sendDefaultPii: false,
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
+      genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+    },
 
     // Cloud Functions freeze the instance between invocations, so a queued event can sit for
     // hours. Small queue, and every entry point flushes before it returns.
