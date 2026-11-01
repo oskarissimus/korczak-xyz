@@ -35,6 +35,7 @@ import { loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
 import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/accountAssets';
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
+import { poseFromRender } from './poseFromRender';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
@@ -45,7 +46,7 @@ export type Body = 'male' | 'female';
  * `voxelSkin`; owner, 31 Oct 2026: "SOTA non-AI rigging methods we could use"), or with the joints
  * read off a T-posed mesh against a standard body (`fit`, `tPoseJoints`; owner, 1 Nov 2026).
  */
-export type Rigger = 'meshy' | 'self' | 'voxel' | 'fit';
+export type Rigger = 'meshy' | 'self' | 'voxel' | 'fit' | 'pose';
 export const DEFAULT_RIGGER: Rigger = 'meshy';
 
 /** Heights a person is rigged at, feet to crown, by who they are. */
@@ -353,7 +354,7 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
   } catch {
     /* worked out again next time */
   }
-  void keepSelfRig(key, packed, { cacheKey: key, version: RIG_VERSION, weights: /&w=(voxel|fit)/.test(key) ? 'voxel' : 'donor', joints: /&w=fit/.test(key) ? 'fit' : 'warp', ms: Math.round(ms) });
+  void keepSelfRig(key, packed, { cacheKey: key, version: RIG_VERSION, weights: /&w=(voxel|fit|pose)/.test(key) ? 'voxel' : 'donor', joints: /&w=(fit|pose)/.exec(key)?.[1] ?? 'warp', ms: Math.round(ms) });
   return { rig, ms };
 }
 
@@ -409,14 +410,14 @@ export class People {
    */
   template(url: string, body: Body, height: number, label = 'person'): Promise<PersonTemplate> {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
-    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}${this.rigger === 'voxel' || this.rigger === 'fit' ? `&w=${this.rigger}` : ''}`;
+    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}${this.rigger === 'voxel' || this.rigger === 'fit' || this.rigger === 'pose' ? `&w=${this.rigger}` : ''}`;
     const falKey = this.rigger === 'meshy' ? this.falKey : null;
     const key = falKey ? `${url}?meshy=1&height=${height}` : own;
     let t = this.templates.get(key);
     if (!t) {
       t = falKey
         ? this.buildMeshy(falKey, url, key, height, label).catch(() => this.build(url, own, body, height, label))
-        : this.build(url, key, body, height, label, this.rigger === 'voxel' || this.rigger === 'fit' ? this.rigger : 'donor');
+        : this.build(url, key, body, height, label, this.rigger === 'voxel' || this.rigger === 'fit' || this.rigger === 'pose' ? this.rigger : 'donor');
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
     }
@@ -486,24 +487,36 @@ export class People {
     return { group, clips: fitClips(moved, (hips as THREE.Bone).position.clone()), ms };
   }
 
-  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'donor' | 'voxel' | 'fit' = 'donor'): Promise<PersonTemplate> {
+  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'donor' | 'voxel' | 'fit' | 'pose' = 'donor'): Promise<PersonTemplate> {
     const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
     // Fitted joints need no donor's shape, only its skeleton: the male one's, which the clips were
     // made on (the female donor's own skeleton is crooked — its head's end below its crown). An
     // A-posed model has no arms to measure along x, so it is weighed by voxels on the warp instead.
-    const fit = mode === 'fit' && tPosed;
+    // `pose` is `fit` with the limb joints a pose detector found in the mesh's front render.
+    const fit = (mode === 'fit' || mode === 'pose') && tPosed;
     const body: Body = fit ? 'male' : wanted;
     const weights = mode === 'donor' ? 'donor' : 'voxel';
     const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
-    const pose = `${tPosed ? 'T-posed' : 'A-posed'}${fit ? ', fitted joints' : ''}${weights === 'voxel' ? ', voxel weights' : ''}`;
+    let pose = `${tPosed ? 'T-posed' : 'A-posed'}${fit ? (mode === 'pose' ? ', joints from the picture' : ', fitted joints') : ''}${weights === 'voxel' ? ', voxel weights' : ''}`;
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
     const index = geometry.index ? new Uint32Array(geometry.index.array as ArrayLike<number>) : null;
     const { rig, ms } = await cachedRig(tPosed ? `${key}&pose=t` : key, async () => {
       const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
       try {
-        const made = await rigOffThread(donor, target, height, { weights, index, joints: fit ? 'fit' : 'warp' });
+        let picture: SelfRigOptions['picture'];
+        if (fit && mode === 'pose') {
+          // Measured off the mesh instead if the detector cannot run or finds nobody.
+          try {
+            const found = await poseFromRender(geometry, Array.isArray(mesh.material) ? mesh.material[0] : mesh.material);
+            picture = found;
+            pose += ` (${found.found}/12 found in ${Math.round(found.ms)} ms)`;
+          } catch (err) {
+            pose += ` (detector failed, measured instead: ${err instanceof Error ? err.message : String(err)})`;
+          }
+        }
+        const made = await rigOffThread(donor, target, height, { weights, index, joints: fit ? 'fit' : 'warp', picture });
         endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
         return made;
       } catch (err) {

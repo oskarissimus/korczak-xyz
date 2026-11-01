@@ -58,8 +58,13 @@ export interface TPoseJoints {
 /**
  * The joints of `positions` (xyz in the rig's space, `height` tall, arms out along x). Throws if the
  * mesh is not in a T-pose — no arms reaching well past the torso — since nothing here then holds.
+ *
+ * `anchors` are limb joints already known from elsewhere (`pictureJoints.ts`: a pose detector on the
+ * front render), by the donor's names — `LeftArm`, `LeftForeArm`, `LeftHand`, `LeftUpLeg`, `LeftLeg`,
+ * `LeftFoot` and their right twins. Each one given replaces the measured one, and the hips' height
+ * moves the spine and the head with it; whatever is missing is measured as without them.
  */
-export function tPoseJoints(positions: ArrayLike<number>, height: number): TPoseJoints {
+export function tPoseJoints(positions: ArrayLike<number>, height: number, anchors: Partial<Record<string, Vec3>> = {}): TPoseJoints {
   const n = positions.length / 3;
   const H = height;
   const notes: string[] = [];
@@ -142,7 +147,8 @@ export function tPoseJoints(positions: ArrayLike<number>, height: number): TPose
     const near = band(shoulderX - side * step * 0.5).filter((i) => Math.abs(Y(i) - elbow[1]) < armThick);
     const m = middle(near);
     const shoulder: Vec3 = m ? [shoulderX, m[1], m[2]] : [shoulderX, elbow[1], elbow[2]];
-    return { Arm: shoulder, ForeArm: elbow, Hand: at(wristX) };
+    const S = side > 0 ? 'Left' : 'Right';
+    return { Arm: anchors[`${S}Arm`] ?? shoulder, ForeArm: anchors[`${S}ForeArm`] ?? elbow, Hand: anchors[`${S}Hand`] ?? at(wristX) };
   };
   const left = arm(1), right = arm(-1);
 
@@ -175,7 +181,9 @@ export function tPoseJoints(positions: ArrayLike<number>, height: number): TPose
   const crotchSeen = apartTo > H * 0.4;
   notes.push(crotchSeen ? `legs apart up to ${(apartTo / H * 100).toFixed(0)} % of the height` : `legs hidden above ${(apartTo / H * 100).toFixed(0)} % (a skirt): hips and knees from the template`);
   // The hip joint sits a little below the crotch; under a skirt, at the template's height.
-  const hipY = crotchSeen ? Math.min(apartTo + H * 0.035, T('LeftUpLeg')[1] + H * 0.03) : T('LeftUpLeg')[1];
+  const anchoredHips = anchors.LeftUpLeg && anchors.RightUpLeg ? (anchors.LeftUpLeg[1] + anchors.RightUpLeg[1]) / 2 : null;
+  if (Object.keys(anchors).length) notes.push(`${Object.keys(anchors).length} limb joints from the picture`);
+  const hipY = anchoredHips ?? (crotchSeen ? Math.min(apartTo + H * 0.035, T('LeftUpLeg')[1] + H * 0.03) : T('LeftUpLeg')[1]);
   const kneeY = T('LeftLeg')[1] * (hipY / T('LeftUpLeg')[1]);
   const ankleY = T('LeftFoot')[1];
   const ankles = legsAt(ankleY) ?? legsAt(ankleY + H * 0.03);
@@ -185,13 +193,14 @@ export function tPoseJoints(positions: ArrayLike<number>, height: number): TPose
   const pelvis = torsoAt(hipY);
   const leg = (side: 1 | -1) => {
     const s = side > 0 ? 'left' : 'right';
-    const ankle: Vec3 = ankles ? [ankles[s][0], ankleY, ankles[s][2]] : [T('LeftFoot')[0] * side, ankleY, T('LeftFoot')[2]];
+    const S = side > 0 ? 'Left' : 'Right';
+    const ankle: Vec3 = anchors[`${S}Foot`] ?? (ankles ? [ankles[s][0], ankleY, ankles[s][2]] : [T('LeftFoot')[0] * side, ankleY, T('LeftFoot')[2]]);
     // The hip's width: the template's, or the stance's if the feet are closer in than that.
     const hipX = side * Math.min(T('LeftUpLeg')[0], Math.abs(ankle[0]) * 0.9 + H * 0.01);
-    const hip: Vec3 = [hipX, hipY, pelvis[2]];
-    const knee: Vec3 = knees
+    const hip: Vec3 = anchors[`${S}UpLeg`] ?? [hipX, hipY, pelvis[2]];
+    const knee: Vec3 = anchors[`${S}Leg`] ?? (knees
       ? [knees[s][0], kneeY, knees[s][2]]
-      : [hip[0] + (ankle[0] - hip[0]) * ((hipY - kneeY) / (hipY - ankleY)), kneeY, (hip[2] + ankle[2]) / 2 + H * 0.02];
+      : [hip[0] + (ankle[0] - hip[0]) * ((hipY - kneeY) / (hipY - ankleY)), kneeY, (hip[2] + ankle[2]) / 2 + H * 0.02]);
     // The toes: the foot's front, low, on that side.
     const foot = inBox(side > 0 ? 0 : -H, side > 0 ? H : 0, 0, H * 0.04);
     let front = ankle[2] + H * 0.08;

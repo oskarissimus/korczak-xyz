@@ -21,7 +21,8 @@
  * body better than Meshy's. Pure, so it runs in a worker and in the tests.
  */
 
-import { tPoseJoints } from './tposeJoints';
+import { jointsFromPicture, type JointName, type Joints2D, type PictureInfo } from './pictureJoints';
+import { tPoseJoints, type Vec3 } from './tposeJoints';
 import { skinBones, voxelSkin } from './voxelSkin';
 
 /** One bone of a donor's skeleton, in metres; parents come before their children. */
@@ -166,9 +167,22 @@ export interface SelfRigOptions {
    * standard body's proportions (`fit`, `tPoseJoints`; owner, 1 Nov 2026), which always weighs by voxels.
    */
   joints?: 'warp' | 'fit';
+  /**
+   * For `fit`: the big joints a pose detector found in the target's front render (`poseFromRender.ts`),
+   * lifted into the mesh (`pictureJoints.ts`) to stand in for the measured ones.
+   */
+  picture?: PictureInfo & { joints: Joints2D };
   /** The target's triangles, for `voxel`: without them only its vertices are voxelised. */
   index?: ArrayLike<number> | null;
 }
+
+/** The detector's joints, by the donor's bone names. */
+const PICTURE_BONES: [JointName, string][] = [
+  ['shoulderL', 'LeftArm'], ['elbowL', 'LeftForeArm'], ['wristL', 'LeftHand'],
+  ['hipL', 'LeftUpLeg'], ['kneeL', 'LeftLeg'], ['ankleL', 'LeftFoot'],
+  ['shoulderR', 'RightArm'], ['elbowR', 'RightForeArm'], ['wristR', 'RightHand'],
+  ['hipR', 'RightUpLeg'], ['kneeR', 'RightLeg'], ['ankleR', 'RightFoot'],
+];
 
 /** Rigs `target` (a mesh's vertices, xyz, in any frame with +y up and the face toward +z) at `height` metres. */
 export function selfRig(donor: Donor, target: ArrayLike<number>, height: number, o: SelfRigOptions = {}): SelfRig {
@@ -184,7 +198,10 @@ export function selfRig(donor: Donor, target: ArrayLike<number>, height: number,
     tPts[i * 3 + 2] = (target[i * 3 + 2] - rb.mid[2]) * s;
   }
   if (o.joints === 'fit') {
-    const { joints: at } = tPoseJoints(tPts, height);
+    const lifted = o.picture ? jointsFromPicture(o.picture.joints, o.picture, tPts, { index: o.index ?? undefined }) : {};
+    const anchors: Record<string, Vec3> = {};
+    for (const [from, to] of PICTURE_BONES) if (lifted[from]) anchors[to] = lifted[from] as Vec3;
+    const { joints: at } = tPoseJoints(tPts, height, anchors);
     const joints = new Float32Array(nB * 3);
     donor.bones.forEach((b, i) => joints.set(at[b.name] ?? b.world, i * 3));
     const bones = skinBones(

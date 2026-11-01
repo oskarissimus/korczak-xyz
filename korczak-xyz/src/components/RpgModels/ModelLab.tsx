@@ -566,10 +566,11 @@ export default function ModelLab({ lang }: { lang: Lang }) {
               {t.rig}:{' '}
               <select
                 value={rigger}
-                onChange={(e) => setRigger(e.target.value === 'meshy' || e.target.value === 'raw' || e.target.value === 'voxel' || e.target.value === 'fit' ? e.target.value : 'self')}
+                onChange={(e) => setRigger(e.target.value === 'meshy' || e.target.value === 'raw' || e.target.value === 'voxel' || e.target.value === 'fit' || e.target.value === 'pose' ? e.target.value : 'self')}
               >
                 <option value="self">{t.rigSelf}</option>
                 <option value="fit">{t.rigFit}</option>
+                <option value="pose">{t.rigPose}</option>
                 <option value="voxel">{t.rigVoxel}</option>
                 <option value="raw">{t.rigRaw}</option>
                 <option value="meshy" disabled={!falKey}>

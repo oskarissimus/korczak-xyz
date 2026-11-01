@@ -984,6 +984,20 @@ content-hashed and immutable.
     crooked (its head's end at 0.876 of the height, its spine off-centre), which the warp copied.
     Voxel weights. On the maid in a dress the skeleton came out symmetric and inside the legs, and
     the dress stopped tearing; an A-posed model falls back to `voxel`. The lab's default rig since.
+  - **Or the limb joints from a pose detector** (`pose`, owner, 1 Nov 2026: "ask a model to mark the
+    big joints, then read them back"). `fit`, with the twelve limb joints (shoulders, elbows,
+    wrists, hips, knees, ankles) given to `tPoseJoints` as anchors: MediaPipe's Pose Landmarker
+    (`full`, from jsDelivr at a pinned 0.10.14, model from Google's bucket, ~18 MB once, fetched only
+    for this rig) on a flat, unlit front render of the mesh itself (`poseFromRender.ts`), lifted
+    into the mesh by `utils/rpg/pictureJoints.ts` (box to box in x and y, depth from rays through the
+    triangles, ankle clamped to the sole + 4.5 %, a straight leg's knee between hip and ankle). The
+    render rather than FLUX's picture because TRELLIS frames the drawing 3–5 % off per axis. Tried
+    against hand-placed joints (`/mnt/project-files/rpg/rig-v2/opcja2-stawy-z-obrazka.md`): 1.5–1.7 %
+    of the height; DWPose on fal 1.1–1.3 % but answers only a picture of the skeleton; Gemini Flash
+    asked for coordinates put the hips at the apron's hem (up to 19 % off); Nano Banana drawing
+    dots 1.1–1.9 % at 7–13¢. If the detector cannot load or finds nobody, the joints are measured as
+    in `fit` and the console row says so. Cache `&w=pose`. On the maid, the legs come out straight
+    and parallel where `fit` leaves them in a V.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
