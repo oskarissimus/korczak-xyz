@@ -1027,7 +1027,7 @@ content-hashed and immutable.
     as int8 (`skin-weights/quantize.py`) but **not the decoder**: int8 everywhere ran twice as fast
     and changed the decoder's greedy tokens, so the maid's apron hem came apart in a walk (her most
     likely bone agreed with fp32 on 53 % of vertices); with the decoder fp32 it agreed on 97–98 %
-    and the rig took ~25 % less. A disk or a bucket mounted under the service was considered and is
+    and the rig took ~25 % less. Measured on Cloud Run after the change: a cold start of **23 s** (from 48 s) and 29–36 s for the rig (from ~42 s). A disk or a bucket mounted under the service was considered and is
     not faster — Cloud Run already streams the image, and the time is the model going into memory.
     An instance kept always on would remove the wait for ~$50–70 a month; not done.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
