@@ -521,9 +521,9 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     return;
   }
   // Skin weights from SkinTokens for a rig the page is working out (`people.ts`, rigger `skin`).
-  if (path === SKIN_PATH && req.method === 'POST') {
+  if (path === SKIN_PATH && (req.method === 'POST' || req.method === 'GET')) {
     try {
-      await handleSkin(await uidOf(req), bodyOf(req), res);
+      await handleSkin(await uidOf(req), req.method, bodyOf(req), res);
     } catch (e) {
       if (e instanceof GatewayRefusal || e instanceof SkinRefusal) {
         res.status(e.status).json({ reason: e.reason, error: { message: e.message } });

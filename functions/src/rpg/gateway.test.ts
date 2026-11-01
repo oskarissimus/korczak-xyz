@@ -323,4 +323,18 @@ describe('skin weights (/_skin)', () => {
     expect(init.headers.Authorization).toBe('Bearer id-token');
     expect(JSON.parse(Buffer.from(init.body).toString())).toEqual(mesh);
   });
+
+  it('wakes the service on a GET from an approved account, sending no mesh', async () => {
+    store.set('accounts/u1', { approved: true });
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).startsWith('http://metadata.google.internal/') ? new Response('id-token') : new Response('{"ok":true}'),
+    );
+    const out = fakeRes();
+    await handleRpgApi(req('/_skin', { method: 'GET', headers: { authorization: 'Bearer good' } }), out as any);
+    expect(out.statusCode).toBe(200);
+    expect(JSON.parse(out.body())).toEqual({ awake: true });
+    const [, init] = fetchMock.mock.calls[1];
+    expect(init.method).toBeUndefined();
+    expect(init.body).toBeUndefined();
+  });
 });

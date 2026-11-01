@@ -39,8 +39,18 @@ async function identityToken(audience: string): Promise<string> {
   return res.text();
 }
 
-export async function handleSkin(uid: string | null, body: Buffer | undefined, res: Response): Promise<void> {
+/**
+ * POST: the weights. GET: only wakes the service (a cold start is ~48 s, the model loading), which
+ * the page asks ahead of a rig that will need it (`wakeSkinTokens`) — answered once it is up.
+ */
+export async function handleSkin(uid: string | null, method: string, body: Buffer | undefined, res: Response): Promise<void> {
   if (!uid) throw new SkinRefusal(401, 'auth', 'skin weights: sign in first');
+  if (method === 'GET') {
+    if (!(await approved(uid))) throw new SkinRefusal(403, 'approval', 'skin weights: an approved account only');
+    const up = await fetch(SKIN_URL, { headers: { Authorization: `Bearer ${await identityToken(SKIN_URL)}` }, signal: AbortSignal.timeout(120_000) });
+    res.status(up.ok ? 200 : 502).json({ awake: up.ok });
+    return;
+  }
   if (!body?.length || body.length > SKIN_MAX_BYTES) throw new SkinRefusal(413, 'size', 'skin weights: the mesh is empty or too big');
   if (!(await approved(uid))) throw new SkinRefusal(403, 'approval', 'skin weights: an approved account only');
   const answer = await fetch(SKIN_URL, {

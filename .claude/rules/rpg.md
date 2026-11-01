@@ -1018,6 +1018,18 @@ content-hashed and immutable.
     under `&w=skin`, so the next visit asks again. The raw weights are diffuse by design (the
     export's README); the four heaviest per vertex looked right as they were, so no localisation
     pass yet.
+    **The cold start** (measured 1 Nov 2026 through the service itself): ~48 s before it answers at
+    all — the image pulled and the model loaded — then ~42 s for the rig. Two answers to it. The
+    page wakes the service ahead of need (`wakeSkinTokens`, a GET to `/_skin` that the gateway
+    passes on bodiless): when a person's model starts being made (`onPersonModelStart` in
+    `landmark3d.ts`, whose FLUX + TRELLIS outlast the start) and when the rig is switched to
+    `skin`, at most every five minutes (`People.warm`). And the image carries the four small graphs
+    as int8 (`skin-weights/quantize.py`) but **not the decoder**: int8 everywhere ran twice as fast
+    and changed the decoder's greedy tokens, so the maid's apron hem came apart in a walk (her most
+    likely bone agreed with fp32 on 53 % of vertices); with the decoder fp32 it agreed on 97–98 %
+    and the rig took ~25 % less. A disk or a bucket mounted under the service was considered and is
+    not faster — Cloud Run already streams the image, and the time is the model going into memory.
+    An instance kept always on would remove the wait for ~$50–70 a month; not done.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

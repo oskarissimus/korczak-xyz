@@ -33,7 +33,7 @@ import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, 
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
-import { HUB_SLOTS, isForestVariant, loadLandmarkBytes, type HubSlot } from '../../utils/rpg/landmark3d';
+import { HUB_SLOTS, isForestVariant, loadLandmarkBytes, onPersonModelStart, type HubSlot } from '../../utils/rpg/landmark3d';
 import { SPAWN_AT, VILLAGE_STANDS, type HubLayout } from '../../utils/rpg/hubLayout';
 import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
@@ -442,6 +442,7 @@ export class RpgScene {
   }
 
   constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
+    onPersonModelStart(() => this.people.warm());
     this.canvas = canvas;
     this.cb = callbacks;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -2094,6 +2095,7 @@ export class RpgScene {
     const was = mode(this.people.rigger, this.people.falKey);
     this.people.rigger = rigger;
     this.people.falKey = falKey;
+    this.people.warm();
     if (was === mode(rigger, falKey)) return;
     for (const [name, npc] of this.npcs) {
       if (!isModel(npc.want)) continue;
@@ -3212,6 +3214,7 @@ export class RpgScene {
   }
 
   dispose() {
+    onPersonModelStart(null);
     cancelAnimationFrame(this.frame);
     this.senses.dispose();
     this.nameTag.remove();

@@ -1008,7 +1008,19 @@ export function ensurePersonModel(
   onError: (err: unknown) => void = () => {},
   o: FalOptions = {},
 ): boolean {
-  return ensurePiece(key, label, id, posePerson(prompt, personPose), onModel, onError, o);
+  const asked = ensurePiece(key, label, id, posePerson(prompt, personPose), onModel, onError, o);
+  if (asked) personStarting?.();
+  return asked;
+}
+
+let personStarting: (() => void) | null = null;
+
+/**
+ * Told whenever a person's model starts being made: the scene wakes whatever will rig it
+ * (`People.warm`, the SkinTokens service's cold start hidden behind FLUX and TRELLIS).
+ */
+export function onPersonModelStart(listener: (() => void) | null): void {
+  personStarting = listener;
 }
 
 /**

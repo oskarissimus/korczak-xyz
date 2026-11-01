@@ -36,7 +36,7 @@ import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/a
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { poseFromRender } from './poseFromRender';
-import { skinTokensWeights } from '../../utils/rpg/skinWeights';
+import { skinTokensWeights, wakeSkinTokens } from '../../utils/rpg/skinWeights';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
@@ -366,6 +366,7 @@ export class People {
   private tPosed: Partial<Record<Body, Donor>> = {};
   /** Who rigs the people asked for from now on; Meshy only with a fal key to pay with. */
   rigger: Rigger = DEFAULT_RIGGER;
+  private wokenAt = 0;
   falKey: string | null = null;
 
   private load() {
@@ -379,6 +380,16 @@ export class People {
     })();
     this.loaded.catch(() => (this.loaded = null));
     return this.loaded;
+  }
+
+  /**
+   * Wakes the SkinTokens service when a rig will soon need it (`wakeSkinTokens`), at most every five
+   * minutes, which is less than Cloud Run keeps an idle instance. Nothing for any other rigger.
+   */
+  warm(): void {
+    if (this.rigger !== 'skin' || Date.now() - this.wokenAt < 5 * 60_000) return;
+    this.wokenAt = Date.now();
+    void wakeSkinTokens();
   }
 
   /** Keeps a rig Meshy answered along with the model (`meshyRigged`), as if `buildMeshy` had asked for it. */

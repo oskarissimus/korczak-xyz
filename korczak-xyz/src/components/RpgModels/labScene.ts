@@ -178,6 +178,7 @@ export class LabStage {
             if (rigger === 'raw') template = await rawTemplate(item.glb, item.height);
             else {
               this.people.rigger = rigger;
+              this.people.warm();
               template = await this.people.template(item.glb, item.body, item.height, item.label);
             }
             s = this.stand(item, rigger, template);

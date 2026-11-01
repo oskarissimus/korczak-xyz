@@ -9,7 +9,7 @@ the donor's 24 the game's clips were made on; the model decides only who moves w
 mesh. See `.claude/rules/rpg.md`, *the weights from SkinTokens*, for why.
 
 The contract, from the reference code (`src/model/tokenrig.py` in the VAST-AI/SkinTokens Space) and
-the export's README:
+the export's README (the image turns every graph but the decoder to int8 weights: `quantize.py`):
   - the mesh in Blender's frame (+z up, facing -y), since the training data came through bpy;
   - mesh and joints fitted together into [-1, 1] about their joint box's centre;
   - 8192 surface samples with their normals;

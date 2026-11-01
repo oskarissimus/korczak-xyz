@@ -32,6 +32,23 @@ export interface ServerSkin {
 /** Why the last call failed, for the console row. */
 export class SkinWeightsError extends Error {}
 
+/**
+ * Wakes the service ahead of a rig that will need it: measured on 1 Nov 2026, a cold start is ~48 s
+ * (the 2.3 GB model loading) before the ~40 s of the rig itself. Asked when a person's model starts
+ * (`ensurePersonModel`, whose FLUX + TRELLIS take longer than that) or the rig is switched to
+ * SkinTokens, the start hides behind a wait there is anyway. Nothing to answer, nothing on failure.
+ */
+export async function wakeSkinTokens(): Promise<void> {
+  try {
+    const { auth } = await import('../../lib/firebase');
+    const token = await auth?.currentUser?.getIdToken().catch(() => null);
+    if (!token) return;
+    await fetch(`${gatewayUrl()}/_skin`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(120_000) });
+  } catch {
+    /* the rig waits for the start instead */
+  }
+}
+
 export async function skinTokensWeights(positions: Float32Array, index: ArrayLike<number>, joints: Float32Array, parents: number[]): Promise<ServerSkin> {
   const { auth } = await import('../../lib/firebase');
   const token = await auth?.currentUser?.getIdToken().catch(() => null);
