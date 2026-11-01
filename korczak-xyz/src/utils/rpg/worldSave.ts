@@ -21,6 +21,7 @@ import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
 import { clearGame, dropGameFor, loadGameFor, writeGameFor } from './save';
 import { forget, saveUnit, STATE_UNIT, touch, unsafeToDrop, worldUnit } from './sync';
+import { rpgSet } from './storage';
 
 const KEY = 'rpg-worlds';
 /** How many earlier worlds the next genesis is told to avoid. */
@@ -82,7 +83,7 @@ function read(): Stored {
 
 function write(stored: Stored) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(stored));
+    rpgSet(KEY, JSON.stringify(stored));
   } catch {
     /* a full or blocked storage forgets the world; the game plays on */
   }
@@ -503,7 +504,7 @@ export function writeAtlas(worldId: string, atlas: Atlas | null): void {
 
 function writeAtlases(all: Record<string, Atlas>) {
   try {
-    localStorage.setItem(ATLAS_KEY, JSON.stringify(all));
+    rpgSet(ATLAS_KEY, JSON.stringify(all));
   } catch {
     /* a full storage forgets the atlas; the world just grows less */
   }

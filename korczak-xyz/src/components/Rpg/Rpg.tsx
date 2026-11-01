@@ -110,6 +110,7 @@ import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import WorldTrash from './WorldTrash';
+import { biggestKeys, onStorageFull, storageFull } from '../../utils/rpg/storage';
 import { setJobAccount } from '../../utils/rpg/serverJobs';
 import { FAST_MODEL, generateBeat, generateFree, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
 import { FREE_MAX, freeDecision } from '../../utils/rpg/freeLine';
@@ -2655,6 +2656,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
     }));
   }, [libraryTick, menu, world, saved]);
   const canPlay = keysReady && storyProvider !== 'static';
+  // A full localStorage keeps nothing the game writes (`storage.ts`): said on the menu, not swallowed.
+  const [fullStore, setFullStore] = useState(storageFull);
+  useEffect(() => onStorageFull(() => setFullStore(true)), []);
+  const fullNote = fullStore
+    ? t.storageFull(
+        Object.entries(biggestKeys(3))
+          .map(([k, kb]) => `${k} ${kb} KB`)
+          .join(', '),
+      )
+    : null;
   // The trash, read again with the library.
   const trashRows = React.useMemo(() => {
     void libraryTick;
@@ -3152,6 +3163,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
                 <>
                   <h2 className="rpg-menu-title">{t.title}</h2>
                   {worldCard}
+                  {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
                   {mainMenu}
                 </>
               )}

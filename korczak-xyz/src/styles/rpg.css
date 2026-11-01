@@ -1960,3 +1960,14 @@ body:has(.rpg-immersive) .safe-top-band {
 .rpg-wish-open summary::-webkit-details-marker {
   display: none;
 }
+
+/* A full localStorage, said in words on the menu (`utils/rpg/storage.ts`). */
+.rpg-storage-full {
+  width: min(100%, 560px);
+  margin: 0 auto 10px;
+  padding: 8px 12px;
+  border: 1px solid #e0a040;
+  background: rgba(60, 30, 0, 0.75);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}

@@ -1560,6 +1560,16 @@ with the deleted worlds, but not in the main menu".
   folded *Kosz (n)* under the people with Restore. `sweepLab` applies the same clean slate to the lab
   once per browser (`swept`), since the lab lives in this browser only: every own person and every
   model made before `at`; the redrawn pictures stay, a cache. `labSpent` leaves the trash out.
+- **A full localStorage keeps nothing, and says so** (`utils/rpg/storage.ts`). The first evening
+  of the trash, the phone had pushed everything (the new world, 19 worlds in the trash) and the
+  account's data synced fine into an empty browser, yet the computer showed none of it: every write
+  of the game's memory went through a bare `catch {}`, so a store that refused writes made the sync
+  "take" the account's copy into nothing. Every write of `rpg-worlds`, `rpg-atlas`, `rpg-saves`,
+  `rpg-chronicle`, `rpg-sync` and `rpg-model-lab` now goes through `rpgSet`: on a quota error it
+  gives back what the game can get again (the saves' console transcripts, and the atlas and quest
+  of trashed worlds the account holds, `makeRoom`) and tries once more; failing that it reports
+  `rpg.storage.write.failed` to Sentry once per key per page load with the biggest keys on the
+  origin, and the menu says the storage is full and what fills it.
 
 ## Language
 

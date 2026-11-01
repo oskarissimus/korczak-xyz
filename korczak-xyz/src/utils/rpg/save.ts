@@ -19,6 +19,7 @@
 
 import type { Spend } from './devlog';
 import { isDead, jobDone, slainBy, type Beat, type DialogueOption, type Lang, type QuestMood, type StepRecord } from './quest';
+import { rpgSet } from './storage';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
@@ -95,12 +96,7 @@ function readAll(): Record<string, SavedGame> {
 }
 
 function writeAll(all: Record<string, SavedGame>): boolean {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(all));
-    return true;
-  } catch {
-    return false;
-  }
+  return rpgSet(KEY, JSON.stringify(all));
 }
 
 /** The quest played last, in any world but those `skip` names (the trash, `worldSave.ts`'s `isTrashed`). */

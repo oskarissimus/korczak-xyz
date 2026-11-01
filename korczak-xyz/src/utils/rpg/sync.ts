@@ -14,6 +14,8 @@
  * (`unsafeToDrop`).
  */
 
+import { rpgSet } from './storage';
+
 const KEY = 'rpg-sync';
 
 interface Stamp {
@@ -36,7 +38,7 @@ function read(): Stamps {
 
 function write(stamps: Stamps) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(stamps));
+    rpgSet(KEY, JSON.stringify(stamps));
   } catch {
     /* without stamps the next pull takes the account's copy */
   }

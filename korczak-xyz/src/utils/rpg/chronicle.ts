@@ -12,6 +12,7 @@
 
 import type { ChronicleEntry } from './quest';
 import { touch, worldUnit } from './sync';
+import { rpgSet } from './storage';
 
 const KEY = 'rpg-chronicle';
 export const KEEP = 8;
@@ -29,7 +30,7 @@ function read(): Stored {
 
 function write(stored: Stored) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(stored));
+    rpgSet(KEY, JSON.stringify(stored));
   } catch {
     /* a full or blocked storage forgets the chronicle; the game plays on */
   }

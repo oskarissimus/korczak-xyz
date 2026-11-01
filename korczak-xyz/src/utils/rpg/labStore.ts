@@ -6,6 +6,7 @@
 
 import type { PersonMesher, PersonPainter } from './landmark3d';
 import type { LabSource } from './labSources';
+import { rpgSet } from './storage';
 
 /**
  * Which picture a model was made from: the game's own, the game's prompt drawn again by another
@@ -63,7 +64,7 @@ function read(): Stored {
 
 function write(stored: Stored) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(stored));
+    rpgSet(KEY, JSON.stringify(stored));
   } catch {
     /* forgotten on reload */
   }
