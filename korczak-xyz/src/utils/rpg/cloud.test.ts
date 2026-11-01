@@ -31,7 +31,7 @@ vi.mock('firebase/firestore', () => {
   };
 });
 vi.mock('../../lib/firebase', () => ({ getDb: () => ({}) }));
-vi.mock('../../lib/firestoreHealth', () => ({ runCloud: (_l: string, run: () => Promise<unknown>) => run() }));
+vi.mock('../../lib/firestoreHealth', () => ({ runCloud: (_l: string, run: () => Promise<unknown>) => run(), isRecoverableClientError: () => false }));
 vi.mock('../../lib/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   describeError: (e: unknown) => ({ error: String(e) }),

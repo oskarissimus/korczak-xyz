@@ -26,7 +26,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { getDb } from '../../lib/firebase';
-import { runCloud } from '../../lib/firestoreHealth';
+import { isRecoverableClientError, runCloud } from '../../lib/firestoreHealth';
 import { describeError, log } from '../../lib/logger';
 import { chronicleTimes, loadChronicle, writeChronicle } from './chronicle';
 import { classicWorld } from './genesis';
@@ -340,7 +340,12 @@ export function startSync(uid: string, pulled: () => void): () => void {
       .then((changed) => {
         if (changed) pulled();
       })
-      .catch((e) => log.warn('rpg.pull.failed', describeError(e)));
+      .catch((e) => {
+        // A stall is the client's to recover from (`runCloud`) and is retried on the next pull; anything
+        // else means this browser is not getting the account's game at all, which used to be silent.
+        if (isRecoverableClientError(e)) log.warn('rpg.pull.failed', describeError(e));
+        else log.error('rpg.pull.failed', { ...describeError(e), stack: e instanceof Error ? e.stack?.slice(0, 1500) : undefined });
+      });
   void doPull();
   const off = onTouch((unit) => {
     queue.add(unit);
