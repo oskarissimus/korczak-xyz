@@ -15,10 +15,11 @@
  * stamped (`sync.ts`) and the pusher sends it.
  */
 
-import { addModelSpend, type ForestVariant, type GroundTexture, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
+import { clearChronicle, loadChronicle, writeChronicle } from './chronicle';
+import { addModelSpend, classicWorld, type ForestVariant, type GroundTexture, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
-import { dropGameFor } from './save';
+import { clearGame, dropGameFor, loadGameFor, writeGameFor } from './save';
 import { forget, saveUnit, STATE_UNIT, touch, unsafeToDrop, worldUnit } from './sync';
 
 const KEY = 'rpg-worlds';
@@ -36,6 +37,14 @@ interface Stored {
 export interface LibraryEntry {
   world: WorldBible;
   played: number;
+  /** In the trash since then (`trashWorld`): out of the library, the menu and the lab, nothing deleted. */
+  deleted?: number;
+  /** Taken out of the trash then, so a clean slate swept on another device does not put it back. */
+  restored?: number;
+  /** A copy of the classic world's chronicle, atlas and quest, set aside by a clean slate (`trashClassic`). */
+  classicOf?: Lang;
+  /** Such a copy put back into the classic world then: it leaves the trash too. */
+  merged?: number;
 }
 
 /** The worlds whose atlas and quest in progress this browser keeps, besides the current ones. */
@@ -57,7 +66,8 @@ function withLibrary(stored: Stored): Record<string, LibraryEntry> {
 }
 
 function trimmed(library: Record<string, LibraryEntry>): Record<string, LibraryEntry> {
-  const entries = Object.entries(library).sort(([, a], [, b]) => b.played - a.played);
+  // The trash goes past the limit first: a full library forgets what was thrown away, not what is played.
+  const entries = Object.entries(library).sort(([, a], [, b]) => Number(Boolean(a.deleted)) - Number(Boolean(b.deleted)) || b.played - a.played);
   return Object.fromEntries(entries.slice(0, LIBRARY_MAX));
 }
 
@@ -79,8 +89,9 @@ function write(stored: Stored) {
 }
 
 export function loadWorld(lang: Lang): WorldBible | null {
-  const world = read().current?.[lang];
-  return valid(world) ? world : null;
+  const stored = read();
+  const world = stored.current?.[lang];
+  return valid(world) && !stored.library?.[world.id]?.deleted ? world : null;
 }
 
 /**
@@ -96,7 +107,8 @@ export function saveWorld(world: WorldBible, now = Date.now()): void {
     if (!past.includes(line)) past.push(line);
   }
   const library = withLibrary(stored);
-  if (world.createdAt > 0) library[world.id] = { world, played: now };
+  // Played again, it is out of the trash; a mark that it was restored stays (`sweepToTrash`).
+  if (world.createdAt > 0) library[world.id] = { ...(library[world.id]?.restored ? { restored: library[world.id].restored } : {}), world, played: now };
   write({ ...stored, current: { ...stored.current, [world.lang]: world }, past: past.slice(-KEEP_PAST), library: trimmed(library) });
   if (world.createdAt > 0) touch(worldUnit(world.id), now);
   touch(STATE_UNIT, now);
@@ -157,7 +169,7 @@ function putWorld(id: string, put: (w: WorldBible) => WorldBible, now: number): 
 /** Every invented world played in this browser or on the account, the most recently played first. */
 export function libraryWorlds(): LibraryEntry[] {
   return Object.values(withLibrary(read()))
-    .filter((e) => valid(e.world) && e.world.createdAt > 0)
+    .filter((e) => valid(e.world) && e.world.createdAt > 0 && !e.deleted && !e.classicOf)
     .sort((a, b) => b.played - a.played);
 }
 
@@ -171,7 +183,8 @@ export function findWorld(id: string): WorldBible | null {
 /** The world being played in each language, by id (the classic one is its language). */
 export function currentIds(): Partial<Record<Lang, string>> {
   const out: Partial<Record<Lang, string>> = {};
-  for (const [lang, w] of Object.entries(read().current ?? {})) if (valid(w)) out[lang as Lang] = w.id;
+  const stored = read();
+  for (const [lang, w] of Object.entries(stored.current ?? {})) if (valid(w) && !stored.library?.[w.id]?.deleted) out[lang as Lang] = w.id;
   return out;
 }
 
@@ -182,12 +195,18 @@ export function currentIds(): Partial<Record<Lang, string>> {
  */
 export function writeCurrent(ids: Partial<Record<Lang, string>>, classic: (lang: Lang) => WorldBible): boolean {
   const stored = read();
-  const current = { ...stored.current };
+  // The account's choice whole: a language it names no world for has none here either (its world
+  // went to the trash on another device).
+  const current: Stored['current'] = {};
   let all = true;
   for (const [lang, id] of Object.entries(ids) as [Lang, string][]) {
     const w = id === lang ? classic(lang) : findWorld(id);
+    if (w && stored.library?.[id]?.deleted) continue;
     if (w) current[lang] = w;
-    else all = false;
+    else {
+      all = false;
+      if (stored.current?.[lang]) current[lang] = stored.current[lang];
+    }
   }
   write({ ...stored, current });
   return all;
@@ -200,8 +219,12 @@ export function writeLibraryEntry(entry: LibraryEntry): void {
   const library = withLibrary(stored);
   library[entry.world.id] = entry;
   const current = { ...stored.current };
-  // The current world's bible is the same object in both places.
-  if (current[entry.world.lang]?.id === entry.world.id) current[entry.world.lang] = entry.world;
+  // The current world's bible is the same object in both places; one put in the trash elsewhere is
+  // no longer anyone's current world.
+  if (current[entry.world.lang]?.id === entry.world.id) {
+    if (entry.deleted) delete current[entry.world.lang];
+    else current[entry.world.lang] = entry.world;
+  }
   write({ ...stored, current, library: trimmed(library) });
 }
 
@@ -213,6 +236,135 @@ export function playedWorld(id: string, now = Date.now()): void {
   library[id] = { ...library[id], played: now };
   write({ ...stored, library: trimmed(library) });
   touch(worldUnit(id), now);
+}
+
+/*
+ * THE TRASH (owner, 1 Nov 2026: "a soft delete of worlds, they clutter my profile and the lab; a trash
+ * in the menu with the deleted worlds, but not in the main menu"). A world in the trash is its library
+ * entry with `deleted` set, and nothing else changes: its atlas, chronicle and quest stay where they
+ * were, here and on the account, and every asset it paid for stays in the bucket. It leaves the
+ * library, the main menu's Continue, the current world of its language and the model lab, and comes
+ * back whole from the trash. The flag travels in the world's own unit, so the other devices hear of it.
+ */
+
+/** Whether this world is in the trash. */
+export function isTrashed(id: string): boolean {
+  return Boolean(read().library?.[id]?.deleted);
+}
+
+/** What is in the trash, the most recently thrown away first. */
+export function trashedWorlds(): LibraryEntry[] {
+  return Object.values(read().library ?? {})
+    .filter((e) => valid(e.world) && e.deleted && !e.merged)
+    .sort((a, b) => (b.deleted ?? 0) - (a.deleted ?? 0));
+}
+
+/** Puts a world in the trash; if it was being played, its language has no current world any more. */
+export function trashWorld(id: string, now = Date.now()): void {
+  const stored = read();
+  const library = withLibrary(stored);
+  const entry = library[id];
+  if (!entry || entry.deleted) return;
+  library[id] = { ...entry, deleted: now };
+  const current = { ...stored.current };
+  let stateChanged = false;
+  for (const [lang, w] of Object.entries(current) as [Lang, WorldBible | undefined][]) {
+    if (w?.id === id) {
+      delete current[lang];
+      stateChanged = true;
+    }
+  }
+  write({ ...stored, current, library: trimmed(library) });
+  touch(worldUnit(id), now);
+  if (stateChanged) touch(STATE_UNIT, now);
+}
+
+/**
+ * Takes a world out of the trash, back into the library as it was. A copy of the classic world goes
+ * back into the classic world instead: its quests join the chronicle, its people the atlas, and its
+ * quest in progress returns if the classic world has none.
+ */
+export function restoreWorld(id: string, now = Date.now()): void {
+  const stored = read();
+  const library = withLibrary(stored);
+  const entry = library[id];
+  if (!entry?.deleted) return;
+  if (entry.classicOf) {
+    const lang = entry.classicOf;
+    const quests = [...loadChronicle(lang), ...loadChronicle(id)].sort((a, b) => a.at - b.at);
+    writeChronicle(lang, quests.filter((q, i) => quests.findIndex((o) => o.at === q.at && o.title === q.title) === i));
+    const atlas = rawAtlas(id);
+    if (atlas) addToAtlas(lang, cleanAtlas(atlas));
+    const game = loadGameFor(id);
+    if (game && !loadGameFor(lang)) {
+      writeGameFor(lang, { ...game, worldId: lang });
+      touch(saveUnit(lang), now);
+    }
+    library[id] = { ...entry, merged: now };
+  } else {
+    const { deleted: _gone, ...rest } = entry;
+    library[id] = { ...rest, restored: now };
+  }
+  write({ ...read(), library: trimmed(library) });
+  touch(worldUnit(id), now);
+  touch(worldUnit(entry.classicOf ?? id), now);
+}
+
+/**
+ * Sets the classic world's memory aside (the willowlands of each language, which has no library
+ * entry to flag): its chronicle, atlas and quest in progress move to a copy in the trash under an id
+ * of its own, and the classic world starts empty. Nothing is lost; `restoreWorld` puts it back. Null
+ * when there was nothing to set aside.
+ */
+export function trashClassic(lang: Lang, now = Date.now()): string | null {
+  const chronicle = loadChronicle(lang);
+  const atlas = rawAtlas(lang);
+  const game = loadGameFor(lang);
+  const people = (atlas?.people?.length ?? 0) + (atlas?.places?.length ?? 0);
+  if (!chronicle.length && !people && !game) return null;
+  const id = `${lang}-old-${now.toString(36)}`;
+  const stored = read();
+  const library = withLibrary(stored);
+  library[id] = { world: { ...classicWorld(lang), id, createdAt: now }, played: now, deleted: now, classicOf: lang };
+  write({ ...stored, library: trimmed(library) });
+  writeChronicle(id, chronicle);
+  if (atlas) writeAtlas(id, atlas);
+  if (game) {
+    writeGameFor(id, { ...game, worldId: id });
+    touch(saveUnit(id), now);
+    clearGame(lang);
+  }
+  clearChronicle(lang);
+  // An empty atlas rather than none: the push leaves a missing one as the account has it.
+  const all = readAtlases();
+  all[lang] = { places: [], people: [], dead: [] };
+  writeAtlases(all);
+  touch(worldUnit(id), now);
+  touch(worldUnit(lang), now);
+  return id;
+}
+
+/**
+ * A clean slate: every world played before `before` goes to the trash, and the classic world's
+ * memory is set aside, so the menu starts from nothing. A world already taken out of the trash once
+ * is left alone, so a sweep that reaches a second device late does not throw it away again.
+ */
+export function sweepToTrash(before: number, now = Date.now()): number {
+  let n = 0;
+  for (const e of Object.values(withLibrary(read()))) {
+    if (e.deleted || e.restored || e.classicOf || !valid(e.world) || e.world.createdAt <= 0 || e.played > before) continue;
+    trashWorld(e.world.id, now);
+    n += 1;
+  }
+  for (const lang of ['pl', 'en'] as const) if (trashClassic(lang, now)) n += 1;
+  // The classic world as the current one goes too: the menu then offers a new world.
+  const stored = read();
+  if (Object.values(stored.current ?? {}).some((w) => w && w.createdAt === 0)) {
+    const current = Object.fromEntries(Object.entries(stored.current ?? {}).filter(([, w]) => w && w.createdAt > 0));
+    write({ ...stored, current });
+    touch(STATE_UNIT, now);
+  }
+  return n;
 }
 
 /** Every world with an atlas here. */

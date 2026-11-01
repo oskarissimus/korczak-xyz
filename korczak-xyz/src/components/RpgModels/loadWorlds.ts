@@ -1,6 +1,6 @@
 /*
  * The worlds whose people the model lab shows: this browser's library, and for a signed-in reader
- * the account's too (`users/{uid}/rpgWorlds`, `rpgSaves`), read only — the game's sync (`cloud.ts`)
+ * the account's too (`users/{uid}/rpgWorlds`, `rpgSaves`), but none in the trash; read only — the game's sync (`cloud.ts`)
  * is the one thing that writes those, and the lab must never stamp or push a unit.
  */
 
@@ -10,7 +10,7 @@ import { getDb } from '../../lib/firebase';
 import { runCloud } from '../../lib/firestoreHealth';
 import type { LabWorld } from '../../utils/rpg/labSources';
 import { loadGameFor, type SavedGame } from '../../utils/rpg/save';
-import { libraryWorlds, loadAtlas, type Atlas, type LibraryEntry } from '../../utils/rpg/worldSave';
+import { isTrashed, libraryWorlds, loadAtlas, type Atlas, type LibraryEntry } from '../../utils/rpg/worldSave';
 
 function parse<T>(text: unknown): T | null {
   if (typeof text !== 'string') return null;
@@ -38,7 +38,8 @@ export async function accountWorlds(uid: string): Promise<LabWorld[]> {
   for (const d of worlds.docs) {
     const data = d.data() as { world?: string | null; atlas?: string | null };
     const entry = parse<LibraryEntry>(data.world);
-    if (!entry?.world) continue;
+    // A world in the trash takes its people with it (`worldSave.ts`).
+    if (!entry?.world || entry.deleted || entry.classicOf || isTrashed(d.id)) continue;
     out.push({ world: entry.world, atlas: parse<Atlas>(data.atlas), game: games.get(d.id) ?? null, played: entry.played ?? 0 });
   }
   return out;

@@ -102,13 +102,14 @@ import {
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { rememberTiming, type Task } from '../../utils/rpg/progress';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
-import { fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
+import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
+import WorldTrash from './WorldTrash';
 import { setJobAccount } from '../../utils/rpg/serverJobs';
 import { FAST_MODEL, generateBeat, generateFree, generateHubSizes, generateWorld, MODEL_CHOICES, modelChain, quick, type QuestSource } from '../../utils/rpg/storyteller';
 import { FREE_MAX, freeDecision } from '../../utils/rpg/freeLine';
@@ -118,7 +119,11 @@ import {
   clearPendingGenesis,
   currentIds,
   findWorld,
+  isTrashed,
   libraryWorlds,
+  restoreWorld,
+  trashedWorlds,
+  trashWorld,
   loadAtlas,
   loadPendingGenesis,
   loadWorld,
@@ -594,7 +599,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // A quest left half way is offered on the intro screen, in its own language.
   useEffect(() => {
-    const game = loadGame();
+    const game = loadGame(isTrashed);
     if (!game) return;
     setSaved(game);
     setGameLang(game.lang);
@@ -604,7 +609,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls'>('main');
+  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls' | 'trash'>('main');
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -615,7 +620,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const w = loadWorld(lang);
     setWorld(w);
     setChronicle(loadChronicle(w?.id ?? lang));
-    setSaved(loadGame());
+    setSaved(loadGame(isTrashed));
     setLibraryTick((n) => n + 1);
   }, []);
   // The account's copy of the game (`cloud.ts`): pulled now and whenever the page comes back to the
@@ -2595,7 +2600,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     if (stalePullRef.current) {
       stalePullRef.current = false;
       reloadIntro();
-    } else setSaved(loadGame());
+    } else setSaved(loadGame(isTrashed));
   };
 
   const fullscreen = () => {
@@ -2650,6 +2655,36 @@ export default function Rpg({ lang }: { lang: Lang }) {
     }));
   }, [libraryTick, menu, world, saved]);
   const canPlay = keysReady && storyProvider !== 'static';
+  // The trash, read again with the library.
+  const trashRows = React.useMemo(() => {
+    void libraryTick;
+    return trashedWorlds();
+  }, [libraryTick, menu, world, saved]);
+  /** A world to the trash from the library; the intro is read again, since it may have been the current one. */
+  const toTrash = (id: string) => {
+    trashWorld(id);
+    reloadIntro();
+  };
+  /** Back out of the trash: the atlas and quest first from the account when this browser no longer keeps them. */
+  const fromTrash = async (id: string) => {
+    if (uidRef.current) {
+      try {
+        await fetchWorld(uidRef.current, id);
+      } catch (e) {
+        log.warn('rpg.fetchWorld.failed', describeError(e));
+      }
+    }
+    restoreWorld(id);
+    reloadIntro();
+  };
+  const sweep = async () => {
+    try {
+      await cleanSlate(uidRef.current);
+    } catch (e) {
+      log.warn('rpg.cleanSlate.failed', describeError(e));
+    }
+    reloadIntro();
+  };
 
   const creatable = keysReady && storyProvider !== 'static';
   const ownSave = saved && saved.lang === gameLang ? saved : null;
@@ -2838,6 +2873,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
         <p className="rpg-today">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</p>
       )}
       {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
+      <p className="rpg-trash-link">
+        <button type="button" onClick={() => setMenu('trash')}>
+          🗑 {t.menuTrash} · {t.menuTrashCount(trashRows.length)}
+        </button>
+      </p>
       <div className="rpg-panel-actions">{back}</div>
     </div>
   );
@@ -3092,7 +3132,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
               signedIn={Boolean(uid)}
               canPlay={canPlay}
               onOpen={(id, cont) => void openWorld(id, cont)}
+              onTrash={toTrash}
+              onOpenTrash={() => setMenu('trash')}
+              trashCount={trashRows.length}
               onBack={() => setMenu('main')}
+            />
+          ) : menu === 'trash' ? (
+            <WorldTrash
+              lang={gameLang}
+              entries={trashRows}
+              canSweep={libraryRows.length > 0}
+              onRestore={(id) => void fromTrash(id)}
+              onSweep={() => void sweep()}
+              onBack={() => setMenu(libraryRows.length > 0 ? 'library' : 'settings')}
             />
           ) : (
             <>

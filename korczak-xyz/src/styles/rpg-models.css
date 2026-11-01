@@ -76,6 +76,44 @@
   background: rgba(0, 0, 128, 0.08);
 }
 
+.lab-person-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lab-person-trash {
+  flex: none;
+  padding: 4px 6px;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.lab-person-trash:hover,
+.lab-person-trash:focus-visible {
+  opacity: 1;
+  border-color: currentColor;
+}
+
+.lab-trash {
+  margin-top: 12px;
+}
+
+.lab-trash ul li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+
+.lab-trash-note {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
 .lab-describe {
   display: flex;
   flex-direction: column;

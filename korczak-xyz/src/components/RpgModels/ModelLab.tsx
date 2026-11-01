@@ -20,7 +20,8 @@ import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
 import { buildPersonMesh, drawImage, FAL_RIG_MODEL, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, isTPose, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
-import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
+import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, restoreLabVariant, restoreSource, setLabPicture, sweepLab, trashedSources, trashedVariants, trashSource, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
+import { cleanSlateAt } from '../../utils/rpg/cloud';
 import type { Lang } from '../../utils/rpg/quest';
 import { PERSON_HEIGHT } from '../Rpg/people';
 import { LabStage, REST, type ModelStats, type StageItem, type StageRig } from './labScene';
@@ -121,12 +122,28 @@ export default function ModelLab({ lang }: { lang: Lang }) {
       (account) => live && setWorlds(mergeWorlds(local, account)),
       (e) => log.warn('rpgModels.read.failed', describeError(e)),
     );
+    // The account's clean slate reaches the lab too, once per browser (`sweepLab`).
+    cleanSlateAt(auth.user.uid).then(
+      (at) => {
+        if (!live || !at || sweepLab(at) === 0) return;
+        setOwn(ownSources());
+        setVersion((v) => v + 1);
+      },
+      (e) => log.warn('rpgModels.cleanSlate.failed', describeError(e)),
+    );
     return () => {
       live = false;
     };
   }, [auth.loading, auth.user]);
 
-  const sources = useMemo(() => [...own, ...labSources(worlds ?? [])], [own, worlds]);
+  const everyone = useMemo(() => [...own, ...labSources(worlds ?? [])], [own, worlds]);
+  // The lab's trash, read again whenever something goes in or comes out (`version`).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const trashed = useMemo(() => trashedSources(), [version]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const binnedModels = useMemo(() => trashedVariants(), [version]);
+  const sources = useMemo(() => everyone.filter((s) => !trashed[s.id]), [everyone, trashed]);
+  const binnedPeople = useMemo(() => everyone.filter((s) => trashed[s.id]), [everyone, trashed]);
   const source = sources.find((s) => s.id === selected) ?? sources[0] ?? null;
 
   const rows: Row[] = useMemo(() => {
@@ -445,7 +462,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
           ) : (
             <ul>
               {sources.map((s) => (
-                <li key={s.id}>
+                <li key={s.id} className="lab-person-row">
                   <button type="button" className={s.id === source?.id ? 'lab-person lab-person-on' : 'lab-person'} onClick={() => setSelected(s.id)}>
                     <img src={s.model.image} alt="" loading="lazy" width={48} height={48} />
                     <span>
@@ -455,9 +472,69 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                       </small>
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    className="lab-person-trash"
+                    title={t.trashPerson(s.name)}
+                    aria-label={t.trashPerson(s.name)}
+                    onClick={() => {
+                      trashSource(s.id);
+                      setVersion((v) => v + 1);
+                    }}
+                  >
+                    🗑
+                  </button>
                 </li>
               ))}
             </ul>
+          )}
+          {(binnedPeople.length > 0 || binnedModels.length > 0) && (
+            <details className="lab-trash">
+              <summary>{t.trash(binnedPeople.length + binnedModels.length)}</summary>
+              <p className="lab-trash-note">{t.trashNote}</p>
+              {binnedPeople.length > 0 && (
+                <>
+                  <h4>{t.trashPeople}</h4>
+                  <ul>
+                    {binnedPeople.map((s) => (
+                      <li key={s.id}>
+                        <img src={s.model.image} alt="" loading="lazy" width={32} height={32} /> {s.name} <small>· {s.world}</small>{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            restoreSource(s.id);
+                            setVersion((v) => v + 1);
+                          }}
+                        >
+                          {t.restore}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {binnedModels.length > 0 && (
+                <>
+                  <h4>{t.trashModels}</h4>
+                  <ul>
+                    {binnedModels.map(({ sourceId, variant: v }) => (
+                      <li key={v.id}>
+                        {everyone.find((s) => s.id === sourceId)?.name ?? '?'} · {t.methods[v.method].split(' · ')[0]} · {formatUsd(v.costUsd)}{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            restoreLabVariant(sourceId, v.id);
+                            setVersion((n) => n + 1);
+                          }}
+                        >
+                          {t.restore}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </details>
           )}
         </aside>
 

@@ -103,9 +103,11 @@ function writeAll(all: Record<string, SavedGame>): boolean {
   }
 }
 
-/** The quest played last, in any world. */
-export function loadGame(): SavedGame | null {
-  const saves = Object.values(readAll()).filter(valid);
+/** The quest played last, in any world but those `skip` names (the trash, `worldSave.ts`'s `isTrashed`). */
+export function loadGame(skip: (worldId: string) => boolean = () => false): SavedGame | null {
+  const saves = Object.entries(readAll())
+    .filter(([id, g]) => valid(g) && !skip(id))
+    .map(([, g]) => g);
   return saves.sort((a, b) => b.at - a.at)[0] ?? null;
 }
 

@@ -42,6 +42,7 @@ import {
   rawAtlas,
   writeAtlas,
   writeCurrent,
+  sweepToTrash,
   writeLibraryEntry,
   type Atlas,
   type LibraryEntry,
@@ -55,6 +56,48 @@ const PUSH_DELAY_MS = 2500;
 const worlds = (uid: string) => collection(getDb()!, 'users', uid, 'rpgWorlds');
 const saves = (uid: string) => collection(getDb()!, 'users', uid, 'rpgSaves');
 const stateDoc = (uid: string) => doc(getDb()!, 'users', uid, 'rpgState', 'current');
+/**
+ * A clean slate asked for the whole account (owner, 1 Nov 2026: "my profile clean of worlds and
+ * characters"): `{ at }`, and every browser that pulls it once sends everything played before `at` to
+ * the trash (`sweepToTrash`). Written by hand, or by the trash's own button; the game only reads it.
+ */
+export const cleanSlateDoc = (uid: string) => doc(getDb()!, 'users', uid, 'rpgState', 'cleanSlate');
+const SWEPT_KEY = 'rpg-clean-slate';
+
+/** The clean slate this browser last swept, by its `at`. */
+export function sweptAt(): number {
+  try {
+    return Number(localStorage.getItem(SWEPT_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markSwept(at: number) {
+  try {
+    localStorage.setItem(SWEPT_KEY, String(at));
+  } catch {
+    /* swept again on the next pull, which finds nothing left to sweep */
+  }
+}
+
+/**
+ * Everything to the trash now: here at once, and on the account's other devices at their next pull,
+ * through the account's clean slate. Signed out, only here. Returns how much went.
+ */
+export async function cleanSlate(uid: string | null, now = Date.now()): Promise<number> {
+  const n = sweepToTrash(now, now);
+  markSwept(now);
+  if (uid && getDb()) await runCloud('rpg.cleanSlate.write', () => setDoc(cleanSlateDoc(uid), { at: now }));
+  return n;
+}
+
+/** The account's clean slate, or 0 when it has none. */
+export async function cleanSlateAt(uid: string): Promise<number> {
+  if (!getDb()) return 0;
+  const snap = await runCloud('rpg.cleanSlate', () => getDoc(cleanSlateDoc(uid)));
+  return snap.exists() ? Number((snap.data() as { at?: number }).at) || 0 : 0;
+}
 
 /** What the account says about a world's quest in progress, for the library of a world not kept here. */
 export interface SaveInfo {
@@ -147,8 +190,8 @@ export function seedStamps(): void {
  */
 export async function pull(uid: string): Promise<boolean> {
   if (!getDb()) return false;
-  const [worldSnap, saveSnap, stateSnap] = await runCloud('rpg.pull', () =>
-    Promise.all([getDocs(worlds(uid)), getDocs(saves(uid)), getDoc(stateDoc(uid))]),
+  const [worldSnap, saveSnap, stateSnap, slateSnap] = await runCloud('rpg.pull', () =>
+    Promise.all([getDocs(worlds(uid)), getDocs(saves(uid)), getDoc(stateDoc(uid)), getDoc(cleanSlateDoc(uid))]),
   );
   let changed = false;
 
@@ -181,6 +224,15 @@ export async function pull(uid: string): Promise<boolean> {
   if (state && stateNewer) {
     // A world the account names before its own document has arrived waits for the next pull.
     if (writeCurrent(state.current ?? {}, classicWorld)) tookCloud(STATE_UNIT, state.updatedAt ?? 0);
+    changed = true;
+  }
+
+  // After everything the account had is in, so the sweep reaches its worlds too.
+  const slate = slateSnap.exists() ? Number((slateSnap.data() as { at?: number }).at) || 0 : 0;
+  if (slate > sweptAt()) {
+    const n = sweepToTrash(slate);
+    markSwept(slate);
+    log.info('rpg.cleanSlate.swept', { worlds: n });
     changed = true;
   }
 

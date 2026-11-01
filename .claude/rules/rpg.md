@@ -1524,6 +1524,43 @@ writing browser's clock:
   chronicle but not the rest; `fetchWorld` takes the atlas and save when the world is picked.
 - A push of a world whose atlas is not here merges and never blanks the account's atlas.
 
+## The trash
+
+Owner, 1 Nov 2026: "a soft delete of worlds, they clutter my main profile and the lab; my profile
+clean of worlds and characters, the lab from a clean slate, its history too; a trash in the menu
+with the deleted worlds, but not in the main menu".
+
+- **A world in the trash is its library entry with `deleted` set** (`trashWorld` in `worldSave.ts`),
+  and nothing else changes: its atlas, chronicle and quest stay, here and on the account, and every
+  asset it paid for stays in the `-rpg` bucket, so the generation cache still answers for it. The flag
+  rides in the world's own unit, so the other devices hear of it at their next pull.
+- Out of the trash means out of `libraryWorlds()` (the library and the menu's *My worlds*),
+  `loadWorld`/`currentIds` (a trashed current world leaves its language with **no** current world,
+  so the menu offers *New world*), Continue (`loadGame(isTrashed)`), and the model lab
+  (`loadWorlds.ts` skips it, so its people go with it). `writeLibraryEntry` drops a world trashed
+  elsewhere from `current`; `writeCurrent` takes the account's state whole and skips trashed ids.
+- `trimmed` puts trashed entries last, so a full library forgets the trash before what is played.
+- **Restore** removes `deleted` and sets `restored`; playing it again (`saveWorld`) keeps `restored`.
+- **The classic world has no library entry to flag**, so `trashClassic` moves its chronicle, atlas and
+  quest to a copy under `<lang>-old-<ts>` with `classicOf` (a trashed entry, never in the library),
+  and leaves the classic world with an empty chronicle and an **empty** atlas, not a missing one
+  (a push leaves a missing atlas as the account has it). Restoring the copy merges it back
+  (chronicle by `at`+title, `addToAtlas`, the quest if the classic world has none) and marks it `merged`.
+- **Where it is**: Settings (*🗑 Kosz · …*) and the foot of *My worlds*, each world there with *Move to
+  trash*; never the main menu (`WorldTrash.tsx`, `menu === 'trash'`).
+- **The clean slate** (`sweepToTrash`): every invented world played before `at` to the trash, plus
+  the classic copy per language, and the classic world dropped as current. A world with `restored`
+  is skipped, so a sweep that reaches a second device after a restore does not throw it away again.
+  It is asked for the whole account by `users/{uid}/rpgState/cleanSlate` `{ at }`: every `pull`
+  reads it and sweeps once per browser (`rpg-clean-slate` in localStorage holds the `at` swept). The
+  trash's *Move every world to the trash* writes it (`cleanSlate` in `cloud.ts`). The owner's account
+  got one on 1 Nov 2026.
+- **The lab's trash** (`labStore.ts`): a model is `deleted` on its `LabVariant`, a person (the lab's
+  own or the game's) is in `trashed` by source id; 🗑 by each person, *Do kosza* on each model, and a
+  folded *Kosz (n)* under the people with Restore. `sweepLab` applies the same clean slate to the lab
+  once per browser (`swept`), since the lab lives in this browser only: every own person and every
+  model made before `at`; the redrawn pictures stay, a cache. `labSpent` leaves the trash out.
+
 ## Language
 
 Asked on the intro screen (Polski / English), starting from the page's locale. It sets the game's

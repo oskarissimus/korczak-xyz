@@ -1802,6 +1802,32 @@ body:has(.rpg-immersive) .safe-top-band {
   opacity: 0.5;
 }
 
+/* The trash: out of the main menu, a quiet link at the foot of Settings and of My worlds. */
+.rpg-library-actions .rpg-library-trash {
+  margin-left: auto;
+  border-color: rgba(185, 167, 127, 0.5);
+  background: transparent;
+  opacity: 0.85;
+}
+
+.rpg-library-foot button,
+.rpg-trash-link button,
+.rpg-trash-sweep > button {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid rgba(185, 167, 127, 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.rpg-library-foot,
+.rpg-trash-sweep {
+  margin-top: 16px;
+}
+
 /* The intro as a game's menu: a title, the world in one line, a column of entries, and each
    sub-screen one level down with its own Back. Scrolls rather than cuts off on a short screen. */
 .rpg-menu-screen {

@@ -25,6 +25,9 @@ export default function WorldLibrary({
   signedIn,
   canPlay,
   onOpen,
+  onTrash,
+  onOpenTrash,
+  trashCount,
   onBack,
 }: {
   lang: Lang;
@@ -32,6 +35,10 @@ export default function WorldLibrary({
   signedIn: boolean;
   canPlay: boolean;
   onOpen: (worldId: string, continueQuest: boolean) => void;
+  /** Moves a world to the trash (`worldSave.ts`'s `trashWorld`). */
+  onTrash: (worldId: string) => void;
+  onOpenTrash: () => void;
+  trashCount: number;
   onBack: () => void;
 }) {
   const t = translations[lang];
@@ -85,11 +92,19 @@ export default function WorldLibrary({
                 <button type="button" disabled={!canPlay || busy !== null} onClick={() => open(w.id, false)}>
                   {busy === w.id ? t.wait : t.libraryNewQuest}
                 </button>
+                <button type="button" className="rpg-library-trash" disabled={busy !== null} onClick={() => onTrash(w.id)}>
+                  🗑 {t.libraryTrash}
+                </button>
               </div>
             </li>
           );
         })}
       </ul>
+      <p className="rpg-library-foot">
+        <button type="button" onClick={onOpenTrash}>
+          🗑 {t.menuTrash} · {t.menuTrashCount(trashCount)}
+        </button>
+      </p>
     </div>
   );
 }

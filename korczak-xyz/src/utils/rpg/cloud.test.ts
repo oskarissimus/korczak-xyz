@@ -38,10 +38,10 @@ vi.mock('../../lib/logger', () => ({
 }));
 
 import { addToChronicle, loadChronicle } from './chronicle';
-import { questsInProgress, saveData, SAVE_MAX, syncNow } from './cloud';
+import { cleanSlate, questsInProgress, saveData, SAVE_MAX, syncNow } from './cloud';
 import { CLASSIC_LOOK, type WorldBible } from './genesis';
 import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from './save';
-import { addToAtlas, libraryWorlds, loadAtlas, loadWorld, saveWorld } from './worldSave';
+import { addToAtlas, isTrashed, libraryWorlds, loadAtlas, loadWorld, restoreWorld, saveWorld, trashedWorlds, trashWorld } from './worldSave';
 
 const devices = { phone: new Map<string, string>(), desk: new Map<string, string>() };
 function on(device: keyof typeof devices) {
@@ -157,5 +157,78 @@ describe('the account copy', () => {
     const data = saveData(big)!;
     expect(data.length).toBeLessThan(SAVE_MAX);
     expect(JSON.parse(data).transcript).toEqual([]);
+  });
+});
+
+describe('the trash', () => {
+  it('hides a world from the library, the menu and Continue on every device, and restores it whole', async () => {
+    on('phone');
+    saveWorld(world('w1', 'Solniska'));
+    addToAtlas('w1', { places: [place], people: [] });
+    saveGame(game('w1', 'Drugi'));
+    await syncNow('u');
+    on('desk');
+    await syncNow('u');
+    expect(loadWorld('pl')?.id).toBe('w1');
+
+    trashWorld('w1');
+    expect(libraryWorlds()).toEqual([]);
+    expect(loadWorld('pl')).toBeNull();
+    expect(loadGame(isTrashed)).toBeNull();
+    // Nothing deleted: the quest and the atlas are still here.
+    expect(loadGameFor('w1')?.beats[0].title).toBe('Drugi');
+    expect(loadAtlas('w1').places).toHaveLength(1);
+    await syncNow('u');
+
+    on('phone');
+    await syncNow('u');
+    expect(libraryWorlds()).toEqual([]);
+    expect(loadWorld('pl')).toBeNull();
+    expect(trashedWorlds().map((e) => e.world.name)).toEqual(['Solniska']);
+
+    restoreWorld('w1');
+    expect(libraryWorlds().map((e) => e.world.name)).toEqual(['Solniska']);
+    expect(loadGame(isTrashed)?.beats[0].title).toBe('Drugi');
+    await syncNow('u');
+    on('desk');
+    await syncNow('u');
+    expect(libraryWorlds().map((e) => e.world.name)).toEqual(['Solniska']);
+    expect(trashedWorlds()).toEqual([]);
+  });
+
+  it('a clean slate sweeps every device once, sets the classic history aside, and leaves a restored world alone', async () => {
+    on('phone');
+    saveWorld(world('w1', 'Solniska'));
+    saveWorld(world('w2', 'Mgły'));
+    addToChronicle('pl', { title: 'Grzechy Ojców', at: clock, steps: [], ending: 'koniec' });
+    addToAtlas('pl', { places: [], people: [{ character: { name: 'Sołtys', gender: 'male', color: '#000' } as never, at: null, line: '' }] });
+    await syncNow('u');
+    on('desk');
+    await syncNow('u');
+
+    on('phone');
+    await cleanSlate('u');
+    expect(libraryWorlds()).toEqual([]);
+    expect(loadWorld('pl')).toBeNull();
+    expect(loadChronicle('pl')).toEqual([]);
+    expect(loadAtlas('pl').people).toEqual([]);
+    const classic = trashedWorlds().find((e) => e.classicOf === 'pl')!;
+    expect(loadChronicle(classic.world.id).map((c) => c.title)).toEqual(['Grzechy Ojców']);
+    restoreWorld('w2');
+    await syncNow('u');
+
+    on('desk');
+    await syncNow('u');
+    // The desk heard of the sweep and of the restore, and does not throw w2 away again.
+    expect(libraryWorlds().map((e) => e.world.id)).toEqual(['w2']);
+    expect(isTrashed('w1')).toBe(true);
+    expect(loadChronicle('pl')).toEqual([]);
+
+    // The classic history goes back into the classic world.
+    on('phone');
+    restoreWorld(classic.world.id);
+    expect(loadChronicle('pl').map((c) => c.title)).toEqual(['Grzechy Ojców']);
+    expect(loadAtlas('pl').people.map((p) => p.character.name)).toEqual(['Sołtys']);
+    expect(trashedWorlds().some((e) => e.classicOf)).toBe(false);
   });
 });
