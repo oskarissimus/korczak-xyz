@@ -9,9 +9,10 @@ import type { LabSource } from './labSources';
 
 /**
  * Which picture a model was made from: the game's own, the game's prompt drawn again by another
- * painter (`redraw`), or redrawn in the wide pose (`widePose`) or a strict T-pose (`tPose`).
+ * painter (`redraw`), or redrawn in the wide pose (`widePose`) or the T-pose (`tPose`). Pictures stored as `tposeDown` (the
+ * palms-down T-pose, when there were two, before 1 Nov 2026) are listed as `tpose`.
  */
-export type LabPose = 'game' | 'redraw' | 'wide' | 'tpose' | 'tposeDown';
+export type LabPose = 'game' | 'redraw' | 'wide' | 'tpose';
 
 export interface LabPicture {
   image: string;
@@ -98,8 +99,9 @@ export function setLabPicture(sourceId: string, pose: LabPose, painter: PersonPa
 export function labPictures(sourceId: string): LabPicture[] {
   const out: LabPicture[] = [];
   for (const [k, v] of Object.entries(read().pictures ?? {})) {
-    const [id, pose, painter = 'schnell'] = k.split('|');
-    if (id === sourceId && (pose === 'wide' || pose === 'redraw' || pose === 'tpose' || pose === 'tposeDown')) out.push({ ...v, pose, painter: painter as PersonPainter });
+    const [id, stored, painter = 'schnell'] = k.split('|');
+    const pose = stored === 'tposeDown' ? 'tpose' : stored;
+    if (id === sourceId && (pose === 'wide' || pose === 'redraw' || pose === 'tpose')) out.push({ ...v, pose, painter: painter as PersonPainter });
   }
   return out;
 }

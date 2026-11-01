@@ -154,7 +154,7 @@ describe('landmark3d', () => {
       expect(model.costUsd).toBeCloseTo(0.842);
       // The game's pose is the T-pose by default, and Meshy is told so.
       expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 't-pose' });
-      expect(model.prompt).toContain('strict T-pose');
+      expect(model.prompt).toContain('in a T-pose: arms straight out');
       expect(calls).not.toContain(`https://queue.fal.run/${FAL_MESH_MODEL}`);
       expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([
         ['fal-ai/nano-banana-lite', 'ok', 0.042],

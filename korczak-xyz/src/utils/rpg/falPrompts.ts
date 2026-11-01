@@ -198,17 +198,31 @@ export function personPrompt(appearance: string, who: { gender?: 'male' | 'femal
     .join(' ');
 }
 
+/**
+ * The T-pose every person is drawn in for a rig. Short on purpose (owner, 1 Nov 2026: "simplify that
+ * prompt, FLUX doesn't need it that exact to do a good job"): the long strict wording it replaced is
+ * kept below only so prompts stored with it still convert.
+ */
 const T_POSE =
+  'Standing in a T-pose: arms straight out to the sides at shoulder height, palms facing down, hands empty, legs slightly apart, feet flat on the ground,';
+
+/** The strict T-pose of 29 Oct 2026, palms forward, and its palms-down twin: in stored prompts only. */
+const OLD_T_POSE =
   'Standing in a strict T-pose for rigging: both arms stretched straight out to the sides, exactly horizontal at shoulder height, in one straight line from fingertip to fingertip, elbows and wrists straight, palms open and facing forward toward the viewer with the thumbs pointing up, fingers straight and together, a clear gap between each arm and the body all the way to the armpit; both hands completely empty, holding nothing at all, no weapon, tool, staff, shield, lantern, bag, book or any other object in or near the hands (anything they carry is worn on the back or at the belt); legs straight and slightly apart with a clear gap between them, feet flat on the ground, clothes close to the body, nothing hanging from the arms or between the legs,';
+const OLD_T_POSE_DOWN = OLD_T_POSE.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'palms facing down');
 
 /**
- * A person's prompt in a strict T-pose, for the model lab (owner, 29 Oct 2026: "the key to a good
- * rig is a very exact T-pose in the picture; the arms pointing exactly, no objects held in them").
- * Palms forward rather than down (owner, 30 Oct 2026: "palms should face the front, not down, to make
- * the rig work just right").
+ * A person's prompt in the T-pose, for the model lab and the game (owner, 29 Oct 2026: "the key to a
+ * good rig is a T-pose in the picture, no objects held in the hands"). Palms down only (owner, 1 Nov
+ * 2026: drop the palms-forward variant).
  */
-export function tPose(prompt: string, palms: 'forward' | 'down' = 'forward'): string {
-  return inPose(prompt, palms === 'down' ? T_POSE_PALMS_DOWN : T_POSE);
+export function tPose(prompt: string): string {
+  return inPose(prompt, T_POSE);
+}
+
+/** Whether `prompt` asks for a T-pose, in today's words or the old strict ones. */
+export function isTPose(prompt: string): boolean {
+  return [T_POSE, OLD_T_POSE, OLD_T_POSE_DOWN].some((pose) => prompt.includes(pose));
 }
 
 /**
@@ -219,16 +233,9 @@ export function tPose(prompt: string, palms: 'forward' | 'down' = 'forward'): st
  * palms forward").
  */
 function inPose(prompt: string, pose: string): string {
-  for (const was of [A_POSE, WIDE_POSE, T_POSE, T_POSE_PALMS_DOWN]) if (prompt.includes(was)) return prompt.replace(was, pose);
+  for (const was of [A_POSE, WIDE_POSE, T_POSE, OLD_T_POSE, OLD_T_POSE_DOWN]) if (prompt.includes(was)) return prompt.replace(was, pose);
   return `${prompt} ${pose.replace(/,$/, '.')}`;
 }
-
-/**
- * The same T-pose with the palms down, as it was before 30 Oct 2026: the lab's second T-pose (owner:
- * "two T-pose variants in the lab, palms forward and palms down; it may be TRELLIS making the hands
- * the way they look, not the rig"), so the two are compared on one person.
- */
-const T_POSE_PALMS_DOWN = T_POSE.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'palms facing down');
 
 /**
  * The pose a person is drawn in, the game's setting (owner, 29 Oct 2026: "put the T-pose in the

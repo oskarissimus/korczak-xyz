@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { devlogVersion, devRequests, subscribeDevlog } from '../../utils/rpg/devlog';
-import { buildPersonMesh, drawImage, FAL_RIG_MODEL, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
+import { buildPersonMesh, drawImage, FAL_RIG_MODEL, TEXT_PERSON_PRICE, textToRiggedPerson, IMAGE_SIZE, PERSON_MESHERS, PERSON_PAINTERS, DEFAULT_PAINTER, setGoogleImageKey, personPrompt, isTPose, tPose, widePose, type PersonMesher, type PersonPainter } from '../../utils/rpg/landmark3d';
 import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSources';
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, setLabPicture, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import type { Lang } from '../../utils/rpg/quest';
@@ -48,7 +48,7 @@ const heightOf = (s: LabSource) => PERSON_HEIGHT[s.role === 'hero' ? 'hero' : s.
 
 /** The prompt a redrawn picture is asked with: the game's own, moved into the chosen pose. */
 function posed(pose: LabPose, prompt: string): string {
-  return pose === 'tpose' ? tPose(prompt) : pose === 'tposeDown' ? tPose(prompt, 'down') : pose === 'wide' ? widePose(prompt) : prompt;
+  return pose === 'tpose' ? tPose(prompt) : pose === 'wide' ? widePose(prompt) : prompt;
 }
 
 /** A picture redrawn before, only while it was asked with the prompt the pose sends now: a changed pose is drawn again. */
@@ -57,7 +57,7 @@ function keptPicture(source: LabSource, pose: LabPose, painter: PersonPainter): 
   return kept && kept.prompt === posed(pose, source.model.prompt) ? kept : null;
 }
 
-/** A person described in the lab is drawn in the strict T-pose from the start: the lab is for rigging. */
+/** A person described in the lab is drawn in the T-pose from the start: the lab is for rigging. */
 function ownPrompt(describe: string, gender: 'male' | 'female'): string {
   return tPose(personPrompt(describe.trim(), { gender }));
 }
@@ -291,7 +291,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
         spent += PERSON_PAINTERS[painter].price(IMAGE_SIZE);
         setLabPicture(source.id, pose, painter, picture);
       }
-      const at = { pose: picture.prompt.includes('strict T-pose') ? ('tpose' as const) : ('apose' as const), height: heightOf(source) };
+      const at = { pose: isTPose(picture.prompt) ? ('tpose' as const) : ('apose' as const), height: heightOf(source) };
       const made = await buildPersonMesh(falKey, picture.image, method, 'lab', {}, undefined, at);
       // In one go: Meshy's rig came with the model, so the Meshy rig shows it for nothing.
       if (made.rigged) {
@@ -540,7 +540,6 @@ export default function ModelLab({ lang }: { lang: Lang }) {
                     {t.picture}:{' '}
                     <select value={pose} onChange={(e) => setPose(e.target.value as LabPose)}>
                       <option value="tpose">{t.poses.tpose}</option>
-                      <option value="tposeDown">{t.poses.tposeDown}</option>
                       <option value="game">{t.pictureGame}</option>
                       <option value="redraw">{t.poses.redraw}</option>
                       <option value="wide">{t.poses.wide}</option>
@@ -566,11 +565,9 @@ export default function ModelLab({ lang }: { lang: Lang }) {
               {t.rig}:{' '}
               <select
                 value={rigger}
-                onChange={(e) => setRigger(e.target.value === 'meshy' || e.target.value === 'raw' || e.target.value === 'voxel' || e.target.value === 'fit' || e.target.value === 'pose' || e.target.value === 'skin' ? e.target.value : 'self')}
+                onChange={(e) => setRigger(e.target.value === 'meshy' || e.target.value === 'raw' || e.target.value === 'voxel' || e.target.value === 'skin' ? e.target.value : 'fit')}
               >
-                <option value="self">{t.rigSelf}</option>
                 <option value="fit">{t.rigFit}</option>
-                <option value="pose">{t.rigPose}</option>
                 <option value="skin">{t.rigSkin}</option>
                 <option value="voxel">{t.rigVoxel}</option>
                 <option value="raw">{t.rigRaw}</option>

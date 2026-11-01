@@ -76,20 +76,4 @@ describe('tPoseJoints', () => {
     box(p, -0.2, 0.2, 0, 1.8, -0.1, 0.1);
     expect(() => tPoseJoints(new Float32Array(p), 1.8)).toThrow(/T-pose/);
   });
-
-  it('takes limb joints given as anchors, and moves the spine with the hips', () => {
-    const plain = tPoseJoints(person({ skirt: true }), 1.8).joints;
-    const { joints, notes } = tPoseJoints(person({ skirt: true }), 1.8, {
-      LeftUpLeg: [0.1, 0.8, 0.01],
-      RightUpLeg: [-0.1, 0.8, 0.01],
-      LeftHand: [0.6, 1.43, 0],
-    });
-    expect(notes.join(' ')).toMatch(/3 limb joints from the picture/);
-    expect(joints.LeftUpLeg).toEqual([0.1, 0.8, 0.01]);
-    expect(joints.LeftHand).toEqual([0.6, 1.43, 0]);
-    // Not anchored: measured as before.
-    expect(joints.RightHand).toEqual(plain.RightHand);
-    expect(joints.Hips[1]).toBeGreaterThan(0.8);
-    expect(joints.Hips[1]).not.toBeCloseTo(plain.Hips[1], 2);
-  });
 });

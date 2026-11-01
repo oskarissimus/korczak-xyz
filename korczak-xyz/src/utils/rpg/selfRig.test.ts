@@ -23,7 +23,7 @@ describe('selfRig', () => {
     }
   });
 
-  it('rigs a body like the donor’s, in TRELLIS’s unit box, with the donor’s joints and weights', () => {
+  it('rigs a body like the donor’s, in TRELLIS’s unit box, with the donor’s joints and weights much like its own', () => {
     // The donor itself, squeezed into a unit box the way TRELLIS answers, a little stockier.
     const p = donor.positions;
     const target = new Float32Array(p.length);
@@ -57,7 +57,9 @@ describe('selfRig', () => {
     expect(at('RightHand')[0]).toBeLessThan(-0.1);
     expect(at('Head')[1]).toBeGreaterThan(at('neck')[1]);
 
-    // Most vertices take the bone that moved them on the donor.
+    // Most vertices take the bone that moved them on the donor. Measured through the body rather than
+    // copied (the copy was taken out on 1 Nov 2026), so a vertex near a joint may pick its neighbour:
+    // 72 % agree on the donor itself.
     let same = 0;
     const n = p.length / 3;
     for (let i = 0; i < n; i++) {
@@ -65,7 +67,7 @@ describe('selfRig', () => {
       for (let a = 1; a < 4; a++) if (donor.skinWeight[i * 4 + a] > donor.skinWeight[i * 4 + top]) top = a;
       if (rig.skinIndex[i * 4] === donor.skinIndex[i * 4 + top]) same++;
     }
-    expect(same / n).toBeGreaterThan(0.8);
+    expect(same / n).toBeGreaterThan(0.65);
     for (let i = 0; i < n; i += 53) {
       const sum = [0, 1, 2, 3].reduce((s, a) => s + rig.skinWeight[i * 4 + a], 0);
       expect(sum).toBeCloseTo(1, 4);

@@ -773,9 +773,13 @@ content-hashed and immutable.
     byte for byte. Each person is then rigged in the browser by `utils/rpg/selfRig.ts`, in a worker
     (`components/Rpg/selfRig.worker.ts`), ~1 s: the donor is laid over the mesh, warped onto it
     through control nodes on a 4 cm grid (40 rounds, stiffness easing, nearest points pulled both
-    ways), and each vertex copies the weights of the nearest warped donor point; joints move with
+    ways), and each vertex copied the weights of the nearest warped donor point; joints move with
     the donor points bound to them, rest rotations stay the donor's, which is why one library of
-    clips (under the game's `Clip` names) moves every person. The rig is cached in the Cache API
+    clips (under the game's `Clip` names) moves every person. **That first way is gone** (owner,
+    1 Nov 2026: "drop the old original rig, it still mangles the character"): the copied weights
+    tore the clothes, and every rig of ours now weighs through the body (`voxel`, `fit`, `skin`
+    below). Meshy with no fal key, or a Meshy rig that fails, rigs as `fit`; a stored `rpg-rigger`
+    of `self` reads as `fit` too. The rig is cached in the Cache API
     beside the GLB under `?rig=N&body=…&height=…` — **a query, not a fragment**: the Cache API
     drops fragments, and a `#` key once handed back the GLB's own bytes as a rig. Bump
     `RIG_VERSION` in `people.ts` when `selfRig` changes what it answers.
@@ -806,7 +810,7 @@ content-hashed and immutable.
     rigged URL is kept in the Cache API under `?meshy=1&height=…` beside the GLB, and since 31 Oct 2026
     on the account too (*Every generated asset is kept*, under *Keys*), so a model is paid for once. The one-person check runs first,
     so a picture of two is not paid for; a refusal or a failed request falls back to the browser's
-    rig, both in the console. Switching re-rigs everyone standing (`RpgScene.setRigger`). Meshy's
+    rig (`fit`), both in the console. Switching re-rigs everyone standing (`RpgScene.setRigger`). Meshy's
     GLB is ~2 MB and ~22k vertices against the self-rig's ~5.5k. Compared on a blacksmith in a
     leather apron (`rpg/postacie-3d/meshy-vs-wlasny-kowal.gif` in the project files), same clips:
     Meshy frees the arms from the body and splits the legs cleanly in the walk; ours keeps the apron
@@ -878,23 +882,25 @@ content-hashed and immutable.
     console logs it as a `fal` step under the Gemini model's name; `providerOf` makes an empty
     balance there Google's, not fal's. Without a Gemini key, fal draws them. The measurement, the
     sheets and the scripts are in the project files, `rpg/obrazy-postaci-modele/`.
-    **The strict T-pose** (owner, 29 Oct 2026: "the key to a good rig is a very exact T-pose in the
+    **The T-pose** (owner, 29 Oct 2026: "the key to a good rig is a very exact T-pose in the
     picture; the arms pointing exactly, no objects held; and let the prompt be seen in the lab") is
-    the lab's default picture (`tPose` in `falPrompts.ts`: arms horizontal in one line, palms forward
-    with the thumbs up since 30 Oct 2026 (owner: "palms to the front, not down, for the rig"),
-    and in the lab both, *palms forward* and *palms down* (`tPose(prompt, 'down')`, owner the same
-    evening: "it may be TRELLIS making the hands so, not the rig; let me test both"),
-    each pose replacing whichever the prompt was in (`inPose`): the game's prompts are T-posed already,
-    and palms down was once appended after their palms forward, so the painters drew palms forward,
-    gaps to the armpit, hands empty with the objects named, carried things on the back or belt), and
-    people described in the lab are drawn in it from the start. A kept picture is used again only while
+    the lab's default picture (`tPose` in `falPrompts.ts`), replacing whichever pose the prompt was
+    in (`inPose`): the game's prompts are T-posed already, and a second pose was once appended after
+    the first, so the painters drew the first. People described in the lab are drawn in it from the
+    start. It was a long, strict prompt (arms in one line, palms forward with the thumbs up, gaps to
+    the armpit, every object a hand might hold named), with a palms-down twin in the lab. Since
+    1 Nov 2026 there is one T-pose, palms down, in one short line (owner: "drop the palms-forward
+    T-pose, keep palms down and call it just T-pose, and simplify the prompt; FLUX doesn't need it
+    that exact"). Palms down is also the rig-friendly pose (*Palms forward costs a twist*, below).
+    The old wordings stay in `inPose`'s list and in `isTPose`, so prompts stored with them still
+    convert and still count as T-posed; lab pictures stored as `tposeDown` are listed as `tpose`. A kept picture is used again only while
     its prompt is the one its pose sends now (`keptPicture`), so a changed pose is drawn afresh. The prompt sent, or the one a kept
     picture was drawn from, is under the Make row and the describe form, word for word. Nano Banana
     draws it cleanly on the blacksmith.
     **The pose is a setting since** (owner, 29 Oct 2026: "put the T-pose in the game, a setting for
     A-pose or T-pose, both prompts viewable and very precise"): *Character pose* (`rpg-pose`, absent
     = T-pose) in the game's settings, each pose's prompt folded out under it word for word
-    (`PERSON_POSES` in `falPrompts.ts`: the strict T-pose, and the precise A-pose, which is the
+    (`PERSON_POSES` in `falPrompts.ts`: the T-pose, and the precise A-pose, which is the
     lab's "wide" picture too). `ensurePersonModel` puts the person's prompt in that pose
     (`posePerson`), so the kept prompt is the one sent, and Meshy's image-to-3D is told the same pose
     (`pose_mode`). For people made from then on; the console's remake redoes the ones standing.
@@ -969,9 +975,9 @@ content-hashed and immutable.
     Seam-split vertices are welded first, or a seam opens where their best four bones differ; the
     smoothing walks only edges under 3 voxels. Replaces copying the nearest donor point's weights,
     measured through the air, which tore shards off the sleeves and split the apron. ~3–4 s in the
-    worker. *Character rig* has it as a third choice (`rpg-rigger` = `voxel`), keyed apart in the
-    cache (`&w=voxel`); the lab's rig switch too, and it is the lab's default. The game still
-    defaults to Meshy until it is judged there.
+    worker. *Character rig* has it as a choice (`rpg-rigger` = `voxel`), keyed apart in the
+    cache (`&w=voxel`); the lab's rig switch too. The game still defaults to Meshy until it is
+    judged there.
   - **Or the joints fitted to the T-pose** (`fit`, owner, 1 Nov 2026: "TRELLIS gives a T-pose as we
     want: start from a standard human and fit it, scaling head, limbs and torso; only the big joints
     need to be right"). `utils/rpg/tposeJoints.ts` reads them off the mesh, no warp: the arms along
@@ -984,20 +990,12 @@ content-hashed and immutable.
     crooked (its head's end at 0.876 of the height, its spine off-centre), which the warp copied.
     Voxel weights. On the maid in a dress the skeleton came out symmetric and inside the legs, and
     the dress stopped tearing; an A-posed model falls back to `voxel`. The lab's default rig since.
-  - **Or the limb joints from a pose detector** (`pose`, owner, 1 Nov 2026: "ask a model to mark the
-    big joints, then read them back"). `fit`, with the twelve limb joints (shoulders, elbows,
-    wrists, hips, knees, ankles) given to `tPoseJoints` as anchors: MediaPipe's Pose Landmarker
-    (`full`, from jsDelivr at a pinned 0.10.14, model from Google's bucket, ~18 MB once, fetched only
-    for this rig) on a flat, unlit front render of the mesh itself (`poseFromRender.ts`), lifted
-    into the mesh by `utils/rpg/pictureJoints.ts` (box to box in x and y, depth from rays through the
-    triangles, ankle clamped to the sole + 4.5 %, a straight leg's knee between hip and ankle). The
-    render rather than FLUX's picture because TRELLIS frames the drawing 3–5 % off per axis. Tried
-    against hand-placed joints (`/mnt/project-files/rpg/rig-v2/opcja2-stawy-z-obrazka.md`): 1.5–1.7 %
-    of the height; DWPose on fal 1.1–1.3 % but answers only a picture of the skeleton; Gemini Flash
-    asked for coordinates put the hips at the apron's hem (up to 19 % off); Nano Banana drawing
-    dots 1.1–1.9 % at 7–13¢. If the detector cannot load or finds nobody, the joints are measured as
-    in `fit` and the console row says so. Cache `&w=pose`. On the maid, the legs come out straight
-    and parallel where `fit` leaves them in a V.
+  - **The limb joints from a pose detector were tried and taken out** (`pose`, 1 Nov 2026, removed
+    the same day: "it brings no benefit either"). `fit` with twelve limb joints from MediaPipe's Pose
+    Landmarker on a flat front render of the mesh: 1.5–1.7 % of the height off hand-placed joints, no
+    better in the walk than `fit` measuring them, for an 18 MB download. The comparison is in
+    `/mnt/project-files/rpg/rig-v2/opcja2-stawy-z-obrazka.md`; the code is in git history
+    (`poseFromRender.ts`, `utils/rpg/pictureJoints.ts`). A stored `rpg-rigger` of `pose` reads as `fit`.
   - **Or the weights from SkinTokens** (`skin`, owner, 1 Nov 2026: "do 1 from the report" — the
     report being `/mnt/project-files/rpg/rig-v2/RAPORT.md`, whose first recommendation this is: by
     then the joints were good and the weights were what still fell short of Meshy). The `fit` joints

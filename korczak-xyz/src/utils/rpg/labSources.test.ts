@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { classicWorld, type LandmarkModel, type WorldBible } from './genesis';
-import { personPrompt, tPose, widePose } from './falPrompts';
+import { personPrompt, isTPose, tPose, widePose } from './falPrompts';
 import { labSources, type LabWorld } from './labSources';
 import type { Character } from './quest';
 import type { SavedGame } from './save';
@@ -46,25 +46,34 @@ describe('labSources', () => {
     expect(widePose('a knight')).toContain('a clear gap between each arm and the body');
   });
 
-  it('draws the T-pose with the palms forward, or down for the lab’s second variant, and nothing else changed', () => {
+  it('draws the T-pose with the palms down, and nothing else changed', () => {
     const p = personPrompt('a blacksmith', { gender: 'male' });
-    const forward = tPose(p);
-    const down = tPose(p, 'down');
-    expect(forward).toContain('thumbs pointing up');
-    expect(down).toContain('palms facing down');
-    expect(down).not.toContain('thumbs');
-    expect(down.replace('palms facing down', 'X')).toBe(forward.replace('palms open and facing forward toward the viewer with the thumbs pointing up', 'X'));
+    const t = tPose(p);
+    expect(t).toContain('a blacksmith');
+    expect(t).toContain('T-pose');
+    expect(t).toContain('palms facing down');
+    expect(t).not.toContain('arms held a little away');
+    expect(isTPose(t)).toBe(true);
+    expect(isTPose(p)).toBe(false);
   });
 
   it('moves a prompt already in one pose into another, rather than adding the second after the first', () => {
     const game = tPose(personPrompt('a smith', { gender: 'male' }));
-    const down = tPose(game, 'down');
-    expect(down).toContain('palms facing down');
-    expect(down).not.toContain('thumbs');
-    expect(down.match(/strict T-pose/g)).toHaveLength(1);
-    expect(tPose(down)).toBe(game);
+    expect(game.match(/T-pose/g)).toHaveLength(1);
+    expect(tPose(game)).toBe(game);
     const wide = widePose(game);
     expect(wide).toContain('precise A-pose');
-    expect(wide).not.toContain('T-pose for rigging');
+    expect(isTPose(wide)).toBe(false);
+    expect(tPose(wide)).toBe(game);
+  });
+
+  it('still converts a prompt stored in the old strict T-pose, either palms', () => {
+    const old = (palms: string) =>
+      `A smith. Standing in a strict T-pose for rigging: both arms stretched straight out to the sides, exactly horizontal at shoulder height, in one straight line from fingertip to fingertip, elbows and wrists straight, ${palms}, fingers straight and together, a clear gap between each arm and the body all the way to the armpit; both hands completely empty, holding nothing at all, no weapon, tool, staff, shield, lantern, bag, book or any other object in or near the hands (anything they carry is worn on the back or at the belt); legs straight and slightly apart with a clear gap between them, feet flat on the ground, clothes close to the body, nothing hanging from the arms or between the legs, facing the viewer.`;
+    for (const palms of ['palms open and facing forward toward the viewer with the thumbs pointing up', 'palms facing down']) {
+      expect(isTPose(old(palms))).toBe(true);
+      expect(tPose(old(palms))).not.toContain('strict');
+      expect(tPose(old(palms))).toContain('facing the viewer.');
+    }
   });
 });
