@@ -972,6 +972,18 @@ content-hashed and immutable.
     worker. *Character rig* has it as a third choice (`rpg-rigger` = `voxel`), keyed apart in the
     cache (`&w=voxel`); the lab's rig switch too, and it is the lab's default. The game still
     defaults to Meshy until it is judged there.
+  - **Or the joints fitted to the T-pose** (`fit`, owner, 1 Nov 2026: "TRELLIS gives a T-pose as we
+    want: start from a standard human and fit it, scaling head, limbs and torso; only the big joints
+    need to be right"). `utils/rpg/tposeJoints.ts` reads them off the mesh, no warp: the arms along
+    x (tip = the x extreme, shoulder = the armpit, where a column's height jumps past 2.4× the arm's,
+    elbow and wrist at 40 % and 75 % of shoulder-to-fingertip — not the thinnest column, which a flat
+    palm is), the legs from the slices where they are two lumps (ankles from the stance, hips just
+    under a crotch that shows, the template's 51 %/30 % of the height under a skirt), the spine at
+    the template's heights stretched between hips and shoulders, a quarter of the way to the back.
+    Always on the male donor's skeleton, whose bones the clips were made on: the female donor's own is
+    crooked (its head's end at 0.876 of the height, its spine off-centre), which the warp copied.
+    Voxel weights. On the maid in a dress the skeleton came out symmetric and inside the legs, and
+    the dress stopped tearing; an A-posed model falls back to `voxel`. The lab's default rig since.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

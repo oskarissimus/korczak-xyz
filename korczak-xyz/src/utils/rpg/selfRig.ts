@@ -21,6 +21,7 @@
  * body better than Meshy's. Pure, so it runs in a worker and in the tests.
  */
 
+import { tPoseJoints } from './tposeJoints';
 import { skinBones, voxelSkin } from './voxelSkin';
 
 /** One bone of a donor's skeleton, in metres; parents come before their children. */
@@ -160,6 +161,11 @@ export type SkinWeights = 'donor' | 'voxel';
 
 export interface SelfRigOptions {
   weights?: SkinWeights;
+  /**
+   * Where the joints come from: the warped donor (`warp`), or read off a T-posed mesh against a
+   * standard body's proportions (`fit`, `tPoseJoints`; owner, 1 Nov 2026), which always weighs by voxels.
+   */
+  joints?: 'warp' | 'fit';
   /** The target's triangles, for `voxel`: without them only its vertices are voxelised. */
   index?: ArrayLike<number> | null;
 }
@@ -177,6 +183,20 @@ export function selfRig(donor: Donor, target: ArrayLike<number>, height: number,
     tPts[i * 3 + 1] = (target[i * 3 + 1] - rb.min[1]) * s;
     tPts[i * 3 + 2] = (target[i * 3 + 2] - rb.mid[2]) * s;
   }
+  if (o.joints === 'fit') {
+    const { joints: at } = tPoseJoints(tPts, height);
+    const joints = new Float32Array(nB * 3);
+    donor.bones.forEach((b, i) => joints.set(at[b.name] ?? b.world, i * 3));
+    const bones = skinBones(
+      donor.bones.map((b) => b.name),
+      donor.bones.map((b) => b.parent),
+      joints,
+      height,
+    );
+    const skin = voxelSkin(tPts, o.index ?? null, bones, { voxel: 0.018 * (height / 1.8), falloff: 0.05 * (height / 1.8) });
+    return { positions: tPts, skinIndex: skin.skinIndex, skinWeight: skin.skinWeight, joints };
+  }
+
   const tb = box(tPts), db = box(donor.positions);
   const k = [0, 1, 2].map((a) => (tb.size[a] || 1) / (db.size[a] || 1));
   const pre = (x: number, y: number, z: number): [number, number, number] => [
