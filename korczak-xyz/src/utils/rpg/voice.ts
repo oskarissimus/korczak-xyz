@@ -447,3 +447,99 @@ export async function speakLines(
     if (controller.signal.aborted) return;
   }
 }
+
+/*
+ * The intro's narrator (`intro.ts`) speaks through the same primed element: iOS lets only the
+ * element the Start click touched play later, and one element means the narrator and a character
+ * can never talk over each other — whoever starts last stops the other (`stopVoice`).
+ */
+
+/** Plays a clip that is already whole (a blob URL), stopping whatever spoke before. `onPlaying` is told when sound starts. */
+export function playClip(url: string, signal: AbortSignal, onPlaying?: () => void): Promise<void> {
+  stopVoice();
+  const el = element();
+  if (!el) return Promise.resolve();
+  if (onPlaying) el.addEventListener('playing', onPlaying, { once: true });
+  return play(el, url, signal);
+}
+
+/**
+ * Whether an MP3 can be played while it is still downloading (Media Source Extensions with
+ * `audio/mpeg`): Chrome, Firefox, desktop Safari and iPadOS. An iPhone has only `ManagedMediaSource`,
+ * whose terms for an `<audio>` element are not worth the risk on the one device the owner plays on,
+ * so there it is read whole first — about half a second later.
+ */
+export function streamingAudio(): boolean {
+  try {
+    return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/mpeg');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Plays ElevenLabs' streamed MP3 as it arrives (owner, 1 Nov 2026: "an API that streams the voice
+ * at once"): each chunk appended to a `MediaSource` the moment it comes, so the narrator starts on
+ * the first few kilobytes rather than after the whole clip and the gateway's copy of it into the
+ * bucket. Resolves when it has been heard to the end, or at once on abort.
+ */
+export async function playStream(response: Response, signal: AbortSignal, onPlaying?: () => void): Promise<void> {
+  stopVoice();
+  const el = element();
+  if (!el || !response.body) return;
+  const source = new MediaSource();
+  const url = URL.createObjectURL(source);
+  const reader = response.body.getReader();
+  try {
+    if (onPlaying) el.addEventListener('playing', onPlaying, { once: true });
+    el.src = url;
+    await new Promise<void>((resolve) => source.addEventListener('sourceopen', () => resolve(), { once: true }));
+    const buffer = source.addSourceBuffer('audio/mpeg');
+    const append = (chunk: Uint8Array) =>
+      new Promise<void>((resolve, reject) => {
+        buffer.addEventListener('updateend', () => resolve(), { once: true });
+        buffer.addEventListener('error', () => reject(new Error('The voice stream would not play.')), { once: true });
+        buffer.appendBuffer(chunk as BufferSource);
+      });
+    let refuse: (e: Error) => void = () => {};
+    const heard = new Promise<void>((resolve, reject) => {
+      const done = (err?: Error) => {
+        el.onended = null;
+        el.onerror = null;
+        signal.removeEventListener('abort', onAbort);
+        if (err) reject(err);
+        else resolve();
+      };
+      const onAbort = () => {
+        el.pause();
+        done();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      el.onended = () => done();
+      el.onerror = () => done(new Error('The voice stream would not play.'));
+      refuse = (e) => done(e);
+    });
+    heard.catch(() => {});
+    let started = false;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done || signal.aborted) break;
+      await append(value);
+      if (!started) {
+        started = true;
+        void el.play().catch((e) => refuse(e instanceof Error ? e : new Error('The voice stream would not play.')));
+      }
+    }
+    if (signal.aborted) {
+      void reader.cancel().catch(() => {});
+      el.pause();
+      return;
+    }
+    if (source.readyState === 'open') source.endOfStream();
+    // A stream too short to have started (or a play() refused) ends here rather than hanging.
+    if (!started) return;
+    await heard;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
