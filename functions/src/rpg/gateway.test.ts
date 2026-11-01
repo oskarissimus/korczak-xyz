@@ -293,3 +293,34 @@ describe('ledgerWrites', () => {
     expect(ledgerWrites('u1', { ...base, usd: null }, '2026-10-31')).toEqual([]);
   });
 });
+
+describe('skin weights (/_skin)', () => {
+  const mesh = { positions: 'AAAA', index: 'AAAA', joints: 'AAAA', parents: [-1] };
+
+  it('refuses a signed-out reader and an account not approved, before calling the service', async () => {
+    const out = fakeRes();
+    await handleRpgApi(req('/_skin', { body: mesh }), out as any);
+    expect(out.statusCode).toBe(401);
+    const pending = fakeRes();
+    await handleRpgApi(req('/_skin', { body: mesh, headers: { authorization: 'Bearer good' } }), pending as any);
+    expect(pending.statusCode).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('passes an approved account’s mesh to the private service with an identity token for it', async () => {
+    store.set('accounts/u1', { approved: true });
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).startsWith('http://metadata.google.internal/')
+        ? new Response('id-token')
+        : new Response(JSON.stringify({ skinIndex: 'x', skinWeight: 'y' }), { status: 200 }),
+    );
+    const out = fakeRes();
+    await handleRpgApi(req('/_skin', { body: mesh, headers: { authorization: 'Bearer good' } }), out as any);
+    expect(out.statusCode).toBe(200);
+    expect(JSON.parse(out.body())).toEqual({ skinIndex: 'x', skinWeight: 'y' });
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(String(url)).toMatch(/^https:\/\/skin-weights-.*\.run\.app$/);
+    expect(init.headers.Authorization).toBe('Bearer id-token');
+    expect(JSON.parse(Buffer.from(init.body).toString())).toEqual(mesh);
+  });
+});

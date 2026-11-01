@@ -71,6 +71,7 @@ import { ASSET_HEADER, FRESH_HEADER, KEEP_HEADER, REUSED_HEADER } from '../../..
 import { dayKey } from '../demo/limits';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
+import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 
@@ -516,6 +517,21 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
       }
       reportError('rpgApi.selfRig', e);
       if (!res.headersSent) res.status(502).json({ reason: 'failed' });
+    }
+    return;
+  }
+  // Skin weights from SkinTokens for a rig the page is working out (`people.ts`, rigger `skin`).
+  if (path === SKIN_PATH && req.method === 'POST') {
+    try {
+      await handleSkin(await uidOf(req), bodyOf(req), res);
+    } catch (e) {
+      if (e instanceof GatewayRefusal || e instanceof SkinRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.skin', e);
+      await flushSentry();
+      if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'skin weights unavailable' } });
     }
     return;
   }

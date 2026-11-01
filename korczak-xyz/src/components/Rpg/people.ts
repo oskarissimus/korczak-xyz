@@ -36,6 +36,7 @@ import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/a
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { poseFromRender } from './poseFromRender';
+import { skinTokensWeights } from '../../utils/rpg/skinWeights';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
@@ -46,7 +47,7 @@ export type Body = 'male' | 'female';
  * `voxelSkin`; owner, 31 Oct 2026: "SOTA non-AI rigging methods we could use"), or with the joints
  * read off a T-posed mesh against a standard body (`fit`, `tPoseJoints`; owner, 1 Nov 2026).
  */
-export type Rigger = 'meshy' | 'self' | 'voxel' | 'fit' | 'pose';
+export type Rigger = 'meshy' | 'self' | 'voxel' | 'fit' | 'pose' | 'skin';
 export const DEFAULT_RIGGER: Rigger = 'meshy';
 
 /** Heights a person is rigged at, feet to crown, by who they are. */
@@ -354,7 +355,7 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
   } catch {
     /* worked out again next time */
   }
-  void keepSelfRig(key, packed, { cacheKey: key, version: RIG_VERSION, weights: /&w=(voxel|fit|pose)/.test(key) ? 'voxel' : 'donor', joints: /&w=(fit|pose)/.exec(key)?.[1] ?? 'warp', ms: Math.round(ms) });
+  void keepSelfRig(key, packed, { cacheKey: key, version: RIG_VERSION, weights: /&w=skin/.test(key) ? 'skintokens' : /&w=(voxel|fit|pose)/.test(key) ? 'voxel' : 'donor', joints: /&w=(fit|pose)/.exec(key)?.[1] ?? (/&w=skin/.test(key) ? 'fit' : 'warp'), ms: Math.round(ms) });
   return { rig, ms };
 }
 
@@ -410,14 +411,17 @@ export class People {
    */
   template(url: string, body: Body, height: number, label = 'person'): Promise<PersonTemplate> {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
-    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}${this.rigger === 'voxel' || this.rigger === 'fit' || this.rigger === 'pose' ? `&w=${this.rigger}` : ''}`;
+    const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}${this.rigger === 'voxel' || this.rigger === 'fit' || this.rigger === 'pose' || this.rigger === 'skin' ? `&w=${this.rigger}` : ''}`;
     const falKey = this.rigger === 'meshy' ? this.falKey : null;
     const key = falKey ? `${url}?meshy=1&height=${height}` : own;
     let t = this.templates.get(key);
     if (!t) {
+      const fitted = () => this.build(url, own.replace('&w=skin', '&w=fit'), body, height, label, 'fit');
       t = falKey
         ? this.buildMeshy(falKey, url, key, height, label).catch(() => this.build(url, own, body, height, label))
-        : this.build(url, key, body, height, label, this.rigger === 'voxel' || this.rigger === 'fit' || this.rigger === 'pose' ? this.rigger : 'donor');
+        : this.rigger === 'skin'
+          ? this.build(url, key, body, height, label, 'skin').catch(fitted)
+          : this.build(url, key, body, height, label, this.rigger === 'self' || this.rigger === 'meshy' ? 'donor' : this.rigger);
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
     }
@@ -487,7 +491,7 @@ export class People {
     return { group, clips: fitClips(moved, (hips as THREE.Bone).position.clone()), ms };
   }
 
-  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'donor' | 'voxel' | 'fit' | 'pose' = 'donor'): Promise<PersonTemplate> {
+  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'donor' | 'voxel' | 'fit' | 'pose' | 'skin' = 'donor'): Promise<PersonTemplate> {
     const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
@@ -495,7 +499,9 @@ export class People {
     // made on (the female donor's own skeleton is crooked — its head's end below its crown). An
     // A-posed model has no arms to measure along x, so it is weighed by voxels on the warp instead.
     // `pose` is `fit` with the limb joints a pose detector found in the mesh's front render.
-    const fit = (mode === 'fit' || mode === 'pose') && tPosed;
+    // `skin` is `fit` (or the warp's joints on an A-posed model) with SkinTokens' weights in place of
+    // the voxel ones, from the private service behind the gateway (`skinWeights.ts`).
+    const fit = (mode === 'fit' || mode === 'pose' || mode === 'skin') && tPosed;
     const body: Body = fit ? 'male' : wanted;
     const weights = mode === 'donor' ? 'donor' : 'voxel';
     const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
@@ -517,6 +523,19 @@ export class People {
           }
         }
         const made = await rigOffThread(donor, target, height, { weights, index, joints: fit ? 'fit' : 'warp', picture });
+        if (mode === 'skin' && index) {
+          try {
+            const skin = await skinTokensWeights(made.positions, index, made.joints, donor.bones.map((b) => b.parent));
+            made.skinIndex = skin.skinIndex;
+            made.skinWeight = skin.skinWeight;
+            pose += `, SkinTokens weights (${(skin.ms / 1000).toFixed(0)} s)`;
+          } catch (err) {
+            // Not kept under this rig's key: `template` falls back to the fitted rig (voxel weights), and the next
+            // visit asks SkinTokens again.
+            pose += `, no SkinTokens weights`;
+            throw err;
+          }
+        }
         endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
         return made;
       } catch (err) {

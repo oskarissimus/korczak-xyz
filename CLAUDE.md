@@ -14,7 +14,9 @@ see *Error reporting* below). **Cloudflare** serves the site: `korczak-xyz/wrang
 Worker that is nothing but its own static assets, and the build is a plain `astro build` with no
 adapter — no SSR, no API routes, nothing running per request. **GCP** (`korczak-xyz-501720`) is the
 backend: Firestore, two gen-2 Cloud Functions in `europe-central2`, Cloud Scheduler, Secret
-Manager, a weekly Cloud Batch job that builds the audio guide's pins, and the project layer in
+Manager, a weekly Cloud Batch job that builds the audio guide's pins, the private Cloud Run service
+`skin-weights` (SkinTokens skin weights for the RPG's rig, reached only through the RPG gateway —
+`.claude/rules/rpg.md`), and the project layer in
 `terraform/`. The browser talks to Firestore directly, so those
 two halves meet in the client and not on a server.
 

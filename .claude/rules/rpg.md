@@ -998,6 +998,26 @@ content-hashed and immutable.
     dots 1.1–1.9 % at 7–13¢. If the detector cannot load or finds nobody, the joints are measured as
     in `fit` and the console row says so. Cache `&w=pose`. On the maid, the legs come out straight
     and parallel where `fit` leaves them in a V.
+  - **Or the weights from SkinTokens** (`skin`, owner, 1 Nov 2026: "do 1 from the report" — the
+    report being `/mnt/project-files/rpg/rig-v2/RAPORT.md`, whose first recommendation this is: by
+    then the joints were good and the weights were what still fell short of Meshy). The `fit` joints
+    (the warp's on an A-posed model), then SkinTokens (VAST-AI-Research, MIT, Qwen3-0.6B; ONNX by
+    QtMeshEditor, pinned revision in the Dockerfile) told the donor's skeleton (teacher forcing) and
+    asked only for weights. 2.3 GB of fp32, so not in the browser: `skin-weights/` is a private
+    Cloud Run service (4 vCPU, 8 GiB, concurrency 1, no minimum instances; deployed by
+    `.github/workflows/skin-weights.yml`), invokable only by the functions' identity, and the page
+    reaches it through the gateway's `/_skin` (`functions/src/rpg/skin.ts`: signed in, approved,
+    ≤8 MB, then an identity token from the metadata server). ~31–36 s a character on four cores
+    plus a cold start, about half a cent of the project's, once per character — the rig is kept on
+    the account like any other. The contract the service follows (Blender's axes, the joint box into
+    [-1, 1], 8192 samples, the skeleton's tokens in depth-first order with `branch` tokens) is at
+    the top of `skin-weights/skin.py`, read off the reference code in the VAST-AI/SkinTokens Space.
+    On the blacksmith and the maid it was the first rig of ours to keep both aprons whole through a
+    sword swing, where the voxel weights tore the blacksmith's and cracked his face. If the call
+    fails (signed out, not approved, the service down) the `fit` rig stands in and nothing is kept
+    under `&w=skin`, so the next visit asks again. The raw weights are diffuse by design (the
+    export's README); the four heaviest per vertex looked right as they were, so no localisation
+    pass yet.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

@@ -1,0 +1,66 @@
+# Builds the SkinTokens skin-weights service (`skin-weights/`) and deploys it as the private Cloud
+# Run service `skin-weights`, which the RPG's gateway calls once per character for the "SkinTokens
+# weights" rig (`.claude/rules/rpg.md`, *the weights from SkinTokens*).
+#
+# Path-filtered: the image carries a 2.3 GB model, so it is rebuilt only when the service changes.
+# Same deploy identity and Workload Identity provider as complexio.yml (Artifact Registry and Cloud
+# Run admin). The registry `skin-weights` was created by hand on 1 Nov 2026.
+name: Skin weights
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "skin-weights/**"
+      - ".github/workflows/skin-weights.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: skin-weights-deploy
+  cancel-in-progress: false
+
+env:
+  REGION: europe-central2
+  PROJECT: korczak-xyz-501720
+  IMAGE: europe-central2-docker.pkg.dev/korczak-xyz-501720/skin-weights/server
+  # Who may call it: the gen-2 functions' runtime identity, which is what `rpgApi` runs as.
+  INVOKER: serviceAccount:1068962621574-compute@developer.gserviceaccount.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Build and push
+        working-directory: skin-weights
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker buildx build --push \
+            --tag "${IMAGE}:${GITHUB_SHA::7}" \
+            --tag "${IMAGE}:latest" .
+
+      # Four vCPUs and 8 GiB: the model is 2.3 GB of fp32 and uses every core for the ~35 s a
+      # character takes, so one request at a time per instance. No minimum instances: a character
+      # is rigged once and kept, so a cold start is paid rarely and nothing is paid idle.
+      # Private (`--no-allow-unauthenticated`): only the gateway's identity can invoke it.
+      - name: Deploy
+        run: |
+          gcloud run deploy skin-weights \
+            --project="${PROJECT}" --region="${REGION}" \
+            --image="${IMAGE}:${GITHUB_SHA::7}" \
+            --no-allow-unauthenticated \
+            --cpu=4 --memory=8Gi --concurrency=1 --max-instances=3 --min-instances=0 \
+            --cpu-boost --timeout=300 --port=8080
+          gcloud run services add-iam-policy-binding skin-weights \
+            --project="${PROJECT}" --region="${REGION}" \
+            --member="${INVOKER}" --role=roles/run.invoker
