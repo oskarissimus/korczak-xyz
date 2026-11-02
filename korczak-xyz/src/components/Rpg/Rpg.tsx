@@ -101,6 +101,7 @@ import {
 } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { rememberTiming, type Task } from '../../utils/rpg/progress';
+import { rigsOfStart } from '../../utils/rpg/rigging';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
@@ -166,7 +167,7 @@ import {
 } from '../../utils/rpg/music';
 import { prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
-import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
+import { FAL_PRICES, FAL_RIG_MODEL, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
 import { introSketch, introView, shownImage, startIntro, stopIntro, subscribeIntro } from '../../utils/rpg/intro';
@@ -176,6 +177,8 @@ import { TouchControls } from './TouchControls';
 
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature']);
+/** The console rows of a rig (`people.ts`), counted in the progress as rigs and not as pieces. */
+const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { translations } from './translations';
 
 interface DialogueLine {
@@ -1571,6 +1574,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
       // Composed for the world's first quest, once the world is written.
       tasks.push({ kind: 'music', state: 'queued', since: null, afterWorld: true });
     }
+    // Every generated person being rigged (`utils/rpg/rigging.ts`): until it ends they are not in the
+    // scene, and with SkinTokens that is half a minute or more after their model came (owner, 2 Nov
+    // 2026: "our rigging endpoint is outside the main loading bar … put it in"). A world with models
+    // kept and no key rigs too, so these come before the key's check.
+    for (const r of rigsOfStart(line?.since ?? null, Date.now())) {
+      tasks.push({ kind: 'rig', state: r.endedAt === null ? 'running' : r.failed ? 'failed' : 'done', since: r.endedAt === null ? r.startedAt : null });
+    }
     if (!falKey) return tasks;
     const pending = falPending();
     const aw = creating ? previewRef.current : world;
@@ -1579,6 +1589,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
       tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       for (let i = 0; i < HUB_SLOTS.length; i++) tasks.push({ kind: 'model', state: 'queued', since: null, afterWorld: true });
+      // And the hero, rigged once its model has come.
+      tasks.push({ kind: 'rig', state: 'queued', since: null, afterWorld: true, afterFal: true });
     } else if (aw && aw.createdAt > 0) {
       const early = earlyRef.current.get(aw.id);
       const ground = groundState(aw.id);
@@ -1612,9 +1624,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
     }
     for (const p of pending) {
       if (/^(clue|place|person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
+      // A person still being made is a rig still to come, after it.
+      if (/^(person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'rig', state: 'queued', since: null, afterFal: true });
     }
     for (const r of devRequests()) {
       if (r.kind !== 'fal' || !PIECE_LABELS.has(r.label ?? '') || (line && r.startedAt < line.since)) continue;
+      // A rig's own row is the rig's row above; a SkinTokens failure there falls back, it is no failed piece.
+      if (RIG_MODELS.has(r.model)) continue;
       if (r.status === 'ok' && r.model.includes('trellis')) tasks.push({ kind: 'piece', state: 'done', since: null });
       else if (r.status === 'error') tasks.push({ kind: 'piece', state: 'failed', since: null });
     }

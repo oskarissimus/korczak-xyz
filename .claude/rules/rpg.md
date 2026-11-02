@@ -105,6 +105,22 @@ queue (`LandmarkModel.queuedMs`), and it counts as running only once fal has giv
 first measured run (27 Oct, dev, Flash): 2 min 40 s estimated at the click, 3 min 9 s to the last of
 15 pieces.
 
+**The rigs are in it too** (owner, 2 Nov 2026: "the processing through our rigging endpoint is
+outside the main loading bar of the world and the quest, and sometimes takes a while — put it in").
+Every `People.template` is followed from the scene's ask to the template (`utils/rpg/rigging.ts`,
+`trackRig`), the GLB's fetch, the worker and SkinTokens' half a minute included, its fallback too,
+and each is a `rig` task in the row *Riggowanie postaci*: running, ✓, or ✗ when even the fallback
+failed. Until one ends that person is not in the scene, so the panel says *Świat gotowy* only once
+the last is in. A person/hero/enemy piece still being made is a queued rig after fal's line
+(`afterFal`), and the hero's before the preview; the usual time is `rig` in `rpg-typical` (default
+30 s, learnt only from rigs that worked rather than came from a cache). A rig's own console row
+(`self-rig`, Meshy's) no longer counts as a failed piece — a SkinTokens failure there falls back to
+`fit`. With no start this session (a saved game opened) only rigs past 1.5 s count, so cached ones
+do not put the panel up on every load. *Finished* must hold for 1.5 s (`SETTLE_MS` in
+`DevConsole.tsx`): a person's model ends its piece a render before the scene asks for the rig. The
+Start tab has a line for them: how many, how many worked out vs from cache, first-to-last and the
+longest.
+
 **fal.ai's concurrency is fal's to limit, not ours** (owner, 27 Oct 2026: "the world could generate
 faster with parallel calls, but are there limits?"). An account runs 2 requests at once when new
 and up to 40 self-serve as its last four weeks of invoices grow, across all endpoints; over the

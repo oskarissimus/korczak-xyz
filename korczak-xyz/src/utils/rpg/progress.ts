@@ -11,7 +11,7 @@
  * No DOM beyond localStorage, so it can be tested.
  */
 
-export type TaskKind = 'world' | 'quest' | 'ground' | 'model' | 'piece' | 'music';
+export type TaskKind = 'world' | 'quest' | 'ground' | 'model' | 'piece' | 'music' | 'rig';
 export type TaskState = 'done' | 'running' | 'queued' | 'failed';
 
 export interface Task {
@@ -21,6 +21,8 @@ export interface Task {
   since: number | null;
   /** A queued task that cannot start before the world is written (the hub, before its preview). */
   afterWorld?: boolean;
+  /** A queued rig whose person's model is still being made: it starts once fal.ai's line has ended. */
+  afterFal?: boolean;
 }
 
 /**
@@ -34,13 +36,18 @@ export interface Typical {
   model: number;
   /** ElevenLabs composing a world's score (`music.ts`), on its own line beside everything else. */
   music: number;
+  /**
+   * Rigging one generated person (`people.ts`): the joints in the worker, and with SkinTokens the
+   * weights from the service (~30–40 s, a minute cold). A rig answered from the cache is not timed.
+   */
+  rig: number;
 }
 
 /**
  * Before this browser has timed anything: quick start's world and opening, and fal.ai's usual 3D
  * model with a runner (27 Oct 2026, 36 pieces: a picture in 1–6 s, a mesh in 14–37 s, ~22 s).
  */
-export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 25_000, music: 60_000 };
+export const DEFAULT_TYPICAL: Typical = { world: 12_000, quest: 12_000, ground: 4_000, model: 25_000, music: 60_000, rig: 30_000 };
 
 /**
  * Meshes fal.ai runs at once for the owner's account, the rest held in its queue: 6–7 at most
@@ -61,6 +68,7 @@ export function loadTypical(): Typical {
       ground: ok(raw?.ground, DEFAULT_TYPICAL.ground),
       model: ok(raw?.model, DEFAULT_TYPICAL.model),
       music: ok(raw?.music, DEFAULT_TYPICAL.music),
+      rig: ok(raw?.rig, DEFAULT_TYPICAL.rig),
     };
   } catch {
     return { ...DEFAULT_TYPICAL };
@@ -120,7 +128,13 @@ export function remainingMs(tasks: readonly Task[], now: number, t: Typical, par
     for (let j = 1; j < workers.length; j++) if (workers[j] < workers[i]) i = j;
     workers[i] = Math.max(workers[i], q.afterWorld ? worldEnd : 0) + typicalOf(q.kind, t);
   }
-  return Math.max(end, ...workers);
+  const falEnd = Math.max(...workers);
+  // The rigs, each on its own (the worker, then the SkinTokens service, which scales out): one whose
+  // person is still a fal.ai piece starts when fal's line ends, a little late rather than too early.
+  for (const r of open.filter((x) => x.kind === 'rig')) {
+    end = Math.max(end, (r.state === 'queued' ? Math.max(r.afterFal ? falEnd : 0, r.afterWorld ? worldEnd : 0) : 0) + left(r, now, t));
+  }
+  return Math.max(end, falEnd);
 }
 
 export interface Progress {

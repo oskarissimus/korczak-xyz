@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_TYPICAL, learnTypical, progressOf, remainingMs, roughly, type Task } from './progress';
 
-const t = { world: 10_000, quest: 10_000, ground: 4_000, model: 50_000, music: 60_000 };
+const t = { world: 10_000, quest: 10_000, ground: 4_000, model: 50_000, music: 60_000, rig: 30_000 };
 const now = 1_000_000;
 
 describe('remainingMs', () => {
@@ -87,5 +87,22 @@ describe('roughly', () => {
     expect(roughly(3_000)).toBeNull();
     expect(roughly(31_000)).toEqual({ min: 0, s: 35 });
     expect(roughly(72_000)).toEqual({ min: 1, s: 20 });
+  });
+});
+
+describe('the rigs', () => {
+  const tr = t;
+  it('runs a rig beside the rest, and one waiting for its model after fal.ai’s line', () => {
+    expect(remainingMs([{ kind: 'rig', state: 'running', since: now - 10_000 }], now, tr)).toBe(20_000);
+    const tasks: Task[] = [
+      { kind: 'piece', state: 'running', since: now - 10_000 },
+      { kind: 'rig', state: 'queued', since: null, afterFal: true },
+    ];
+    expect(remainingMs(tasks, now, tr)).toBe(40_000 + 30_000);
+  });
+
+  it('keeps the start unfinished while a rig runs', () => {
+    const p = progressOf([{ kind: 'piece', state: 'done', since: null }, { kind: 'rig', state: 'running', since: now }], now, tr);
+    expect(p.finished).toBe(false);
   });
 });

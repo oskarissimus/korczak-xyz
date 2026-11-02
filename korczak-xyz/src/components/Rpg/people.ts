@@ -36,6 +36,7 @@ import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/a
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { skinTokensWeights, wakeSkinTokens } from '../../utils/rpg/skinWeights';
+import { trackRig } from '../../utils/rpg/rigging';
 import { Rig } from './characters';
 
 export type Body = 'male' | 'female';
@@ -437,6 +438,8 @@ export class People {
           : this.build(url, key, body, height, label, mode);
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
+      // In the start's progress until it is there (`utils/rpg/rigging.ts`), the fallback included.
+      trackRig(label, url, t);
     }
     return t;
   }

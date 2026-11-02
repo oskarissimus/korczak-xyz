@@ -32,6 +32,7 @@ import {
 } from '../../utils/rpg/funds';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
+import { rigsOfStart, rigSummary } from '../../utils/rpg/rigging';
 import { personaLabel } from '../../utils/rpg/persona';
 import type { Beat, Character, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
@@ -381,6 +382,29 @@ function at(ms: number): string {
  * each thing the reader waits for arrived, and every request since the click, by when it began,
  * first answered and ended — a bar per request, so the steps that ran one after another show.
  */
+/**
+ * The rigs of this start (`utils/rpg/rigging.ts`): how many, how many worked out rather than taken
+ * from a cache, the wall time from the first asked to the last in, and the longest one. Each worked
+ * rig is also its own bar below (model `self-rig`, or Meshy's), with SkinTokens' share in its text.
+ */
+function RigStats({ lang, since }: { lang: Lang; since: number }) {
+  const t = translations[lang];
+  const now = Date.now();
+  const list = rigsOfStart(since, now);
+  const running = list.some((j) => j.endedAt === null);
+  useTick(running, 500);
+  if (list.length === 0) return null;
+  const s = rigSummary(list, now);
+  const failed = list.filter((j) => j.failed).length;
+  return (
+    <div className="rpg-dev-start-eta">
+      {running ? '⏳ ' : ''}
+      {t.devRigs(s.count, s.worked, formatMs(s.spanMs), formatMs(s.longestMs))}
+      {failed > 0 ? ` · ${t.progressFailed(failed)}` : ''}
+    </div>
+  );
+}
+
 function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly DevRequest[]; tasks: (() => Task[]) | null }) {
   const t = translations[lang];
   const line = timeline();
@@ -413,9 +437,10 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
       {list.length > 0 && (
         <div className="rpg-dev-start-eta">
           {t.devProgress(p.ended, p.total, p.failed)}
-          {p.finished ? '' : ` · ETA ${formatMs(p.leftMs)}`} · {t.devTypical(formatMs(typical.world), formatMs(typical.quest), formatMs(typical.ground), formatMs(typical.model))}
+          {p.finished ? '' : ` · ETA ${formatMs(p.leftMs)}`} · {t.devTypical(formatMs(typical.world), formatMs(typical.quest), formatMs(typical.ground), formatMs(typical.model), formatMs(typical.rig))}
         </div>
       )}
+      <RigStats lang={lang} since={line.since} />
       <dl>
         {reached.map((s) => (
           <React.Fragment key={s}>
@@ -774,19 +799,24 @@ function progressHeadline(list: readonly Task[], lang: Lang): string {
       ? t.progressQuestTitle
       : open(['piece'])
         ? t.progressPiecesTitle
-        : t.progressMusicTitle;
+        : open(['rig'])
+          ? t.progressRigTitle
+          : open(['music'])
+            ? t.progressMusicTitle
+            : t.progressTitle;
 }
 
 /** The rows of the start's progress, one per kind of work, in the order they usually end. */
 const PROGRESS_ROWS: {
   kinds: TaskKind[];
-  key: 'progressWorld' | 'progressQuest' | 'progressGround' | 'progressModels' | 'progressPieces' | 'progressMusic';
+  key: 'progressWorld' | 'progressQuest' | 'progressGround' | 'progressModels' | 'progressPieces' | 'progressRigs' | 'progressMusic';
 }[] = [
   { kinds: ['world'], key: 'progressWorld' },
   { kinds: ['quest'], key: 'progressQuest' },
   { kinds: ['ground'], key: 'progressGround' },
   { kinds: ['model'], key: 'progressModels' },
   { kinds: ['piece'], key: 'progressPieces' },
+  { kinds: ['rig'], key: 'progressRigs' },
   { kinds: ['music'], key: 'progressMusic' },
 ];
 
@@ -796,6 +826,9 @@ const PROGRESS_ROWS: {
  * opening, the ground, the hub's 3D models and the quest's own, each done or counted, and the time
  * left by `progress.ts`. Once all of it has come it says so for a few seconds and goes.
  */
+/** How long the start must have nothing left before it counts as finished (`WorldProgress`). */
+const SETTLE_MS = 1_500;
+
 export function WorldProgress({ lang, tasks, since }: { lang: Lang; tasks: () => Task[]; since: number | null }) {
   const t = translations[lang];
   useDevlog();
@@ -803,21 +836,28 @@ export function WorldProgress({ lang, tasks, since }: { lang: Lang; tasks: () =>
   const now = Date.now();
   const p = progressOf(list, now, loadTypical());
   useTick(list.length > 0, 1000);
-  // Shown while anything runs, and for a few seconds after the last thing came.
+  // Shown while anything runs, and for a few seconds after the last thing came. Finished only once it
+  // has stayed so for a moment: a person's model coming in ends its piece a render before the scene
+  // asks for its rig, and *World ready* must not flash up in between.
   const [doneAt, setDoneAt] = useState<number | null>(null);
   const [wasBusy, setWasBusy] = useState(false);
+  const [quietSince, setQuietSince] = useState<number | null>(null);
+  const settled = p.finished && quietSince !== null && now - quietSince >= SETTLE_MS;
   useEffect(() => {
     if (list.length === 0) return;
     if (!p.finished) {
       setWasBusy(true);
       setDoneAt(null);
-    } else if (wasBusy && doneAt === null) {
+      setQuietSince(null);
+    } else if (quietSince === null) {
+      setQuietSince(Date.now());
+    } else if (settled && wasBusy && doneAt === null) {
       setDoneAt(Date.now());
       markStage('all');
     }
-  }, [list.length, p.finished, wasBusy, doneAt]);
+  }, [list.length, p.finished, wasBusy, doneAt, quietSince, settled]);
   if (list.length === 0) return null;
-  if (p.finished) {
+  if (p.finished && (settled || !wasBusy)) {
     if (!wasBusy || (doneAt !== null && now - doneAt > 10_000)) return null;
     return (
       <div className="rpg-progress rpg-progress-done" role="status">
