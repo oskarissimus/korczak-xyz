@@ -107,6 +107,13 @@ maybe('firestore.rules', () => {
       await assertFails(setDoc(doc(owner(), 'events/e2'), { title: 'y' }));
     });
 
+    it('reads its documents and lists its collections (a list query, not only a get)', async () => {
+      await assertSucceeds(getDoc(doc(owner(), 'users/owner/rpgState/current')));
+      await assertSucceeds(getDoc(doc(owner(), 'users/owner/rpgState/cleanSlate')));
+      await assertSucceeds(getDocs(collection(owner(), 'users/owner/rpgWorlds')));
+      await assertSucceeds(getDocs(collection(owner(), 'users/owner/rpgSaves')));
+    });
+
     it('cannot reach another account’s subtree', async () => {
       await assertFails(getDoc(doc(wife(), 'users/owner/progress/p1')));
     });

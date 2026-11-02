@@ -333,8 +333,17 @@ service cloud.firestore {
     // the keys it gets from the gateway (which exist, their last four characters). Written as a
     // condition on the catch-all rather than as a rule of its own because rules are a permissive
     // union: a `keys` rule saying `allow read: if false` would be ignored beside this one.
-    match /users/{uid}/{document=**} {
-      allow read: if approved() && request.auth.uid == uid && document[0] != 'keys';
+    //
+    // The collection is its own wildcard, not `document[0]` of a recursive one: a list query is
+    // judged on its path before any document is read, and the engine cannot prove `document[0]`
+    // there, so `document[0] != 'keys'` refused EVERY collection read under users/{uid} — from
+    // 31 Oct 2026, when it went in, until 2 Nov, when the RPG's sync was found pushing its worlds
+    // up and taking nothing down on any device. `coll` is in the query's path, so it is provable.
+    match /users/{uid} {
+      allow read, write: if approved() && request.auth.uid == uid;
+    }
+    match /users/{uid}/{coll}/{document=**} {
+      allow read: if approved() && request.auth.uid == uid && coll != 'keys';
       allow write: if approved() && request.auth.uid == uid;
     }
 
