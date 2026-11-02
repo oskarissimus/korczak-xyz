@@ -212,6 +212,39 @@ the overlay is `.rpg-intro` in `Rpg.tsx`.
 - The gateway learnt the `/stream` speech path in the same change; until the function deploys, a 404
   there falls back to the whole clip.
 
+## Four proposed worlds on the menu
+
+Owner, 2 Nov 2026: "the player opens the game and has four proposed worlds generated for them — not
+whole worlds with a bible and assets, only proposals a world can be generated from — each with a cover
+picture, and under them the menu as it is, where you can still type your own idea". `WorldProposals.tsx`
+over the main menu, `utils/rpg/proposals.ts` asks and keeps, `proposalScript.ts` is the prompt and reader.
+
+- **A proposal is a premise**: a name, a pitch of at most 30 words, a genre, two colours and an English
+  cover description. Tapping one is *New world* with the proposal as the player's description
+  (`proposalWish`: "The world is called „…” (genre). pitch", into `GenesisContext.wish`, so it takes
+  the `playerLines` path and the intro hears it too) at `PROPOSAL_EXOTIC` 25 — the well-loved version
+  of what the proposal says, since it is already the premise. The slider and `WorldWish` are untouched
+  and still behind *New world* (*Or your own idea of a world* under it).
+- **Spread on purpose** (`PROPOSAL_KINDS`): a classic RPG setting, a well-loved genre that is not
+  medieval fantasy, a familiar genre with a strong twist, and anything at all. Two dice words each
+  (`drawWords`, no Wikipedia, for speed) — flavour only for the first two, since as the premise salt
+  and pollen made the "classic" one a strange desert — and `pastWorlds` as "avoid".
+- **Cheap and quick**: `INTRO_MODELS` (Flash-Lite, no thinking), plain `N:/P:/G:/C:/I:` lines
+  streamed so each card appears as its lines end; measured 2 Nov 2026: all four in ~3 s, ~560 tokens
+  in and ~580 out, ~$0.001. Each cover is FLUX schnell 768×432 ($0.003) started the moment its `I:`
+  line is whole, four at once with 429 retried. No fal.ai key: a card is its two colours.
+- **Made once, kept until used**: localStorage `rpg-proposals` per language; shown again on every
+  visit, a tap marks it `used` and the next visit draws four new ones; *Inne / Others* draws a new set
+  at once. Cover URLs are the gateway's bucket copies, so a kept set still has its pictures tomorrow;
+  a kept set without covers (made with no fal key) gets them once there is one.
+- **Only on the reader's own Google key** (`proposing` in `Rpg.tsx`): the demo builds every prompt on
+  its server and this is not one of them.
+- **In the console**: the requests are labelled `proposals` (the stream, errors, tokens, each cover
+  priced) and count as the world's (`scopeOf`); the Start tab heads with `ProposalStats` — the model,
+  first card, all written, covers, tokens, fal pictures and the total — read from the set itself,
+  because a new world's `resetDevlog` clears the request list. The line under the cards says the same
+  in short. Sentry Logs `rpg.proposals` has the times, counts and dollars, never the words.
+
 ## The world grows
 
 Owner, Oct 2026: "after the first quest the characters and locations stay, only someone new appears

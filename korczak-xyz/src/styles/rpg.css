@@ -1894,6 +1894,168 @@ body:has(.rpg-immersive) .safe-top-band {
   cursor: default;
 }
 
+/* The menu's four proposed worlds (`WorldProposals.tsx`): two by two, a cover over each name. */
+.rpg-proposals {
+  width: min(100%, 640px);
+  box-sizing: border-box;
+}
+
+.rpg-proposals-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rpg-proposals-head h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd36b;
+}
+
+.rpg-proposals-refresh {
+  min-height: 32px;
+  padding: 2px 12px;
+  border: 1px solid rgba(185, 167, 127, 0.55);
+  background: rgba(20, 14, 6, 0.7);
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.rpg-proposals-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rpg-proposals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rpg-proposal {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid rgba(185, 167, 127, 0.55);
+  color: #f1e6cf;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.rpg-proposal:hover:not(:disabled),
+.rpg-proposal:focus-visible {
+  border-color: #ffd36b;
+  outline: none;
+  box-shadow: 0 0 0 1px #ffd36b;
+}
+
+.rpg-proposal:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rpg-proposal-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.rpg-proposal-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rpg-proposal-drawing {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.rpg-proposal-genre {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  padding: 1px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(10, 7, 3, 0.75);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.rpg-proposal-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px 10px;
+  background: rgba(10, 7, 3, 0.78);
+  flex: 1;
+}
+
+.rpg-proposal-text strong {
+  font-size: 15px;
+  color: #ffd36b;
+}
+
+.rpg-proposal-text span {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.rpg-proposal-empty {
+  min-height: 150px;
+  background: rgba(20, 14, 6, 0.5);
+  cursor: default;
+  animation: rpg-proposal-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@media (max-width: 480px) {
+  .rpg-proposal-text span { -webkit-line-clamp: 3; }
+}
+
+@keyframes rpg-proposal-pulse {
+  from { opacity: 0.45; }
+  to { opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-proposal-empty { animation: none; }
+}
+
+.rpg-proposals-figures,
+.rpg-proposals-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+  text-align: center;
+}
+
+.rpg-proposals-error {
+  opacity: 1;
+  color: #ffb4a0;
+}
+
 .rpg-world {
   width: min(100%, 520px);
   box-sizing: border-box;

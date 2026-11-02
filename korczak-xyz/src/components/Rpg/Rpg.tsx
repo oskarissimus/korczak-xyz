@@ -108,6 +108,9 @@ import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
+import WorldProposals from './WorldProposals';
+import { drawProposals, ensureProposals, pickedProposal } from '../../utils/rpg/proposals';
+import { PROPOSAL_EXOTIC, proposalWish, type Proposal } from '../../utils/rpg/proposalScript';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import WorldTrash from './WorldTrash';
 import { biggestKeys, onStorageFull, storageFull } from '../../utils/rpg/storage';
@@ -438,6 +441,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setWish(next);
     saveWish(next);
   };
+  /** A proposed world picked on the menu (`WorldProposals`): the next `createWorld` is made from it, once. */
+  const proposalRef = useRef<Proposal | null>(null);
   /** The description the world being born is made of, for its waiting screen. */
   const [creatingWish, setCreatingWish] = useState('');
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -1222,7 +1227,10 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setPendingGenesis(null);
     // The story intro starts talking at once, before the seeds are even drawn (`intro.ts`): it needs
     // the reader's own Google key for the words; the voice and the pictures come where there are keys.
-    const askedNow = wishRef.current;
+    // A proposal picked on the menu is the player's description, as if typed (`proposalWish`).
+    const picked = again ? null : proposalRef.current;
+    proposalRef.current = null;
+    const askedNow: Wish = picked ? { words: [], text: proposalWish(picked, gameLang) } : wishRef.current;
     if (introOnRef.current && storyProvider === 'google' && apiKeys.google) {
       startIntro({
         lang: gameLang,
@@ -1244,12 +1252,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
     scene?.setMarker(null);
     scene?.teleport('spawn');
     // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
-    const asked = wishRef.current;
+    const asked = askedNow;
     const own = !again && wished(asked);
     const seeds = again?.seeds ?? (own ? asked.words : await drawSeeds());
     const chosenSeeds = again ? again.chosen === true : own && asked.words.length > 0;
     const wishText = (again ? again.wish : own ? asked.text.trim() : '') || undefined;
-    const exoticNow = again?.exotic ?? exoticRef.current;
+    const exoticNow = again?.exotic ?? (picked ? PROPOSAL_EXOTIC : exoticRef.current);
     if (token !== questTokenRef.current) return;
     setCreating(seeds);
     setCreatingWish(wishText ?? '');
@@ -1613,6 +1621,12 @@ export default function Rpg({ lang }: { lang: Lang }) {
     return tasks;
   }, [creating, generating, falKey, world, music, musicKey, musicOn]);
   falKeyRef.current = falKey;
+  // The menu's four proposed worlds (`proposals.ts`): the kept set, or a new one, whenever the main
+  // menu shows on the reader's own Google key.
+  const proposing = !started && menu === 'main' && keysReady && storyProvider === 'google' && Boolean(apiKeys.google);
+  useEffect(() => {
+    if (proposing && apiKeys.google) ensureProposals(gameLang, { google: apiKeys.google, fal: falKey });
+  }, [proposing, gameLang, apiKeys.google, falKey]);
   useEffect(() => sceneRef.current?.setRigger(rigger, falKey), [rigger, falKey]);
   useEffect(() => sceneRef.current?.setJumping(jumping), [jumping]);
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
@@ -2564,6 +2578,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
     void createWorld(pending);
   };
 
+  /** A proposed world tapped on the menu: a new world made from it; the next visit gets four new ones. */
+  const pickProposal = (p: Proposal) => {
+    proposalRef.current = p;
+    pickedProposal(gameLang);
+    begin(true);
+  };
+
   const begin = (fresh = false) => {
     // Inside the click: iOS lets only an element a gesture touched play audio later.
     primeVoice();
@@ -2779,7 +2800,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {!keysReady && item('wait', t.wait, () => {}, { disabled: true })}
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
       {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: t.menuInWorld(world.name) })}
-      {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave })}
+      {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined })}
       {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
       {item('controls', t.menuControls, () => setMenu('controls'))}
@@ -3238,6 +3259,14 @@ export default function Rpg({ lang }: { lang: Lang }) {
                   <h2 className="rpg-menu-title">{t.title}</h2>
                   {worldCard}
                   {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
+                  {proposing && apiKeys.google && (
+                    <WorldProposals
+                      lang={gameLang}
+                      disabled={!creatable}
+                      onPick={pickProposal}
+                      onRefresh={() => void drawProposals(gameLang, { google: apiKeys.google!, fal: falKey })}
+                    />
+                  )}
                   {mainMenu}
                 </>
               )}

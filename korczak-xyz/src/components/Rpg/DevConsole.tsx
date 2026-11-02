@@ -42,6 +42,7 @@ import type { RpgScene } from './RpgScene';
 import { RELIEFS, type Relief } from '../../utils/rpg/terrain';
 import { translations } from './translations';
 import { lastIntro, subscribeIntro, type IntroView } from '../../utils/rpg/intro';
+import { proposalsView, proposalTotals, subscribeProposals } from '../../utils/rpg/proposals';
 
 function useDevlog(): readonly DevRequest[] {
   useSyncExternalStore(subscribeDevlog, devlogVersion, devlogVersion);
@@ -386,7 +387,13 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
   const list = tasks?.() ?? [];
   const typical = loadTypical();
   const p = progressOf(list, Date.now(), typical);
-  if (!line) return <div className="rpg-dev-list"><div className="rpg-dev-empty">{t.devStartEmpty}</div></div>;
+  if (!line)
+    return (
+      <div className="rpg-dev-list rpg-dev-start">
+        <ProposalStats lang={lang} />
+        <div className="rpg-dev-empty">{t.devStartEmpty}</div>
+      </div>
+    );
   const mine = requests.filter((r) => r.startedAt >= line.since && r.kind !== 'voice');
   // The clock runs while something does, and stops at the last thing that came.
   const busy = mine.some((r) => r.ms === null);
@@ -401,6 +408,7 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
       <div className="rpg-dev-beat">
         {line.what === 'world' ? t.devStartWorld : t.devStartQuest} · {formatMs(now)}
       </div>
+      <ProposalStats lang={lang} />
       <IntroStats lang={lang} requests={requests} since={line.since} />
       {list.length > 0 && (
         <div className="rpg-dev-start-eta">
@@ -474,6 +482,30 @@ function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly 
       in {tokens(tok.input)} out {tokens(tok.output)} ≈ {formatUsd(sum('model'))} · ElevenLabs {chars} {t.chars} ≈ {Math.round(credits)} cr ≈ {formatUsd(sum('voice'))} · fal.ai {pictures}× ≈ {formatUsd(sum('fal'))} · {t.total} ≈ {formatUsd(sum('model') + sum('voice') + sum('fal'))}
       {errors > 0 ? ` · ✗ ${t.errors(errors)}` : ''}
       {v?.error ? ` · ${v.error}` : ''}
+    </div>
+  );
+}
+
+/**
+ * The menu's proposed worlds (`proposals.ts`; the standing rule again: tokens, errors, cost and
+ * time): which model wrote them, when the first card and the last came, the covers, and what the
+ * words and the pictures cost. Read from the set itself, since a new world clears the request list
+ * while the set stays on the menu.
+ */
+function ProposalStats({ lang }: { lang: Lang }) {
+  const t = translations[lang];
+  const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
+  if (!v.since) return null;
+  const s = proposalTotals(v);
+  const ms = (n: number | null) => (n === null ? '…' : formatMs(n));
+  return (
+    <div className="rpg-dev-start-eta">
+      🗺 {t.proposalsDev} · {v.items.length}/4{v.model ? ` · ${v.model}` : ''} · 1st {ms(v.firstMs)} · {t.proposalsWriting} {ms(v.writtenMs)} · {t.proposalsCovers}{' '}
+      {v.drawing > 0 ? `⏳ ${v.drawing}` : ms(v.coversMs)}
+      <br />
+      in {tokens(s.input)} out {tokens(s.output)} ≈ {formatUsd(s.modelUsd)} · fal.ai {s.covers}× ≈ {formatUsd(s.coversUsd)} · {t.total} ≈ {formatUsd(s.total)}
+      {s.errors > 0 ? ` · ✗ ${t.errors(s.errors)}` : ''}
+      {v.error ? ` · ${v.error}` : ''}
     </div>
   );
 }
