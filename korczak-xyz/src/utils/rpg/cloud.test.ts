@@ -6,6 +6,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const server = vi.hoisted(() => new Map<string, Record<string, unknown>>());
+/** Paths whose reads the fake Firestore refuses, as rules would. */
+const denied = vi.hoisted(() => new Set<string>());
 
 vi.mock('firebase/firestore', () => {
   const key = (path: string[]) => path.join('/');
@@ -14,6 +16,7 @@ vi.mock('firebase/firestore', () => {
     doc: (parent: { path: string[] } | unknown, ...path: string[]) =>
       parent && typeof parent === 'object' && 'path' in (parent as object) ? { path: [...(parent as { path: string[] }).path, ...path] } : { path },
     getDoc: async (ref: { path: string[] }) => {
+      if (denied.has(key(ref.path))) throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
       const data = server.get(key(ref.path));
       return { exists: () => data !== undefined, data: () => data };
     },
@@ -56,6 +59,7 @@ function on(device: keyof typeof devices) {
 let clock = 1_000_000;
 beforeEach(() => {
   server.clear();
+  denied.clear();
   devices.phone.clear();
   devices.desk.clear();
   vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000));
@@ -230,5 +234,15 @@ describe('the trash', () => {
     expect(loadChronicle('pl').map((c) => c.title)).toEqual(['Grzechy Ojców']);
     expect(loadAtlas('pl').people.map((p) => p.character.name)).toEqual(['Sołtys']);
     expect(trashedWorlds().some((e) => e.classicOf)).toBe(false);
+  });
+
+  it('a clean slate that cannot be read does not stop the rest of the pull', async () => {
+    on('phone');
+    saveWorld(world('w1', 'Solniska'));
+    await syncNow('u');
+    on('desk');
+    denied.add('users/u/rpgState/cleanSlate');
+    await syncNow('u');
+    expect(loadWorld('pl')?.name).toBe('Solniska');
   });
 });

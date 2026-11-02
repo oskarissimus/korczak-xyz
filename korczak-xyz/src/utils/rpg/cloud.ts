@@ -190,9 +190,16 @@ export function seedStamps(): void {
  */
 export async function pull(uid: string): Promise<boolean> {
   if (!getDb()) return false;
-  const [worldSnap, saveSnap, stateSnap, slateSnap] = await runCloud('rpg.pull', () =>
-    Promise.all([getDocs(worlds(uid)), getDocs(saves(uid)), getDoc(stateDoc(uid)), getDoc(cleanSlateDoc(uid))]),
+  const [worldSnap, saveSnap, stateSnap] = await runCloud('rpg.pull', () =>
+    Promise.all([getDocs(worlds(uid)), getDocs(saves(uid)), getDoc(stateDoc(uid))]),
   );
+  // Read on its own and never fatal: inside the Promise.all above, a refused read of it (1 Nov 2026,
+  // permission-denied) failed every pull on every device, so nothing came down from the account while
+  // pushes still went up.
+  const slate = await cleanSlateAt(uid).catch((e) => {
+    log.warn('rpg.cleanSlate.unreadable', describeError(e));
+    return 0;
+  });
   let changed = false;
 
   const state = stateSnap.exists() ? (stateSnap.data() as { updatedAt?: number; current?: Partial<Record<Lang, string>> }) : null;
@@ -228,7 +235,6 @@ export async function pull(uid: string): Promise<boolean> {
   }
 
   // After everything the account had is in, so the sweep reaches its worlds too.
-  const slate = slateSnap.exists() ? Number((slateSnap.data() as { at?: number }).at) || 0 : 0;
   if (slate > sweptAt()) {
     const n = sweepToTrash(slate);
     markSwept(slate);
