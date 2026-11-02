@@ -2321,7 +2321,7 @@ export class RpgScene {
   async setClueModel(id: string, url: string): Promise<void> {
     const before = this.clues.get(id);
     if (!before || before.userData.model === url) return;
-    const model = await loadHubModel(url, CLUE_FIT);
+    const model = await loadHubModel(url, CLUE_FIT, true);
     const now = this.clues.get(id);
     if (!now || now !== before) {
       disposeHubModel(model.group);
@@ -2579,7 +2579,7 @@ export class RpgScene {
     if (this.itemModel?.url !== url) {
       const size = this.itemLook?.size ?? 1;
       const fit = { height: Math.min(1.4, ITEM_FIT.height * size), width: Math.min(1.6, ITEM_FIT.width * size) };
-      const model = await loadHubModel(url, fit);
+      const model = await loadHubModel(url, fit, true);
       if (token !== this.itemToken) {
         disposeHubModel(model.group);
         return;

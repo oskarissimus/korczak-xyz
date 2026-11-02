@@ -120,3 +120,104 @@ export function isCard(bytes: ArrayBuffer): boolean {
 
 /** The error a card is thrown as, so a try is spent on it like on any other failure (`withRetries`). */
 export const CARD_ERROR = 'came back as a flat card, not a model';
+
+/*
+ * The floor TRELLIS lays under a small thing (owner, 2 Nov 2026, a screenshot of a melted seal on a
+ * black square twice its size: "sometimes these items on the floor have a black square"). FLUX
+ * draws "a small object lying on the ground" with a soft shadow under it however hard the prompt
+ * says "no ground, no shadow", and TRELLIS makes the shadow a sheet: flat, double-sided, filling
+ * the whole width and depth of its unit box, textured black. Under the seal it lay at the very
+ * bottom (1.27 of the footprint, both faces, in the lowest 4% of the height); through a rusted
+ * canister lying on its side it ran at a third of the height (1.39), cutting it like a waterline.
+ * Since the box is what a model is sized by, the square also shrank the thing itself to half.
+ *
+ * The test is the floor's own shape: flat triangles in one thin layer (`FLOOR_LAYER` of the height)
+ * that together cover at least `FLOOR_SHARE` of the footprint and reach across nearly all of it
+ * both ways, while everything else in the model stays well inside it (`FLOOR_REST`) — the sheet is
+ * larger than the thing, which is what a chest's lid or a coin's face never is. Only the small
+ * things are checked (clues and things to gather).
+ */
+
+/** How thick, as a share of the height, the layer a floor sheet lies in is. */
+export const FLOOR_LAYER = 0.06;
+/** Above this share of the footprint covered by flat faces in one layer (a two-sided sheet counts twice), it may be a floor. */
+export const FLOOR_SHARE = 0.5;
+/** How far across the box, each way, the sheet has to reach. */
+const FLOOR_REACH = 0.9;
+/** How far across the box, along its narrower way, the rest may reach for the sheet to be a floor. */
+const FLOOR_REST = 0.85;
+
+/**
+ * The triangles (by their number, nine numbers each in `tris`) of a floor sheet in the model: both
+ * its faces and its rim, everything lying wholly within its layer. Empty where there is none.
+ */
+export function floorTriangles(tris: Float32Array): number[] {
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < tris.length; i++) {
+    const k = i % 3;
+    if (tris[i] < lo[k]) lo[k] = tris[i];
+    if (tris[i] > hi[k]) hi[k] = tris[i];
+  }
+  const ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+  const footprint = ext[0] * ext[2];
+  if (!(footprint > 0) || !(ext[1] > 0)) return [];
+  const count = Math.floor(tris.length / 9);
+  const top = (t: number) => Math.max(tris[t * 9 + 1], tris[t * 9 + 4], tris[t * 9 + 7]);
+  const bottom = (t: number) => Math.min(tris[t * 9 + 1], tris[t * 9 + 4], tris[t * 9 + 7]);
+  // Flat triangles by the layer they lie in, with their area. Either way up: a sheet written once,
+  // facing down, is still drawn on a two-sided material.
+  const layers = Math.ceil(1 / FLOOR_LAYER);
+  const area = new Float64Array(layers + 1);
+  const flatIn: number[][] = Array.from({ length: layers + 1 }, () => []);
+  for (let t = 0; t < count; t++) {
+    const o = t * 9;
+    const ax = tris[o + 3] - tris[o], ay = tris[o + 4] - tris[o + 1], az = tris[o + 5] - tris[o + 2];
+    const bx = tris[o + 6] - tris[o], by = tris[o + 7] - tris[o + 1], bz = tris[o + 8] - tris[o + 2];
+    const ny = az * bx - ax * bz;
+    const len = Math.hypot(ay * bz - az * by, ny, ax * by - ay * bx);
+    if (!(len > 0) || Math.abs(ny) / len < 0.99) continue;
+    const layer = Math.round(((tris[o + 1] + tris[o + 4] + tris[o + 7]) / 3 - lo[1]) / ext[1] / FLOOR_LAYER);
+    area[layer] += len / 2;
+    flatIn[layer].push(t);
+  }
+  for (let layer = 0; layer <= layers; layer++) {
+    // A sheet's two faces can straddle the boundary between two layers, so each is read with the next.
+    const flat = [...flatIn[layer], ...(flatIn[layer + 1] ?? [])];
+    if ((area[layer] + (area[layer + 1] ?? 0)) / footprint < FLOOR_SHARE) continue;
+    const reach = [Infinity, -Infinity, Infinity, -Infinity];
+    let from = Infinity;
+    let to = -Infinity;
+    for (const t of flat) {
+      from = Math.min(from, bottom(t));
+      to = Math.max(to, top(t));
+      for (const c of [0, 3, 6]) {
+        reach[0] = Math.min(reach[0], tris[t * 9 + c]);
+        reach[1] = Math.max(reach[1], tris[t * 9 + c]);
+        reach[2] = Math.min(reach[2], tris[t * 9 + c + 2]);
+        reach[3] = Math.max(reach[3], tris[t * 9 + c + 2]);
+      }
+    }
+    if ((reach[1] - reach[0]) / ext[0] < FLOOR_REACH || (reach[3] - reach[2]) / ext[2] < FLOOR_REACH) continue;
+    // The sheet's rim is not quite flat (under the seal, 87 slivers at its edge), so with it goes
+    // everything lying wholly within its layer.
+    const margin = ext[1] * 0.015;
+    const sheet: number[] = [];
+    const rest = [Infinity, -Infinity, Infinity, -Infinity];
+    for (let t = 0; t < count; t++) {
+      if (bottom(t) >= from - margin && top(t) <= to + margin) {
+        sheet.push(t);
+        continue;
+      }
+      for (const c of [0, 3, 6]) {
+        rest[0] = Math.min(rest[0], tris[t * 9 + c]);
+        rest[1] = Math.max(rest[1], tris[t * 9 + c]);
+        rest[2] = Math.min(rest[2], tris[t * 9 + c + 2]);
+        rest[3] = Math.max(rest[3], tris[t * 9 + c + 2]);
+      }
+    }
+    const narrower = Math.min((rest[1] - rest[0]) / ext[0], (rest[3] - rest[2]) / ext[2]);
+    if (narrower <= FLOOR_REST) return sheet;
+  }
+  return [];
+}

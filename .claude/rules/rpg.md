@@ -540,6 +540,18 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     `ensureHubModels`) and a card in it is made again. Every piece's picture also says `FRAMED` —
     small, centred, a white margin all round — and `tree3` no longer asks to be larger, since how big
     a thing stands is `hubFit`'s, not the picture's.
+  - **And a small thing's floor is cut away** (owner, 2 Nov 2026, a screenshot of a melted seal on
+    a black square twice its size: "sometimes these items on the floor have a black square"). FLUX
+    gives "a small object lying on the ground" a soft shadow whatever the prompt says, and TRELLIS
+    makes the shadow a flat two-sided sheet filling the whole footprint of its box, black: under the
+    seal at the very bottom, through a canister lying on its side at a third of its height. The box
+    being what a model is sized by, it also shrank the thing to half. `floorTriangles`
+    (`meshShape.ts`) finds it — flat faces in one thin layer covering ≥0.5 of the footprint and
+    reaching ≥90% across it both ways, with everything else at most 85% across along its narrower
+    way, so a chest's lid or a mat is never one — and `loadHubModel(…, small)` cuts it out, vertices
+    and all, before sizing. Only for clues and things to gather (`setClueModel`, `setItemModel`):
+    a building's plinth can be exactly that shape. Nothing is regenerated; kept models are mended
+    as they load, at $0.
 - **And the ground** (owner, 27 Oct 2026: "the ground texture should be generated too; now it seems
   to be always grass"). The one Poly Haven scan, dyed the world's ground colour, read as grass in a
   desert, in snow and on a scrapyard alike. Now genesis writes `terrain` (English, ≤14 words, a

@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { HubSize } from '../../utils/rpg/genesis';
 import { fitScale } from '../../utils/rpg/hubLayout';
 import { loadLandmarkBytes } from '../../utils/rpg/landmark3d';
+import { floorTriangles } from '../../utils/rpg/meshShape';
 
 // Sized by the slot, or by the world's own size for it: `HUB_FIT`, `hubFit` (`utils/rpg/hubLayout.ts`).
 export { HUB_FIT, hubFit } from '../../utils/rpg/hubLayout';
@@ -24,10 +25,15 @@ export interface HubModel {
   radius: number;
 }
 
-export async function loadHubModel(url: string, fit: { height: number; width: number }): Promise<HubModel> {
+/**
+ * `small`: a thing lying on the ground (a clue, a thing to gather), whose floor sheet is cut away
+ * before it is sized (`floorTriangles`, `utils/rpg/meshShape.ts`).
+ */
+export async function loadHubModel(url: string, fit: { height: number; width: number }, small = false): Promise<HubModel> {
   const bytes = await loadLandmarkBytes(url);
   const gltf = await new GLTFLoader().parseAsync(bytes, '');
   const model = gltf.scene;
+  if (small) dropFloor(model);
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const scale = fitScale(size, fit);
@@ -50,6 +56,49 @@ export async function loadHubModel(url: string, fit: { height: number; width: nu
   const group = new THREE.Group();
   group.add(model);
   return { group, radius: (Math.max(size.x, size.z) * scale) / 2 + 0.3 };
+}
+
+/** Cuts the floor sheet out of every mesh it runs through, vertices and all, so the box no longer counts it. */
+function dropFloor(model: THREE.Object3D): void {
+  model.updateMatrixWorld(true);
+  const meshes: { mesh: THREE.Mesh; index: ArrayLike<number> }[] = [];
+  const corners: number[] = [];
+  const v = new THREE.Vector3();
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const position = mesh.geometry.attributes.position;
+    if (!position) return;
+    const index = mesh.geometry.index?.array ?? Array.from({ length: position.count }, (_, i) => i);
+    meshes.push({ mesh, index });
+    for (let i = 0; i < index.length - (index.length % 3); i++) {
+      v.fromBufferAttribute(position, index[i]).applyMatrix4(mesh.matrixWorld);
+      corners.push(v.x, v.y, v.z);
+    }
+  });
+  const drop = new Set(floorTriangles(Float32Array.from(corners)));
+  if (!drop.size) return;
+  let first = 0;
+  for (const { mesh, index } of meshes) {
+    const count = Math.floor(index.length / 3);
+    const kept: number[] = [];
+    for (let t = 0; t < count; t++) if (!drop.has(first + t)) kept.push(index[t * 3], index[t * 3 + 1], index[t * 3 + 2]);
+    first += count;
+    if (kept.length === count * 3) continue;
+    // Only the vertices the kept triangles use, so the bounding box is the thing's and not the floor's.
+    const old = mesh.geometry;
+    const remap = new Map<number, number>();
+    for (const i of kept) if (!remap.has(i)) remap.set(i, remap.size);
+    const geometry = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(old.attributes)) {
+      const out = new Float32Array(remap.size * attr.itemSize);
+      for (const [from, to] of remap) for (let c = 0; c < attr.itemSize; c++) out[to * attr.itemSize + c] = attr.getComponent(from, c);
+      geometry.setAttribute(name, new THREE.BufferAttribute(out, attr.itemSize, attr.normalized));
+    }
+    geometry.setIndex(kept.map((i) => remap.get(i)!));
+    old.dispose();
+    mesh.geometry = geometry;
+  }
 }
 
 export function disposeHubModel(group: THREE.Object3D): void {
