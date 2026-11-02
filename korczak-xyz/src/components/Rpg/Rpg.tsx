@@ -1760,13 +1760,19 @@ export default function Rpg({ lang }: { lang: Lang }) {
         void load(clue.model.glb);
         return;
       }
-      if (!falKey || !clue.prop) return;
+      if (!falKey) return;
+      // A beat now and then writes a clue with no `prop` (2 Nov 2026: "Porzucony flakon z żywicą"
+      // stood as its block for good). Its own name and description then say what it is: in the
+      // game's language, which FLUX reads well enough for a single thing, and far better than a block.
+      const what = clue.prop ?? [clue.name, clue.text].filter(Boolean).join(': ');
+      if (!what) return;
+      if (!clue.prop) log.warn('rpg.clue.noProp', { name: clue.name });
       const token = questTokenRef.current;
       const world = worldRef.current;
       ensureClueModel(
         falKey,
         `${world?.id ?? gameLangRef.current}/${seedRef.current}/${beat.index}/${i}/${clue.name}`,
-        cluePrompt(clue.prop, world?.look),
+        cluePrompt(what, world?.look),
         (model) => {
           if (questTokenRef.current !== token) return;
           const keep = (b: Beat): Beat =>
