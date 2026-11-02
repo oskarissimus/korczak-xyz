@@ -14,6 +14,7 @@ import {
   questSpend,
   questTotals,
   spendUsd,
+  OPTIONAL_STAGES,
   STAGES,
   subscribeDevlog,
   timeline,
@@ -40,6 +41,7 @@ import type { Rigger } from './people';
 import type { RpgScene } from './RpgScene';
 import { RELIEFS, type Relief } from '../../utils/rpg/terrain';
 import { translations } from './translations';
+import { lastIntro, subscribeIntro, type IntroView } from '../../utils/rpg/intro';
 
 function useDevlog(): readonly DevRequest[] {
   useSyncExternalStore(subscribeDevlog, devlogVersion, devlogVersion);
@@ -122,7 +124,8 @@ function tail(text: string, lines: number): string {
 function headline(r: DevRequest): string {
   const parts = [r.servedBy && r.servedBy !== r.model ? `${r.model} → ${r.servedBy}` : r.model];
   if (r.beat !== null) parts.unshift(r.label ? `beat ${r.beat + 1} (${r.label})` : `beat ${r.beat + 1}`);
-  else if (r.kind === 'model') parts.unshift('world');
+  else if (r.kind === 'model') parts.unshift(r.label ?? 'world');
+  else if (r.kind === 'voice' && r.label) parts.unshift(r.label);
   else if (r.kind === 'fal') parts.unshift(r.label ?? 'landmark');
   else if (r.kind === 'music') parts.unshift(`♪ music${r.label ? ` (${r.label})` : ''}`);
   parts.push(`${r.status} ${formatMs(elapsed(r))}`);
@@ -391,13 +394,14 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
   const now = busy ? Date.now() - line.since : Math.max(0, ...ends);
   const span = Math.max(now, ...ends, 1);
   const reached = STAGES.filter((s) => line.stages[s] !== undefined).sort((a, b) => line.stages[a]! - line.stages[b]!);
-  const waiting = STAGES.filter((s) => line.stages[s] === undefined);
+  const waiting = STAGES.filter((s) => line.stages[s] === undefined && !OPTIONAL_STAGES.includes(s));
   const pct = (ms: number) => `${Math.min(100, (ms / span) * 100).toFixed(2)}%`;
   return (
     <div className="rpg-dev-list rpg-dev-start">
       <div className="rpg-dev-beat">
         {line.what === 'world' ? t.devStartWorld : t.devStartQuest} · {formatMs(now)}
       </div>
+      <IntroStats lang={lang} requests={requests} since={line.since} />
       {list.length > 0 && (
         <div className="rpg-dev-start-eta">
           {t.devProgress(p.ended, p.total, p.failed)}
@@ -421,7 +425,7 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
       {mine.map((r) => {
         const from = r.startedAt - line.since;
         const took = elapsed(r);
-        const what = r.kind === 'model' ? (r.beat === null ? 'world' : `beat ${r.beat + 1}`) : (r.label ?? r.kind);
+        const what = r.kind === 'model' ? (r.beat === null ? (r.label ?? 'world') : `beat ${r.beat + 1}`) : (r.label ?? r.kind);
         return (
           <div key={r.id} className={`rpg-dev-span rpg-dev-${r.status}`}>
             <div className="rpg-dev-span-text">
@@ -443,6 +447,37 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
  * along the bottom "grew too big, it can be a tab of its own"). The closing screen's
  * `QuestSummary` is the one that counts every sitting and the world.
  */
+/**
+ * The intro's own figures (`intro.ts`; owner, standing rule: the tokens, the errors, the cost with
+ * the tokens and ElevenLabs apart, and the time): how soon it spoke and showed a picture, which model
+ * wrote it, and what its words, its voice and its pictures cost — the requests labelled `intro`.
+ */
+function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly DevRequest[]; since: number }) {
+  const t = translations[lang];
+  useSyncExternalStore(subscribeIntro, lastIntro, lastIntro);
+  const v: IntroView | null = lastIntro();
+  const mine = requests.filter((r) => r.label === 'intro' && r.startedAt >= since);
+  if (!v && mine.length === 0) return null;
+  const sum = (kind: DevRequest['kind']) => mine.filter((r) => r.kind === kind).reduce((n, r) => n + (r.cost ?? 0), 0);
+  const tok = mine.filter((r) => r.kind === 'model' && r.usage).reduce((n, r) => ({ input: n.input + r.usage!.input, output: n.output + r.usage!.output }), { input: 0, output: 0 });
+  const chars = mine.filter((r) => r.kind === 'voice').reduce((n, r) => n + r.chars, 0);
+  const credits = mine.filter((r) => r.kind === 'voice').reduce((n, r) => n + r.credits, 0);
+  const pictures = mine.filter((r) => r.kind === 'fal' && r.status === 'ok').length;
+  const errors = mine.filter((r) => r.status === 'error').length;
+  const ms = (n: number | null | undefined) => (n === null || n === undefined ? '…' : formatMs(n));
+  return (
+    <div className="rpg-dev-start-eta">
+      🎬 {t.introDev}
+      {v ? ` · ${t.introDevVoice} ${ms(v.firstVoiceMs)} · ${t.introDevPicture} ${ms(v.firstPictureMs)} · ${t.introDevNamed} ${ms(v.sketchMs)} · ${t.introDevWritten} ${ms(v.writtenMs)}` : ''}
+      {v?.model ? ` · ${v.model}` : ''}
+      <br />
+      in {tokens(tok.input)} out {tokens(tok.output)} ≈ {formatUsd(sum('model'))} · ElevenLabs {chars} {t.chars} ≈ {Math.round(credits)} cr ≈ {formatUsd(sum('voice'))} · fal.ai {pictures}× ≈ {formatUsd(sum('fal'))} · {t.total} ≈ {formatUsd(sum('model') + sum('voice') + sum('fal'))}
+      {errors > 0 ? ` · ✗ ${t.errors(errors)}` : ''}
+      {v?.error ? ` · ${v.error}` : ''}
+    </div>
+  );
+}
+
 function CostTab({ lang }: { lang: Lang }) {
   const t = translations[lang];
   const totals = questTotals();

@@ -1971,3 +1971,132 @@ body:has(.rpg-immersive) .safe-top-band {
   font-size: 0.9em;
   overflow-wrap: anywhere;
 }
+
+/* The story intro on a new world's loading screen (`utils/rpg/intro.ts`): a picture filling the
+   view, drifting slowly, the narrator's line as a subtitle, and the world's progress and the skip
+   at the foot. Above the genesis screen it replaces, below the console and the funds banner. */
+.rpg-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  background: radial-gradient(ellipse at center, #1d1a14 0%, #050504 75%);
+  color: #f1e6cf;
+  text-align: center;
+}
+
+.rpg-intro-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: rpg-intro-in 1.2s ease-out both, rpg-intro-drift 14s ease-out both;
+  pointer-events: none;
+}
+
+.rpg-intro::after {
+  /* Darkens the top and the foot so the words stay readable over any picture. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+}
+
+.rpg-intro > :not(.rpg-intro-picture) {
+  position: relative;
+  z-index: 1;
+}
+
+.rpg-intro-top h2 {
+  margin: 0;
+  font-size: 30px;
+  color: #ffd36b;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 8px #000;
+}
+
+.rpg-intro-text {
+  align-self: center;
+  max-width: 680px;
+  margin: auto 0 12px;
+  font-size: 20px;
+  line-height: 1.5;
+  font-style: italic;
+  text-shadow: 0 1px 3px #000, 0 0 12px #000;
+  animation: rpg-intro-in 0.8s ease-out both;
+}
+
+.rpg-intro-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.rpg-intro-dots {
+  letter-spacing: 0.4em;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.rpg-intro-dot-past {
+  opacity: 0.5;
+}
+
+.rpg-intro .rpg-progress {
+  font-size: 12px;
+  opacity: 0.85;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.rpg-intro .rpg-progress-row {
+  display: none;
+}
+
+.rpg-intro .rpg-progress-track {
+  margin: 4px auto 0;
+  max-width: 220px;
+}
+
+@keyframes rpg-intro-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rpg-intro-drift {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .rpg-intro-top h2 {
+    font-size: 22px;
+  }
+  .rpg-intro-text {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-intro-picture {
+    animation: rpg-intro-in 1.2s ease-out both;
+  }
+}

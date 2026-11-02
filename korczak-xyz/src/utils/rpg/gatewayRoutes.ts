@@ -116,7 +116,7 @@ const ROUTES: readonly Route[] = [
   { host: 'generativelanguage.googleapis.com', methods: ['POST'], path: new RegExp(`^/v1beta/models/${MODEL}:(?:streamGenerateContent|generateContent)$`) },
   { host: 'api.openai.com', methods: ['POST'], path: /^\/v1\/chat\/completions$/ },
   // A line, a tagged line, the score, the library search, the voices the game designs and keeps.
-  { host: 'api.elevenlabs.io', methods: ['POST'], path: /^\/v1\/text-to-speech\/\w+$/ },
+  { host: 'api.elevenlabs.io', methods: ['POST'], path: /^\/v1\/text-to-speech\/\w+(?:\/stream)?$/ },
   { host: 'api.elevenlabs.io', methods: ['POST'], path: /^\/v1\/text-to-dialogue$/ },
   { host: 'api.elevenlabs.io', methods: ['POST'], path: /^\/v1\/music(?:\/stream)?$/ },
   { host: 'api.elevenlabs.io', methods: ['GET'], path: /^\/v1\/shared-voices$/ },

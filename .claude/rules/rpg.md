@@ -167,6 +167,51 @@ broadleaf or dead trees, or primitive fungi and spires, or none). The kit's text
 (`recolor`), because multiplying purple into green leaves made mud. `parseLook` lifts every colour
 to a floor of brightness (`lift`), since the models do paint worlds in #000000.
 
+## The intro tells the world while it is made
+
+Owner, 1 Nov 2026: "a toggle in Settings, a feature flag on by default: an intro during the world's
+generation — a very fast model makes about six frames one after another and tells a story that brings
+us into the world, not the quest, which is still being written. The Witcher 3 does it: the loading
+screen is an entry into the plot and the mood. A pleasant ElevenLabs voice from the catalogue, not a
+designed one, so it starts quickly; low latency to the loading screen is the key thing; the picture can
+be poor, it must be fast." `utils/rpg/intro.ts` plays it, `introScript.ts` is its prompt and reader,
+the overlay is `.rpg-intro` in `Rpg.tsx`.
+
+- **Only on *New world*** (`createWorld`, which also covers *Dokończ rodzący się świat*), only with
+  the reader's own Google key (`storyProvider === 'google'`), behind the Settings checkbox (localStorage
+  `rpg-intro`, on unless `'0'`). The voice needs an ElevenLabs key (never the demo's), the pictures a
+  fal.ai key; without either the frame is words on the dark for a reader's time (`readingMs`).
+- **Ordered for the first sound.** At the click a fixed prologue (`prologue`, the same words every
+  time) starts at once, through ElevenLabs' streaming endpoint (`/v1/text-to-speech/{id}/stream`) fed
+  into a `MediaSource` as it arrives (`playStream` in `voice.ts`; an iPhone, with no plain
+  `MediaSource`, reads it whole). Being the same request every time, after the first it is answered
+  from the account's bucket at $0. It covers the seconds before anything is known about the world.
+- **The genesis names the world early** (`sketchWorld`, told through `generateWorld`'s `onSketch`):
+  the four one-sentence candidates and `chosen` come first in the answer, so the chosen candidate's
+  name and sentence are known about a second after the first token, long before the bible. That is
+  when the narration is asked; the born world names it again in case no sketch came.
+- **The narration is plain lines, `N:` then `I:`, six frames** (`parseIntro`), not JSON, so a frame is
+  usable the moment its line ends. Frame 1 is at most 10 words so its clip is short. The prompt names
+  nobody and nothing the sketch does not, since the rest of the world is still being written. Written
+  by `INTRO_MODELS`: `gemini-3.1-flash-lite` with **no** thinking config first — measured 1 Nov 2026:
+  first token 0.63 s, first frame 0.78 s, all six 2.9 s, ~$0.001; asked for `minimal` thinking it took
+  4.4 s to its first token — then Flash-Lite latest, then 3 Flash.
+- **Each line starts its clip and its picture** while earlier frames are told: Flash v2.5 in George's
+  voice (`NARRATOR_VOICE`, premade "warm storyteller": a library voice is 11–17 s cold, *Voice* below;
+  premade voices end 31 Dec 2026, so it needs a library storyteller, warmed, before then), two clips at
+  a time; FLUX schnell at 768×432 (~1.1 s, $0.003), loaded before it is shown. A frame waits up to
+  1.5 s for its own picture; the first frame's picture shows already under the prologue.
+- **It stops** on *Pomiń intro* / *▶ Graj* (the label once the world is born), a failed genesis, a
+  dialogue, or leaving to the menu (`stopIntro`), and ends by itself after the last frame. The score is
+  ducked under it and the journal's banners wait for it.
+- **In the console** its requests are labelled `intro` and are the world's (`scopeOf`); the Start tab
+  marks *intro: first voice* and *intro: first picture* (`OPTIONAL_STAGES`, never listed as awaited)
+  and heads with the intro's own line: first voice, first picture, world named, narration written,
+  the model, tokens, ElevenLabs characters and credits, fal.ai pictures, each priced, and the total.
+  Sentry Logs `rpg.intro` has the same times and how it ended, never the words.
+- The gateway learnt the `/stream` speech path in the same change; until the function deploys, a 404
+  there falls back to the whole clip.
+
 ## The world grows
 
 Owner, Oct 2026: "after the first quest the characters and locations stay, only someone new appears

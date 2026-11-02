@@ -264,6 +264,8 @@ export function onRequestEnd(listener: (entry: DevRequest) => void): () => void 
 /** The world's requests are the ones that make the world: its genesis, its sizes, its hub's models. */
 export function scopeOf(kind: DevRequest['kind'], beat: number | null, label?: string): SpendScope {
   if (kind === 'model') return beat === null ? 'world' : 'quest';
+  // The intro (`intro.ts`) tells the world while it is made: its words, clips and pictures are the world's.
+  if (label === 'intro') return 'world';
   if (kind === 'fal') return label === 'clue' || label === 'place' || label === 'person' || label === 'enemy' || label === 'creature' ? 'quest' : 'world';
   return 'quest';
 }
@@ -448,8 +450,10 @@ export function questTotals(): QuestTotals {
  */
 
 /** What the start waits for, in the order it usually comes. */
-export const STAGES = ['assets', 'world', 'quest', 'ground', 'cover', 'landmark', 'firstModel', 'hub', 'all'] as const;
+export const STAGES = ['introVoice', 'introPicture', 'assets', 'world', 'quest', 'ground', 'cover', 'landmark', 'firstModel', 'hub', 'all'] as const;
 export type Stage = (typeof STAGES)[number];
+/** Stages that come only when something optional runs (the intro, `intro.ts`): never listed as still awaited. */
+export const OPTIONAL_STAGES: readonly Stage[] = ['introVoice', 'introPicture'];
 
 let timelineSince: number | null = null;
 let timelineWhat: 'world' | 'quest' = 'world';

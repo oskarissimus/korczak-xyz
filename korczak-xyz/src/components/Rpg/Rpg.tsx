@@ -166,6 +166,7 @@ import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgr
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
+import { introSketch, introView, shownImage, startIntro, stopIntro, subscribeIntro } from '../../utils/rpg/intro';
 import { DEFAULT_RIGGER, type Rigger } from './people';
 import { heroBody, RpgScene, type PersonBody, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
@@ -249,6 +250,8 @@ declare global {
 const MODEL_KEY = 'rpg-model';
 /** Whether the world and the opening are written quickly (`quick` in `storyteller.ts`); on unless '0'. */
 const FAST_KEY = 'rpg-fast-start';
+/** Whether a new world is told as a story while it is made (`utils/rpg/intro.ts`); on unless '0'. */
+const INTRO_KEY = 'rpg-intro';
 /** `text` cut to `n` characters, with an ellipsis when it was longer. */
 function clip(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n - 1)}…` : text;
@@ -417,6 +420,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
   setPersonPose(pose);
   const fastStartRef = useRef(true);
   fastStartRef.current = fastStart;
+  /** The story intro on the loading screen of a new world (`intro.ts`): a feature flag in Settings, on by default. */
+  const [introOn, setIntroOn] = useState(true);
+  const introOnRef = useRef(true);
+  introOnRef.current = introOn;
+  const intro = useSyncExternalStore(subscribeIntro, introView, introView);
   /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
   const [exotic, setExotic] = useState(DEFAULT_EXOTIC);
   const exoticRef = useRef(DEFAULT_EXOTIC);
@@ -1212,6 +1220,20 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setPreview(null);
     setCreating([]);
     setPendingGenesis(null);
+    // The story intro starts talking at once, before the seeds are even drawn (`intro.ts`): it needs
+    // the reader's own Google key for the words; the voice and the pictures come where there are keys.
+    const askedNow = wishRef.current;
+    if (introOnRef.current && storyProvider === 'google' && apiKeys.google) {
+      startIntro({
+        lang: gameLang,
+        google: apiKeys.google,
+        fal: falKeyRef.current,
+        voice: voiceRef.current && voiceRef.current !== DEMO_VOICE_KEY ? voiceRef.current : null,
+        wish: (again ? again.wish : wished(askedNow) ? askedNow.text.trim() : '') || undefined,
+      });
+    } else {
+      stopIntro();
+    }
     // The last world goes at once: its places, its people and its quest's marks. The board stays
     // empty until the new world's own pieces come (`shown`).
     const scene = sceneRef.current;
@@ -1264,6 +1286,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
         chosen,
         quick(fastStartRef.current),
         early,
+        (sketch) => {
+          if (token === questTokenRef.current) introSketch(sketch);
+        },
       );
     } catch (e) {
       log.error('rpg.world.crashed', describeError(e));
@@ -1284,6 +1309,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const born = attempt?.world ? withEarly({ ...attempt.world, spent: triesSpend(attempt.tries, attempt.ms) }) : null;
     if (born) {
       markStage('world');
+      // A stream that never let the world be named early (an old answer's shape) names it now.
+      introSketch({ name: born.name, pitch: born.pitch });
       // A new world is a new game: the quest left half way belonged to the old one.
       saveWorld(born);
       setSaved(null);
@@ -1295,6 +1322,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const failure = attempt?.refusal
       ? tRef.current.demoClosed(attempt.refusal)
       : (attempt?.error ?? attempt?.outcome ?? 'crashed');
+    stopIntro();
     setStalled({
       failure: failure.slice(0, 160),
       opening: true,
@@ -1825,7 +1853,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
 
   // A notice waits for the dialogue it arrived under to close, then shows for six seconds: a step
   // that lands while the reply is still being read must not expire unseen.
-  const noticeShown = notice !== null && dialogue === null && ending === null;
+  const noticeShown = notice !== null && dialogue === null && ending === null && !intro.on;
   useEffect(() => {
     if (!noticeShown || !notice) return;
     const id = notice.id;
@@ -2245,6 +2273,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
+      setIntroOn(localStorage.getItem(INTRO_KEY) !== '0');
       const keptRigger = localStorage.getItem(RIGGER_KEY);
       setRigger(keptRigger === 'voxel' || keptRigger === 'fit' || keptRigger === 'skin' ? keptRigger : keptRigger === 'self' || keptRigger === 'pose' ? 'fit' : DEFAULT_RIGGER);
       setJumping(localStorage.getItem(JUMP_KEY) === '1');
@@ -2271,6 +2300,15 @@ export default function Rpg({ lang }: { lang: Lang }) {
     try {
       if (on) localStorage.removeItem(FAST_KEY);
       else localStorage.setItem(FAST_KEY, '0');
+    } catch {
+      /* forgotten on reload */
+    }
+  };
+  const pickIntro = (on: boolean) => {
+    setIntroOn(on);
+    try {
+      if (on) localStorage.removeItem(INTRO_KEY);
+      else localStorage.setItem(INTRO_KEY, '0');
     } catch {
       /* forgotten on reload */
     }
@@ -2402,7 +2440,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
     };
   }, [flash, musicKey, musicOn, musicTry, score, started]);
   // Under a voice the score steps back; a hidden page stops it where it is.
-  useEffect(() => duckMusic(Boolean(dialogue)), [dialogue]);
+  useEffect(() => duckMusic(Boolean(dialogue) || intro.on), [dialogue, intro.on]);
+  // A conversation begun behind the intro ends it: one voice at a time.
+  useEffect(() => {
+    if (dialogue) stopIntro();
+  }, [dialogue]);
   useEffect(() => {
     const change = () => pauseMusic(document.visibilityState === 'hidden');
     document.addEventListener('visibilitychange', change);
@@ -2592,6 +2634,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setGenerating(false);
     setUnfolding(false);
     setCreating(null);
+    stopIntro();
     stopVoice();
     setDialogue(null);
     setHeld(null);
@@ -2793,6 +2836,11 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {keysReady && storyProvider !== 'static' && storyProvider !== 'openai' && (
         <label className="rpg-model">
           <input type="checkbox" checked={fastStart} onChange={(e) => pickFastStart(e.target.checked)} /> {t.fastStart(FAST_MODEL)}
+        </label>
+      )}
+      {keysReady && storyProvider === 'google' && (
+        <label className="rpg-model">
+          <input type="checkbox" checked={introOn} onChange={(e) => pickIntro(e.target.checked)} /> {t.introSetting}
         </label>
       )}
       {keysReady && falKey && (
@@ -3017,6 +3065,32 @@ export default function Rpg({ lang }: { lang: Lang }) {
               {creating.length > 0 && <p className="rpg-genesis-seeds">{t.worldSeeds(creating.join(' · '))}</p>}
               <StreamLine />
               <WorldProgress lang={gameLang} tasks={progressTasks} since={timeline()?.since ?? null} />
+            </div>
+          )}
+
+          {intro.on && (
+            <div className="rpg-intro" role="region" aria-label={intro.name ?? t.creatingWorld}>
+              {shownImage(intro) && <img key={shownImage(intro)!} className="rpg-intro-picture" src={shownImage(intro)!} alt="" />}
+              <div className="rpg-intro-top">
+                <h2>{intro.name ?? t.creatingWorld}</h2>
+                {!intro.name && creating && creating.length > 0 && <p className="rpg-genesis-seeds">{t.worldSeeds(creating.join(' · '))}</p>}
+              </div>
+              <p key={intro.current} className="rpg-intro-text">
+                {intro.frames[intro.current]?.text ?? t.introWaiting}
+              </p>
+              <div className="rpg-intro-bottom">
+                <div className="rpg-intro-dots" aria-hidden="true">
+                  {intro.frames.slice(1).map((_, i) => (
+                    <span key={i} className={i + 1 === intro.current ? 'rpg-intro-dot-on' : i + 1 < intro.current ? 'rpg-intro-dot-past' : ''}>
+                      {i + 1 === intro.current ? '●' : '○'}
+                    </span>
+                  ))}
+                </div>
+                <WorldProgress lang={gameLang} tasks={progressTasks} since={timeline()?.since ?? null} />
+                <button type="button" className={creating ? '' : 'rpg-start'} onClick={() => stopIntro()}>
+                  {creating ? t.introSkip : t.introPlay}
+                </button>
+              </div>
             </div>
           )}
 

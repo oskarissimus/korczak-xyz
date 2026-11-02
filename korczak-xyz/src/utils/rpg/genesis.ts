@@ -962,6 +962,31 @@ export function previewWorld(soFar: string, ctx: GenesisContext, now: number): W
   };
 }
 
+/** What a world is in two lines: its name and its pitch, all the intro's narrator is told (`intro.ts`). */
+export interface WorldSketch {
+  name: string;
+  pitch: string;
+}
+
+/**
+ * The world being written, as early as the stream can say what it is (owner, 1 Nov 2026: the intro
+ * that tells the world while it is made must start talking quickly). The four one-sentence
+ * candidates and `chosen` come first in the answer, so the chosen candidate's sketch is known a
+ * second or so after the first token, long before the bible; the world's own name and pitch win once
+ * they have streamed too. Null before either, and for an answer in the old shape.
+ */
+export function sketchWorld(soFar: string): WorldSketch | null {
+  const raw = partialJson(soFar) as Record<string, unknown> | null;
+  if (!raw || typeof raw !== 'object') return null;
+  const w = raw.world as Record<string, unknown> | undefined;
+  if (w && typeof w === 'object' && text(w.name, 60) && text(w.pitch, 400)) return { name: text(w.name, 60)!, pitch: text(w.pitch, 400)! };
+  const chosen = Math.round(Number(raw.chosen));
+  const candidates = Array.isArray(raw.candidates) ? raw.candidates : [];
+  const c = candidates[chosen - 1] as Record<string, unknown> | undefined;
+  if (!c || typeof c !== 'object' || !text(c.name, 60) || !text(c.pitch, 400)) return null;
+  return { name: text(c.name, 60)!, pitch: text(c.pitch, 400)! };
+}
+
 /**
  * One of the two whose typicality is closest to `target` (`typicalityTarget`), by the game's dice
  * rather than the model's taste. At the slider's far right that is the two least typical.

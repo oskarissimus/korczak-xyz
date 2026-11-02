@@ -37,6 +37,8 @@ import {
   parseWorlds,
   pickWorld,
   previewWorld,
+  sketchWorld,
+  type WorldSketch,
   typicalityTarget,
   type GenesisContext,
   type HubSizes,
@@ -379,6 +381,50 @@ async function readGoogle(response: Response, dog: Watchdog, entry: DevRequest, 
   });
   if (!text) throw new ProviderError(`empty answer (${why ?? 'no candidates'})`, response.status);
   return text;
+}
+
+/**
+ * A plain-text answer from Gemini, streamed through the gateway into the console's `entry` and handed
+ * over as it grows: the intro's narration (`intro.ts`), which wants its first line in under a second,
+ * so no JSON mode and no thinking unless asked. Aborted with `signal` when the intro is skipped.
+ */
+export async function streamGoogleText(
+  key: string,
+  model: string,
+  prompt: string,
+  how: { temperature: number; thinking?: 'minimal' | 'low'; signal?: AbortSignal },
+  entry: DevRequest,
+  onText?: (soFar: string) => void,
+): Promise<string> {
+  const dog = new Watchdog();
+  const stop = () => dog.controller.abort();
+  if (how.signal?.aborted) stop();
+  how.signal?.addEventListener('abort', stop, { once: true });
+  try {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}` +
+      `:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`;
+    const response = await apiFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: dog.controller.signal,
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: how.temperature,
+          maxOutputTokens: 2048,
+          ...(how.thinking ? { thinkingConfig: { thinkingLevel: how.thinking } } : {}),
+        },
+      }),
+    });
+    if (!response.ok) throw new ProviderError(await errorText(response), response.status);
+    return await readGoogle(response, dog, entry, onText);
+  } catch (e) {
+    throw dog.wrap(e);
+  } finally {
+    dog.done();
+    how.signal?.removeEventListener('abort', stop);
+  }
 }
 
 async function askOpenAi(
@@ -763,12 +809,15 @@ export async function generateWorld(
   chosen: string | null = null,
   how: Quick = {},
   onPreview?: (world: WorldBible) => void,
+  /** Told once per model's turn when what the world is can first be read (`sketchWorld`): the intro's cue. */
+  onSketch?: (sketch: WorldSketch) => void,
 ): Promise<WorldAttempt> {
   const prompt = genesisPrompt(ctx);
   let candidates: WorldBible[] = [];
   // Minted per model's turn, so a world started from one model's stream is never another's.
   let now = Date.now();
   let previewed = false;
+  let sketched = false;
   const run = await askChain(keys, chosen, {
     ...how,
     prompt,
@@ -783,16 +832,25 @@ export async function generateWorld(
     onTry: (at) => {
       now = at;
       previewed = false;
+      sketched = false;
     },
-    onText: onPreview
-      ? (soFar) => {
-          if (previewed) return;
-          const world = previewWorld(soFar, ctx, now);
-          if (!world) return;
-          previewed = true;
-          onPreview(world);
-        }
-      : undefined,
+    onText:
+      onPreview || onSketch
+        ? (soFar) => {
+            if (onSketch && !sketched) {
+              const sketch = sketchWorld(soFar);
+              if (sketch) {
+                sketched = true;
+                onSketch(sketch);
+              }
+            }
+            if (!onPreview || previewed) return;
+            const world = previewWorld(soFar, ctx, now);
+            if (!world) return;
+            previewed = true;
+            onPreview(world);
+          }
+        : undefined,
   });
   const { value, ...rest } = run;
   return { ...rest, prompt, seeds: ctx.seeds, candidates, world: value };
