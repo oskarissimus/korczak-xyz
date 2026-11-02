@@ -31,7 +31,9 @@ import clipsUrl from '../../assets/rpg/people/people_clips.json?url';
 import donorFemaleUrl from '../../assets/rpg/people/donor_female.bin?url';
 import donorMaleUrl from '../../assets/rpg/people/donor_male.bin?url';
 import { endRequest, startRequest } from '../../utils/rpg/devlog';
-import { loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
+import { keepGlbOnFal, loadLandmarkBytes, rigWithMeshy } from '../../utils/rpg/landmark3d';
+import { facing, turnGlb, type Pixels } from '../../utils/rpg/facing';
+import { log } from '../../lib/logger';
 import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/accountAssets';
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
@@ -360,10 +362,70 @@ async function cachedRig(key: string, make: () => Promise<SelfRig>): Promise<{ r
 }
 
 /** The donors and the clips, fetched once, on the first person anybody asks for. */
+/** A drawable's pixels at `size` × `size` (the aspect is not kept: both sides are compared on a grid). */
+function pixelsOf(source: CanvasImageSource, size: number): Pixels | null {
+  const canvas: OffscreenCanvas | HTMLCanvasElement =
+    typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) : Object.assign(document.createElement('canvas'), { width: size, height: size });
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  if (!ctx) return null;
+  ctx.drawImage(source, 0, 0, size, size);
+  return ctx.getImageData(0, 0, size, size);
+}
+
+/**
+ * Whether the model faces −Z rather than +Z, which every rig here assumes (`utils/rpg/facing.ts`:
+ * TRELLIS turned Mila round, 2 Nov 2026), judged against the picture it was made from and kept in
+ * the Cache API beside the GLB, so the picture is fetched once. No picture, or one that will not
+ * load, says nothing, and the model is taken as it is.
+ */
+async function turnedRound(url: string, mesh: THREE.Mesh, geometry: THREE.BufferGeometry, picture: string | undefined, label: string): Promise<boolean> {
+  const key = `${url}?facing=1`;
+  let cache: Cache | null = null;
+  try {
+    cache = typeof caches === 'undefined' ? null : await caches.open(CACHE);
+    const hit = await cache?.match(key);
+    if (hit) return (await hit.text()) === 'back';
+  } catch {
+    cache = null;
+  }
+  if (!picture) return false;
+  try {
+    const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+    const image = material.map?.image as CanvasImageSource | undefined;
+    const uvs = geometry.attributes.uv;
+    if (!image || !uvs) return false;
+    const res = await fetch(picture);
+    if (!res.ok) return false;
+    const bitmap = await createImageBitmap(await res.blob());
+    const pic = pixelsOf(bitmap, 128);
+    bitmap.close();
+    const tex = pixelsOf(image, 256);
+    if (!pic || !tex) return false;
+    const seen = facing(
+      { positions: geometry.attributes.position.array, uvs: uvs.array, index: geometry.index ? geometry.index.array : null },
+      tex,
+      pic,
+    );
+    if (!seen) return false;
+    if (seen.turned) log.info('rpg.person.turned', { label, url, front: Math.round(seen.front), back: Math.round(seen.back) });
+    try {
+      await cache?.put(key, new Response(seen.turned ? 'back' : 'front'));
+    } catch {
+      /* judged again next time */
+    }
+    return seen.turned;
+  } catch (err) {
+    log.warn('rpg.person.facing.failed', { label, url, message: err instanceof Error ? err.message : String(err) });
+    return false;
+  }
+}
+
 export class People {
   private loaded: Promise<{ donors: Record<Body, Donor>; clips: ClipData[] }> | null = null;
   private templates = new Map<string, Promise<PersonTemplate>>();
   private tPosed: Partial<Record<Body, Donor>> = {};
+  /** The picture each model was made from, as last told, for a re-rig asked without one (`RpgScene.setRigger`). */
+  private pictures = new Map<string, string>();
   /** Who rigs the people asked for from now on; Meshy only with a fal key to pay with. */
   rigger: Rigger = DEFAULT_RIGGER;
   private wokenAt = 0;
@@ -420,22 +482,24 @@ export class People {
    * Working out a rig is a row in the console (kind `fal`, `label` as the piece's): model `self-rig`,
    * with its time and a price of nothing, or Meshy's with its $0.20; one from the cache is not.
    */
-  template(url: string, body: Body, height: number, label = 'person'): Promise<PersonTemplate> {
+  template(url: string, body: Body, height: number, label = 'person', picture?: string): Promise<PersonTemplate> {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
     // Meshy with no fal.ai key, or Meshy failing, rigs as `fit` (the first way, the donor's weights
     // copied, was taken out on 1 Nov 2026: "it still mangles the character").
+    if (picture) this.pictures.set(url, picture);
+    else picture = this.pictures.get(url);
     const mode = this.rigger === 'meshy' ? 'fit' : this.rigger;
     const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}&w=${mode}`;
     const falKey = this.rigger === 'meshy' ? this.falKey : null;
     const key = falKey ? `${url}?meshy=1&height=${height}` : own;
     let t = this.templates.get(key);
     if (!t) {
-      const fitted = () => this.build(url, own.replace('&w=skin', '&w=fit'), body, height, label, 'fit');
+      const fitted = () => this.build(url, own.replace('&w=skin', '&w=fit'), body, height, label, 'fit', picture);
       t = falKey
-        ? this.buildMeshy(falKey, url, key, height, label).catch(fitted)
+        ? this.buildMeshy(falKey, url, key, height, label, picture).catch(fitted)
         : mode === 'skin'
-          ? this.build(url, key, body, height, label, 'skin').catch(fitted)
-          : this.build(url, key, body, height, label, mode);
+          ? this.build(url, key, body, height, label, 'skin', picture).catch(fitted)
+          : this.build(url, key, body, height, label, mode, picture);
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
       // In the start's progress until it is there (`utils/rpg/rigging.ts`), the fallback included.
@@ -449,7 +513,7 @@ export class People {
    * Not an enemy's: a rusted automaton with an exhaust pipe beside its head counted two (2 Nov 2026),
    * and an ogre may have two heads; FLUX drawing two people is a risk of the quest's characters.
    */
-  private async standing(url: string, label: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry }> {
+  private async standing(url: string, label: string, picture?: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry; turned: boolean }> {
     const bytes = await loadLandmarkBytes(url);
     const gltf = await new GLTFLoader().parseAsync(bytes, '');
     gltf.scene.updateMatrixWorld(true);
@@ -467,7 +531,13 @@ export class People {
     // people, but still has one head.
     const n = label === 'enemy' ? 1 : heads(geometry);
     if (n !== 1) throw new Error(`not one standing person (${n} heads)`);
-    return { mesh, geometry };
+    // Turned round to face +Z when it came facing −Z, before anything reads its joints off it.
+    const turned = await turnedRound(url, mesh, geometry, picture, label);
+    if (turned) {
+      geometry.rotateY(Math.PI);
+      geometry.computeBoundingBox();
+    }
+    return { mesh, geometry, turned };
   }
 
   /**
@@ -475,10 +545,14 @@ export class People {
    * `height` (Meshy keeps the TRELLIS frame and its own centimetre armature). Checked as one standing
    * person first, so a picture of two is not paid for.
    */
-  private async buildMeshy(falKey: string, url: string, key: string, height: number, label: string): Promise<PersonTemplate> {
-    const [{ clips, donors }] = await Promise.all([this.load(), this.standing(url, label)]);
+  private async buildMeshy(falKey: string, url: string, key: string, height: number, label: string, picture?: string): Promise<PersonTemplate> {
+    const [{ clips, donors }, { turned }] = await Promise.all([this.load(), this.standing(url, label, picture)]);
     const started = performance.now();
-    const rigged = await cachedMeshy(key, () => rigWithMeshy(falKey, url, height, label));
+    // Meshy rigs the file as it is, with a skeleton facing +Z whichever way the body does (Mila's came
+    // back with her left leg's bone in her right), so a model facing −Z goes to it turned round.
+    const rigged = turned
+      ? await cachedMeshy(`${key}&turn=1`, async () => rigWithMeshy(falKey, await keepGlbOnFal(falKey, turnGlb(await loadLandmarkBytes(url))), height, label))
+      : await cachedMeshy(key, () => rigWithMeshy(falKey, url, height, label));
     const gltf = await new GLTFLoader().parseAsync(await loadLandmarkBytes(rigged), '');
     const model = gltf.scene;
     let hips: THREE.Bone | null = null;
@@ -511,8 +585,8 @@ export class People {
     return { group, clips: fitClips(moved, (hips as THREE.Bone).position.clone()), ms };
   }
 
-  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'voxel' | 'fit' | 'skin'): Promise<PersonTemplate> {
-    const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url, label)]);
+  private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'voxel' | 'fit' | 'skin', picture?: string): Promise<PersonTemplate> {
+    const [{ donors, clips }, { mesh, geometry, turned }] = await Promise.all([this.load(), this.standing(url, label, picture)]);
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
     // Fitted joints need no donor's shape, only its skeleton: the male one's, which the clips were
@@ -523,10 +597,11 @@ export class People {
     const fit = (mode === 'fit' || mode === 'skin') && tPosed;
     const body: Body = fit ? 'male' : wanted;
     const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
-    let pose = `${tPosed ? 'T-posed' : 'A-posed'}${fit ? ', fitted joints' : ''}, voxel weights`;
+    let pose = `${turned ? 'turned round (it faced −Z), ' : ''}${tPosed ? 'T-posed' : 'A-posed'}${fit ? ', fitted joints' : ''}, voxel weights`;
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
     const index = geometry.index ? new Uint32Array(geometry.index.array as ArrayLike<number>) : null;
-    const { rig, ms } = await cachedRig(tPosed ? `${key}&pose=t` : key, async () => {
+    // A turned model is a rig of its own: one worked out before on it facing −Z is the backward one.
+    const { rig, ms } = await cachedRig(`${key}${tPosed ? '&pose=t' : ''}${turned ? '&turn=1' : ''}`, async () => {
       const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
       try {
         const made = await rigOffThread(donor, target, height, { index, joints: fit ? 'fit' : 'warp' });

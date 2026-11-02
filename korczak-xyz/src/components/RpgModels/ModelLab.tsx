@@ -37,6 +37,8 @@ const MAX_SHOWN = 5;
 interface Row {
   key: string;
   glb: string;
+  /** The picture it was made from, which way it faces is judged by (`people.ts`). */
+  picture?: string;
   label: string;
   costUsd: number;
   ms: number;
@@ -151,11 +153,12 @@ export default function ModelLab({ lang }: { lang: Lang }) {
     void version;
     const out: Row[] = [];
     if (source.model.glb)
-      out.push({ key: source.model.glb, glb: source.model.glb, label: t.fromGame, costUsd: source.model.costUsd, ms: source.model.ms, bytes: null, fromGame: true });
+      out.push({ key: source.model.glb, glb: source.model.glb, picture: source.model.image || undefined, label: t.fromGame, costUsd: source.model.costUsd, ms: source.model.ms, bytes: null, fromGame: true });
     for (const v of labVariants(source.id))
       out.push({
         key: v.id,
         glb: v.glb,
+        picture: v.image || undefined,
         label: `${t.methods[v.method].split(' · ')[0]}${v.pose === 'game' ? '' : ` · ${t.poses[v.pose]}${v.painter ? `, ${t.painters[v.painter].split(' · ')[0]}` : ''}`}`,
         costUsd: v.costUsd,
         ms: v.ms,
@@ -194,7 +197,7 @@ export default function ModelLab({ lang }: { lang: Lang }) {
   }, [stageGen]);
 
   const wanted: StageItem[] = source
-    ? rows.filter((r) => shown.includes(r.key)).map((r) => ({ key: r.key, glb: r.glb, body: source.body, height: heightOf(source), label: 'lab' }))
+    ? rows.filter((r) => shown.includes(r.key)).map((r) => ({ key: r.key, glb: r.glb, picture: r.picture, body: source.body, height: heightOf(source), label: 'lab' }))
     : [];
   // One array for as long as the same models are wanted: the stage is set up again only when they change.
   const signature = wanted.map((i) => `${i.key}|${i.glb}|${i.body}|${i.height}`).join('\n');

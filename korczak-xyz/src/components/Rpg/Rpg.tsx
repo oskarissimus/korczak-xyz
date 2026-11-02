@@ -694,9 +694,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
    * nothing until then (owner, 27 Oct 2026: "the things to pick up should be generated assets too");
    * the block only where no model will come.
    */
-  const itemFor = useCallback((job: BeatJob): { url?: string; wait: boolean } => {
+  const itemFor = useCallback((job: BeatJob): { url?: string; picture?: string; wait: boolean } => {
     const invented = (worldRef.current?.createdAt ?? 0) > 0;
-    return { url: job.model?.glb, wait: invented && (!!job.model || !!falKeyRef.current) };
+    return { url: job.model?.glb, picture: job.model?.image, wait: invented && (!!job.model || !!falKeyRef.current) };
   }, []);
   const persistRef = useRef<() => void>(() => {});
   const putPlace = useCallback((given: PlaceSpec) => {
@@ -769,7 +769,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       // A model that failed, or a key fal.ai refused, is never coming: waiting would leave them unseen
       // for good (Malina, 30 Oct 2026).
       const coming = !!world && personModelMayCome('person', `${world.id}/${c.name}`);
-      return { url: model?.glb, wait: invented && (!!model || !keysReadyRef.current || (!!falKeyRef.current && coming)) };
+      return { url: model?.glb, picture: model?.image, wait: invented && (!!model || !keysReadyRef.current || (!!falKeyRef.current && coming)) };
     },
     [modelOf],
   );
@@ -813,7 +813,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         (model) => {
           keepPerson(world.id, c.name, model);
           if (worldRef.current?.id === world.id)
-            void sceneRef.current?.setNpcBody(c.name, { url: model.glb }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
+            void sceneRef.current?.setNpcBody(c.name, { url: model.glb, picture: model.image }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
         },
         (e) => {
           log.warn('rpg.person.failed', { name: c.name, ...describeError(e) });
@@ -1512,7 +1512,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ask('person', `${world.id}/${c.name}`, personPrompt(personLook(c, world), c), (model) => {
           keepPerson(world.id, c.name, model);
           if (worldRef.current?.id === world.id)
-            void sceneRef.current?.setNpcBody(c.name, { url: model.glb }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
+            void sceneRef.current?.setNpcBody(c.name, { url: model.glb, picture: model.image }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
         });
       }
       if (who === 'nearest') return;
@@ -1529,7 +1529,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           if (beatRef.current) beatRef.current = keep(beatRef.current);
           persistRef.current();
           if (beatRef.current?.index === beat.index)
-            void sceneRef.current?.setEnemyBody({ url: model.glb }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
+            void sceneRef.current?.setEnemyBody({ url: model.glb, picture: model.image }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
         });
       }
     },
@@ -1680,8 +1680,8 @@ export default function Rpg({ lang }: { lang: Lang }) {
     const look = world ? heroLook(world) : '';
     const body: PersonBody =
       creating !== null
-        ? { url: shown?.heroModel?.glb, wait: true }
-        : { url: invented ? world!.heroModel?.glb : undefined, wait: invented && (!!world!.heroModel || !keysReady || !!falKey) };
+        ? { url: shown?.heroModel?.glb, picture: shown?.heroModel?.image, wait: true }
+        : { url: invented ? world!.heroModel?.glb : undefined, picture: invented ? world!.heroModel?.image : undefined, wait: invented && (!!world!.heroModel || !keysReady || !!falKey) };
     void scene.setHero(body, creating !== null && shown ? heroLook(shown) : look).catch((e) => log.warn('rpg.hero.load.failed', describeError(e)));
   }, [world, creating, shown, falKey, keysReady]);
   const sizesAskedRef = useRef(new Set<string>());
@@ -1835,7 +1835,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         if (beatRef.current) beatRef.current = keep(beatRef.current);
         persist();
         if (beatRef.current?.index === beat.index)
-          void scene.setEnemyBody({ url: model.glb }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
+          void scene.setEnemyBody({ url: model.glb, picture: model.image }).catch((e) => log.warn('rpg.enemy.load.failed', describeError(e)));
       },
       (e) => {
         log.warn('rpg.enemy.failed', describeError(e));
@@ -1868,7 +1868,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         if (beatRef.current) beatRef.current = keep(beatRef.current);
         persist();
         if (beatRef.current?.index === beat.index)
-          void scene.setEnemyBody({ url: model.glb }).catch((e) => {
+          void scene.setEnemyBody({ url: model.glb, picture: model.image }).catch((e) => {
             log.warn('rpg.creature.load.failed', describeError(e));
             void scene.setEnemyBody({});
           });

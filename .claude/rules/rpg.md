@@ -1134,6 +1134,27 @@ content-hashed and immutable.
     and the rig took ~25 % less. Measured on Cloud Run after the change: a cold start of **23 s** (from 48 s) and 29–36 s for the rig (from ~42 s). A disk or a bucket mounted under the service was considered and is
     not faster — Cloud Run already streams the image, and the time is the model going into memory.
     An instance kept always on would remove the wait for ~$50–70 a month; not done.
+  - **A model facing −Z is turned round before any rig sees it** (owner, 2 Nov 2026, the second
+    time: "a character rigs back to front again — fix it"). Every rig here takes the face to be +Z —
+    `tposeJoints`' toes and `headfront`, the warp's donor, SkinTokens, the scene's turning — and so
+    does Meshy, which rigged a backward model with its skeleton facing +Z anyway (its `LeftUpLeg` in
+    her right leg; measured on the model below, $0.20). TRELLIS nearly always keeps the picture's
+    front as +Z; Mila (world `wmvznukks1`, `rpgWorlds` atlas, `model.glb` …`193837-utgne8`) came back
+    turned 180° about Y, the dragon mask still on her left — one of twelve people on the account that
+    day — and walked backwards with her back to whoever she spoke to. `utils/rpg/facing.ts` sees the
+    mesh from +Z and from −Z in its own texture on a 48-cell grid and compares each with the picture
+    it was made from, cut to its figure: the nearer is the front. Twelve of twelve right on that day's
+    people, the closest a trench coat (34 against 39, mean colour distance of 255), Mila 53 against
+    35. The geometry alone does not say it: the toes stick out forward, but a coat to the ankles hides
+    them (the hero 0.92 front over back, Mila 0.23). So the picture rides with the model
+    (`PersonBody.picture`, `model.image`; `People` remembers it per URL for a re-rig), the verdict is
+    kept in the Cache API (`?facing=1`), a turned mesh is `rotateY(π)` in `standing`, its own rig is
+    keyed `&turn=1` (the backward one is never reused), and for Meshy the GLB is turned in its bytes
+    (`turnGlb`: x and z negated in positions and normals, a turn and not a mirror) and put on fal's
+    storage (`keepGlbOnFal`) to be rigged. That upload has a new URL each time, so a turned model's
+    Meshy rig is not found on the account from another device and is paid for there again. No picture
+    (Meshy's text-to-3D), or one that will not load, leaves the model as it is; `rpg.person.turned`
+    is logged when one is turned.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
     The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor

@@ -55,6 +55,8 @@ export type Prompt = 'talk' | 'pickup' | 'examine';
  */
 export interface PersonBody {
   url?: string;
+  /** The picture the model was made from: which way the model faces is judged against it (`people.ts`). */
+  picture?: string;
   wait?: boolean;
 }
 
@@ -2052,7 +2054,7 @@ export class RpgScene {
     if (want === 'wait') return;
     if (want !== 'kit') {
       try {
-        const template = await this.people.template(want, npc.gender, HEIGHT[npc.gender], 'person');
+        const template = await this.people.template(want, npc.gender, HEIGHT[npc.gender], 'person', body.picture);
         if (current()) {
           npc.group.clear();
           npc.rig = this.people.dress(npc.group, template);
@@ -2146,7 +2148,7 @@ export class RpgScene {
     if (want === 'wait') return;
     if (want !== 'kit') {
       try {
-        const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero');
+        const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero', body.picture);
         if (token !== this.heroToken) return;
         this.player.clear();
         this.playerRig = this.people.dress(this.player, template);
@@ -2394,11 +2396,12 @@ export class RpgScene {
    * at all until that model comes, in an invented world, where no block stands in for anything.
    * For enemies that walk on two legs `item` is their generated body the same way (`setEnemyBody`).
    */
-  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null, item: { url?: string; wait?: boolean } = {}) {
+  spawnObjective(kind: ObjectiveKind, count: number, look: TargetLook, at: string | null, item: { url?: string; picture?: string; wait?: boolean } = {}) {
     this.clearObjective();
     if (kind === 'slay') {
       this.enemyLook = look;
       this.enemyWant = wanted(item);
+      this.enemyPicture = item.picture;
       this.enemyToken++;
     }
     this.itemLook = look;
@@ -2442,6 +2445,8 @@ export class RpgScene {
 
   /** What the enemies are drawn as (`PersonBody`), and a count that makes an older load stale. */
   private enemyWant = 'kit';
+  /** The picture the enemy's model was made from (`PersonBody.picture`). */
+  private enemyPicture: string | undefined;
   private enemyToken = 0;
   private enemyLook: TargetLook | null = null;
 
@@ -2454,6 +2459,7 @@ export class RpgScene {
     const want = wanted(body);
     if (want === this.enemyWant) return;
     this.enemyWant = want;
+    this.enemyPicture = body.picture;
     const token = ++this.enemyToken;
     await Promise.all(this.enemies.map((e) => this.dressEnemy(e, token)));
   }
@@ -2499,7 +2505,7 @@ export class RpgScene {
           return;
         }
         try {
-          const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy');
+          const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy', this.enemyPicture);
           if (token !== this.enemyToken || enemy.hp <= 0) return;
           this.undressEnemy(enemy);
           enemy.rig = this.people.dress(enemy.mesh, template);

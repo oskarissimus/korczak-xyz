@@ -313,18 +313,26 @@ async function drawWithGemini(
 
 /** Bytes (base64) onto fal's storage, as fal's own client uploads a file: a signed URL to PUT to, and the URL it is read at after. */
 async function keepOnFal(key: string, base64: string, type: string, o: FalOptions): Promise<string> {
+  return putOnFal(key, Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)), type, `person.${type.includes('png') ? 'png' : 'jpg'}`, o);
+}
+
+/** A GLB onto fal's storage, for a model fal is to read that is not the one it answered (`turnGlb` before Meshy rigs it). */
+export function keepGlbOnFal(key: string, glb: ArrayBuffer, o: FalOptions = {}): Promise<string> {
+  return putOnFal(key, new Uint8Array(glb), 'model/gltf-binary', 'person.glb', o);
+}
+
+async function putOnFal(key: string, bytes: Uint8Array, type: string, name: string, o: FalOptions): Promise<string> {
   const f = o.fetchImpl ?? apiFetch;
   const init = await f('https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3', {
     method: 'POST',
     headers: headers(key),
     signal: o.signal,
-    body: JSON.stringify({ content_type: type, file_name: `person.${type.includes('png') ? 'png' : 'jpg'}` }),
+    body: JSON.stringify({ content_type: type, file_name: name }),
   });
   if (!init.ok) throw await failure(init);
   const { upload_url, file_url } = (await init.json()) as { upload_url?: string; file_url?: string };
   if (!upload_url || !file_url) throw new Error('fal storage gave no URL to upload to');
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const put = await f(upload_url, { method: 'PUT', headers: { 'Content-Type': type }, signal: o.signal, body: bytes });
+  const put = await f(upload_url, { method: 'PUT', headers: { 'Content-Type': type }, signal: o.signal, body: bytes as BodyInit });
   if (!put.ok) throw await failure(put);
   return file_url;
 }

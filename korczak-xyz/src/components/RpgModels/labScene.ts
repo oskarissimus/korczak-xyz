@@ -30,6 +30,8 @@ export interface ModelStats {
 export interface StageItem {
   key: string;
   glb: string;
+  /** The picture the model was made from (`People.template`). */
+  picture?: string;
   body: Body;
   height: number;
   label: string;
@@ -179,7 +181,7 @@ export class LabStage {
             else {
               this.people.rigger = rigger;
               this.people.warm();
-              template = await this.people.template(item.glb, item.body, item.height, item.label);
+              template = await this.people.template(item.glb, item.body, item.height, item.label, item.picture);
             }
             s = this.stand(item, rigger, template);
             onItem(item.key, { stats: statsOf(template), ms: template.ms || performance.now() - started });
