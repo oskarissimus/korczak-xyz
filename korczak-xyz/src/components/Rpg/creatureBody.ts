@@ -51,7 +51,7 @@ export function prepareCreature(template: THREE.Group, shape: CreatureShape): nu
       // Linear in the height, as a stiff leg turning at the hip would be.
       leg[i * 2] = w;
       // Front-left with back-right, front-right with back-left: a trot.
-      leg[i * 2 + 1] = (v.x - cx) * (v.z - cz) >= 0 ? 0 : 1;
+      leg[i * 2 + 1] = shape === 'biped' ? (v.x < cx ? 0 : 1) : (v.x - cx) * (v.z - cz) >= 0 ? 0 : 1;
     }
     mesh.geometry.setAttribute('creatureLeg', new THREE.BufferAttribute(leg, 2));
     // The creature's metres, in this geometry's units and axes: the linear part of the inverse.

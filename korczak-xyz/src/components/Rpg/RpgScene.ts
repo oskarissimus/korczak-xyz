@@ -128,7 +128,7 @@ const CLUE_FIT = { height: 0.8, width: 1.2 };
 /** A thing to gather from fal.ai, floating: about the block's size, times the look's own size. */
 const ITEM_FIT = { height: 0.7, width: 0.8 };
 /** A beast's or a blob's model at the look's size 1, about the blocks' size; `Enemy.size` scales it. */
-const CREATURE_FIT = { beast: { height: 1.1, width: 1.8 }, blob: { height: 0.9, width: 1.5 } };
+const CREATURE_FIT = { beast: { height: 1.1, width: 1.8 }, blob: { height: 0.9, width: 1.5 }, biped: { height: PERSON_HEIGHT.enemy, width: 2.4 } };
 /** How far out a village piece reaches when its spot says nothing: the kit's stall and cart, barrels, the well. */
 const SPOT_SIZE: Partial<Record<SpotKind, number>> = { stall: 1.8, cart: 2.2, goods: 0.8, landmark: 1.6 };
 const ATTACK_RANGE = 3;
@@ -2498,11 +2498,24 @@ export class RpgScene {
           enemy.mesh.add(enemy.creature.body);
           return;
         }
-        const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy');
-        if (token !== this.enemyToken || enemy.hp <= 0) return;
-        this.undressEnemy(enemy);
-        enemy.rig = this.people.dress(enemy.mesh, template);
-        return;
+        try {
+          const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy');
+          if (token !== this.enemyToken || enemy.hp <= 0) return;
+          this.undressEnemy(enemy);
+          enemy.rig = this.people.dress(enemy.mesh, template);
+          return;
+        } catch (err) {
+          // Its own model unrigged, moved from outside, rather than the kit's body (owner, 2 Nov 2026:
+          // "the enemy is still some Quaternius model, not generated").
+          log.warn('rpg.enemy.rig.failed', { error: err instanceof Error ? err.message : String(err) });
+          if (token !== this.enemyToken) return;
+          const template = await this.creatureTemplate(want, 'biped');
+          if (token !== this.enemyToken || enemy.hp <= 0) return;
+          this.undressEnemy(enemy);
+          enemy.creature = dressCreature(template.group, 'biped', template.height, Math.random() * 6);
+          enemy.mesh.add(enemy.creature.body);
+          return;
+        }
       } catch (err) {
         if (token !== this.enemyToken) return;
         this.enemyWant = 'kit';

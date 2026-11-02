@@ -1112,6 +1112,15 @@ content-hashed and immutable.
     having no finger bones to place it by.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
   flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once).
+- **A generated enemy never falls back to the kit's body** (owner, 2 Nov 2026: "the enemy is still
+  some Quaternius model, not generated"). The *mechaniczny wartownik* of quest `q-mvz194tz-u1mvm`
+  had its model (`job.model.glb`, made 16:22 UTC) — a rusted automaton with an exhaust pipe standing
+  up beside its head — and the one-person check counted the pipe as a second head (`heads` = 2 on
+  that GLB), refused it, and the scene put the kit's body there. Now `standing` skips the check for
+  `enemy` (it guards against FLUX drawing two of a quest's characters; a monster may have horns, a
+  pipe or two heads), and if the rig still fails the enemy is its own model unrigged, moved as a
+  creature with its legs paired left and right (`biped` in `creature.ts`). The kit's body is left
+  for the classic world and no fal key.
 - **Beasts and blobs are generated too** (owner, 30 Oct 2026: "generate the enemies like the other
   NPCs", over a screenshot of four black blocks with red eyes as the quest's pests). In an invented
   world with a fal key, a `slay` job whose look is `beast` or `blob` gets a model made once from the

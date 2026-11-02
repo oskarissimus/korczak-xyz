@@ -16,7 +16,8 @@
  * Plain numbers and no Three.js, so it is tested (`creature.test.ts`).
  */
 
-export type CreatureShape = 'beast' | 'blob';
+/** `biped`: an enemy on two legs whose model could not be rigged, moved like a beast with its legs paired left and right. */
+export type CreatureShape = 'beast' | 'blob' | 'biped';
 
 /** The share of the height that is legs: below it a vertex swings, the lower the more. */
 export const LEG_TOP = 0.45;

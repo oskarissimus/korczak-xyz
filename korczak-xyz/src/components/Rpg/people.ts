@@ -441,8 +441,12 @@ export class People {
     return t;
   }
 
-  /** The TRELLIS model's one mesh, in its file's frame; refused when it is not one standing person. */
-  private async standing(url: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry }> {
+  /**
+   * The TRELLIS model's one mesh, in its file's frame; refused when it is not one standing person.
+   * Not an enemy's: a rusted automaton with an exhaust pipe beside its head counted two (2 Nov 2026),
+   * and an ogre may have two heads; FLUX drawing two people is a risk of the quest's characters.
+   */
+  private async standing(url: string, label: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry }> {
     const bytes = await loadLandmarkBytes(url);
     const gltf = await new GLTFLoader().parseAsync(bytes, '');
     gltf.scene.updateMatrixWorld(true);
@@ -458,7 +462,7 @@ export class People {
     // Two people side by side (FLUX did draw that) are two heads. Counted rather than measured: a
     // wide stance or a T-pose — Nano Banana draws one when asked for a wide pose — is as wide as two
     // people, but still has one head.
-    const n = heads(geometry);
+    const n = label === 'enemy' ? 1 : heads(geometry);
     if (n !== 1) throw new Error(`not one standing person (${n} heads)`);
     return { mesh, geometry };
   }
@@ -469,7 +473,7 @@ export class People {
    * person first, so a picture of two is not paid for.
    */
   private async buildMeshy(falKey: string, url: string, key: string, height: number, label: string): Promise<PersonTemplate> {
-    const [{ clips, donors }] = await Promise.all([this.load(), this.standing(url)]);
+    const [{ clips, donors }] = await Promise.all([this.load(), this.standing(url, label)]);
     const started = performance.now();
     const rigged = await cachedMeshy(key, () => rigWithMeshy(falKey, url, height, label));
     const gltf = await new GLTFLoader().parseAsync(await loadLandmarkBytes(rigged), '');
@@ -505,7 +509,7 @@ export class People {
   }
 
   private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'voxel' | 'fit' | 'skin'): Promise<PersonTemplate> {
-    const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url)]);
+    const [{ donors, clips }, { mesh, geometry }] = await Promise.all([this.load(), this.standing(url, label)]);
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
     // Fitted joints need no donor's shape, only its skeleton: the male one's, which the clips were
