@@ -192,6 +192,8 @@ export const PERSON_PAINTERS = {
 } as const;
 export type PersonPainter = keyof typeof PERSON_PAINTERS;
 export const DEFAULT_PAINTER: PersonPainter = 'nanoBananaLite';
+/** Who draws the hero's weapon (`utils/rpg/weapon.ts`), whatever the people's switch says. */
+export const WEAPON_PAINTER: PersonPainter = 'nanoBananaLite';
 let personPainter: PersonPainter = DEFAULT_PAINTER;
 let googleKey: string | null = null;
 /** The account's Gemini key, if it has one: Google's own painters are then asked at Google rather than through fal. */
@@ -695,6 +697,14 @@ async function imageAndMesh(
     const { glb, costUsd } = await buildPersonMesh(key, image, personMesher, label, o, running);
     return { image, glb, queuedMs: 0, costUsd: PERSON_PAINTERS[painter].price(IMAGE_SIZE) + costUsd };
   }
+  if (label === 'weapon') {
+    // FLUX schnell drew a sword point down whatever the prompt said, and the hand cannot tell a hilt
+    // from a tip by shape alone; Nano Banana Lite drew four of four upright, hilt at the bottom (3 Nov 2026).
+    const image = await drawImage(key, prompt, label, o, IMAGE_SIZE, undefined, WEAPON_PAINTER);
+    const { glb, queuedMs } = await buildMesh(key, image, label, o, running);
+    if (await isCardAt(glb, label, o)) throw new Error(CARD_ERROR);
+    return { image, glb, queuedMs, costUsd: PERSON_PAINTERS[WEAPON_PAINTER].price(IMAGE_SIZE) + FAL_PRICES.mesh };
+  }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);
     // A card the server made before it checked (a job is kept 14 days) is made here instead.
@@ -1003,6 +1013,23 @@ export function ensureCreatureModel(
   return ensurePiece(key, 'creature', id, prompt, onModel, onError, o);
 }
 
+/** The hero's weapon (`utils/rpg/weapon.ts`), made once per world: `id` is the world's. */
+export function ensureWeaponModel(
+  key: string,
+  id: string,
+  prompt: string,
+  onModel: (model: LandmarkModel) => void,
+  onError: (err: unknown) => void = () => {},
+  o: FalOptions = {},
+): boolean {
+  return ensurePiece(key, 'weapon', id, prompt, onModel, onError, o);
+}
+
+/** Whether the world's weapon can still come this session; when it cannot, the hero holds the kit's sword. */
+export function weaponModelMayCome(id: string): boolean {
+  return !refused.has('weapon') && !outOfFunds('fal') && !failed.has(`weapon/${id}`);
+}
+
 /**
  * A person's model (`personPrompt`), made once: a quest's character by world and name, the hero by
  * world, an enemy by the beat whose job it is. Rigged in the browser when it loads (`people.ts`).
@@ -1041,7 +1068,7 @@ export function personModelMayCome(label: PersonSlot, id: string): boolean {
 
 function ensurePiece(
   key: string,
-  label: 'clue' | 'place' | 'creature' | PersonSlot,
+  label: 'clue' | 'place' | 'creature' | 'weapon' | PersonSlot,
   id: string,
   prompt: string,
   onModel: (model: LandmarkModel) => void,

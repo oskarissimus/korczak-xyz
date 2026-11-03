@@ -81,6 +81,8 @@ import {
   type PersonPainter,
   ensureCreatureModel,
   ensurePersonModel,
+  ensureWeaponModel,
+  weaponModelMayCome,
   personModelMayCome,
   personCostNow,
   personMakersNow,
@@ -140,6 +142,7 @@ import {
   setWorldCover,
   setWorldGround,
   setWorldHero,
+  setWorldWeapon,
   setWorldModel,
   setWorldSizes,
   updateAtlasPerson,
@@ -174,9 +177,10 @@ import { introSketch, introView, shownImage, startIntro, stopIntro, subscribeInt
 import { DEFAULT_RIGGER, type Rigger } from './people';
 import { heroBody, RpgScene, type PersonBody, type Prompt } from './RpgScene';
 import { TouchControls } from './TouchControls';
+import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
-const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature']);
+const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 /** The console rows of a rig (`people.ts`), counted in the progress as rigs and not as pieces. */
 const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { translations } from './translations';
@@ -296,6 +300,7 @@ interface EarlyMade {
   ground?: GroundTexture;
   cover?: GroundTexture[];
   hero?: LandmarkModel;
+  weapon?: LandmarkModel;
 }
 
 /** `w` with what was made for it early put on it. */
@@ -305,6 +310,7 @@ function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
   if (kept.ground) next = { ...next, groundTexture: kept.ground };
   if (kept.cover) next = { ...next, coverSprites: kept.cover };
   if (kept.hero) next = { ...next, heroModel: kept.hero };
+  if (kept.weapon) next = { ...next, weaponModel: kept.weapon };
   return next;
 }
 
@@ -1161,6 +1167,18 @@ export default function Rpg({ lang }: { lang: Lang }) {
     setWorld((now) => (now?.id === id ? { ...now, heroModel: model } : now));
   }, []);
 
+  /** And what the hero holds (`utils/rpg/weapon.ts`). */
+  const keepWeapon = useCallback((id: string, model: LandmarkModel) => {
+    if (!findWorld(id)) {
+      earlyFor(id).weapon = model;
+      setEarlyMade((n) => n + 1);
+      return;
+    }
+    setWorldWeapon(id, model);
+    if (worldRef.current?.id === id) worldRef.current = { ...worldRef.current, weaponModel: model };
+    setWorld((now) => (now?.id === id ? { ...now, weaponModel: model } : now));
+  }, []);
+
   /** And what grows on it. */
   const keepCover = useCallback((id: string, sprites: GroundTexture[]) => {
     markStage('cover');
@@ -1207,8 +1225,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
             if (worldRef.current?.id === w.id) void sceneRef.current?.setHero({});
           },
         );
+      // What the hero holds, once per world like the hero; a world from before `weapon` gets one
+      // guessed from who the player is. Failing, the hero holds the kit's sword.
+      if (!w.weaponModel)
+        ensureWeaponModel(
+          key,
+          w.id,
+          weaponPrompt(weaponLook(w), w.look),
+          (model) => keepWeapon(w.id, model),
+          (e) => {
+            log.warn('rpg.weapon.failed', describeError(e));
+            if (worldRef.current?.id === w.id || previewRef.current?.id === w.id) void sceneRef.current?.setWeapon({});
+          },
+        );
     },
-    [keepCover, keepGround, keepHero, keepModel],
+    [keepCover, keepGround, keepHero, keepModel, keepWeapon],
   );
 
   /**
@@ -1589,8 +1620,9 @@ export default function Rpg({ lang }: { lang: Lang }) {
       tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       tasks.push({ kind: 'ground', state: 'queued', since: null, afterWorld: true });
       for (let i = 0; i < HUB_SLOTS.length; i++) tasks.push({ kind: 'model', state: 'queued', since: null, afterWorld: true });
-      // And the hero, rigged once its model has come.
+      // And the hero, rigged once its model has come, and what the hero holds.
       tasks.push({ kind: 'rig', state: 'queued', since: null, afterWorld: true, afterFal: true });
+      tasks.push({ kind: 'piece', state: 'queued', since: null, afterWorld: true });
     } else if (aw && aw.createdAt > 0) {
       const early = earlyRef.current.get(aw.id);
       const ground = groundState(aw.id);
@@ -1623,7 +1655,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
       }
     }
     for (const p of pending) {
-      if (/^(clue|place|person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
+      if (/^(clue|place|person|hero|enemy|weapon)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
       // A person still being made is a rig still to come, after it.
       if (/^(person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'rig', state: 'queued', since: null, afterFal: true });
     }
@@ -1683,6 +1715,17 @@ export default function Rpg({ lang }: { lang: Lang }) {
         ? { url: shown?.heroModel?.glb, picture: shown?.heroModel?.image, wait: true }
         : { url: invented ? world!.heroModel?.glb : undefined, picture: invented ? world!.heroModel?.image : undefined, wait: invented && (!!world!.heroModel || !keysReady || !!falKey) };
     void scene.setHero(body, creating !== null && shown ? heroLook(shown) : look).catch((e) => log.warn('rpg.hero.load.failed', describeError(e)));
+  }, [world, creating, shown, falKey, keysReady]);
+  // What the hero holds: the world's own weapon once made, nothing while it is, the kit's sword in
+  // the classic world, without a key and once it cannot come this session.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const w = creating !== null ? shown : world;
+    const invented = !!w && w.createdAt > 0;
+    const url = invented ? w!.weaponModel?.glb : undefined;
+    const wait = creating !== null ? !!falKey || !keysReady : invented && (!!w!.weaponModel || !keysReady || (!!falKey && weaponModelMayCome(w!.id)));
+    void scene.setWeapon({ url, wait }, weaponLength(w)).catch((e) => log.warn('rpg.weapon.load.failed', describeError(e)));
   }, [world, creating, shown, falKey, keysReady]);
   const sizesAskedRef = useRef(new Set<string>());
   // Where it all stands is the world's own (`utils/rpg/hubLayout.ts`), and nothing stands there until

@@ -149,6 +149,11 @@ export function setWorldHero(id: string, model: LandmarkModel, now = Date.now())
   putWorld(id, (w) => ({ ...w, heroModel: model }), now);
 }
 
+/** The hero's weapon the same way (`weapon.ts`), so it is made once. */
+export function setWorldWeapon(id: string, model: LandmarkModel, now = Date.now()): void {
+  putWorld(id, (w) => ({ ...w, weaponModel: model }), now);
+}
+
 /** And what grows on it (`groundCover.ts`). */
 export function setWorldCover(id: string, sprites: GroundTexture[], now = Date.now()): void {
   putWorld(id, (w) => ({ ...w, coverSprites: sprites }), now);

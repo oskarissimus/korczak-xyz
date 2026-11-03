@@ -30,6 +30,8 @@ import { People, PERSON_HEIGHT, type Body, type Rigger } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { dressCreature, disposeCreature, moveCreature, prepareCreature, type CreatureBody } from './creatureBody';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
+import { loadWeapon } from './heldWeapon';
+import { weaponGrip } from '../../utils/rpg/weapon';
 import type { Spinner } from './landmark';
 import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, type HouseKind } from './world';
 import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
@@ -143,6 +145,18 @@ const JUMP_START_SECONDS = 0.45;
 /** Jump_Land from standing; a hunter landing on the move runs straight on. */
 const JUMP_LAND_SECONDS = 0.6;
 const MAX_HP = 100;
+
+/** Where the hero's right hand holds a weapon, in the hand bone's space (`RpgScene.gripSword`). */
+interface HandGrip {
+  rig: Rig;
+  hand: THREE.Object3D;
+  /** The fist's centre. */
+  grip: THREE.Vector3;
+  /** The way the blade leaves the fist, a unit vector. */
+  along: THREE.Vector3;
+  /** Metres to the hand's units: 100 in the kit's centimetre rig, 1 in a generated one. */
+  scale: number;
+}
 
 interface Tree {
   /** The cone and trunk it starts as; hidden for good once the kit's trees stand in. */
@@ -2142,7 +2156,7 @@ export class RpgScene {
     this.heroWant = want;
     const token = ++this.heroToken;
     if (!swap) {
-      this.player.clear();
+      this.clearPlayer();
       this.playerRig = null;
     }
     if (want === 'wait') return;
@@ -2150,14 +2164,14 @@ export class RpgScene {
       try {
         const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero', body.picture);
         if (token !== this.heroToken) return;
-        this.player.clear();
+        this.clearPlayer();
         this.playerRig = this.people.dress(this.player, template);
         this.gripSword(this.playerRig);
         return;
       } catch (err) {
         if (token !== this.heroToken) return;
         this.heroWant = 'kit';
-        this.player.clear();
+        this.clearPlayer();
         this.playerRig = null;
         this.dressKitHero(token);
         throw err;
@@ -2184,17 +2198,28 @@ export class RpgScene {
         if (token !== this.heroToken) return;
         this.player.add(humanoid(0x3b3b46, 0xe0c2a2));
         this.sword.position.set(0.45, 1.05, 0.45);
+        this.sword.quaternion.identity();
+        this.sword.scale.setScalar(1);
         this.player.add(this.sword);
       },
     );
   }
 
+  /** Empties the hero's group, taking out of the hand first what is kept across bodies (the weapon). */
+  private clearPlayer() {
+    this.held?.removeFromParent();
+    this.held = null;
+    this.sword.removeFromParent();
+    this.handGrip = null;
+    this.player.clear();
+  }
+
   /**
-   * The sword in a generated person's hand (`people.ts`), which has a wrist and no fingers: from the
-   * hand's rest pose, the blade points where the body faces, and the fist is a few centimetres past
-   * the wrist along the hand.
+   * Where the hand holds things (`placeWeapon`), in a generated person's hand (`people.ts`), which has a
+   * wrist and no fingers: from the hand's rest pose, the blade points where the body faces, and the
+   * fist is a few centimetres past the wrist along the hand.
    */
-  private gripGenerated(rig: Rig, hand: THREE.Object3D) {
+  private generatedGrip(rig: Rig, hand: THREE.Object3D): HandGrip {
     let mesh: THREE.SkinnedMesh | null = null;
     rig.model.traverse((o) => {
       if ((o as THREE.SkinnedMesh).isSkinnedMesh && !mesh) mesh = o as THREE.SkinnedMesh;
@@ -2204,29 +2229,14 @@ export class RpgScene {
     const rest = new THREE.Quaternion();
     if (skinned && i >= 0) new THREE.Matrix4().copy(skinned.skeleton.boneInverses[i]).invert().decompose(new THREE.Vector3(), rest, new THREE.Vector3());
     const along = new THREE.Vector3(0, 0, 1).applyQuaternion(rest.invert()).normalize();
-    const grip = new THREE.Vector3(0, 0.08, 0);
-    hand.add(this.sword);
-    this.sword.scale.setScalar(1);
-    this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
-    this.sword.position.copy(grip).addScaledVector(along, 0.42);
-    this.kit.ready.then(
-      () => {
-        if (this.playerRig !== rig) return;
-        const blade = this.kit.piece('Sword_Bronze');
-        const box = new THREE.Box3().setFromObject(blade);
-        blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
-        blade.position.copy(grip).addScaledVector(along, -(box.min.y + 0.12));
-        hand.remove(this.sword);
-        hand.add(blade);
-      },
-      () => {},
-    );
+    return { rig, hand, grip: new THREE.Vector3(0, 0.08, 0), along, scale: 1 };
   }
 
   /**
-   * Puts the sword in the hunter's right hand, worked out from the hand's own bones rather than
-   * tuned by eye: the grip is between the wrist and the knuckles, and the blade leaves the fist
-   * on the thumb side, along the line from the little finger's knuckle to the index finger's.
+   * Works out where the hero's right hand holds a weapon, from the hand's own bones rather than tuned
+   * by eye: the grip is between the wrist and the knuckles, and the blade leaves the fist on the thumb
+   * side, along the line from the little finger's knuckle to the index finger's. Then puts in it
+   * whatever the hero holds (`placeWeapon`).
    */
   private gripSword(rig: Rig) {
     const hand = rig.hand;
@@ -2234,40 +2244,129 @@ export class RpgScene {
     const pinky = rig.model.getObjectByName('pinky_01_r');
     const middle = rig.model.getObjectByName('middle_01_r');
     if (hand && hand.name === 'RightHand') {
-      this.gripGenerated(rig, hand);
-      return;
+      this.handGrip = this.generatedGrip(rig, hand);
+    } else if (!hand || !index || !pinky || !middle) {
+      this.handGrip = null;
+    } else {
+      rig.model.updateMatrixWorld(true);
+      const local = (o: THREE.Object3D) => hand.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+      // The rig is in centimetres under a 0.01 armature; the weapon is in metres.
+      this.handGrip = {
+        rig,
+        hand,
+        grip: local(middle).multiplyScalar(0.55),
+        along: local(index).sub(local(pinky)).normalize(),
+        scale: 1 / hand.getWorldScale(new THREE.Vector3()).x,
+      };
     }
-    if (!hand || !index || !pinky || !middle) {
+    if (!this.handGrip) {
+      // No hand to hold it in: the old box at the hip.
+      this.held?.removeFromParent();
+      this.held = null;
       this.sword.position.set(0.45, 1.05, 0.45);
+      this.sword.quaternion.identity();
+      this.sword.scale.setScalar(1);
       this.player.add(this.sword);
       return;
     }
-    rig.model.updateMatrixWorld(true);
-    const local = (o: THREE.Object3D) => hand.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
-    const along = local(index).sub(local(pinky)).normalize();
-    const grip = local(middle).multiplyScalar(0.55);
-    // The rig is in centimetres under a 0.01 armature; the sword is in metres.
-    const s = hand.getWorldScale(new THREE.Vector3()).x;
-    hand.add(this.sword);
-    this.sword.scale.setScalar(1 / s);
-    this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
-    // The box is centred; most of its 1.1 m is blade, beyond the fist.
-    this.sword.position.copy(grip).addScaledVector(along, 0.42 / s);
+    if (!this.kitSwordAsked) {
+      // The kit's bronze sword, when it comes, in place of the box: its blade is +y, the pommel at the bottom.
+      this.kitSwordAsked = true;
+      this.kit.ready.then(
+        () => {
+          const blade = this.kit.piece('Sword_Bronze');
+          const box = new THREE.Box3().setFromObject(blade);
+          blade.position.y = -box.min.y;
+          const group = new THREE.Group();
+          group.add(blade);
+          this.kitSword = group;
+          this.placeWeapon();
+        },
+        () => {},
+      );
+    }
+    this.placeWeapon();
+  }
 
-    // The kit's bronze sword, when it comes: its blade is +y, the pommel at the bottom.
-    this.kit.ready.then(
-      () => {
-        const blade = this.kit.piece('Sword_Bronze');
-        const box = new THREE.Box3().setFromObject(blade);
-        blade.scale.setScalar(1 / s);
-        blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
-        // The fist closes round the grip a hand's width above the pommel.
-        blade.position.copy(grip).addScaledVector(along, -(box.min.y + 0.12) / s);
-        hand.remove(this.sword);
-        hand.add(blade);
-      },
-      () => {},
-    );
+  private handGrip: HandGrip | null = null;
+  /** What is in the hero's hand now: the world's weapon, the kit's sword or the box. */
+  private held: THREE.Object3D | null = null;
+  private kitSword: THREE.Group | null = null;
+  private kitSwordAsked = false;
+  /** The world's weapon as `setWeapon` was last asked: its URL, `wait` or `kit` (`wanted`). */
+  private weaponWant = 'kit';
+  private weaponLength = 1;
+  /** The world's weapon once loaded (`heldWeapon.ts`): handle at the origin, blade up +Y, in metres. */
+  private weapon: { url: string; group: THREE.Group; grip: number } | null = null;
+  private weaponToken = 0;
+
+  /**
+   * What the hero holds (`utils/rpg/weapon.ts`): the world's generated weapon, nothing while it is
+   * made, or the kit's bronze sword in the classic world, without a key and when it cannot come.
+   * Rejects when the model would not load, after putting the sword in the hand.
+   */
+  async setWeapon(body: { url?: string; wait?: boolean }, length = 1): Promise<void> {
+    const want = body.url ?? (body.wait ? 'wait' : 'kit');
+    if (want === this.weaponWant && length === this.weaponLength) return;
+    this.weaponWant = want;
+    this.weaponLength = length;
+    const token = ++this.weaponToken;
+    if (!isModel(want) || this.weapon?.url !== want) {
+      this.placeWeapon();
+    }
+    if (!isModel(want)) return;
+    try {
+      const group = await loadWeapon(want, length);
+      if (token !== this.weaponToken) {
+        disposeHubModel(group);
+        return;
+      }
+      if (this.weapon) disposeHubModel(this.weapon.group);
+      this.weapon = { url: want, group, grip: weaponGrip(length) };
+      this.placeWeapon();
+    } catch (err) {
+      if (token !== this.weaponToken) return;
+      this.weaponWant = 'kit';
+      this.placeWeapon();
+      throw err;
+    }
+  }
+
+  /**
+   * Puts in the hand what the hero holds now. Each held thing is built handle-down, blade up +Y, in
+   * metres, with the fist closing `grip` metres above its bottom; it is turned onto the hand's line
+   * and scaled out of the rig's centimetres.
+   */
+  private placeWeapon() {
+    const g = this.handGrip;
+    if (!g || this.playerRig !== g.rig) return;
+    this.held?.removeFromParent();
+    this.held = null;
+    this.sword.removeFromParent();
+    let thing: THREE.Object3D | null = null;
+    let grip = 0.12;
+    if (isModel(this.weaponWant)) {
+      if (this.weapon?.url !== this.weaponWant) return;
+      thing = this.weapon.group;
+      grip = this.weapon.grip;
+    } else if (this.weaponWant === 'wait') {
+      return;
+    } else if (this.kitSword) {
+      thing = this.kitSword;
+    } else {
+      // The box until the kit comes: centred on its 1.1 m, along +z, so it is turned and slid to match.
+      this.sword.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), g.along);
+      this.sword.scale.setScalar(g.scale);
+      this.sword.position.copy(g.grip).addScaledVector(g.along, 0.42 * g.scale);
+      g.hand.add(this.sword);
+      this.held = this.sword;
+      return;
+    }
+    thing.scale.setScalar(g.scale);
+    thing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), g.along);
+    thing.position.copy(g.grip).addScaledVector(g.along, -grip * g.scale);
+    g.hand.add(thing);
+    this.held = thing;
   }
 
   /** Takes one character out of the world for good: they are dead. */

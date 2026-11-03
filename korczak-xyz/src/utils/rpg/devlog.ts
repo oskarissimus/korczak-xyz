@@ -198,7 +198,7 @@ export function triesSpend(tries: readonly ModelTry[], ms: number): ModelSpend {
  */
 export function worldSpend(world: WorldBible | null): Spend | null {
   if (!world || world.createdAt === 0) return null;
-  const models = [world.landmarkModel, ...Object.values(world.kitModels ?? {}), world.heroModel].filter((m) => m !== undefined);
+  const models = [world.landmarkModel, ...Object.values(world.kitModels ?? {}), world.heroModel, world.weaponModel].filter((m) => m !== undefined);
   const textures = [...(world.groundTexture ? [world.groundTexture] : []), ...(world.coverSprites ?? [])];
   const s = world.spent;
   return {

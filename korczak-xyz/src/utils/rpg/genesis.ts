@@ -171,6 +171,16 @@ export interface WorldBible extends WorldBrief {
   /** That hero made by fal.ai and rigged in the browser (`people.ts`), once; kept like the hub's models. */
   heroModel?: LandmarkModel;
   /**
+   * What the hero holds in their right hand, in ENGLISH like the landmark, for the picture its model is
+   * made from (`utils/rpg/weapon.ts`). Worlds from before 3 Nov 2026 have none and are given one from
+   * `player` and `tech`.
+   */
+  weapon?: string;
+  /** How long that weapon is, in metres, by the model that described it; 1 m when it said nothing. */
+  weaponLength?: number;
+  /** That weapon made by fal.ai, once; kept like the hero. */
+  weaponModel?: LandmarkModel;
+  /**
    * What this world sounds like, in ENGLISH like the landmark: genre, instruments, tempo and feel of
    * its background score, for ElevenLabs' music model (`music.ts`). Worlds from before 30 Oct 2026
    * have none and are described from their look and bible.
@@ -660,6 +670,11 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     '  "hero": string (IN ENGLISH too, at most 20 words: how the player looks, for a 3D model of them — build,',
     '    clothes and gear worn on the body, hair, nothing held; "a lean scarred hunter in a long oiled leather coat,',
     '    boots and a hood"),',
+    '  "weapon": string (IN ENGLISH too, at most 16 words: the ONE melee weapon the hero swings in their right hand,',
+    '    fitting this world, its people and how far technology goes here — a blade, club, axe, hammer, mace,',
+    '    staff, spear, wrench, crowbar, bone or crystal, whatever belongs; one object, its materials and',
+    '    colours, nothing worn; "a short broad bronze sword with a leather-wrapped grip"),',
+    '  "weaponLength": number (that weapon\'s whole length in metres: a dagger 0.35, a sword 0.9, a staff 1.8),',
     '  "music": string (IN ENGLISH too, at most 25 words: this world\'s background score for a music model —',
     '    genre, instruments, tempo, era and feel, no artist or franchise names; "slow dark folk, hurdy-gurdy,',
     '    frame drum and low fiddle drones, 70 BPM, misty and earthy"),',
@@ -898,6 +913,8 @@ function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBi
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
     ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
     ...(text(r.hero, 200) ? { hero: text(r.hero, 200)! } : {}),
+    ...(text(r.weapon, 200) ? { weapon: text(r.weapon, 200)! } : {}),
+    ...(Number.isFinite(Number(r.weaponLength)) && Number(r.weaponLength) > 0 ? { weaponLength: Number(r.weaponLength) } : {}),
     ...(text(r.music, 240) ? { music: text(r.music, 240)! } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
@@ -958,6 +975,8 @@ export function previewWorld(soFar: string, ctx: GenesisContext, now: number): W
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
     ...(text(r.cover, 160) ? { cover: text(r.cover, 160)! } : {}),
     ...(text(r.hero, 200) ? { hero: text(r.hero, 200)! } : {}),
+    ...(text(r.weapon, 200) ? { weapon: text(r.weapon, 200)! } : {}),
+    ...(Number.isFinite(Number(r.weaponLength)) && Number(r.weaponLength) > 0 ? { weaponLength: Number(r.weaponLength) } : {}),
     ...(parseSizes(r.sizes) ? { sizes: parseSizes(r.sizes)! } : {}),
   };
 }

@@ -839,7 +839,8 @@ content-hashed and immutable.
   name (`lookFor` in `RpgScene.ts`): outfit (30% ranger), hair, beard, hair colour; their gender
   picks the body; their clothes colour is multiplied into the outfit at 55%, so "a woman in red"
   still reads as red. The hunter is the male ranger with a beard; the sword sits in the right
-  hand, placed from the hand's own finger bones (`gripSword`), not tuned by eye.
+  hand, placed from the hand's own finger bones (`gripSword`), not tuned by eye — in an invented world
+  the world's own generated weapon goes there instead (below).
 - **A name over the head** (owner, 30 Oct 2026: "the name should show as you walk up to an NPC").
   The nearest character within `NAME_RANGE` (6 m, a step before E's `TALK_RANGE`) gets their name
   over their head, fading in over the last two metres (`updateNameTag`). It is one HTML element
@@ -1157,8 +1158,26 @@ content-hashed and immutable.
     is logged when one is turned.
   - Each worked-out rig is a console row (kind `fal`, model `self-rig` at $0 or
     `fal-ai/meshy/rigging` at $0.20, adding to the fal.ai total); a cached one is not. TRELLIS sets no metallic factor, which glTF reads as fully metal, so `people.ts` sets 0.
-    The sword in a generated hand is aimed from the hand's bind pose (`gripGenerated`), the donor
+    The weapon in a generated hand is aimed from the hand's bind pose (`generatedGrip`), the donor
     having no finger bones to place it by.
+- **The hero's weapon is generated too** (owner, 3 Nov 2026: "the hero runs about with a sword
+  however the world is generated; the hand weapon should be a generated asset too"). Genesis writes
+  `weapon` (English, ≤16 words, one melee weapon that fits the world and its tech) and
+  `weaponLength` (metres); fal.ai makes it once per world (`ensureWeaponModel`, slot `weapon/{worldId}`,
+  TRELLIS at 0.95) and it is kept as `weaponModel` beside `heroModel`, early-made like the hero while
+  the world is still streaming. A world from before has one guessed from `player` and `tech`
+  (`weaponLook`, `utils/rpg/weapon.ts`). **The picture is Nano Banana Lite's, not FLUX's**
+  (`WEAPON_PAINTER`): FLUX schnell drew a sword point down against the prompt, and nothing in the
+  mesh says which end is the hilt — the area centroid put the head at the hilt on three swords of
+  four, a guard and pommel outweighing the blade. Nano Banana drew four of four upright, hilt down,
+  and TRELLIS kept the picture's top as +Y on all four, so `heldWeapon.ts` stands the model on the
+  bottom of its box (a model laid flat anyway is stood on its longest axis, a guess), sizes it to
+  `weaponLength` and the fist closes `weaponGrip` above the bottom: 12 cm, or a third up a staff or
+  spear over 1.6 m. ~$0.054 with a Gemini key. The scene's hand frame (`HandGrip`: grip point, blade
+  line, metres-to-hand scale) is worked out once per body (`gripSword`) and `placeWeapon` puts in it
+  whatever is held: the world's weapon, **nothing while it is made**, the kit's bronze sword in the
+  classic world, without a fal key and once the weapon failed this session (`weaponModelMayCome`).
+  It is a `piece` in the start's loading bar and a `fal` row in the console like any other.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
   flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once).
 - **A generated enemy never falls back to the kit's body** (owner, 2 Nov 2026: "the enemy is still

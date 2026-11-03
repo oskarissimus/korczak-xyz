@@ -59,7 +59,7 @@ export async function loadHubModel(url: string, fit: { height: number; width: nu
 }
 
 /** Cuts the floor sheet out of every mesh it runs through, vertices and all, so the box no longer counts it. */
-function dropFloor(model: THREE.Object3D): void {
+export function dropFloor(model: THREE.Object3D): void {
   model.updateMatrixWorld(true);
   const meshes: { mesh: THREE.Mesh; index: ArrayLike<number> }[] = [];
   const corners: number[] = [];

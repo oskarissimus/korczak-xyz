@@ -36,9 +36,9 @@ export function isForestVariant(slot: HubSlot): slot is ForestVariant {
  * Everything fal.ai is asked to make: the hub's pieces, the forest, a quest's clues (`ensureClueModel`),
  * what stands at a quest's places (`ensurePlaceModel`), the people (`ensurePersonModel`): the
  * quest's characters, the hero, and the enemies that walk on two legs; and the enemies that do not
- * (`ensureCreatureModel`).
+ * (`ensureCreatureModel`); and the hero's weapon (`ensureWeaponModel`).
  */
-export type FalSlot = HubSlot | 'clue' | 'place' | 'creature' | PersonSlot;
+export type FalSlot = HubSlot | 'clue' | 'place' | 'creature' | 'weapon' | PersonSlot;
 export type PersonSlot = 'person' | 'hero' | 'enemy';
 
 /**
@@ -48,6 +48,8 @@ export type PersonSlot = 'person' | 'hero' | 'enemy';
  */
 export const SIMPLIFY: Record<FalSlot, number> = {
   clue: 0.98,
+  // The hero's weapon: in view all the time and thin; at 0.97 a sword was ~850 triangles.
+  weapon: 0.95,
   // A person is looked at up close and bends at every joint: ~9k triangles, as many as a Quaternius one.
   person: 0.95,
   hero: 0.95,
