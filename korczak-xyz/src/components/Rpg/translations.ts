@@ -2,10 +2,6 @@ import type { RpgDemoReason } from '../../utils/rpg/demoLimits';
 import type { FundsProvider } from '../../utils/rpg/funds';
 import type { QuestSource } from '../../utils/rpg/storyteller';
 
-function usd(n: number): string {
-  return `$${n.toFixed(2)}`;
-}
-
 const en = {
   title: 'Wanderer',
   intro:
@@ -48,8 +44,8 @@ const en = {
   readingKeys: 'Reading your API keys from the account…',
   voiceOn: 'Voice: ElevenLabs, on your key.',
   voiceOff: 'Voice: none, there is no ElevenLabs key.',
-  demoQuest: (left: number, cap: number) =>
-    `Story: written by Gemini on the demo, no key or account needed. ${usd(left)} of today's ${usd(cap)} left for you.`,
+  demoQuest: (left: string, cap: string) =>
+    `Story: written by Gemini on the demo, no key or account needed. ${left} of today's ${cap} of diesel left for you.`,
   demoVoice: 'Voice: ElevenLabs, on the demo.',
   demoClosed: (reason: RpgDemoReason): string =>
     reason === 'ip-cap'
@@ -58,6 +54,18 @@ const en = {
         ? "Today's demo budget for everybody is spent; it comes back at midnight (Warsaw)."
         : 'The demo is closed right now.',
   ownKey: 'With your own key there is no limit: keys are set on your account page.',
+  dieselLeft: (amount: string) => `${amount} of diesel in the tank`,
+  dieselOpen: 'The generator and the diesel',
+  dieselRunning: 'The data centre is running on the diesel generator',
+  dieselStopped: 'The generator is out of diesel and the data centre is dark',
+  dieselEmpty: 'Out of diesel: the generator has stopped and the data centre is dark. A free delivery comes at midnight (Warsaw).',
+  dieselRefuel: 'Pouring the diesel in…',
+  dieselPreview: (amount: string) => `Preview: ${amount} poured in. Canisters are not on sale yet.`,
+  dieselSoon: 'Canisters are not on sale yet: a tap only shows the refuelling. Today the demo pours one tank a day for free.',
+  dieselCanister: { can: 'Canister', barrel: 'Barrel', tank: 'Tanker' } as Record<'can' | 'barrel' | 'tank', string>,
+  dieselPlantTitle: 'Diesel',
+  dieselPrices: (world: string, step: string, line: string) => `A new world ~${world} · a step of the story ~${step} · a spoken line ~${line}`,
+  dieselNote: 'One litre of diesel is one cent of what the models cost.',
   voiceFailed: 'ElevenLabs did not answer, the line is text only.',
   fundsTitle: (name: string) => `${name}: out of money`,
   fundsWhat: (p: FundsProvider): string =>
@@ -365,7 +373,7 @@ const pl: typeof en = {
   voiceOn: 'Głos: ElevenLabs, na Twoim kluczu.',
   voiceOff: 'Głos: brak, nie ma klucza ElevenLabs.',
   demoQuest: (left, cap) =>
-    `Fabuła: pisze Gemini w trybie demo, bez klucza i bez konta. Zostało Ci ${usd(left)} z dzisiejszych ${usd(cap)}.`,
+    `Fabuła: pisze Gemini w trybie demo, bez klucza i bez konta. Zostało Ci ${left} z dzisiejszych ${cap} dizla.`,
   demoVoice: 'Głos: ElevenLabs, w trybie demo.',
   demoClosed: (reason) =>
     reason === 'ip-cap'
@@ -374,6 +382,18 @@ const pl: typeof en = {
         ? 'Dzisiejszy budżet demo dla wszystkich się skończył; wraca o północy.'
         : 'Tryb demo jest teraz wyłączony.',
   ownKey: 'Z własnym kluczem nie ma limitu: klucze ustawiasz na stronie konta.',
+  dieselLeft: (amount) => `${amount} dizla w baku`,
+  dieselOpen: 'Generator i dizel',
+  dieselRunning: 'Data center działa na generatorze diesla',
+  dieselStopped: 'W generatorze skończył się dizel i w data center zgasło światło',
+  dieselEmpty: 'Skończył się dizel: generator stanął, w data center zgasło światło. Darmowa dostawa przyjedzie o północy.',
+  dieselRefuel: 'Dolewam dizla…',
+  dieselPreview: (amount) => `Podgląd: dolano ${amount}. Kanistrów jeszcze nie można kupić.`,
+  dieselSoon: 'Kanistrów jeszcze nie można kupić: kliknięcie pokazuje tylko tankowanie. Na razie demo dolewa za darmo jeden bak dziennie.',
+  dieselCanister: { can: 'Kanister', barrel: 'Beczka', tank: 'Cysterna' },
+  dieselPlantTitle: 'Dizel',
+  dieselPrices: (world, step, line) => `Nowy świat ~${world} · krok opowieści ~${step} · kwestia czytana na głos ~${line}`,
+  dieselNote: 'Litr dizla to jeden cent z tego, co kosztują modele.',
   voiceFailed: 'ElevenLabs nie odpowiedział, kwestia jest tylko tekstem.',
   fundsTitle: (name: string) => `${name}: skończyły się środki`,
   fundsWhat: (p: FundsProvider): string =>

@@ -1601,6 +1601,34 @@ before its usage arrived keeps the whole reservation, which errs the owner's way
 Not written down anywhere else: nothing on the admin panel sets the two dollar caps yet, so the
 defaults apply until `rpgPerIpUsd`/`rpgDailyUsd` are written into `demo/config` by hand.
 
+### The budget is shown as diesel
+
+Owner, Nov 2026: "many data centres run on gas turbines — my variation: the currency is called
+diesel, a data centre runs on a smoking diesel generator; when the credits run out the light goes
+out and the generator stops, new canisters are shown to buy, and when somebody buys, a little man
+pours it in and the light comes back on along the cable. Checking the balance shows a canister, and
+the price of a world or a beat is in it too."
+
+- **Litres are only a way of saying dollars** (`utils/rpg/diesel.ts`): one litre is one cent at list
+  price, so the $4 a day is 400 L. Nothing stores litres; the demo's caps, reservations and
+  settlements stay in dollars, and the two cannot drift apart.
+- **`DieselPlant.tsx`**: an SVG data centre on a generator. Running, the generator shakes and smokes,
+  current runs down the cable, the racks blink. Below `EMPTY_LITRES` (4 L, the cheapest paid step's
+  worst case) it is dark and still and the canisters come up. Going from empty to anything (the
+  midnight refill, later a purchase), the man walks in, pours (3.6 s, `REFUEL_MS` = the CSS
+  keyframes), and only then do the lights come on.
+- **Where it shows**, only for a reader on the demo: the canister badge on the main menu (the plant
+  itself when empty), the panel behind the badge with the prices, the badge and a price tag on
+  New world, a price tag on New quest, the line in Settings, and the plant on the ending screen. A
+  spent cap closes the demo (`available: false`, so the story falls back to `static`), and that is
+  exactly when the dark plant must show — the condition reads the cap reasons for that.
+- **The tags are estimates** (`beatLitres`: 5k in, 1.5k out on the chosen demo model; a world is two
+  of those; a spoken line 150 characters at `clipCost`), said with "~". The console keeps the bill.
+- **Nothing sells the canisters yet.** The three packs (200 L / 10 zł, 450 L / 20 zł, 1200 L / 49 zł)
+  are the ones the payment comparison proposed; a tap plays the refuelling as a preview, says so,
+  and goes back to the real tank. Wiring a provider means a purchase raising the balance, and the
+  plant already animates any rise from empty.
+
 ## The autosave
 
 `utils/rpg/save.ts`, localStorage `rpg-saves`, one quest at a time **in each world**, by world id

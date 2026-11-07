@@ -2262,3 +2262,309 @@ body:has(.rpg-immersive) .safe-top-band {
     animation: rpg-intro-in 1.2s ease-out both;
   }
 }
+
+/* The diesel plant (`DieselPlant.tsx`): the demo's budget as a data centre on a smoking generator.
+   Running: the generator shakes, smoke rises, current runs down the cable, the racks blink. Stopped:
+   all of it still and dark. Refuel: still dark while a man walks in and pours (3.6s, `REFUEL_MS`). */
+.rpg-dz {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.rpg-dz-scene {
+  width: 100%;
+  height: auto;
+  background: linear-gradient(#1b2030, #2a2f3d 70%);
+  border: 1px solid #6b5b3e;
+}
+
+.rpg-dz-sign {
+  font: bold 8px sans-serif;
+  letter-spacing: 0.12em;
+  fill: #8fd6ff;
+}
+
+.rpg-dz-led {
+  fill: #54ff7a;
+  animation: rpg-dz-blink 1.3s steps(2, jump-none) infinite;
+}
+
+.rpg-dz-led-blue {
+  fill: #59b8ff;
+}
+
+.rpg-dz-dark {
+  fill: #000;
+  opacity: 0;
+  transition: opacity 0.6s;
+  pointer-events: none;
+}
+
+.rpg-dz-current {
+  stroke: #ffd36b;
+  stroke-dasharray: 6 10;
+  animation: rpg-dz-flow 0.6s linear infinite;
+}
+
+.rpg-dz-fuel {
+  fill: #c8321f;
+  transition: y 0.8s, height 0.8s;
+}
+
+.rpg-dz-gen {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.rpg-dz-running .rpg-dz-gen {
+  animation: rpg-dz-shake 0.12s linear infinite alternate;
+}
+
+.rpg-dz-smoke circle {
+  fill: #6d6a66;
+  opacity: 0;
+}
+
+.rpg-dz-running .rpg-dz-smoke circle {
+  animation: rpg-dz-puff 1.8s ease-out infinite;
+}
+
+.rpg-dz-stopped .rpg-dz-dark,
+.rpg-dz-refuel .rpg-dz-dark {
+  opacity: 0.72;
+}
+
+.rpg-dz-stopped .rpg-dz-led,
+.rpg-dz-refuel .rpg-dz-led,
+.rpg-dz-stopped .rpg-dz-current,
+.rpg-dz-refuel .rpg-dz-current {
+  animation: none;
+  opacity: 0;
+}
+
+.rpg-dz-stopped .rpg-dz-sign,
+.rpg-dz-refuel .rpg-dz-sign {
+  fill: #555;
+}
+
+.rpg-dz-worker {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.rpg-dz-refuel .rpg-dz-worker {
+  animation: rpg-dz-walk 3.6s ease-in-out forwards;
+}
+
+.rpg-dz-can {
+  transform-box: view-box;
+  transform-origin: 6px 112px;
+}
+
+.rpg-dz-arm {
+  transform-box: view-box;
+  transform-origin: 0 106px;
+}
+
+.rpg-dz-refuel .rpg-dz-arm {
+  animation: rpg-dz-lift 3.6s ease-in-out forwards;
+}
+
+.rpg-dz-refuel .rpg-dz-can {
+  animation: rpg-dz-pour 3.6s ease-in-out forwards;
+}
+
+.rpg-dz-drops circle {
+  fill: #c8a83a;
+  opacity: 0;
+}
+
+.rpg-dz-refuel .rpg-dz-drops circle {
+  animation: rpg-dz-drip 3.6s linear forwards;
+}
+
+.rpg-dz-status {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.rpg-dz-stopped .rpg-dz-status {
+  color: #ff9a7a;
+}
+
+.rpg-dz-shop {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.rpg-dz-offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 92px;
+  padding: 8px 10px;
+  border: 1px solid #b9a77f;
+  background: #3a2c18;
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rpg-dz-offer:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.rpg-dz-price {
+  color: #ffd36b;
+  font-weight: bold;
+}
+
+.rpg-dz-note {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+  text-align: center;
+}
+
+.rpg-dz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding: 3px 10px;
+  border: 1px solid #6b5b3e;
+  background: rgba(0, 0, 0, 0.4);
+  color: #e6dcc6;
+  font: inherit;
+  font-size: 13px;
+}
+
+button.rpg-dz-badge {
+  cursor: pointer;
+}
+
+.rpg-dz-badge-empty {
+  border-color: #c8321f;
+  color: #ff9a7a;
+}
+
+.rpg-dz-tag {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+@keyframes rpg-dz-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes rpg-dz-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+@keyframes rpg-dz-shake {
+  from {
+    transform: translate(-0.6px, 0);
+  }
+  to {
+    transform: translate(0.6px, -0.5px);
+  }
+}
+
+@keyframes rpg-dz-puff {
+  0% {
+    opacity: 0.8;
+    transform: translate(0, 0) scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(14px, -46px) scale(2.2);
+  }
+}
+
+/* Walk in to the generator's cap (x ≈ 30), pour, walk out. */
+@keyframes rpg-dz-walk {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  8% {
+    opacity: 1;
+  }
+  30%,
+  70% {
+    opacity: 1;
+    transform: translateX(24px);
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes rpg-dz-pour {
+  0%,
+  32% {
+    transform: rotate(0deg) translate(0, 0);
+  }
+  40%,
+  62% {
+    transform: translate(0, -8px) rotate(35deg);
+  }
+  70%,
+  100% {
+    transform: rotate(0deg) translate(0, 0);
+  }
+}
+
+@keyframes rpg-dz-lift {
+  0%,
+  32%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  40%,
+  62% {
+    transform: rotate(-45deg);
+  }
+}
+
+@keyframes rpg-dz-drip {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  45%,
+  60% {
+    opacity: 1;
+  }
+  65%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-dz-running .rpg-dz-gen,
+  .rpg-dz-led,
+  .rpg-dz-current {
+    animation: none;
+  }
+}

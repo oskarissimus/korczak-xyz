@@ -184,6 +184,8 @@ const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creat
 /** The console rows of a rig (`people.ts`), counted in the progress as rigs and not as pieces. */
 const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { translations } from './translations';
+import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
+import { beatLitres, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
   speaker: string;
@@ -632,7 +634,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls' | 'trash'>('main');
+  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls' | 'trash' | 'diesel'>('main');
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -2841,6 +2843,21 @@ export default function Rpg({ lang }: { lang: Lang }) {
       {opts.sub && <small>{opts.sub}</small>}
     </button>
   );
+  // The demo's budget for today, said in litres of diesel (`DieselPlant.tsx`, `diesel.ts`).
+  // A spent cap closes the demo (`available: false`), which is exactly when the dark plant must show.
+  const diesel =
+    demo && (storyProvider === 'demo' || (storyProvider === 'static' && (demo.reason === 'ip-cap' || demo.reason === 'all-cap')))
+      ? { litres: litres(Math.min(demo.remaining.ip, demo.remaining.all)), capacity: litres(demo.perIpUsd) }
+      : null;
+  const dieselModel = modelChain('demo', chosenModel)[0] ?? null;
+  const dieselPrices =
+    diesel && dieselModel
+      ? t.dieselPrices(
+          formatLitres(worldLitres(dieselModel) ?? 0, gameLang),
+          formatLitres(beatLitres(dieselModel) ?? 0, gameLang),
+          formatLitres(lineLitres(), gameLang),
+        )
+      : null;
   const back = (
     <button type="button" className="rpg-menu-back" onClick={() => setMenu('main')}>
       ← {t.menuBack}
@@ -2864,7 +2881,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
         item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title })}
       {!keysReady && item('wait', t.wait, () => {}, { disabled: true })}
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: t.menuInWorld(world.name) })}
+      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, beatLitres(dieselModel)) : undefined].filter(Boolean).join(' · ') })}
       {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined })}
       {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
@@ -2877,9 +2894,13 @@ export default function Rpg({ lang }: { lang: Lang }) {
       <h3>{t.menuNewWorld}</h3>
       {exoticSlider}
       <WorldWish lang={gameLang} wish={wish} onChange={pickWish} open />
+      {diesel && dieselModel && (
+        <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
+      )}
       <div className="rpg-panel-actions">
         <button type="button" className="rpg-start" disabled={!creatable} onClick={() => begin(true)}>
           {t.menuCreate}
+          {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel))}</small>}
         </button>
         {back}
       </div>
@@ -2986,7 +3007,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
             {storyProvider === 'static'
               ? t.staticQuest
               : storyProvider === 'demo' && demo
-                ? t.demoQuest(Math.min(demo.remaining.ip, demo.remaining.all), demo.perIpUsd)
+                ? t.demoQuest(formatLitres(diesel?.litres ?? 0, gameLang), formatLitres(diesel?.capacity ?? 0, gameLang))
                 : t.aiQuest(storyProvider)}
           </li>
           {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
@@ -3057,6 +3078,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
   );
 
   // The world the next quest is played in: its name and who you are there, the pitch a tap away.
+  const dieselMenu = diesel && (
+    <div className="rpg-panel">
+      <h3>⛽ {t.dieselPlantTitle}</h3>
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} showCanisters />
+      {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
+      <p className="rpg-dz-note">{t.dieselNote}</p>
+      <div className="rpg-panel-actions">{back}</div>
+    </div>
+  );
+
   const worldCard = world && storyProvider !== 'static' && (
     <details className="rpg-world">
       <summary>
@@ -3332,9 +3363,16 @@ export default function Rpg({ lang }: { lang: Lang }) {
                       onRefresh={() => void drawProposals(gameLang, { google: apiKeys.google!, fal: falKey })}
                     />
                   )}
+                  {diesel &&
+                    (plantState(diesel.litres) === 'stopped' ? (
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} />
+                    ) : (
+                      <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
+                    ))}
                   {mainMenu}
                 </>
               )}
+              {menu === 'diesel' && (dieselMenu || mainMenu)}
               {menu === 'world' && worldMenu}
               {menu === 'settings' && settingsMenu}
               {menu === 'controls' && controlsMenu}
@@ -3348,6 +3386,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>
