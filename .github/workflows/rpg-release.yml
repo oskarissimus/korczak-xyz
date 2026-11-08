@@ -10,7 +10,8 @@
 # deploys nothing; turn it into a release on GitHub to ship it.
 #
 # Rolling back is running this workflow by hand with an older tag (Actions -> RPG release -> Run
-# workflow), which builds and deploys exactly that commit. It never touches korczak.xyz.
+# workflow), which builds and deploys exactly that commit. It never touches korczak.xyz. Run by hand
+# with a NEW tag, it makes that release from main and ships it (the `release` job).
 #
 # What is deployed is the whole site built in mode `rpg` (`.env.rpg`) to a second Worker
 # (`env.rpg` in korczak-xyz/wrangler.jsonc), with the game as its front door
@@ -29,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to deploy (e.g. v1.2.0) — for a rollback or a re-run"
+        description: "Tag to deploy (e.g. v1.2.0). An existing release is redeployed (rollback, re-run); a new tag becomes a release of the branch this is run from"
         required: true
 
 # One production deploy at a time, and never cancel one half-way: a cancelled `wrangler deploy`
@@ -46,8 +47,36 @@ env:
   GCP_SERVICE_ACCOUNT: github-deployer@korczak-rpg.iam.gserviceaccount.com
 
 jobs:
+  # A run by hand with a tag no release has yet makes that release first, from the commit the run
+  # was started on (main, normally) — so shipping is one button, and a Claude session, which can
+  # start a workflow but has no way to create a release, can ship too. Made with GITHUB_TOKEN, which
+  # by GitHub's design starts no workflow, so this does not also fire the `release` trigger above
+  # and deploy twice. An existing tag is left alone: that run is a rollback or a re-run.
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Make the release if the tag has none
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG exists: redeploying it."
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "$TAG" --generate-notes
+          fi
+
   backend:
-    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    needs: release
+    # `always()` because `release` is skipped on the release trigger, and a skipped need would
+    # otherwise skip this too.
+    if: >-
+      always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' &&
+      (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
     runs-on: ubuntu-latest
     # The pool in korczak-rpg trusts tokens from this environment only, so this is the one job in
     # the repository that can act on the game's production.
@@ -88,6 +117,8 @@ jobs:
 
   deploy:
     needs: backend
+    # Explicit for the same reason: a skipped `release` upstream would skip this by default.
+    if: always() && needs.backend.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: rpg-production
