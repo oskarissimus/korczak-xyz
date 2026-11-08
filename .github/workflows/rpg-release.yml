@@ -9,9 +9,9 @@
 # (which this workflow ignores — a pre-release does not deploy). A pushed `v*` tag ships as well,
 # getting its release made on the way.
 #
-# Rolling back is running this workflow by hand with an older tag (Actions -> RPG release -> Run
-# workflow), which builds and deploys exactly that commit. It never touches korczak.xyz. Run by hand
-# with a NEW tag, it makes that release from main and ships it (the `release` job).
+# Shipping is Actions -> RPG release -> Run workflow with the tag left empty: it makes a release
+# named `YYYY-MM-DD-HHMM-<hash>` (UTC) from main and deploys it. Rolling back is the same button
+# with an older tag, which builds and deploys exactly that commit. It never touches korczak.xyz.
 #
 # What is deployed is the whole site built in mode `rpg` (`.env.rpg`) to a second Worker
 # (`env.rpg` in korczak-xyz/wrangler.jsonc), with the game as its front door
@@ -31,12 +31,13 @@ on:
   # session ships (`git push origin v1.2.0`) — its GitHub connector can push but can neither create
   # a release nor start a workflow.
   push:
-    tags: ["v*"]
+    tags: ["v*", "20*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to deploy (e.g. v1.2.0). An existing release is redeployed (rollback, re-run); a new tag becomes a release of the branch this is run from"
-        required: true
+        description: "Leave empty for a new release named by the time and commit (2026-11-08-1948-abc1234). Name an existing tag to redeploy it (rollback, re-run)."
+        required: false
+        default: ""
 
 # One production deploy at a time, and never cancel one half-way: a cancelled `wrangler deploy`
 # leaves whichever version last finished, which is fine, but two racing can leave an older release
@@ -46,27 +47,43 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REF: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'push' && github.ref || format('refs/tags/{0}', inputs.tag) }}
-  TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'push' && github.ref_name || inputs.tag }}
   GCP_PROJECT: korczak-rpg
   GCP_WORKLOAD_IDENTITY_PROVIDER: projects/921805700652/locations/global/workloadIdentityPools/github/providers/github
   GCP_SERVICE_ACCOUNT: github-deployer@korczak-rpg.iam.gserviceaccount.com
 
 jobs:
-  # A pushed tag, or a run by hand with a tag no release has yet, makes that release first — from
-  # the tagged commit, or the commit the run was started on (main, normally). So shipping is one
-  # button or one `git push`. Made with GITHUB_TOKEN, which by GitHub's design starts no workflow,
-  # so this does not also fire the `release` trigger above and deploy twice. A tag that already has
-  # a release is left alone: that run is a rollback or a re-run.
+  # Settles which tag ships and makes its release when it has none. A run by hand with no tag names
+  # a new release by when it was made and from what: `YYYY-MM-DD-HHMM-<short hash>`, UTC, the hash
+  # being the commit the run was started on (main, normally) and the same seven characters the
+  # navbar prints. Made with GITHUB_TOKEN, which by GitHub's design starts no workflow, so it does
+  # not fire the `release` trigger above and deploy twice. A tag that already has a release is left
+  # alone: that run is a rollback or a re-run.
   release:
-    if: github.event_name != 'release'
+    if: github.event_name != 'release' || !github.event.release.prerelease
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
+      - name: Which tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            release) tag="$RELEASE_TAG" ;;
+            push)    tag="$GITHUB_REF_NAME" ;;
+            *)       tag="${INPUT_TAG:-$(date -u +%Y-%m-%d-%H%M)-${GITHUB_SHA::7}}" ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "### Shipping \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Make the release if the tag has none
+        if: github.event_name != 'release'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG exists: redeploying it."
@@ -77,11 +94,6 @@ jobs:
 
   backend:
     needs: release
-    # `always()` because `release` is skipped on the release trigger, and a skipped need would
-    # otherwise skip this too.
-    if: >-
-      always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' &&
-      (github.event_name != 'release' || !github.event.release.prerelease)
     runs-on: ubuntu-latest
     # The pool in korczak-rpg trusts tokens from this environment only, so this is the one job in
     # the repository that can act on the game's production.
@@ -93,7 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.REF }}
+          ref: refs/tags/${{ needs.release.outputs.tag }}
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:
@@ -121,9 +133,7 @@ jobs:
           --project "$GCP_PROJECT" --non-interactive --force
 
   deploy:
-    needs: backend
-    # Explicit for the same reason: a skipped `release` upstream would skip this by default.
-    if: always() && needs.backend.result == 'success'
+    needs: [release, backend]
     runs-on: ubuntu-latest
     environment:
       name: rpg-production
@@ -131,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.REF }}
+          ref: refs/tags/${{ needs.release.outputs.tag }}
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:
