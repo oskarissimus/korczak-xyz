@@ -152,7 +152,15 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
       release: RELEASE,
       // A production build served anywhere but the site — `astro preview` under an end-to-end
       // test, above all — is `preview`, so a mocked model's quests do not land among real ones.
-      environment: import.meta.env.DEV ? 'development' : onSite() ? 'production' : 'preview',
+      // `rpg` is the game's production build (`astro build --mode rpg`, served at rpg.korczak.xyz
+      // from GitHub releases), so its issues can be filtered apart from the site that follows main.
+      environment: import.meta.env.DEV
+        ? 'development'
+        : !onSite()
+          ? 'preview'
+          : import.meta.env.MODE === 'rpg'
+            ? 'rpg'
+            : 'production',
 
       /*
        * Errors only. The default integration list includes the tracing and replay machinery, so

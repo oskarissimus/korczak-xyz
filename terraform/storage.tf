@@ -96,6 +96,7 @@ resource "google_storage_bucket" "sloper" {
     origin = [
       "https://korczak.xyz",
       "https://www.korczak.xyz",
+      "https://rpg.korczak.xyz",
       # `astro dev` and `astro preview`.
       "http://localhost:4321",
       "http://localhost:4322",
@@ -209,6 +210,7 @@ resource "google_storage_bucket" "rpg" {
     origin = [
       "https://korczak.xyz",
       "https://www.korczak.xyz",
+      "https://rpg.korczak.xyz",
       # `astro dev` and `astro preview`.
       "http://localhost:4321",
       "http://localhost:4322",

@@ -90,6 +90,8 @@ on:
       - "korczak-xyz/src/utils/rpg/assetStore.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
+      # The RPG production project has its own workflow (rpg-terraform.yml) and nothing here reads it.
+      - "!terraform/rpg/**"
       - "audio-guide-function/**"
       # The weekly pins build. Terraform base64s these into the Batch job's environment
       # (terraform/audio-guide-pins.tf), so a change to either only reaches Saturday's build

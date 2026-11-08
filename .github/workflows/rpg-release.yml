@@ -1,0 +1,77 @@
+# The RPG's production: rpg.korczak.xyz, deployed from GitHub releases.
+#
+# korczak.xyz follows main (node.js.yml deploys every push). rpg.korczak.xyz moves only when a
+# release is published, so a half-finished game on main never reaches the people playing it, and
+# the release page is the changelog and the list of points to go back to.
+#
+# Why a release and not a bare tag push: publishing a release creates its tag anyway, and on top
+# of that carries the notes, can be drafted and published later, and can be marked pre-release
+# (which this workflow ignores — a pre-release does not deploy). A tag pushed without a release
+# deploys nothing; turn it into a release on GitHub to ship it.
+#
+# Rolling back is running this workflow by hand with an older tag (Actions -> RPG release -> Run
+# workflow), which builds and deploys exactly that commit. It never touches korczak.xyz.
+#
+# What is deployed is the whole site built in mode `rpg` (`.env.rpg`) to a second Worker
+# (`env.rpg` in korczak-xyz/wrangler.jsonc), with the game as its front door
+# (scripts/rpg-release.mjs). The backend is still the site's own GCP project for now: the
+# functions the game calls (`rpgDemo`, `rpgApi`, `rpgJob`) are the ones firebase-deploy.yml ships
+# from main. Moving the game onto a project of its own is a job that will be added here once that
+# project exists, gated on its repository variables so this file keeps working until then.
+name: RPG release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy (e.g. v1.2.0) — for a rollback or a re-run"
+        required: true
+
+# One production deploy at a time, and never cancel one half-way: a cancelled `wrangler deploy`
+# leaves whichever version last finished, which is fine, but two racing can leave an older release
+# live after a newer one.
+concurrency:
+  group: rpg-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    environment:
+      name: rpg-production
+      url: https://rpg.korczak.xyz/
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || format('refs/tags/{0}', inputs.tag) }}
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: "npm"
+          cache-dependency-path: "korczak-xyz/package-lock.json"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: korczak-xyz
+      - name: Test
+        run: npm test
+        working-directory: korczak-xyz
+      - name: Build
+        run: npm run build -- --mode rpg
+        working-directory: korczak-xyz
+        env:
+          # Same as node.js.yml: without it the build still succeeds, minus readable stack traces.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      - name: Put the game at the front door
+        run: node scripts/rpg-release.mjs dist
+        working-directory: korczak-xyz
+      - name: Deploy to rpg.korczak.xyz
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: korczak-xyz
+          environment: rpg
