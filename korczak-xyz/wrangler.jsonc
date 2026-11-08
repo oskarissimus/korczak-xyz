@@ -58,5 +58,29 @@
    */
   "workers_dev": true,
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  /*
+   * The RPG's production: `wrangler deploy --env rpg`, run only by .github/workflows/rpg-release.yml
+   * when a GitHub release is published. A second Worker, so korczak.xyz keeps following main and
+   * rpg.korczak.xyz changes only when a release says so — rolling back is publishing (or
+   * re-running) an older release, and never touches the site.
+   *
+   * Same static-assets-only design as above. The dist/ it serves is the whole site built in mode
+   * `rpg` (`.env.rpg`), and `scripts/rpg-release.mjs` puts the game at `/` and keeps the rest out
+   * of search; see that file for why the other pages are not stripped.
+   *
+   * `routes` and `workers_dev` are not inherited by a named environment, so they are stated again.
+   * The custom domain's DNS record is created by the first deploy, as it was for the apex.
+   */
+  "env": {
+    "rpg": {
+      "name": "korczak-xyz-rpg",
+      "routes": [
+        { "pattern": "rpg.korczak.xyz", "custom_domain": true }
+      ],
+      "workers_dev": true,
+      "observability": { "enabled": true }
+    }
+  }
 }

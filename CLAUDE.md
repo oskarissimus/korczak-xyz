@@ -42,6 +42,7 @@ that file cannot match on hostname. **This is the one piece of the serving path 
 korczak.xyz      AAAA   100::           proxied   <- Cloudflare-managed, the Worker's custom domain
 www.korczak.xyz  CNAME  korczak.xyz     proxied   <- exists only to be proxied; the redirect fires first
 media            (R2 custom domain)     proxied   <- the songbook's videos, bucket korczak-xyz-media
+rpg.korczak.xyz  AAAA   100::           proxied   <- Cloudflare-managed, the korczak-xyz-rpg Worker
 dresden          A      34.66.172.112   proxied   <- unrelated to this site
 korczak.xyz      TXT    v=spf1 -all     _dmarc p=reject   <- the domain sends no mail
 ```
@@ -51,6 +52,20 @@ domain has no origin server, so Cloudflare points the record at an address that 
 and routes the request to the Worker before that matters. The same is true of `www` — the CNAME
 target is irrelevant because the Single Redirect returns before any origin is consulted. **Neither
 record is a thing to "fix" if it looks wrong.**
+
+### rpg.korczak.xyz: the game's production, from releases
+
+korczak.xyz follows `main`. **rpg.korczak.xyz moves only when a GitHub release is published**
+(`.github/workflows/rpg-release.yml`; a pre-release does not deploy, and a bare tag push deploys
+nothing). It is a second Worker, `env.rpg` in `korczak-xyz/wrangler.jsonc`, serving the whole site
+built with `astro build --mode rpg` — which reads `.env.rpg` *instead of* `.env.production` — with
+`scripts/rpg-release.mjs` putting the game at `/`. Rolling back is running that workflow by hand
+with an older tag. Its Sentry environment is `rpg`.
+
+So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
+reaches rpg.korczak.xyz only through a release. The backend is still `korczak-xyz-501720` for
+both; giving the game a GCP project of its own is planned, and when it lands the Firebase block of
+`.env.rpg` and a backend job in that workflow are what change.
 
 **`terraform/cloudflare/`** is the Cloudflare counterpart of `terraform/`: the songbook's R2 bucket
 and its `media` domain so far, applied by `.github/workflows/cloudflare.yml` with the same
