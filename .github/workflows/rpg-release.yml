@@ -6,8 +6,8 @@
 #
 # Why a release and not a bare tag push: publishing a release creates its tag anyway, and on top
 # of that carries the notes, can be drafted and published later, and can be marked pre-release
-# (which this workflow ignores — a pre-release does not deploy). A tag pushed without a release
-# deploys nothing; turn it into a release on GitHub to ship it.
+# (which this workflow ignores — a pre-release does not deploy). A pushed `v*` tag ships as well,
+# getting its release made on the way.
 #
 # Rolling back is running this workflow by hand with an older tag (Actions -> RPG release -> Run
 # workflow), which builds and deploys exactly that commit. It never touches korczak.xyz. Run by hand
@@ -27,6 +27,11 @@ name: RPG release
 on:
   release:
     types: [published]
+  # A pushed `v*` tag ships too: the `release` job makes its release first. This is how a Claude
+  # session ships (`git push origin v1.2.0`) — its GitHub connector can push but can neither create
+  # a release nor start a workflow.
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -41,19 +46,20 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REF: ${{ github.event_name == 'release' && github.event.release.tag_name || format('refs/tags/{0}', inputs.tag) }}
+  REF: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'push' && github.ref || format('refs/tags/{0}', inputs.tag) }}
+  TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event_name == 'push' && github.ref_name || inputs.tag }}
   GCP_PROJECT: korczak-rpg
   GCP_WORKLOAD_IDENTITY_PROVIDER: projects/921805700652/locations/global/workloadIdentityPools/github/providers/github
   GCP_SERVICE_ACCOUNT: github-deployer@korczak-rpg.iam.gserviceaccount.com
 
 jobs:
-  # A run by hand with a tag no release has yet makes that release first, from the commit the run
-  # was started on (main, normally) — so shipping is one button, and a Claude session, which can
-  # start a workflow but has no way to create a release, can ship too. Made with GITHUB_TOKEN, which
-  # by GitHub's design starts no workflow, so this does not also fire the `release` trigger above
-  # and deploy twice. An existing tag is left alone: that run is a rollback or a re-run.
+  # A pushed tag, or a run by hand with a tag no release has yet, makes that release first — from
+  # the tagged commit, or the commit the run was started on (main, normally). So shipping is one
+  # button or one `git push`. Made with GITHUB_TOKEN, which by GitHub's design starts no workflow,
+  # so this does not also fire the `release` trigger above and deploy twice. A tag that already has
+  # a release is left alone: that run is a rollback or a re-run.
   release:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -61,7 +67,6 @@ jobs:
       - name: Make the release if the tag has none
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
         run: |
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG exists: redeploying it."
@@ -76,7 +81,7 @@ jobs:
     # otherwise skip this too.
     if: >-
       always() && needs.release.result != 'failure' && needs.release.result != 'cancelled' &&
-      (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
+      (github.event_name != 'release' || !github.event.release.prerelease)
     runs-on: ubuntu-latest
     # The pool in korczak-rpg trusts tokens from this environment only, so this is the one job in
     # the repository that can act on the game's production.

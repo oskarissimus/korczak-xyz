@@ -56,8 +56,9 @@ record is a thing to "fix" if it looks wrong.**
 ### rpg.korczak.xyz: the game's production, from releases
 
 korczak.xyz follows `main`. **rpg.korczak.xyz moves only when a GitHub release is published**
-(`.github/workflows/rpg-release.yml`; a pre-release does not deploy, and a bare tag push deploys
-nothing). It is a second Worker, `env.rpg` in `korczak-xyz/wrangler.jsonc`, serving the whole site
+(`.github/workflows/rpg-release.yml`; a pre-release does not deploy). A pushed `v*` tag, or a run
+by hand with a new tag, makes the release itself and ships it — which is how a session ships, since
+its GitHub connector can push a tag but cannot create a release or start a workflow. It is a second Worker, `env.rpg` in `korczak-xyz/wrangler.jsonc`, serving the whole site
 built with `astro build --mode rpg` — which reads `.env.rpg` *instead of* `.env.production` — with
 `scripts/rpg-release.mjs` putting the game at `/`. Rolling back is running that workflow by hand
 with an older tag. Its Sentry environment is `rpg`.
