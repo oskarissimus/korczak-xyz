@@ -32,6 +32,7 @@ function collection(path: string): any {
 
 vi.mock('firebase-admin/firestore', () => ({ FieldValue: { increment: (n: number) => ({ __inc: n }) } }));
 vi.mock('../runtime', () => ({
+  RPG_BUCKET: 'korczak-xyz-501720-rpg',
   db: {
     collection,
     runTransaction: async (fn: (tx: any) => unknown) =>

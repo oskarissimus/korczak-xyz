@@ -14,10 +14,13 @@
 #
 # What is deployed is the whole site built in mode `rpg` (`.env.rpg`) to a second Worker
 # (`env.rpg` in korczak-xyz/wrangler.jsonc), with the game as its front door
-# (scripts/rpg-release.mjs). The backend is still the site's own GCP project for now: the
-# functions the game calls (`rpgDemo`, `rpgApi`, `rpgJob`) are the ones firebase-deploy.yml ships
-# from main. Moving the game onto a project of its own is a job that will be added here once that
-# project exists, gated on its repository variables so this file keeps working until then.
+# (scripts/rpg-release.mjs). The backend is the game's own GCP project, korczak-rpg
+# (terraform/rpg/): the `backend` job deploys the Firestore rules and indexes and the game's three
+# functions (`rpgDemo`, `rpgApi`, `rpgJob`) there from the same tag, before the front goes out, so
+# a release never serves a page that calls functions older than itself.
+#
+# The three GCP values are written below rather than kept as repository variables: none is a
+# secret (Workload Identity needs no key), and terraform/rpg/outputs.tf is where they come from.
 name: RPG release
 
 on:
@@ -36,9 +39,55 @@ concurrency:
   group: rpg-release
   cancel-in-progress: false
 
+env:
+  REF: ${{ github.event_name == 'release' && github.event.release.tag_name || format('refs/tags/{0}', inputs.tag) }}
+  GCP_PROJECT: korczak-rpg
+  GCP_WORKLOAD_IDENTITY_PROVIDER: projects/921805700652/locations/global/workloadIdentityPools/github/providers/github
+  GCP_SERVICE_ACCOUNT: github-deployer@korczak-rpg.iam.gserviceaccount.com
+
 jobs:
-  deploy:
+  backend:
     if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    # The pool in korczak-rpg trusts tokens from this environment only, so this is the one job in
+    # the repository that can act on the game's production.
+    environment:
+      name: rpg-production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.REF }}
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: "npm"
+          cache-dependency-path: "functions/package-lock.json"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: functions
+      - name: Build and test the functions
+        run: npm run build && npm test
+        working-directory: functions
+      - name: Authenticate to korczak-rpg
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+      # Only the game's three functions: the rest of the codebase is the site's and has no business
+      # in this project (and its secrets do not exist here). No storage rules either — the one
+      # bucket here is written by these functions alone and read by download-token URL.
+      - name: Deploy rules and the game's functions
+        run: >-
+          npx --yes firebase-tools@15 deploy
+          --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob
+          --project "$GCP_PROJECT" --non-interactive --force
+
+  deploy:
+    needs: backend
     runs-on: ubuntu-latest
     environment:
       name: rpg-production
@@ -46,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || format('refs/tags/{0}', inputs.tag) }}
+          ref: ${{ env.REF }}
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:

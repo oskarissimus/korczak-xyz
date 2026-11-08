@@ -35,6 +35,7 @@ vi.mock('firebase-admin/storage', () => ({
   }),
 }));
 vi.mock('../runtime', () => ({
+  RPG_BUCKET: 'korczak-xyz-501720-rpg',
   db: {
     doc: (path: string) => ({
       path,

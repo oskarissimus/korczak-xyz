@@ -5,7 +5,7 @@
  * (`functions/src/rpg/assets.ts`) keeps and reuses, the page (`accountAssets.ts`) asks whether
  * something is kept already.
  *
- * WHERE IT GOES. The bytes go to the bucket `korczak-xyz-501720-rpg` (terraform/storage.tf), under
+ * WHERE IT GOES. The bytes go to the bucket `<project>-rpg` (`RPG_BUCKET` in functions/src/runtime.ts), under
  * `users/{uid}/rpg/{assetId}/`, one object per file the provider answered plus `meta.json`. What
  * made them goes to Firestore, `rpgAssets/{uid}/items/{assetId}`: the prompt, the model, the
  * request's parameters, the cost, when, the world and the quest, and each file's path and URL.
@@ -30,8 +30,6 @@
 
 import type { GatewayTarget } from './gatewayRoutes';
 
-/** The bucket (terraform/storage.tf). */
-export const ASSET_BUCKET = 'korczak-xyz-501720-rpg';
 /** `rpgAssets/{uid}/items/{id}` and `rpgAssets/{uid}/requests/{fingerprint}`. Top level, read by the owner, written by the server only. */
 export const ASSET_ROOT = 'rpgAssets';
 

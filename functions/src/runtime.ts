@@ -51,6 +51,13 @@ export const VERTEX_LOCATION = 'global';
 export const SLOPER_BUCKET = `${PROJECT_ID}-sloper`;
 
 /**
+ * The RPG's kept assets (`rpg/assets.ts`), named the same way: `korczak-xyz-501720-rpg` on the
+ * site's project (terraform/storage.tf) and `korczak-rpg-rpg` on the game's production project
+ * (terraform/rpg/data.tf), so one build of these functions serves either.
+ */
+export const RPG_BUCKET = `${PROJECT_ID}-rpg`;
+
+/**
  * Who the push service should contact about a misbehaving sender.
  *
  * Apple rejects a VAPID `sub` that is not a `mailto:` or `https:` URL, with a 400 that says

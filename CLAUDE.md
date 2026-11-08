@@ -63,11 +63,17 @@ built with `astro build --mode rpg` — which reads `.env.rpg` *instead of* `.en
 with an older tag. Its Sentry environment is `rpg`.
 
 So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
-reaches rpg.korczak.xyz only through a release. The backend is still `korczak-xyz-501720` for
-both. The game's own GCP project, **`korczak-rpg`**, exists and its layer is `terraform/rpg/`
-(applied by `rpg-terraform.yml`: APIs, Firebase, its own deployer, and a Workload Identity pool
-that trusts only the `rpg-production` environment). Moving the backend there is what changes the
-Firebase block of `.env.rpg` and adds a backend job to the release workflow.
+reaches rpg.korczak.xyz only through a release.
+
+**The game's production has a GCP project of its own, `korczak-rpg`** — its own Firestore,
+accounts, asset bucket (`korczak-rpg-rpg`) and copies of the three game functions (`rpgDemo`,
+`rpgApi`, `rpgJob`), so nothing played on rpg.korczak.xyz is shared with korczak.xyz. Its layer is
+`terraform/rpg/`, applied by `rpg-terraform.yml` as the site's deployer (Owner on `korczak-rpg`, the
+one grant made by hand, with the billing link). The release workflow's `backend` job deploys the
+rules and the three functions there as `github-deployer@korczak-rpg`, through a Workload Identity
+pool that trusts only the `rpg-production` environment — no push to main can reach it. The one
+thing still shared is `skin-weights`, which stays in `korczak-xyz-501720` with an invoker grant
+for the game project's runtime account.
 
 **`terraform/cloudflare/`** is the Cloudflare counterpart of `terraform/`: the songbook's R2 bucket
 and its `media` domain so far, applied by `.github/workflows/cloudflare.yml` with the same

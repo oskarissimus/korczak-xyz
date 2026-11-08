@@ -19,7 +19,6 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
 import {
-  ASSET_BUCKET,
   ASSET_HEADER,
   ASSET_ROOT,
   assetPath,
@@ -45,7 +44,7 @@ import {
   type AssetRoute,
 } from '../../../korczak-xyz/src/utils/rpg/assetStore';
 import { COST_HEADER, type GatewayTarget } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
-import { db } from '../runtime';
+import { RPG_BUCKET, db } from '../runtime';
 import { reportError } from '../sentry';
 
 /** Larger than anything a provider answers the game with; a bound, not a budget. */
@@ -92,7 +91,7 @@ export interface AssetContext {
   payer: string;
 }
 
-const bucket = () => getStorage().bucket(ASSET_BUCKET);
+const bucket = () => getStorage().bucket(RPG_BUCKET);
 
 /** One file into the bucket, with a download token, so the game and fal.ai can read it by URL. */
 export async function putFile(uid: string, assetId: string, role: string, bytes: Buffer, contentType: string, sourceUrl: string | null, model: string): Promise<KeptFile> {
@@ -106,7 +105,7 @@ export async function putFile(uid: string, assetId: string, role: string, bytes:
       contentType,
       metadata: { cacheControl: 'private, max-age=31536000, immutable', metadata: { firebaseStorageDownloadTokens: token, assetId, model: model.slice(0, 200) } },
     });
-  return { role, path, url: downloadUrl(ASSET_BUCKET, path, token), contentType, bytes: bytes.length, sourceUrl };
+  return { role, path, url: downloadUrl(RPG_BUCKET, path, token), contentType, bytes: bytes.length, sourceUrl };
 }
 
 /** A file fal.ai answered with, fetched and put in the bucket. */

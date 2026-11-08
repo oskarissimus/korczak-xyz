@@ -37,6 +37,7 @@ vi.mock('firebase-admin/firestore', () => ({
   Timestamp: { fromMillis: (ms: number) => ({ ms }) },
 }));
 vi.mock('../runtime', () => ({
+  RPG_BUCKET: 'korczak-xyz-501720-rpg',
   db: {
     doc: ref,
     runTransaction: async (fn: (tx: any) => unknown) => fn({ get: (r: any) => r.get(), update: (r: any, f: Record<string, unknown>) => r.update(f) }),
