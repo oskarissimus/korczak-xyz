@@ -1,0 +1,101 @@
+# The RPG production project's layer: terraform/rpg/ applied to korczak-rpg.
+#
+# Kept apart from firebase-deploy.yml on purpose. That workflow is the site's and runs on every
+# backend change from main; this one touches a different project and runs only when its own
+# directory changes (or by hand).
+#
+# It runs as the SITE's deployer, which holds Owner on korczak-rpg — the one bootstrap grant made
+# by hand (see the header of terraform/rpg/main.tf). It cannot run as the project's own deployer,
+# because that account is one of the things this directory creates, and the pool it trusts accepts
+# only the `rpg-production` environment of the release workflow.
+name: RPG Terraform
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "terraform/rpg/**"
+      - ".github/workflows/rpg-terraform.yml"
+  pull_request:
+    paths:
+      - "terraform/rpg/**"
+      - ".github/workflows/rpg-terraform.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: rpg-terraform
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: terraform/rpg
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      # Needs no credentials, so it runs on pull requests and before the bootstrap too.
+      - name: Validate
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Authenticate to Google Cloud
+        if: github.event_name != 'pull_request'
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      # Until the site's deployer has been let into korczak-rpg (and billing linked), nothing below
+      # can succeed. Say so and stop green, rather than fail every push until then.
+      - name: Has the bootstrap grant been made?
+        id: bootstrap
+        if: github.event_name != 'pull_request'
+        run: |
+          if gcloud projects get-iam-policy korczak-rpg \
+               --flatten='bindings[].members' \
+               --filter="bindings.role=roles/owner AND bindings.members=serviceAccount:${{ vars.GCP_SERVICE_ACCOUNT }}" \
+               --format='value(bindings.role)' 2>/dev/null | grep -q owner; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=korczak-rpg not bootstrapped::Grant ${{ vars.GCP_SERVICE_ACCOUNT }} Owner on korczak-rpg and link billing. See terraform/rpg/main.tf."
+          fi
+
+      - name: Init
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform init -input=false -reconfigure
+
+      - name: Plan
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform plan -input=false -out=tfplan
+
+      # Same gate as the site's: nothing in this directory should ever delete.
+      - name: Refuse a plan that destroys anything
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: |
+          terraform show -json tfplan > tfplan.json
+          doomed=$(jq -r '[.resource_changes[]? | select(.change.actions[]? == "delete") | .address] | join(", ")' tfplan.json)
+          if [ -n "$doomed" ]; then
+            echo "::error title=Terraform wants to destroy::$doomed"
+            exit 1
+          fi
+
+      - name: Apply
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Repository variables for the release workflow
+        if: steps.bootstrap.outputs.ready == 'true'
+        run: terraform output

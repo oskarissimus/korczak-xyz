@@ -64,8 +64,10 @@ with an older tag. Its Sentry environment is `rpg`.
 
 So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
 reaches rpg.korczak.xyz only through a release. The backend is still `korczak-xyz-501720` for
-both; giving the game a GCP project of its own is planned, and when it lands the Firebase block of
-`.env.rpg` and a backend job in that workflow are what change.
+both. The game's own GCP project, **`korczak-rpg`**, exists and its layer is `terraform/rpg/`
+(applied by `rpg-terraform.yml`: APIs, Firebase, its own deployer, and a Workload Identity pool
+that trusts only the `rpg-production` environment). Moving the backend there is what changes the
+Firebase block of `.env.rpg` and adds a backend job to the release workflow.
 
 **`terraform/cloudflare/`** is the Cloudflare counterpart of `terraform/`: the songbook's R2 bucket
 and its `media` domain so far, applied by `.github/workflows/cloudflare.yml` with the same
