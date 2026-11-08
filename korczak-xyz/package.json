@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "postbuild": "node scripts/generate-sw.mjs",
+    "build:rpg": "astro build --config astro.config.rpg.mjs --mode rpg && node scripts/rpg-release.mjs dist",
     "icons": "node scripts/generate-icons.mjs",
     "preview": "astro preview",
     "astro": "astro",

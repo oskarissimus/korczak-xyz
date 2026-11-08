@@ -1,0 +1,17 @@
+---
+import Game from '../layouts/Game.astro';
+import LoginForm from '../../src/components/Auth/LoginForm';
+import { useTranslations } from '../../src/i18n';
+import '../../src/styles/auth.css';
+import '../styles/pages.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Game title={`${t('Login')} · ${t('Rpg')}`} lang={lang} path="/login/" noindex>
+  <main class="rpg-page">
+    <h1>{t('Rpg')}</h1>
+    <LoginForm client:only="react" lang={lang} variant="game" />
+  </main>
+</Game>

@@ -13,9 +13,10 @@
 # named `YYYY-MM-DD-HHMM-<hash>` (UTC) from main and deploys it. Rolling back is the same button
 # with an older tag, which builds and deploys exactly that commit. It never touches korczak.xyz.
 #
-# What is deployed is the whole site built in mode `rpg` (`.env.rpg`) to a second Worker
-# (`env.rpg` in korczak-xyz/wrangler.jsonc), with the game as its front door
-# (scripts/rpg-release.mjs). The backend is the game's own GCP project, korczak-rpg
+# What is deployed is the game and nothing else: korczak-xyz/src-rpg/ (its README), built in mode
+# `rpg` (`.env.rpg`) by `npm run build:rpg` to a second Worker (`env.rpg` in
+# korczak-xyz/wrangler.jsonc). No navbar, no other apps, the game at `/`; scripts/rpg-release.mjs
+# fails the build if any other page made it into dist/. The backend is the game's own GCP project, korczak-rpg
 # (terraform/rpg/): the `backend` job deploys the Firestore rules and indexes and the game's three
 # functions (`rpgDemo`, `rpgApi`, `rpgJob`) there from the same tag, before the front goes out, so
 # a release never serves a page that calls functions older than itself.
@@ -154,15 +155,12 @@ jobs:
       - name: Test
         run: npm test
         working-directory: korczak-xyz
-      - name: Build
-        run: npm run build -- --mode rpg
+      - name: Build the game alone
+        run: npm run build:rpg
         working-directory: korczak-xyz
         env:
           # Same as node.js.yml: without it the build still succeeds, minus readable stack traces.
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      - name: Put the game at the front door
-        run: node scripts/rpg-release.mjs dist
-        working-directory: korczak-xyz
       - name: Deploy to rpg.korczak.xyz
         uses: cloudflare/wrangler-action@v4
         with:

@@ -45,11 +45,19 @@ import { translations, type Lang, type Translation } from './translations';
 
 interface AccountProps {
   lang: Lang;
+  /**
+   * `game` is rpg.korczak.xyz, where this page is the game's own and nothing else of the site
+   * exists: only the four keys the game spends, no "used by" (there is one user), no section about
+   * the other apps, and every link stays on that host.
+   */
+  variant?: 'site' | 'game';
 }
 
 type Provider = 'openai' | 'google' | 'elevenLabs' | 'deepseek' | 'fal';
 
 const PROVIDERS: Provider[] = ['google', 'elevenLabs', 'openai', 'deepseek', 'fal'];
+/** What the RPG spends (`components/Rpg/Rpg.tsx`): the story on Google or OpenAI, voice and music on ElevenLabs, art on fal.ai. */
+const GAME_PROVIDERS: Provider[] = ['google', 'openai', 'elevenLabs', 'fal'];
 
 const PLACEHOLDER: Record<KeyName, string> = {
   openai: 'sk-…',
@@ -258,13 +266,15 @@ function Reason<T>({ reading }: { reading: Loadable<T> }) {
 
 interface CardProps {
   api: AccountKeysApi;
-  usedBy: string[];
+  /** Null where the question has no answer worth giving: the game's page, which has one user. */
+  usedBy: string[] | null;
   refresh: number;
   t: Translation;
   lang: Lang;
 }
 
-function UsedBy({ usedBy, t }: { usedBy: string[]; t: Translation }) {
+function UsedBy({ usedBy, t }: { usedBy: string[] | null; t: Translation }) {
+  if (!usedBy) return null;
   return (
     <p className="acct-dim">
       {t.usedBy}: {usedBy.length > 0 ? usedBy.join(', ') : t.usedByNone}
@@ -768,11 +778,21 @@ const SYNC_LABEL = {
   error: 'syncError',
 } as const;
 
-export default function Account({ lang }: AccountProps) {
+export default function Account({ lang, variant = 'site' }: AccountProps) {
   const t = translations[lang];
+  const game = variant === 'game';
   const auth = useAuth();
   const api = useAccountKeys(auth.user);
-  const apps = useAppConfigs(auth.user?.uid ?? null);
+  // The game's page never shows the other apps' settings, so it does not read them either.
+  const apps = useAppConfigs(game ? null : (auth.user?.uid ?? null));
+  const home = lang === 'pl' ? '/pl/' : '/';
+  const back = game && (
+    <p>
+      <a className="retro-btn" href={home}>
+        {t.backToGame}
+      </a>
+    </p>
+  );
   const [refresh, setRefresh] = useState(0);
 
   if (auth.loading) return <p className="acct-dim">{t.checking}</p>;
@@ -786,6 +806,7 @@ export default function Account({ lang }: AccountProps) {
             {t.signIn}
           </a>
         </p>
+        {back}
       </div>
     );
   }
@@ -801,6 +822,7 @@ export default function Account({ lang }: AccountProps) {
 
   return (
     <div className="acct">
+      {back}
       <p className="acct-dim">
         {t.signedInAs} <strong>{auth.user.email}</strong>
       </p>
@@ -812,18 +834,18 @@ export default function Account({ lang }: AccountProps) {
             {t.refresh}
           </button>
         </div>
-        <p className="acct-dim">{t.keysBlurb}</p>
+        <p className="acct-dim">{game ? t.keysBlurbGame : t.keysBlurb}</p>
         <p className={api.sync === 'error' ? 'acct-dim acct-warn' : 'acct-dim'}>
           {t[SYNC_LABEL[api.sync]]}
         </p>
         {api.ready &&
-          PROVIDERS.map((provider) => {
+          (game ? GAME_PROVIDERS : PROVIDERS).map((provider) => {
             const Card = cards[provider];
             return (
               <Card
                 key={provider}
                 api={api}
-                usedBy={uses[provider]}
+                usedBy={game ? null : uses[provider]}
                 refresh={refresh}
                 t={t}
                 lang={lang}
@@ -832,7 +854,7 @@ export default function Account({ lang }: AccountProps) {
           })}
       </section>
 
-      <AppsSection api={api} apps={apps} t={t} lang={lang} />
+      {!game && <AppsSection api={api} apps={apps} t={t} lang={lang} />}
     </div>
   );
 }

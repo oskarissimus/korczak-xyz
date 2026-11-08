@@ -66,9 +66,9 @@
    * rpg.korczak.xyz changes only when a release says so — rolling back is publishing (or
    * re-running) an older release, and never touches the site.
    *
-   * Same static-assets-only design as above. The dist/ it serves is the whole site built in mode
-   * `rpg` (`.env.rpg`), and `scripts/rpg-release.mjs` puts the game at `/` and keeps the rest out
-   * of search; see that file for why the other pages are not stripped.
+   * Same static-assets-only design as above. The dist/ it serves is the game alone: src-rpg/, built
+   * by `npm run build:rpg` in mode `rpg` (`.env.rpg`) — the game at `/`, sign-in, the keys page,
+   * and none of korczak.xyz. `assets` is inherited from the top level (directory ./dist, 404-page).
    *
    * `routes` and `workers_dev` are not inherited by a named environment, so they are stated again.
    * The custom domain's DNS record is created by the first deploy, as it was for the apex.

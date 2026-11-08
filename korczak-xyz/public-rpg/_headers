@@ -1,0 +1,23 @@
+# rpg.korczak.xyz. The same cache tiers as public/_headers on korczak.xyz, minus what this site
+# does not have (no service worker, no fonts).
+
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/*
+  Cache-Control: public, max-age=604800
+
+/manifests/*
+  Cache-Control: public, max-age=0, must-revalidate
+  Content-Type: application/manifest+json
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The workers.dev copies are previews; keep them out of search.
+https://korczak-xyz-rpg.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
+https://:version.korczak-xyz-rpg.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

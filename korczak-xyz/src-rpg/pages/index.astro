@@ -1,0 +1,16 @@
+---
+import Game from '../layouts/Game.astro';
+import Rpg from '../../src/components/Rpg/Rpg';
+import { useTranslations } from '../../src/i18n';
+import '../../src/styles/rpg.css';
+import '../styles/standalone.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Game title={t('Rpg')} lang={lang} path="/">
+  <main class="rpg-content rpg-standalone">
+    <Rpg client:only="react" lang={lang} />
+  </main>
+</Game>

@@ -1,0 +1,59 @@
+/* Sign-in and the keys page, in the game's colours rather than the site's Windows 95 desktop.
+   auth.css and account.css are the site's own and draw everything from the --retro-* colours,
+   so the game's palette goes in through those names instead of a second copy of both files. */
+
+:root {
+  --retro-gray: #1d1812;      /* panels */
+  --retro-white: #3a3024;     /* bevels, input wells */
+  --retro-black: #f1e6cf;     /* text */
+  --retro-dark-gray: #6b5a42; /* the dark side of a bevel, dim text */
+  --retro-navy: #e0b96a;      /* accents */
+  --retro-teal: #8fb3a0;
+  --retro-yellow: #f3d27a;
+  --retro-red: #e07a6a;
+}
+
+.rpg-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(24px + var(--safe-top)) calc(16px + var(--safe-right)) calc(32px + var(--safe-bottom))
+    calc(16px + var(--safe-left));
+  line-height: 1.5;
+}
+
+.rpg-page h1 {
+  font-weight: normal;
+  letter-spacing: 0.04em;
+  text-align: center;
+  margin: 0 0 24px;
+  color: #e0b96a;
+}
+
+.retro-btn {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1px solid #b9a77f;
+  border-radius: 4px;
+  background: #2a2219;
+  color: #f1e6cf;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.retro-btn:hover {
+  background: #3a3024;
+  color: #f1e6cf;
+}
+
+.rpg-page input,
+.rpg-page select {
+  font: inherit;
+}
+
+/* auth.css and account.css set the site's VT323 on their own elements, and this site does not
+   ship that font; the game's serif, everywhere on these pages. */
+.rpg-page *,
+.rpg-page *::placeholder {
+  font-family: inherit !important;
+}

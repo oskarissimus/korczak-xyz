@@ -1,45 +1,71 @@
 #!/usr/bin/env node
 /**
- * Turns a `astro build --mode rpg` dist/ into what rpg.korczak.xyz serves.
+ * Finishes the dist/ of `astro build --config astro.config.rpg.mjs --mode rpg` (`npm run build:rpg`)
+ * into what rpg.korczak.xyz serves, and refuses one that is not only the game.
  *
- * Run by .github/workflows/rpg-release.yml between the build and `wrangler deploy --env rpg`, never
- * on the main site's build. The one change is the front door: `/` on rpg.korczak.xyz is the game,
- * not the homepage, so two redirects go at the TOP of dist/_redirects (first match wins, and these
- * must not lose to anything below them).
+ * Two jobs:
  *
- * 302 rather than 301 on purpose. A browser keeps a 301 for ever, and where the front door points
- * is exactly the kind of thing a later release may want to change.
+ * 1. The icons. The game's artwork lives in public/icons/ with every other app's, and iconUrl()
+ *    hashes it from there; this site's public dir (`public-rpg/`) has none of it, so the `rpg-*`
+ *    files are copied in rather than kept twice in git.
  *
- * The rest of the site is left in dist/ rather than stripped. The game links into it (sign-in, the
- * account page and its key store, the shared layout's assets), so cutting it down to /apps/rpg/
- * would be a list of exceptions that breaks quietly the first time the game links somewhere new.
- * Every page canonicalises to https://korczak.xyz (`site` in astro.config.mjs), so search engines
- * treat the copies here as the duplicates they are.
+ * 2. The page list. src-rpg/ shares its components with korczak.xyz, and the point of this site is
+ *    that nothing else of korczak.xyz comes with them. So dist/ is checked against EXPECTED: a page
+ *    that is not on it means the site leaked in, and one that is missing means the game links
+ *    somewhere that 404s. Either fails the release before anything is deployed.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const FRONT_DOOR = [
-  '# rpg.korczak.xyz: the front door is the game. Added by scripts/rpg-release.mjs.',
-  '/       /apps/rpg/     302',
-  '/pl     /pl/apps/rpg/  302',
-  '/pl/    /pl/apps/rpg/  302',
-  '',
-].join('\n');
+export const EXPECTED = [
+  '404.html',
+  'index.html',
+  'login/index.html',
+  'account/index.html',
+  'pl/index.html',
+  'pl/login/index.html',
+  'pl/account/index.html',
+];
 
-export function withFrontDoor(redirects) {
-  if (redirects.startsWith(FRONT_DOOR)) return redirects;
-  return `${FRONT_DOOR}\n${redirects}`;
+/** Every .html under `dir`, relative and with forward slashes. */
+export function htmlPages(dir) {
+  const out = [];
+  const walk = (d) => {
+    for (const name of readdirSync(d)) {
+      const p = join(d, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (name.endsWith('.html')) out.push(relative(dir, p).split(sep).join('/'));
+    }
+  };
+  walk(dir);
+  return out.sort();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/** What is wrong with a page list, as sentences; empty when it is exactly the game's. */
+export function pageProblems(pages) {
+  const have = new Set(pages);
+  return [
+    ...pages.filter((p) => !EXPECTED.includes(p)).map((p) => `unexpected page ${p}: only the game ships here`),
+    ...EXPECTED.filter((p) => !have.has(p)).map((p) => `missing page ${p}`),
+  ];
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dist = process.argv[2] ?? 'dist';
-  if (!existsSync(join(dist, 'apps', 'rpg', 'index.html'))) {
-    console.error(`${dist}/apps/rpg/index.html is missing — is this a built dist/?`);
+  const icons = new URL('../public/icons/', import.meta.url);
+  mkdirSync(join(dist, 'icons'), { recursive: true });
+  for (const name of readdirSync(icons)) {
+    if (name.startsWith('rpg-')) copyFileSync(new URL(name, icons), join(dist, 'icons', name));
+  }
+  if (!existsSync(join(dist, 'icons', 'rpg-192.png'))) {
+    console.error('rpg-release: public/icons/rpg-*.png are missing');
     process.exit(1);
   }
-  const file = join(dist, '_redirects');
-  const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  writeFileSync(file, withFrontDoor(before));
-  console.log(`rpg-release: front door written to ${file}`);
+  const problems = pageProblems(htmlPages(dist));
+  if (problems.length > 0) {
+    for (const p of problems) console.error(`rpg-release: ${p}`);
+    process.exit(1);
+  }
+  console.log(`rpg-release: ${dist}/ is the game and nothing else (${EXPECTED.length} pages)`);
 }

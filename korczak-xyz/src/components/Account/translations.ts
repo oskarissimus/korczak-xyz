@@ -19,6 +19,12 @@ const en = {
     'the one they all use, and clearing it here clears it everywhere. Kept in this browser and in ' +
     'your account, readable by you alone. The numbers come straight from each provider, with the ' +
     'key itself; where a provider does not say, this page says so instead of guessing.',
+  keysBlurbGame:
+    'The keys the game plays on: the story on Google or OpenAI, voices and music on ElevenLabs, ' +
+    'pictures and models on fal.ai. Kept in this browser and in your account, readable by you ' +
+    'alone. The numbers come straight from each provider; where a provider does not say, this page ' +
+    'says so instead of guessing.',
+  backToGame: '← Back to the game',
   syncLocal: 'This browser only',
   syncSyncing: 'Checking the account…',
   syncSynced: 'Saved to your account',
@@ -122,6 +128,12 @@ const pl: Translation = {
     'czyści go wszędzie. Trzymane w tej przeglądarce i na twoim koncie, widoczne tylko dla ciebie. ' +
     'Liczby pochodzą prosto od dostawców, z użyciem tego klucza; gdy dostawca czegoś nie podaje, ' +
     'strona to mówi zamiast zgadywać.',
+  keysBlurbGame:
+    'Klucze, na których gra działa: opowieść na Google albo OpenAI, głosy i muzyka na ElevenLabs, ' +
+    'obrazy i modele na fal.ai. Trzymane w tej przeglądarce i na twoim koncie, widoczne tylko dla ' +
+    'ciebie. Liczby pochodzą prosto od dostawców; gdy dostawca czegoś nie podaje, strona to mówi ' +
+    'zamiast zgadywać.',
+  backToGame: '← Wróć do gry',
   syncLocal: 'Tylko ta przeglądarka',
   syncSyncing: 'Sprawdzam konto…',
   syncSynced: 'Zapisane na koncie',

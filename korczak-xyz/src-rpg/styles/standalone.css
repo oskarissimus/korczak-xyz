@@ -1,0 +1,14 @@
+/* The game as the whole page. styles/rpg.css sizes the container for a window under the site's
+   navbar (78vh, or the screen less 150px on a phone); here nothing sits around it, so it takes
+   the screen less the status bar an installed iPhone app draws over the top. */
+
+.rpg-standalone {
+  padding-top: var(--safe-top);
+}
+
+.rpg-standalone .rpg-container,
+.rpg-standalone .rpg-container.rpg-touch:not(.rpg-immersive) {
+  height: calc(100vh - var(--safe-top));
+  height: calc(100dvh - var(--safe-top));
+  min-height: 0;
+}

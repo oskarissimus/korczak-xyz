@@ -17,6 +17,8 @@ import { useAuth, type AuthErrorCode } from '../../hooks/useAuth';
 
 interface LoginFormProps {
   lang: 'en' | 'pl';
+  /** `game` is rpg.korczak.xyz: home is the game, and the site's other pages do not exist there. */
+  variant?: 'site' | 'game';
 }
 
 const translations = {
@@ -31,6 +33,7 @@ const translations = {
     signOut: 'Sign out',
     signedInAs: 'Signed in as',
     home: 'Home',
+    backToGame: '← Back to the game',
     typing: 'Typing Trainer',
     admin: 'Accounts',
     unavailable: 'Login is not configured.',
@@ -71,6 +74,7 @@ const translations = {
     signOut: 'Wyloguj',
     signedInAs: 'Zalogowano jako',
     home: 'Strona główna',
+    backToGame: '← Wróć do gry',
     typing: 'Trening Pisania',
     admin: 'Konta',
     unavailable: 'Logowanie nie jest skonfigurowane.',
@@ -110,7 +114,8 @@ function safeRedirect(): string | null {
   return null;
 }
 
-export default function LoginForm({ lang }: LoginFormProps) {
+export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
+  const game = variant === 'game';
   const {
     enabled,
     user,
@@ -155,14 +160,16 @@ export default function LoginForm({ lang }: LoginFormProps) {
         </p>
         <div className="auth-links">
           <a className="retro-btn" href={homePath}>
-            {t.home}
+            {game ? t.backToGame : t.home}
           </a>
-          <a className="retro-btn" href={typingPath}>
-            {t.typing}
-          </a>
+          {!game && (
+            <a className="retro-btn" href={typingPath}>
+              {t.typing}
+            </a>
+          )}
           {/* Only an admin has anywhere to go, and only an admin is told the page exists. The
               page itself does not take this on trust — see AdminAccounts. */}
-          {isAdmin && (
+          {isAdmin && !game && (
             <a className="retro-btn" href={adminPath}>
               {t.admin}
             </a>

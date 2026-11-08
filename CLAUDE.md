@@ -59,9 +59,13 @@ korczak.xyz follows `main`. **rpg.korczak.xyz moves only when a GitHub release i
 (`.github/workflows/rpg-release.yml`; a pre-release does not deploy). Shipping is one button: Actions →
 *RPG release* → *Run workflow* with the tag left empty makes a release named
 `YYYY-MM-DD-HHMM-<hash>` (UTC, the navbar's short hash) from main and deploys it; naming an existing
-tag redeploys it. It is a second Worker, `env.rpg` in `korczak-xyz/wrangler.jsonc`, serving the whole site
-built with `astro build --mode rpg` — which reads `.env.rpg` *instead of* `.env.production` — with
-`scripts/rpg-release.mjs` putting the game at `/`. Rolling back is running that workflow by hand
+tag redeploys it. It is a second Worker, `env.rpg` in `korczak-xyz/wrangler.jsonc`, serving **the game
+and nothing else of korczak.xyz** (owner, Nov 2026: "clean experience bez całego narzutu"): a
+second Astro source tree, `korczak-xyz/src-rpg/` (see its README), over the same components — the
+game at `/` with no navbar or window around it, plus a game-only sign-in and keys page, in both
+locales. `npm run build:rpg` builds it in mode `rpg`, which reads `.env.rpg` *instead of*
+`.env.production`, and `scripts/rpg-release.mjs` fails the release if any other page reaches
+dist/. Rolling back is running that workflow by hand
 with an older tag. Its Sentry environment is `rpg`.
 
 So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
