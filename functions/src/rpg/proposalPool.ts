@@ -275,6 +275,10 @@ export function poolFor(rawLang: unknown): Promise<Pool | null> {
     return syncLanguage(google, lang, source, have);
   })();
   building.set(lang, job);
-  job.finally(() => setTimeout(() => building.delete(lang), 60_000)).catch(() => {});
+  // A failure is asked again on the next request; a success is not, for a minute.
+  job.then(
+    () => setTimeout(() => building.delete(lang), 60_000),
+    () => building.delete(lang),
+  );
   return job;
 }

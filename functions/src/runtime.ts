@@ -28,10 +28,21 @@ export const TICKETMASTER_API_KEY = defineSecret('TICKETMASTER_API_KEY');
  * key to store, rotate or leak — and nothing new on the deploy path, since a secret named in a
  * function's `secrets` array has to exist before the CLI will deploy at all.
  *
- * `GOOGLE_CLOUD_PROJECT` is set by the Cloud Functions runtime. The literal is the fallback for a
- * local run, and it is the same id `.firebaserc` names.
+ * `GCLOUD_PROJECT` is what the Firebase SDK sets on a gen-2 function; `GOOGLE_CLOUD_PROJECT` is
+ * not set there at all. Reading only the second made every function in `korczak-rpg` believe it
+ * was in `korczak-xyz-501720`: on 9 Nov 2026 the game's gateway failed 229 times to keep a picture
+ * in `korczak-xyz-501720-rpg`, a bucket it has no access to. The literal is the fallback for a local
+ * run, and it is the same id `.firebaserc` names.
  */
-export const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'korczak-xyz-501720';
+export const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || firebaseProject() || 'korczak-xyz-501720';
+
+function firebaseProject(): string | null {
+  try {
+    return (JSON.parse(process.env.FIREBASE_CONFIG ?? 'null') as { projectId?: string } | null)?.projectId ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Where the model is asked. Not `REGION`: the functions run in Warsaw, and the generative models
