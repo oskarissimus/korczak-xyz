@@ -23,6 +23,7 @@
 
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
+import { paletteLine } from './falPrompts';
 import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
 
 export type { GroundTexture };
@@ -55,7 +56,10 @@ export function groundPrompt(world: PromptWorld): string {
     `Seamless tileable texture of the ground seen from directly above: ${subject.replace(/[.\s]+$/, '')}.`,
     'Flat top-down view of about four metres of ground, evenly lit, no shadows, no horizon, no sky,',
     'no objects, no buildings, no people, no text, the same detail all over the image, stylised hand-painted game texture.',
-  ].join(' ');
+    paletteLine(world.look.light),
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 const made = new Set<string>();

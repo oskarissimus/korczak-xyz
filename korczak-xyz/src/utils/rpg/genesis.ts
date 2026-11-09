@@ -75,6 +75,11 @@ export interface WorldLook {
    * asked for, and in the classic look: the land then takes one from the world's id.
    */
   relief?: Relief;
+  /**
+   * The light the world was drawn in, by the game's dice (`drawLight`). Absent in a world from before
+   * 9 Nov 2026, which keeps the light and the asset prompts it had.
+   */
+  light?: Light;
 }
 
 export const TIMES = ['dawn', 'day', 'dusk', 'night'] as const;
@@ -85,6 +90,68 @@ export const GROWTHS = ['barren', 'sparse', 'lush'] as const;
 export const FLORAS = ['pines', 'broadleaf', 'dead', 'fungi', 'spires', 'none'] as const;
 export const WALL_SURFACES = ['plaster', 'stone', 'planks', 'rock'] as const;
 export const ROOF_SURFACES = ['thatch', 'planks', 'stone', 'leaves'] as const;
+
+/*
+ * THE LIGHT IS DICE, NOT THE MODEL'S TASTE (owner, 9 Nov 2026: "everything generated looks dull, as if
+ * it were all a dark Polish autumn; the light and the colour should be generated too, and sometimes
+ * sunny and bright"). Left to choose, a model paints its worlds moody: sixteen geneses on Flash that
+ * day came back with not one clear sky, six at dusk or night, six in thick haze, rain, ash or sparks
+ * in half, and a "day" sky of #2c3e50. So the game draws the light before asking, as it draws a
+ * quest's tone (`drawMood`): the prompt is told which, `parseLook` holds the look to it, the scene
+ * lights it (`LIGHT_GAIN` in `components/Rpg/atmosphere.ts`), and every picture of the world's things
+ * is asked in its palette (`paletteLine` in `falPrompts.ts`). Moody worlds stay — one in six or so.
+ */
+export const LIGHTS = ['sunny', 'golden', 'fresh', 'moody'] as const;
+export type Light = (typeof LIGHTS)[number];
+export const LIGHT_WEIGHTS: Record<Light, number> = { sunny: 40, golden: 20, fresh: 25, moody: 15 };
+
+export function drawLight(random: () => number = Math.random): Light {
+  const total = LIGHTS.reduce((sum, l) => sum + LIGHT_WEIGHTS[l], 0);
+  let roll = random() * total;
+  for (const l of LIGHTS) {
+    roll -= LIGHT_WEIGHTS[l];
+    if (roll < 0) return l;
+  }
+  return 'sunny';
+}
+
+/** What the prompt says about each light: the look's colours, time, haze and weather follow from it. */
+const LIGHT_LINES: Record<Light, string[]> = {
+  sunny: [
+    'a SUNNY, BRIGHT day: a high sun in a clear sky, crisp shadows, everything in full, saturated colour — a',
+    'deep clear sky (blue, or this world’s own strong hue), lively growth, bright walls and roofs. So "time" is',
+    '"day", "haze" is "clear", and nothing grey falls (no rain, no ash). Even a harsh or strange land is shown on',
+    'its best, sunniest day.',
+  ],
+  golden: [
+    'a GOLDEN HOUR: the sun low and warm, at dawn or dusk, long shadows, warm amber, rose and orange light over',
+    'rich colours and a sky that glows. So "time" is "dawn" or "dusk", "haze" is "clear" or "light", no rain or ash.',
+  ],
+  fresh: [
+    'a FRESH, SOFT day: mild light through thin cloud or a light mist, gentle shadows, clean clear colours —',
+    'fresh, never grey or washed out. So "time" is "day" or "dawn", "haze" is "light" or "clear"; a light rain or',
+    'snow may fall, no ash.',
+  ],
+  moody: [
+    'a MOODY light: night, a storm, dusk, thick haze, rain or ash, whatever suits this world’s darker side. Even',
+    'so its colours stay distinct and readable, never one murky brown-grey.',
+  ],
+};
+
+function lightLines(ctx: GenesisContext): string[] {
+  const lines = [
+    '',
+    'Pick the look’s colours as a stylised, colourful game would: saturated and distinct from one another, never',
+    'a palette of greys, browns and drab olive (and if this world truly is all stone or ash, give it one strong',
+    'accent).',
+  ];
+  if (!ctx.light) return lines;
+  return [
+    ...lines,
+    `THE LIGHT, drawn by the game’s dice before you were asked: ${LIGHT_LINES[ctx.light].join(' ')}`,
+    ...(ctx.wish ? ['If the player’s description says otherwise about the light or the weather, the description wins.'] : []),
+  ];
+}
 
 
 /** The words of a world every beat's prompt is given. */
@@ -356,6 +423,8 @@ export interface GenesisContext {
    * before asking, since only the picked one is written in full. Absent is the nearest.
    */
   nth?: 1 | 2;
+  /** The light the world is drawn in: the game's dice too (`drawLight`). Absent leaves it to the model. */
+  light?: Light;
 }
 
 /** The longest description of a world the player may write. */
@@ -634,6 +703,7 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     'role for the player that gives them a reason to help strangers ("player").',
     'The game draws it in simple 3D — ground, sky, fog, light, weather, plants, buildings — from the "look", so',
     'choose the look to show this world and nothing generic.',
+    ...lightLines(ctx),
     '',
     `Write every text field in ${language}. Be concrete and sensory, not grand. Each text field at most 240 characters.`,
     'Write the fields of "world" in exactly the order below: the game starts building the world from its look,',
@@ -718,7 +788,6 @@ function oneOf<T extends string>(value: unknown, options: readonly T[], fallback
   return options.find((o) => o === key) ?? fallback;
 }
 
-/** A model's look, every value checked; what is missing or unknown is the classic one. */
 /**
  * `color` brought up to at least `floor` of brightness (the largest channel, 0–1), keeping its hue.
  * The models paint some worlds in pure black — a ground of #000000 under a sky of #000000 — and a
@@ -734,19 +803,87 @@ export function lift(color: string, floor: number): string {
   return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export function parseLook(raw: unknown): WorldLook {
+/** A colour's hue, saturation and lightness, each 0–1. */
+function toHsl(color: string): [number, number, number] {
+  const n = parseInt(color.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+
+function fromHsl(h: number, s: number, l: number): string {
+  const f = (k: number) => {
+    const a = s * Math.min(l, 1 - l);
+    const t = (k + h * 12) % 12;
+    return l - a * Math.max(-1, Math.min(t - 3, 9 - t, 1));
+  };
+  return `#${[f(0), f(8), f(4)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * `color` made more itself: saturation times `gain` up to 85% (never lowered: a model's own neon stays
+ * its own), lightness held within `[lo, hi]`. A grey (under 6% saturation) keeps its no-hue, since
+ * multiplying it would give white walls a tint picked by rounding.
+ */
+export function vivid(color: string, gain: number, lo = 0, hi = 1): string {
+  const [h, s, l] = toHsl(color);
+  return fromHsl(h, s < 0.06 ? s : Math.max(s, Math.min(0.85, s * gain)), Math.min(hi, Math.max(lo, l)));
+}
+
+/** How far each light pushes the palette: saturation, and the sky's lightness kept off night-blue. */
+const VIVID: Record<Light, { gain: number; sky: [number, number] }> = {
+  sunny: { gain: 1.25, sky: [0.5, 0.82] },
+  golden: { gain: 1.2, sky: [0.42, 0.8] },
+  fresh: { gain: 1.12, sky: [0.5, 0.85] },
+  moody: { gain: 1.08, sky: [0, 1] },
+};
+
+/** The time, haze and weather a light allows; what a model chose against it is brought back inside. */
+function holdToLight(look: WorldLook, light: Light): WorldLook {
+  const l = { ...look };
+  const grey = l.weather === 'rain' || l.weather === 'ash';
+  if (light === 'sunny') {
+    l.time = 'day';
+    l.haze = 'clear';
+    if (grey) l.weather = 'none';
+  } else if (light === 'golden') {
+    if (l.time !== 'dawn' && l.time !== 'dusk') l.time = l.time === 'night' ? 'dusk' : 'dawn';
+    if (l.haze === 'thick') l.haze = 'light';
+    if (grey) l.weather = 'none';
+  } else if (light === 'fresh') {
+    if (l.time === 'night' || l.time === 'dusk') l.time = 'day';
+    if (l.haze === 'thick') l.haze = 'light';
+    if (l.weather === 'ash') l.weather = 'none';
+  }
+  return l;
+}
+
+/**
+ * A model's look, every value checked; what is missing or unknown is the classic one. With a `light`
+ * the palette is pushed toward it (`VIVID`) and, unless the player described the world themselves
+ * (`hold` false), the time, haze and weather are held to it.
+ */
+export function parseLook(raw: unknown, light?: Light, hold = true): WorldLook {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const c = CLASSIC_LOOK;
-  const sky = lift(hex(r.sky) ?? c.sky, 0.14);
-  return {
+  const v = light ? VIVID[light] : null;
+  const push = (color: string, lo = 0, hi = 1) => (v ? vivid(color, v.gain, lo, hi) : color);
+  const sky = lift(push(hex(r.sky) ?? c.sky, ...(v?.sky ?? [0, 1])), 0.14);
+  const look: WorldLook = {
     sky,
-    fog: lift(hex(r.fog) ?? sky, 0.14),
+    fog: lift(push(hex(r.fog) ?? sky, ...(v?.sky ?? [0, 1])), 0.14),
     sun: lift(hex(r.sun) ?? c.sun, 0.6),
-    ground: lift(hex(r.ground) ?? c.ground, 0.45),
-    foliage: lift(hex(r.foliage) ?? c.foliage, 0.35),
-    wall: lift(hex(r.wall) ?? c.wall, 0.4),
-    roof: lift(hex(r.roof) ?? c.roof, 0.4),
-    accent: lift(hex(r.accent) ?? c.accent, 0.5),
+    ground: lift(push(hex(r.ground) ?? c.ground), 0.45),
+    foliage: lift(push(hex(r.foliage) ?? c.foliage), 0.35),
+    wall: lift(push(hex(r.wall) ?? c.wall), 0.4),
+    roof: lift(push(hex(r.roof) ?? c.roof), 0.4),
+    accent: lift(push(hex(r.accent) ?? c.accent), 0.5),
     time: oneOf(r.time, TIMES, c.time),
     haze: oneOf(r.haze, HAZES, c.haze),
     weather: oneOf(r.weather, WEATHERS, c.weather),
@@ -757,6 +894,8 @@ export function parseLook(raw: unknown): WorldLook {
     roofSurface: oneOf(r.roofSurface, ROOF_SURFACES, c.roofSurface),
     ...(RELIEFS.includes(r.relief as Relief) ? { relief: r.relief as Relief } : {}),
   };
+  if (!light) return look;
+  return { ...(hold ? holdToLight(look, light) : look), light };
 }
 
 /** A world's words, or null when one the game needs is missing. */
@@ -910,7 +1049,7 @@ function bible(c: unknown, i: number, ctx: GenesisContext, now: number): WorldBi
     createdAt: now,
     seeds: ctx.seeds,
     typicality: Number.isFinite(typicality) ? Math.min(100, Math.max(0, Math.round(typicality))) : 50,
-    look: parseLook(r.look),
+    look: parseLook(r.look, ctx.light, !ctx.wish),
     ...(text(r.landmark, 300) ? { landmark: text(r.landmark, 300)! } : {}),
     ...parseKit(r.kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
@@ -972,7 +1111,7 @@ export function previewWorld(soFar: string, ctx: GenesisContext, now: number): W
     address: '',
     hub: text(r.hub, 60) ?? '',
     words: [],
-    look: parseLook(look),
+    look: parseLook(look, ctx.light, !ctx.wish),
     landmark: text(r.landmark, 300)!,
     ...parseKit(kit),
     ...(text(r.terrain, 160) ? { terrain: text(r.terrain, 160)! } : {}),
@@ -1080,5 +1219,6 @@ export function demoGenesis(value: unknown): GenesisContext {
     chosen: r.chosen === true,
     wish: cut(r.wish, WISH_MAX).trim() || undefined,
     nth: r.nth === 2 ? 2 : 1,
+    ...(LIGHTS.includes(r.light as Light) ? { light: r.light as Light } : {}),
   };
 }

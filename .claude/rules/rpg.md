@@ -183,6 +183,26 @@ broadleaf or dead trees, or primitive fungi and spires, or none). The kit's text
 (`recolor`), because multiplying purple into green leaves made mud. `parseLook` lifts every colour
 to a floor of brightness (`lift`), since the models do paint worlds in #000000.
 
+**The light is the game's dice, not the model's taste** (owner, 9 Nov 2026: "every generated asset
+and texture is dull, as if it were all a dark Polish autumn; the light and the colour should be
+generated too, and sometimes sunny and bright"). Left to choose, Flash painted 16 test worlds with
+not one clear sky, 6 at dusk or night, 6 in thick haze, weather falling in half of them, and a "day"
+sky of #2c3e50; mean palette saturation 0.44. So `drawLight` (`genesis.ts`) draws one of `LIGHTS`
+before asking — `sunny` 40, `golden` 20, `fresh` 25, `moody` 15 — kept in `GenesisContext.light` (and
+the pending genesis, and `demoGenesis`), and:
+- the prompt says which (`LIGHT_LINES`), with a line for every world asking for saturated, distinct
+  colours rather than greys, browns and drab olive; a player's own description wins over the dice;
+- `parseLook(raw, light, hold)` holds time, haze and weather to it (`holdToLight`: sunny is day, clear,
+  no rain or ash; golden dawn or dusk; fresh no night, no thick haze; moody anything), not when the
+  player described the world, and pushes the palette (`vivid`: saturation ×1.08–1.25, never lowered,
+  capped at 85%; greys stay grey; a sunny sky's lightness kept in 0.5–0.82). It is `look.light`;
+- the scene multiplies the time of day's sun and sky by `LIGHT_GAIN` (`atmosphere.ts`);
+- every picture of the world's things — hub pieces, ground, cover, people, enemies, clues, place
+  pieces, the weapon — gets `paletteLine(look.light)` (`falPrompts.ts`).
+With the dice the same 16 came back at saturation 0.74. A world from before has no `light`: its
+look, its light and every one of its prompts are byte for byte what they were, so nothing kept in
+the bucket is asked for again (the fingerprint is the request body).
+
 ## The intro tells the world while it is made
 
 Owner, 1 Nov 2026: "a toggle in Settings, a feature flag on by default: an intro during the world's

@@ -76,6 +76,18 @@ export const DAYLIGHT: Record<WorldLook['time'], { elevation: number; sun: numbe
   night: { elevation: 0.7, sun: 0.45, sky: 0.35 },
 };
 
+/**
+ * How a world's drawn light (`WorldLook.light`, `genesis.ts`) lifts its time of day: the sun's strength
+ * and the sky's. A sunny noon is a harder, brighter sun; a fresh day a softer sun under more sky; a
+ * moody world is the time of day as it always was, and so is a world from before the light was drawn.
+ */
+export const LIGHT_GAIN: Record<NonNullable<WorldLook['light']>, { sun: number; sky: number }> = {
+  sunny: { sun: 1.3, sky: 1.12 },
+  golden: { sun: 1.25, sky: 1.05 },
+  fresh: { sun: 0.9, sky: 1.2 },
+  moody: { sun: 1, sky: 1 },
+};
+
 const BOX = 70;
 const HEIGHT = 30;
 

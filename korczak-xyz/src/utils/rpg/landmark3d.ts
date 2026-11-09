@@ -44,7 +44,7 @@ import { FRESH_HEADER, meshyRigBody } from './assetStore';
 import { geminiImageCost, type GeminiImageUsage } from './gatewayRoutes';
 import { outOfFunds } from './funds';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, paletteLine, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { CARD_ERROR, isCard } from './meshShape';
@@ -918,10 +918,11 @@ export function hubSlotPending(worldId: string, slot: HubSlot): boolean {
  * to light them up"): the thing the model described in English (`Clue.prop`), small and whole, in
  * the world's colours where it has any, lying as it would be found.
  */
-export function cluePrompt(prop: string, look?: Pick<WorldBible['look'], 'accent'>): string {
+export function cluePrompt(prop: string, look?: Pick<WorldBible['look'], 'accent' | 'light'>): string {
   return [
     `A single stylised low-poly game asset, a small object lying on the ground: ${prop.trim().replace(/[.\s]+$/, '')}.`,
     look ? `A touch of ${look.accent} somewhere on it.` : '',
+    paletteLine(look?.light),
     'The whole object in view, three-quarter view from slightly above.',
     'Chunky, thick proportions with no thin or spindly parts,',
     FRAMED,
@@ -952,10 +953,15 @@ export function ensureClueModel(
  * What a quest's place shows in an invented world (`PlaceAsset`): its landmark, or a thing that stands
  * around it many times over, as the beat described it in English, in the world's colours.
  */
-export function placeAssetPrompt(what: string, role: 'landmark' | 'scatter', look?: Pick<WorldBible['look'], 'wall' | 'roof' | 'accent'>): string {
+export function placeAssetPrompt(
+  what: string,
+  role: 'landmark' | 'scatter',
+  look?: Pick<WorldBible['look'], 'wall' | 'roof' | 'accent' | 'light'>,
+): string {
   return [
     `A single stylised low-poly game asset: ${what.trim().replace(/[.\s]+$/, '')}.`,
     look ? `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.` : '',
+    paletteLine(look?.light),
     role === 'landmark'
       ? 'Seen from the front and slightly above, its entrance or face toward the viewer, the whole of it in view, standing on a small base,'
       : 'The whole object in view, three-quarter view from slightly above, chunky, thick proportions with no thin or spindly parts,',
@@ -986,10 +992,11 @@ export function ensurePlaceModel(
  * `LEG_TOP` of its height swings as legs (`utils/rpg/creature.ts`) and a leg fused to its neighbour
  * drags the belly with it; nothing long and thin, which TRELLIS loses at this simplification.
  */
-export function creaturePrompt(prop: string, shape: 'beast' | 'blob', color?: string): string {
+export function creaturePrompt(prop: string, shape: 'beast' | 'blob', color?: string, light?: WorldBible['look']['light']): string {
   return [
     `A single stylised low-poly game creature, one monster only: ${prop.trim().replace(/[.\s]+$/, '')}.`,
     color ? `Mostly ${color}.` : '',
+    paletteLine(light),
     shape === 'blob'
       ? 'A squat rounded body sitting on the ground, no legs, facing the viewer with its eyes or mouth toward us,'
       : 'Standing on all its legs in a neutral stance, thick sturdy legs set apart with a clear gap between them and under the belly, facing the viewer with its head toward us,',

@@ -62,7 +62,7 @@ import {
   validSpend,
 } from '../../utils/rpg/devlog';
 import { outOfFunds } from '../../utils/rpg/funds';
-import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
+import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, drawLight, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture, groundState } from '../../utils/rpg/groundTexture';
 import { coverState, ensureGroundCover, hasCover } from '../../utils/rpg/groundCover';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
@@ -874,7 +874,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         key,
         'person',
         `${world.id}/${c.name}`,
-        personPrompt(personLook(c, world), c),
+        personPrompt(personLook(c, world), c, world.look.light),
         (model) => {
           keepPerson(world.id, c.name, model);
           if (worldRef.current?.id === world.id)
@@ -1277,7 +1277,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           key,
           'hero',
           w.id,
-          personPrompt(heroLook(w), { gender: heroBody(heroLook(w)) }),
+          personPrompt(heroLook(w), { gender: heroBody(heroLook(w)) }, w.look.light),
           (model) => keepHero(w.id, model),
           (e) => {
             log.warn('rpg.hero.failed', describeError(e));
@@ -1356,7 +1356,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     setCreatingWish(wishText ?? '');
     const nth: 1 | 2 = again?.nth ?? (Math.random() < 0.5 ? 1 : 2);
     const avoid = again?.avoid ?? pastWorlds();
-    const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText, nth, avoid };
+    const light = again ? again.light : drawLight();
+    const pending = { lang: gameLang, seeds, exotic: exoticNow, chosen: chosenSeeds, wish: wishText, nth, avoid, light };
     savePendingGenesis({ ...pending, at: Date.now() });
     const keys = { google: apiKeys.google, openai: apiKeys.openai, demo: storyProvider === 'demo' };
     const chosen = chosenModelRef.current;
@@ -1383,6 +1384,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           chosen: chosenSeeds,
           wish: wishText,
           nth,
+          light,
         },
         chosen,
         quick(fastStartRef.current),
@@ -1599,20 +1601,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       for (const name of who === 'nearest' ? here.people.slice(0, 1) : who === 'hero' ? [] : here.people) {
         const c = charactersRef.current.find((k) => k.name === name);
         if (!c) continue;
-        ask('person', `${world.id}/${c.name}`, personPrompt(personLook(c, world), c), (model) => {
+        ask('person', `${world.id}/${c.name}`, personPrompt(personLook(c, world), c, world.look.light), (model) => {
           keepPerson(world.id, c.name, model);
           if (worldRef.current?.id === world.id)
             void sceneRef.current?.setNpcBody(c.name, { url: model.glb, picture: model.image }).catch((e) => log.warn('rpg.person.load.failed', { name: c.name, ...describeError(e) }));
         });
       }
       if (who === 'nearest') return;
-      if (here.hero || who === 'hero') ask('hero', world.id, personPrompt(heroLook(world), { gender: heroBody(heroLook(world)) }), (model) => keepHero(world.id, model));
+      if (here.hero || who === 'hero') ask('hero', world.id, personPrompt(heroLook(world), { gender: heroBody(heroLook(world)) }, world.look.light), (model) => keepHero(world.id, model));
       if (who === 'hero') return;
       const beat = beatRef.current;
       const job = beat?.job;
       if (here.enemy && beat && job?.kind === 'slay') {
         const token = questTokenRef.current;
-        ask('enemy', `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`, personPrompt(job.prop ?? job.targetName, { color: job.look.color }), (model) => {
+        ask('enemy', `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`, personPrompt(job.prop ?? job.targetName, { color: job.look.color }, world.look.light), (model) => {
           if (questTokenRef.current !== token) return;
           const keep = (b: Beat): Beat => (b.index === beat.index && b.title === beat.title && b.job ? { ...b, job: { ...b.job, model } } : b);
           beatsRef.current = beatsRef.current.map(keep);
@@ -1934,7 +1936,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       falKey,
       'enemy',
       `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`,
-      personPrompt(job.prop ?? job.targetName, { color: job.look.color }),
+      personPrompt(job.prop ?? job.targetName, { color: job.look.color }, world.look.light),
       (model) => {
         if (questTokenRef.current !== token) return;
         const keep = (b: Beat): Beat =>
@@ -1967,7 +1969,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     ensureCreatureModel(
       falKey,
       `${world.id}/${seedRef.current}/${beat.index}/${job.targetName}`,
-      creaturePrompt(job.prop ?? job.targetName, shape, job.look.color),
+      creaturePrompt(job.prop ?? job.targetName, shape, job.look.color, world.look.light),
       (model) => {
         if (questTokenRef.current !== token) return;
         const keep = (b: Beat): Beat =>

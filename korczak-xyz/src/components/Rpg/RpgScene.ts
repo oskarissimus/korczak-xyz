@@ -37,7 +37,7 @@ import { DEAD_TREES, GROUND_COVER, HOUSE_RADIUS, TREES, WorldKit, mergeStatic, t
 import { CLASSIC_LOOK, type HubSize, type HubSizes, type WorldLook } from '../../utils/rpg/genesis';
 import { HUB_SLOTS, isForestVariant, loadLandmarkBytes, onPersonModelStart, type HubSlot } from '../../utils/rpg/landmark3d';
 import { SPAWN_AT, VILLAGE_STANDS, type HubLayout } from '../../utils/rpg/hubLayout';
-import { DAYLIGHT, HAZE, recolor, Sky, stars, Weather } from './atmosphere';
+import { DAYLIGHT, HAZE, LIGHT_GAIN, recolor, Sky, stars, Weather } from './atmosphere';
 import { DEFAULT_QUALITY, FrameRecorder, type FrameStats, type FrameWindow, type Quality } from './frames';
 import { SENSES_SECONDS, SensesView, type SenseTarget } from './senses';
 import { footprints, nearestOnLine, roadPoints, trailPoints, type Ground } from '../../utils/rpg/trail';
@@ -1027,9 +1027,10 @@ export class RpgScene {
       this.hemi.color.set(look.sky).lerp(new THREE.Color(0xffffff), 0.45);
       this.hemi.groundColor.set(look.ground);
     }
-    this.hemi.intensity = day.sky;
+    const gain = look.light ? LIGHT_GAIN[look.light] : { sun: 1, sky: 1 };
+    this.hemi.intensity = day.sky * gain.sky;
     this.sunLight.color.set(look.sun);
-    this.sunLight.intensity = day.sun;
+    this.sunLight.intensity = day.sun * gain.sun;
     this.sunOffset.set(Math.cos(day.elevation) * 47, Math.sin(day.elevation) * 82, Math.cos(day.elevation) * 30);
     if (classic) this.sunOffset.set(40, 70, 25);
     this.sky.set(look, this.sunOffset);

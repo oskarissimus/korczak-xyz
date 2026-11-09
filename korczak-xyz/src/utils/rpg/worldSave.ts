@@ -16,7 +16,7 @@
  */
 
 import { clearChronicle, loadChronicle, writeChronicle } from './chronicle';
-import { addModelSpend, classicWorld, type ForestVariant, type GroundTexture, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
+import { addModelSpend, classicWorld, LIGHTS, type Light, type ForestVariant, type GroundTexture, type HubPiece, type HubSizes, type LandmarkModel, type ModelSpend, type WorldBible } from './genesis';
 import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
 import { clearGame, dropGameFor, loadGameFor, writeGameFor } from './save';
@@ -561,6 +561,8 @@ export interface PendingGenesis {
   /** The coin and the worlds to be unlike, as asked: the same prompt finds the server's job again (`jobs.ts`). */
   nth?: 1 | 2;
   avoid?: string[];
+  /** The light's dice (`drawLight`), kept for the same reason. */
+  light?: Light;
   at: number;
 }
 
@@ -586,6 +588,7 @@ export function loadPendingGenesis(lang: Lang, now = Date.now()): PendingGenesis
       wish,
       ...(p.nth === 1 || p.nth === 2 ? { nth: p.nth } : {}),
       ...(Array.isArray(p.avoid) ? { avoid: p.avoid.filter((a: unknown) => typeof a === 'string') } : {}),
+      ...(LIGHTS.includes(p.light) ? { light: p.light as Light } : {}),
       at: p.at,
     };
   } catch {

@@ -6,6 +6,7 @@ import {
   DEFAULT_EXOTIC,
   demoGenesis,
   demoWorld,
+  drawLight,
   firstObject,
   franchised,
   genesisPrompt,
@@ -19,7 +20,9 @@ import {
   pickWorld,
   previewWorld,
   typicalityTarget,
+  vivid,
 } from './genesis';
+import { paletteLine } from './falPrompts';
 
 const ctx = { lang: 'pl' as const, seeds: ['lighthouse', 'fermentation', 'Battle of Lützen (1632)'], avoid: ['Kraina Mgieł: a foggy marsh'], exotic: 100 };
 
@@ -301,5 +304,50 @@ describe('firstObject', () => {
   it('reads an answer the model kept closing after it was whole', () => {
     expect(firstObject('{"world": {"name": "x}"}}\n }\n}\n}')).toEqual({ world: { name: 'x}' } });
     expect(parseWorlds(`${JSON.stringify({ chosen: 1, world: candidate('Ok', 20) })}\n }\n}`, ctx, 1)).toHaveLength(1);
+  });
+});
+
+describe('the light', () => {
+  it('is drawn by weight, bright more often than moody', () => {
+    expect(drawLight(() => 0)).toBe('sunny');
+    expect(drawLight(() => 0.39)).toBe('sunny');
+    expect(drawLight(() => 0.41)).toBe('golden');
+    expect(drawLight(() => 0.7)).toBe('fresh');
+    expect(drawLight(() => 0.99)).toBe('moody');
+  });
+
+  it('is told to the model, and yields to a player’s own description', () => {
+    expect(genesisPrompt({ ...ctx, light: 'sunny' })).toMatch(/THE LIGHT.*SUNNY, BRIGHT/);
+    expect(genesisPrompt(ctx)).not.toMatch(/THE LIGHT/);
+    expect(genesisPrompt({ ...ctx, light: 'golden', wish: 'a swamp at night' })).toMatch(/the description wins/);
+  });
+
+  it('holds the time, haze and weather to it', () => {
+    const moody = { sky: '#2c3e50', time: 'night', haze: 'thick', weather: 'ash' };
+    expect(parseLook(moody, 'sunny')).toMatchObject({ time: 'day', haze: 'clear', weather: 'none', light: 'sunny' });
+    expect(parseLook(moody, 'golden')).toMatchObject({ time: 'dusk', haze: 'light', weather: 'none' });
+    expect(parseLook({ ...moody, weather: 'snow' }, 'fresh')).toMatchObject({ time: 'day', haze: 'light', weather: 'snow' });
+    expect(parseLook(moody, 'moody')).toMatchObject({ time: 'night', haze: 'thick', weather: 'ash', light: 'moody' });
+    // A player's description of the world wins over the dice.
+    expect(parseLook(moody, 'sunny', false)).toMatchObject({ time: 'night', light: 'sunny' });
+    // Without a light, nothing changes: a world from before keeps its look.
+    expect(parseLook(moody)).not.toHaveProperty('light');
+    expect(parseLook(moody).sky).toBe('#2c3e50');
+  });
+
+  it('pushes the palette: a night-blue sky becomes a day sky, a grey stays grey', () => {
+    const sky = parseLook({ sky: '#2c3e50' }, 'sunny').sky;
+    expect(parseInt(sky.slice(1, 3), 16) + parseInt(sky.slice(3, 5), 16) + parseInt(sky.slice(5), 16)).toBeGreaterThan(330);
+    expect(vivid('#808080', 1.5)).toBe('#808080');
+    expect(vivid('#806040', 1.3)).not.toBe('#806040');
+    expect(parseLook({ wall: '#ffffff' }, 'sunny').wall).toBe('#ffffff');
+  });
+
+  it('gives the demo its dice, and the pictures their palette', () => {
+    expect(demoGenesis({ light: 'golden' }).light).toBe('golden');
+    expect(demoGenesis({ light: 'neon' })).not.toHaveProperty('light');
+    expect(paletteLine(undefined)).toBe('');
+    expect(paletteLine('sunny')).toMatch(/saturated/);
+    expect(paletteLine('moody')).toMatch(/not muddy/);
   });
 });

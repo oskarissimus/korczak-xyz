@@ -15,6 +15,7 @@
  */
 
 import type { WorldBible } from './genesis';
+import { paletteLine } from './falPrompts';
 
 /** How long a weapon is when the world does not say, and the range a world may say. */
 export const WEAPON_LENGTH = { fallback: 1.0, min: 0.3, max: 2.2 } as const;
@@ -41,10 +42,11 @@ export function weaponLook(world: Pick<WorldBible, 'weapon' | 'player' | 'tech'>
  * its whole outline shows, thick enough that the mesh keeps it (a thin blade at TRELLIS's
  * simplification comes back with holes, as the hub's slender lamp posts did).
  */
-export function weaponPrompt(what: string, look?: Pick<WorldBible['look'], 'accent'>): string {
+export function weaponPrompt(what: string, look?: Pick<WorldBible['look'], 'accent' | 'light'>): string {
   return [
     `A single stylised low-poly game asset, one hand-held weapon only: ${what.trim().replace(/[.\s]+$/, '')}.`,
     look ? `A touch of ${look.accent} somewhere on it.` : '',
+    paletteLine(look?.light),
     'Standing perfectly upright and vertical, its grip or handle at the bottom and its blade, head or tip pointing straight up,',
     'seen from the side so its whole outline shows, centred, the whole weapon in view.',
     'Chunky, thick proportions: a thick blade or shaft, nothing thin, spindly or wispy, no chains, no strings, no sheath,',

@@ -21,6 +21,7 @@
 
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
+import { paletteLine } from './falPrompts';
 import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
 
 /** Square: the clump is cropped out of it in the browser. Below a megapixel, so the cheapest picture. */
@@ -62,7 +63,10 @@ export function coverPrompt(world: PromptWorld, kind: (typeof COVER_KINDS)[numbe
     `Game foliage sprite on a plain pure white background: ${kind}. What grows here: ${subject.replace(/[.\s]+$/, '')}.`,
     'Side view at eye level, centred, cut out, nothing under it: no ground, no soil, no shadow, no sky, no scenery, no text.',
     'Stylised hand-painted game art.',
-  ].join(' ');
+    paletteLine(world.look.light),
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 const made = new Set<string>();

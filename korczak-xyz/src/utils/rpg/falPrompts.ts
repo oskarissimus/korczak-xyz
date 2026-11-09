@@ -126,6 +126,20 @@ export function hubSlots(world: PromptWorld): HubSlot[] {
  * Every piece's picture says to keep a white margin all round; how big it stands in the game is the
  * game's to decide (`hubFit`), never the picture's.
  */
+/**
+ * The palette a world's pictures are asked in, from its drawn light (`WorldLook.light`, `genesis.ts`).
+ * FLUX takes a hex colour as a hint and paints the rest in its own house style, which for "a stylised
+ * game asset" of a hut, a weed or a road was brown, olive and grey (owner, 9 Nov 2026: "every generated
+ * asset and texture is dull, as if it were all a dark Polish autumn"). Empty for a world from before
+ * the light was drawn, so none of its prompts change and nothing kept is asked for again.
+ */
+export function paletteLine(light: WorldBible['look']['light']): string {
+  if (!light) return '';
+  return light === 'moody'
+    ? 'Rich, distinct colours even in its darker palette, not muddy, brown or grey.'
+    : 'Bright, clean, saturated colours, a cheerful colourful stylised palette, not muted, dull, brown or desaturated.';
+}
+
 export const FRAMED =
   'Small in the frame and centred, with a wide empty white margin on every side, nothing cut off or touching the edges of the picture,';
 
@@ -147,10 +161,13 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
     return [
       `A single stylised low-poly game asset: ${subject}.`,
       `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.`,
+      paletteLine(look.light),
       'The whole object in view, three-quarter view from slightly above, standing on a small base,',
       FRAMED,
       'isolated on a plain white background, no ground, no people, no text, soft even light.',
-    ].join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
   const subject = isForestVariant(slot)
     ? `${(treeSubject(world) ?? 'a tree').replace(/[.\s]+$/, '')}, ${VARIANT[slot]}`
@@ -162,6 +179,7 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
     tree
       ? `Colours: foliage ${look.foliage}, glowing accents ${look.accent}.`
       : `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.`,
+    paletteLine(look.light),
     building
       ? 'Seen from the front and slightly above, its entrance facing the viewer, the whole of it in view.'
       : 'The whole object in view, three-quarter view from slightly above.',
@@ -169,7 +187,9 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
     ...(tree ? ['a few thick limbs and one solid, compact silhouette, no twigs, simple faceted shapes like a mobile game asset,'] : []),
     FRAMED,
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** The landmark's picture prompt, as it was before the other pieces. */
@@ -186,11 +206,16 @@ const WIDE_POSE =
  * or a friend beside them comes out with the wrong bones. "One person only" is there because FLUX drew
  * the same woman twice side by side (28 Oct 2026), and TRELLIS made both.
  */
-export function personPrompt(appearance: string, who: { gender?: 'male' | 'female'; color?: string }): string {
+export function personPrompt(
+  appearance: string,
+  who: { gender?: 'male' | 'female'; color?: string },
+  light?: WorldBible['look']['light'],
+): string {
   return [
     `A single full-body 3D game character, one person only: ${appearance.trim().replace(/[.\s]+$/, '')}.`,
     who.gender === 'female' ? 'A woman.' : who.gender === 'male' ? 'A man.' : '',
     who.color ? `Their clothes are mostly ${who.color}.` : '',
+    paletteLine(light),
     A_POSE,
     'facing the viewer, the whole figure from head to feet, centred.',
     'Stylised low-poly game character, chunky proportions,',
