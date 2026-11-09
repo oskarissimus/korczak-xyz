@@ -156,7 +156,7 @@ import {
   type PendingGenesis,
 } from '../../utils/rpg/worldSave';
 import { recordLine, resetTranscript, transcript } from '../../utils/rpg/transcript';
-import { asideLabel, directions } from '../../utils/rpg/audioTags';
+import { shownText } from '../../utils/rpg/audioTags';
 import {
   duckMusic,
   forgetMusicState,
@@ -292,18 +292,11 @@ const PAINTER_KEY = 'rpg-painter';
 const POSE_KEY = 'rpg-pose';
 
 /**
- * A line as the dialogue shows it: an audio tag ("[coughs]", or an old save's "[Kaszel]") as a short
- * italic aside in the game's language, and any other bracketed stage direction the same way, as
- * written — never the brackets (`audioTags.ts`).
+ * A line as the dialogue shows it: only what is said. Audio tags ("[coughs]") and any other bracket
+ * are for the voice or nobody, never the page (`shownText` in `audioTags.ts`).
  */
-function LineText({ text, lang }: { text: string; lang: Lang }) {
-  return (
-    <>
-      {directions(text).map((p, i) =>
-        p.kind === 'say' ? p.text : <em key={i} className="rpg-aside">{asideLabel(p, lang)}</em>,
-      )}
-    </>
-  );
+function LineText({ text }: { text: string }) {
+  return <>{shownText(text)}</>;
 }
 
 /** What fal.ai made for a world before it was saved (`earlyRef` in `Rpg`). */
@@ -3413,7 +3406,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <div className={`rpg-dialogue${held ? ' rpg-dialogue-held' : ''}`} role="dialog">
             <div className="rpg-dialogue-speaker">{shown.line.speaker}</div>
             <p className="rpg-dialogue-text">
-              <LineText text={shown.line.text} lang={gameLang} />
+              <LineText text={shown.line.text} />
             </p>
             <ol className="rpg-dialogue-choices">
               {shown.choices.map((c, i) => {
@@ -3431,7 +3424,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                       disabled={held !== null || freeState === 'busy'}
                       onClick={() => choose(c)}
                     >
-                      <span className="rpg-choice-n">{i + 1}.</span> <LineText text={c.label} lang={gameLang} />
+                      <span className="rpg-choice-n">{i + 1}.</span> <LineText text={c.label} />
                     </button>
                   </li>
                 );

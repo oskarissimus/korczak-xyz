@@ -2046,9 +2046,15 @@ brackets. Only v3 and v4 act a tag, and they are told in English. `utils/rpg/aud
   describe sounds that are not the voice (Mirabella's "clicking tongue sound between sentences" is
   where her "(Kliknięcie językiem)" came from).
 - `directions` splits a line. A known tag, or an old save's Polish one by `ALIASES`, is **spoken**
-  as its English tag and **shown** as a small italic aside in the game's language ("kaszle"). Any
-  other `[…]` or `(…)` is a stage direction: shown in italics as written, never spoken, on any model
-  — "(Cyriak freezes as a living statue…)" in Cyriak's voice was worse than silence.
+  as its English tag. Any other `[…]` or `(…)` is a stage direction: never spoken, on any model —
+  "(Cyriak freezes as a living statue…)" in Cyriak's voice was worse than silence.
+- **The player never reads a tag** (owner, 9 Nov 2026: "nie pokazywać w ogóle tych efektów w
+  tekście"). The dialogue and the choices show `shownText`, which leaves out *every* bracket, a known
+  tag or not. That is deliberate: the game speaks any language, and a model that writes "[hustet]" or
+  "[咳]" instead of "[coughs]" must not need a word list to stay off the page. The dev console still
+  logs the raw line. Until then a tag showed as a small italic aside in the game's language.
+- **No `[snorts]`** (owner, 9 Nov 2026: it sounded strange on v4). It is out of `TAGS` and its
+  aliases, so the prompt never offers it and an old save's snort is a plain direction: dropped.
 - `voicing` sends a line to `eleven_v4` **only when it has a tag to act**; everything else stays on
   Flash. v4 is served through **Text to Dialogue** (`/v1/text-to-dialogue`, one input), not the TTS
   endpoint, with stability 0.5. It costs **a credit a character, twice Flash** (`voiceCreditsPerChar`,

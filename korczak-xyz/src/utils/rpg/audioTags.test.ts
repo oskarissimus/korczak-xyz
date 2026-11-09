@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directions, hasTags, spokenText } from './audioTags';
+import { directions, hasTags, shownText, spokenText, TAGS } from './audioTags';
 
 // Lines from the quest in Firestore, 29 Oct 2026 (`users/{uid}/rpgSaves/wmvsih7dt0`, beat 1).
 const ELARA = 'Pożeracz Dźwięków. Ukradł mój głos i... i mój dziennik badawczy. Uciekł w stronę starych katakumb pod wieżą. [Kaszel].';
@@ -42,5 +42,22 @@ describe('audio tags', () => {
       { kind: 'say', text: '. Dobrze! Potrzebowałam rzadkiego reagenta.' },
     ]);
     expect(directions('Bez tagów.')).toEqual([{ kind: 'say', text: 'Bez tagów.' }]);
+  });
+
+  it('shows the player only what is said, whatever language the brackets are in', () => {
+    expect(shownText(ELARA)).toBe(
+      'Pożeracz Dźwięków. Ukradł mój głos i... i mój dziennik badawczy. Uciekł w stronę starych katakumb pod wieżą.',
+    );
+    expect(shownText('[sighs] Znowu ty.')).toBe('Znowu ty.');
+    expect(shownText(CYRIAK)).toBe('Co ty robisz?! To zakazane zaklęcie... nie!');
+    expect(shownText('[hustet] Na gut. (lacht leise) Komm mit.')).toBe('Na gut. Komm mit.');
+    expect(shownText('[咳] 好吧。')).toBe('好吧。');
+  });
+
+  it('offers no snort, and drops an old save\'s one instead of acting it', () => {
+    expect(TAGS).not.toContain('snorts');
+    expect(hasTags('[snorts] Ty? Bohater?')).toBe(false);
+    expect(spokenText('[snorts] Ty? Bohater?', true)).toBe('Ty? Bohater?');
+    expect(spokenText('(Prycha) Ty?', true)).toBe('Ty?');
   });
 });

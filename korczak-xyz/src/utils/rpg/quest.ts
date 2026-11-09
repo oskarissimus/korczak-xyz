@@ -44,7 +44,7 @@ import { asCraft, craftLines, type Craft } from './craft';
 import { base, languageName, type BaseLang, type Lang } from './language';
 import { CONTENT_RULES } from './contentPolicy';
 
-const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
+const TAG_LIST = TAGS.map((t) => `[${t}]`).join(', ');
 
 export type { Lang } from './language';
 

@@ -102,7 +102,7 @@ const LEAD_WORDS: Record<'slay' | 'collect' | 'talk' | 'end', string> = {
   end: 'the end: the quest ENDS here, and the "reply" is the epilogue',
 };
 
-const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
+const TAG_LIST = TAGS.map((t) => `[${t}]`).join(', ');
 
 export function freePrompt(ctx: FreeContext): string {
   const language = languageName(ctx.lang);

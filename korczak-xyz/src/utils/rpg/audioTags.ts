@@ -7,13 +7,12 @@
  *
  * So the prompt asks for English tags in square brackets from `TAGS`, and every line is read
  * through `directions`: a known tag (or an old save's Polish one, by `ALIASES`) is spoken as its
- * English tag on the expressive model and shown as a short italic aside in the game's language; any
- * other bracket or parenthesis is a stage direction, shown and never spoken. A line goes to the
+ * English tag on the expressive model; any other bracket or parenthesis is a stage direction, never
+ * spoken. The dialogue shows none of them (`shownText`). A line goes to the
  * expressive model only when it has a tag to act (`voicing`); everything else stays on Flash.
  */
 
 import type { Lang } from "./quest";
-import { base, type BaseLang } from './language';
 
 /**
  * The languages ElevenLabs' Flash v2.5 takes a `language_code` for (their model page, Nov 2026), by
@@ -42,24 +41,16 @@ export const FLASH_MODEL = "eleven_flash_v2_5";
  */
 export const TAG_MODEL = "eleven_v4";
 
-/** The tags the prompt offers, with how the dialogue shows them. From ElevenLabs' v4 prompting guide. */
-export const TAGS: Record<string, Record<BaseLang, string>> = {
-  coughs: { pl: "kaszle", en: "coughs" },
-  sighs: { pl: "wzdycha", en: "sighs" },
-  laughs: { pl: "śmieje się", en: "laughs" },
-  chuckles: { pl: "chichocze", en: "chuckles" },
-  whispers: { pl: "szeptem", en: "whispering" },
-  shouts: { pl: "krzyczy", en: "shouting" },
-  crying: { pl: "płacze", en: "crying" },
-  sobs: { pl: "szlocha", en: "sobs" },
-  gasps: { pl: "łapie powietrze", en: "gasps" },
-  "clears throat": { pl: "odchrząkuje", en: "clears throat" },
-  gulps: { pl: "przełyka ślinę", en: "gulps" },
-  snorts: { pl: "prycha", en: "snorts" },
-  exhales: { pl: "wypuszcza powietrze", en: "exhales" },
-  groans: { pl: "jęczy", en: "groans" },
-  sniffs: { pl: "pociąga nosem", en: "sniffs" },
-};
+/**
+ * The tags the prompt offers, from ElevenLabs' v4 prompting guide. They are heard and never read:
+ * the dialogue leaves every bracket out (`shownText`). No `[snorts]` (owner, 9 Nov 2026: it sounded
+ * wrong), so an old save's snort is a direction like any other — dropped, never spoken.
+ */
+export const TAGS = [
+  "coughs", "sighs", "laughs", "chuckles", "whispers", "shouts", "crying", "sobs", "gasps",
+  "clears throat", "gulps", "exhales", "groans", "sniffs",
+];
+const KNOWN = new Set(TAGS);
 
 /**
  * What a direction may be written as, by its start, lower-cased: the English forms besides the
@@ -96,8 +87,6 @@ const ALIASES: [string, string][] = [
   ["chrząk", "clears throat"],
   ["gulp", "gulps"],
   ["przełyka", "gulps"],
-  ["snort", "snorts"],
-  ["prych", "snorts"],
   ["exhale", "exhales"],
   ["groan", "groans"],
   ["jęk", "groans"],
@@ -112,7 +101,7 @@ export type LinePart =
 
 function tagOf(inner: string): string | null {
   const s = inner.trim().toLowerCase();
-  if (TAGS[s]) return s;
+  if (KNOWN.has(s)) return s;
   for (const [start, tag] of ALIASES) if (s.startsWith(start)) return tag;
   return null;
 }
@@ -170,12 +159,13 @@ export function spokenText(text: string, tags: boolean): string {
     .trim();
 }
 
-/** How the dialogue shows an aside: a known tag in the game's language, anything else as written. */
-export function asideLabel(
-  part: Extract<LinePart, { kind: "aside" }>,
-  lang: Lang,
-): string {
-  return part.tag ? TAGS[part.tag][base(lang)] : part.text;
+/**
+ * A line as the player reads it: what is said and nothing else. Every `[…]` and `(…)` is left out,
+ * a known tag or not, in whatever language the model wrote it (owner, 9 Nov 2026: the effects are
+ * for the voice, not the page), so no list of words has to keep up with the game's languages.
+ */
+export function shownText(text: string): string {
+  return spokenText(text, false);
 }
 
 /** The model a line is spoken with, and the text it is sent; `tags: false` keeps everything on Flash. */
