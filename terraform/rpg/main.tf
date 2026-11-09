@@ -1,5 +1,5 @@
 /*
- * The RPG's production project, korczak-rpg — the GCP half of rpg.korczak.xyz.
+ * The RPG's production project, korczak-rpg — the GCP half of everyrpg.korczak.xyz.
  *
  * A project of its own so that the game's production cannot be touched by anything that ships from
  * main, and so its bill, quotas and data are its own. The site's project layer is `terraform/` one

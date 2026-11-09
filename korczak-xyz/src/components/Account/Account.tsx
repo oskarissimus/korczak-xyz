@@ -46,7 +46,7 @@ import { translations, type Lang, type Translation } from './translations';
 interface AccountProps {
   lang: Lang;
   /**
-   * `game` is rpg.korczak.xyz, where this page is the game's own and nothing else of the site
+   * `game` is everyrpg.korczak.xyz, where this page is the game's own and nothing else of the site
    * exists: only the four keys the game spends, no "used by" (there is one user), no section about
    * the other apps, and every link stays on that host.
    */

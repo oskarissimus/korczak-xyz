@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * rpg.korczak.xyz: the game and nothing else. `npm run build:rpg`, run only by
+ * everyrpg.korczak.xyz: the game and nothing else. `npm run build:rpg`, run only by
  * .github/workflows/rpg-release.yml.
  *
  * The site's config with another source tree (`src-rpg/`, see its README) and another public dir,
@@ -14,7 +14,7 @@ import site from './astro.config.mjs';
 
 export default defineConfig({
   ...site,
-  site: 'https://rpg.korczak.xyz',
+  site: 'https://everyrpg.korczak.xyz',
   srcDir: './src-rpg',
   publicDir: './public-rpg',
   integrations: [react()],

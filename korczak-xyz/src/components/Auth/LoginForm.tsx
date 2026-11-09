@@ -17,7 +17,7 @@ import { useAuth, type AuthErrorCode } from '../../hooks/useAuth';
 
 interface LoginFormProps {
   lang: 'en' | 'pl';
-  /** `game` is rpg.korczak.xyz: home is the game, and the site's other pages do not exist there. */
+  /** `game` is everyrpg.korczak.xyz: home is the game, and the site's other pages do not exist there. */
   variant?: 'site' | 'game';
 }
 

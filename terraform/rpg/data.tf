@@ -1,6 +1,6 @@
 /*
  * What the game keeps and who may sign in: the game's own database, accounts and bucket, so nothing
- * on rpg.korczak.xyz is shared with korczak.xyz. Rules and functions are not here — the release
+ * on everyrpg.korczak.xyz is shared with korczak.xyz. Rules and functions are not here — the release
  * workflow deploys those with the Firebase CLI, the same ownership line as terraform/README.md.
  */
 
@@ -38,7 +38,7 @@ resource "google_identity_platform_config" "auth" {
     "localhost",
     "${local.project_id}.firebaseapp.com",
     "${local.project_id}.web.app",
-    "rpg.korczak.xyz",
+    "everyrpg.korczak.xyz",
   ]
 
   sign_in {
@@ -56,7 +56,7 @@ resource "google_identity_platform_config" "auth" {
 resource "google_firebase_web_app" "rpg" {
   provider        = google-beta
   project         = local.project_id
-  display_name    = "rpg.korczak.xyz"
+  display_name    = "everyrpg.korczak.xyz"
   deletion_policy = "ABANDON"
 
   depends_on = [google_firebase_project.this]
@@ -84,7 +84,7 @@ resource "google_storage_bucket" "assets" {
 
   cors {
     origin = [
-      "https://rpg.korczak.xyz",
+      "https://everyrpg.korczak.xyz",
       # `astro dev` and `astro preview`.
       "http://localhost:4321",
       "http://localhost:4322",

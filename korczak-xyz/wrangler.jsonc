@@ -63,7 +63,7 @@
   /*
    * The RPG's production: `wrangler deploy --env rpg`, run only by .github/workflows/rpg-release.yml
    * when a GitHub release is published. A second Worker, so korczak.xyz keeps following main and
-   * rpg.korczak.xyz changes only when a release says so — rolling back is publishing (or
+   * everyrpg.korczak.xyz changes only when a release says so — rolling back is publishing (or
    * re-running) an older release, and never touches the site.
    *
    * Same static-assets-only design as above. The dist/ it serves is the game alone: src-rpg/, built
@@ -77,7 +77,7 @@
     "rpg": {
       "name": "korczak-xyz-rpg",
       "routes": [
-        { "pattern": "rpg.korczak.xyz", "custom_domain": true }
+        { "pattern": "everyrpg.korczak.xyz", "custom_domain": true }
       ],
       "workers_dev": true,
       "observability": { "enabled": true }

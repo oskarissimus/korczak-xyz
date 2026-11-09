@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Finishes the dist/ of `astro build --config astro.config.rpg.mjs --mode rpg` (`npm run build:rpg`)
- * into what rpg.korczak.xyz serves, and refuses one that is not only the game.
+ * into what everyrpg.korczak.xyz serves, and refuses one that is not only the game.
  *
  * Two jobs:
  *

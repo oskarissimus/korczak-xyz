@@ -42,7 +42,7 @@ that file cannot match on hostname. **This is the one piece of the serving path 
 korczak.xyz      AAAA   100::           proxied   <- Cloudflare-managed, the Worker's custom domain
 www.korczak.xyz  CNAME  korczak.xyz     proxied   <- exists only to be proxied; the redirect fires first
 media            (R2 custom domain)     proxied   <- the songbook's videos, bucket korczak-xyz-media
-rpg.korczak.xyz  AAAA   100::           proxied   <- Cloudflare-managed, the korczak-xyz-rpg Worker
+everyrpg.korczak.xyz  AAAA   100::           proxied   <- Cloudflare-managed, the korczak-xyz-rpg Worker
 dresden          A      34.66.172.112   proxied   <- unrelated to this site
 korczak.xyz      TXT    v=spf1 -all     _dmarc p=reject   <- the domain sends no mail
 ```
@@ -53,9 +53,14 @@ and routes the request to the Worker before that matters. The same is true of `w
 target is irrelevant because the Single Redirect returns before any origin is consulted. **Neither
 record is a thing to "fix" if it looks wrong.**
 
-### rpg.korczak.xyz: the game's production, from releases
+### everyrpg.korczak.xyz: the game's production, from releases
 
-korczak.xyz follows `main`. **rpg.korczak.xyz moves only when a GitHub release is published**
+The game is *Every RPG* in both locales, and its production host is everyrpg.korczak.xyz (owner, 9 Nov
+2026: the name and the host should match). It was *Wanderer* / *Wędrowiec* at rpg.korczak.xyz for
+its first day; the internal names — Worker `korczak-xyz-rpg`, project `korczak-rpg`, `env.rpg`,
+mode `rpg`, `src-rpg/` — kept the short form, since none of them is seen by a player.
+
+korczak.xyz follows `main`. **everyrpg.korczak.xyz moves only when a GitHub release is published**
 (`.github/workflows/rpg-release.yml`; a pre-release does not deploy). Shipping is one button: Actions →
 *RPG release* → *Run workflow* with the tag left empty makes a release named
 `YYYY-MM-DD-HHMM-<hash>` (UTC, the navbar's short hash) from main and deploys it; naming an existing
@@ -69,11 +74,11 @@ dist/. Rolling back is running that workflow by hand
 with an older tag. Its Sentry environment is `rpg`.
 
 So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
-reaches rpg.korczak.xyz only through a release.
+reaches everyrpg.korczak.xyz only through a release.
 
 **The game's production has a GCP project of its own, `korczak-rpg`** — its own Firestore,
 accounts, asset bucket (`korczak-rpg-rpg`) and copies of the three game functions (`rpgDemo`,
-`rpgApi`, `rpgJob`), so nothing played on rpg.korczak.xyz is shared with korczak.xyz. Its layer is
+`rpgApi`, `rpgJob`), so nothing played on everyrpg.korczak.xyz is shared with korczak.xyz. Its layer is
 `terraform/rpg/`, applied by `rpg-terraform.yml` as the site's deployer (Owner on `korczak-rpg`, the
 one grant made by hand, with the billing link). The release workflow's `backend` job deploys the
 rules and the three functions there as `github-deployer@korczak-rpg`, through a Workload Identity

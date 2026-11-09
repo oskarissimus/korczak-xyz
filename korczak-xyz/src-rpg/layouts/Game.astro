@@ -1,6 +1,6 @@
 ---
 /**
- * The frame every page of rpg.korczak.xyz is drawn in — on purpose almost nothing. See README.md.
+ * The frame every page of everyrpg.korczak.xyz is drawn in — on purpose almost nothing. See README.md.
  */
 import { useTranslations, type Lang } from '../../src/i18n';
 import islandRecovery from '../../src/scripts/island-recovery.js?raw';
@@ -18,7 +18,7 @@ interface Props {
 
 const { title, description, lang, path, noindex = false } = Astro.props;
 const t = useTranslations(lang);
-const origin = 'https://rpg.korczak.xyz';
+const origin = 'https://everyrpg.korczak.xyz';
 const href = (l: Lang) => `${origin}${l === 'pl' ? `/pl${path}` : path}`;
 const recoveryStrings = {
   title: t('hydrationError.title'),

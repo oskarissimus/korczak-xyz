@@ -1,6 +1,6 @@
 ---
 name: rpg
-description: The 3D RPG at /apps/rpg/ (Wanderer / Wędrowiec) - quests written one beat at a time after each decision, the branching the game draws, the chronicle, the blocks places are built from, parseBeat as the boundary, the keys it reads, the demo on the owner's keys with its dollar caps.
+description: The 3D RPG at /apps/rpg/ (Every RPG) - quests written one beat at a time after each decision, the branching the game draws, the chronicle, the blocks places are built from, parseBeat as the boundary, the keys it reads, the demo on the owner's keys with its dollar caps.
 paths:
   - "**/components/Rpg/**"
   - "**/utils/rpg/**"
@@ -1994,7 +1994,7 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   shrinks the stick and buttons and clamps the objective to two lines.
 
 **It installs** (owner, Oct 2026: "it should be a PWA too"): `pwa="rpg"` on both pages, scope
-`/apps/rpg`, *Wanderer* / *Wędrowiec* under a sword-on-glass icon, a precache tier of its code
+`/apps/rpg`, *Every RPG* under a sword-on-glass icon, a precache tier of its code
 (see `pwa.md`). Installed, Safari's bars are gone and immersive mode really is the whole screen;
 every inset is read through the site's `--safe-*` properties, so the notch and home bar can be
 faked from a desktop console. Offline, an install that has been played once runs the

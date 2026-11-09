@@ -1,4 +1,4 @@
-# rpg.korczak.xyz
+# everyrpg.korczak.xyz
 
 The game's production site, and nothing else. A second Astro source tree over the same
 components: `astro.config.rpg.mjs` points `srcDir` here and `publicDir` at `public-rpg/`, so

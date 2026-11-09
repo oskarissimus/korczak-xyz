@@ -1,6 +1,6 @@
-# The RPG's production: rpg.korczak.xyz, deployed from GitHub releases.
+# The RPG's production: everyrpg.korczak.xyz, deployed from GitHub releases.
 #
-# korczak.xyz follows main (node.js.yml deploys every push). rpg.korczak.xyz moves only when a
+# korczak.xyz follows main (node.js.yml deploys every push). everyrpg.korczak.xyz moves only when a
 # release is published, so a half-finished game on main never reaches the people playing it, and
 # the release page is the changelog and the list of points to go back to.
 #
@@ -138,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: rpg-production
-      url: https://rpg.korczak.xyz/
+      url: https://everyrpg.korczak.xyz/
     steps:
       - uses: actions/checkout@v7
         with:
@@ -161,7 +161,7 @@ jobs:
         env:
           # Same as node.js.yml: without it the build still succeeds, minus readable stack traces.
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      - name: Deploy to rpg.korczak.xyz
+      - name: Deploy to everyrpg.korczak.xyz
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

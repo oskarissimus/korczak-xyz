@@ -148,7 +148,7 @@ export const ALLOWED_ORIGINS = [
   'https://korczak.xyz',
   'https://www.korczak.xyz',
   // The RPG's production, deployed from GitHub releases (.github/workflows/rpg-release.yml).
-  'https://rpg.korczak.xyz',
+  'https://everyrpg.korczak.xyz',
   // `astro dev` and `astro preview`.
   'http://localhost:4321',
   'http://localhost:4322',

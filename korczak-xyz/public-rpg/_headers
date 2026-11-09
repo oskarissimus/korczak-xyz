@@ -1,4 +1,4 @@
-# rpg.korczak.xyz. The same cache tiers as public/_headers on korczak.xyz, minus what this site
+# everyrpg.korczak.xyz. The same cache tiers as public/_headers on korczak.xyz, minus what this site
 # does not have (no service worker, no fonts).
 
 /_astro/*

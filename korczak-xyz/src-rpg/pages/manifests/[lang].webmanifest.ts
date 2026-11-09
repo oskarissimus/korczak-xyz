@@ -3,7 +3,7 @@ import { languages, useTranslations, type Lang } from '../../../src/i18n';
 import { iconUrl } from '../../../src/utils/pwa/iconUrl';
 
 /**
- * The game installed from rpg.korczak.xyz: one app per locale, the whole origin its scope. Same
+ * The game installed from everyrpg.korczak.xyz: one app per locale, the whole origin its scope. Same
  * artwork as the copy on korczak.xyz (`src/pages/manifests/[app].webmanifest.ts`), but a different
  * origin is a different app to the browser, so the two never collide.
  */

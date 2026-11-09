@@ -152,7 +152,7 @@ export function initSentry(context: 'page' | 'sw' = 'page'): void {
       release: RELEASE,
       // A production build served anywhere but the site — `astro preview` under an end-to-end
       // test, above all — is `preview`, so a mocked model's quests do not land among real ones.
-      // `rpg` is the game's production build (`astro build --mode rpg`, served at rpg.korczak.xyz
+      // `rpg` is the game's production build (`astro build --mode rpg`, served at everyrpg.korczak.xyz
       // from GitHub releases), so its issues can be filtered apart from the site that follows main.
       environment: import.meta.env.DEV
         ? 'development'

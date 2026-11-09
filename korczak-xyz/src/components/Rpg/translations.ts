@@ -3,7 +3,7 @@ import type { FundsProvider } from '../../utils/rpg/funds';
 import type { QuestSource } from '../../utils/rpg/storyteller';
 
 const en = {
-  title: 'Wanderer',
+  title: 'Every RPG',
   intro:
     'A world nobody has seen before, invented by a model from three random seeds or from the words you choose, and somebody in it who needs help. The quest is written one step at a time, after each of your decisions; the world keeps what happened in it, and later quests remember how you chose.',
   move: 'walk',
@@ -332,7 +332,7 @@ const en = {
 };
 
 const pl: typeof en = {
-  title: 'Wędrowiec',
+  title: 'Every RPG',
   intro:
     'Świat, którego nikt wcześniej nie widział, wymyślony przez model z trzech losowych ziaren albo z wybranych przez Ciebie słów, i ktoś w nim, kto potrzebuje pomocy. Quest powstaje krok po kroku, po każdej Twojej decyzji; świat zachowuje to, co się w nim wydarzyło, a kolejne questy pamiętają, jak wybrałeś.',
   move: 'chodzenie',
