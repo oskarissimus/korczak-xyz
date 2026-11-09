@@ -791,6 +791,14 @@ export default function Account({ lang, variant = 'site' }: AccountProps) {
       <a className="retro-btn" href={home}>
         {t.backToGame}
       </a>
+      {auth.isAdmin && (
+        <>
+          {' '}
+          <a className="retro-btn" href={lang === 'pl' ? '/pl/admin/' : '/admin/'}>
+            {t.adminPanel}
+          </a>
+        </>
+      )}
     </p>
   );
   const [refresh, setRefresh] = useState(0);

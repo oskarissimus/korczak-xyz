@@ -266,6 +266,13 @@ service cloud.firestore {
      */
 
     /*
+     * The game's server keys, `rpgServerKeys/config` (`functions/src/rpg/admin.ts`), set on the
+     * game's admin panel through the gateway, and deliberately NO match block: a key written there
+     * must never be readable by a page, the admin's own included. The gateway checks `admins/` and
+     * answers only the last four characters of each.
+     */
+
+    /*
      * The RPG's kept assets (`korczak-xyz/src/utils/rpg/assetStore.ts`): what made each picture,
      * model, rig, line and track in the account's bucket — prompt, model, parameters, cost — and
      * which request each one answers (`requests/{fingerprint}`). The gateway answers a request from

@@ -12,6 +12,7 @@ What exists here, in both locales:
 | `/` | the game, the whole screen, no site around it |
 | `/login/` | sign in and sign up (`LoginForm`, `variant="game"`) |
 | `/account/` | the four keys the game spends (`Account`, `variant="game"`) |
+| `/admin/` | the admin panel: the server's keys and the demo's dials (`AdminPanel`, admins only) |
 
 `Layout.astro` is not used: no navbar, footer, taskbar, desktop or window frame, no client
 router and no service worker. `layouts/Game.astro` keeps only what the game needs from it — the

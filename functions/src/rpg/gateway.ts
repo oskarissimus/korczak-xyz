@@ -72,6 +72,8 @@ import { dayKey } from '../demo/limits';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
+import { AdminRefusal, handleAdmin } from './admin';
+import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 
@@ -532,6 +534,21 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
       reportError('rpgApi.skin', e);
       await flushSentry();
       if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'skin weights unavailable' } });
+    }
+    return;
+  }
+  // The game's admin panel (`admin.ts`): the server's keys and the demo's dials, admins only.
+  if (path === ADMIN_PATH && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      await handleAdmin(req, res, await uidOf(req));
+    } catch (e) {
+      if (e instanceof GatewayRefusal || e instanceof AdminRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.admin', e);
+      await flushSentry();
+      if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'admin: unavailable' } });
     }
     return;
   }

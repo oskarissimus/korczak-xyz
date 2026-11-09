@@ -183,3 +183,7 @@ have — and they are worse here for two reasons worth remembering before reachi
 is minted into the ID token, so a revocation takes up to an hour to bite, and setting one needs the
 Admin SDK, which puts a Cloud Function in the approval path. A document is read at the moment of
 the request, and the panel is one `updateDoc` from a browser.
+
+**And a fourth, Every RPG's** (Nov 2026): the game's server keys and its demo's dials, the same
+component as `/admin/` on everyrpg.korczak.xyz, written through the gateway rather than a rule
+(`rpg.md`, *The admin panel*).

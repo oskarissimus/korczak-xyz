@@ -30,6 +30,7 @@ import {
   WORLD_HEADER,
 } from './gatewayRoutes';
 import { ACCOUNT_KEY } from '../accountKeys/keys';
+import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
 
 export { ACCOUNT_KEY };
@@ -117,10 +118,30 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   return fetch(`${base}/${url.host}${url.pathname}${url.search}`, { ...init, headers });
 }
 
-async function signedInCall(path: string, method: string, signal?: AbortSignal): Promise<Response> {
+async function signedInCall(path: string, method: string, signal?: AbortSignal, body?: unknown): Promise<Response> {
   const token = await idToken();
   if (!token) throw new Error('gateway: signed out');
-  return fetch(`${gatewayUrl()}${path}`, { method, headers: { Authorization: `Bearer ${token}` }, signal });
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  return fetch(`${gatewayUrl()}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  });
+}
+
+/** The game's admin panel (`adminConfig.ts`): every section, or — with a patch — saved, then every section. */
+export async function adminConfig(patch?: AdminPatch, signal?: AbortSignal): Promise<AdminStatus> {
+  const response = await signedInCall(ADMIN_PATH, patch ? 'POST' : 'GET', signal, patch);
+  const body = (await response.json().catch(() => null)) as (AdminStatus & { reason?: string; error?: { message?: string } }) | null;
+  if (!response.ok || !body) {
+    throw Object.assign(new Error(body?.error?.message ?? `gateway: admin ${response.status}`), {
+      status: response.status,
+      reason: body?.reason ?? null,
+    });
+  }
+  return body;
 }
 
 /** What the gateway says of the account's keys — never a key, only which exist and their last four characters. */

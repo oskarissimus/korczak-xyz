@@ -4,8 +4,10 @@ import PageContent from '../../../components/PageContent.astro';
 import AdminDemo from '../../../components/Auth/AdminDemo';
 import AdminAccounts from '../../../components/Auth/AdminAccounts';
 import AdminVideos from '../../../components/Auth/AdminVideos';
+import AdminPanel from '../../../components/Rpg/AdminPanel';
 import { getCollection } from 'astro:content';
 import { hasSongVideo } from '../../../utils/songVideo';
+import '../../../styles/account.css';
 import { useTranslations } from '../../../i18n';
 
 const lang = 'pl';
@@ -26,5 +28,6 @@ const songs = (await getCollection('songs', ({ data }) => data.published && data
     <AdminAccounts client:only="react" lang={lang} />
     <AdminDemo client:only="react" lang={lang} />
     <AdminVideos client:only="react" lang={lang} songs={songs} />
+    <AdminPanel client:only="react" lang={lang} variant="site" />
   </PageContent>
 </Layout>

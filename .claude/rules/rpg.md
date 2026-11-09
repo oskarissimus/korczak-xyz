@@ -1598,8 +1598,33 @@ before its usage arrived keeps the whole reservation, which errs the owner's way
   quest cut short by a cap ends on the decision made, with the reason on the ending screen
   (`Ending.cut`) — the toast is under that overlay.
 
-Not written down anywhere else: nothing on the admin panel sets the two dollar caps yet, so the
-defaults apply until `rpgPerIpUsd`/`rpgDailyUsd` are written into `demo/config` by hand.
+The two caps and the RPG's switch are set on the game's admin panel (*The admin panel*, below).
+
+## The admin panel
+
+Owner, 9 Nov 2026: "an admin panel in the game, so I can set the keys for now — later other things
+will come in handy too". `/admin/` on everyrpg.korczak.xyz (both locales; linked from `/account/`
+for an admin) and the last section of `/apps/admin/` on korczak.xyz: one component,
+`components/Rpg/AdminPanel.tsx`.
+
+- **One endpoint, sections in it.** The gateway's `GET|POST /admin/config` (`functions/src/rpg/admin.ts`)
+  answers every section; a POST is a patch naming only the sections it changes, parsed field by field
+  in `utils/rpg/adminConfig.ts` (both runtimes) — an unknown section, key or field is a 400, not
+  ignored. A new section is a field on `AdminStatus`/`AdminPatch` with its parser, a branch in
+  `admin.ts`, and a `<section>` in the panel.
+- **Admin is `admins/{uid}`**, checked by the function with the Admin SDK — the list `isAdmin()` in
+  `firestore.rules` reads, appointed by hand in the console. On `korczak-rpg` that document has to
+  be created there for the owner's account in that project; the page draws nothing useful without it.
+- **Server keys** (Google, ElevenLabs, fal.ai, OpenAI) live in `rpgServerKeys/config`, `{apiKeys, updatedAt,
+  updatedBy}`, with **no Firestore rule**: no page reads a key back, the admin's own included; the
+  answer is the last four characters. Null in a patch clears one (`FieldValue.delete`).
+- **The demo spends them first** (`demoKeys` in `admin.ts`, `demoKeysOf`): the server's Google and
+  ElevenLabs keys, each failing over to `demo/config.keyUid`'s account store as before, so the game's
+  production can run its demo without any account volunteering its keys. fal.ai and OpenAI are kept
+  for what comes next (credits, the `payer` branch in `gateway.ts`); nothing spends them yet.
+- **The demo section** writes `apps.rpg`, `rpgPerIpUsd`, `rpgDailyUsd` into `demo/config` merged, so
+  the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
+  `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
 
 ### The budget is shown as diesel
 

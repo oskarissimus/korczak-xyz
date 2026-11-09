@@ -23,8 +23,8 @@
  * reported by the browser and so can be inflated by anybody who wants to; each report is capped
  * so that takes effort, and nothing but a number on the intro screen ever reads them.
  *
- * The keys are read at call time from the paying account's own store, as the roaster's demo reads
- * them; nothing in a request names that account, and no answer says whose it is. Nothing about the
+ * The keys are read at call time: the server's own, set on the game's admin panel (`admin.ts`),
+ * and failing those the paying account's own store, as the roaster's demo reads them; nothing in a request names that account, and no answer says whose it is. Nothing about the
  * caller is stored but a day-keyed hash of the address holding a number of dollars.
  */
 
@@ -32,7 +32,6 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 
-import { keysFrom } from '../../../korczak-xyz/src/utils/accountKeys/keys';
 import { tokenCost } from '../../../korczak-xyz/src/utils/rpg/cost';
 import {
   BadContext,
@@ -67,6 +66,7 @@ import { callerIp, dayKey, ipKey } from '../demo/limits';
 import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
+import { demoKeys } from './admin';
 import { flushSentry, reportError } from '../sentry';
 
 const VOICE_MODEL = FLASH_MODEL;
@@ -91,14 +91,6 @@ async function readSettings(): Promise<RpgDemoSettings> {
   return normalizeRpgDemo(snap.exists ? snap.data() : {});
 }
 
-async function demoKeys(uid: string): Promise<{ google: string | null; elevenLabs: string | null }> {
-  if (!uid) return { google: null, elevenLabs: null };
-  const snap = await db.collection('users').doc(uid).collection('keys').doc('config').get();
-  const keys = keysFrom(snap.exists ? snap.data() : {});
-  return { google: keys.google, elevenLabs: keys.elevenLabs };
-}
-
-/** `demoUsage/rpg-{day}`, beside the roaster's buckets, with the hashed addresses under it. */
 function counters(day: string, ip: string) {
   const allDoc = db.collection('demoUsage').doc(`rpg-${day}`);
   return { allDoc, ipDoc: allDoc.collection('ips').doc(ipKey(ip, day)) };

@@ -1,0 +1,18 @@
+---
+import Game from '../layouts/Game.astro';
+import AdminPanel from '../../src/components/Rpg/AdminPanel';
+import { useTranslations } from '../../src/i18n';
+import '../../src/styles/auth.css';
+import '../../src/styles/account.css';
+import '../styles/pages.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+---
+
+<Game title={`${t('rpg.admin')} · ${t('Rpg')}`} lang={lang} path="/admin/" noindex>
+  <main class="rpg-page">
+    <h1>{t('rpg.admin')}</h1>
+    <AdminPanel client:only="react" lang={lang} variant="game" />
+  </main>
+</Game>

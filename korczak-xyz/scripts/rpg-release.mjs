@@ -23,9 +23,11 @@ export const EXPECTED = [
   'index.html',
   'login/index.html',
   'account/index.html',
+  'admin/index.html',
   'pl/index.html',
   'pl/login/index.html',
   'pl/account/index.html',
+  'pl/admin/index.html',
 ];
 
 /** Every .html under `dir`, relative and with forward slashes. */
