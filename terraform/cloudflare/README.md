@@ -9,7 +9,7 @@ CI gate that refuses any plan that deletes, and an ownership line.
 |---|---|
 | the `korczak-xyz-media` R2 bucket | the `korczak-xyz` Worker and its assets (`korczak-xyz/wrangler.jsonc`) |
 | `media.korczak.xyz`, the bucket's custom domain, and the DNS record it makes | the apex custom domain and its `100::` record |
-| | the objects in the bucket (`korczak-xyz/scripts/song-videos.mjs`) |
+| `mail.korczak.xyz`: SPF, Firebase verification TXT and two DKIM CNAMEs for Firebase Auth's mail (`mail.tf`) | the objects in the bucket (`korczak-xyz/scripts/song-videos.mjs`) |
 
 Nothing may be in both columns.
 
