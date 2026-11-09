@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
-import { ACCOUNT_KEY, setGatewayContext } from '../../utils/rpg/gateway';
+import { ACCOUNT_KEY, refuelWallet, setGatewayContext } from '../../utils/rpg/gateway';
 import { useDieselWallet } from '../../hooks/useDieselWallet';
 import { fuelKeys } from '../../utils/rpg/wallet';
 import { useAuth } from '../../hooks/useAuth';
@@ -187,7 +187,7 @@ const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creat
 const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { translations } from './translations';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
-import { beatLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
+import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
   speaker: string;
@@ -2871,11 +2871,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     : demo && (storyProvider === 'demo' || (storyProvider === 'static' && (demo.reason === 'ip-cap' || demo.reason === 'all-cap')))
       ? { litres: litres(Math.min(demo.remaining.ip, demo.remaining.all)), capacity: litres(demo.perIpUsd), tank: false }
       : null;
+  // An admin's canister pours real diesel into their own tank, free (`/wallet/refuel`; the server
+  // checks `admins/`). The tank's live snapshot raises the gauge.
+  const adminRefuel = onDiesel && auth.isAdmin ? async (c: { id: string }) => Boolean(await refuelWallet(c.id)) : undefined;
   const dieselModel = modelChain(onDiesel ? (wallet!.server.google ? 'google' : 'openai') : 'demo', chosenModel)[0] ?? null;
+  // What a quest and a world cost in all, not only the model's words: the lines, the score and the
+  // models are most of it (`questLitres`, measured on the ledger) — and only what is on for this reader.
+  const priceParts = { voice: Boolean(voiceOn && voiceKey), music: Boolean(musicOn && musicKey), fal: Boolean(falKey) };
   const dieselPrices =
     diesel && dieselModel
       ? t.dieselPrices(
-          formatLitres(worldLitres(dieselModel) ?? 0, gameLang),
+          formatLitres(worldLitres(dieselModel, priceParts) ?? 0, gameLang),
+          formatLitres(questLitres(dieselModel, priceParts) ?? 0, gameLang),
           formatLitres(beatLitres(dieselModel) ?? 0, gameLang),
           formatLitres(lineLitres(), gameLang),
         )
@@ -2903,7 +2910,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title })}
       {!keysReady && item('wait', t.wait, () => {}, { disabled: true })}
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, beatLitres(dieselModel)) : undefined].filter(Boolean).join(' · ') })}
+      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
       {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined })}
       {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
@@ -2956,7 +2963,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <div className="rpg-panel-actions">
         <button type="button" className="rpg-start" disabled={!creatable} onClick={() => begin(true)}>
           {t.menuCreate}
-          {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel))}</small>}
+          {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel, priceParts))}</small>}
         </button>
         {back}
       </div>
@@ -3141,7 +3148,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselMenu = diesel && (
     <div className="rpg-panel">
       <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} showCanisters />
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <div className="rpg-panel-actions">{back}</div>
@@ -3425,7 +3432,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                   )}
                   {diesel &&
                     (plantState(diesel.litres) === 'stopped' ? (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} />
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
                     ) : (
                       <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
                     ))}
@@ -3447,7 +3454,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
-          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} />}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beatLitres, CANISTERS, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from './diesel';
+import { beatLitres, questLitres, CANISTERS, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from './diesel';
 import { DEMO_MODELS, RPG_DEMO_DEFAULTS } from './demoLimits';
 
 describe('diesel', () => {
@@ -20,15 +20,25 @@ describe('diesel', () => {
     expect(plantState(EMPTY_LITRES)).toBe('running');
   });
 
-  it('prices every demo model, a world as two steps', () => {
+  it('prices every demo model, a world as more than its quest', () => {
+    const all = { voice: true, music: true, fal: true };
     for (const model of DEMO_MODELS) {
       const beat = beatLitres(model);
       expect(beat, model).not.toBeNull();
-      expect(worldLitres(model)).toBeCloseTo(beat! * 2);
+      expect(worldLitres(model, all)!).toBeGreaterThan(questLitres(model, all)!);
     }
     expect(beatLitres('gemma-4-31b-it')).toBe(0);
     expect(beatLitres('no-such-model')).toBeNull();
     expect(lineLitres()).toBeGreaterThan(0);
+  });
+
+  it('prices a world and its first quest at what the ledger measured, not just the model’s words', () => {
+    const all = { voice: true, music: true, fal: true };
+    // Seven worlds played through their first quest, 1–4 Nov 2026: $0.41–0.72.
+    expect(worldLitres('gemini-3.8-flash', all)).toBeGreaterThan(55);
+    expect(worldLitres('gemini-3.8-flash', all)).toBeLessThan(85);
+    // On the demo: no score, no models, so it is mostly the lines.
+    expect(questLitres('gemini-3.8-flash', { voice: true, music: false, fal: false })).toBeLessThan(questLitres('gemini-3.8-flash', all)!);
   });
 
   it('sells more litres per złoty in the bigger canister', () => {

@@ -25,6 +25,8 @@ import type { KeyName } from '../accountKeys/keys';
 
 /** The gateway's own endpoint: the balance, granting the first tank to a new account. */
 export const WALLET_PATH = '/wallet';
+/** An admin's canister: poured for free, no payment (owner, 9 Nov 2026: "when I click refuel and I'm admin I should get more fuel without needing to pay"). */
+export const REFUEL_PATH = '/wallet/refuel';
 
 /** Where the balance sits: `rpgLedger/{uid}`, fields below. */
 export const WALLET_COLLECTION = 'rpgLedger';

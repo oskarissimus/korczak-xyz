@@ -10,6 +10,7 @@ const store = new Map<string, Record<string, unknown>>();
 const written: { path: string; data: Record<string, unknown> }[] = [];
 const reserve = vi.fn();
 const settle = vi.fn(async () => {});
+const topUp = vi.fn(async () => 3);
 
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { increment: (n: number) => ({ __inc: n }), serverTimestamp: () => ({ __now: true }), delete: () => ({ __del: true }) },
@@ -34,6 +35,7 @@ vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () 
 vi.mock('./wallet', () => ({
   reserveDiesel: (...a: unknown[]) => reserve(...a),
   settleDiesel: (...a: unknown[]) => settle(...(a as [])),
+  topUpDiesel: (...a: unknown[]) => topUp(...a),
   walletStatus: async () => ({ balanceUsd: 1, grantUsd: 1, server: { google: true, elevenLabs: true, fal: true, openai: false } }),
 }));
 vi.mock('./assets', () => ({
@@ -47,6 +49,7 @@ vi.mock('./assets', () => ({
 vi.mock('./admin', () => ({
   AdminRefusal: class extends Error {},
   handleAdmin: vi.fn(),
+  isAdminUid: async (uid: string) => uid === 'u1',
   readServerKeys: async () => ({ google: 'AIza-server', elevenLabs: 'el-server', fal: 'fal-server', openai: null }),
 }));
 
@@ -217,5 +220,19 @@ describe('diesel', () => {
     await handleRpgApi(req(BEAT, { headers: { authorization: 'Bearer good', 'x-rpg-keep': '1' }, body: {} }), fakeRes() as any);
     expect(fetchMock.mock.calls[0][1].headers['x-goog-api-key']).toBe('AIza-own');
     expect(reserve).not.toHaveBeenCalled();
+  });
+
+  it('pours an admin’s canister for free, and refuses anyone else', async () => {
+    let res = fakeRes();
+    await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'barrel' } }), res as any);
+    expect(res.statusCode).toBe(200);
+    expect(topUp).toHaveBeenCalledWith('u1', 4.5);
+    res = fakeRes();
+    await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer keyless' }, body: { canister: 'barrel' } }), res as any);
+    expect(res.statusCode).toBe(403);
+    res = fakeRes();
+    await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'truck' } }), res as any);
+    expect(res.statusCode).toBe(400);
+    expect(topUp).toHaveBeenCalledTimes(1);
   });
 });

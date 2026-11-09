@@ -74,6 +74,7 @@ export default function DieselPlant({
   capacity,
   showCanisters = false,
   tank = false,
+  onRefuel,
 }: {
   lang: Lang;
   litres: number;
@@ -82,11 +83,15 @@ export default function DieselPlant({
   showCanisters?: boolean;
   /** The account's own tank (`wallet.ts`) rather than the demo's day: nothing comes at midnight. */
   tank?: boolean;
+  /** An admin's canister is poured for real and for free (`/wallet/refuel`); resolves whether it was. */
+  onRefuel?: (c: Canister) => Promise<boolean>;
 }) {
   const t = translations[lang];
   const real = plantState(litres);
   const [phase, setPhase] = useState<Phase>(real);
   const [preview, setPreview] = useState<Canister | null>(null);
+  /** The admin's canister poured for real, and how it went: the line under the plant says so. */
+  const [poured, setPoured] = useState<{ c: Canister; ok: boolean | null } | null>(null);
   const before = useRef(real);
   const timers = useRef<number[]>([]);
 
@@ -110,6 +115,18 @@ export default function DieselPlant({
 
   const buy = (c: Canister) => {
     if (phase === 'refuel') return;
+    if (onRefuel) {
+      setPoured({ c, ok: null });
+      setPhase('refuel');
+      const started = Date.now();
+      void onRefuel(c).then((ok) => {
+        setPoured({ c, ok });
+        // The man finishes pouring before the lights come on, however fast the server was.
+        later(() => setPhase(ok ? 'running' : plantState(litres)), Math.max(0, REFUEL_MS - (Date.now() - started)));
+        later(() => setPoured(null), REFUEL_MS + PREVIEW_HOLD_MS * 2);
+      });
+      return;
+    }
     setPreview(c);
     setPhase('refuel');
     later(() => setPhase('running'), REFUEL_MS);
@@ -200,7 +217,11 @@ export default function DieselPlant({
         </g>
       </svg>
       <p className="rpg-dz-status">
-        {preview && phase !== 'stopped'
+        {poured && poured.ok !== null
+          ? poured.ok
+            ? t.dieselAdminPoured(formatLitres(poured.c.litres, lang))
+            : t.dieselAdminFailed
+          : preview && phase !== 'stopped'
           ? t.dieselPreview(formatLitres(preview.litres, lang))
           : phase === 'refuel'
             ? t.dieselRefuel
@@ -222,7 +243,7 @@ export default function DieselPlant({
               </button>
             ))}
           </div>
-          <p className="rpg-dz-note">{tank ? t.dieselTankSoon : t.dieselSoon}</p>
+          <p className="rpg-dz-note">{onRefuel ? t.dieselAdminNote : tank ? t.dieselTankSoon : t.dieselSoon}</p>
         </>
       )}
     </div>

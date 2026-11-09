@@ -1655,8 +1655,18 @@ the price of a world or a beat is in it too."
   New world, a price tag on New quest, the line in Settings, and the plant on the ending screen. A
   spent cap closes the demo (`available: false`, so the story falls back to `static`), and that is
   exactly when the dark plant must show — the condition reads the cap reasons for that.
-- **The tags are estimates** (`beatLitres`: 5k in, 1.5k out on the chosen demo model; a world is two
-  of those; a spoken line 150 characters at `clipCost`), said with "~". The console keeps the bill.
+- **The tags are estimates of the whole thing**, said with "~"; the console keeps the bill. Until
+  9 Nov 2026 they priced only the model's words — ~1.9 L for a world, ~0.9 L for a quest — while the
+  ledger measured $0.41–0.72 for a world and its first quest, most of it ElevenLabs and fal.ai (owner:
+  "massively underpriced"). Now (`diesel.ts`): a step is 8k in, 1.2k out, 0.8k thinking on the chosen
+  model (`beatLitres`); a quest is six steps plus its lines ($0.27), its score ($0.132) and its new
+  people and places on fal.ai ($0.05) (`questLitres`); a world is one more request, its village's
+  pieces ($0.2) and its first quest (`worldLitres`) — about 75 L and 53 L on 3.8 Flash. Only what is
+  on for the reader counts (`PriceParts`): the demo has no score and no models, ~37 L a world.
+- **An admin's canister is real and free** (owner, 9 Nov 2026: "when I click refuel and I'm admin I
+  should get more fuel without needing to pay"): on the account's tank, a tap posts `/wallet/refuel`,
+  the gateway checks `admins/{uid}` and pours the canister's litres in (`topUpDiesel`); the plant
+  plays the pouring and the live snapshot raises the gauge. Anyone else still gets the preview.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
 - **Nothing sells the canisters yet.** The three packs (200 L / 10 zł, 450 L / 20 zł, 1200 L / 49 zł)

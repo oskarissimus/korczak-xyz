@@ -32,7 +32,7 @@ import {
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
-import { WALLET_PATH, type WalletStatus } from './wallet';
+import { REFUEL_PATH, WALLET_PATH, type WalletStatus } from './wallet';
 
 export { ACCOUNT_KEY };
 
@@ -145,6 +145,17 @@ export async function fetchWallet(signal?: AbortSignal): Promise<WalletStatus | 
     if (!response.ok) return null;
     const body = (await response.json()) as WalletStatus;
     return typeof body?.balanceUsd === 'number' && body.server ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/** An admin's free canister (`/wallet/refuel`): the tank after it, or null when refused. */
+export async function refuelWallet(canister: string): Promise<WalletStatus | null> {
+  try {
+    const response = await signedInCall(REFUEL_PATH, 'POST', undefined, { canister });
+    if (!response.ok) return null;
+    return (await response.json()) as WalletStatus;
   } catch {
     return null;
   }
