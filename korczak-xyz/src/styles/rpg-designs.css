@@ -1,0 +1,1612 @@
+/* The ten candidate looks for Every RPG (`utils/rpg/designs.ts`). Off by default: every rule here
+   is under `:root[data-rpg-design]`, which only `?design=<id>` sets, so without it the game is drawn
+   by rpg.css and pages.css exactly as before.
+
+   Two layers:
+   1. The skeleton (`:root[data-rpg-design]`): every surface of the game — the start screen, its
+      sub-menus, the HUD, dialogue, notices, the journal, the ending, the intro, sign-in and the
+      account page — drawn from one set of tokens (`--d-*`), plus the start screen's decluttering,
+      which all ten share (designs.ts, SHARED_RULES).
+   2. One block per look: its tokens, then the few rules no token can say (cut corners, a drop
+      capital, rivets, a cursor).
+
+   The ~ console is left alone in every look: it sets its own monospace and colours (rpg.css,
+   `.rpg-dev`). Once a look is picked, its tokens move into rpg.css and this file goes. */
+
+@import '@fontsource/alegreya/latin-400.css';
+@import '@fontsource/alegreya/latin-ext-400.css';
+@import '@fontsource/alegreya/latin-400-italic.css';
+@import '@fontsource/alegreya/latin-ext-400-italic.css';
+@import '@fontsource/alegreya/latin-700.css';
+@import '@fontsource/alegreya/latin-ext-700.css';
+@import '@fontsource/eb-garamond/latin-400.css';
+@import '@fontsource/eb-garamond/latin-ext-400.css';
+@import '@fontsource/eb-garamond/latin-400-italic.css';
+@import '@fontsource/eb-garamond/latin-ext-400-italic.css';
+@import '@fontsource/eb-garamond/latin-600.css';
+@import '@fontsource/eb-garamond/latin-ext-600.css';
+@import '@fontsource/cinzel/latin-500.css';
+@import '@fontsource/cinzel/latin-ext-500.css';
+@import '@fontsource/cinzel/latin-700.css';
+@import '@fontsource/cinzel/latin-ext-700.css';
+@import '@fontsource/cinzel-decorative/latin-700.css';
+@import '@fontsource/cinzel-decorative/latin-ext-700.css';
+@import '@fontsource/marcellus/latin-400.css';
+@import '@fontsource/marcellus/latin-ext-400.css';
+@import '@fontsource/cormorant-garamond/latin-500.css';
+@import '@fontsource/cormorant-garamond/latin-ext-500.css';
+@import '@fontsource/cormorant-garamond/latin-500-italic.css';
+@import '@fontsource/cormorant-garamond/latin-ext-500-italic.css';
+@import '@fontsource/cormorant-garamond/latin-700.css';
+@import '@fontsource/cormorant-garamond/latin-ext-700.css';
+@import '@fontsource/lora/latin-400.css';
+@import '@fontsource/lora/latin-ext-400.css';
+@import '@fontsource/lora/latin-400-italic.css';
+@import '@fontsource/lora/latin-ext-400-italic.css';
+@import '@fontsource/lora/latin-600.css';
+@import '@fontsource/lora/latin-ext-600.css';
+@import '@fontsource/spectral/latin-300.css';
+@import '@fontsource/spectral/latin-ext-300.css';
+@import '@fontsource/spectral/latin-300-italic.css';
+@import '@fontsource/spectral/latin-ext-300-italic.css';
+@import '@fontsource/spectral/latin-500.css';
+@import '@fontsource/spectral/latin-ext-500.css';
+@import '@fontsource/pixelify-sans/latin-400.css';
+@import '@fontsource/pixelify-sans/latin-ext-400.css';
+@import '@fontsource/pixelify-sans/latin-700.css';
+@import '@fontsource/pixelify-sans/latin-ext-700.css';
+@import '@fontsource/manrope/latin-400.css';
+@import '@fontsource/manrope/latin-ext-400.css';
+@import '@fontsource/manrope/latin-600.css';
+@import '@fontsource/manrope/latin-ext-600.css';
+@import '@fontsource/manrope/latin-800.css';
+@import '@fontsource/manrope/latin-ext-800.css';
+@import '@fontsource/barlow-condensed/latin-400.css';
+@import '@fontsource/barlow-condensed/latin-ext-400.css';
+@import '@fontsource/barlow-condensed/latin-600.css';
+@import '@fontsource/barlow-condensed/latin-ext-600.css';
+@import '@fontsource/barlow-condensed/latin-800.css';
+@import '@fontsource/barlow-condensed/latin-ext-800.css';
+
+/* ============================================================================================
+   1. The skeleton
+   ============================================================================================ */
+
+:root[data-rpg-design] {
+  /* Type */
+  --d-font: Georgia, 'Times New Roman', serif;
+  --d-font-display: var(--d-font);
+  --d-font-ui: var(--d-font);
+  --d-display-case: none;
+  --d-display-track: 0.04em;
+  --d-display-weight: 600;
+  --d-display-variant: normal;
+  --d-title-size: clamp(36px, 8vw, 64px);
+  --d-title-track: 0.08em;
+  --d-title-style: normal;
+  --d-title-shadow: 0 2px 0 #000, 0 0 18px rgba(0, 0, 0, 0.6);
+  --d-ui-case: none;
+  --d-ui-track: 0.02em;
+  --d-ui-weight: normal;
+  --d-ui-size: 18px;
+  --d-read-size: 16px;
+
+  /* Colour: ink and accent on a panel, and on the bare scene (they differ only where panels are light) */
+  --d-ink: #f1e6cf;
+  --d-ink-dim: rgba(241, 230, 207, 0.7);
+  --d-ink-strong: #fff;
+  --d-scene-ink: var(--d-ink);
+  --d-accent: #ffd36b;
+  --d-scene-accent: var(--d-accent);
+  --d-accent-soft: rgba(255, 211, 107, 0.15);
+  --d-plot: #ffb45e;
+  --d-asked: rgba(241, 230, 207, 0.5);
+  --d-danger: #ff9a7a;
+  --d-hp: linear-gradient(#c43a2f, #7d1e17);
+
+  /* Surfaces */
+  --d-surface-bg: rgba(12, 10, 8, 0.86);
+  --d-surface-strong: rgba(10, 7, 3, 0.92);
+  --d-page-surface: var(--d-surface-bg);
+  --d-solid: #1d1812;
+  --d-well: rgba(0, 0, 0, 0.35);
+  --d-well-ink: var(--d-ink);
+  --d-overlay: rgba(8, 8, 10, 0.72);
+  --d-line: #6b5b3e;
+  --d-line-w: 1px;
+  --d-radius: 0px;
+  --d-radius-sm: 0px;
+  --d-shadow: none;
+  --d-blur: none;
+  --d-clip: none;
+  --d-stitch: none;
+
+  /* Buttons */
+  --d-btn-bg: rgba(20, 14, 6, 0.7);
+  --d-btn-bg-hover: var(--d-btn-bg);
+  --d-btn-ink: var(--d-ink);
+  --d-btn-line: rgba(185, 167, 127, 0.55);
+  --d-btn-radius: var(--d-radius);
+  --d-btn-shadow: none;
+  --d-primary-bg: #3a2c18;
+  --d-primary-ink: var(--d-ink);
+  --d-primary-line: #c9a45c;
+  --d-glow: none;
+
+  /* The start screen: a tint and a vignette over the village picture */
+  --d-tint: linear-gradient(transparent, transparent);
+  --d-scrim: radial-gradient(ellipse at center, rgba(8, 7, 5, 0.55) 0%, rgba(8, 7, 5, 0.88) 80%);
+  --d-bg: #000;
+}
+
+/* --- type and the bare scene --- */
+
+:root[data-rpg-design] body,
+:root[data-rpg-design] .rpg-container {
+  font-family: var(--d-font);
+  color: var(--d-scene-ink);
+}
+
+:root[data-rpg-design] .rpg-menu-title,
+:root[data-rpg-design] .rpg-overlay h2,
+:root[data-rpg-design] .rpg-panel h3,
+:root[data-rpg-design] .rpg-proposals-head h3,
+:root[data-rpg-design] .rpg-intro-top h2,
+:root[data-rpg-design] .rpg-ending h3,
+:root[data-rpg-design] .rpg-log h3,
+:root[data-rpg-design] .rpg-log h4,
+:root[data-rpg-design] .rpg-page h1,
+:root[data-rpg-design] .rpg-notice-title {
+  font-family: var(--d-font-display);
+  font-weight: var(--d-display-weight);
+  font-variant: var(--d-display-variant);
+  text-transform: var(--d-display-case);
+  letter-spacing: var(--d-display-track);
+  color: var(--d-scene-accent);
+}
+
+:root[data-rpg-design] .rpg-menu-title {
+  margin: 0 0 6px;
+  font-size: var(--d-title-size) !important;
+  letter-spacing: var(--d-title-track) !important;
+  font-style: var(--d-title-style);
+  line-height: 1.05;
+  text-shadow: var(--d-title-shadow);
+}
+
+:root[data-rpg-design] .rpg-compass-arrow,
+:root[data-rpg-design] .rpg-overlay a {
+  color: var(--d-scene-accent);
+}
+
+:root[data-rpg-design] .rpg-compass {
+  font-family: var(--d-font-ui);
+}
+
+/* --- the start screen: the village behind it, and one thing at a time --- */
+
+:root[data-rpg-design] .rpg-menu-screen {
+  background:
+    var(--d-tint),
+    var(--d-scrim),
+    url('../assets/rpg/menu-background.jpg') center / cover no-repeat,
+    var(--d-bg);
+  gap: 16px;
+}
+
+:root[data-rpg-design] body::before {
+  background:
+    var(--d-tint),
+    var(--d-scrim),
+    url('../assets/rpg/menu-background.jpg') center / cover no-repeat,
+    var(--d-bg);
+}
+
+:root[data-rpg-design] .rpg-overlay:not(.rpg-menu-screen) {
+  background: var(--d-overlay);
+}
+
+/* What you came to do comes first: the title, a line of status (the diesel), the menu, and only
+   then the world you are in and the proposed ones — below the fold of attention, not above it. */
+:root[data-rpg-design] .rpg-menu-screen > .rpg-menu-title {
+  order: 0;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-dz-slot,
+:root[data-rpg-design] .rpg-menu-screen > .rpg-storage-full {
+  order: 1;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-menu {
+  order: 2;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-account {
+  order: 3;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-world {
+  order: 4;
+  margin-top: 10px;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-proposals {
+  order: 5;
+}
+
+:root[data-rpg-design] .rpg-menu-screen > .rpg-dz {
+  order: 6;
+}
+
+/* The menu: full-width entries for what you came to do, and a quiet row of words under them for
+   language, settings and controls (SHARED_RULES: at most three entries and one quiet row). */
+:root[data-rpg-design] .rpg-menu {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 4px;
+  width: min(100%, 340px);
+}
+
+:root[data-rpg-design] .rpg-menu-item {
+  position: relative;
+  flex: 1 1 100%;
+  justify-content: center;
+  min-height: 50px;
+  padding: 8px 18px;
+  border: var(--d-line-w) solid var(--d-btn-line);
+  border-radius: var(--d-btn-radius);
+  background: var(--d-btn-bg);
+  color: var(--d-btn-ink);
+  font-family: var(--d-font-ui);
+  font-size: var(--d-ui-size);
+  font-weight: var(--d-ui-weight);
+  letter-spacing: var(--d-ui-track);
+  text-transform: var(--d-ui-case);
+  box-shadow: var(--d-btn-shadow);
+  clip-path: var(--d-clip);
+  outline: var(--d-stitch);
+  outline-offset: -6px;
+  -webkit-backdrop-filter: var(--d-blur);
+  backdrop-filter: var(--d-blur);
+  transition:
+    color 0.18s,
+    border-color 0.18s,
+    background 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+
+:root[data-rpg-design] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design] .rpg-menu-item:focus-visible {
+  border-color: var(--d-accent);
+  color: var(--d-accent);
+  background: var(--d-btn-bg-hover);
+  box-shadow: var(--d-btn-shadow), var(--d-glow);
+  outline: var(--d-stitch);
+  outline-offset: -6px;
+}
+
+:root[data-rpg-design] .rpg-menu-item small {
+  font-family: var(--d-font);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.65;
+}
+
+:root[data-rpg-design] .rpg-menu-primary {
+  min-height: 58px;
+  border-color: var(--d-primary-line);
+  background: var(--d-primary-bg);
+  color: var(--d-primary-ink);
+  font-size: calc(var(--d-ui-size) + 2px);
+}
+
+:root[data-rpg-design] .rpg-menu-primary:hover:not(:disabled),
+:root[data-rpg-design] .rpg-menu-primary:focus-visible {
+  border-color: var(--d-primary-line);
+  background: var(--d-primary-bg);
+  color: var(--d-primary-ink);
+  filter: brightness(1.1);
+}
+
+:root[data-rpg-design] .rpg-menu-item:is([data-key='language'], [data-key='settings'], [data-key='controls']) {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 4px 12px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+  outline: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--d-scene-ink);
+  opacity: 0.78;
+  font-family: var(--d-font);
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+:root[data-rpg-design] .rpg-menu-item:is([data-key='language'], [data-key='settings'], [data-key='controls']):hover,
+:root[data-rpg-design] .rpg-menu-item:is([data-key='language'], [data-key='settings'], [data-key='controls']):focus-visible {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--d-scene-accent);
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* The language entry says the language itself ("🌐 Polski"), not the word "Language". */
+:root[data-rpg-design] .rpg-menu-item[data-key='language'] > span {
+  display: none;
+}
+
+:root[data-rpg-design] .rpg-menu-item[data-key='language'] small {
+  font-size: inherit;
+  opacity: 1;
+}
+
+:root[data-rpg-design] .rpg-menu-item[data-key='language'] small::before {
+  content: '🌐 ';
+}
+
+/* The account: words, not a third row of boxes. */
+:root[data-rpg-design] .rpg-account {
+  gap: 2px 10px;
+}
+
+:root[data-rpg-design] .rpg-account-link {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--d-scene-ink);
+  opacity: 0.75;
+  font-family: var(--d-font);
+  font-size: 14px;
+}
+
+:root[data-rpg-design] .rpg-account-primary {
+  color: var(--d-scene-accent);
+  opacity: 1;
+}
+
+:root[data-rpg-design] .rpg-account-link:hover,
+:root[data-rpg-design] .rpg-account-link:focus-visible {
+  border: 0;
+  color: var(--d-scene-accent);
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+:root[data-rpg-design] .rpg-account-who {
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+/* --- buttons --- */
+
+:root[data-rpg-design] .rpg-start,
+:root[data-rpg-design] .auth-card--game .auth-submit {
+  padding: 10px 30px;
+  border: var(--d-line-w) solid var(--d-primary-line);
+  border-radius: var(--d-btn-radius);
+  background: var(--d-primary-bg);
+  color: var(--d-primary-ink);
+  font-family: var(--d-font-ui);
+  font-weight: var(--d-ui-weight);
+  letter-spacing: var(--d-ui-track);
+  text-transform: var(--d-ui-case);
+  box-shadow: var(--d-btn-shadow);
+  clip-path: var(--d-clip);
+}
+
+:root[data-rpg-design] .rpg-start:hover:not(:disabled),
+:root[data-rpg-design] .auth-card--game .auth-submit:hover {
+  background: var(--d-primary-bg);
+  color: var(--d-primary-ink);
+  filter: brightness(1.1);
+}
+
+:root[data-rpg-design] .rpg-menu-back,
+:root[data-rpg-design] .rpg-proposals-refresh,
+:root[data-rpg-design] .rpg-wish button,
+:root[data-rpg-design] .rpg-lang button,
+:root[data-rpg-design] .rpg-library-head button,
+:root[data-rpg-design] .rpg-library-actions button:not(.rpg-start),
+:root[data-rpg-design] .rpg-library-foot button,
+:root[data-rpg-design] .rpg-trash-link button,
+:root[data-rpg-design] .rpg-trash-sweep > button,
+:root[data-rpg-design] .rpg-stalled-actions button:not(.rpg-start),
+:root[data-rpg-design] .rpg-dz-offer,
+:root[data-rpg-design] .rpg-dz-badge,
+:root[data-rpg-design] .rpg-chronicle button,
+:root[data-rpg-design] .retro-btn {
+  border: var(--d-line-w) solid var(--d-btn-line);
+  border-radius: var(--d-btn-radius);
+  background: var(--d-btn-bg);
+  color: var(--d-btn-ink);
+  font-family: var(--d-font-ui);
+  letter-spacing: var(--d-ui-track);
+  box-shadow: var(--d-btn-shadow);
+  -webkit-backdrop-filter: var(--d-blur);
+  backdrop-filter: var(--d-blur);
+}
+
+:root[data-rpg-design] .rpg-menu-back:hover,
+:root[data-rpg-design] .rpg-proposals-refresh:hover:not(:disabled),
+:root[data-rpg-design] .rpg-wish button:hover:not(:disabled),
+:root[data-rpg-design] .rpg-lang button:hover,
+:root[data-rpg-design] .rpg-dz-offer:hover:not(:disabled),
+:root[data-rpg-design] button.rpg-dz-badge:hover,
+:root[data-rpg-design] .retro-btn:hover {
+  border-color: var(--d-accent);
+  background: var(--d-btn-bg-hover);
+  color: var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-dz-badge {
+  padding: 4px 12px;
+  font-family: var(--d-font);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+:root[data-rpg-design] .rpg-dz-badge-empty {
+  border-color: var(--d-danger);
+  color: var(--d-danger);
+}
+
+/* --- fields --- */
+
+:root[data-rpg-design] .rpg-dialogue-free input,
+:root[data-rpg-design] .rpg-wish select,
+:root[data-rpg-design] .rpg-wish input,
+:root[data-rpg-design] .rpg-wish textarea,
+:root[data-rpg-design] .rpg-lang select,
+:root[data-rpg-design] .rpg-model select,
+:root[data-rpg-design] .auth-card--game .auth-field input,
+:root[data-rpg-design] .rpg-page select {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-well);
+  color: var(--d-well-ink);
+}
+
+:root[data-rpg-design] .rpg-dialogue-free input:focus,
+:root[data-rpg-design] .auth-card--game .auth-field input:focus {
+  border-color: var(--d-accent);
+  box-shadow: 0 0 0 3px var(--d-accent-soft);
+}
+
+:root[data-rpg-design] .rpg-exotic-row input {
+  accent-color: var(--d-accent);
+}
+
+/* --- every panel is one surface --- */
+
+:root[data-rpg-design] .rpg-dialogue,
+:root[data-rpg-design] .rpg-journal,
+:root[data-rpg-design] .rpg-notice,
+:root[data-rpg-design] .rpg-stalled,
+:root[data-rpg-design] .rpg-hint,
+:root[data-rpg-design] .rpg-prompt,
+:root[data-rpg-design] .rpg-toast,
+:root[data-rpg-design] .rpg-world,
+:root[data-rpg-design] .rpg-library > ul > li,
+:root[data-rpg-design] .rpg-log-page,
+:root[data-rpg-design] .auth-card--game {
+  border: var(--d-line-w) solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  color: var(--d-ink);
+  box-shadow: var(--d-shadow);
+  clip-path: var(--d-clip);
+  -webkit-backdrop-filter: var(--d-blur);
+  backdrop-filter: var(--d-blur);
+}
+
+:root[data-rpg-design] .rpg-journal,
+:root[data-rpg-design] .rpg-hint,
+:root[data-rpg-design] .rpg-prompt,
+:root[data-rpg-design] .rpg-toast {
+  text-shadow: none;
+  padding: 8px 14px;
+}
+
+:root[data-rpg-design] .rpg-journal {
+  padding: 8px 12px;
+}
+
+:root[data-rpg-design] .rpg-journal-fresh {
+  animation: d-journal-fresh 1s ease 3;
+}
+
+@keyframes d-journal-fresh {
+  50% {
+    border-color: var(--d-accent);
+    box-shadow: var(--d-shadow), 0 0 0 2px var(--d-accent-soft), 0 0 22px var(--d-accent-soft);
+  }
+}
+
+:root[data-rpg-design] .rpg-toast,
+:root[data-rpg-design] .rpg-notice-title,
+:root[data-rpg-design] .rpg-dialogue-speaker,
+:root[data-rpg-design] .rpg-choice-n,
+:root[data-rpg-design] .rpg-log h3,
+:root[data-rpg-design] .rpg-log h4,
+:root[data-rpg-design] .rpg-proposal-text strong,
+:root[data-rpg-design] .rpg-dz-price {
+  color: var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-notice,
+:root[data-rpg-design] .rpg-stalled {
+  border-color: var(--d-accent);
+  border-width: max(2px, var(--d-line-w));
+}
+
+:root[data-rpg-design] .rpg-log-page {
+  padding: 22px 24px;
+  text-align: left;
+}
+
+:root[data-rpg-design] .rpg-log-page .rpg-start {
+  display: block;
+  margin: 18px auto 0;
+}
+
+:root[data-rpg-design] .rpg-name-tag {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-surface-strong);
+  color: var(--d-accent);
+  font-family: var(--d-font-ui);
+}
+
+/* --- the dialogue --- */
+
+:root[data-rpg-design] .rpg-dialogue {
+  padding: 16px 20px 14px;
+  font-size: var(--d-read-size);
+}
+
+:root[data-rpg-design] .rpg-dialogue-speaker {
+  font-family: var(--d-font-display);
+  font-variant: var(--d-display-variant);
+  letter-spacing: var(--d-display-track);
+  text-transform: var(--d-display-case);
+  font-weight: var(--d-display-weight);
+}
+
+:root[data-rpg-design] .rpg-dialogue-text {
+  line-height: 1.5;
+}
+
+:root[data-rpg-design] .rpg-dialogue-choices button {
+  position: relative;
+  padding: 5px 8px;
+  border-radius: var(--d-radius-sm);
+  color: var(--d-ink);
+}
+
+:root[data-rpg-design] .rpg-dialogue-choices button:hover,
+:root[data-rpg-design] .rpg-dialogue-choices button:focus-visible {
+  color: var(--d-ink-strong);
+  background: var(--d-accent-soft);
+}
+
+:root[data-rpg-design] .rpg-dialogue-choices button.rpg-choice-plot {
+  color: var(--d-plot);
+}
+
+:root[data-rpg-design] .rpg-dialogue-choices button.rpg-choice-asked {
+  color: var(--d-asked);
+}
+
+:root[data-rpg-design] .rpg-dialogue-choices button.rpg-choice-saying {
+  color: var(--d-accent);
+  background: var(--d-accent-soft);
+  border-left: 3px solid var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-dialogue-free button {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  color: var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-dialogue-free-status {
+  color: var(--d-ink-dim);
+}
+
+:root[data-rpg-design] .rpg-dialogue-free-error {
+  color: var(--d-danger);
+}
+
+/* One primary per screen: on the ending, New world is the second choice, not a second primary. */
+:root[data-rpg-design] .rpg-start + .rpg-start {
+  border-color: var(--d-btn-line);
+  background: var(--d-btn-bg);
+  color: var(--d-btn-ink);
+}
+
+/* --- the HUD --- */
+
+:root[data-rpg-design] .rpg-hp {
+  height: 9px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-surface-strong);
+  overflow: hidden;
+}
+
+:root[data-rpg-design] .rpg-hp-fill {
+  background: var(--d-hp);
+}
+
+:root[data-rpg-design] .rpg-progress-fill {
+  background: var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-progress-track {
+  border-color: var(--d-line);
+  border-radius: var(--d-radius-sm);
+  overflow: hidden;
+}
+
+:root[data-rpg-design] .rpg-senses-key,
+:root[data-rpg-design] .rpg-voice,
+:root[data-rpg-design] .rpg-music,
+:root[data-rpg-design] .rpg-fullscreen,
+:root[data-rpg-design] .rpg-devtoggle,
+:root[data-rpg-design] .rpg-leave {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-surface-strong);
+  color: var(--d-ink);
+  -webkit-backdrop-filter: var(--d-blur);
+  backdrop-filter: var(--d-blur);
+}
+
+:root[data-rpg-design] .rpg-senses-key {
+  font-family: var(--d-font-ui);
+}
+
+:root[data-rpg-design] .rpg-senses-key-on {
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+}
+
+:root[data-rpg-design] .rpg-act {
+  font-family: var(--d-font-ui);
+}
+
+/* --- the start screen's other parts --- */
+
+:root[data-rpg-design] .rpg-world {
+  padding: 10px 14px;
+}
+
+:root[data-rpg-design] .rpg-proposals {
+  width: min(100%, 600px);
+}
+
+:root[data-rpg-design] .rpg-proposals-head h3 {
+  font-size: 14px;
+}
+
+:root[data-rpg-design] .rpg-proposals-refresh {
+  min-height: 30px;
+  padding: 2px 12px;
+  font-size: 13px;
+}
+
+:root[data-rpg-design] .rpg-proposal {
+  border: var(--d-line-w) solid var(--d-line);
+  border-radius: var(--d-radius);
+  clip-path: var(--d-clip);
+  box-shadow: var(--d-shadow);
+}
+
+:root[data-rpg-design] .rpg-proposal:hover:not(:disabled),
+:root[data-rpg-design] .rpg-proposal:focus-visible {
+  border-color: var(--d-accent);
+  box-shadow: var(--d-shadow), 0 0 0 1px var(--d-accent), var(--d-glow);
+}
+
+:root[data-rpg-design] .rpg-proposal-text {
+  background: var(--d-surface-strong);
+  color: var(--d-ink);
+}
+
+:root[data-rpg-design] .rpg-proposal-text strong {
+  font-family: var(--d-font-display);
+  font-variant: var(--d-display-variant);
+}
+
+/* Two lines of a pitch, not four: the card is a door, the rest is behind it. The box is sized
+   by --pitch-lines (rpg.css), so a placeholder and a written card stay the same height. */
+:root[data-rpg-design] .rpg-proposal-text {
+  --pitch-lines: 2;
+}
+
+:root[data-rpg-design] .rpg-proposal-text span {
+  -webkit-line-clamp: 2;
+  opacity: 0.85;
+}
+
+:root[data-rpg-design] .rpg-proposal-genre {
+  border-radius: var(--d-radius-sm);
+  background: var(--d-surface-strong);
+  color: var(--d-ink);
+}
+
+@media (min-width: 760px) {
+  :root[data-rpg-design] .rpg-proposals {
+    width: min(100%, 760px);
+  }
+
+  :root[data-rpg-design] .rpg-proposals-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The proposals' model, timings and cost belong to the console (~); here they are a whisper. */
+:root[data-rpg-design] .rpg-proposals-figures {
+  font-size: 11px;
+  opacity: 0.45;
+}
+
+:root[data-rpg-design] .rpg-panel {
+  gap: 12px;
+}
+
+:root[data-rpg-design] .rpg-intro-top h2 {
+  color: var(--d-scene-accent);
+}
+
+:root[data-rpg-design] .rpg-intro-text {
+  font-family: var(--d-font);
+}
+
+/* --- sign-in and the account page --- */
+
+:root[data-rpg-design] {
+  --retro-gray: var(--d-solid);
+  --retro-black: var(--d-ink);
+  --retro-navy: var(--d-accent);
+}
+
+:root[data-rpg-design] .rpg-page:not(:has(.auth-card--game)) {
+  border: var(--d-line-w) solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-page-surface);
+  box-shadow: var(--d-shadow);
+}
+
+:root[data-rpg-design] .rpg-page h1 {
+  text-shadow: var(--d-title-shadow);
+}
+
+:root[data-rpg-design] .auth-card--game .auth-tabs {
+  border-color: var(--d-line);
+  border-radius: calc(var(--d-radius-sm) + 2px);
+  background: var(--d-well);
+}
+
+:root[data-rpg-design] .auth-card--game .auth-tab {
+  border-radius: var(--d-radius-sm);
+  color: var(--d-ink-dim);
+  font-family: var(--d-font-ui);
+}
+
+:root[data-rpg-design] .auth-card--game .auth-tab--on {
+  background: var(--d-accent-soft);
+  color: var(--d-accent);
+  box-shadow: 0 0 0 1px var(--d-line) inset;
+}
+
+:root[data-rpg-design] .auth-card--game .auth-subtitle,
+:root[data-rpg-design] .auth-card--game .auth-field {
+  color: var(--d-ink-dim);
+}
+
+/* ============================================================================================
+   2. The ten looks
+   ============================================================================================ */
+
+/* --- 1. Ognisko / Hearth ------------------------------------------------------------------- */
+
+:root[data-rpg-design='ognisko'] {
+  --d-font: 'Alegreya', Georgia, serif;
+  --d-display-variant: small-caps;
+  --d-display-track: 0.06em;
+  --d-display-weight: 700;
+  --d-title-track: 0.06em;
+  --d-title-shadow: 0 2px 0 #1a0b03, 0 0 28px rgba(255, 140, 60, 0.55), 0 0 60px rgba(255, 100, 30, 0.25);
+  --d-ui-size: 19px;
+  --d-read-size: 17px;
+
+  --d-ink: #f6e7cf;
+  --d-ink-dim: rgba(246, 231, 207, 0.68);
+  --d-ink-strong: #fffaf0;
+  --d-accent: #ffb562;
+  --d-accent-soft: rgba(255, 160, 80, 0.16);
+  --d-plot: #ff8a4c;
+  --d-asked: rgba(246, 231, 207, 0.48);
+  --d-hp: linear-gradient(90deg, #b8321c, #ff7a3a);
+
+  --d-surface-bg: linear-gradient(180deg, rgba(46, 26, 14, 0.88), rgba(24, 13, 7, 0.9));
+  --d-surface-strong: rgba(24, 13, 7, 0.92);
+  --d-solid: #24150b;
+  --d-well: rgba(12, 6, 2, 0.55);
+  --d-overlay: radial-gradient(ellipse at 50% 120%, rgba(120, 50, 10, 0.4), rgba(10, 5, 2, 0.86) 70%);
+  --d-line: rgba(255, 170, 90, 0.28);
+  --d-radius: 14px;
+  --d-radius-sm: 8px;
+  --d-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 200, 140, 0.08);
+  --d-blur: blur(8px);
+
+  --d-btn-bg: linear-gradient(180deg, rgba(52, 30, 16, 0.82), rgba(30, 17, 9, 0.85));
+  --d-btn-bg-hover: linear-gradient(180deg, rgba(70, 38, 18, 0.88), rgba(38, 20, 10, 0.9));
+  --d-btn-line: rgba(255, 170, 90, 0.3);
+  --d-primary-bg: linear-gradient(180deg, #ffa552, #d9622b);
+  --d-primary-ink: #2a1208;
+  --d-primary-line: #ffc27f;
+  --d-btn-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --d-glow: 0 0 22px rgba(255, 140, 60, 0.35);
+
+  --d-tint: radial-gradient(ellipse at 50% 115%, rgba(255, 120, 40, 0.32), transparent 60%);
+  --d-scrim: radial-gradient(ellipse at center, rgba(20, 10, 4, 0.45) 0%, rgba(10, 5, 2, 0.9) 80%);
+  --d-bg: #0c0604;
+}
+
+:root[data-rpg-design='ognisko'] .rpg-menu-title {
+  animation: d-ember 5s ease-in-out infinite alternate;
+}
+
+@keyframes d-ember {
+  0% {
+    text-shadow: 0 2px 0 #1a0b03, 0 0 24px rgba(255, 140, 60, 0.45), 0 0 60px rgba(255, 100, 30, 0.2);
+  }
+  40% {
+    text-shadow: 0 2px 0 #1a0b03, 0 0 32px rgba(255, 150, 70, 0.62), 0 0 70px rgba(255, 100, 30, 0.3);
+  }
+  100% {
+    text-shadow: 0 2px 0 #1a0b03, 0 0 26px rgba(255, 130, 50, 0.5), 0 0 55px rgba(255, 100, 30, 0.22);
+  }
+}
+
+:root[data-rpg-design='ognisko'] .rpg-menu-primary {
+  font-weight: 700;
+}
+
+/* --- 2. Pergamin / Parchment --------------------------------------------------------------- */
+
+:root[data-rpg-design='pergamin'] {
+  --d-font: 'EB Garamond', Garamond, Georgia, serif;
+  --d-display-variant: small-caps;
+  --d-display-track: 0.05em;
+  --d-display-weight: 600;
+  --d-title-track: 0.05em;
+  --d-title-shadow: 0 2px 0 #1a120a, 0 0 14px rgba(0, 0, 0, 0.9);
+  --d-ui-size: 20px;
+  --d-read-size: 18px;
+
+  --d-ink: #2b1d10;
+  --d-ink-dim: rgba(43, 29, 16, 0.7);
+  --d-ink-strong: #120a03;
+  --d-scene-ink: #f3e6c4;
+  --d-accent: #8e2a1c;
+  --d-scene-accent: #ecd08a;
+  --d-accent-soft: rgba(142, 42, 28, 0.12);
+  --d-plot: #8e2a1c;
+  --d-asked: rgba(43, 29, 16, 0.5);
+  --d-danger: #9e2b16;
+  --d-hp: linear-gradient(#a8321f, #6e1a0e);
+
+  --d-surface-bg:
+    radial-gradient(ellipse at 20% 10%, rgba(255, 250, 235, 0.6), transparent 60%),
+    radial-gradient(ellipse at 90% 100%, rgba(150, 110, 60, 0.25), transparent 60%),
+    linear-gradient(#efe2c2, #e4d2a8);
+  --d-surface-strong: rgba(236, 222, 190, 0.96);
+  --d-page-surface: rgba(30, 21, 12, 0.95);
+  --d-solid: #2a1e12;
+  --d-well: rgba(255, 252, 240, 0.75);
+  --d-well-ink: #2b1d10;
+  --d-overlay: rgba(14, 10, 6, 0.8);
+  --d-line: #8a6a3a;
+  --d-radius: 3px;
+  --d-radius-sm: 2px;
+  --d-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 0 0 3px #efe2c2, inset 0 0 0 4px rgba(120, 80, 30, 0.45);
+
+  --d-btn-bg: linear-gradient(#efe2c2, #e1cd9f);
+  --d-btn-bg-hover: linear-gradient(#f6ecd2, #e8d6ad);
+  --d-btn-ink: #2b1d10;
+  --d-btn-line: #8a6a3a;
+  --d-btn-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 0 0 3px rgba(239, 226, 194, 0.9), inset 0 0 0 4px rgba(120, 80, 30, 0.35);
+  --d-primary-bg: linear-gradient(#8e2a1c, #6c1d12);
+  --d-primary-ink: #f6e3b0;
+  --d-primary-line: #4a120a;
+  --d-glow: 0 0 0 2px rgba(236, 208, 138, 0.5);
+
+  --d-scrim: radial-gradient(ellipse at center, rgba(20, 14, 8, 0.4) 0%, rgba(14, 10, 6, 0.88) 80%);
+  --d-tint: linear-gradient(rgba(60, 40, 15, 0.18), rgba(60, 40, 15, 0.18));
+  --d-bg: #140e08;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design='pergamin'] .rpg-menu-item:focus-visible {
+  color: #8e2a1c;
+  border-color: #8e2a1c;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-menu-primary:hover:not(:disabled),
+:root[data-rpg-design='pergamin'] .rpg-menu-primary:focus-visible {
+  color: #f6e3b0;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-dialogue-text::first-letter {
+  float: left;
+  margin: 2px 6px 0 0;
+  font-size: 2.6em;
+  line-height: 0.85;
+  color: #8e2a1c;
+  font-weight: 600;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-dialogue-speaker {
+  border-bottom: 1px solid rgba(142, 42, 28, 0.35);
+  padding-bottom: 4px;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-dialogue-choices button.rpg-choice-plot {
+  font-style: italic;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-proposal-genre {
+  color: #2b1d10;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-hint,
+:root[data-rpg-design='pergamin'] .rpg-prompt {
+  font-style: italic;
+}
+
+:root[data-rpg-design='pergamin'] .rpg-senses-key-on {
+  background: #2b1d10;
+  color: #f3e6c4;
+}
+
+/* --- 3. Runa / Rune ------------------------------------------------------------------------ */
+
+:root[data-rpg-design='runa'] {
+  --d-font: 'Marcellus', Georgia, serif;
+  --d-font-display: 'Cinzel', 'Marcellus', serif;
+  --d-font-ui: 'Cinzel', 'Marcellus', serif;
+  --d-display-case: uppercase;
+  --d-display-track: 0.16em;
+  --d-display-weight: 700;
+  --d-title-size: clamp(32px, 7.4vw, 60px);
+  --d-title-track: 0.28em;
+  --d-title-shadow: 0 2px 0 #05080b, 0 0 26px rgba(169, 216, 255, 0.35);
+  --d-ui-case: uppercase;
+  --d-ui-track: 0.14em;
+  --d-ui-weight: 500;
+  --d-ui-size: 16px;
+  --d-read-size: 16px;
+
+  --d-ink: #e4ecf1;
+  --d-ink-dim: rgba(228, 236, 241, 0.66);
+  --d-accent: #a9d8ff;
+  --d-accent-soft: rgba(169, 216, 255, 0.13);
+  --d-plot: #ffd27a;
+  --d-asked: rgba(228, 236, 241, 0.45);
+  --d-hp: linear-gradient(90deg, #8f2433, #d24a5c);
+
+  --d-surface-bg: linear-gradient(170deg, rgba(34, 46, 56, 0.9), rgba(16, 22, 28, 0.92));
+  --d-surface-strong: rgba(14, 20, 26, 0.94);
+  --d-solid: #141c23;
+  --d-well: rgba(6, 10, 14, 0.6);
+  --d-overlay: linear-gradient(rgba(8, 12, 18, 0.7), rgba(4, 6, 9, 0.9));
+  --d-line: rgba(169, 216, 255, 0.34);
+  --d-shadow: inset 0 1px 0 rgba(220, 240, 255, 0.12), inset 0 0 18px rgba(169, 216, 255, 0.05);
+  --d-clip: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+
+  --d-btn-bg: linear-gradient(170deg, rgba(36, 50, 61, 0.85), rgba(18, 25, 32, 0.88));
+  --d-btn-bg-hover: linear-gradient(170deg, rgba(48, 66, 80, 0.9), rgba(22, 31, 40, 0.92));
+  --d-btn-line: rgba(169, 216, 255, 0.35);
+  --d-primary-bg: linear-gradient(170deg, #3d5c74, #1d2f3d);
+  --d-primary-ink: #f2f8ff;
+  --d-primary-line: #a9d8ff;
+  --d-btn-shadow: inset 0 1px 0 rgba(220, 240, 255, 0.18);
+  --d-glow: inset 0 0 18px rgba(169, 216, 255, 0.18);
+
+  --d-tint: linear-gradient(180deg, rgba(60, 100, 140, 0.25), transparent 50%);
+  --d-scrim: radial-gradient(ellipse at center, rgba(6, 10, 14, 0.45) 0%, rgba(4, 7, 10, 0.9) 80%);
+  --d-bg: #05080b;
+}
+
+:root[data-rpg-design='runa'] .rpg-menu-title::after {
+  content: '';
+  display: block;
+  width: 60%;
+  height: 1px;
+  margin: 14px auto 0;
+  background: linear-gradient(90deg, transparent, #ffd27a, transparent);
+}
+
+:root[data-rpg-design='runa'] .rpg-dialogue-speaker::before {
+  content: 'ᛟ ';
+  color: #ffd27a;
+}
+
+/* --- 4. Zmierzch / Dusk -------------------------------------------------------------------- */
+
+:root[data-rpg-design='zmierzch'] {
+  --d-font: 'Cormorant Garamond', Garamond, Georgia, serif;
+  --d-display-weight: 700;
+  --d-display-track: 0.03em;
+  --d-title-size: clamp(42px, 10vw, 80px);
+  --d-title-track: 0.02em;
+  --d-title-style: italic;
+  --d-title-shadow: 0 0 30px rgba(201, 184, 255, 0.5), 0 2px 0 rgba(10, 8, 25, 0.8);
+  --d-ui-size: 21px;
+  --d-ui-weight: 700;
+  --d-read-size: 19px;
+
+  --d-ink: #ece8ff;
+  --d-ink-dim: rgba(236, 232, 255, 0.68);
+  --d-accent: #c9b8ff;
+  --d-scene-accent: #efe9ff;
+  --d-accent-soft: rgba(201, 184, 255, 0.16);
+  --d-plot: #ffc6a8;
+  --d-asked: rgba(236, 232, 255, 0.45);
+  --d-hp: linear-gradient(90deg, #d0587a, #ff9bb0);
+
+  --d-surface-bg: linear-gradient(160deg, rgba(48, 40, 92, 0.55), rgba(22, 18, 48, 0.62));
+  --d-surface-strong: rgba(24, 20, 50, 0.85);
+  --d-solid: #1d1838;
+  --d-well: rgba(12, 10, 30, 0.45);
+  --d-overlay: linear-gradient(180deg, rgba(40, 30, 90, 0.55), rgba(10, 8, 25, 0.88));
+  --d-line: rgba(220, 210, 255, 0.24);
+  --d-radius: 18px;
+  --d-radius-sm: 10px;
+  --d-shadow: 0 16px 50px rgba(5, 3, 20, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --d-blur: blur(16px) saturate(1.3);
+
+  --d-btn-bg: rgba(46, 38, 92, 0.42);
+  --d-btn-bg-hover: rgba(70, 58, 130, 0.55);
+  --d-btn-line: rgba(220, 210, 255, 0.28);
+  --d-btn-radius: 999px;
+  --d-primary-bg: linear-gradient(135deg, #b9a4ff, #8f7cf0 60%, #f0a9c6);
+  --d-primary-ink: #160f33;
+  --d-primary-line: rgba(255, 255, 255, 0.55);
+  --d-btn-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --d-glow: 0 0 26px rgba(201, 184, 255, 0.4);
+
+  --d-tint: linear-gradient(180deg, rgba(70, 50, 150, 0.45), rgba(20, 15, 60, 0.15) 45%, rgba(255, 150, 140, 0.12));
+  --d-scrim: radial-gradient(ellipse at center, rgba(10, 8, 25, 0.25) 0%, rgba(8, 6, 22, 0.85) 85%);
+  --d-bg: #0d0a1f;
+}
+
+:root[data-rpg-design='zmierzch'] .rpg-intro-text,
+:root[data-rpg-design='zmierzch'] .rpg-ending blockquote {
+  font-size: 1.15em;
+}
+
+:root[data-rpg-design='zmierzch'] .rpg-dialogue-text {
+  font-style: italic;
+}
+
+/* --- 5. Gaj / Grove ------------------------------------------------------------------------ */
+
+:root[data-rpg-design='gaj'] {
+  --d-font: 'Lora', Georgia, serif;
+  --d-display-weight: 600;
+  --d-display-track: 0.03em;
+  --d-title-size: clamp(36px, 8.4vw, 62px);
+  --d-title-track: 0.04em;
+  --d-title-shadow: 0 3px 0 #06100a, 0 0 22px rgba(0, 0, 0, 0.6);
+  --d-ui-size: 18px;
+  --d-ui-weight: 600;
+  --d-read-size: 16px;
+
+  --d-ink: #f4efe0;
+  --d-ink-dim: rgba(244, 239, 224, 0.7);
+  --d-accent: #f2c14e;
+  --d-accent-soft: rgba(242, 193, 78, 0.15);
+  --d-plot: #ff7a5c;
+  --d-asked: rgba(244, 239, 224, 0.48);
+  --d-danger: #ff7a5c;
+  --d-hp: linear-gradient(90deg, #b8302a, #e2553f);
+
+  --d-surface-bg: linear-gradient(180deg, rgba(26, 48, 32, 0.9), rgba(14, 28, 18, 0.92));
+  --d-surface-strong: rgba(12, 26, 16, 0.94);
+  --d-solid: #142619;
+  --d-well: rgba(4, 12, 6, 0.55);
+  --d-overlay: rgba(6, 14, 8, 0.82);
+  --d-line: rgba(140, 190, 110, 0.4);
+  --d-radius: 10px;
+  --d-radius-sm: 6px;
+  --d-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --d-stitch: 1px dashed rgba(242, 193, 78, 0.35);
+
+  --d-btn-bg: linear-gradient(180deg, rgba(30, 56, 36, 0.88), rgba(18, 36, 22, 0.9));
+  --d-btn-bg-hover: linear-gradient(180deg, rgba(40, 72, 46, 0.92), rgba(22, 44, 28, 0.94));
+  --d-btn-line: rgba(140, 190, 110, 0.45);
+  --d-primary-bg: linear-gradient(180deg, #e2553f, #b8302a);
+  --d-primary-ink: #fff7e6;
+  --d-primary-line: #f2c14e;
+  --d-btn-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  --d-glow: 0 0 0 2px rgba(242, 193, 78, 0.25);
+
+  --d-scrim: radial-gradient(ellipse at center, rgba(6, 16, 9, 0.4) 0%, rgba(4, 12, 6, 0.9) 82%);
+  --d-tint: linear-gradient(180deg, rgba(30, 70, 40, 0.25), transparent 60%);
+  --d-bg: #050c07;
+}
+
+/* Every surface carries the stitch too, not only the buttons. */
+:root[data-rpg-design='gaj'] .rpg-dialogue,
+:root[data-rpg-design='gaj'] .rpg-log-page,
+:root[data-rpg-design='gaj'] .rpg-notice,
+:root[data-rpg-design='gaj'] .auth-card--game,
+:root[data-rpg-design='gaj'] .rpg-start {
+  outline: 1px dashed rgba(242, 193, 78, 0.35);
+  outline-offset: -6px;
+}
+
+/* The paper-cut band under the title and over the dialogue: poppies on a sunflower thread. */
+:root[data-rpg-design='gaj'] .rpg-menu-title::after,
+:root[data-rpg-design='gaj'] .rpg-log-page::before {
+  content: '';
+  display: block;
+  width: min(240px, 70%);
+  height: 14px;
+  margin: 12px auto 0;
+  background:
+    radial-gradient(circle, #e2553f 0 4px, transparent 4.5px) 0 50% / 24px 14px repeat-x,
+    radial-gradient(circle, #6fae5a 0 2px, transparent 2.5px) 12px 50% / 24px 14px repeat-x,
+    linear-gradient(90deg, transparent, #f2c14e 15%, #f2c14e 85%, transparent) 0 50% / 100% 2px no-repeat;
+}
+
+:root[data-rpg-design='gaj'] .rpg-log-page::before {
+  margin: 0 auto 12px;
+}
+
+:root[data-rpg-design='gaj'] .rpg-dialogue::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 140px;
+  height: 14px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle, #e2553f 0 4px, transparent 4.5px) 0 50% / 24px 14px repeat-x,
+    radial-gradient(circle, #f2c14e 0 2px, transparent 2.5px) 12px 50% / 24px 14px repeat-x;
+}
+
+:root[data-rpg-design='gaj'] .rpg-proposal-genre,
+:root[data-rpg-design='gaj'] .rpg-dz-badge {
+  border-radius: 999px;
+}
+
+/* --- 6. Kronika / Chronicle ---------------------------------------------------------------- */
+
+:root[data-rpg-design='kronika'] {
+  --d-font: 'Spectral', Georgia, serif;
+  --d-display-variant: small-caps;
+  --d-display-track: 0.22em;
+  --d-display-weight: 300;
+  --d-title-size: clamp(28px, 6vw, 46px);
+  --d-title-track: 0.42em;
+  --d-title-shadow: none;
+  --d-ui-size: 19px;
+  --d-ui-weight: 300;
+  --d-ui-track: 0.08em;
+  --d-read-size: 17px;
+
+  --d-ink: #ecebe6;
+  --d-ink-dim: rgba(236, 235, 230, 0.6);
+  --d-accent: #d8c08a;
+  --d-accent-soft: rgba(216, 192, 138, 0.1);
+  --d-plot: #e6b36a;
+  --d-asked: rgba(236, 235, 230, 0.4);
+  --d-hp: linear-gradient(90deg, #8a2a20, #c0503a);
+
+  --d-surface-bg: linear-gradient(rgba(216, 192, 138, 0.7), rgba(216, 192, 138, 0.7)) top / 100% 1px no-repeat, rgba(6, 6, 6, 0.82);
+  --d-surface-strong: rgba(6, 6, 6, 0.9);
+  --d-page-surface: linear-gradient(rgba(216, 192, 138, 0.7), rgba(216, 192, 138, 0.7)) top / 100% 1px no-repeat, rgba(6, 6, 6, 0.94);
+  --d-solid: #0e0e0d;
+  --d-well: rgba(255, 255, 255, 0.04);
+  --d-overlay: rgba(4, 4, 4, 0.9);
+  --d-line: transparent;
+  --d-line-w: 0px;
+
+  --d-btn-bg: transparent;
+  --d-btn-bg-hover: transparent;
+  --d-btn-line: transparent;
+  --d-primary-bg: transparent;
+  --d-primary-ink: #d8c08a;
+  --d-primary-line: transparent;
+
+  --d-scrim: radial-gradient(ellipse at center, rgba(5, 5, 5, 0.72) 0%, rgba(3, 3, 3, 0.96) 70%);
+  --d-bg: #030303;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu {
+  gap: 2px 6px;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design='kronika'] .rpg-menu-item:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu-primary {
+  font-weight: 500;
+  font-size: 22px;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu-primary > span::before {
+  content: '—  ';
+  opacity: 0.6;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu-primary > span::after {
+  content: '  —';
+  opacity: 0.6;
+}
+
+:root[data-rpg-design='kronika'] .rpg-menu-item:is([data-key='language'], [data-key='settings'], [data-key='controls']) {
+  margin-top: 18px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  font-variant: small-caps;
+}
+
+:root[data-rpg-design='kronika'] .rpg-start,
+:root[data-rpg-design='kronika'] .rpg-menu-back,
+:root[data-rpg-design='kronika'] .retro-btn,
+:root[data-rpg-design='kronika'] .auth-card--game .auth-submit,
+:root[data-rpg-design='kronika'] .rpg-wish button,
+:root[data-rpg-design='kronika'] .rpg-dz-badge,
+:root[data-rpg-design='kronika'] .rpg-proposals-refresh {
+  border: 1px solid rgba(216, 192, 138, 0.4);
+}
+
+:root[data-rpg-design='kronika'] .rpg-start,
+:root[data-rpg-design='kronika'] .auth-card--game .auth-submit {
+  color: #d8c08a;
+  border-color: #d8c08a;
+}
+
+:root[data-rpg-design='kronika'] .rpg-proposal {
+  border: 1px solid rgba(216, 192, 138, 0.25);
+}
+
+:root[data-rpg-design='kronika'] .rpg-hp,
+:root[data-rpg-design='kronika'] .rpg-dialogue-free input,
+:root[data-rpg-design='kronika'] .rpg-progress-track,
+:root[data-rpg-design='kronika'] .rpg-senses-key,
+:root[data-rpg-design='kronika'] .rpg-voice,
+:root[data-rpg-design='kronika'] .rpg-music,
+:root[data-rpg-design='kronika'] .rpg-fullscreen,
+:root[data-rpg-design='kronika'] .rpg-devtoggle,
+:root[data-rpg-design='kronika'] .rpg-leave,
+:root[data-rpg-design='kronika'] .rpg-name-tag,
+:root[data-rpg-design='kronika'] .rpg-dialogue-free button,
+:root[data-rpg-design='kronika'] .rpg-wish select,
+:root[data-rpg-design='kronika'] .rpg-wish textarea,
+:root[data-rpg-design='kronika'] .rpg-lang select,
+:root[data-rpg-design='kronika'] .rpg-model select,
+:root[data-rpg-design='kronika'] .auth-card--game .auth-field input {
+  border-color: rgba(236, 235, 230, 0.2);
+}
+
+/* --- 7. Witraż / Stained glass ------------------------------------------------------------- */
+
+:root[data-rpg-design='witraz'] {
+  --d-font: 'EB Garamond', Garamond, Georgia, serif;
+  --d-font-display: 'Cinzel Decorative', 'Cinzel', serif;
+  --d-font-ui: 'EB Garamond', Garamond, Georgia, serif;
+  --d-display-weight: 700;
+  --d-display-track: 0.04em;
+  --d-title-size: clamp(32px, 7.6vw, 60px);
+  --d-title-track: 0.04em;
+  --d-title-shadow: 0 3px 0 #000, 0 0 24px rgba(245, 197, 66, 0.4), 0 0 50px rgba(120, 60, 200, 0.3);
+  --d-ui-size: 20px;
+  --d-ui-weight: 600;
+  --d-read-size: 18px;
+
+  --d-ink: #f6f0e2;
+  --d-ink-dim: rgba(246, 240, 226, 0.7);
+  --d-accent: #f5c542;
+  --d-accent-soft: rgba(245, 197, 66, 0.15);
+  --d-plot: #ff6f7d;
+  --d-asked: rgba(246, 240, 226, 0.45);
+  --d-hp: linear-gradient(90deg, #8c1028, #e0324f);
+
+  --d-surface-bg:
+    linear-gradient(90deg, #b3122e 0 25%, #f5c542 25% 50%, #1f8a5b 50% 75%, #2850c8 75%) top / 100% 4px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 30%),
+    linear-gradient(160deg, rgba(22, 26, 64, 0.92), rgba(10, 12, 30, 0.94));
+  --d-surface-strong: rgba(10, 12, 30, 0.94);
+  --d-solid: #121633;
+  --d-well: rgba(2, 2, 10, 0.55);
+  --d-overlay: radial-gradient(ellipse at 50% 0%, rgba(60, 30, 120, 0.5), rgba(5, 5, 12, 0.9) 70%);
+  --d-line: #050508;
+  --d-line-w: 3px;
+  --d-radius: 10px;
+  --d-radius-sm: 6px;
+  --d-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(245, 197, 66, 0.25);
+
+  --d-btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 40%), linear-gradient(160deg, #23408f, #142659);
+  --d-btn-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 45%), linear-gradient(160deg, #2c51b5, #1a3070);
+  --d-btn-line: #050508;
+  --d-btn-radius: 26px 26px 6px 6px;
+  --d-primary-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 40%), linear-gradient(160deg, #c0183a, #6e0c20);
+  --d-primary-ink: #fff4d6;
+  --d-primary-line: #050508;
+  --d-btn-shadow: 0 0 0 1px rgba(245, 197, 66, 0.35), 0 6px 16px rgba(0, 0, 0, 0.45);
+  --d-glow: 0 0 22px rgba(245, 197, 66, 0.4);
+
+  --d-tint: radial-gradient(ellipse at 50% 0%, rgba(120, 70, 220, 0.3), transparent 60%);
+  --d-scrim: radial-gradient(ellipse at center, rgba(5, 5, 12, 0.45) 0%, rgba(4, 4, 10, 0.9) 80%);
+  --d-bg: #050508;
+}
+
+:root[data-rpg-design='witraz'] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design='witraz'] .rpg-menu-item:focus-visible {
+  border-color: #050508;
+  color: #ffe08a;
+}
+
+:root[data-rpg-design='witraz'] .rpg-dialogue,
+:root[data-rpg-design='witraz'] .rpg-log-page {
+  padding-top: 20px;
+}
+
+/* --- 8. Piksel / Pixel --------------------------------------------------------------------- */
+
+:root[data-rpg-design='piksel'] {
+  --d-font: 'Pixelify Sans', ui-monospace, monospace;
+  --d-display-weight: 700;
+  --d-display-track: 0.04em;
+  --d-title-size: clamp(36px, 9vw, 72px);
+  --d-title-track: 0.06em;
+  --d-title-shadow: 4px 4px 0 #0b1640, 4px 4px 0 #0b1640, -2px -2px 0 #0b1640, 2px -2px 0 #0b1640, -2px 2px 0 #0b1640;
+  --d-ui-size: 20px;
+  --d-read-size: 17px;
+
+  --d-ink: #ffffff;
+  --d-ink-dim: rgba(255, 255, 255, 0.72);
+  --d-accent: #ffe066;
+  --d-accent-soft: rgba(255, 224, 102, 0.16);
+  --d-plot: #ff9f43;
+  --d-asked: #9fb0d8;
+  --d-hp: linear-gradient(#ff5d5d 0 50%, #d12b2b 50%);
+
+  --d-surface-bg: linear-gradient(180deg, #2546a8, #0f1d5c);
+  --d-surface-strong: #0f1d5c;
+  --d-solid: #142a74;
+  --d-well: #0a1442;
+  --d-overlay: rgba(4, 7, 24, 0.85);
+  --d-line: #f4f4f4;
+  --d-line-w: 3px;
+  --d-radius: 6px;
+  --d-radius-sm: 3px;
+  --d-shadow: 0 0 0 2px #05081a, 4px 4px 0 2px rgba(0, 0, 0, 0.45);
+
+  --d-btn-bg: linear-gradient(180deg, #2546a8, #0f1d5c);
+  --d-btn-bg-hover: linear-gradient(180deg, #2f56c6, #142674);
+  --d-btn-line: #f4f4f4;
+  --d-primary-bg: linear-gradient(180deg, #3a5fd0, #1a2f86);
+  --d-primary-ink: #ffe066;
+  --d-primary-line: #ffe066;
+  --d-btn-shadow: 0 0 0 2px #05081a, 3px 3px 0 2px rgba(0, 0, 0, 0.45);
+
+  --d-scrim: radial-gradient(ellipse at center, rgba(4, 8, 30, 0.35) 0%, rgba(4, 7, 24, 0.86) 80%);
+  --d-bg: #05081a;
+}
+
+:root[data-rpg-design='piksel'] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design='piksel'] .rpg-menu-item:focus-visible {
+  border-color: #ffe066;
+  color: #ffe066;
+}
+
+/* The pointing cursor: the selected entry is marked by ▶, not by the colour alone. */
+:root[data-rpg-design='piksel'] .rpg-menu-item:not([data-key='language'], [data-key='settings'], [data-key='controls']):hover:not(:disabled)::before,
+:root[data-rpg-design='piksel'] .rpg-menu-item:not([data-key='language'], [data-key='settings'], [data-key='controls']):focus-visible::before,
+:root[data-rpg-design='piksel'] .rpg-dialogue-choices button:hover:not(:disabled)::before,
+:root[data-rpg-design='piksel'] .rpg-dialogue-choices button:focus-visible::before {
+  content: '▶';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffe066;
+  font-size: 14px;
+  animation: d-blink 0.9s steps(2, start) infinite;
+}
+
+:root[data-rpg-design='piksel'] .rpg-dialogue-choices button {
+  padding-left: 30px;
+}
+
+:root[data-rpg-design='piksel'] .rpg-dialogue-choices button:hover,
+:root[data-rpg-design='piksel'] .rpg-dialogue-choices button:focus-visible {
+  background: transparent;
+  color: #ffe066;
+}
+
+@keyframes d-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+:root[data-rpg-design='piksel'] .rpg-hp {
+  height: 12px;
+  border: 2px solid #f4f4f4;
+  box-shadow: 0 0 0 2px #05081a;
+}
+
+/* --- 9. Mgła / Mist ------------------------------------------------------------------------ */
+
+:root[data-rpg-design='mgla'] {
+  --d-font: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --d-display-weight: 800;
+  --d-display-track: -0.01em;
+  --d-title-size: clamp(38px, 9vw, 72px);
+  --d-title-track: -0.025em;
+  --d-title-shadow: 0 4px 30px rgba(0, 0, 0, 0.55);
+  --d-ui-size: 17px;
+  --d-ui-weight: 600;
+  --d-ui-track: 0;
+  --d-read-size: 16px;
+
+  --d-ink: #f3f5f4;
+  --d-ink-dim: rgba(243, 245, 244, 0.64);
+  --d-scene-accent: #f3f5f4;
+  --d-accent: #9fe3c8;
+  --d-accent-soft: rgba(159, 227, 200, 0.14);
+  --d-plot: #ffd08a;
+  --d-asked: rgba(243, 245, 244, 0.42);
+  --d-hp: linear-gradient(90deg, #ff6b6b, #ff9a7a);
+
+  --d-surface-bg: rgba(24, 27, 29, 0.58);
+  --d-surface-strong: rgba(18, 20, 22, 0.88);
+  --d-solid: #1c1f21;
+  --d-well: rgba(255, 255, 255, 0.06);
+  --d-overlay: rgba(10, 11, 12, 0.7);
+  --d-line: rgba(255, 255, 255, 0.14);
+  --d-radius: 16px;
+  --d-radius-sm: 10px;
+  --d-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  --d-blur: blur(20px) saturate(1.4);
+
+  --d-btn-bg: rgba(40, 44, 47, 0.5);
+  --d-btn-bg-hover: rgba(60, 66, 70, 0.6);
+  --d-btn-line: rgba(255, 255, 255, 0.14);
+  --d-btn-radius: 999px;
+  --d-primary-bg: #f3f5f4;
+  --d-primary-ink: #0f1112;
+  --d-primary-line: #f3f5f4;
+  --d-glow: 0 0 0 4px rgba(159, 227, 200, 0.18);
+
+  --d-scrim: linear-gradient(180deg, rgba(10, 11, 12, 0.15), rgba(10, 11, 12, 0.75) 75%);
+  --d-tint: radial-gradient(ellipse at center, transparent 40%, rgba(10, 11, 12, 0.4));
+  --d-bg: #0b0c0d;
+}
+
+:root[data-rpg-design='mgla'] .rpg-menu-title {
+  text-transform: none;
+}
+
+:root[data-rpg-design='mgla'] .rpg-menu-item:hover:not(:disabled),
+:root[data-rpg-design='mgla'] .rpg-menu-item:focus-visible {
+  color: #f3f5f4;
+  border-color: rgba(159, 227, 200, 0.6);
+}
+
+:root[data-rpg-design='mgla'] .rpg-dialogue-speaker,
+:root[data-rpg-design='mgla'] .rpg-notice-title {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* --- 10. Kuźnia / Forge -------------------------------------------------------------------- */
+
+:root[data-rpg-design='kuznia'] {
+  --d-font: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --d-display-case: uppercase;
+  --d-display-weight: 800;
+  --d-display-track: 0.08em;
+  --d-title-size: clamp(44px, 11vw, 92px);
+  --d-title-track: 0.06em;
+  --d-ui-case: uppercase;
+  --d-ui-track: 0.12em;
+  --d-ui-weight: 600;
+  --d-ui-size: 19px;
+  --d-read-size: 18px;
+
+  --d-ink: #e9e6e1;
+  --d-ink-dim: rgba(233, 230, 225, 0.66);
+  --d-accent: #ff7a1a;
+  --d-accent-soft: rgba(255, 122, 26, 0.16);
+  --d-plot: #ffb347;
+  --d-asked: rgba(233, 230, 225, 0.45);
+  --d-hp: linear-gradient(90deg, #c2410c, #ff7a1a);
+
+  /* Iron: a rivet in each corner over a brushed plate. */
+  --d-surface-bg:
+    radial-gradient(circle at 8px 8px, #9a9da3 0 2px, #2b2c30 2.5px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 8px) 8px, #9a9da3 0 2px, #2b2c30 2.5px, transparent 3.5px),
+    radial-gradient(circle at 8px calc(100% - 8px), #9a9da3 0 2px, #2b2c30 2.5px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), #9a9da3 0 2px, #2b2c30 2.5px, transparent 3.5px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg, rgba(44, 45, 49, 0.95), rgba(22, 23, 25, 0.96));
+  --d-surface-strong: rgba(20, 21, 23, 0.95);
+  --d-solid: #222326;
+  --d-well: rgba(0, 0, 0, 0.45);
+  --d-overlay: radial-gradient(ellipse at 50% 120%, rgba(160, 60, 10, 0.35), rgba(8, 8, 9, 0.9) 70%);
+  --d-line: #55575c;
+  --d-line-w: 2px;
+  --d-radius: 2px;
+  --d-radius-sm: 2px;
+  --d-shadow: 0 8px 18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  --d-btn-bg: linear-gradient(180deg, #3a3b40, #222326);
+  --d-btn-bg-hover: linear-gradient(180deg, #46474d, #2a2b2f);
+  --d-btn-line: #5f6167;
+  --d-primary-bg: linear-gradient(180deg, #ff8a1f, #c2410c);
+  --d-primary-ink: #1a0d05;
+  --d-primary-line: #ffb070;
+  --d-btn-shadow: 0 4px 0 #0b0b0c, inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --d-glow: 0 0 20px rgba(255, 122, 26, 0.45);
+
+  --d-tint: radial-gradient(ellipse at 50% 110%, rgba(255, 110, 20, 0.3), transparent 55%);
+  --d-scrim: radial-gradient(ellipse at center, rgba(10, 10, 11, 0.5) 0%, rgba(8, 8, 9, 0.92) 80%);
+  --d-bg: #0c0c0d;
+}
+
+:root[data-rpg-design='kuznia'] .rpg-menu-screen h2.rpg-menu-title {
+  background: linear-gradient(180deg, #ffffff 0%, #d4d7dc 42%, #7c8087 52%, #e6e8eb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 3px 0 #000) drop-shadow(0 0 22px rgba(255, 122, 26, 0.5));
+}
+
+:root[data-rpg-design='kuznia'] .rpg-dialogue,
+:root[data-rpg-design='kuznia'] .rpg-log-page,
+:root[data-rpg-design='kuznia'] .auth-card--game {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+:root[data-rpg-design='kuznia'] .rpg-menu-primary {
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-rpg-design] .rpg-menu-title,
+  :root[data-rpg-design] .rpg-journal-fresh,
+  :root[data-rpg-design='piksel'] *::before {
+    animation: none !important;
+  }
+}

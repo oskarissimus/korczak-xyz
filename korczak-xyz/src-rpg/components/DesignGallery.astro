@@ -1,0 +1,671 @@
+---
+/**
+ * /designs/: every screen of the game in each candidate look (src/utils/rpg/designs.ts), side by
+ * side with that look's guidelines, so the owner can rate them and pick one.
+ *
+ * The screens are the game's own markup and classes (Rpg.tsx, WorldProposals.tsx, DieselPlant.tsx,
+ * LoginForm.tsx) filled with sample text, drawn over a still of the village rather than the live 3D
+ * scene: a look is CSS, and this way all of them can be compared without starting a quest. Temporary,
+ * like the looks themselves: it goes when one is picked.
+ */
+import type { Lang } from '../../src/i18n';
+import { translations } from '../../src/utils/rpg/translations';
+import { DESIGNS, SHARED_RULES } from '../../src/utils/rpg/designs';
+import scene from '../../src/assets/rpg/menu-background.jpg';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = translations[lang];
+const home = lang === 'pl' ? '/pl/' : '/';
+
+const s =
+  lang === 'pl'
+    ? {
+        title: 'Dziesięć wyglądów gry',
+        lead: 'Każdy wariant to ten sam ekran startowy, menu, HUD, dialog, dziennik, wczytywanie, zakończenie i logowanie — tylko inny charakter. Wybierz numer, przewiń ekrany, a potem zagraj w nim naprawdę. Wybrany trafi na produkcję jako jedyny wygląd.',
+        current: 'Obecny',
+        play: 'Zagraj w tym wyglądzie →',
+        playCurrent: 'Zagraj w obecnym wyglądzie →',
+        currentNote: 'Tak gra wygląda dziś. Porównaj z wariantami 1–10.',
+        fonts: 'Krój',
+        rules: 'Wytyczne tego wariantu',
+        shared: 'Zasady wspólne dla wszystkich dziesięciu',
+        screens: {
+          start: 'Ekran startowy — zalogowany gracz z zapisaną grą',
+          fresh: 'Ekran startowy — nowy gracz',
+          talk: 'W grze — rozmowa',
+          explore: 'W grze — eksploracja i nowy wpis w dzienniku',
+          journal: 'Dziennik questa',
+          world: 'Nowy świat',
+          intro: 'Wczytywanie nowego świata',
+          ending: 'Koniec questu',
+          login: 'Logowanie',
+        },
+        world: { name: 'Dolina Szeptów', hero: 'Zielarka z Brzezin', pitch: 'Mgła nad mokradłami szepcze imiona tych, którzy zaginęli. Ktoś we wsi wie więcej, niż mówi.' },
+        quest: 'Czarna woda',
+        email: 'oskar@example.com',
+        diesel: '3,2 l dizla w baku',
+        proposals: [
+          { name: 'Miasto pod lodem', genre: 'baśń północy', pitch: 'Zamarznięte jezioro skrywa dzwonnicę, której dzwony słychać tylko w pełnię.', colors: ['#1d3a52', '#0a1520'] },
+          { name: 'Ostatni jarmark', genre: 'komedia przygodowa', pitch: 'Wędrowny kram, gadająca koza i długi u niewłaściwych ludzi.', colors: ['#7a3b14', '#2a1206'] },
+          { name: 'Popiół i miód', genre: 'dark fantasy', pitch: 'Pszczelarka z wypalonej wsi szuka tego, kto podpalił jej ule.', colors: ['#5a4a12', '#1a1404'] },
+          { name: 'Siódmy brzeg', genre: 'żeglarska legenda', pitch: 'Mapa z wyspą, której nie ma, i kapitan, który przysięga, że na niej był.', colors: ['#134a4a', '#06191a'] },
+        ],
+        speaker: 'Stary Radomir',
+        line: 'Woda w studni sczerniała trzy noce temu. Od tamtej pory nikt nie chodzi na mokradła po zmroku — poza tobą, jak widzę.',
+        choices: ['Kto ostatni widział Jagnę?', 'Co jest na mokradłach?', 'Zejdę do studni sama.', 'Do zobaczenia.'],
+        objective: 'Dowiedz się, co zatruło studnię',
+        toast: 'Zdobyto: pęk suszonej ruty',
+        notice: 'Nowy trop',
+        noticeText: 'Ślady prowadzą do starego młyna',
+        prompt: 'Rozmawiaj',
+        log: [
+          ['Zielarka przybyła do wsi', 'Radomir prosi o pomoc ze studnią.'],
+          ['Pytałaś o Jagnę', 'Ostatnio widziano ją przy młynie.'],
+        ],
+        clues: 'Tropy: 2 z 4',
+        place: 'Studnia na rynku',
+        newWorld: 'Nowy świat',
+        exotic: 'Jak dziwny ma być świat: swojski',
+        wish: 'Z czego ma być zrobiony (opcjonalnie)',
+        create: 'Stwórz świat',
+        introText: '— Dawno temu, gdy rzeki jeszcze pamiętały swoje imiona, w dolinie zamieszkała cisza…',
+        introProgress: 'Świat powstaje · zostało ok. 40 s',
+        endingTitle: 'Czarna woda',
+        endingQuote: 'Studnia znów jest czysta. Ale młyn — młyn wciąż szepcze.',
+        endingSteps: [['Zeszłaś do studni sama.', 'Znalazłaś zatopiony amulet.'], ['Oddałaś amulet Jagnie.', 'Wieś ci ufa, młynarz — już nie.']],
+        decisions: 'Twoje decyzje',
+        playTime: 'Czas gry: 24 min',
+        login: { in: 'Zaloguj się', up: 'Załóż konto', subtitle: 'Twoje światy i klucze zapisane na koncie.', email: 'E-mail', password: 'Hasło' },
+      }
+    : {
+        title: 'Ten looks for the game',
+        lead: 'Every variant is the same start screen, menus, HUD, dialogue, journal, loading, ending and sign-in — only the character changes. Pick a number, scroll the screens, then play it for real. The chosen one ships as the only look.',
+        current: 'Current',
+        play: 'Play in this look →',
+        playCurrent: 'Play in the current look →',
+        currentNote: 'This is how the game looks today. Compare it with 1–10.',
+        fonts: 'Type',
+        rules: 'Guidelines for this look',
+        shared: 'Rules all ten share',
+        screens: {
+          start: 'Start screen — signed in, with a saved game',
+          fresh: 'Start screen — a new player',
+          talk: 'In game — a conversation',
+          explore: 'In game — exploring, and a new journal entry',
+          journal: 'Quest journal',
+          world: 'New world',
+          intro: 'Loading a new world',
+          ending: 'Quest complete',
+          login: 'Sign in',
+        },
+        world: { name: 'Vale of Whispers', hero: 'The herbalist from Birchwood', pitch: 'The fog over the marshes whispers the names of the missing. Someone in the village knows more than they say.' },
+        quest: 'Black water',
+        email: 'oskar@example.com',
+        diesel: '3.2 L of diesel in the tank',
+        proposals: [
+          { name: 'City under the ice', genre: 'northern fairy tale', pitch: 'A frozen lake hides a bell tower whose bells ring only at full moon.', colors: ['#1d3a52', '#0a1520'] },
+          { name: 'The last fair', genre: 'adventure comedy', pitch: 'A travelling stall, a talking goat and debts to the wrong people.', colors: ['#7a3b14', '#2a1206'] },
+          { name: 'Ash and honey', genre: 'dark fantasy', pitch: 'A beekeeper from a burnt village hunts whoever set fire to her hives.', colors: ['#5a4a12', '#1a1404'] },
+          { name: 'The seventh shore', genre: 'sea legend', pitch: 'A map with an island that is not there, and a captain who swears he has been.', colors: ['#134a4a', '#06191a'] },
+        ],
+        speaker: 'Old Radomir',
+        line: 'The well water turned black three nights ago. Since then nobody walks the marshes after dark — save you, it seems.',
+        choices: ['Who last saw Jagna?', 'What is out on the marshes?', 'I will go down the well myself.', 'Farewell.'],
+        objective: 'Find out what poisoned the well',
+        toast: 'Found: a bundle of dried rue',
+        notice: 'New lead',
+        noticeText: 'The tracks lead to the old mill',
+        prompt: 'Talk',
+        log: [
+          ['The herbalist came to the village', 'Radomir asks for help with the well.'],
+          ['You asked about Jagna', 'She was last seen by the mill.'],
+        ],
+        clues: 'Clues: 2 of 4',
+        place: 'The well in the square',
+        newWorld: 'New world',
+        exotic: 'How strange a world: homely',
+        wish: 'What it should be made of (optional)',
+        create: 'Create the world',
+        introText: '— Long ago, when the rivers still remembered their names, a silence came to live in the valley…',
+        introProgress: 'The world is being made · about 40 s left',
+        endingTitle: 'Black water',
+        endingQuote: 'The well runs clear again. But the mill — the mill still whispers.',
+        endingSteps: [['You went down the well alone.', 'You found a drowned amulet.'], ['You gave the amulet to Jagna.', 'The village trusts you; the miller no longer does.']],
+        decisions: 'Your decisions',
+        playTime: 'Play time: 24 min',
+        login: { in: 'Sign in', up: 'Create account', subtitle: 'Your worlds and keys, kept on your account.', email: 'Email', password: 'Password' },
+      };
+
+const canister = `<svg width="18" height="21.6" viewBox="0 0 20 24" aria-hidden="true"><path d="M3 5h9l5 5v12H3z" fill="#5a1a14" stroke="#e8c37a" stroke-width="1.2"/><rect x="4" y="12.4" width="12" height="9.6" fill="#c8321f"/><path d="M6 2h5v3H6z" fill="#e8c37a"/></svg>`;
+const nativeName = lang === 'pl' ? 'Polski' : 'English';
+---
+
+<div class="dg">
+  <header class="dg-head">
+    <h1>{s.title}</h1>
+    <p class="dg-lead">{s.lead}</p>
+    <nav class="dg-tabs" aria-label={s.title}>
+      <button type="button" class="dg-tab" data-design="">
+        <span class="dg-tab-n">0</span>
+        <span class="dg-tab-name">{s.current}</span>
+        <span class="dg-swatches" aria-hidden="true">
+          {['#000', '#1d1812', '#f1e6cf', '#ffd36b', '#ffb45e'].map((c) => <i style={`background:${c}`} />)}
+        </span>
+      </button>
+      {
+        DESIGNS.map((d, i) => (
+          <button type="button" class="dg-tab" data-design={d.id}>
+            <span class="dg-tab-n">{i + 1}</span>
+            <span class="dg-tab-name">{d.name[lang]}</span>
+            <span class="dg-swatches" aria-hidden="true">
+              {d.swatches.map((c) => (
+                <i style={`background:${c}`} />
+              ))}
+            </span>
+          </button>
+        ))
+      }
+    </nav>
+  </header>
+
+  <section class="dg-about" aria-live="polite">
+    <div class="dg-guide" data-guide="">
+      <h2>0 · {s.current}</h2>
+      <p class="dg-mood">{s.currentNote}</p>
+      <p><a class="rpg-start dg-play" href={`${home}?design=off`}>{s.playCurrent}</a></p>
+    </div>
+    {
+      DESIGNS.map((d, i) => (
+        <div class="dg-guide" data-guide={d.id} hidden>
+          <h2>
+            {i + 1} · {d.name[lang]}
+          </h2>
+          <p class="dg-mood">{d.mood[lang]}</p>
+          <p class="dg-fonts">
+            {s.fonts}: {d.fonts.join(' + ')}
+          </p>
+          <h3>{s.rules}</h3>
+          <ul>
+            {d.rules[lang].map((r) => (
+              <li>{r}</li>
+            ))}
+          </ul>
+          <p>
+            <a class="rpg-start dg-play" href={`${home}?design=${d.id}`}>
+              {s.play}
+            </a>
+          </p>
+        </div>
+      ))
+    }
+    <details class="dg-shared">
+      <summary>{s.shared}</summary>
+      <ul>
+        {SHARED_RULES[lang].map((r) => <li>{r}</li>)}
+      </ul>
+    </details>
+  </section>
+
+  <section class="dg-screens">
+    <!-- 1. The start screen, signed in, with a save and proposals -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.start}</figcaption>
+      <div class="rpg-container dg-frame dg-tall">
+        <img class="rpg-canvas dg-scene" src={scene.src} alt="" />
+        <div class="rpg-overlay rpg-menu-screen">
+          <h2 class="rpg-menu-title">{t.title}</h2>
+          <details class="rpg-world">
+            <summary><strong>{s.world.name}</strong><span class="rpg-world-you"> · {s.world.hero}</span></summary>
+            <p>{s.world.pitch}</p>
+          </details>
+          <section class="rpg-proposals" aria-label={t.proposalsTitle}>
+            <div class="rpg-proposals-head">
+              <h3>{t.proposalsTitle}</h3>
+              <button type="button" class="rpg-proposals-refresh">↻ {t.proposalsRefresh}</button>
+            </div>
+            <div class="rpg-proposals-grid">
+              {
+                s.proposals.map((p) => (
+                  <button type="button" class="rpg-proposal" style={`background: linear-gradient(160deg, ${p.colors[0]}, ${p.colors[1]})`}>
+                    <span class="rpg-proposal-cover" aria-hidden="true">
+                      <span class="rpg-proposal-genre">{p.genre}</span>
+                    </span>
+                    <span class="rpg-proposal-text">
+                      <strong>{p.name}</strong>
+                      <span>{p.pitch}</span>
+                    </span>
+                  </button>
+                ))
+              }
+            </div>
+            <p class="rpg-proposals-figures">gemini-3-flash · 6.2 s · ≈ $0.004</p>
+          </section>
+          <div class="rpg-dz-slot">
+            <button type="button" class="rpg-dz-badge"><Fragment set:html={canister} /><span>{s.diesel}</span></button>
+          </div>
+          <nav class="rpg-menu">
+            <button type="button" class="rpg-menu-item rpg-menu-primary" data-key="continue"><span>{t.menuContinue}</span><small>{s.quest}</small></button>
+            <button type="button" class="rpg-menu-item" data-key="quest"><span>{t.menuNewQuest}</span><small>{t.menuInWorld(s.world.name)} · ⛽ ~0,4 l</small></button>
+            <button type="button" class="rpg-menu-item" data-key="world"><span>{t.menuNewWorld}</span></button>
+            <button type="button" class="rpg-menu-item" data-key="library"><span>{t.menuWorlds}</span><small>{t.menuWorldsCount(3)}</small></button>
+            <button type="button" class="rpg-menu-item" data-key="language"><span>🌐 {t.language}</span><small>{nativeName}</small></button>
+            <button type="button" class="rpg-menu-item" data-key="settings"><span>{t.menuSettings}</span></button>
+            <button type="button" class="rpg-menu-item" data-key="controls"><span>{t.menuControls}</span></button>
+          </nav>
+          <div class="rpg-account">
+            <small class="rpg-account-who">{s.email}</small>
+            <a class="rpg-account-link" href="#">{t.menuAccount}</a>
+            <button type="button" class="rpg-account-link">{t.menuSignOut}</button>
+          </div>
+        </div>
+        <div class="rpg-corner">
+          <button type="button" class="rpg-devtoggle">~</button>
+          <button type="button" class="rpg-fullscreen">⛶</button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 2. The start screen for somebody new -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.fresh}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene" src={scene.src} alt="" />
+        <div class="rpg-overlay rpg-menu-screen">
+          <h2 class="rpg-menu-title">{t.title}</h2>
+          <nav class="rpg-menu">
+            <button type="button" class="rpg-menu-item rpg-menu-primary" data-key="start"><span>{t.start}</span></button>
+            <button type="button" class="rpg-menu-item" data-key="language"><span>🌐 {t.language}</span><small>{nativeName}</small></button>
+            <button type="button" class="rpg-menu-item" data-key="settings"><span>{t.menuSettings}</span></button>
+            <button type="button" class="rpg-menu-item" data-key="controls"><span>{t.menuControls}</span></button>
+          </nav>
+          <div class="rpg-account">
+            <a class="rpg-account-link rpg-account-primary" href="#">{t.menuSignIn}</a>
+            <a class="rpg-account-link" href="#">{t.menuSignUp}</a>
+          </div>
+        </div>
+        <div class="rpg-corner">
+          <button type="button" class="rpg-devtoggle">~</button>
+          <button type="button" class="rpg-fullscreen">⛶</button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 3. A conversation -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.talk}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene dg-scene-lit" src={scene.src} alt="" />
+        <div class="rpg-journal" role="button" tabindex="0"><div class="rpg-journal-objective">◆ {s.objective}</div></div>
+        <div class="rpg-hp"><div class="rpg-hp-fill" style="width: 72%"></div></div>
+        <div class="rpg-compass"><span class="rpg-compass-arrow" style="transform: rotate(0.6rad)">➤</span><span class="rpg-compass-distance">48 m</span></div>
+        <div class="rpg-dialogue" role="dialog">
+          <div class="rpg-dialogue-speaker">{s.speaker}</div>
+          <p class="rpg-dialogue-text">{s.line}</p>
+          <ol class="rpg-dialogue-choices">
+            <li><button type="button"><span class="rpg-choice-n">1.</span> {s.choices[0]}</button></li>
+            <li><button type="button" class="rpg-choice-asked"><span class="rpg-choice-n">2.</span> {s.choices[1]}</button></li>
+            <li><button type="button" class="rpg-choice-plot"><span class="rpg-choice-n">3.</span> {s.choices[2]}</button></li>
+            <li><button type="button"><span class="rpg-choice-n">4.</span> {s.choices[3]}</button></li>
+          </ol>
+          <form class="rpg-dialogue-free" onsubmit="return false">
+            <input type="text" placeholder={t.freePlaceholder} aria-label={t.freePlaceholder} />
+            <button type="submit">↵</button>
+          </form>
+        </div>
+        <div class="rpg-corner">
+          <button type="button" class="rpg-voice">🔊</button>
+          <button type="button" class="rpg-music">🎵</button>
+          <button type="button" class="rpg-devtoggle">~</button>
+          <button type="button" class="rpg-fullscreen">⛶</button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 4. Exploring: the HUD, a notice, a toast, a prompt -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.explore}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene dg-scene-lit" src={scene.src} alt="" />
+        <div class="rpg-journal rpg-journal-fresh" role="button" tabindex="0"><div class="rpg-journal-objective">◆ {s.objective}</div></div>
+        <div class="rpg-hp"><div class="rpg-hp-fill" style="width: 72%"></div></div>
+        <div class="rpg-compass"><span class="rpg-compass-arrow" style="transform: rotate(-0.4rad)">➤</span><span class="rpg-compass-distance">112 m</span></div>
+        <div class="rpg-toast">{s.toast}</div>
+        <div class="rpg-notice dg-still" role="status">
+          <div class="rpg-notice-title">📜 {s.notice}</div>
+          <div class="rpg-notice-text">{s.noticeText}</div>
+        </div>
+        <div class="rpg-prompt"><kbd>E</kbd> {s.prompt}</div>
+        <div class="rpg-hint">{t.clickToLook}</div>
+        <div class="rpg-corner">
+          <button type="button" class="rpg-senses-key"><kbd>Q</kbd> 👁 {t.senses}</button>
+          <button type="button" class="rpg-voice">🔊</button>
+          <button type="button" class="rpg-music">🎵</button>
+          <button type="button" class="rpg-devtoggle">~</button>
+          <button type="button" class="rpg-fullscreen">⛶</button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 5. The journal -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.journal}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene dg-scene-lit" src={scene.src} alt="" />
+        <div class="rpg-overlay rpg-log" role="dialog">
+          <div class="rpg-log-page">
+            <h3>{t.journal}</h3>
+            <p class="rpg-log-title">{s.quest}</p>
+            <p class="rpg-log-objective">◆ {s.objective}</p>
+            <p class="rpg-log-place">{s.place}</p>
+            <p class="rpg-log-place">{s.clues}</p>
+            <ol class="rpg-ending-steps">
+              {s.log.map(([a, b]) => <li><strong>{a}</strong> {b}</li>)}
+            </ol>
+            <button type="button" class="rpg-start">{t.menuBack}</button>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 6. A sub-menu: the new world -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.world}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene" src={scene.src} alt="" />
+        <div class="rpg-overlay rpg-menu-screen">
+          <div class="rpg-panel">
+            <h3>{s.newWorld}</h3>
+            <label class="rpg-exotic">
+              <span class="rpg-exotic-title">{s.exotic}</span>
+              <span class="rpg-exotic-row"><span>🏡</span><input type="range" min="0" max="100" value="25" /><span>🐉</span></span>
+            </label>
+            <details class="rpg-wish rpg-wish-open" open>
+              <summary>{s.wish}</summary>
+              <textarea rows="2" placeholder="…"></textarea>
+            </details>
+            <div class="rpg-panel-actions">
+              <button type="button" class="rpg-start">{s.create} <small class="rpg-dz-tag">⛽ ~1,1 l</small></button>
+              <button type="button" class="rpg-menu-back">← {t.menuBack}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 7. The intro while a world is made -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.intro}</figcaption>
+      <div class="rpg-container dg-frame">
+        <div class="rpg-intro" role="region">
+          <img class="rpg-intro-picture dg-still" src={scene.src} alt="" />
+          <div class="rpg-intro-top"><h2>{s.world.name}</h2></div>
+          <p class="rpg-intro-text">{s.introText}</p>
+          <div class="rpg-intro-bottom">
+            <div class="rpg-intro-dots" aria-hidden="true"><span class="rpg-intro-dot-past">● ● </span>● ○ ○</div>
+            <div class="rpg-progress"><div class="rpg-progress-head">⏳ {s.introProgress}</div><div class="rpg-progress-track"><div class="rpg-progress-fill" style="width: 58%"></div></div></div>
+            <button type="button" class="rpg-menu-back">⏭</button>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 8. The ending -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.ending}</figcaption>
+      <div class="rpg-container dg-frame">
+        <img class="rpg-canvas dg-scene dg-scene-lit" src={scene.src} alt="" />
+        <div class="rpg-overlay rpg-ending">
+          <h2>{t.questComplete}</h2>
+          <p class="rpg-ending-title">{s.endingTitle}</p>
+          <blockquote><p>{s.endingQuote}</p><footer>{s.speaker}</footer></blockquote>
+          <h3>{s.decisions}</h3>
+          <ol class="rpg-ending-steps">
+            {s.endingSteps.map(([a, b]) => <li><strong>{a}</strong> {b}</li>)}
+          </ol>
+          <p class="rpg-ending-note">{t.remembered}</p>
+          <p class="rpg-ending-play">{s.playTime}</p>
+          <button type="button" class="rpg-start">{t.menuNewQuest}</button>
+          <button type="button" class="rpg-start">{t.menuNewWorld}</button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- 9. Sign in -->
+    <figure class="dg-shot">
+      <figcaption>{s.screens.login}</figcaption>
+      <div class="dg-login">
+        <main class="rpg-page">
+          <h1>{t.title}</h1>
+          <form class="auth-card auth-card--game auth-form" onsubmit="return false">
+            <div class="auth-tabs" role="tablist">
+              <button type="button" class="auth-tab auth-tab--on">{s.login.in}</button>
+              <button type="button" class="auth-tab">{s.login.up}</button>
+            </div>
+            <p class="auth-subtitle">{s.login.subtitle}</p>
+            <label class="auth-field">{s.login.email}<input type="email" value={s.email} /></label>
+            <label class="auth-field">{s.login.password}<input type="password" value="hunter2hunter2" /></label>
+            <button type="submit" class="retro-btn auth-submit">{s.login.in}</button>
+          </form>
+        </main>
+      </div>
+    </figure>
+  </section>
+</div>
+
+<script>
+  /** The tabs pick a look through the switcher (DesignPreview.astro), which owns the attribute,
+   *  the address and the memory; this only follows what it says. */
+  const root = document.documentElement;
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>('.dg-tab')];
+  const guides = [...document.querySelectorAll<HTMLElement>('.dg-guide')];
+
+  function show() {
+    const id = root.dataset.rpgDesign ?? '';
+    for (const t of tabs) t.setAttribute('aria-pressed', String(t.dataset.design === id));
+    for (const g of guides) g.hidden = g.dataset.guide !== id;
+  }
+
+  for (const t of tabs) {
+    t.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('rpg-design-pick', { detail: t.dataset.design || null }));
+    });
+  }
+  window.addEventListener('rpg-design', show);
+  show();
+</script>
+
+<style>
+  .dg {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: calc(20px + var(--safe-top, 0px)) 16px 80px;
+  }
+
+  .dg-head h1 {
+    margin: 0 0 8px;
+    text-align: center;
+  }
+
+  .dg-lead {
+    max-width: 720px;
+    margin: 0 auto 18px;
+    text-align: center;
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+
+  .dg-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+
+  .dg-tab {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .dg-tab[aria-pressed='true'] {
+    border-color: currentColor;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 0 1px currentColor;
+  }
+
+  .dg-tab-n {
+    grid-row: span 2;
+    font-size: 22px;
+    font-weight: bold;
+    opacity: 0.75;
+  }
+
+  .dg-swatches {
+    display: flex;
+    gap: 3px;
+  }
+
+  .dg-swatches i {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+  }
+
+  .dg-about {
+    max-width: 760px;
+    margin: 24px auto 28px;
+    line-height: 1.5;
+  }
+
+  .dg-guide h2 {
+    margin: 0 0 4px;
+  }
+
+  .dg-guide h3 {
+    margin: 14px 0 4px;
+    font-size: 1em;
+  }
+
+  .dg-mood {
+    font-size: 1.1em;
+    font-style: italic;
+    margin: 0;
+  }
+
+  .dg-fonts {
+    margin: 4px 0 0;
+    opacity: 0.75;
+    font-size: 0.9em;
+  }
+
+  .dg-guide ul,
+  .dg-shared ul {
+    margin: 0;
+    padding-left: 1.2em;
+  }
+
+  .dg-guide li,
+  .dg-shared li {
+    margin: 4px 0;
+  }
+
+  .dg-play {
+    display: inline-block;
+    text-decoration: none;
+  }
+
+  .dg-shared {
+    margin-top: 18px;
+    opacity: 0.9;
+  }
+
+  .dg-shared summary {
+    cursor: pointer;
+  }
+
+  /* One screen per row, as wide as a laptop's game: at half width the corner buttons ran into the
+     dialogue, which the real game at full width does not do. */
+  .dg-screens {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .dg-shot {
+    margin: 0;
+  }
+
+  .dg-shot figcaption {
+    margin-bottom: 6px;
+    font-size: 0.95em;
+    opacity: 0.85;
+  }
+
+  .dg-frame {
+    height: min(680px, 85vh) !important;
+    min-height: 0 !important;
+    border-radius: 10px;
+    background: #000;
+    user-select: none;
+  }
+
+  .dg-tall {
+    height: 980px !important;
+  }
+
+  .dg-scene {
+    position: absolute;
+    inset: 0;
+    object-fit: cover;
+    filter: brightness(0.75);
+  }
+
+  .dg-scene-lit {
+    filter: none;
+  }
+
+  /* A still: the notice would fade away after six seconds, and the intro would drift. */
+  .dg-still {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .dg-frame .rpg-canvas {
+    pointer-events: none;
+  }
+
+  .dg-login {
+    position: relative;
+    height: 600px;
+    overflow: hidden;
+    border-radius: 10px;
+    background:
+      radial-gradient(ellipse at center, rgba(8, 7, 5, 0.5) 0%, rgba(8, 7, 5, 0.9) 85%),
+      url('../../src/assets/rpg/menu-background.jpg') center / cover no-repeat;
+  }
+
+  :global(:root[data-rpg-design]) .dg-login {
+    background:
+      var(--d-tint),
+      var(--d-scrim),
+      url('../../src/assets/rpg/menu-background.jpg') center / cover no-repeat,
+      var(--d-bg);
+  }
+
+  .dg-login .rpg-page {
+    margin-top: 0;
+  }
+</style>

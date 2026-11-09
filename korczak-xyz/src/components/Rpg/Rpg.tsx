@@ -2905,6 +2905,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       key={key}
       type="button"
       className={`rpg-menu-item${opts.primary ? ' rpg-menu-primary' : ''}${opts.waiting ? ' rpg-menu-waiting' : ''}`}
+      data-key={key}
       disabled={opts.disabled}
       aria-disabled={opts.waiting || undefined}
       onClick={opts.waiting ? undefined : onClick}
