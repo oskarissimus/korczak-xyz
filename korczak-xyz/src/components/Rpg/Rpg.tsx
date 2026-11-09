@@ -316,7 +316,12 @@ function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
   return next;
 }
 
-export default function Rpg({ lang }: { lang: Lang }) {
+/**
+ * `standalone` is everyrpg.korczak.xyz, where no navbar sits above the game: the main menu then
+ * carries sign-in and sign-up itself (owner, Nov 2026: "nie ma takiej opcji"). On korczak.xyz the
+ * navbar already does, so the menu stays as it was.
+ */
+export default function Rpg({ lang, standalone = false }: { lang: Lang; standalone?: boolean }) {
   // The game's language is asked on the intro screen; the page's is only where it starts.
   const [gameLang, setGameLang] = useState<Lang>(lang);
   const t = translations[gameLang];
@@ -2889,6 +2894,40 @@ export default function Rpg({ lang }: { lang: Lang }) {
     </nav>
   );
 
+  // The account, under the menu, on the standalone site only (see the props above). Links rather
+  // than buttons: sign-in and the keys are their own pages there (`src-rpg/pages`).
+  const accountRoot = gameLang === 'pl' ? '/pl/' : '/';
+  const accountBar =
+    standalone && !auth.loading ? (
+      <div className="rpg-account">
+        {auth.user ? (
+          <>
+            <small className="rpg-account-who">{auth.user.email}</small>
+            <a className="rpg-account-link" href={`${accountRoot}account/`}>
+              {t.menuAccount}
+            </a>
+            <button type="button" className="rpg-account-link" onClick={() => void auth.signOut()}>
+              {t.menuSignOut}
+            </button>
+          </>
+        ) : auth.identity ? (
+          // Signed up and waiting for approval: the sign-in page is where that is said.
+          <a className="rpg-account-link" href={`${accountRoot}login/`}>
+            {t.menuPending}
+          </a>
+        ) : (
+          <>
+            <a className="rpg-account-link rpg-account-primary" href={`${accountRoot}login/`}>
+              {t.menuSignIn}
+            </a>
+            <a className="rpg-account-link" href={`${accountRoot}login/?mode=up`}>
+              {t.menuSignUp}
+            </a>
+          </>
+        )}
+      </div>
+    ) : null;
+
   const worldMenu = (
     <div className="rpg-panel">
       <h3>{t.menuNewWorld}</h3>
@@ -3370,6 +3409,7 @@ export default function Rpg({ lang }: { lang: Lang }) {
                       <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
                     ))}
                   {mainMenu}
+                  {accountBar}
                 </>
               )}
               {menu === 'diesel' && (dieselMenu || mainMenu)}

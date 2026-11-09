@@ -136,7 +136,10 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
   const typingPath = lang === 'en' ? '/apps/typing/' : '/pl/apps/typing/';
   const adminPath = lang === 'en' ? '/apps/admin/' : '/pl/apps/admin/';
 
-  const [mode, setMode] = useState<'in' | 'up'>('in');
+  // `?mode=up` opens on sign-up: the game's "Create account" lands here (everyrpg.korczak.xyz).
+  const [mode, setMode] = useState<'in' | 'up'>(() =>
+    typeof location !== 'undefined' && new URLSearchParams(location.search).get('mode') === 'up' ? 'up' : 'in',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');

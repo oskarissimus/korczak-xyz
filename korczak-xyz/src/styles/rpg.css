@@ -2568,3 +2568,50 @@ button.rpg-dz-badge {
     animation: none;
   }
 }
+
+/* The account under the main menu, on everyrpg.korczak.xyz only (`standalone` in Rpg.tsx). Quieter
+   than the menu: it is where you go once, not what you came to do. */
+.rpg-account {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 12px;
+  width: min(100%, 320px);
+  pointer-events: auto;
+}
+
+.rpg-account-who {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpg-account-link {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid rgba(185, 167, 127, 0.35);
+  background: rgba(20, 14, 6, 0.55);
+  color: #f1e6cf;
+  font: inherit;
+  font-size: 15px;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rpg-account-primary {
+  border-color: rgba(255, 211, 107, 0.7);
+}
+
+.rpg-account-link:hover,
+.rpg-account-link:focus-visible {
+  border-color: #ffd36b;
+  color: #ffd36b;
+  outline: none;
+}
