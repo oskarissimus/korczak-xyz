@@ -27,6 +27,7 @@ import { demoWorld } from './genesis';
 import { parsePlace } from './place';
 import { parsePersona } from './persona';
 import { HEARD_MAX, parseMood, SITUATION_MAX, type BeatContext, type Meeting, type Character, type ChronicleEntry, type Job, type Lang, type StepRecord } from './quest';
+import { normLang } from './language';
 
 /** The Google models the demo may be asked for: the game's picker, less what is not Google. */
 export const DEMO_MODELS = [
@@ -204,7 +205,7 @@ function list<T>(value: unknown, max: number, each: (v: unknown) => T): T[] {
  */
 export function demoContext(value: unknown): BeatContext {
   const r = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
-  const lang: Lang = r.lang === 'pl' ? 'pl' : 'en';
+  const lang: Lang = normLang(r.lang);
   const index = Number(r.index);
   if (!Number.isInteger(index) || index < 0 || index > 3) throw new BadContext('Bad beat index');
   const plan = Array.isArray(r.plan) ? r.plan.slice(0, 3).map(job) : [];

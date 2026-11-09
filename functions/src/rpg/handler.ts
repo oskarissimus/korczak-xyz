@@ -67,6 +67,8 @@ import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { demoKeys } from './admin';
+import { uiStrings } from './ui';
+import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
 
 const VOICE_MODEL = FLASH_MODEL;
@@ -328,9 +330,9 @@ async function generate(
  * stale copy is still served if asking again fails.
  */
 const VOICE_LISTS_MS = 7 * 24 * 3600_000;
-const voiceMemory = new Map<'pl' | 'en', { at: number; lists: Promise<VoiceLists> }>();
+const voiceMemory = new Map<string, { at: number; lists: Promise<VoiceLists> }>();
 
-async function readVoiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
+async function readVoiceLists(lang: string, elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
   const doc = db.collection('rpgVoices').doc(lang);
   const snap = await doc.get();
   const stored = snap.exists ? snap.data() : null;
@@ -365,7 +367,7 @@ async function readVoiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<strin
   }
 }
 
-function voiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
+function voiceLists(lang: string, elevenLabs: () => Promise<string | null>): Promise<VoiceLists> {
   const cached = voiceMemory.get(lang);
   if (cached && Date.now() - cached.at < 3600_000) return cached.lists;
   const lists = readVoiceLists(lang, elevenLabs);
@@ -376,7 +378,7 @@ function voiceLists(lang: 'pl' | 'en', elevenLabs: () => Promise<string | null>)
 
 /** The library's voices for every kind of character, handed to the game when a quest starts. */
 async function voices(res: Response, body: Record<string, unknown>): Promise<void> {
-  const lang = body.lang === 'pl' ? 'pl' : 'en';
+  const lang = normLang(body.lang);
   const lists = await voiceLists(lang, async () => (await demoKeys((await readSettings()).keyUid)).elevenLabs);
   res.set('Cache-Control', 'no-store');
   res.status(200).json({ lang, lists });
@@ -391,7 +393,7 @@ function speaker(raw: unknown): VoiceWho | null {
   return { name, gender: r.gender === 'female' ? 'female' : 'male', ...(age && { age }) };
 }
 
-function speak(key: string, voiceId: string, text: string, lang: 'pl' | 'en', model: string): Promise<globalThis.Response> {
+function speak(key: string, voiceId: string, text: string, lang: string, model: string): Promise<globalThis.Response> {
   return fetch(...speechRequest(key, voiceId, text, lang, model));
 }
 
@@ -400,7 +402,7 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   if (!text || text.length > MAX_CLIP_CHARS) throw new BadRequest('Bad text');
   const voice = (Object.keys(DEMO_VOICES) as DemoVoice[]).find((v) => v === body.voice);
   if (!voice) throw new BadRequest('Unknown voice');
-  const lang = body.lang === 'pl' ? 'pl' : 'en';
+  const lang = normLang(body.lang);
   // A line with an audio tag goes to v4 at its own rate, the rest to Flash (`audioTags.ts`); the
   // reservation is the tagged price, and a fall back to Flash settles at Flash's.
   let said = voicing(text);
@@ -478,6 +480,15 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
  * JSON, or JSON sent as text: the stats go out by `sendBeacon` as `text/plain`, which needs no CORS
  * preflight and survives the page closing.
  */
+/** The game's interface in a language nobody wrote it in (`ui.ts`), on the server's keys. */
+async function ui(res: Response, body: Record<string, unknown>): Promise<void> {
+  const answer = await uiStrings(body.lang, async () => (await demoKeys((await readSettings()).keyUid)).google);
+  if (!answer) throw new BadRequest('Unknown language');
+  // A complete translation changes only with a deploy; an incomplete one is asked for again soon.
+  res.set('Cache-Control', answer.hash ? 'public, max-age=3600' : 'no-store');
+  res.status(200).json(answer);
+}
+
 function parseBody(raw: unknown): Record<string, unknown> {
   let value = raw;
   if (Buffer.isBuffer(value)) value = value.toString('utf8');
@@ -516,6 +527,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     else if (body.kind === 'world') await world(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);
     else if (body.kind === 'voices') await voices(res, body);
+    else if (body.kind === 'ui') await ui(res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {
     if (e instanceof BadRequest) {

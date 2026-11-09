@@ -10,6 +10,7 @@
  * two never sound alike, and never with the same archetype.
  */
 import type { Lang } from './quest';
+import { base, type BaseLang } from './language';
 
 export const MBTI_TYPES = [
   'INTJ', 'INTP', 'ENTJ', 'ENTP',
@@ -68,7 +69,7 @@ const ARCHETYPE_DRIVE: Record<Archetype, string> = {
 };
 
 /** The names the console shows them by. */
-const MBTI_NAME: Record<Lang, Record<Mbti, string>> = {
+const MBTI_NAME: Record<BaseLang, Record<Mbti, string>> = {
   en: {
     INTJ: 'Architect', INTP: 'Logician', ENTJ: 'Commander', ENTP: 'Debater',
     INFJ: 'Advocate', INFP: 'Mediator', ENFJ: 'Protagonist', ENFP: 'Campaigner',
@@ -83,7 +84,7 @@ const MBTI_NAME: Record<Lang, Record<Mbti, string>> = {
   },
 };
 
-const ARCHETYPE_NAME: Record<Lang, Record<Archetype, string>> = {
+const ARCHETYPE_NAME: Record<BaseLang, Record<Archetype, string>> = {
   en: {
     innocent: 'Innocent', everyman: 'Everyman', hero: 'Hero', caregiver: 'Caregiver', explorer: 'Explorer', rebel: 'Rebel',
     lover: 'Lover', creator: 'Creator', jester: 'Jester', sage: 'Sage', magician: 'Magician', ruler: 'Ruler',
@@ -141,6 +142,6 @@ export function personaWords(p: Persona): string {
 
 /** The persona as the console names it: "ENTP Dyskutant · Błazen". */
 export function personaLabel(p: Persona, lang: Lang): string {
-  const type = `${p.mbti} ${MBTI_NAME[lang][p.mbti]}`;
-  return p.archetype ? `${type} · ${ARCHETYPE_NAME[lang][p.archetype]}` : type;
+  const type = `${p.mbti} ${MBTI_NAME[base(lang)][p.mbti]}`;
+  return p.archetype ? `${type} · ${ARCHETYPE_NAME[base(lang)][p.archetype]}` : type;
 }

@@ -108,6 +108,8 @@ import { rememberTiming, type Task } from '../../utils/rpg/progress';
 import { rigsOfStart } from '../../utils/rpg/rigging';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
+import { LANGUAGES, guessLang, nativeName, startingLang, storeLangChoice } from '../../utils/rpg/language';
+import { pushLangChoice, syncLangChoice } from '../../utils/rpg/langSync';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
@@ -185,7 +187,7 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 /** The console rows of a rig (`people.ts`), counted in the progress as rigs and not as pieces. */
 const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
-import { translations } from './translations';
+import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
 import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
 
@@ -261,6 +263,11 @@ declare global {
   }
 }
 
+/** The menu's languages, each by its own name, in alphabetical order. */
+const languageOptions: [string, string][] = LANGUAGES.map((l): [string, string] => [l, nativeName(l)]).sort((a, b) =>
+  a[1].localeCompare(b[1]),
+);
+
 const MODEL_KEY = 'rpg-model';
 /** Whether the world and the opening are written quickly (`quick` in `storyteller.ts`); on unless '0'. */
 const FAST_KEY = 'rpg-fast-start';
@@ -324,9 +331,11 @@ function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
  * navbar already does, so the menu stays as it was.
  */
 export default function Rpg({ lang, standalone = false }: { lang: Lang; standalone?: boolean }) {
-  // The game's language is asked on the intro screen; the page's is only where it starts.
-  const [gameLang, setGameLang] = useState<Lang>(lang);
-  const t = translations[gameLang];
+  // The game's language, any language (`utils/rpg/language.ts`): chosen on the menu and kept in this
+  // browser and on the account; until somebody chooses, guessed from the browser, English failing that.
+  // The page's own locale only says where `/pl/` starts.
+  const [gameLang, setGameLang] = useState<Lang>(() => startingLang(lang, loadGame(isTrashed)?.lang ?? null));
+  const t = useUi(gameLang);
   const tRef = useRef(t);
   tRef.current = t;
   const gameLangRef = useRef(gameLang);
@@ -642,19 +651,31 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   useEffect(() => setVoiceWorld(worldId), [worldId]);
   useEffect(() => setChronicle(loadChronicle(worldId)), [worldId]);
 
-  // A quest left half way is offered on the intro screen, in its own language.
+  // A quest left half way is offered on the intro screen when it is in the game's language (the
+  // language it was played in is where a visit starts before anything was chosen, `startingLang`).
   useEffect(() => {
     const game = loadGame(isTrashed);
     if (!game) return;
     setSaved(game);
-    setGameLang(game.lang);
   }, []);
+
+  /** The player's choice of language: kept here and on the account, and the game switches to it. */
+  const chooseLang = useCallback((next: Lang) => {
+    const at = Date.now();
+    storeLangChoice(next, at);
+    if (uidRef.current) void pushLangChoice(uidRef.current, next, at);
+    setGameLang(next);
+  }, []);
+  // The page says its language, for a screen reader and the browser's own translate offer.
+  useEffect(() => {
+    document.documentElement.lang = gameLang;
+  }, [gameLang]);
 
   /** Bumped whenever the library may have changed, so the intro reads it again. */
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'controls' | 'trash' | 'diesel'>('main');
+  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'language' | 'controls' | 'trash' | 'diesel'>('main');
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -671,6 +692,17 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // The account's copy of the game (`cloud.ts`): pulled now and whenever the page comes back to the
   // front, pushed after every change. A pull never swaps the world under a quest being played.
   const uid = auth.user?.uid ?? null;
+  // Signed in, the account's language wins over a guess, and the later of two choices wins (`langSync.ts`).
+  useEffect(() => {
+    if (!uid) return;
+    let live = true;
+    void syncLangChoice(uid).then((chosen) => {
+      if (live && chosen && !startedRef.current) setGameLang(chosen);
+    });
+    return () => {
+      live = false;
+    };
+  }, [uid]);
   useEffect(() => {
     if (!uid) return;
     return startSync(uid, () => {
@@ -2715,7 +2747,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     if (!w) return;
     saveWorld(w);
     openingRef.current = { id, cont };
-    if (w.lang !== gameLangRef.current) setGameLang(w.lang);
+    if (w.lang !== gameLangRef.current) chooseLang(w.lang);
     setOpening((n) => n + 1);
   };
   useEffect(() => {
@@ -2849,6 +2881,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   };
 
   const creatable = keysReady && storyProvider !== 'static';
+  const guessed = guessLang(typeof navigator === 'undefined' ? undefined : navigator);
   const ownSave = saved && saved.lang === gameLang ? saved : null;
   /** One entry of the main menu: a label, and a line under it when there is something to say. */
   const item = (key: string, label: string, onClick: () => void, opts: { sub?: string; primary?: boolean; disabled?: boolean } = {}) => (
@@ -2913,6 +2946,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
       {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined })}
       {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
+      {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
       {item('controls', t.menuControls, () => setMenu('controls'))}
     </nav>
@@ -2970,23 +3004,42 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </div>
   );
 
+  // Every language on the list, by its own name (owner, 9 Nov 2026: "change language in main menu to
+  // any language"). English and Polish are written by hand; any other is translated on the server the
+  // first time somebody picks it, and the menu says so while it is.
+  const languagePicker = (
+    <div className="rpg-lang">
+      <label>
+        {t.language}:{' '}
+        <select value={gameLang} onChange={(e) => chooseLang(e.target.value)}>
+          {languageOptions.map(([code, name]) => (
+            <option key={code} value={code}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {uiPending(gameLang) && <small className="rpg-lang-note">{t.languageTranslating}</small>}
+      {guessed !== gameLang && (
+        <button type="button" className="rpg-lang-guess" onClick={() => chooseLang(guessed)}>
+          {t.languageBrowser(nativeName(guessed))}
+        </button>
+      )}
+      <small className="rpg-lang-note">{t.languageHint}</small>
+    </div>
+  );
+  const languageMenu = (
+    <div className="rpg-panel">
+      <h3>🌐 {t.language}</h3>
+      {languagePicker}
+      <div className="rpg-panel-actions">{back}</div>
+    </div>
+  );
+
   const settingsMenu = (
     <div className="rpg-panel">
       <h3>{t.menuSettings}</h3>
-      <div className="rpg-lang" role="group" aria-label={t.language}>
-        <span>{t.language}:</span>
-        {(['pl', 'en'] as const).map((l) => (
-          <button
-            key={l}
-            type="button"
-            className={l === gameLang ? 'rpg-lang-on' : ''}
-            aria-pressed={l === gameLang}
-            onClick={() => setGameLang(l)}
-          >
-            {l === 'pl' ? 'Polski' : 'English'}
-          </button>
-        ))}
-      </div>
+      {languagePicker}
       <label className="rpg-model">
         <input type="checkbox" checked={jumping} onChange={(e) => pickJumping(e.target.checked)} /> {t.jumpSetting}
       </label>
@@ -3443,6 +3496,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               {menu === 'diesel' && (dieselMenu || mainMenu)}
               {menu === 'world' && worldMenu}
               {menu === 'settings' && settingsMenu}
+              {menu === 'language' && languageMenu}
               {menu === 'controls' && controlsMenu}
             </>
           )}

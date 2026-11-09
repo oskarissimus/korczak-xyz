@@ -13,6 +13,23 @@
  */
 
 import type { Lang } from "./quest";
+import { base, type BaseLang } from './language';
+
+/**
+ * The languages ElevenLabs' Flash v2.5 takes a `language_code` for (their model page, Nov 2026), by
+ * their code. Another language is spoken without one, which their API then detects from the text,
+ * rather than refused for a code it does not know.
+ */
+const ELEVEN_LANGUAGES = new Set([
+  'en', 'ja', 'zh', 'de', 'hi', 'fr', 'ko', 'pt', 'it', 'es', 'id', 'nl', 'tr', 'fil', 'pl', 'sv', 'bg', 'ro', 'ar',
+  'cs', 'el', 'fi', 'hr', 'ms', 'sk', 'da', 'ta', 'uk', 'ru', 'hu', 'no', 'vi',
+]);
+
+/** The game's language as ElevenLabs names it (`nb` is their `no`), or undefined when they take no code for it. */
+export function elevenLanguage(lang: Lang): string | undefined {
+  const code = lang === 'nb' ? 'no' : lang;
+  return ELEVEN_LANGUAGES.has(code) ? code : undefined;
+}
 
 /** Their low-latency model; it speaks Polish and English with the same voices. It has no audio tags. */
 export const FLASH_MODEL = "eleven_flash_v2_5";
@@ -26,7 +43,7 @@ export const FLASH_MODEL = "eleven_flash_v2_5";
 export const TAG_MODEL = "eleven_v4";
 
 /** The tags the prompt offers, with how the dialogue shows them. From ElevenLabs' v4 prompting guide. */
-export const TAGS: Record<string, Record<Lang, string>> = {
+export const TAGS: Record<string, Record<BaseLang, string>> = {
   coughs: { pl: "kaszle", en: "coughs" },
   sighs: { pl: "wzdycha", en: "sighs" },
   laughs: { pl: "śmieje się", en: "laughs" },
@@ -158,7 +175,7 @@ export function asideLabel(
   part: Extract<LinePart, { kind: "aside" }>,
   lang: Lang,
 ): string {
-  return part.tag ? TAGS[part.tag][lang] : part.text;
+  return part.tag ? TAGS[part.tag][base(lang)] : part.text;
 }
 
 /** The model a line is spoken with, and the text it is sent; `tags: false` keeps everything on Flash. */
@@ -195,7 +212,7 @@ export function speechRequest(
         body: JSON.stringify({
           inputs: [{ text, voice_id: voiceId }],
           model_id: model,
-          language_code: lang,
+          ...(elevenLanguage(lang) && { language_code: elevenLanguage(lang) }),
           settings: { stability: 0.5 },
         }),
       },
@@ -209,7 +226,7 @@ export function speechRequest(
       body: JSON.stringify({
         text,
         model_id: model,
-        language_code: lang,
+        ...(elevenLanguage(lang) && { language_code: elevenLanguage(lang) }),
         voice_settings: { stability: 0.45, similarity_boost: 0.75 },
       }),
     },

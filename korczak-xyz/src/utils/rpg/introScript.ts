@@ -11,6 +11,7 @@
 
 import type { Lang } from './quest';
 import type { WorldSketch } from './genesis';
+import { languageName } from './language';
 
 /** How many frames the narrator tells, after the prologue. */
 export const INTRO_FRAMES = 6;
@@ -49,7 +50,7 @@ export function picturePrompt(picture: string): string {
 }
 
 export function introPrompt(ask: IntroAsk): string {
-  const language = ask.lang === 'pl' ? 'Polish' : 'English';
+  const language = languageName(ask.lang);
   const lines = [
     'You narrate the loading screen of a role-playing game, like the storyteller who opens a chapter of The Witcher 3:',
     'a warm, unhurried voice telling the player about the world they are about to enter, over a slideshow of pictures.',

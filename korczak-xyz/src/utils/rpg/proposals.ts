@@ -103,10 +103,10 @@ interface Kept {
   items: Proposal[];
 }
 
-function readAll(): Partial<Record<Lang, Kept>> {
+function readAll(): Record<Lang, Kept> {
   try {
     const raw = JSON.parse(localStorage.getItem(PROPOSALS_KEY) ?? '{}') as Record<string, unknown>;
-    const out: Partial<Record<Lang, Kept>> = {};
+    const out: Record<Lang, Kept> = {};
     for (const lang of ['en', 'pl'] as const) {
       const k = raw?.[lang] as Record<string, unknown> | undefined;
       if (!k || !Array.isArray(k.items)) continue;

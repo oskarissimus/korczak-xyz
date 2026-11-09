@@ -39,6 +39,7 @@ import {
   type QuestMood,
   type StepRecord,
 } from './quest';
+import { languageName } from './language';
 
 /** As long as the reader may type: a line, not a letter. */
 export const FREE_MAX = 200;
@@ -103,7 +104,7 @@ const LEAD_WORDS: Record<'slay' | 'collect' | 'talk' | 'end', string> = {
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
 export function freePrompt(ctx: FreeContext): string {
-  const language = ctx.lang === 'pl' ? 'Polish' : 'English';
+  const language = languageName(ctx.lang);
   const world = ctx.world ?? classicWorld(ctx.lang);
   const b = ctx.beat;
   const npc = b.npc;

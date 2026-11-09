@@ -43,7 +43,7 @@ import type { Mesher, PersonPainter } from '../../utils/rpg/landmark3d';
 import type { Rigger } from './people';
 import type { RpgScene } from './RpgScene';
 import { RELIEFS, type Relief } from '../../utils/rpg/terrain';
-import { translations } from './translations';
+import { ui } from './ui';
 import { lastIntro, subscribeIntro, type IntroView } from '../../utils/rpg/intro';
 import { proposalsView, proposalTotals, subscribeProposals } from '../../utils/rpg/proposals';
 
@@ -58,7 +58,7 @@ function useFunds(): void {
 
 /** One provider out of money: who, what stops, where to top up, and the provider's own words. */
 function FundsNotice({ lang, alert, onHide }: { lang: Lang; alert: FundsAlert; onHide?: () => void }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const { name, url } = TOP_UP[alert.provider];
   // The game's own tank ran dry (`wallet.ts`), not the provider's balance: nothing to top up there.
   if (alert.error.includes(NO_DIESEL)) {
@@ -189,7 +189,7 @@ function personaOf(c: Character, lang: Lang): string {
 
 /** Who a step is with and who they are (owner, 30 Oct 2026: the personality type, shown in the console). */
 function BeatCast({ lang, beat }: { lang: Lang; beat: Beat }) {
-  const t = translations[lang];
+  const t = ui(lang);
   return (
     <div className="rpg-dev-cast">
       🎭 {beat.npc.name}: {personaOf(beat.npc, lang)}
@@ -205,7 +205,7 @@ function BeatCast({ lang, beat }: { lang: Lang; beat: Beat }) {
 
 /** Everyone met so far, with their type, archetype and the voice the model wrote for them. */
 function PeopleTab({ lang, people }: { lang: Lang; people: readonly Character[] }) {
-  const t = translations[lang];
+  const t = ui(lang);
   if (people.length === 0) return <div className="rpg-dev-list rpg-dev-empty">{t.devNoPeople}</div>;
   return (
     <div className="rpg-dev-list rpg-dev-people">
@@ -227,7 +227,7 @@ function PeopleTab({ lang, people }: { lang: Lang; people: readonly Character[] 
  * keeps, so a quest from before the transcript knew of them shows them too.
  */
 function BeatDecisions({ lang, beat, chose }: { lang: Lang; beat: Beat; chose: string | null }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const [json, setJson] = useState(false);
   return (
     <div className="rpg-dev-options">
@@ -273,7 +273,7 @@ function PerfTab({
   onBadge: (on: boolean) => void;
   remake: (() => RemakeOffer | null) | null;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   useTick(true, 500);
   const [, setVersion] = useState(0);
   if (!scene) return <div className="rpg-dev-list" />;
@@ -367,7 +367,7 @@ export interface RemakeOffer {
 }
 
 function RemakeBox({ lang, offer }: { lang: Lang; offer: RemakeOffer | null }) {
-  const t = translations[lang];
+  const t = ui(lang);
   if (!offer) return <p className="rpg-dev-empty">{t.remakeNone}</p>;
   const { painter, mesher, rigger } = offer.makers;
   return (
@@ -406,7 +406,7 @@ function at(ms: number): string {
  * rig is also its own bar below (model `self-rig`, or Meshy's), with SkinTokens' share in its text.
  */
 function RigStats({ lang, since }: { lang: Lang; since: number }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const now = Date.now();
   const list = rigsOfStart(since, now);
   const running = list.some((j) => j.endedAt === null);
@@ -424,7 +424,7 @@ function RigStats({ lang, since }: { lang: Lang; since: number }) {
 }
 
 function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly DevRequest[]; tasks: (() => Task[]) | null }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const line = timeline();
   const list = tasks?.() ?? [];
   const typical = loadTypical();
@@ -504,7 +504,7 @@ function StartTab({ lang, requests, tasks }: { lang: Lang; requests: readonly De
  * wrote it, and what its words, its voice and its pictures cost — the requests labelled `intro`.
  */
 function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly DevRequest[]; since: number }) {
-  const t = translations[lang];
+  const t = ui(lang);
   useSyncExternalStore(subscribeIntro, lastIntro, lastIntro);
   const v: IntroView | null = lastIntro();
   const mine = requests.filter((r) => r.label === 'intro' && r.startedAt >= since);
@@ -536,7 +536,7 @@ function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly 
  * while the set stays on the menu.
  */
 function ProposalStats({ lang }: { lang: Lang }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
   if (!v.since) return null;
   const s = proposalTotals(v);
@@ -554,7 +554,7 @@ function ProposalStats({ lang }: { lang: Lang }) {
 }
 
 function CostTab({ lang }: { lang: Lang }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const totals = questTotals();
   const rows: [string, string][] = [
     [t.genTime, formatMs(totals.generationMs)],
@@ -635,7 +635,7 @@ export function DevConsole({
   /** The Perf tab's remake of the people standing here, as the switches now stand. */
   remake?: (() => RemakeOffer | null) | null;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
   const [tab, setTab] = useState<'requests' | 'start' | 'lines' | 'people' | 'costs' | 'perf'>('requests');
@@ -809,14 +809,14 @@ export function DevConsole({
 /** About how long, in the game's words: "35 s", "1 min 20 s", or a moment. */
 function eta(ms: number, lang: Lang): string {
   const r = roughly(ms);
-  const t = translations[lang];
+  const t = ui(lang);
   if (!r) return t.progressMoment;
   return t.progressLeft(r.min > 0 ? `${r.min} min${r.s ? ` ${r.s} s` : ''}` : `${r.s} s`);
 }
 
 /** What the wait is mostly for: the world while any of it is still coming, else the quest, else its pieces. */
 function progressHeadline(list: readonly Task[], lang: Lang): string {
-  const t = translations[lang];
+  const t = ui(lang);
   const open = (kinds: TaskKind[]) => list.some((x) => kinds.includes(x.kind) && (x.state === 'running' || x.state === 'queued'));
   return open(['world', 'ground', 'model'])
     ? t.progressTitle
@@ -855,7 +855,7 @@ const PROGRESS_ROWS: {
 const SETTLE_MS = 1_500;
 
 export function WorldProgress({ lang, tasks, since }: { lang: Lang; tasks: () => Task[]; since: number | null }) {
-  const t = translations[lang];
+  const t = ui(lang);
   useDevlog();
   const list = tasks();
   const now = Date.now();
@@ -937,7 +937,7 @@ export function StreamLine() {
  * (the autosave carries the earlier ones), and the world it was played in on a line of its own.
  */
 export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | null }) {
-  const t = translations[lang];
+  const t = ui(lang);
   useDevlog();
   const q = questSpend();
   const w = worldSpend(world);

@@ -49,7 +49,7 @@ export function sharedVoicesUrl(lang: Lang, gender: VoiceWho['gender'], age?: Vo
   const query = new URLSearchParams({
     page_size: String(PAGE),
     sort: 'usage_character_count_1y',
-    language: lang,
+    language: lang === 'nb' ? 'no' : lang,
     gender,
   });
   if (age) query.set('age', age);
@@ -70,7 +70,7 @@ export function usableVoice(v: SharedVoice, lang: Lang, model: string): boolean 
   if (!v || typeof v.voice_id !== 'string' || !/^[A-Za-z0-9]{8,40}$/.test(v.voice_id)) return false;
   if ((v.rate ?? 1) !== 1 || (v.fiat_rate ?? null) !== null) return false;
   const verified = v.verified_languages ?? [];
-  return verified.length === 0 || verified.some((l) => l.language === lang && (!l.model_id || l.model_id === model));
+  return verified.length === 0 || verified.some((l) => l.language === (lang === 'nb' ? 'no' : lang) && (!l.model_id || l.model_id === model));
 }
 
 function hash(text: string): number {

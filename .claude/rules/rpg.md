@@ -1839,9 +1839,45 @@ with the deleted worlds, but not in the main menu".
 
 ## Language
 
-Asked on the intro screen (Polski / English), starting from the page's locale. It sets the game's
-UI, the language the quest is written in, and ElevenLabs' `language_code`. The quest is generated
-on Start, not on load, so the choice is what the model is asked for.
+Any language (owner, 9 Nov 2026: "user language should be guessed, defaulting to English, and the
+page should autotranslate to that language and it should be persisted; the user should be able to
+change language in the main menu to any language, persisted in the browser and in the account").
+`utils/rpg/language.ts` holds the list (`LANGUAGES`, ~80 ISO 639 primary subtags — `pt-BR` is `pt`,
+`no` is `nb` — each with its own name for the menu, written out because a browser's Intl data may
+lack it and answer in the browser's language). `Lang` is now any of them, not `'en' | 'pl'`.
+
+- **Where a visit starts** (`startingLang`): what this browser chose (`rpg-lang`, `{lang, at}`), else
+  the language of a quest left half way, else `/pl/` when that is the page, else the first of
+  `navigator.languages` on the list, else English. A saved quest no longer switches the language on
+  load; it is offered when it is in the game's language.
+- **The choice**: *🌐 Language* on the main menu (and the same picker in Settings), a `<select>` of
+  every language by its own name, with a one-tap way back to the browser's language. Opening a world
+  of another language from the library counts as a choice.
+- **On the account**: `users/{uid}/rpgState/lang` `{lang, at}` (`langSync.ts`). At sign-in the later
+  of the two choices wins; a browser that never chose takes the account's.
+- **What the model writes is in the language** — the world, the quest, the lines, the intro, the
+  proposals, a free line: every prompt names it by `languageName` ("German"), and a voice design
+  starts "Native German.". ElevenLabs gets a `language_code` only for the 32 languages Flash v2.5
+  takes one for (`elevenLanguage` in `audioTags.ts`); for any other it detects the language from the
+  text rather than refuse the code. The library voice search asks in the language (`no` for `nb`).
+- **What is hand-written is English unless it is Polish** (`base`): the hand-written quest, the
+  classic world, the prologue, the stage directions' asides, the persona names, the word picker.
+- **The interface is translated on the server, once per language** (`utils/rpg/uiTranslate.ts`,
+  `functions/src/rpg/ui.ts`): `{kind:'ui', lang}` on rpgDemo, on the server's Google key, cached in
+  `rpgUi/{lang}` (Admin SDK only) with the English each string came from, so a deploy that changes
+  some English re-translates only those. The browser sends a language and nothing else — the server
+  translates its own copy of `translations.en` — so the endpoint cannot translate arbitrary text,
+  and its whole cost is one ~16k-character translation per language on the list, which is why it
+  is outside the demo's budget. The browser keeps it in `rpg-ui-<lang>` and shows English until it
+  arrives (the menu says it is translating). `translations.ts` stays the source: a string or a
+  record's entry is translated as it is, a function as its template with `{0}`, `{1}`… for its
+  arguments; a function whose words depend on an argument reads them off the table through `this`
+  (`aiQuest`, `demoClosed`, `fundsWhat`, `exoticBand`), and one that cannot be templated (`devRigs`,
+  `wishSummary`) stays English. Plurals take the translation's one form ("1 Welten"), the price of
+  not asking for every form. `translations.ts` imports no module that touches `import.meta.env`,
+  because the functions compile it.
+- Not translated: the admin panel and the model lab (owner tools, English/Polish by page), and the
+  sign-in and account pages, which are the site's own i18n.
 
 ## Voice
 

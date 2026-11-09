@@ -11,6 +11,7 @@
  */
 
 import type { Lang } from './quest';
+import { languageName } from './language';
 
 export const PROPOSAL_COUNT = 4;
 
@@ -57,7 +58,7 @@ export function coverPrompt(picture: string): string {
 }
 
 export function proposalPrompt(ask: ProposalAsk): string {
-  const language = ask.lang === 'pl' ? 'Polish' : 'English';
+  const language = languageName(ask.lang);
   const lines = [
     'You propose worlds for a role-playing game. The player opens the game and picks one of your proposals;',
     'only then is the whole world written. So each proposal is a premise, not a world: a name, a pitch that',

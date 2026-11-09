@@ -16,6 +16,7 @@
 
 import { tokenCost } from './cost';
 import { clipCost, priceAs } from './demoLimits';
+import { localeOf } from './language';
 
 export const LITRES_PER_USD = 100;
 
@@ -27,9 +28,9 @@ export function litres(usd: number): number {
 }
 
 /** "312 L", "4,5 L" — whole litres from 10 up, one decimal below, the locale's comma. */
-export function formatLitres(l: number, lang: 'en' | 'pl'): string {
+export function formatLitres(l: number, lang: string): string {
   const shown = l >= 10 ? Math.round(l) : Math.round(l * 10) / 10;
-  return `${shown.toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-GB')} L`;
+  return `${shown.toLocaleString(localeOf(lang))} L`;
 }
 
 /**

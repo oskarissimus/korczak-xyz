@@ -41,10 +41,11 @@ import { asAge, type VoiceAge } from './voicePick';
 import { TAGS } from './audioTags';
 import { personaWords, type Persona } from './persona';
 import { asCraft, craftLines, type Craft } from './craft';
+import { base, languageName, type BaseLang, type Lang } from './language';
 
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
-export type Lang = 'en' | 'pl';
+export type { Lang } from './language';
 
 /** What can be done at a place: gather things lying there, or kill what lives there. */
 export type ObjectiveKind = 'collect' | 'slay';
@@ -459,7 +460,7 @@ function told(parts: [string, string][]): Pick<Beat, 'story' | 'situation'> {
   return { story, situation: story.map((p) => p.say).join(' ') };
 }
 
-const VILLAGE_STEP: Record<Lang, string> = { en: 'the village square', pl: 'plac we wsi' };
+const VILLAGE_STEP: Record<BaseLang, string> = { en: 'the village square', pl: 'plac we wsi' };
 
 /** The quest the game plays without a key: the drowners, now with two ways to end it. */
 export function staticBeat(lang: Lang, index: number): Beat {
@@ -751,7 +752,7 @@ function thisStep(ctx: BeatContext, hub: string): string[] {
 
 /** The prompt for one beat. Everything the model may choose, and everything it may not, is in it. */
 export function beatPrompt(ctx: BeatContext): string {
-  const language = ctx.lang === 'pl' ? 'Polish' : 'English';
+  const language = languageName(ctx.lang);
   const chronicle = ctx.chronicle.slice(-5);
   const world = ctx.world ?? classicWorld(ctx.lang);
   const mood = ctx.mood ?? DEFAULT_MOOD;
@@ -1040,7 +1041,7 @@ export function narrated(line: string, name: string): boolean {
 }
 
 /** What the hunter says to hear more, when a story part comes without its own question. */
-const MORE: Record<Lang, string[]> = {
+const MORE: Record<BaseLang, string[]> = {
   en: ['What happened?', 'Go on.', 'And then?', 'What do you want of me?'],
   pl: ['Co się stało?', 'Mów dalej.', 'I co potem?', 'Czego ode mnie chcesz?'],
 };
@@ -1204,13 +1205,13 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     .map((o, i) => {
       const part = o as Record<string, unknown> | null;
       const say = text(part?.say, 500);
-      return say ? { ask: text(part?.ask, 100) ?? MORE[ctx.lang][Math.min(i, MORE[ctx.lang].length - 1)], say } : null;
+      return say ? { ask: text(part?.ask, 100) ?? MORE[base(ctx.lang)][Math.min(i, MORE[base(ctx.lang)].length - 1)], say } : null;
     })
     .filter((p): p is StoryPart => p !== null)
     .slice(0, 5);
   // The beat format before the story came in parts, which a model may still fall back to.
   const flat = text(r.situation, 700);
-  if (story.length === 0 && flat) story.push({ ask: MORE[ctx.lang][0], say: flat });
+  if (story.length === 0 && flat) story.push({ ask: MORE[base(ctx.lang)][0], say: flat });
   if (!title || story.length === 0) return null;
   const situation = story.map((p) => p.say).join(' ');
 
@@ -1276,7 +1277,7 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     npc,
     place,
     job,
-    objectiveText: text(r.objectiveText, 120) ?? `${npc.name} — ${place?.name ?? VILLAGE_STEP[ctx.lang]}`,
+    objectiveText: text(r.objectiveText, 120) ?? `${npc.name} — ${place?.name ?? VILLAGE_STEP[base(ctx.lang)]}`,
     greeting,
     story,
     situation,

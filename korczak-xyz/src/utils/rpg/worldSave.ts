@@ -28,7 +28,7 @@ const KEY = 'rpg-worlds';
 const KEEP_PAST = 8;
 
 interface Stored {
-  current?: Partial<Record<Lang, WorldBible>>;
+  current?: Record<Lang, WorldBible>;
   /** "name: pitch" of earlier worlds, newest last, every language. */
   past?: string[];
   /** Every world played here, with when it was last played. */
@@ -187,8 +187,8 @@ export function findWorld(id: string): WorldBible | null {
 }
 
 /** The world being played in each language, by id (the classic one is its language). */
-export function currentIds(): Partial<Record<Lang, string>> {
-  const out: Partial<Record<Lang, string>> = {};
+export function currentIds(): Record<Lang, string> {
+  const out: Record<Lang, string> = {};
   const stored = read();
   for (const [lang, w] of Object.entries(stored.current ?? {})) if (valid(w) && !stored.library?.[w.id]?.deleted) out[lang as Lang] = w.id;
   return out;
@@ -199,7 +199,7 @@ export function currentIds(): Partial<Record<Lang, string>> {
  * a world this browser does not have yet must be put there first (`writeLibraryEntry`). False when
  * one of them is not here yet, so the next pull tries again.
  */
-export function writeCurrent(ids: Partial<Record<Lang, string>>, classic: (lang: Lang) => WorldBible): boolean {
+export function writeCurrent(ids: Record<Lang, string>, classic: (lang: Lang) => WorldBible): boolean {
   const stored = read();
   // The account's choice whole: a language it names no world for has none here either (its world
   // went to the trash on another device).

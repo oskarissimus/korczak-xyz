@@ -202,7 +202,7 @@ export async function pull(uid: string): Promise<boolean> {
   });
   let changed = false;
 
-  const state = stateSnap.exists() ? (stateSnap.data() as { updatedAt?: number; current?: Partial<Record<Lang, string>> }) : null;
+  const state = stateSnap.exists() ? (stateSnap.data() as { updatedAt?: number; current?: Record<Lang, string> }) : null;
   const stateNewer = Boolean(state && (state.updatedAt ?? 0) > stampOf(STATE_UNIT).local);
   const live = liveIds(stateNewer ? Object.values(state?.current ?? {}) : []);
 

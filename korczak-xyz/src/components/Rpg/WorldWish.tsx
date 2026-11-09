@@ -9,9 +9,10 @@
 
 import { CHOSEN_LEN, CHOSEN_MAX, WISH_MAX } from '../../utils/rpg/genesis';
 import type { Lang } from '../../utils/rpg/quest';
+import { base } from '../../utils/rpg/language';
 import { PICK_GROUPS } from '../../utils/rpg/seedWords';
 import { addWords, NO_WISH, wished, type Wish } from '../../utils/rpg/wish';
-import { translations } from './translations';
+import { ui } from './ui';
 
 export default function WorldWish({
   lang,
@@ -25,7 +26,7 @@ export default function WorldWish({
   /** Shown whole, in the menu's own world screen, rather than folded. */
   open?: boolean;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const full = wish.words.length >= CHOSEN_MAX;
   const add = (typed: string) => onChange({ ...wish, words: addWords(wish.words, typed) });
   const typedAdd = (input: HTMLInputElement | null) => {
@@ -49,7 +50,7 @@ export default function WorldWish({
         >
           <option value="">{full ? t.wishFull : t.wishPick}</option>
           {PICK_GROUPS.map((g) => (
-            <optgroup key={g.en} label={g[lang]}>
+            <optgroup key={g.en} label={g[base(lang)]}>
               {g.words.map(([en, pl]) => {
                 const word = lang === 'pl' ? pl : en;
                 return (

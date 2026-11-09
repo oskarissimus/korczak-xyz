@@ -10,7 +10,7 @@ import { proposalsView, proposalTotals, subscribeProposals } from '../../utils/r
 import { PROPOSAL_COUNT, type Proposal } from '../../utils/rpg/proposalScript';
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import type { Lang } from '../../utils/rpg/quest';
-import { translations } from './translations';
+import { ui } from './ui';
 
 interface Props {
   lang: Lang;
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export default function WorldProposals({ lang, disabled, onPick, onRefresh }: Props) {
-  const t = translations[lang];
+  const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
   if (v.lang !== lang) return null;
   const busy = v.writing || v.drawing > 0;

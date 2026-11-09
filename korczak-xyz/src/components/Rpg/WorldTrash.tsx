@@ -8,7 +8,8 @@
 import { useState } from 'react';
 import type { Lang } from '../../utils/rpg/quest';
 import type { LibraryEntry } from '../../utils/rpg/worldSave';
-import { translations } from './translations';
+import { ui } from './ui';
+import { localeOf } from '../../utils/rpg/language';
 
 export default function WorldTrash({
   lang,
@@ -26,10 +27,10 @@ export default function WorldTrash({
   onSweep: () => void;
   onBack: () => void;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const [asking, setAsking] = useState(false);
   const date = (at: number) =>
-    new Date(at).toLocaleDateString(lang === 'pl' ? 'pl-PL' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(at).toLocaleDateString(localeOf(lang), { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <div className="rpg-library rpg-trash">

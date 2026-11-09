@@ -17,6 +17,7 @@ import { DesignRefused, DESIGN_MODEL, designVoice, findDesigned, previewText, ty
 import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing as voicingOf } from './audioTags';
 import { voiceCreditsPerChar } from './cost';
 import type { Lang } from './quest';
+import { normLang } from './language';
 
 /** Flash for every line without an audio tag; a tagged line goes to `TAG_MODEL` (`audioTags.ts`). */
 export const VOICE_MODEL = FLASH_MODEL;
@@ -103,7 +104,7 @@ export function prefetchVoices(lang: Lang): void {
 }
 
 async function servedList(url: string): Promise<SharedVoice[] | null> {
-  const lang: Lang = new URL(url).searchParams.get('language') === 'pl' ? 'pl' : 'en';
+  const lang: Lang = normLang(new URL(url).searchParams.get('language'));
   const lists = served.get(lang);
   if (!lists) return null;
   try {

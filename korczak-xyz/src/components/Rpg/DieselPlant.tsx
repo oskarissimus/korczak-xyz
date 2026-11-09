@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CANISTERS, formatLitres, plantState, type Canister } from '../../utils/rpg/diesel';
 import type { Lang } from '../../utils/rpg/quest';
-import { translations } from './translations';
+import { ui } from './ui';
 
 /** How long the man takes: walk in, pour, walk out. Matches `rpg-dz-walk` in rpg.css. */
 const REFUEL_MS = 3600;
@@ -46,7 +46,7 @@ export function DieselBadge({
   capacity: number;
   onClick?: () => void;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const empty = plantState(litres) === 'stopped';
   const body = (
     <>
@@ -86,7 +86,7 @@ export default function DieselPlant({
   /** An admin's canister is poured for real and for free (`/wallet/refuel`); resolves whether it was. */
   onRefuel?: (c: Canister) => Promise<boolean>;
 }) {
-  const t = translations[lang];
+  const t = ui(lang);
   const real = plantState(litres);
   const [phase, setPhase] = useState<Phase>(real);
   const [preview, setPreview] = useState<Canister | null>(null);

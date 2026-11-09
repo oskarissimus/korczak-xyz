@@ -23,6 +23,7 @@ import { labSources, type LabSource, type LabWorld } from '../../utils/rpg/labSo
 import { addLabVariant, addOwnSource, labPicture, labPictures, labSpent, labVariants, ownSources, removeLabVariant, restoreLabVariant, restoreSource, setLabPicture, sweepLab, trashedSources, trashedVariants, trashSource, type LabPose, type LabVariant } from '../../utils/rpg/labStore';
 import { cleanSlateAt } from '../../utils/rpg/cloud';
 import type { Lang } from '../../utils/rpg/quest';
+import { base } from '../../utils/rpg/language';
 import { PERSON_HEIGHT } from '../Rpg/people';
 import { LabStage, REST, type ModelStats, type StageItem, type StageRig } from './labScene';
 import { accountWorlds, localWorlds, mergeWorlds } from './loadWorlds';
@@ -66,7 +67,7 @@ function ownPrompt(describe: string, gender: 'male' | 'female'): string {
 }
 
 export default function ModelLab({ lang }: { lang: Lang }) {
-  const t = strings[lang];
+  const t = strings[base(lang)];
   const auth = useAuth();
   const account = useAccountKeys(auth.user);
   // Handles, not keys, for a signed-in reader (`useAccountKeys`): every request goes through the server (`utils/rpg/gateway.ts`).

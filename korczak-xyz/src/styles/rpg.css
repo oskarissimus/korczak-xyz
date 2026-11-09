@@ -459,9 +459,19 @@
 
 .rpg-lang {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   margin: 4px 0;
+}
+
+.rpg-lang select {
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #6b5b3e;
+  background: #1c160d;
+  color: #e6dcc6;
+  font: inherit;
 }
 
 .rpg-lang button {
@@ -473,10 +483,8 @@
   cursor: pointer;
 }
 
-.rpg-lang button.rpg-lang-on {
-  border-color: #ffd36b;
-  color: #ffd36b;
-  background: #3a2c18;
+.rpg-lang-note {
+  opacity: 0.75;
 }
 
 ul.rpg-source {

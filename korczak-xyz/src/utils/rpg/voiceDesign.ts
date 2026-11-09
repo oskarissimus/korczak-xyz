@@ -36,6 +36,7 @@
 
 import { spokenText } from './audioTags';
 import type { Lang } from './quest';
+import { languageName } from './language';
 
 export const DESIGN_MODEL = 'eleven_multilingual_ttv_v2';
 const PREFIX = 'rpg · ';
@@ -85,7 +86,7 @@ function withoutEffects(d: string): string {
 
 /** The description as ElevenLabs' guide asks it to begin: the language first. */
 export function description(who: DesignWho, lang: Lang): string {
-  const native = lang === 'pl' ? 'Native Polish.' : 'Native English.';
+  const native = `Native ${languageName(lang)}.`;
   let d = withoutEffects(who.voice.trim().replace(/\s+/g, ' '));
   if (!/^native\b/i.test(d)) d = `${native} ${d}`;
   if (!/[.!?]$/.test(d)) d = `${d}.`;

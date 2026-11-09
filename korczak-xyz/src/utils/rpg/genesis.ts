@@ -46,6 +46,7 @@
 
 import type { Lang } from './quest';
 import { RELIEFS, type Relief } from './terrain';
+import { languageName, normLang } from './language';
 
 /** A world's colours, light, air, water and growth: what `RpgScene.applyWorld` draws. */
 export interface WorldLook {
@@ -494,7 +495,7 @@ export function franchised(text: string): boolean {
 
 /** The prompt for a new world. Everything the model may choose, and everything it may not, is in it. */
 export function genesisPrompt(ctx: GenesisContext): string {
-  const language = ctx.lang === 'pl' ? 'Polish' : 'English';
+  const language = languageName(ctx.lang);
   const exotic = clampExotic(ctx.exotic);
   const lines =
     askedFor(ctx)
@@ -1070,7 +1071,7 @@ export function demoGenesis(value: unknown): GenesisContext {
   const strings = (v: unknown, n: number, max: number) =>
     Array.isArray(v) ? v.slice(0, n).map((s) => cut(s, max).trim()).filter(Boolean) : [];
   return {
-    lang: r.lang === 'pl' ? 'pl' : 'en',
+    lang: normLang(r.lang),
     seeds: strings(r.seeds, CHOSEN_MAX, 80),
     avoid: strings(r.avoid, 8, 200),
     exotic: clampExotic(r.exotic),

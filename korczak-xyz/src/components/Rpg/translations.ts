@@ -1,6 +1,10 @@
 import type { RpgDemoReason } from '../../utils/rpg/demoLimits';
-import type { FundsProvider } from '../../utils/rpg/funds';
-import type { QuestSource } from '../../utils/rpg/storyteller';
+
+// Written out rather than imported from `funds.ts` and `storyteller.ts`: the server translates this
+// table (`functions/src/rpg/ui.ts`), and those modules reach the browser's own (`import.meta.env`).
+// The compiler still checks them against the originals wherever the game passes one in.
+type FundsProvider = 'fal' | 'elevenlabs' | 'google' | 'openai';
+type QuestSource = 'google' | 'openai' | 'demo' | 'static';
 
 const en = {
   title: 'Every RPG',
@@ -39,7 +43,13 @@ const en = {
   progressMusicTitle: 'Composing the music',
   progressFailed: (n: number) => `${n} failed`,
   staticQuest: 'Story: no Google or OpenAI key, so the hand-written quest.',
-  aiQuest: (source: QuestSource) => `Story: written by ${source === 'google' ? 'Google (Gemini/Gemma)' : 'OpenAI'} on your key.`,
+  // A function whose words change with an argument reads them off the table through `this`, so a
+  // translated table (`uiTranslate.ts`) gives its own words for each branch.
+  aiQuest(source: QuestSource): string {
+    return source === 'google' ? this.aiQuestGoogle : this.aiQuestOpenai;
+  },
+  aiQuestGoogle: 'Story: written by Google (Gemini/Gemma) on your key.',
+  aiQuestOpenai: 'Story: written by OpenAI on your key.',
   addKey: 'Keys are set on your account page.',
   readingKeys: 'Reading your API keys from the account…',
   voiceOn: 'Voice: ElevenLabs, on your key.',
@@ -47,12 +57,12 @@ const en = {
   demoQuest: (left: string, cap: string) =>
     `Story: written by Gemini on the demo, no key or account needed. ${left} of today's ${cap} of diesel left for you.`,
   demoVoice: 'Voice: ElevenLabs, on the demo.',
-  demoClosed: (reason: RpgDemoReason): string =>
-    reason === 'ip-cap'
-      ? "Today's demo budget for you is spent; it comes back at midnight (Warsaw)."
-      : reason === 'all-cap'
-        ? "Today's demo budget for everybody is spent; it comes back at midnight (Warsaw)."
-        : 'The demo is closed right now.',
+  demoClosed(reason: RpgDemoReason): string {
+    return reason === 'ip-cap' ? this.demoClosedIp : reason === 'all-cap' ? this.demoClosedAll : this.demoClosedOff;
+  },
+  demoClosedIp: "Today's demo budget for you is spent; it comes back at midnight (Warsaw).",
+  demoClosedAll: "Today's demo budget for everybody is spent; it comes back at midnight (Warsaw).",
+  demoClosedOff: 'The demo is closed right now.',
   ownKey: 'With your own key there is no limit: keys are set on your account page.',
   dieselLeft: (amount: string) => `${amount} of diesel in the tank`,
   dieselOpen: 'The generator and the diesel',
@@ -78,17 +88,20 @@ const en = {
   dieselOutWhat: 'Your tank is empty, so the game cannot ask the models on its keys any more. Keys of your own on the account page play without diesel.',
   voiceFailed: 'ElevenLabs did not answer, the line is text only.',
   fundsTitle: (name: string) => `${name}: out of money`,
-  fundsWhat: (p: FundsProvider): string =>
-    p === 'fal'
-      ? 'No more 3D models or pictures this sitting; the game goes on with the built-in ones.'
-      : p === 'elevenlabs'
-        ? 'No more voices or music this sitting; the game goes on as text.'
-        : 'The story cannot be written on this key until it is topped up.',
+  fundsWhat(p: FundsProvider): string {
+    return p === 'fal' ? this.fundsWhatFal : p === 'elevenlabs' ? this.fundsWhatVoice : this.fundsWhatStory;
+  },
+  fundsWhatFal: 'No more 3D models or pictures this sitting; the game goes on with the built-in ones.',
+  fundsWhatVoice: 'No more voices or music this sitting; the game goes on as text.',
+  fundsWhatStory: 'The story cannot be written on this key until it is topped up.',
   fundsTopUp: 'Top up',
   fundsThenReload: 'then reload the page.',
   fundsRefused: (n: number) => (n > 1 ? `${n} requests refused` : 'request refused'),
   fundsHide: 'Hide',
   language: 'Language',
+  languageTranslating: 'Translating the menus into this language… they are in English until then.',
+  languageBrowser: (name: string) => `Your browser’s language: ${name}`,
+  languageHint: 'The story, the dialogue and the voices are written in this language. Kept in this browser and on your account.',
   mute: 'Mute the voice',
   unmute: 'Turn the voice on',
   musicLine: 'ElevenLabs music',
@@ -280,7 +293,12 @@ const en = {
   finishWorld: (seeds: string) => `🎲 Finish the world being born (${seeds})`,
   newWorldHint: 'A new world starts over: its places, people and chronicle are its own.',
   exoticLabel: (band: string) => `Next world: ${band}`,
-  exoticBand: (n: number): string => (n < 34 ? 'a classic RPG' : n < 67 ? 'a familiar genre with a twist' : 'exotic, anything goes'),
+  exoticBand(n: number): string {
+    return n < 34 ? this.exoticClassic : n < 67 ? this.exoticTwist : this.exoticAnything;
+  },
+  exoticClassic: 'a classic RPG',
+  exoticTwist: 'a familiar genre with a twist',
+  exoticAnything: 'exotic, anything goes',
   exoticLeft: 'classic',
   exoticRight: 'exotic',
   creatingWorld: 'A world is being born…',
@@ -382,7 +400,11 @@ const pl: typeof en = {
   progressMusicTitle: 'Komponuję muzykę',
   progressFailed: (n) => `${n} nie wyszło`,
   staticQuest: 'Fabuła: brak klucza Google ani OpenAI, więc quest napisany ręcznie.',
-  aiQuest: (source) => `Fabuła: pisze ${source === 'google' ? 'Google (Gemini/Gemma)' : 'OpenAI'} na Twoim kluczu.`,
+  aiQuest(source: QuestSource): string {
+    return source === 'google' ? this.aiQuestGoogle : this.aiQuestOpenai;
+  },
+  aiQuestGoogle: 'Fabuła: pisze Google (Gemini/Gemma) na Twoim kluczu.',
+  aiQuestOpenai: 'Fabuła: pisze OpenAI na Twoim kluczu.',
   addKey: 'Klucze ustawiasz na stronie konta.',
   readingKeys: 'Pobieram klucze API z konta…',
   voiceOn: 'Głos: ElevenLabs, na Twoim kluczu.',
@@ -390,12 +412,12 @@ const pl: typeof en = {
   demoQuest: (left, cap) =>
     `Fabuła: pisze Gemini w trybie demo, bez klucza i bez konta. Zostało Ci ${left} z dzisiejszych ${cap} dizla.`,
   demoVoice: 'Głos: ElevenLabs, w trybie demo.',
-  demoClosed: (reason) =>
-    reason === 'ip-cap'
-      ? 'Twój dzisiejszy budżet demo się skończył; wraca o północy.'
-      : reason === 'all-cap'
-        ? 'Dzisiejszy budżet demo dla wszystkich się skończył; wraca o północy.'
-        : 'Tryb demo jest teraz wyłączony.',
+  demoClosed(reason: RpgDemoReason): string {
+    return reason === 'ip-cap' ? this.demoClosedIp : reason === 'all-cap' ? this.demoClosedAll : this.demoClosedOff;
+  },
+  demoClosedIp: 'Twój dzisiejszy budżet demo się skończył; wraca o północy.',
+  demoClosedAll: 'Dzisiejszy budżet demo dla wszystkich się skończył; wraca o północy.',
+  demoClosedOff: 'Tryb demo jest teraz wyłączony.',
   ownKey: 'Z własnym kluczem nie ma limitu: klucze ustawiasz na stronie konta.',
   dieselLeft: (amount) => `${amount} dizla w baku`,
   dieselOpen: 'Generator i dizel',
@@ -421,18 +443,21 @@ const pl: typeof en = {
   dieselOutWhat: 'Bak jest pusty, więc gra nie może już pytać modeli na swoich kluczach. Z własnymi kluczami na stronie konta grasz bez dizla.',
   voiceFailed: 'ElevenLabs nie odpowiedział, kwestia jest tylko tekstem.',
   fundsTitle: (name: string) => `${name}: skończyły się środki`,
-  fundsWhat: (p: FundsProvider): string =>
-    p === 'fal'
-      ? 'Do końca tego posiedzenia bez nowych modeli 3D i obrazów; gra idzie dalej na wbudowanych.'
-      : p === 'elevenlabs'
-        ? 'Do końca tego posiedzenia bez głosów i muzyki; gra idzie dalej jako tekst.'
-        : 'Na tym kluczu nie da się pisać opowieści, dopóki konto nie zostanie doładowane.',
+  fundsWhat(p: FundsProvider): string {
+    return p === 'fal' ? this.fundsWhatFal : p === 'elevenlabs' ? this.fundsWhatVoice : this.fundsWhatStory;
+  },
+  fundsWhatFal: 'Do końca tego posiedzenia bez nowych modeli 3D i obrazów; gra idzie dalej na wbudowanych.',
+  fundsWhatVoice: 'Do końca tego posiedzenia bez głosów i muzyki; gra idzie dalej jako tekst.',
+  fundsWhatStory: 'Na tym kluczu nie da się pisać opowieści, dopóki konto nie zostanie doładowane.',
   fundsTopUp: 'Doładuj',
   fundsThenReload: 'potem odśwież stronę.',
   fundsRefused: (n: number) =>
     n === 1 ? 'odrzucono zapytanie' : `odrzucono ${n} ${n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'zapytania' : 'zapytań'}`,
   fundsHide: 'Ukryj',
   language: 'Język',
+  languageTranslating: 'Tłumaczę menu na ten język… do tego czasu jest po angielsku.',
+  languageBrowser: (name) => `Język Twojej przeglądarki: ${name}`,
+  languageHint: 'W tym języku powstaje fabuła, dialogi i głosy. Zapamiętany w tej przeglądarce i na Twoim koncie.',
   mute: 'Wycisz głos',
   unmute: 'Włącz głos',
   musicLine: 'ElevenLabs muzyka',
@@ -624,7 +649,12 @@ const pl: typeof en = {
   finishWorld: (seeds) => `🎲 Dokończ rodzący się świat (${seeds})`,
   newWorldHint: 'Nowy świat zaczyna od zera: jego miejsca, ludzie i kronika są tylko jego.',
   exoticLabel: (band) => `Następny świat: ${band}`,
-  exoticBand: (n) => (n < 34 ? 'klasyczne RPG' : n < 67 ? 'znany gatunek z twistem' : 'egzotyczny, wszystko możliwe'),
+  exoticBand(n: number): string {
+    return n < 34 ? this.exoticClassic : n < 67 ? this.exoticTwist : this.exoticAnything;
+  },
+  exoticClassic: 'klasyczne RPG',
+  exoticTwist: 'znany gatunek z twistem',
+  exoticAnything: 'egzotyczny, wszystko możliwe',
   exoticLeft: 'klasyka',
   exoticRight: 'egzotyka',
   creatingWorld: 'Rodzi się świat…',
