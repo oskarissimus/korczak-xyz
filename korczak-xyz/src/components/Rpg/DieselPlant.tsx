@@ -73,12 +73,15 @@ export default function DieselPlant({
   litres,
   capacity,
   showCanisters = false,
+  tank = false,
 }: {
   lang: Lang;
   litres: number;
   capacity: number;
   /** Show the canisters even with fuel in the tank (the panel opened from the badge). */
   showCanisters?: boolean;
+  /** The account's own tank (`wallet.ts`) rather than the demo's day: nothing comes at midnight. */
+  tank?: boolean;
 }) {
   const t = translations[lang];
   const real = plantState(litres);
@@ -203,7 +206,9 @@ export default function DieselPlant({
             ? t.dieselRefuel
             : on
               ? t.dieselLeft(formatLitres(litres, lang))
-              : t.dieselEmpty}
+              : tank
+                ? t.dieselTankEmpty
+                : t.dieselEmpty}
       </p>
       {canisters && (
         <>
@@ -217,7 +222,7 @@ export default function DieselPlant({
               </button>
             ))}
           </div>
-          <p className="rpg-dz-note">{t.dieselSoon}</p>
+          <p className="rpg-dz-note">{tank ? t.dieselTankSoon : t.dieselSoon}</p>
         </>
       )}
     </div>

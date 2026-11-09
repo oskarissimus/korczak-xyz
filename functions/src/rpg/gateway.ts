@@ -72,7 +72,17 @@ import { dayKey } from '../demo/limits';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
-import { AdminRefusal, handleAdmin } from './admin';
+import { AdminRefusal, handleAdmin, readServerKeys } from './admin';
+import { reserveDiesel, settleDiesel, walletStatus } from './wallet';
+import {
+  DIESEL_KEYS,
+  NO_DIESEL,
+  WALLET_PATH,
+  dieselReservation,
+  dieselRoute,
+  isFollowUp,
+  type DieselKey,
+} from '../../../korczak-xyz/src/utils/rpg/wallet';
 import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
@@ -121,7 +131,10 @@ export interface Payer {
   key: string;
   /** Whose ledger it goes in; null for a signed-out reader's own key. */
   uid: string | null;
-  kind: 'account' | 'byok';
+  /** `diesel`: the server's key, paid out of `uid`'s tank (`wallet.ts`). */
+  kind: 'account' | 'byok' | 'diesel';
+  /** What was taken out of the tank before the request, settled after it. */
+  reservedUsd?: number;
 }
 
 async function uidOf(req: Request): Promise<string | null> {
@@ -170,8 +183,45 @@ export async function payer(
   }
   const own = req.headers[BYOK_HEADER];
   if (typeof own === 'string' && own.trim() && own.trim() !== ACCOUNT_KEY) return { key: own.trim(), uid, kind: 'byok' };
-  // Prepaid credits are this branch: the owner's key, reserved and settled against `uid`'s balance.
+  // Diesel is the next branch (`dieselPayer`), for a signed-in reader on the game's own routes.
   throw new GatewayRefusal(402, 'no-credits', `${NO_CREDITS} (no ${keyName} key on this account)`);
+}
+
+/**
+ * A signed-in reader with no key of their own for this provider, on one of the game's own requests:
+ * the server's key from the admin panel, with the request's worst case taken out of their diesel
+ * tank first (`wallet.ts`). Null when diesel cannot pay at all (signed out, another app's request,
+ * no server key) — the caller then refuses as before. An empty tank is a 402 in words `funds.ts`
+ * reads as no money, with `no-diesel` in them so the game says diesel and not the provider.
+ */
+export async function dieselPayer(req: Request, target: GatewayTarget, body: Buffer | undefined): Promise<Payer | null> {
+  if (req.headers[KEEP_HEADER] !== '1' || !dieselRoute(target, req.method)) return null;
+  const name = target.key as DieselKey;
+  if (!(DIESEL_KEYS as readonly string[]).includes(name)) return null;
+  const uid = await uidOf(req);
+  if (!uid) return null;
+  const key = (await cachedServerKeys())[name];
+  if (!key) return null;
+  const free = isFollowUp(target, req.method);
+  const reservedUsd = free ? 0 : dieselReservation(target, req.method, jsonOf(body), body?.length ?? 0);
+  const r = await reserveDiesel(uid, reservedUsd, free);
+  if (!r.ok) {
+    throw new GatewayRefusal(
+      402,
+      NO_DIESEL,
+      `${NO_CREDITS} (${NO_DIESEL}: ${Math.round(r.balanceUsd * 1000) / 10} L left, this request may take up to ${Math.round(reservedUsd * 1000) / 10} L)`,
+    );
+  }
+  return { key, uid, kind: 'diesel', reservedUsd };
+}
+
+/** The server's keys, kept a minute per instance like an account's (a fal.ai job is polled every two seconds). */
+let serverKeysCache: { at: number; keys: Awaited<ReturnType<typeof readServerKeys>> } | null = null;
+async function cachedServerKeys() {
+  if (serverKeysCache && Date.now() - serverKeysCache.at < KEYS_MS) return serverKeysCache.keys;
+  const keys = await readServerKeys();
+  serverKeysCache = { at: Date.now(), keys };
+  return keys;
 }
 
 /**
@@ -382,14 +432,14 @@ async function pass(
   query: string,
   who: Payer,
   extraHeaders: Record<string, string> = {},
-): Promise<void> {
+): Promise<number | null> {
   const body = bodyOf(req);
   const json = jsonOf(body);
   const header = (name: string) => (typeof req.headers[name] === 'string' ? (req.headers[name] as string) : null);
   // The RPG's kept assets (`assets.ts`): a request made before is answered from the bucket, for nothing.
-  if (await serveReusedQueue(who.uid, target, req.method, res)) return;
+  if (await serveReusedQueue(who.uid, target, req.method, res)) return 0;
   const assets: AssetContext | null = await assetContext(who.uid, target, req.method, json, query, header, who.kind);
-  if (assets && (await serveReused(assets, res))) return;
+  if (assets && (await serveReused(assets, res))) return 0;
   const headers: Record<string, string> = {};
   for (const h of FORWARDED_HEADERS) {
     const v = req.headers[h];
@@ -416,7 +466,8 @@ async function pass(
   }
   if (!upstream.ok || !upstream.body) {
     res.send(Buffer.from(await upstream.arrayBuffer()));
-    return;
+    // A refusal costs nothing (Google's, ElevenLabs'); an empty 200 has nothing to price either.
+    return upstream.ok ? null : 0;
   }
 
   const spend = (usd: number | null, model: string): Spend => ({
@@ -450,7 +501,7 @@ async function pass(
     await record(who.uid, spend(usd, meter.model));
     res.write(`\n${COST_EVENT}${JSON.stringify({ usd, model: meter.model })}\n\n`);
     res.end();
-    return;
+    return usd;
   }
 
   if (type.includes('json')) {
@@ -470,7 +521,7 @@ async function pass(
     const kept = assets ? await keepJson(assets, bytes, usd) : null;
     if (kept?.assetId) res.set(ASSET_HEADER, kept.assetId);
     res.send(kept?.bytes ?? bytes);
-    return;
+    return usd;
   }
 
   // Audio, or anything else priced before it was asked: said in the header, then streamed through.
@@ -488,6 +539,33 @@ async function pass(
   // Kept before the end, while the request still holds the instance's CPU (`assets.ts`).
   if (assets) await keepAudio(assets, Buffer.concat(chunks), type, upfront);
   res.end();
+  return upfront;
+}
+
+/**
+ * `pass`, settling the tank after it: what the request cost is spent, the rest of the reservation
+ * goes back. A request that failed before anything was sent back cost nothing and is refunded whole;
+ * one cut mid-answer keeps its reservation, as the demo's does.
+ */
+async function passOnDiesel(req: Request, res: Response, target: GatewayTarget, query: string, who: Payer): Promise<void> {
+  const reserved = who.reservedUsd ?? 0;
+  let spent: number | null = null;
+  try {
+    spent = await pass(req, res, target, query, who);
+  } catch (e) {
+    spent = res.headersSent ? null : 0;
+    throw e;
+  } finally {
+    if (who.uid && reserved > 0) await settleDiesel(who.uid, reserved, spent).catch((e) => reportError('rpgApi.diesel', e, { provider: target.provider }));
+  }
+}
+
+/** `/wallet`: the reader's tank, granting the first one; signed in only. */
+async function wallet(req: Request, res: Response): Promise<void> {
+  const uid = await uidOf(req);
+  if (!uid) throw new GatewayRefusal(401, 'auth', 'rpg wallet: sign in first');
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json(await walletStatus(uid));
 }
 
 export async function handleRpgApi(req: Request, res: Response): Promise<void> {
@@ -552,9 +630,9 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     }
     return;
   }
-  if ((path === ACCOUNT_STATUS_PATH && req.method === 'GET') || (path === LIVE_TOKEN_PATH && req.method === 'POST')) {
+  if ((path === ACCOUNT_STATUS_PATH && req.method === 'GET') || (path === LIVE_TOKEN_PATH && req.method === 'POST') || (path === WALLET_PATH && req.method === 'GET')) {
     try {
-      await (path === ACCOUNT_STATUS_PATH ? accountStatus(req, res) : liveToken(req, res));
+      await (path === ACCOUNT_STATUS_PATH ? accountStatus(req, res) : path === WALLET_PATH ? wallet(req, res) : liveToken(req, res));
     } catch (e) {
       if (e instanceof GatewayRefusal) {
         res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
@@ -576,7 +654,16 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
       const { headers, who } = await audioGuideKeys(req);
       await pass(req, res, target, query, who, headers);
     } else {
-      await pass(req, res, target, query, await payer(req, target.key));
+      let who: Payer;
+      try {
+        who = await payer(req, target.key);
+      } catch (e) {
+        const diesel = e instanceof GatewayRefusal && e.reason === 'no-credits' ? await dieselPayer(req, target, bodyOf(req)) : null;
+        if (!diesel) throw e;
+        who = diesel;
+      }
+      if (who.kind !== 'diesel') await pass(req, res, target, query, who);
+      else await passOnDiesel(req, res, target, query, who);
     }
   } catch (e) {
     if (e instanceof GatewayRefusal) {

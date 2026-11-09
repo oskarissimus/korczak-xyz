@@ -14,7 +14,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
-import { setGatewayContext } from '../../utils/rpg/gateway';
+import { ACCOUNT_KEY, setGatewayContext } from '../../utils/rpg/gateway';
+import { useDieselWallet } from '../../hooks/useDieselWallet';
+import { fuelKeys } from '../../utils/rpg/wallet';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
@@ -185,7 +187,7 @@ const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creat
 const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { translations } from './translations';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
-import { beatLitres, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
+import { beatLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
   speaker: string;
@@ -363,7 +365,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // `useAccountKeys` hands over are handles — the account's keys never reach the page — and the
   // server reads the key itself; the page sends only the reader's ID token. Signed out, the key in
   // this browser goes with each request, the reader's own and kept nowhere.
-  const apiKeys = account.keys;
+  // A signed-in reader with no story key of their own plays on the server's keys, paid out of their
+  // diesel tank (`wallet.ts`, `useDieselWallet`): the keys they lack become the account's handle, and
+  // the gateway pays each request from the tank. Their own keys stay theirs and cost no diesel. An
+  // empty tank hands back only their own keys — the hand-written quest, not the demo: signed in,
+  // diesel is the gate (owner, 9 Nov 2026).
+  const wallet = useDieselWallet(auth.user);
+  const onDiesel = Boolean(
+    auth.user && wallet && (wallet.server.google || wallet.server.openai) && !account.keys.google && !account.keys.openai,
+  );
+  const fueled = onDiesel && litres(wallet!.balanceUsd) >= EMPTY_LITRES;
+  const apiKeys = useMemo(
+    () => (fueled ? fuelKeys(account.keys, wallet!.server, ACCOUNT_KEY) : account.keys),
+    [fueled, account.keys, wallet],
+  );
   // What the server's ledger counts each request under: this world, and this quest once there is one.
   setGatewayContext(() => ({ world: worldRef.current?.createdAt ? worldRef.current.id : null, quest: questIdRef.current }));
   const ownStory = Boolean(apiKeys.google || apiKeys.openai);
@@ -375,7 +390,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     ? 'google'
     : apiKeys.openai
       ? 'openai'
-      : demo?.available
+      : demo?.available && !onDiesel
         ? 'demo'
         : 'static';
   const voiceKey = apiKeys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
@@ -2850,11 +2865,13 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   );
   // The demo's budget for today, said in litres of diesel (`DieselPlant.tsx`, `diesel.ts`).
   // A spent cap closes the demo (`available: false`), which is exactly when the dark plant must show.
-  const diesel =
-    demo && (storyProvider === 'demo' || (storyProvider === 'static' && (demo.reason === 'ip-cap' || demo.reason === 'all-cap')))
-      ? { litres: litres(Math.min(demo.remaining.ip, demo.remaining.all)), capacity: litres(demo.perIpUsd) }
+  // Signed in on the server's keys, it is the account's own tank instead (`wallet.ts`).
+  const diesel = onDiesel
+    ? { litres: litres(wallet!.balanceUsd), capacity: litres(Math.max(wallet!.grantUsd, wallet!.balanceUsd)), tank: true }
+    : demo && (storyProvider === 'demo' || (storyProvider === 'static' && (demo.reason === 'ip-cap' || demo.reason === 'all-cap')))
+      ? { litres: litres(Math.min(demo.remaining.ip, demo.remaining.all)), capacity: litres(demo.perIpUsd), tank: false }
       : null;
-  const dieselModel = modelChain('demo', chosenModel)[0] ?? null;
+  const dieselModel = modelChain(onDiesel ? (wallet!.server.google ? 'google' : 'openai') : 'demo', chosenModel)[0] ?? null;
   const dieselPrices =
     diesel && dieselModel
       ? t.dieselPrices(
@@ -3043,14 +3060,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {keysReady ? (
         <ul className="rpg-source">
           <li>
-            {storyProvider === 'static'
+            {onDiesel && fueled
+              ? t.dieselQuest(formatLitres(diesel?.litres ?? 0, gameLang))
+              : onDiesel
+                ? t.dieselTankEmpty
+                : storyProvider === 'static'
               ? t.staticQuest
               : storyProvider === 'demo' && demo
                 ? t.demoQuest(formatLitres(diesel?.litres ?? 0, gameLang), formatLitres(diesel?.capacity ?? 0, gameLang))
                 : t.aiQuest(storyProvider)}
           </li>
           {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
-          <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
+          <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !account.keys.elevenLabs ? t.dieselVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
           {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
             <li>
               <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
@@ -3120,7 +3141,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselMenu = diesel && (
     <div className="rpg-panel">
       <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} showCanisters />
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <div className="rpg-panel-actions">{back}</div>
@@ -3404,7 +3425,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                   )}
                   {diesel &&
                     (plantState(diesel.litres) === 'stopped' ? (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} />
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} />
                     ) : (
                       <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
                     ))}
@@ -3426,7 +3447,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
-          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} />}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>
@@ -3549,6 +3570,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           tasks={progressTasks}
           quest={questView}
           remake={remakeOffer}
+          tankLitres={diesel?.litres ?? null}
           onClose={() => setDevOpen(false)}
           scene={sceneRef.current}
           badge={fpsBadge}

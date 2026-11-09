@@ -43,11 +43,26 @@ const translations = {
     noKey: 'not set',
     set: 'set',
     used: {
-      google: 'the demo’s story (Gemini)',
-      elevenLabs: 'the demo’s voices',
-      fal: 'kept for later: pictures and models',
-      openai: 'kept for later',
+      google: 'the story (Gemini), on the demo and on diesel',
+      elevenLabs: 'the voices and the score, on the demo and on diesel',
+      fal: 'pictures and 3D models, on diesel',
+      openai: 'the story when there is no Google key, on diesel',
     } as Record<ServerKeyName, string>,
+    test: 'Test the keys',
+    testing: 'Testing…',
+    testBlurb: 'Each key makes one real, tiny paid request (a fraction of a cent in all), so an account without money shows up too.',
+    testCost: (usd: string) => `the test cost ${usd}`,
+    dieselTitle: 'Diesel',
+    dieselBlurb:
+      'A signed-in player with no story key of their own plays on the server keys, paid out of their diesel tank ' +
+      '(1 L = 1 cent at list price). Every request reserves its worst case first and is settled at what it cost, ' +
+      'so a tank cannot go below zero. Their own keys cost no diesel.',
+    grant: 'Litres a new account starts with',
+    topUpTitle: 'Top up an account',
+    topUpEmail: 'E-mail the account signed up with',
+    topUpLitres: 'Litres to add',
+    topUp: 'Pour in',
+    toppedUp: (email: string, litres: string) => `${email} now has ${litres}.`,
     updated: 'Last changed',
     demoTitle: 'Demo',
     demoBlurb:
@@ -85,11 +100,26 @@ const translations = {
     noKey: 'brak',
     set: 'ustawiony',
     used: {
-      google: 'fabuła w demie (Gemini)',
-      elevenLabs: 'głosy w demie',
-      fal: 'na później: obrazy i modele',
-      openai: 'na później',
+      google: 'fabuła (Gemini), w demie i na dizlu',
+      elevenLabs: 'głosy i muzyka, w demie i na dizlu',
+      fal: 'obrazy i modele 3D, na dizlu',
+      openai: 'fabuła, gdy nie ma klucza Google, na dizlu',
     } as Record<ServerKeyName, string>,
+    test: 'Sprawdź klucze',
+    testing: 'Sprawdzam…',
+    testBlurb: 'Każdy klucz robi jedno prawdziwe, malutkie płatne wywołanie (razem ułamek centa), więc wyjdzie też konto bez środków.',
+    testCost: (usd: string) => `test kosztował ${usd}`,
+    dieselTitle: 'Dizel',
+    dieselBlurb:
+      'Zalogowany gracz bez własnego klucza do fabuły gra na kluczach serwera i płaci dizlem z baku ' +
+      '(1 L = 1 cent według cennika). Każde wywołanie najpierw rezerwuje najgorszy przypadek, a potem rozlicza ' +
+      'to, co naprawdę kosztowało, więc bak nie zejdzie poniżej zera. Własne klucze gracza nie kosztują dizla.',
+    grant: 'Litrów na start dla nowego konta',
+    topUpTitle: 'Dolej dizla na konto',
+    topUpEmail: 'E-mail, którym konto się zarejestrowało',
+    topUpLitres: 'Ile litrów dolać',
+    topUp: 'Dolej',
+    toppedUp: (email: string, litres: string) => `${email} ma teraz ${litres}.`,
     updated: 'Ostatnia zmiana',
     demoTitle: 'Demo',
     demoBlurb:
@@ -209,6 +239,7 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
         <>
           <KeysSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'keys'} save={save} />
           <DemoSection status={status} t={t} busy={busy} saved={savedAt === 'demo'} save={save} />
+          <DieselSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'diesel'} save={save} />
         </>
       )}
     </div>
@@ -226,6 +257,7 @@ interface SectionProps {
 function KeysSection({ status, t, lang, busy, saved, save }: SectionProps & { lang: Lang }) {
   const [drafts, setDrafts] = useState(EMPTY_DRAFTS);
   const [visible, setVisible] = useState(false);
+  const [testing, setTesting] = useState(false);
   const changed = SERVER_KEY_NAMES.filter((n) => drafts[n].trim());
 
   const submit = async () => {
@@ -293,9 +325,102 @@ function KeysSection({ status, t, lang, busy, saved, save }: SectionProps & { la
           {t.updated}: {new Date(status.keysUpdatedAt).toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-GB')}
         </p>
       )}
+      <p className="acct-dim">{t.testBlurb}</p>
+      <p>
+        <button
+          type="button"
+          className="retro-btn"
+          disabled={busy || testing}
+          onClick={async () => {
+            setTesting(true);
+            await save('test', { testKeys: true });
+            setTesting(false);
+          }}
+        >
+          {testing ? t.testing : t.test}
+        </button>
+      </p>
+      {status.keyTests && (
+        <ul className="acct-dim">
+          {SERVER_KEY_NAMES.map((name) => {
+            const r = status.keyTests![name];
+            return (
+              <li key={name} className={r.ok ? undefined : 'acct-warn'}>
+                {r.ok ? '✓' : '✗'} <strong>{LABELS[name]}</strong>
+                {r.status ? ` (${r.status})` : ''}: {r.note}
+                {r.usd > 0 ? ` · ${t.testCost(`$${r.usd.toFixed(4)}`)}` : ''}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }
+
+function DieselSection({ status, t, lang, busy, saved, save }: SectionProps & { lang: Lang }) {
+  const [grant, setGrant] = useState(String(Math.round(status.diesel.grantUsd * 100)));
+  const [email, setEmail] = useState('');
+  const [add, setAdd] = useState('100');
+  useEffect(() => setGrant(String(Math.round(status.diesel.grantUsd * 100))), [status.diesel.grantUsd]);
+  const litresOf = (usd: number) => `${Math.round(usd * 100).toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-GB')} L`;
+
+  return (
+    <section className="acct-section">
+      <h2 className="acct-heading">⛽ {t.dieselTitle}</h2>
+      <p className="acct-dim">{t.dieselBlurb}</p>
+      <div className="acct-field">
+        <label>{t.grant}</label>
+        <div className="acct-field-row">
+          <input
+            type="number"
+            aria-label={t.grant}
+            min={0}
+            max={status.limits.maxGrantUsd * 100}
+            step={10}
+            value={grant}
+            onChange={(e) => setGrant(e.target.value)}
+          />
+          <span className="acct-prefix">L</span>
+          <button type="button" className="retro-btn" disabled={busy} onClick={() => void save('diesel', { diesel: { grantUsd: Number(grant) / 100 } })}>
+            {t.save}
+          </button>
+        </div>
+      </div>
+      {saved && !status.topUp && <p className="acct-dim">{t.saved}</p>}
+      <h3>{t.topUpTitle}</h3>
+      <div className="acct-field">
+        <label>{t.topUpEmail}</label>
+        <input type="email" aria-label={t.topUpEmail} value={email} autoComplete="off" onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <div className="acct-field">
+        <label>{t.topUpLitres}</label>
+        <div className="acct-field-row">
+          <input
+            type="number"
+            aria-label={t.topUpLitres}
+            min={1}
+            max={status.limits.maxTopUpUsd * 100}
+            step={10}
+            value={add}
+            onChange={(e) => setAdd(e.target.value)}
+          />
+          <span className="acct-prefix">L</span>
+          <button
+            type="button"
+            className="retro-btn"
+            disabled={busy || !email.trim() || !(Number(add) > 0)}
+            onClick={() => void save('diesel', { topUp: { email: email.trim(), usd: Number(add) / 100 } })}
+          >
+            {t.topUp}
+          </button>
+        </div>
+      </div>
+      {status.topUp && <p className="acct-dim">{t.toppedUp(status.topUp.email, litresOf(status.topUp.balanceUsd))}</p>}
+    </section>
+  );
+}
+
 
 function DemoSection({ status, t, busy, saved, save }: SectionProps) {
   const [on, setOn] = useState(status.demo.on);

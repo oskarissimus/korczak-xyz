@@ -7,6 +7,8 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
+import { formatLitres, litres } from '../../utils/rpg/diesel';
+import { NO_DIESEL } from '../../utils/rpg/wallet';
 import {
   devlogVersion,
   devRequests,
@@ -58,6 +60,22 @@ function useFunds(): void {
 function FundsNotice({ lang, alert, onHide }: { lang: Lang; alert: FundsAlert; onHide?: () => void }) {
   const t = translations[lang];
   const { name, url } = TOP_UP[alert.provider];
+  // The game's own tank ran dry (`wallet.ts`), not the provider's balance: nothing to top up there.
+  if (alert.error.includes(NO_DIESEL)) {
+    return (
+      <div className="rpg-funds-notice" role="alert">
+        <strong>⛽ {t.dieselOut}</strong> {t.dieselOutWhat}
+        <span className="rpg-funds-said">
+          {t.fundsRefused(alert.count)}: {alert.error}
+        </span>
+        {onHide && (
+          <button type="button" className="rpg-funds-hide" onClick={onHide} aria-label={t.fundsHide} title={t.fundsHide}>
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="rpg-funds-notice" role="alert">
       <strong>💸 {t.fundsTitle(name)}</strong> {t.fundsWhat(alert.provider)}{' '}
@@ -137,7 +155,7 @@ function headline(r: DevRequest): string {
   if (r.kind === 'music' && r.status === 'ok') parts.push(`${r.chars} s ≈ ${Math.round(r.credits)} cr`);
   // Priced by the gateway (`utils/rpg/gateway.ts`), the figure the reader's ledger holds; else the page's estimate.
   const priced = typeof r.serverCost === 'number';
-  if (r.kind === 'model' ? r.usage || priced : r.status === 'ok') parts.push(priced ? `${formatUsd(r.cost)} (server)` : formatUsd(r.cost));
+  if (r.kind === 'model' ? r.usage || priced : r.status === 'ok') parts.push(`${formatUsd(r.cost)} ≈ ${formatLitres(litres(r.cost ?? 0), 'en')}${priced ? ' (server)' : ''}`);
   // Asked by the server's job runner (`utils/rpg/serverJobs.ts`), which goes on with the page in the background.
   if (r.server) parts.push('☁ server');
   return parts.join(' · ');
@@ -547,7 +565,10 @@ function CostTab({ lang }: { lang: Lang }) {
     ['ElevenLabs', `${totals.voiceChars} ${t.chars} ≈ ${Math.round(totals.voiceCredits)} cr ≈ ${formatUsd(totals.voiceCost)}`],
     [t.musicLine, `${totals.musicSeconds} s ≈ ${Math.round(totals.musicCredits)} cr ≈ ${formatUsd(totals.musicCost)}`],
     ['fal.ai', `${totals.falModels}× 3D${totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ ${formatUsd(totals.falCost)}`],
-    [t.total, `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost)}${totals.unpriced ? '+?' : ''}`],
+    [
+      t.total,
+      `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost)} ≈ ${formatLitres(litres(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost), lang)}${totals.unpriced ? '+?' : ''}`,
+    ],
     [t.devRequestCount, String(totals.requests)],
   ];
   return (
@@ -598,8 +619,11 @@ export function DevConsole({
   badge = false,
   onBadge = () => {},
   remake = null,
+  tankLitres = null,
 }: {
   lang: Lang;
+  /** The diesel left — the account's tank, or the demo's day — beside the costs tab; null when there is none. */
+  tankLitres?: number | null;
   onClose: () => void;
   scene?: RpgScene | null;
   /** What the start is still making (`WorldProgress`), for the Start tab's ETA. */
@@ -678,8 +702,9 @@ export function DevConsole({
             {t.devPeople}
           </button>
           <button type="button" role="tab" aria-selected={tab === 'costs'} onClick={() => setTab('costs')}>
-            {t.devCosts} ≈ {formatUsd(totalUsd)}
+            {t.devCosts} ≈ {formatUsd(totalUsd)} ≈ {formatLitres(litres(totalUsd), lang)}
             {totals.unpriced ? '+?' : ''}
+            {tankLitres !== null && <> · ⛽ {formatLitres(tankLitres, lang)}</>}
             {totals.errors > 0 && <span className="rpg-dev-error"> ✗{totals.errors}</span>}
           </button>
           <button type="button" role="tab" aria-selected={tab === 'perf'} onClick={() => setTab('perf')}>

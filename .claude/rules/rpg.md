@@ -1391,9 +1391,8 @@ shared by both runtimes and tested on both).
   level with no Firestore rule, like `demoUsage`: a ledger its reader could write would be no ledger
   once it is money. A signed-out key writes nothing.
 - **Nobody pays → 402** `{reason:'no-credits'}` with `rpg-credits` in the message, which `funds.ts`
-  reads as an empty balance for every provider. That branch of `payer` is where credits plug in:
-  the owner's key, a reservation before the call and a settlement after it, as `rpgDemo` already
-  does in dollars.
+  reads as an empty balance for every provider — unless diesel pays (`dieselPayer`, *Signed in, the
+  tank pays*, below).
 - Not moved: the demo (`rpgDemo`) and the server's own jobs (`rpgJob`) were already on the server.
   The account page itself still syncs the keys into this browser for the other apps that read them
   (`account-keys.md`); the game no longer sends them anywhere.
@@ -1620,8 +1619,17 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   answer is the last four characters. Null in a patch clears one (`FieldValue.delete`).
 - **The demo spends them first** (`demoKeys` in `admin.ts`, `demoKeysOf`): the server's Google and
   ElevenLabs keys, each failing over to `demo/config.keyUid`'s account store as before, so the game's
-  production can run its demo without any account volunteering its keys. fal.ai and OpenAI are kept
-  for what comes next (credits, the `payer` branch in `gateway.ts`); nothing spends them yet.
+  production can run its demo without any account volunteering its keys. All four are what diesel
+  pays with (*Signed in, the tank pays*, below).
+- **Test the keys** (`testKeys: true` in a patch, `functions/src/rpg/keyTest.ts`): each key makes one
+  real, tiny *paid* request — Flash-Lite a few tokens, a three-letter ElevenLabs line (with the
+  subscription's credits left where the key may read it), a 256² FLUX schnell picture, one gpt-4.1-mini
+  token — because a model list answers just as happily for an account with no money. The answer is a
+  status and a few words per key, never the key. Nothing else can check them: the keys have no rule and
+  no page or coding session reads them back.
+- **Diesel**: the first tank a new account gets (`rpgDiesel/config.grantUsd`, default $1 = 100 L, at
+  most $20) and a top-up of one account by its e-mail (`topUp`, at most $100 a go) — how the owner
+  pours diesel in until canisters are on sale.
 - **The demo section** writes `apps.rpg`, `rpgPerIpUsd`, `rpgDailyUsd` into `demo/config` merged, so
   the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
   `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
@@ -1649,10 +1657,50 @@ the price of a world or a beat is in it too."
   exactly when the dark plant must show — the condition reads the cap reasons for that.
 - **The tags are estimates** (`beatLitres`: 5k in, 1.5k out on the chosen demo model; a world is two
   of those; a spoken line 150 characters at `clipCost`), said with "~". The console keeps the bill.
+- **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
+  the demo's day for a reader signed in to nothing.
 - **Nothing sells the canisters yet.** The three packs (200 L / 10 zł, 450 L / 20 zł, 1200 L / 49 zł)
   are the ones the payment comparison proposed; a tap plays the refuelling as a preview, says so,
   and goes back to the real tank. Wiring a provider means a purchase raising the balance, and the
   plant already animates any rise from empty.
+
+### Signed in, the tank pays
+
+Owner, 9 Nov 2026: "make the demo and signed-in use run on the server keys, gated by the amount of
+diesel". A signed-in reader with **no Google or OpenAI key of their own** plays on the server's keys
+(the panel's), and every request is paid out of their tank — `rpgLedger/{uid}.dieselUsd`, beside the
+running total the ledger already kept (`utils/rpg/wallet.ts`, `functions/src/rpg/wallet.ts`).
+
+- **The page hands out handles** (`fuelKeys` in `Rpg.tsx`): with at least `EMPTY_LITRES` in the tank,
+  every key the reader lacks and the server has becomes `ACCOUNT_KEY`, so each call site works
+  unchanged and the gateway decides who pays. The reader's own keys stay theirs and cost no diesel; a
+  reader with their own story key is not on diesel at all.
+- **The gateway pays** (`dieselPayer`, after `payer` found no key): only for a request marked
+  `x-rpg-keep` (the game's pages; every page of the `rpg` build, which is the game at `/`), only on the
+  game's routes (`dieselRoute`: not sloper's pictures, not key checks, not DeepSeek or the audio guide)
+  and only with a key the server has. Each request **reserves its worst case** in a transaction
+  (`dieselReservation`: a clip, the score and a fal.ai job exactly; a model's answer as the whole
+  prompt in and the whole 16k output out; a price nobody knows $0.25) and is **settled** at what it
+  cost (`passOnDiesel`): a provider's refusal and a reused asset are refunded whole, a stream cut
+  mid-answer keeps the reservation. The tank cannot go below zero. A fal.ai status poll, result,
+  upload or library search is let through on any balance (`isFollowUp`) — it belongs to work already
+  paid for, on the server's own fal account.
+- **Empty is a 402** with `rpg-credits` and `no-diesel` in the words: `funds.ts` marks the provider as
+  usual, and `FundsNotice` says *Out of diesel* instead of sending the reader to top up Google. The
+  story's chain moves to the next model on it (`tryNext`), since a cheaper one may still fit.
+- **Signed in, diesel is the gate**: an empty tank gives the hand-written quest, not the demo. The demo
+  stays for readers signed in to nothing.
+- **The first tank is granted once** (`dieselGrantedAt`), on `/wallet` or the first paid request;
+  emptying it never refills it. Sign-up sends no verification mail, so a grant can be farmed with new
+  addresses — the same exposure as the demo's per-address day, and why the grant is small.
+- **The gauge is live**: `/wallet` (granting, and which server keys exist), then `onSnapshot` on
+  `rpgLedger/{uid}` — the one ledger document the owner may read (`firestore.rules`). The plant, the
+  badge and the price tags show the tank (`DieselPlant tank`, no midnight delivery), the console's
+  costs tab shows litres beside dollars and the tank beside them.
+- **Not on the server's jobs.** `rpgJob` still runs only on the account's own keys; for a reader on
+  diesel it answers `noKey` and the browser asks through the gateway, which is metered. So a quest on
+  diesel is written by the page, not in the background — wiring the tank into `jobs.ts` is the next
+  step if that matters.
 
 ## The autosave
 

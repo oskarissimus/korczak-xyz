@@ -17,6 +17,7 @@
 
 import { keyHint, type KeyName } from '../accountKeys/keys';
 import { MAX_DAILY_USD, MAX_PER_IP_USD } from './demoLimits';
+import { MAX_GRANT_USD, MAX_TOPUP_USD } from './wallet';
 
 export const ADMIN_PATH = '/admin/config';
 
@@ -41,18 +42,44 @@ export interface AdminDemo {
   payer: 'server' | 'account' | 'nobody';
 }
 
+/** One server key tried with the cheapest request its provider has (`functions/src/rpg/keyTest.ts`). */
+export interface KeyTest {
+  ok: boolean;
+  /** The provider's HTTP status; 0 when it could not be reached, or there is no key. */
+  status: number;
+  /** What was asked and what came back, in a few words — never the key. */
+  note: string;
+  /** What the test itself cost, in dollars (a fraction of a cent, or nothing). */
+  usd: number;
+}
+
+export interface AdminDiesel {
+  /** What a new account finds in its tank, in dollars (said in litres). */
+  grantUsd: number;
+}
+
 export interface AdminStatus {
   /** Per key, its last four characters, or null where the server has none. */
   keys: Record<ServerKeyName, string | null>;
   keysUpdatedAt: number;
   demo: AdminDemo;
-  limits: { maxPerIpUsd: number; maxDailyUsd: number };
+  diesel: AdminDiesel;
+  limits: { maxPerIpUsd: number; maxDailyUsd: number; maxGrantUsd: number; maxTopUpUsd: number };
+  /** Only in the answer to a patch that asked `testKeys`. */
+  keyTests?: Record<ServerKeyName, KeyTest>;
+  /** Only in the answer to a patch with `topUp`: the account's tank after it. */
+  topUp?: { email: string; balanceUsd: number };
 }
 
 export interface AdminPatch {
   /** A string sets a key, null clears it, a missing name leaves it as it is. */
   keys?: Partial<Record<ServerKeyName, string | null>>;
   demo?: Partial<Pick<AdminDemo, 'on' | 'perIpUsd' | 'dailyUsd'>>;
+  diesel?: Partial<AdminDiesel>;
+  /** Adds dollars to an account's tank, found by its e-mail. Not a setting: done once per request. */
+  topUp?: { email: string; usd: number };
+  /** Tries every server key with a cheap request and answers how each did. */
+  testKeys?: true;
 }
 
 export class BadPatch extends Error {}
@@ -93,7 +120,30 @@ export function parseAdminPatch(raw: unknown): AdminPatch {
   if (!body) throw new BadPatch('expected a JSON object');
   const out: AdminPatch = {};
   for (const section of Object.keys(body)) {
-    if (section !== 'keys' && section !== 'demo') throw new BadPatch(`unknown section ${section}`);
+    if (!['keys', 'demo', 'diesel', 'topUp', 'testKeys'].includes(section)) throw new BadPatch(`unknown section ${section}`);
+  }
+  if (body.testKeys !== undefined) {
+    if (body.testKeys !== true) throw new BadPatch('testKeys must be true');
+    out.testKeys = true;
+  }
+  if (body.diesel !== undefined) {
+    const diesel = record(body.diesel);
+    if (!diesel) throw new BadPatch('diesel must be an object');
+    out.diesel = {};
+    for (const [name, value] of Object.entries(diesel)) {
+      if (name === 'grantUsd') out.diesel.grantUsd = dollars(value, MAX_GRANT_USD, 'diesel.grantUsd');
+      else throw new BadPatch(`unknown diesel field ${name}`);
+    }
+  }
+  if (body.topUp !== undefined) {
+    const topUp = record(body.topUp);
+    if (!topUp) throw new BadPatch('topUp must be an object');
+    for (const name of Object.keys(topUp)) if (name !== 'email' && name !== 'usd') throw new BadPatch(`unknown topUp field ${name}`);
+    const email = typeof topUp.email === 'string' ? topUp.email.trim().toLowerCase() : '';
+    if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) throw new BadPatch('topUp.email is not an e-mail address');
+    const usd = dollars(topUp.usd, MAX_TOPUP_USD, 'topUp.usd');
+    if (usd <= 0) throw new BadPatch('topUp.usd must be more than 0');
+    out.topUp = { email, usd };
   }
   if (body.keys !== undefined) {
     const keys = record(body.keys);

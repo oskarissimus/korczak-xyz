@@ -294,6 +294,17 @@ service cloud.firestore {
      */
 
     /*
+     * The RPG's ledger, `rpgLedger/{uid}` (`functions/src/rpg/gateway.ts`, `wallet.ts`): what the
+     * account has spent and, in `dieselUsd`, what is left in its diesel tank. The owner may READ the
+     * root document, so the game's gauge follows the tank live; nobody writes it but the gateway on
+     * the Admin SDK, since a ledger its reader could write would be no ledger once it is money. The
+     * days, worlds and quests under it have no block and stay closed.
+     */
+    match /rpgLedger/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+    }
+
+    /*
      * The RPG's kept assets (`korczak-xyz/src/utils/rpg/assetStore.ts`): what made each picture,
      * model, rig, line and track in the account's bucket — prompt, model, parameters, cost — and
      * which request each one answers (`requests/{fingerprint}`). The gateway answers a request from

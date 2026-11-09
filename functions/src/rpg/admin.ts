@@ -12,6 +12,9 @@
  *   (`demoKeysOf`). Answered as their last four characters, never whole.
  * - **demo** — the RPG's own switch and its two dollar caps in `demo/config`, merged so the
  *   roaster's fields beside them are left as they are.
+ * - **diesel** — the first tank a new account is given (`rpgDiesel/config`), and two actions that
+ *   are not settings: `topUp` adds to one account's tank by its e-mail, `testKeys` tries every
+ *   server key with a cheap paid request (`keyTest.ts`).
  */
 
 import type { Request } from 'firebase-functions/v2/https';
@@ -32,6 +35,10 @@ import {
   type ServerKeyName,
 } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { MAX_DAILY_USD, MAX_PER_IP_USD, normalizeRpgDemo } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
+import { DIESEL_CONFIG_DOC, MAX_GRANT_USD, MAX_TOPUP_USD } from '../../../korczak-xyz/src/utils/rpg/wallet';
+import { getAuth } from 'firebase-admin/auth';
+import { grantUsd, topUpDiesel } from './wallet';
+import { testServerKeys } from './keyTest';
 import { SETTINGS_PATH } from '../demo/handler';
 import { db } from '../runtime';
 
@@ -86,12 +93,13 @@ export async function adminStatus(): Promise<AdminStatus> {
   ]);
   const keysData = keysSnap.data();
   const settings = normalizeRpgDemo(demoSnap.data() ?? {});
-  const { payer } = await demoKeys(settings.keyUid);
+  const [{ payer }, grant] = await Promise.all([demoKeys(settings.keyUid), grantUsd()]);
   return {
     keys: keyHints(serverKeysFrom(keysData)),
     keysUpdatedAt: stampOf(keysData),
     demo: { on: settings.on, enabled: settings.enabled, perIpUsd: settings.perIpUsd, dailyUsd: settings.dailyUsd, payer },
-    limits: { maxPerIpUsd: MAX_PER_IP_USD, maxDailyUsd: MAX_DAILY_USD },
+    diesel: { grantUsd: grant },
+    limits: { maxPerIpUsd: MAX_PER_IP_USD, maxDailyUsd: MAX_DAILY_USD, maxGrantUsd: MAX_GRANT_USD, maxTopUpUsd: MAX_TOPUP_USD },
   };
 }
 
@@ -130,7 +138,21 @@ export async function handleAdmin(req: Request, res: Response, uid: string | nul
     if (patch.demo && Object.keys(patch.demo).length > 0) {
       batch.set(ref(SETTINGS_PATH.join('/')), { ...demoWrite(patch.demo), rpgUpdatedAt: Date.now() }, { merge: true });
     }
+    if (patch.diesel?.grantUsd !== undefined) {
+      batch.set(ref(DIESEL_CONFIG_DOC.join('/')), { grantUsd: patch.diesel.grantUsd, updatedAt: Date.now(), updatedBy: uid }, { merge: true });
+    }
     await batch.commit();
+    let topUp: AdminStatus['topUp'];
+    if (patch.topUp) {
+      const user = await getAuth()
+        .getUserByEmail(patch.topUp.email)
+        .catch(() => null);
+      if (!user) throw new AdminRefusal(404, 'no-user', `admin: no account signed up as ${patch.topUp.email}`);
+      topUp = { email: patch.topUp.email, balanceUsd: await topUpDiesel(user.uid, patch.topUp.usd) };
+    }
+    const keyTests = patch.testKeys ? await testServerKeys() : undefined;
+    res.status(200).json({ ...(await adminStatus()), ...(topUp ? { topUp } : {}), ...(keyTests ? { keyTests } : {}) });
+    return;
   }
   res.status(200).json(await adminStatus());
 }

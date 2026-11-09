@@ -24,6 +24,7 @@
  * the hand-written quest, every time.
  */
 
+import { NO_DIESEL } from './wallet';
 import { apiFetch } from './gateway';
 import { readCostEvent } from './gatewayRoutes';
 import { beatPrompt, parseBeat, type Beat, type BeatContext, type Job, type QuestMood } from './quest';
@@ -481,6 +482,8 @@ function tryNext(e: unknown): boolean {
     e.status === 404 ||
     e.status === 429 ||
     e.status === 503 ||
+    // The diesel tank cannot cover this model's worst case (`wallet.ts`); a cheaper one may still fit.
+    (e.status === 402 && e.message.includes(NO_DIESEL)) ||
     (e.status === 400 && /model|not (found|supported|available)/i.test(e.message))
   );
 }

@@ -32,6 +32,7 @@ import {
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
+import { WALLET_PATH, type WalletStatus } from './wallet';
 
 export { ACCOUNT_KEY };
 
@@ -113,8 +114,10 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   const { world, quest } = context();
   if (world) headers.set(WORLD_HEADER, world.slice(0, 120));
   if (quest) headers.set(QUEST_HEADER, quest.slice(0, 120));
-  // The RPG's pages keep what they generate, and are answered from it (`assetStore.ts`); no other app's are.
-  if (typeof location !== 'undefined' && keepsAssets(location.pathname)) headers.set(KEEP_HEADER, '1');
+  // The RPG's pages keep what they generate, and are answered from it (`assetStore.ts`); no other app's
+  // are. The mark is also what lets diesel pay (`wallet.ts`). The game's own build (`astro build
+  // --mode rpg`, everyrpg.korczak.xyz) is nothing but the game, at `/` rather than `/apps/rpg/`.
+  if (typeof location !== 'undefined' && (import.meta.env.MODE === 'rpg' || keepsAssets(location.pathname))) headers.set(KEEP_HEADER, '1');
   return fetch(`${base}/${url.host}${url.pathname}${url.search}`, { ...init, headers });
 }
 
@@ -129,6 +132,18 @@ async function signedInCall(path: string, method: string, signal?: AbortSignal, 
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
+}
+
+/** The reader's diesel tank (`wallet.ts`), granting the first one; null signed out or unreachable. */
+export async function fetchWallet(signal?: AbortSignal): Promise<WalletStatus | null> {
+  try {
+    const response = await signedInCall(WALLET_PATH, 'GET', signal);
+    if (!response.ok) return null;
+    const body = (await response.json()) as WalletStatus;
+    return typeof body?.balanceUsd === 'number' && body.server ? body : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The game's admin panel (`adminConfig.ts`): every section, or — with a patch — saved, then every section. */
