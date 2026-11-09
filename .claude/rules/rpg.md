@@ -1647,6 +1647,24 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
   `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
 
+### The content rules: every person is invented
+
+Owner, Nov 2026, readying the game for Paddle's review of AI products (generated human faces are a
+restricted category; deepfakes, voice impersonation and a real person's likeness are forbidden).
+`utils/rpg/contentPolicy.ts` is one block of rules — no real people, living or dead, swapped for an
+invented character in the same role when the player asks for one; no sexual content; adventure-game
+violence — read by the three prompts that invent people: the world (`genesis.ts`, every variant via
+`finish`), each step (`beatPrompt`) and the answer to a typed line (`freePrompt`). It sits **above**
+the player's own words, because those are where a real name would come in. The pictures and models
+inherit it from the descriptions those prompts wrote; **their own prompts are deliberately not
+touched**, since a person's prompt is the key its model is kept under (`assetStore.ts`), and editing
+it would pay for every model again. `contentPolicy.ts` is on `firebase-deploy.yml`'s paths, because
+the demo's function compiles those prompts.
+
+The same rules for people are the page `/apps/rpg/rules/` on korczak.xyz and `/rules/` on everyrpg
+(`components/Rpg/RpgRules.astro`, on `rpg-release.mjs`'s page list), linked from Settings and the
+diesel panel. A rule on the page that the prompts do not carry is a promise the game does not keep.
+
 ### The budget is shown as diesel
 
 Owner, Nov 2026: "many data centres run on gas turbines — my variation: the currency is called

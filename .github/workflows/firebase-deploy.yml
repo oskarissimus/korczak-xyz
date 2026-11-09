@@ -82,6 +82,8 @@ on:
       - "korczak-xyz/src/utils/rpg/clips.ts"
       - "korczak-xyz/src/utils/rpg/terrain.ts"
       - "korczak-xyz/src/utils/rpg/trail.ts"
+      # The content rules every one of those prompts carries (no real people, `contentPolicy.ts`).
+      - "korczak-xyz/src/utils/rpg/contentPolicy.ts"
       # And the generation jobs the `rpgJob` function runs: their shape and ids, and the fal.ai prompts it
       # builds for a world it has just born.
       - "korczak-xyz/src/utils/rpg/jobs.ts"

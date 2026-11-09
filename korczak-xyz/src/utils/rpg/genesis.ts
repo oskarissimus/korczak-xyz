@@ -47,6 +47,7 @@
 import type { Lang } from './quest';
 import { RELIEFS, type Relief } from './terrain';
 import { languageName, normLang } from './language';
+import { CONTENT_RULES } from './contentPolicy';
 
 /** A world's colours, light, air, water and growth: what `RpgScene.applyWorld` draws. */
 export interface WorldLook {
@@ -617,6 +618,7 @@ function finish(lines: string[], ctx: GenesisContext, language: string, target: 
     for (const w of ctx.avoid) lines.push(`- ${w}`);
   }
   const which = ctx.nth === 2 ? 'the SECOND closest' : 'the closest';
+  lines.push('', ...CONTENT_RULES);
   lines.push(
     '',
     'Think of 4 CANDIDATE worlds, as different from one another as you can make them. For each, rate honestly how',

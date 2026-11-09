@@ -40,6 +40,7 @@ import {
   type StepRecord,
 } from './quest';
 import { languageName } from './language';
+import { CONTENT_RULES } from './contentPolicy';
 
 /** As long as the reader may type: a line, not a letter. */
 export const FREE_MAX = 200;
@@ -113,6 +114,8 @@ export function freePrompt(ctx: FreeContext): string {
     `hero says to ${npc.name}, instead of picking one of the offered lines. Answer it as ${npc.name}.`,
     '',
     ...worldLines(world),
+    '',
+    ...CONTENT_RULES,
     '',
   ];
   if (ctx.mood) lines.push(`This quest's tone: ${ctx.mood.tone}.`, '');

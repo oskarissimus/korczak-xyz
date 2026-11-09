@@ -42,6 +42,7 @@ import { TAGS } from './audioTags';
 import { personaWords, type Persona } from './persona';
 import { asCraft, craftLines, type Craft } from './craft';
 import { base, languageName, type BaseLang, type Lang } from './language';
+import { CONTENT_RULES } from './contentPolicy';
 
 const TAG_LIST = Object.keys(TAGS).map((t) => `[${t}]`).join(', ');
 
@@ -761,6 +762,8 @@ export function beatPrompt(ctx: BeatContext): string {
     'time, and the hero’s decisions decide what comes next.',
     '',
     ...worldLines(world),
+    '',
+    ...CONTENT_RULES,
     '',
   ];
   if (chronicle.length) {

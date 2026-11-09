@@ -1,0 +1,17 @@
+---
+import Game from '../layouts/Game.astro';
+import RpgRules from '../../src/components/Rpg/RpgRules.astro';
+import { useTranslations } from '../../src/i18n';
+import '../styles/pages.css';
+
+const lang = 'en';
+const t = useTranslations(lang);
+const title = 'Wanderer: content rules';
+---
+
+<Game title={`${title} · ${t('Rpg')}`} lang={lang} path="/rules/">
+  <main class="rpg-page rpg-rules">
+    <h1>{title}</h1>
+    <RpgRules lang={lang} gameHref="/" termsHref="https://korczak.xyz/terms/" />
+  </main>
+</Game>

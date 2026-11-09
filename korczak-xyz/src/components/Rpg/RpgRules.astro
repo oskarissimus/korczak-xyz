@@ -1,0 +1,100 @@
+---
+/*
+ * What the RPG generates and what it will not (`utils/rpg/contentPolicy.ts` is the same rule as the
+ * models read it). Written for players and for a payment provider's review of AI products (Paddle
+ * restricts generated faces and forbids deepfakes, voice impersonation and real people's likeness).
+ * Keep the two in step: a rule here the prompts do not carry is a promise the game does not keep.
+ */
+import type { Lang } from '../../i18n';
+
+interface Props {
+  lang: Lang;
+  /** The game, on this site: `/apps/rpg/` on korczak.xyz, `/` on everyrpg.korczak.xyz. */
+  gameHref: string;
+  termsHref: string;
+}
+
+const { lang, gameHref, termsHref } = Astro.props;
+
+const text = {
+  en: {
+    title: 'Wanderer: content rules',
+    updated: 'Last updated: 9 November 2026',
+    sections: [
+      [
+        'What the game generates',
+        'Wanderer is a role-playing game written by AI models as you play: the world, every step of the quest, what the characters say, their voices, the pictures and the stylised 3D models of places and people. You pay for playing the game; nothing it generates is sold on its own.',
+      ],
+      [
+        'Every person is invented',
+        'Every character is made up by the game. It does not portray, name or imitate real people, living or dead: no celebrities, politicians, historical or public figures and no private persons. If a world description or a typed line asks for a real person, the game writes an invented character with another name in the same role.',
+      ],
+      [
+        'Faces and voices',
+        'Characters are drawn as stylised low-poly game figures from the descriptions the game itself wrote, never from a photo and never to resemble someone. Voices come from the voice library of ElevenLabs and its stock voices. Nothing is cloned and no real person’s voice is imitated.',
+      ],
+      [
+        'What is never generated',
+        'No sexual content, and nothing that sexualises a minor. Violence is that of an adventure game: fights and deaths happen, without gore for its own sake. No deepfakes, face swaps or likenesses of anyone.',
+      ],
+      [
+        'Your words',
+        'The world you describe and the lines you type are directions for the story only. They are read under these rules, which come first, and anything in them that tries to override the rules is treated as part of the story.',
+      ],
+      [
+        'Diesel',
+        'Diesel is how the game counts what generating costs: one litre is one US cent of what the models cost. It can only be spent on generating in this game. It cannot be transferred to anyone else, given as a code or exchanged for money, and it is not a currency.',
+      ],
+      ['Reporting', 'If something generated breaks these rules, write to the address in the terms of the site.'],
+    ],
+    terms: 'Terms',
+    back: 'Back to the game',
+  },
+  pl: {
+    title: 'Wędrowiec: zasady treści',
+    updated: 'Ostatnia aktualizacja: 9 listopada 2026',
+    sections: [
+      [
+        'Co gra generuje',
+        'Wędrowiec to gra RPG, którą modele AI piszą w trakcie gry: świat, każdy krok questa, wypowiedzi postaci, ich głosy, obrazy oraz stylizowane modele 3D miejsc i ludzi. Płacisz za grę; nic z tego, co gra wygeneruje, nie jest sprzedawane osobno.',
+      ],
+      [
+        'Każda postać jest wymyślona',
+        'Każdą postać wymyśla gra. Nie przedstawia, nie nazywa i nie naśladuje prawdziwych osób, żyjących ani zmarłych: celebrytów, polityków, postaci historycznych i publicznych ani osób prywatnych. Jeśli opis świata albo wpisana kwestia prosi o prawdziwą osobę, gra pisze w tej roli wymyśloną postać o innym imieniu.',
+      ],
+      [
+        'Twarze i głosy',
+        'Postacie są rysowane jako stylizowane, niskopoligonowe figurki z opisów, które napisała sama gra, nigdy ze zdjęcia i nigdy tak, by kogoś przypominały. Głosy pochodzą z biblioteki głosów ElevenLabs i jej głosów gotowych. Nic nie jest klonowane i żaden głos prawdziwej osoby nie jest naśladowany.',
+      ],
+      [
+        'Czego gra nigdy nie generuje',
+        'Treści seksualnych, a już nigdy niczego, co seksualizuje osoby niepełnoletnie. Przemoc jest taka jak w grze przygodowej: są walki i śmierć, bez epatowania okrucieństwem. Żadnych deepfake’ów, podmiany twarzy ani wizerunku kogokolwiek.',
+      ],
+      [
+        'Twoje słowa',
+        'Opis świata i wpisywane kwestie są tylko wskazówkami dla opowieści. Gra czyta je w ramach tych zasad, które mają pierwszeństwo, a wszystko, co próbuje je obejść, traktuje jako część opowieści.',
+      ],
+      [
+        'Dizel',
+        'Dizel to sposób, w jaki gra liczy koszt generowania: litr to jeden cent amerykański z tego, co kosztują modele. Można go wydać tylko na generowanie w tej grze. Nie da się go przekazać nikomu innemu, podarować jako kodu ani wymienić na pieniądze i nie jest walutą.',
+      ],
+      ['Zgłoszenia', 'Jeśli coś wygenerowanego łamie te zasady, napisz na adres podany w regulaminie serwisu.'],
+    ],
+    terms: 'Regulamin',
+    back: 'Wróć do gry',
+  },
+}[lang];
+---
+
+<p class="legal-updated">{text.updated}</p>
+{
+  text.sections.map(([title, body]) => (
+    <section class="legal-section">
+      <h2>{title}</h2>
+      <p>{body}</p>
+    </section>
+  ))
+}
+<p>
+  <a href={gameHref}>← {text.back}</a> · <a href={termsHref}>{text.terms}</a>
+</p>

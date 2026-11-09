@@ -31,6 +31,10 @@ export const EXPECTED = [
   // The ten candidate looks side by side (src/utils/rpg/designs.ts), until one is picked.
   'designs/index.html',
   'pl/designs/index.html',
+  // The content rules the menu links to (components/Rpg/RpgRules.astro), for players and for a
+  // payment provider's review of the game.
+  'rules/index.html',
+  'pl/rules/index.html',
 ];
 
 /** Every .html under `dir`, relative and with forward slashes. */

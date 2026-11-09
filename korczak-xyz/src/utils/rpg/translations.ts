@@ -77,6 +77,7 @@ const en = {
   dieselPrices: (world: string, quest: string, step: string, line: string) =>
     `A new world with its first quest ~${world} · a new quest ~${quest} · of which a step of the story ~${step} and a spoken line ~${line}`,
   dieselNote: 'One litre of diesel is one cent of what the models cost.',
+  rulesLink: 'Content rules: what the game generates and what it never will',
   dieselQuest: (left: string) => `Story: written by Gemini on the game's keys, paid in diesel. ${left} in your tank.`,
   dieselVoice: "Voice: ElevenLabs on the game's keys, paid in diesel.",
   dieselTankEmpty: 'Out of diesel: the generator has stopped and the data centre is dark. Until a refill, the story is the hand-written quest — or set keys of your own on the account page.',
@@ -432,6 +433,7 @@ const pl: typeof en = {
   dieselPrices: (world, quest, step, line) =>
     `Nowy świat z pierwszym questem ~${world} · nowy quest ~${quest} · w tym krok opowieści ~${step} i kwestia czytana na głos ~${line}`,
   dieselNote: 'Litr dizla to jeden cent z tego, co kosztują modele.',
+  rulesLink: 'Zasady treści: co gra generuje, a czego nigdy',
   dieselQuest: (left) => `Fabuła: pisze Gemini na kluczach gry, płacisz dizlem. W baku: ${left}.`,
   dieselVoice: 'Głos: ElevenLabs na kluczach gry, płacisz dizlem.',
   dieselTankEmpty: 'Skończył się dizel: generator stanął, w data center zgasło światło. Do dolania gra ma tylko ręcznie napisany quest — albo ustaw własne klucze na stronie konta.',

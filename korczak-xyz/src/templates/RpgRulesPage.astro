@@ -1,0 +1,37 @@
+---
+/* The content rules on korczak.xyz; the text is `components/Rpg/RpgRules.astro`, shared with everyrpg. */
+import Layout from '../layouts/Layout.astro';
+import PageContent from '../components/PageContent.astro';
+import RpgRules from '../components/Rpg/RpgRules.astro';
+import type { Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const prefix = lang === 'pl' ? '/pl' : '';
+const title = lang === 'pl' ? 'Wędrowiec: zasady treści' : 'Wanderer: content rules';
+---
+
+<Layout title={`${title} | korczak.xyz`} lang={lang}>
+  <PageContent title={title}>
+    <RpgRules lang={lang} gameHref={`${prefix}/apps/rpg/`} termsHref={`${prefix}/terms/`} />
+  </PageContent>
+</Layout>
+
+<style is:global>
+  .legal-updated {
+    color: var(--retro-yellow);
+  }
+
+  .legal-section h2 {
+    color: var(--retro-cyan);
+    margin-bottom: 10px;
+  }
+
+  .legal-section p {
+    color: var(--retro-white);
+    text-align: justify;
+  }
+</style>

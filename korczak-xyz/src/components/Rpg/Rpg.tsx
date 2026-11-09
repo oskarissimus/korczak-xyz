@@ -332,6 +332,8 @@ function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
  * navbar already does, so the menu stays as it was.
  */
 export default function Rpg({ lang, standalone = false }: { lang: Lang; standalone?: boolean }) {
+  /** The content rules (`components/Rpg/RpgRules.astro`), at the root of everyrpg and under the game here. */
+  const rulesHref = `${lang === 'pl' ? '/pl' : ''}${standalone ? '' : '/apps/rpg'}/rules/`;
   // The game's language, any language (`utils/rpg/language.ts`): chosen on the menu and kept in this
   // browser and on the account; until somebody chooses, guessed from the browser, English failing that.
   // The page's own locale only says where `/pl/` starts.
@@ -3156,6 +3158,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
             </li>
           )}
+          <li>
+            <a href={rulesHref}>{t.rulesLink}</a>
+          </li>
         </ul>
       ) : (
         <p className="rpg-source">{t.readingKeys}</p>
@@ -3223,6 +3228,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
+      <p className="rpg-dz-note">
+        <a href={rulesHref}>{t.rulesLink}</a>
+      </p>
       <div className="rpg-panel-actions">{back}</div>
     </div>
   );
