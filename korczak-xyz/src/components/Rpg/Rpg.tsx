@@ -116,7 +116,8 @@ import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldProposals from './WorldProposals';
-import { drawProposals, ensureProposals, pickedProposal } from '../../utils/rpg/proposals';
+import { ensureProposals, otherProposals, pickedProposal } from '../../utils/rpg/proposals';
+import type { PoolItem } from '../../utils/rpg/proposalPool';
 import { PROPOSAL_EXOTIC, proposalWish, type Proposal } from '../../utils/rpg/proposalScript';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
 import WorldTrash from './WorldTrash';
@@ -483,6 +484,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   };
   /** A proposed world picked on the menu (`WorldProposals`): the next `createWorld` is made from it, once. */
   const proposalRef = useRef<Proposal | null>(null);
+  /** A proposal tapped while the keys were still on their way: picked the moment they are ready. */
+  const [queuedPick, setQueuedPick] = useState<PoolItem | null>(null);
   /** The description the world being born is made of, for its waiting screen. */
   const [creatingWish, setCreatingWish] = useState('');
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -1723,12 +1726,12 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     return tasks;
   }, [creating, generating, falKey, world, music, musicKey, musicOn]);
   falKeyRef.current = falKey;
-  // The menu's four proposed worlds (`proposals.ts`): the kept set, or a new one, whenever the main
-  // menu shows on the reader's own Google key.
-  const proposing = !started && menu === 'main' && keysReady && storyProvider === 'google' && Boolean(apiKeys.google);
+  // The menu's four proposed worlds (`proposals.ts`): drawn from the server's daily pool for every
+  // reader, on the first frame — nothing about them waits for the keys or the account.
+  const proposing = !started && menu === 'main';
   useEffect(() => {
-    if (proposing && apiKeys.google) ensureProposals(gameLang, { google: apiKeys.google, fal: falKey });
-  }, [proposing, gameLang, apiKeys.google, falKey]);
+    if (proposing) ensureProposals(gameLang);
+  }, [proposing, gameLang]);
   useEffect(() => sceneRef.current?.setRigger(rigger, falKey), [rigger, falKey]);
   useEffect(() => sceneRef.current?.setJumping(jumping), [jumping]);
   // The places already standing ask again once the key is there (each piece is made once whatever happens).
@@ -2698,9 +2701,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   };
 
   /** A proposed world tapped on the menu: a new world made from it; the next visit gets four new ones. */
-  const pickProposal = (p: Proposal) => {
+  const pickProposal = (p: PoolItem) => {
+    // Tapped before the keys have answered: made as soon as they have (`queuedPick` below).
+    if (!keysReady) {
+      setQueuedPick(p);
+      return;
+    }
     proposalRef.current = p;
-    pickedProposal(gameLang);
+    pickedProposal(p.id);
     begin(true);
   };
 
@@ -2881,16 +2889,25 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   };
 
   const creatable = keysReady && storyProvider !== 'static';
+  // A proposal tapped before the keys answered is made once they have, or forgotten if nothing can make it.
+  useEffect(() => {
+    if (!queuedPick || !keysReady) return;
+    setQueuedPick(null);
+    if (creatable && !started) pickProposal(queuedPick);
+  }, [queuedPick, keysReady, creatable, started]); // eslint-disable-line react-hooks/exhaustive-deps
   const guessed = guessLang(typeof navigator === 'undefined' ? undefined : navigator);
   const ownSave = saved && saved.lang === gameLang ? saved : null;
   /** One entry of the main menu: a label, and a line under it when there is something to say. */
-  const item = (key: string, label: string, onClick: () => void, opts: { sub?: string; primary?: boolean; disabled?: boolean } = {}) => (
+  // `waiting`: the entry the menu will have once the keys have answered, there already so nothing
+  // moves when they do (owner, 9 Nov 2026: no layout shift), looking as it will but not yet taking a tap.
+  const item = (key: string, label: string, onClick: () => void, opts: { sub?: string; primary?: boolean; disabled?: boolean; waiting?: boolean } = {}) => (
     <button
       key={key}
       type="button"
-      className={`rpg-menu-item${opts.primary ? ' rpg-menu-primary' : ''}`}
+      className={`rpg-menu-item${opts.primary ? ' rpg-menu-primary' : ''}${opts.waiting ? ' rpg-menu-waiting' : ''}`}
       disabled={opts.disabled}
-      onClick={onClick}
+      aria-disabled={opts.waiting || undefined}
+      onClick={opts.waiting ? undefined : onClick}
     >
       <span>{label}</span>
       {opts.sub && <small>{opts.sub}</small>}
@@ -2933,19 +2950,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const mainMenu = (
     <nav className="rpg-menu" aria-label={t.title}>
       {pendingGenesis &&
-        creatable &&
+        (creatable || !keysReady) &&
         item('finish', t.menuFinishWorld, () => finishGenesis(pendingGenesis), {
           primary: true,
           sub: pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40),
+          waiting: !keysReady,
         })}
-      {ownSave &&
-        keysReady &&
-        item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title })}
-      {!keysReady && item('wait', t.wait, () => {}, { disabled: true })}
+      {ownSave && item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title, waiting: !keysReady })}
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {creatable && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
-      {creatable && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined })}
-      {libraryRows.length > 0 && item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length) })}
+      {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
+      {(creatable || !keysReady) && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined, waiting: !keysReady })}
+      {/* Always there, so a library the account brings in a moment later changes a number, not the menu's height. */}
+      {item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length), disabled: libraryRows.length === 0 })}
       {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
       {item('controls', t.menuControls, () => setMenu('controls'))}
@@ -2955,8 +2971,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // The account, under the menu, on the standalone site only (see the props above). Links rather
   // than buttons: sign-in and the keys are their own pages there (`src-rpg/pages`).
   const accountRoot = gameLang === 'pl' ? '/pl/' : '/';
-  const accountBar =
-    standalone && !auth.loading ? (
+  const accountBar = standalone && auth.loading ? (
+    // Its room kept while the account answers, so the menu above does not move when it has.
+    <div className="rpg-account rpg-account-waiting" aria-hidden="true" />
+  ) : standalone ? (
       <div className="rpg-account">
         {auth.user ? (
           <>
@@ -3475,20 +3493,15 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                   <h2 className="rpg-menu-title">{t.title}</h2>
                   {worldCard}
                   {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
-                  {proposing && apiKeys.google && (
-                    <WorldProposals
-                      lang={gameLang}
-                      disabled={!creatable}
-                      onPick={pickProposal}
-                      onRefresh={() => void drawProposals(gameLang, { google: apiKeys.google!, fal: falKey })}
-                    />
+                  <WorldProposals lang={gameLang} disabled={keysReady && !creatable} onPick={pickProposal} onRefresh={otherProposals} />
+                  {/* The badge's row is there before the tank or the demo has answered (and stays, empty, on one's own keys). */}
+                  {diesel && plantState(diesel.litres) === 'stopped' ? (
+                    <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
+                  ) : (
+                    <div className="rpg-dz-slot">
+                      {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
+                    </div>
                   )}
-                  {diesel &&
-                    (plantState(diesel.litres) === 'stopped' ? (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
-                    ) : (
-                      <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
-                    ))}
                   {mainMenu}
                   {accountBar}
                 </>

@@ -26,6 +26,7 @@ import { handleRoastDemo } from './demo/handler';
 import { handleRpgDemo } from './rpg/handler';
 import { handleRpgApi } from './rpg/gateway';
 import { runJob } from './rpg/jobs';
+import { growPool } from './rpg/proposalPool';
 import { flushSentry, initSentry, reportError, withSentry } from './sentry';
 import type { PushSub } from '../../korczak-xyz/src/utils/events/types';
 
@@ -334,4 +335,25 @@ export const rpgJob = onDocumentWritten(
       await flushSentry();
     }
   },
+);
+
+/**
+ * The menu's proposed worlds (`rpg/proposalPool.ts`): once a day, eight new ones in front of the pool
+ * of the last hundred, with covers, and every language's file brought up to them. The page reads the
+ * files straight from the bucket, so the menu never waits on a model for them.
+ */
+export const rpgProposals = onSchedule(
+  {
+    schedule: '30 4 * * *',
+    timeZone: 'Europe/Warsaw',
+    region: REGION,
+    memory: '512MiB',
+    timeoutSeconds: 540,
+    // A failed day is followed by the next one; the pool is still there meanwhile.
+    retryCount: 0,
+  },
+  async () =>
+    withSentry('rpgProposals', async () => {
+      console.log('rpgProposals', JSON.stringify(await growPool()));
+    }),
 );

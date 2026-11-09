@@ -67,6 +67,7 @@ import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { demoKeys } from './admin';
+import { poolFor } from './proposalPool';
 import { uiStrings } from './ui';
 import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
@@ -489,6 +490,14 @@ async function ui(res: Response, body: Record<string, unknown>): Promise<void> {
   res.status(200).json(answer);
 }
 
+/** A language's proposed worlds when the page found no file for it (`proposalPool.ts`). */
+async function proposals(res: Response, body: Record<string, unknown>): Promise<void> {
+  const pool = await poolFor(body.lang);
+  if (!pool) throw new BadRequest('Unknown language');
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json(pool);
+}
+
 function parseBody(raw: unknown): Record<string, unknown> {
   let value = raw;
   if (Buffer.isBuffer(value)) value = value.toString('utf8');
@@ -528,6 +537,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     else if (body.kind === 'voice') await clip(req, res, body);
     else if (body.kind === 'voices') await voices(res, body);
     else if (body.kind === 'ui') await ui(res, body);
+    else if (body.kind === 'proposals') await proposals(res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {
     if (e instanceof BadRequest) {

@@ -45,7 +45,7 @@ import type { RpgScene } from './RpgScene';
 import { RELIEFS, type Relief } from '../../utils/rpg/terrain';
 import { ui } from './ui';
 import { lastIntro, subscribeIntro, type IntroView } from '../../utils/rpg/intro';
-import { proposalsView, proposalTotals, subscribeProposals } from '../../utils/rpg/proposals';
+import { proposalsView, subscribeProposals } from '../../utils/rpg/proposals';
 
 function useDevlog(): readonly DevRequest[] {
   useSyncExternalStore(subscribeDevlog, devlogVersion, devlogVersion);
@@ -530,25 +530,21 @@ function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly 
 }
 
 /**
- * The menu's proposed worlds (`proposals.ts`; the standing rule again: tokens, errors, cost and
- * time): which model wrote them, when the first card and the last came, the covers, and what the
- * words and the pictures cost. Read from the set itself, since a new world clears the request list
- * while the set stays on the menu.
+ * The menu's proposed worlds (`proposals.ts`): no model on the page any more, only a file the server
+ * writes once a day — so what is worth seeing is where the four came from (kept here, the file, or
+ * the server translating it now), the pool's size and language, when it was written, how long the
+ * file took and whether it failed.
  */
 function ProposalStats({ lang }: { lang: Lang }) {
   const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
-  if (!v.since) return null;
-  const s = proposalTotals(v);
-  const ms = (n: number | null) => (n === null ? '…' : formatMs(n));
+  if (!v.lang) return null;
   return (
     <div className="rpg-dev-start-eta">
-      🗺 {t.proposalsDev} · {v.items.length}/4{v.model ? ` · ${v.model}` : ''} · 1st {ms(v.firstMs)} · {t.proposalsWriting} {ms(v.writtenMs)} · {t.proposalsCovers}{' '}
-      {v.drawing > 0 ? `⏳ ${v.drawing}` : ms(v.coversMs)}
-      <br />
-      in {tokens(s.input)} out {tokens(s.output)} ≈ {formatUsd(s.modelUsd)} · fal.ai {s.covers}× ≈ {formatUsd(s.coversUsd)} · {t.total} ≈ {formatUsd(s.total)}
-      {s.errors > 0 ? ` · ✗ ${t.errors(s.errors)}` : ''}
-      {v.error ? ` · ${v.error}` : ''}
+      🗺 {t.proposalsDev} · {v.items.length}/4 · pool {v.pool.length} {v.poolLang ?? ''} · {v.source ?? '…'}
+      {v.at ? ` · ${new Date(v.at).toLocaleString()}` : ''}
+      {v.ms !== null ? ` · ${formatMs(v.ms)}` : v.loading ? ' · ⏳' : ''}
+      {v.error ? ` · ✗ ${v.error}` : ''}
     </div>
   );
 }

@@ -151,7 +151,7 @@ jobs:
       - name: Deploy rules and the game's functions
         run: >-
           npx --yes firebase-tools@15 deploy
-          --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob
+          --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob,functions:rpgProposals
           --project "$GCP_PROJECT" --non-interactive --force
 
   deploy:

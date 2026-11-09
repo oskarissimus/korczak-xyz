@@ -1,87 +1,54 @@
 /*
  * The menu's four proposed worlds (owner, 2 Nov 2026: "the player opens the game and has four
- * proposed worlds generated for them — not whole worlds with a bible and assets, only proposals a
- * world can be generated from — each with a cover picture, and under them the menu as it is, where
- * you can still type your own idea"). The words and the reader are `proposalScript.ts`; this asks
- * for them, draws the covers and keeps the set.
+ * proposed worlds generated for them … each with a cover picture, and under them the menu as it
+ * is"), drawn from the pool the server makes once a day (owner, 9 Nov 2026: "the start screen should
+ * load at once and not wait for something" — `proposalPool.ts` has the pool, the files and why).
  *
- * - **Cheap and quick.** The same model as the intro's narration (`INTRO_MODELS`: Flash-Lite with no
- *   thinking, ~1 s to the first token, a fraction of a cent for all four), streamed, so each card
- *   appears as its lines end; each cover is FLUX schnell at 768×432 ($0.003), started the moment its
- *   proposal's `I:` line is whole. Without a fal.ai key a card is its two colours.
- * - **Made once, kept until used.** The set is kept per language in localStorage `rpg-proposals` and
- *   shown again on every visit to the menu; picking one marks the set used (`pickedProposal`), and the
- *   next visit draws four new ones, unlike every world played so far (`pastWorlds`). ↻ draws a new
- *   set at once. The covers' URLs are the gateway's bucket copies (`assetStore.ts`), so they last.
- * - **Everything is in the `~` console**: the requests are labelled `proposals` (the model's stream,
- *   its errors, tokens and cost; each cover with its price), and `ProposalStats` heads the Start tab
- *   with this set's model, times and totals, kept here because a new world clears the request list.
- *   Sentry Logs `rpg.proposals` has the times and how it ended, never the words.
- *
- * Only on the reader's own Google key: the demo builds every prompt on its server, and this is not
- * one of them.
+ * - **At once**: the pool last read is kept in localStorage `rpg-proposal-pool` (one language, the
+ *   last one played in), so a returning player's four are on the first frame. The file is read again
+ *   in the background — started by the page's own inline script before this bundle has even loaded
+ *   (`src-rpg/components/MenuSkeleton.astro`, `window.__rpgPool`) — and only replaces the four on
+ *   screen when there were none.
+ * - **A first visit** shows four placeholder cards of the same size until the file comes, ~100 ms.
+ * - **A language with no file yet** shows the English pool at once and asks rpgDemo to translate it
+ *   (`{kind:'proposals', lang}`); the same four cards then change their words, not their size.
+ * - **Picked once, not offered again**: a tap keeps the id in `rpg-proposals-used`, which `drawFour`
+ *   skips. ↻ draws four others from the pool — no model, no wait, no cost.
+ * - **In the `~` console**: `ProposalStats` says where the four came from, how big the pool is, when
+ *   it was written and how long the file took.
  */
 
-import { apiFetch, serverCost } from './gateway';
-import { endRequest, startRequest, type DevRequest } from './devlog';
-import { streamGoogleText } from './storyteller';
-import { FAL_IMAGE_MODEL, imageCost } from './falPrompts';
-import { outOfFunds } from './funds';
-import { drawWords } from './seedWords';
-import { pastWorlds } from './worldSave';
 import { rpgSet } from './storage';
-import { INTRO_MODELS, PICTURE_SIZE } from './intro';
-import {
-  coverPrompt,
-  parseProposals,
-  PROPOSAL_COUNT,
-  PROPOSAL_KINDS,
-  proposalPrompt,
-  validProposal,
-  type Proposal,
-} from './proposalScript';
+import { drawFour, poolUrl, readPool, type Pool, type PoolItem } from './proposalPool';
+import { rpgDemoUrl } from './demo';
 import type { Lang } from './quest';
-import { recordMeasurement } from '../../lib/sentry';
 
-export const PROPOSALS_KEY = 'rpg-proposals';
-export const PROPOSAL_LABEL = 'proposals';
+export const POOL_KEY = 'rpg-proposal-pool';
+export const USED_KEY = 'rpg-proposals-used';
+const USED_MAX = 300;
 
 export interface ProposalsView {
   lang: Lang | null;
-  items: Proposal[];
-  /** The proposals are being written (the covers may still be drawing after). */
-  writing: boolean;
-  /** Covers still being drawn. */
-  drawing: number;
-  model: string | null;
-  /** When this set was asked for; 0 for one read back from storage. */
-  since: number;
-  /** Ms from the ask: the first card, all four written, the last cover in. */
-  firstMs: number | null;
-  writtenMs: number | null;
-  coversMs: number | null;
+  /** The four on screen. */
+  items: PoolItem[];
+  /** The whole pool they were drawn from. */
+  pool: PoolItem[];
+  /** The pool's language: the game's, or English while that one is being translated. */
+  poolLang: Lang | null;
+  /** When the server wrote the pool, ms. */
+  at: number | null;
+  /** Where the four on screen came from. */
+  source: 'kept' | 'file' | 'server' | null;
+  /** How long the file took, ms. */
+  ms: number | null;
+  loading: boolean;
   error: string | null;
-  /** This set's requests, for the console's figures: held here, since a new world clears the console's list. */
-  requests: DevRequest[];
 }
 
-const EMPTY: ProposalsView = {
-  lang: null,
-  items: [],
-  writing: false,
-  drawing: 0,
-  model: null,
-  since: 0,
-  firstMs: null,
-  writtenMs: null,
-  coversMs: null,
-  error: null,
-  requests: [],
-};
+const EMPTY: ProposalsView = { lang: null, items: [], pool: [], poolLang: null, at: null, source: null, ms: null, loading: false, error: null };
 
 let view: ProposalsView = EMPTY;
 const listeners = new Set<() => void>();
-let controller: AbortController | null = null;
 
 export function subscribeProposals(listener: () => void): () => void {
   listeners.add(listener);
@@ -97,236 +64,133 @@ function set(patch: Partial<ProposalsView>): void {
   for (const l of listeners) l();
 }
 
-interface Kept {
-  at: number;
-  used?: boolean;
-  items: Proposal[];
+function project(): string | null {
+  return (import.meta.env.PUBLIC_FIREBASE_PROJECT_ID as string | undefined) ?? null;
 }
 
-function readAll(): Record<Lang, Kept> {
+function readKept(lang: Lang): Pool | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(PROPOSALS_KEY) ?? '{}') as Record<string, unknown>;
-    const out: Record<Lang, Kept> = {};
-    for (const lang of ['en', 'pl'] as const) {
-      const k = raw?.[lang] as Record<string, unknown> | undefined;
-      if (!k || !Array.isArray(k.items)) continue;
-      const items = k.items.map(validProposal).filter((p): p is Proposal => p !== null);
-      if (items.length) out[lang] = { at: Number(k.at) || 0, used: k.used === true, items };
-    }
-    return out;
+    const pool = readPool(JSON.parse(localStorage.getItem(POOL_KEY) ?? 'null'));
+    return pool && pool.lang === lang && pool.items.length ? pool : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-function keep(lang: Lang, kept: Kept): void {
-  const all = readAll();
-  all[lang] = kept;
-  rpgSet(PROPOSALS_KEY, JSON.stringify(all));
+function keep(pool: Pool): void {
+  rpgSet(POOL_KEY, JSON.stringify(pool));
 }
 
-export interface ProposalKeys {
-  /** The Google key or the account's handle for it. */
-  google: string;
-  fal: string | null;
-}
-
-/**
- * The menu is showing: the kept set of this language, or four new ones when there is none or the
- * last was used. Covers a kept set lacks (made with no fal.ai key then) are drawn now.
- */
-export function ensureProposals(lang: Lang, keys: ProposalKeys): void {
-  if (view.lang === lang && (view.writing || view.items.length)) {
-    fillCovers(keys);
-    return;
-  }
-  const kept = readAll()[lang];
-  if (kept && !kept.used) {
-    controller?.abort();
-    controller = new AbortController();
-    view = { ...EMPTY, lang, items: kept.items };
-    for (const l of listeners) l();
-    fillCovers(keys);
-    return;
-  }
-  void drawProposals(lang, keys);
-}
-
-/** A proposal was picked: the next visit to the menu draws a new set. */
-export function pickedProposal(lang: Lang): void {
-  const kept = readAll()[lang];
-  if (kept) keep(lang, { ...kept, used: true });
-  if (view.lang === lang) {
-    controller?.abort();
-    view = EMPTY;
-    for (const l of listeners) l();
-  }
-}
-
-function since(): number {
-  return Date.now() - view.since;
-}
-
-/** Four new proposals, written by the fastest model that answers, each card's cover started as it comes. */
-export async function drawProposals(lang: Lang, keys: ProposalKeys): Promise<void> {
-  controller?.abort();
-  const mine = new AbortController();
-  controller = mine;
-  const signal = mine.signal;
-  view = { ...EMPTY, lang, writing: true, since: Date.now() };
-  for (const l of listeners) l();
-  const words = drawWords(PROPOSAL_KINDS.length * 2);
-  const prompt = proposalPrompt({
-    lang,
-    seeds: PROPOSAL_KINDS.map((_, i) => words.slice(i * 2, i * 2 + 2)),
-    avoid: pastWorlds(),
-  });
-  const started = new Set<number>();
-  const absorb = (soFar: string, final: boolean) => {
-    if (signal.aborted) return;
-    const parsed = parseProposals(soFar, final);
-    if (!parsed.length) return;
-    // Covers already drawn stay with their card.
-    const items = parsed.map((p, i) => ({ ...p, image: view.items[i]?.image ?? null }));
-    set({ items, ...(view.firstMs === null ? { firstMs: since() } : {}) });
-    items.forEach((p, i) => {
-      if (p.picture && !started.has(i) && keys.fal) {
-        started.add(i);
-        void drawCover(i, p.picture, keys.fal, signal);
-      }
-    });
-  };
-  let error: string | null = null;
-  for (const { model, thinking } of INTRO_MODELS) {
-    if (signal.aborted) return;
-    const entry = startRequest('model', model, null, '', PROPOSAL_LABEL);
-    set({ model, requests: [...view.requests, entry] });
-    try {
-      const text = await streamGoogleText(keys.google, model, prompt, { temperature: 1.2, thinking, signal }, entry, (soFar) => absorb(soFar, false));
-      endRequest(entry, null);
-      absorb(text, true);
-      error = view.items.length ? null : 'no proposals in the answer';
-      if (!error) break;
-    } catch (e) {
-      const message = signal.aborted ? 'stopped' : e instanceof Error ? e.message : String(e);
-      endRequest(entry, message);
-      error = message;
-      if (signal.aborted || view.items.length) break;
-    }
-  }
-  if (signal.aborted) return;
-  set({ writing: false, writtenMs: since(), error: view.items.length ? null : error });
-  if (view.items.length) keep(lang, { at: Date.now(), items: view.items });
-  if (!view.drawing) finished();
-}
-
-/** Covers for a kept set that has none (made without a fal.ai key, or a cover that failed). */
-function fillCovers(keys: ProposalKeys): void {
-  if (!keys.fal || view.writing || !controller) return;
-  view.items.forEach((p, i) => {
-    if (p.picture && !p.image && !pendingCovers.has(i)) void drawCover(i, p.picture, keys.fal!, controller!.signal);
-  });
-}
-
-const pendingCovers = new Set<number>();
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(t);
-        resolve();
-      },
-      { once: true },
-    );
-  });
-}
-
-async function drawCover(at: number, picture: string, fal: string, signal: AbortSignal): Promise<void> {
-  const prompt = coverPrompt(picture);
-  const entry = startRequest('fal', FAL_IMAGE_MODEL, null, prompt, PROPOSAL_LABEL);
-  pendingCovers.add(at);
-  set({ drawing: view.drawing + 1, requests: [...view.requests, entry] });
+function usedIds(): Set<string> {
   try {
-    if (outOfFunds('fal')) throw new Error('skipped: no money left on fal.ai');
-    let response: Response;
-    for (let attempt = 0; ; attempt++) {
-      response = await apiFetch(`https://fal.run/${FAL_IMAGE_MODEL}`, {
-        method: 'POST',
-        headers: { Authorization: `Key ${fal}`, 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify({ prompt, image_size: PICTURE_SIZE, num_inference_steps: 4, num_images: 1, enable_safety_checker: true }),
-      });
-      // Four at once can meet the account's limit (`rpg.md`, fal.ai's concurrency): asked again.
-      if (response.status !== 429 || attempt >= 3) break;
-      await sleep(1000 * 2 ** attempt, signal);
-    }
-    if (!response.ok) throw new Error(`${response.status} ${(await response.text().catch(() => '')).slice(0, 200)}`);
-    const url = ((await response.json()) as { images?: { url?: string }[] }).images?.[0]?.url;
-    if (!url) throw new Error('no image in the answer');
-    endRequest(entry, null, { cost: imageCost(PICTURE_SIZE.width, PICTURE_SIZE.height), serverCost: serverCost(response), text: `${prompt}\n→ ${url}` });
-    if (signal.aborted) return;
-    const items = view.items.map((p, i) => (i === at ? { ...p, image: url } : p));
-    set({ items });
-    if (!view.writing && view.lang) {
-      const kept = readAll()[view.lang];
-      keep(view.lang, { at: kept?.at ?? Date.now(), items });
-    }
-  } catch (e) {
-    if (entry.status !== 'ok') endRequest(entry, signal.aborted ? 'stopped' : e instanceof Error ? e.message : String(e));
-  } finally {
-    pendingCovers.delete(at);
-    if (!signal.aborted) {
-      set({ drawing: Math.max(0, view.drawing - 1) });
-      if (!view.drawing && !view.writing) finished();
-    }
+    const raw = JSON.parse(localStorage.getItem(USED_KEY) ?? '[]');
+    return new Set(Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
   }
 }
 
-/** The set is whole: the last cover's time, and Sentry Logs. */
-function finished(): void {
-  if (!view.since) return;
-  const coversMs = view.items.some((p) => p.image) ? since() : null;
-  set({ coversMs });
-  const t = proposalTotals(view);
-  recordMeasurement('rpg.proposals', {
-    outcome: view.items.length >= PROPOSAL_COUNT ? 'whole' : view.items.length ? 'partial' : 'failed',
-    lang: view.lang,
-    model: view.model,
-    proposals: view.items.length,
-    covers: view.items.filter((p) => p.image).length,
-    firstMs: view.firstMs,
-    writtenMs: view.writtenMs,
-    coversMs,
-    usd: Math.round(t.total * 10000) / 10000,
-  });
+/** What the page's inline script already asked for, if it asked for this language. */
+function early(lang: Lang): Promise<unknown> | null {
+  const w = typeof window === 'undefined' ? null : (window as unknown as { __rpgPool?: { lang?: string; promise?: Promise<unknown> } }).__rpgPool;
+  if (!w || w.lang !== lang || !w.promise) return null;
+  const promise = w.promise;
+  delete (window as unknown as { __rpgPool?: unknown }).__rpgPool;
+  return promise;
 }
 
-export interface ProposalTotals {
-  input: number;
-  output: number;
-  modelUsd: number;
-  covers: number;
-  coversUsd: number;
-  total: number;
-  errors: number;
+/** The file for `lang`: null when there is none yet (404), thrown on any other failure. */
+async function fetchFile(lang: Lang): Promise<Pool | null> {
+  const asked = early(lang);
+  if (asked) {
+    const raw = await asked.catch(() => undefined);
+    if (raw !== undefined) return raw === null ? null : readPool(raw);
+  }
+  const p = project();
+  if (!p) throw new Error('no Firebase project in this build');
+  const r = await fetch(poolUrl(p, lang));
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`proposals ${r.status}`);
+  return readPool(await r.json());
 }
 
-/** What this set cost: the words and the covers apart, and how many requests failed. */
-export function proposalTotals(v: ProposalsView): ProposalTotals {
-  const models = v.requests.filter((r) => r.kind === 'model');
-  const covers = v.requests.filter((r) => r.kind === 'fal' && r.status === 'ok');
-  const modelUsd = models.reduce((n, r) => n + (r.cost ?? 0), 0);
-  const coversUsd = covers.reduce((n, r) => n + (r.cost ?? 0), 0);
-  return {
-    input: models.reduce((n, r) => n + (r.usage?.input ?? 0), 0),
-    output: models.reduce((n, r) => n + (r.usage?.output ?? 0), 0),
-    modelUsd,
-    covers: covers.length,
-    coversUsd,
-    total: modelUsd + coversUsd,
-    errors: v.requests.filter((r) => r.status === 'error' && r.error !== 'stopped').length,
-  };
+/** The server makes the file (`{kind:'proposals'}`): a translation, or a first English pool. */
+async function askServer(lang: Lang): Promise<Pool | null> {
+  const url = rpgDemoUrl();
+  if (!url) return null;
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'proposals', lang }) });
+  if (!r.ok) throw new Error(`proposals ${r.status}`);
+  return readPool(await r.json());
+}
+
+/** A pool came: kept, and shown when nothing is; four already on screen get only their words in this language. */
+function absorb(lang: Lang, pool: Pool, source: ProposalsView['source']): void {
+  if (view.lang !== lang || !pool.items.length) return;
+  if (pool.lang === lang) keep(pool);
+  const byId = new Map(pool.items.map((p) => [p.id, p]));
+  const items = view.items.length ? view.items.map((p) => byId.get(p.id) ?? p) : drawFour(pool.items, usedIds());
+  set({ items, pool: pool.items, poolLang: pool.lang, at: pool.at, source: view.items.length ? view.source : source });
+}
+
+let asking: Lang | null = null;
+
+/** The menu is showing in `lang`: four at once from what this browser kept, and the file read again. */
+export function ensureProposals(lang: Lang): void {
+  if (view.lang === lang && (view.items.length || view.loading)) return;
+  // The sets the page used to write itself, before the pool: nothing reads them any more.
+  try {
+    localStorage.removeItem('rpg-proposals');
+  } catch {
+    /* a blocked store */
+  }
+  const kept = readKept(lang);
+  view = { ...EMPTY, lang, ...(kept ? { items: drawFour(kept.items, usedIds()), pool: kept.items, poolLang: lang, at: kept.at, source: 'kept' as const } : {}) };
+  for (const l of listeners) l();
+  void refresh(lang);
+}
+
+async function refresh(lang: Lang): Promise<void> {
+  if (asking === lang) return;
+  asking = lang;
+  set({ loading: true, error: null });
+  const started = performance.now();
+  try {
+    const file = await fetchFile(lang);
+    if (view.lang !== lang) return;
+    set({ ms: Math.round(performance.now() - started) });
+    if (file?.items.length) {
+      absorb(lang, file, 'file');
+      return;
+    }
+    // No file in this language yet: the English meanwhile, and the server makes this one.
+    if (lang !== 'en') {
+      const english = await fetchFile('en').catch(() => null);
+      if (english?.items.length) absorb(lang, english, 'file');
+    }
+    const made = await askServer(lang);
+    if (made?.items.length) absorb(lang, made, 'server');
+    else if (!view.items.length) set({ error: 'no proposals yet' });
+  } catch (e) {
+    if (view.lang === lang) set({ error: e instanceof Error ? e.message : String(e) });
+  } finally {
+    if (asking === lang) asking = null;
+    if (view.lang === lang) set({ loading: false });
+  }
+}
+
+/** ↻: four others from the pool, none of the four on screen. */
+export function otherProposals(): void {
+  if (!view.pool.length) return;
+  const skip = usedIds();
+  for (const p of view.items) skip.add(p.id);
+  set({ items: drawFour(view.pool, skip) });
+}
+
+/** A proposal was picked: never offered here again, and the next visit draws four others. */
+export function pickedProposal(id: string): void {
+  const used = [...usedIds()].filter((x) => x !== id);
+  used.push(id);
+  rpgSet(USED_KEY, JSON.stringify(used.slice(-USED_MAX)));
+  view = { ...EMPTY };
+  for (const l of listeners) l();
 }

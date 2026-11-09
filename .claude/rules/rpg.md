@@ -233,7 +233,7 @@ the overlay is `.rpg-intro` in `Rpg.tsx`.
 Owner, 2 Nov 2026: "the player opens the game and has four proposed worlds generated for them — not
 whole worlds with a bible and assets, only proposals a world can be generated from — each with a cover
 picture, and under them the menu as it is, where you can still type your own idea". `WorldProposals.tsx`
-over the main menu, `utils/rpg/proposals.ts` asks and keeps, `proposalScript.ts` is the prompt and reader.
+over the main menu, `utils/rpg/proposals.ts` reads the pool and draws, `proposalScript.ts` is the prompt and reader.
 
 - **A proposal is a premise**: a name, a pitch of at most 30 words, a genre, two colours and an English
   cover description. Tapping one is *New world* with the proposal as the player's description
@@ -244,22 +244,35 @@ over the main menu, `utils/rpg/proposals.ts` asks and keeps, `proposalScript.ts`
 - **Spread on purpose** (`PROPOSAL_KINDS`): a classic RPG setting, a well-loved genre that is not
   medieval fantasy, a familiar genre with a strong twist, and anything at all. Two dice words each
   (`drawWords`, no Wikipedia, for speed) — flavour only for the first two, since as the premise salt
-  and pollen made the "classic" one a strange desert — and `pastWorlds` as "avoid".
-- **Cheap and quick**: `INTRO_MODELS` (Flash-Lite, no thinking), plain `N:/P:/G:/C:/I:` lines
-  streamed so each card appears as its lines end; measured 2 Nov 2026: all four in ~3 s, ~560 tokens
-  in and ~580 out, ~$0.001. Each cover is FLUX schnell 768×432 ($0.003) started the moment its `I:`
-  line is whole, four at once with 429 retried. No fal.ai key: a card is its two colours.
-- **Made once, kept until used**: localStorage `rpg-proposals` per language; shown again on every
-  visit, a tap marks it `used` and the next visit draws four new ones; *Inne / Others* draws a new set
-  at once. Cover URLs are the gateway's bucket copies, so a kept set still has its pictures tomorrow;
-  a kept set without covers (made with no fal key) gets them once there is one.
-- **Only on the reader's own Google key** (`proposing` in `Rpg.tsx`): the demo builds every prompt on
-  its server and this is not one of them.
-- **In the console**: the requests are labelled `proposals` (the stream, errors, tokens, each cover
-  priced) and count as the world's (`scopeOf`); the Start tab heads with `ProposalStats` — the model,
-  first card, all written, covers, tokens, fal pictures and the total — read from the set itself,
-  because a new world's `resetDevlog` clears the request list. The line under the cards says the same
-  in short. Sentry Logs `rpg.proposals` has the times, counts and dollars, never the words.
+  and pollen made the "classic" one a strange desert — and the pool's newest 24 as "avoid".
+- **A pool on the server, not a model on the page** (owner, 9 Nov 2026: "the start screen loads at
+  once and does not wait for anything; the proposals can be static on the server, a cron makes them
+  once a day into a queue of the last 100, and the player gets four drawn from it"). `rpgProposals`
+  (`functions/src/rpg/proposalPool.ts`, 04:30 Warsaw) writes eight in English, two of each kind,
+  each cover FLUX schnell copied into the bucket, on the **server's** keys (~3¢ a day), and keeps the
+  newest `POOL_SIZE` 100. `utils/rpg/proposalPool.ts` is the shared half: the format, `drawFour`,
+  the merge and the translation prompt.
+- **Files, not a function**: `proposals/{lang}.json` in `<project>-rpg` with the fixed download token
+  `POOL_TOKEN`, so the page knows the URL at build time and nothing has a cold start. English is the
+  source (`proposals/source.json` keeps the cover prompts the public files drop). Polish is made
+  every run; any other language the first time a page asks rpgDemo `{kind:'proposals', lang}` after a
+  404 (it shows the English meanwhile, and the same four cards change their words), and every run
+  after. A missing English pool is made on that same call, so a fresh project needs no cron to wait for.
+- **For every reader**, not only one with their own Google key: nothing is generated on the page.
+  A card tapped before the keys have answered is made once they have (`queuedPick`).
+- **Kept and drawn here**: localStorage `rpg-proposal-pool` (the last language's pool) gives a
+  returning player their four on the first frame; the file is read again behind it and only fills
+  cards that are still empty. A pick goes to `rpg-proposals-used` and is never drawn again; ↻ draws
+  four others from the pool at once.
+- **Nothing on the menu moves** when something answers: the cards are a fixed box (`.rpg-proposal-text`
+  has one height whatever the pitch), the diesel badge has its row (`.rpg-dz-slot`) before the tank or
+  the demo answers, the entries that wait for the keys are there already (`waiting` in `item`, not
+  dimmed), *My worlds* is always listed (disabled at 0), and the account bar keeps its room while
+  auth loads. Before the bundle runs at all, `src-rpg/components/MenuSkeleton.astro` is the island's
+  fallback — the same boxes in the same classes — and its inline script has already asked for the
+  pool file (`window.__rpgPool`). Measured on a local build: CLS 0.0003.
+- **In the console**: the Start tab's `ProposalStats` says where the four came from (`kept`, `file`,
+  `server`), the pool's size and language, when it was written, how long the file took, and errors.
 
 ## The world grows
 

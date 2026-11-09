@@ -1909,6 +1909,11 @@ body:has(.rpg-immersive) .safe-top-band {
   cursor: default;
 }
 
+/* An entry waiting for the keys: looks as it will, so nothing flickers when they come (`item` in Rpg.tsx). */
+.rpg-menu-waiting {
+  cursor: progress;
+}
+
 /* The menu's four proposed worlds (`WorldProposals.tsx`): two by two, a cover over each name. */
 .rpg-proposals {
   width: min(100%, 640px);
@@ -1991,6 +1996,12 @@ body:has(.rpg-immersive) .safe-top-band {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.rpg-proposal-cover img.rpg-proposal-loaded {
+  opacity: 1;
 }
 
 .rpg-proposal-drawing {
@@ -2015,17 +2026,27 @@ body:has(.rpg-immersive) .safe-top-band {
   letter-spacing: 0.04em;
 }
 
+/* One height whatever the words (owner, 9 Nov 2026: no layout shift): a line of name and four of
+   pitch (three on a phone), so a placeholder, a short pitch and a long one are the same box. */
 .rpg-proposal-text {
+  --pitch-lines: 4;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  box-sizing: border-box;
+  height: calc(18px + 20px + 3px + var(--pitch-lines) * 12.5px * 1.35);
   padding: 8px 10px 10px;
   background: rgba(10, 7, 3, 0.78);
-  flex: 1;
+  overflow: hidden;
 }
 
 .rpg-proposal-text strong {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 15px;
+  line-height: 20px;
   color: #ffd36b;
 }
 
@@ -2039,14 +2060,22 @@ body:has(.rpg-immersive) .safe-top-band {
 }
 
 .rpg-proposal-empty {
-  min-height: 150px;
   background: rgba(20, 14, 6, 0.5);
   cursor: default;
   animation: rpg-proposal-pulse 1.4s ease-in-out infinite alternate;
 }
 
 @media (max-width: 480px) {
+  .rpg-proposal-text { --pitch-lines: 3; }
   .rpg-proposal-text span { -webkit-line-clamp: 3; }
+}
+
+.rpg-proposal-failed {
+  animation: none;
+}
+
+.rpg-proposal-failed .rpg-proposal-text span {
+  color: #ffb4a0;
 }
 
 @keyframes rpg-proposal-pulse {
@@ -2455,6 +2484,13 @@ body:has(.rpg-immersive) .safe-top-band {
   text-align: center;
 }
 
+/* The badge's row on the main menu, there before the tank answers (Rpg.tsx): its height whether or not it holds one. */
+.rpg-dz-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 34px;
+}
+
 .rpg-dz-badge {
   display: inline-flex;
   align-items: center;
@@ -2604,8 +2640,11 @@ button.rpg-dz-badge {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+  align-content: flex-start;
   gap: 8px 12px;
   width: min(100%, 320px);
+  /* Signed in: the address over two links. Kept whether or not, and before the account answers. */
+  min-height: 62px;
   pointer-events: auto;
 }
 
@@ -2642,4 +2681,17 @@ button.rpg-dz-badge {
   border-color: #ffd36b;
   color: #ffd36b;
   outline: none;
+}
+
+/* The menu before the bundle runs (src-rpg/components/MenuSkeleton.astro): the entries' boxes, quieter. */
+.rpg-skeleton-item,
+.rpg-skeleton-bar {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+.rpg-skeleton-bar {
+  display: inline-block;
+  width: 72px;
+  box-sizing: border-box;
 }

@@ -47,8 +47,10 @@ export interface ProposalAsk {
   lang: Lang;
   /** Two dice words per proposal, in `PROPOSAL_KINDS` order: what keeps four from being the four a model always writes. */
   seeds: string[][];
-  /** Worlds this reader already had ("name: pitch"), to be unlike. */
+  /** Worlds to be unlike ("name: pitch"): ones this reader already had, or the pool's newest. */
   avoid: string[];
+  /** The avoid list is the pool's own proposals, not worlds a player has been to (`proposalPool.ts`). */
+  avoidPool?: boolean;
 }
 
 export const COVER_STYLE = 'painterly fantasy book cover art, wide establishing shot, dramatic atmospheric light, rich colour, no text, no letters, no title';
@@ -73,8 +75,13 @@ export function proposalPrompt(ask: ProposalAsk): string {
     lines.push(`${i + 1}. ${kind}.${seeds}`);
   });
   if (ask.avoid.length) {
-    lines.push('', 'The player has ALREADY BEEN to these worlds; every proposal must be unlike all of them:');
-    for (const w of ask.avoid.slice(-8)) lines.push(`- ${w.slice(0, 160)}`);
+    lines.push(
+      '',
+      ask.avoidPool
+        ? 'These worlds are ALREADY PROPOSED; every new proposal must be unlike all of them — another land, another trouble, other names:'
+        : 'The player has ALREADY BEEN to these worlds; every proposal must be unlike all of them:',
+    );
+    for (const w of ask.avoid.slice(ask.avoidPool ? 0 : -8, ask.avoidPool ? 24 : undefined)) lines.push(`- ${w.slice(0, 160)}`);
   }
   lines.push(
     '',

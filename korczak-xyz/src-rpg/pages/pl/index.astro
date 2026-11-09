@@ -1,4 +1,5 @@
 ---
+import MenuSkeleton from '../../components/MenuSkeleton.astro';
 import Game from '../../layouts/Game.astro';
 import Rpg from '../../../src/components/Rpg/Rpg';
 import { useTranslations } from '../../../src/i18n';
@@ -11,6 +12,8 @@ const t = useTranslations(lang);
 
 <Game title={t('Rpg')} lang={lang} path="/">
   <main class="rpg-content rpg-standalone">
-    <Rpg client:only="react" lang={lang} standalone />
+    <Rpg client:only="react" lang={lang} standalone>
+      <Fragment slot="fallback"><MenuSkeleton lang={lang} /></Fragment>
+    </Rpg>
   </main>
 </Game>

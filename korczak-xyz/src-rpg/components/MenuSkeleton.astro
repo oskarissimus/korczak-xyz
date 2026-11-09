@@ -1,0 +1,84 @@
+---
+/**
+ * The main menu before the game's bundle has loaded (owner, 9 Nov 2026: "everything on the start
+ * screen loads at once, and what cannot has a placeholder, so nothing shifts"). The game is a
+ * `client:only` island — three.js and all — so without this the page is black until it runs; this
+ * is the island's fallback, the menu's own boxes in the menu's own classes (styles/rpg.css), so the
+ * real one lands on top of it rather than appearing from nothing.
+ *
+ * No words but the title: the game's language is settled by the bundle (`startingLang`), and a
+ * German browser on `/` should not see an English menu flash into a German one.
+ *
+ * And the proposed worlds' file is asked for here, in an inline script, before the bundle has even
+ * started downloading: `utils/rpg/proposals.ts` picks the promise up from `window.__rpgPool`.
+ */
+import { poolUrl } from '../../src/utils/rpg/proposalPool';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const project = import.meta.env.PUBLIC_FIREBASE_PROJECT_ID as string | undefined;
+// The URL with a hole for the language, filled in by the script below.
+const poolTemplate = project ? poolUrl(project, '__LANG__') : '';
+const menuEntries = 5;
+---
+
+<script is:inline define:vars={{ poolTemplate, lang }}>
+  (function () {
+    if (!poolTemplate) return;
+    var game = lang;
+    try {
+      var chosen = JSON.parse(localStorage.getItem('rpg-lang') || 'null');
+      if (chosen && typeof chosen.lang === 'string') game = chosen.lang;
+      else if (lang === 'en' && navigator.language) game = navigator.language.split('-')[0].toLowerCase();
+    } catch (e) {
+      /* a blocked store: the page's language */
+    }
+    var url = poolTemplate.replace('__LANG__', encodeURIComponent(game));
+    window.__rpgPool = {
+      lang: game,
+      promise: fetch(url).then(function (r) {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error('proposals ' + r.status);
+        return r.json();
+      }),
+    };
+    window.__rpgPool.promise.catch(function () {});
+  })();
+</script>
+
+<div class="rpg-container" aria-hidden="true">
+  <div class="rpg-overlay rpg-menu-screen">
+    <h2 class="rpg-menu-title">Every RPG</h2>
+    <section class="rpg-proposals">
+      <div class="rpg-proposals-head">
+        <h3>&nbsp;</h3>
+        <span class="rpg-proposals-refresh rpg-skeleton-bar">&nbsp;</span>
+      </div>
+      <div class="rpg-proposals-grid">
+        {
+          Array.from({ length: 4 }, () => (
+            <div class="rpg-proposal rpg-proposal-empty">
+              <span class="rpg-proposal-cover" />
+              <span class="rpg-proposal-text" />
+            </div>
+          ))
+        }
+      </div>
+    </section>
+    <div class="rpg-dz-slot"></div>
+    <nav class="rpg-menu">
+      {
+        Array.from({ length: menuEntries }, (_, i) => (
+          <span class="rpg-menu-item rpg-skeleton-item">
+            <span>&nbsp;</span>
+            {i < 3 && <small>&nbsp;</small>}
+          </span>
+        ))
+      }
+    </nav>
+    <div class="rpg-account"></div>
+  </div>
+</div>

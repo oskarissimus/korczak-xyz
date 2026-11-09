@@ -21,6 +21,8 @@ locals {
     "pubsub.googleapis.com",
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
+    # `rpgProposals`, the menu's proposed worlds once a day.
+    "cloudscheduler.googleapis.com",
 
     # Workload Identity Federation, how CI gets in without a key.
     "iam.googleapis.com",
