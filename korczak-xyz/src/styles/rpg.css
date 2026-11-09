@@ -2342,10 +2342,14 @@ body:has(.rpg-immersive) .safe-top-band {
 .rpg-dz-smoke circle {
   fill: #6d6a66;
   opacity: 0;
+  /* Each puff grows around its own centre, at the exhaust's mouth. Without these an SVG element
+     scales around the drawing's (0,0), so the smoke flew sideways and down (owner, 9 Nov 2026). */
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .rpg-dz-running .rpg-dz-smoke circle {
-  animation: rpg-dz-puff 1.8s ease-out infinite;
+  animation: rpg-dz-puff 2.6s ease-out infinite;
 }
 
 .rpg-dz-stopped .rpg-dz-dark,
@@ -2499,14 +2503,23 @@ button.rpg-dz-badge {
   }
 }
 
+/* Out of the exhaust and up: a little sway, a light breeze, spreading thin as it rises. */
 @keyframes rpg-dz-puff {
   0% {
-    opacity: 0.8;
-    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  12% {
+    opacity: 0.85;
+    transform: translate(0, -6px) scale(0.6);
+  }
+  45% {
+    opacity: 0.55;
+    transform: translate(-3px, -24px) scale(1.2);
   }
   100% {
     opacity: 0;
-    transform: translate(14px, -46px) scale(2.2);
+    transform: translate(8px, -52px) scale(2.1);
   }
 }
 

@@ -195,8 +195,8 @@ export default function DieselPlant({
           </g>
           {/* Smoke from the exhaust */}
           <g className="rpg-dz-smoke">
-            {[0, 1, 2, 3].map((i) => (
-              <circle key={i} cx="108" cy="56" r="7" style={{ animationDelay: `${i * 0.45}s` }} />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <circle key={i} cx="108" cy="54" r="6" style={{ animationDelay: `${i * 0.52}s` }} />
             ))}
           </g>
         </g>
