@@ -20,7 +20,7 @@
  *   one that does not stays English rather than show a template it does not fit.
  */
 
-import { translations } from '../../components/Rpg/translations';
+import { translations } from './translations';
 
 export type UiTable = typeof translations.en;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { translations } from '../../components/Rpg/translations';
+import { translations } from './translations';
 import { cleanTranslation, fill, slices, sourceHash, uiSource, uiTable } from './uiTranslate';
 
 describe('uiSource', () => {

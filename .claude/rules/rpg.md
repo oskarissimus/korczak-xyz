@@ -1869,7 +1869,7 @@ lack it and answer in the browser's language). `Lang` is now any of them, not `'
   translates its own copy of `translations.en` — so the endpoint cannot translate arbitrary text,
   and its whole cost is one ~16k-character translation per language on the list, which is why it
   is outside the demo's budget. The browser keeps it in `rpg-ui-<lang>` and shows English until it
-  arrives (the menu says it is translating). `translations.ts` stays the source: a string or a
+  arrives (the menu says it is translating). `utils/rpg/translations.ts` (moved from `components/Rpg/`, which re-exports it, because only `utils/rpg` has the tsconfig the functions' CI can read) stays the source: a string or a
   record's entry is translated as it is, a function as its template with `{0}`, `{1}`… for its
   arguments; a function whose words depend on an argument reads them off the table through `this`
   (`aiQuest`, `demoClosed`, `fundsWhat`, `exoticBand`), and one that cannot be templated (`devRigs`,
