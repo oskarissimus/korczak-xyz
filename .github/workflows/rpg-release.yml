@@ -148,12 +148,12 @@ jobs:
         run: |
           sed -i 's|return false; // SELF_ADMISSION|return true; // SELF_ADMISSION|' firestore.rules
           grep -q 'return true; // SELF_ADMISSION' firestore.rules
-      # Not `rpgProposals` yet: its deploy writes a Cloud Scheduler job, which this deployer has no
-      # role for (terraform/rpg/iam.tf). Until it does, rpgDemo makes the pool when a page finds none.
+      # `rpgProposals` writes a Cloud Scheduler job on deploy: the deployer's `cloudscheduler.admin`
+      # in terraform/rpg/iam.tf is for it.
       - name: Deploy rules and the game's functions
         run: >-
           npx --yes firebase-tools@15 deploy
-          --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob
+          --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob,functions:rpgProposals
           --project "$GCP_PROJECT" --non-interactive --force
 
   deploy:
