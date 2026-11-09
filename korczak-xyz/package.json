@@ -56,7 +56,7 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
-    "@sentry/vite-plugin": "^11.10.0",
+    "@sentry/vite-plugin": "^11.11.0",
     "@tailwindcss/forms": "^0.5.11",
     "@types/leaflet": "^1.9.22",
     "@types/react": "^19.3.0",
