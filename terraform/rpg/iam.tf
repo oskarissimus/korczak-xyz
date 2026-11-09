@@ -13,8 +13,9 @@ resource "google_service_account" "deployer" {
 }
 
 locals {
-  # The site deployer's roles in korczak-xyz-501720, minus what the game has no use for (Cloud
-  # Scheduler). Everything `firebase deploy` and the apply of this directory need.
+  # The site deployer's roles in korczak-xyz-501720. Everything `firebase deploy` and the apply of
+  # this directory need. Cloud Scheduler was left out until the game had a schedule of its own:
+  # `rpgProposals`, the menu's proposed worlds once a day (9 Nov 2026), whose deploy writes its job.
   deployer_roles = [
     "roles/firebase.admin",
     "roles/cloudfunctions.admin",
@@ -29,6 +30,7 @@ locals {
     "roles/storage.admin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/logging.configWriter",
+    "roles/cloudscheduler.admin",
   ]
 }
 
