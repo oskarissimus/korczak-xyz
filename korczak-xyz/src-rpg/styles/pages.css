@@ -32,6 +32,21 @@ body::before {
     #000;
 }
 
+/* The account and admin pages put their text straight on the page, and over the village it was
+   unreadable (owner, 9 Nov 2026: "coś z kontrastem słabo"). So the whole page sits in one dark,
+   nearly opaque panel there. Sign-in has its own card and is left out — its island is
+   `display: contents`, so the card is the thing `:has` finds. */
+.rpg-page:not(:has(.auth-card--game)) {
+  margin-top: calc(24px + var(--safe-top));
+  margin-bottom: 24px;
+  background: rgba(16, 13, 9, 0.94);
+  border: 1px solid #4a3d2c;
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
 .rpg-page h1 {
   text-shadow: 0 2px 0 #000, 0 0 18px rgba(255, 211, 107, 0.35);
 }
@@ -242,4 +257,40 @@ body::before {
   .auth-card--game {
     padding: 22px 18px 20px;
   }
+}
+
+/* --- Contrast on the account and admin pages --- */
+/* account.css picks its text colours for the site's teal window and gray cards: off-card text is
+   `--retro-white` (here a dark bevel brown) and in-card dim text is #3a3a3a, both near-invisible on
+   the game's dark panel, and its ✓/! greens and reds are drawn for a light gray. Every pair below
+   is at least 4.5:1 against the panel (#100d09) or the card (#1d1812). */
+.rpg-page .acct > .acct-dim,
+.rpg-page .acct-section > .acct-dim,
+.rpg-page .acct-heading,
+.rpg-page .auth-subtitle,
+.rpg-page .auth-note {
+  color: #cdbf9f;
+}
+
+.rpg-page .acct-dim,
+.rpg-page .acct-card .acct-dim,
+.rpg-page .acct-numbers dt,
+.rpg-page .admin-account-meta,
+.rpg-page .admin-demo-hint {
+  color: #b3a382;
+}
+
+.rpg-page .acct-card h3,
+.rpg-page .acct-card a {
+  color: #f3d27a;
+}
+
+.rpg-page .acct-ok,
+.rpg-page .admin-account-ok {
+  color: #8fd19e;
+}
+
+.rpg-page .acct-warn,
+.rpg-page .admin-account-warn {
+  color: #f0a090;
 }
