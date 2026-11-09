@@ -121,7 +121,9 @@ export function checkRpgDemo(
   cost: number,
 ): RpgDemoVerdict {
   if (!settings.enabled) return { ok: false, reason: 'disabled', status: 503 };
-  if (!settings.keyUid) return { ok: false, reason: 'no-key', status: 503 };
+  // No `keyUid` is not "no key": the server's own keys (the admin panel) pay first, and the caller
+  // checks that a Google key exists from either (`demoKeys`). Until 9 Nov 2026 this line closed the
+  // demo on everyrpg.korczak.xyz, whose project has server keys and no `demo/config` at all.
   if (!settings.on) return { ok: false, reason: 'app-off', status: 503 };
   if (spent.ip + cost > settings.perIpUsd) return { ok: false, reason: 'ip-cap', status: 402 };
   if (spent.all + cost > settings.dailyUsd) return { ok: false, reason: 'all-cap', status: 402 };

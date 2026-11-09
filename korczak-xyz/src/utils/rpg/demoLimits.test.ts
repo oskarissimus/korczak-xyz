@@ -41,7 +41,8 @@ describe('checkRpgDemo', () => {
 
   it('says why it is closed before it counts anything', () => {
     expect(checkRpgDemo({ ...settings, enabled: false }, { ip: 0, all: 0 }, 0)).toMatchObject({ reason: 'disabled' });
-    expect(checkRpgDemo({ ...settings, keyUid: '' }, { ip: 0, all: 0 }, 0)).toMatchObject({ reason: 'no-key' });
+    // The server's keys pay without a paying account: the caller checks a Google key exists.
+    expect(checkRpgDemo({ ...settings, keyUid: '' }, { ip: 0, all: 0 }, 0)).toEqual({ ok: true });
     expect(checkRpgDemo({ ...settings, on: false }, { ip: 0, all: 0 }, 0)).toMatchObject({ reason: 'app-off', status: 503 });
   });
 

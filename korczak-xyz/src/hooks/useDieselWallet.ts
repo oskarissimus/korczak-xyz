@@ -20,7 +20,17 @@ export function useDieselWallet(user: User | null): WalletStatus | null {
     if (!uid) return;
     const controller = new AbortController();
     let unsubscribe: (() => void) | null = null;
-    void fetchWallet(controller.signal).then(async (status) => {
+    // Asked again a few times if it fails (a weak signal, the function cold): one miss would leave a
+    // signed-in reader without their tank, on the hand-written quest, until a reload.
+    const ask = async (): Promise<WalletStatus | null> => {
+      for (let attempt = 0; attempt < 5 && !controller.signal.aborted; attempt++) {
+        const status = await fetchWallet(controller.signal);
+        if (status) return status;
+        await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
+      }
+      return null;
+    };
+    void ask().then(async (status) => {
       if (controller.signal.aborted || !status) return;
       setWallet(status);
       const [{ getDb }, { doc, onSnapshot }] = await Promise.all([import('../lib/firebase'), import('firebase/firestore')]);

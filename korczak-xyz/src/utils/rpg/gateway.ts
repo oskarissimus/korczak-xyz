@@ -69,6 +69,10 @@ export function setTokenSource(source: (() => Promise<string | null>) | null): v
 async function idToken(): Promise<string | null> {
   if (tokenSource) return tokenSource();
   const { auth } = await import('../../lib/firebase');
+  // The page may know the reader from the sign-in cache (`authCache.ts`) before Firebase has restored
+  // them: wait for that once rather than calling them signed out. The diesel tank was asked in that
+  // window and never again, so a signed-in reader got the hand-written quest (9 Nov 2026).
+  if (auth && !auth.currentUser) await auth.authStateReady().catch(() => {});
   return (await auth?.currentUser?.getIdToken().catch(() => null)) ?? null;
 }
 
