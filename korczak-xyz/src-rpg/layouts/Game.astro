@@ -74,6 +74,8 @@ const recoveryStrings = {
     --safe-right: env(safe-area-inset-right);
     --safe-bottom: env(safe-area-inset-bottom);
     --safe-left: env(safe-area-inset-left);
+    /* The build stamp's black strip (components/BuildStamp.astro), home bar included. */
+    --stamp-h: calc(16px + var(--safe-bottom));
     color-scheme: dark;
   }
 
@@ -89,6 +91,10 @@ const recoveryStrings = {
     background: #000;
     color: #f1e6cf;
     font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  body {
+    padding-bottom: var(--stamp-h);
   }
 
   a {

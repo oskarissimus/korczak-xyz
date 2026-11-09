@@ -5,8 +5,8 @@
  * (owner, 9 Nov 2026). The hash is `git rev-parse --short HEAD` like Navbar.astro's; the time is
  * when the build ran, shown in the viewer's own zone.
  *
- * It never takes a tap: it sits over the game, and the bottom edge is where the stick and the
- * buttons are. Polling a deploy reads `data-commit` from the HTML.
+ * It never takes a tap, and nothing of the page sits under it: every page ends `--stamp-h` above
+ * the bottom edge. Polling a deploy reads `data-commit` from the HTML.
  */
 import { execSync } from 'node:child_process';
 
@@ -39,16 +39,23 @@ const built = new Date().toISOString();
 </script>
 
 <style>
+  /* A black strip across the bottom, and the page ends above it rather than under it
+     (`--stamp-h` in layouts/Game.astro: the body is padded by it, the game shortened by it): on top of
+     the game's world cards the text alone was unreadable (owner, 9 Nov 2026, a photo). */
   .build-stamp {
     position: fixed;
-    left: 50%;
-    bottom: calc(2px + var(--safe-bottom, 0px));
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--stamp-h);
+    padding-bottom: var(--safe-bottom, 0px);
     z-index: 1001; /* over the game in immersive mode (styles/rpg.css, 1000) */
     pointer-events: none;
+    background: #000;
+    text-align: center;
     white-space: nowrap;
-    font: 10px/1.2 ui-monospace, Menlo, Consolas, monospace;
-    color: rgba(241, 230, 207, 0.45);
-    text-shadow: 0 1px 0 #000;
+    overflow: hidden;
+    font: 10px/16px ui-monospace, Menlo, Consolas, monospace;
+    color: rgba(241, 230, 207, 0.6);
   }
 </style>

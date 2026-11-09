@@ -8,7 +8,18 @@
 
 .rpg-standalone .rpg-container,
 .rpg-standalone .rpg-container.rpg-touch:not(.rpg-immersive) {
-  height: calc(100vh - var(--safe-top));
-  height: calc(100dvh - var(--safe-top));
+  height: calc(100vh - var(--safe-top) - var(--stamp-h));
+  height: calc(100dvh - var(--safe-top) - var(--stamp-h));
   min-height: 0;
+}
+
+/* And above the build stamp's strip, which already covers the home bar: the game's controls stop
+   adding the bottom inset themselves, or the stick would sit that much higher again. */
+.rpg-standalone .rpg-container {
+  --safe-bottom: 0px;
+}
+
+.rpg-standalone .rpg-container.rpg-immersive {
+  height: calc(100vh - var(--rpg-top) - var(--stamp-h));
+  height: calc(100dvh - var(--rpg-top) - var(--stamp-h));
 }
