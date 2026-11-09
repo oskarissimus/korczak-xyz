@@ -12,6 +12,7 @@ import { auth, firebaseEnabled } from '../lib/firebase';
 import {
   getAccountState,
   loadIsAdmin,
+  SELF_ADMISSION,
   subscribeAccountState,
   watchAccount,
   type AccountRecord,
@@ -192,8 +193,10 @@ export function useAuth(): AuthApi {
     authResolved,
     cachedUid: cachedUser?.uid ?? null,
     identityUid: identity?.uid ?? null,
-    accountReady,
-    approved: account.record?.approved === true,
+    // The game's build has no gate: signed in is let in, without waiting for the row, and an
+    // older row still marked not approved changes nothing (`SELF_ADMISSION` in lib/account.ts).
+    accountReady: SELF_ADMISSION || accountReady,
+    approved: SELF_ADMISSION || account.record?.approved === true,
   });
 
   const user = status === 'approved' ? identity : null;

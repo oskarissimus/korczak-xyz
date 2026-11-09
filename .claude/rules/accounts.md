@@ -54,14 +54,16 @@ sign-up form.** There is no catch-all that grants.
 
 ### Every RPG has no gate (Nov 2026)
 
-Owner, 9 Nov 2026: "remove approval gate" — for the game. On everyrpg.korczak.xyz a new account
-works the moment it is made; korczak.xyz still waits for the owner. It is **one ruleset with one
-line of difference**: `selfAdmission()` in `firestore.rules` returns false, and the game's release
-workflow (`rpg-release.yml`, *Let new accounts in*) seds it to true before deploying to
-`korczak-rpg`, failing if the line is gone. All it changes is that a sign-up may create its row with
-`approved: true`; the game's build writes it that way (`SELF_ADMISSION` in `lib/account.ts`, mode
-`rpg`) and treats a missing row as *checking* rather than flashing the waiting screen. So revoking
-still works there — an admin sets the row to false and the subject cannot set it back.
+Owner, 9 Nov 2026: "remove approval gate for everyrpg prod". On everyrpg.korczak.xyz any signed-in
+account is let in — new ones, and ones made before the change that are still marked not approved;
+korczak.xyz still waits for the owner. It is **one ruleset with one line of difference**:
+`selfAdmission()` in `firestore.rules` returns false, and the game's release workflow
+(`rpg-release.yml`, *Let new accounts in*) seds it to true before deploying to `korczak-rpg`,
+failing if the line is gone. There `approved()` asks nothing of the account row. The game's build
+does the same on the page (`SELF_ADMISSION` in `lib/account.ts`, mode `rpg`, read by `useAuth`), so
+it never shows the waiting screen, and `skin.ts` skips its check when running in `korczak-rpg`. A
+sign-up there still writes its row, approved, so the row exists and tells the truth. There is no
+turning anybody away in the game; that would be a new switch, not this one.
 
 It costs the owner nothing because nothing an account does in the game spends his keys: `payer`
 in `functions/src/rpg/gateway.ts` takes the account's own key or the reader's, and the demo is

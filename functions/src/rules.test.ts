@@ -294,8 +294,8 @@ maybe('firestore.rules as deployed to the game (korczak-rpg)', () => {
   const row = (extra: Partial<Record<string, unknown>> = {}) =>
     account('fresh@example.com', { emailTrusted: false, createdAt: 10, lastSeenAt: 10, ...extra });
 
-  it('a sign-up creates its own row approved, and can use the game at once', async () => {
-    await assertFails(setDoc(doc(fresh(), 'users/fresh/rpgSaves/w1'), { quest: '{}' }));
+  it('a sign-up can use the game at once, and creates its own row approved', async () => {
+    await assertSucceeds(setDoc(doc(fresh(), 'users/fresh/rpgSaves/w1'), { quest: '{}' }));
     await assertSucceeds(setDoc(doc(fresh(), 'accounts/fresh'), row()));
     await assertSucceeds(setDoc(doc(fresh(), 'users/fresh/rpgSaves/w1'), { quest: '{}' }));
     await assertSucceeds(getDoc(doc(fresh(), 'users/fresh/rpgSaves/w1')));
@@ -313,10 +313,16 @@ maybe('firestore.rules as deployed to the game (korczak-rpg)', () => {
     await assertFails(getDocs(collection(fresh(), 'accounts')));
   });
 
-  it('an account the admin has turned away cannot let itself back in', async () => {
-    const revoked = as('revoked', 'revoked@example.com');
-    await assertFails(updateDoc(doc(revoked, 'accounts/revoked'), { approved: true }));
-    await assertFails(setDoc(doc(revoked, 'users/revoked/rpgSaves/w1'), { quest: '{}' }));
-    await assertSucceeds(updateDoc(doc(as('owner', 'owner@example.com'), 'accounts/revoked'), { approved: true }));
+  it('an account marked not approved, made before the gate came off, plays like any other', async () => {
+    const old = as('revoked', 'revoked@example.com');
+    await assertSucceeds(setDoc(doc(old, 'users/revoked/rpgSaves/w1'), { quest: '{}' }));
+    await assertSucceeds(getDoc(doc(old, 'users/revoked/rpgSaves/w1')));
+    await assertFails(getDoc(doc(old, 'users/fresh/rpgSaves/w1')));
+  });
+
+  it('signed out is still nobody, and the admin list is still the admin list', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/fresh/rpgSaves/w1')));
+    await assertFails(setDoc(doc(fresh(), 'admins/fresh'), {}));
+    await assertFails(updateDoc(doc(as('revoked', 'revoked@example.com'), 'accounts/revoked'), { emailTrusted: true }));
   });
 });

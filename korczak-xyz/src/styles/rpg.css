@@ -1830,7 +1830,14 @@ body:has(.rpg-immersive) .safe-top-band {
 
 /* The intro as a game's menu: a title, the world in one line, a column of entries, and each
    sub-screen one level down with its own Back. Scrolls rather than cuts off on a short screen. */
+/* A picture from the game behind the main menu (owner, 9 Nov 2026), darkened so the menu reads. It
+   was the dimmed canvas before, which before a world exists is a black screen. The same picture is
+   behind sign-in on everyrpg.korczak.xyz (src-rpg/styles/pages.css). */
 .rpg-menu-screen {
+  background:
+    radial-gradient(ellipse at center, rgba(8, 7, 5, 0.55) 0%, rgba(8, 7, 5, 0.88) 80%),
+    url('../assets/rpg/menu-background.jpg') center / cover no-repeat,
+    #08080a;
   overflow-y: auto;
   justify-content: safe center;
   -webkit-overflow-scrolling: touch;

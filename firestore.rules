@@ -76,23 +76,24 @@ service cloud.firestore {
      * revocation both bite on the next query, and the panel is one `updateDoc` from the browser.
      */
     function approved() {
-      return signedIn() && callerAccount().approved == true;
+      return signedIn() && (selfAdmission() || callerAccount().approved == true);
     }
 
     /*
-     * Whether a new account lets itself in. False here, which is korczak.xyz: the owner decides.
+     * Whether every signed-in account is let in. False here, which is korczak.xyz: the owner decides.
      *
      * True on everyrpg.korczak.xyz's own project, korczak-rpg (owner, 9 Nov 2026: "remove approval
-     * gate"). The game's release workflow (`.github/workflows/rpg-release.yml`) rewrites the line
-     * below before it deploys this file there and fails if the line is not found, so this is one
-     * ruleset with one difference rather than two files drifting apart. `functions/src/rules.test.ts`
-     * runs both.
+     * gate for everyrpg prod"). There `approved()` asks nothing of the account row, so an account
+     * made before the change, still marked not approved, plays like any other; there is no
+     * approving and no turning away in the game. A sign-up may also write its row approved, so
+     * the row tells the truth. The game's release workflow (`.github/workflows/rpg-release.yml`)
+     * rewrites the line below before it deploys this file there and fails if the line is not
+     * found, so this is one ruleset with one difference rather than two files drifting apart.
+     * `functions/src/rules.test.ts` runs both.
      *
-     * It only changes what a sign-up may write on create — `approved: true` rather than `false` —
-     * so the gate itself stays: an admin can still set the row to false, and the subject still
-     * cannot set it back. Letting everyone in costs the owner nothing on that project: an account
-     * spends its own keys (`payer` in functions/src/rpg/gateway.ts), and the demo is capped per
-     * address whether anybody is signed in or not.
+     * Letting everyone in costs the owner nothing on that project: an account spends its own keys
+     * (`payer` in functions/src/rpg/gateway.ts), and the demo is capped per address whether
+     * anybody is signed in or not. Admin-only paths still ask `isAdmin()`.
      */
     function selfAdmission() {
       return false; // SELF_ADMISSION

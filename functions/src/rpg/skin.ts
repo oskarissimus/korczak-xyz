@@ -24,7 +24,14 @@ export class SkinRefusal extends Error {
   }
 }
 
+/**
+ * The game's own project has no approval (owner, 9 Nov 2026), the same as `selfAdmission()` in
+ * firestore.rules there: any signed-in account is let in. Elsewhere the account row decides.
+ */
+const SELF_ADMISSION = (process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT) === 'korczak-rpg';
+
 async function approved(uid: string): Promise<boolean> {
+  if (SELF_ADMISSION) return true;
   const snap = await db.doc(`accounts/${uid}`).get();
   return snap.data()?.approved === true;
 }

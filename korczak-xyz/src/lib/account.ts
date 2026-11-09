@@ -76,11 +76,12 @@ export interface AccountState {
 }
 
 /**
- * everyrpg.korczak.xyz lets a new account in on sign-up (owner, 9 Nov 2026: "remove approval
- * gate"); korczak.xyz waits for the owner. The client writes the row approved there, and the rules
- * deployed to the game's project are what allow it — `selfAdmission()` in `firestore.rules`.
+ * everyrpg.korczak.xyz has no approval at all (owner, 9 Nov 2026: "remove approval gate for
+ * everyrpg prod"); korczak.xyz waits for the owner. In the game's build every signed-in account is
+ * approved whatever its row says (`useAuth`), the row is written approved for honesty, and the
+ * rules deployed to the game's project agree — `selfAdmission()` in `firestore.rules`.
  */
-const SELF_ADMISSION = import.meta.env.MODE === 'rpg';
+export const SELF_ADMISSION = import.meta.env.MODE === 'rpg';
 
 const SIGNED_OUT: AccountState = { resolved: true, uid: null, record: null, error: null };
 
