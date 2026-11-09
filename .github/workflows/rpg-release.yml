@@ -31,7 +31,12 @@ on:
   # A pushed `v*` tag ships too: the `release` job makes its release first. This is how a Claude
   # session ships (`git push origin v1.2.0`) — its GitHub connector can push but can neither create
   # a release nor start a workflow.
+  #
+  # And every push to main, for now (owner, 9 Nov 2026: "prod should follow main until setup is
+  # done"). That ships the commit as it is, with no release made for it, so the release list stays
+  # the list of real releases. To return to releases only, delete the `branches` line.
   push:
+    branches: [main]
     tags: ["v*", "20*"]
   workflow_dispatch:
     inputs:
@@ -66,6 +71,8 @@ jobs:
       contents: write
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      # What the two jobs below check out: the tag, or on a push to main the commit itself.
+      ref: ${{ steps.tag.outputs.ref }}
     steps:
       - name: Which tag
         id: tag
@@ -73,15 +80,22 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "### Shipping main at \`${GITHUB_SHA::7}\` (no release)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           case "$GITHUB_EVENT_NAME" in
             release) tag="$RELEASE_TAG" ;;
             push)    tag="$GITHUB_REF_NAME" ;;
             *)       tag="${INPUT_TAG:-$(date -u +%Y-%m-%d-%H%M)-${GITHUB_SHA::7}}" ;;
           esac
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/tags/$tag" >> "$GITHUB_OUTPUT"
           echo "### Shipping \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Make the release if the tag has none
-        if: github.event_name != 'release'
+        if: github.event_name != 'release' && steps.tag.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.tag.outputs.tag }}
@@ -106,7 +120,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.release.outputs.tag }}
+          ref: ${{ needs.release.outputs.ref }}
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:
@@ -149,7 +163,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.release.outputs.tag }}
+          ref: ${{ needs.release.outputs.ref }}
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:

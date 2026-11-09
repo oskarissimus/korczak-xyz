@@ -5,6 +5,7 @@
 import { useTranslations, type Lang } from '../../src/i18n';
 import islandRecovery from '../../src/scripts/island-recovery.js?raw';
 import { iconUrl } from '../../src/utils/pwa/iconUrl';
+import BuildStamp from '../components/BuildStamp.astro';
 
 interface Props {
   title: string;
@@ -59,6 +60,7 @@ const recoveryStrings = {
   </head>
   <body>
     <slot />
+    <BuildStamp />
   </body>
 </html>
 

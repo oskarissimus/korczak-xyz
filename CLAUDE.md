@@ -73,8 +73,19 @@ locales. `npm run build:rpg` builds it in mode `rpg`, which reads `.env.rpg` *in
 dist/. Rolling back is running that workflow by hand
 with an older tag. Its Sentry environment is `rpg`.
 
-So "is it live" has two answers now: a push to `main` reaches korczak.xyz (poll as below), and
-reaches everyrpg.korczak.xyz only through a release.
+**For now it also follows `main`** (owner, 9 Nov 2026, until the game's setup is done): the same
+workflow runs on every push to main and deploys that commit — backend and front — without making a
+release, so the release list stays the list of real releases. Deleting `branches: [main]` from its
+`push:` trigger returns it to releases only. While that line is there, a push to main reaches both
+hosts, and everyrpg.korczak.xyz is polled the same way as below, from the build stamp at the
+bottom of every page:
+
+```
+curl -sS https://everyrpg.korczak.xyz/ | grep -o 'data-commit="[0-9a-f]*"'
+```
+
+The stamp (`src-rpg/components/BuildStamp.astro`) is the commit and the build time in the viewer's
+zone, the game's equivalent of the navbar's status bar.
 
 **The game's production has a GCP project of its own, `korczak-rpg`** — its own Firestore,
 accounts, asset bucket (`korczak-rpg-rpg`) and copies of the three game functions (`rpgDemo`,

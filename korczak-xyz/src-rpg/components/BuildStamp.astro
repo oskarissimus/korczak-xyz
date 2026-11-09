@@ -1,0 +1,54 @@
+---
+/**
+ * The commit and the build time, small at the bottom of every page of everyrpg.korczak.xyz — the
+ * same two things korczak.xyz's navbar prints, so a phone can tell which build it is playing
+ * (owner, 9 Nov 2026). The hash is `git rev-parse --short HEAD` like Navbar.astro's; the time is
+ * when the build ran, shown in the viewer's own zone.
+ *
+ * It never takes a tap: it sits over the game, and the bottom edge is where the stick and the
+ * buttons are. Polling a deploy reads `data-commit` from the HTML.
+ */
+import { execSync } from 'node:child_process';
+
+let commit = 'dev';
+try {
+  commit = execSync('git rev-parse --short HEAD').toString().trim();
+} catch {
+  // A checkout with no .git still builds.
+}
+const built = new Date().toISOString();
+---
+
+<div class="build-stamp" aria-hidden="true" data-commit={commit} data-built={built}>
+  {commit} · <time datetime={built}>{built.slice(0, 16).replace('T', ' ')} UTC</time>
+</div>
+
+<script>
+  for (const el of document.querySelectorAll<HTMLElement>('.build-stamp time')) {
+    const at = new Date(el.dateTime);
+    if (!Number.isNaN(at.getTime())) {
+      el.textContent = at.toLocaleString(document.documentElement.lang === 'pl' ? 'pl-PL' : 'en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  }
+</script>
+
+<style>
+  .build-stamp {
+    position: fixed;
+    left: 50%;
+    bottom: calc(2px + var(--safe-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 1001; /* over the game in immersive mode (styles/rpg.css, 1000) */
+    pointer-events: none;
+    white-space: nowrap;
+    font: 10px/1.2 ui-monospace, Menlo, Consolas, monospace;
+    color: rgba(241, 230, 207, 0.45);
+    text-shadow: 0 1px 0 #000;
+  }
+</style>
