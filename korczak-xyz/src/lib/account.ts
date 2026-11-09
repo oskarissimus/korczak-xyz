@@ -75,6 +75,13 @@ export interface AccountState {
   error: string | null;
 }
 
+/**
+ * everyrpg.korczak.xyz lets a new account in on sign-up (owner, 9 Nov 2026: "remove approval
+ * gate"); korczak.xyz waits for the owner. The client writes the row approved there, and the rules
+ * deployed to the game's project are what allow it — `selfAdmission()` in `firestore.rules`.
+ */
+const SELF_ADMISSION = import.meta.env.MODE === 'rpg';
+
 const SIGNED_OUT: AccountState = { resolved: true, uid: null, record: null, error: null };
 
 let state: AccountState = { resolved: false, uid: null, record: null, error: null };
@@ -132,7 +139,7 @@ export function accountEmailOf(identity: AccountIdentity): string {
  * Put this account in front of the owner.
  *
  * Creating the row is not being admitted — `approved` is false and the rules refuse any other
- * value from the subject. It is how an account becomes *visible*: without it the panel has nothing
+ * value from the subject, except in the game's build (`SELF_ADMISSION`), whose rules accept true. It is how an account becomes *visible*: without it the panel has nothing
  * to list, and somebody who signed up would be waiting on a decision nobody had been asked to
  * make.
  */
@@ -144,7 +151,7 @@ async function ensureAccount(identity: AccountIdentity): Promise<void> {
       setDoc(doc(accountsCollection(), identity.uid), {
         email: accountEmailOf(identity),
         emailVerified: identity.emailVerified === true,
-        approved: false,
+        approved: SELF_ADMISSION,
         emailTrusted: false,
         createdAt: Date.now(),
         lastSeenAt: Date.now(),
@@ -153,6 +160,11 @@ async function ensureAccount(identity: AccountIdentity): Promise<void> {
     log.info('account.created', { uid: identity.uid });
   } catch (e) {
     log.warn('account.create.failed', describeError(e));
+    // Self-admitting, the missing row was left unresolved while this ran (see `watchAccount`);
+    // the write failing is the answer now, so the screen can say so instead of waiting forever.
+    if (SELF_ADMISSION && activeUid === identity.uid) {
+      publish({ resolved: true, uid: identity.uid, record: null, error: String(describeError(e).message ?? 'could not create the account') });
+    }
   } finally {
     ensuring = null;
   }
@@ -227,7 +239,9 @@ export function watchAccount(identity: AccountIdentity | null): void {
       // to a question nobody is asking any more.
       if (activeUid !== identity.uid) return;
       if (!snap.exists()) {
-        publish({ resolved: true, uid: identity.uid, record: null, error: null });
+        // Where a new account lets itself in, a missing row is a row about to be written approved:
+        // still "checking" rather than a flash of the waiting screen. The next snapshot settles it.
+        if (!SELF_ADMISSION) publish({ resolved: true, uid: identity.uid, record: null, error: null });
         void ensureAccount(identity);
         return;
       }

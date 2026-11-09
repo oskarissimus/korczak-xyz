@@ -80,6 +80,25 @@ service cloud.firestore {
     }
 
     /*
+     * Whether a new account lets itself in. False here, which is korczak.xyz: the owner decides.
+     *
+     * True on everyrpg.korczak.xyz's own project, korczak-rpg (owner, 9 Nov 2026: "remove approval
+     * gate"). The game's release workflow (`.github/workflows/rpg-release.yml`) rewrites the line
+     * below before it deploys this file there and fails if the line is not found, so this is one
+     * ruleset with one difference rather than two files drifting apart. `functions/src/rules.test.ts`
+     * runs both.
+     *
+     * It only changes what a sign-up may write on create — `approved: true` rather than `false` —
+     * so the gate itself stays: an admin can still set the row to false, and the subject still
+     * cannot set it back. Letting everyone in costs the owner nothing on that project: an account
+     * spends its own keys (`payer` in functions/src/rpg/gateway.ts), and the demo is capped per
+     * address whether anybody is signed in or not.
+     */
+    function selfAdmission() {
+      return false; // SELF_ADMISSION
+    }
+
+    /*
      * Whether this account's address may be taken to be its own.
      *
      * It matters in exactly one place — the household share, which is keyed by *address* rather
@@ -145,7 +164,8 @@ service cloud.firestore {
              ['email', 'emailVerified', 'approved', 'emailTrusted', 'createdAt', 'lastSeenAt'])
         && request.resource.data.keys().hasAll(
              ['email', 'emailVerified', 'approved', 'emailTrusted', 'createdAt'])
-        && request.resource.data.approved == false
+        && (request.resource.data.approved == false
+            || (selfAdmission() && request.resource.data.approved == true))
         && request.resource.data.emailTrusted == false
         && selfDescribed();
 

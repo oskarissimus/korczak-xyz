@@ -57,3 +57,164 @@
 .rpg-page *::placeholder {
   font-family: inherit !important;
 }
+
+/* --- Sign in / create account, in the game's own card --- */
+/* auth.css lays the form out for the site's Windows 95 dialog: bevels, inset wells, a pressed-in
+   tab. Recoloured that read as a form somebody forgot to style, so the game variant
+   (`auth-card--game`, set by LoginForm) gets a card of its own. The admin page also draws with
+   auth.css here and is left as it is. */
+.auth-card--game {
+  max-width: 400px;
+  gap: 18px;
+  padding: 28px 28px 24px;
+  background: linear-gradient(180deg, rgba(42, 34, 25, 0.92), rgba(22, 18, 13, 0.95));
+  border: 1px solid #4a3d2c;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(224, 185, 106, 0.06) inset,
+    0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+.auth-card--game .auth-tabs {
+  gap: 0;
+  padding: 4px;
+  background: #120e0a;
+  border: 1px solid #3a3024;
+  border-radius: 8px;
+}
+
+.auth-card--game .auth-tab {
+  padding: 8px 10px;
+  font-size: 1rem;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #a8987a;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.auth-card--game .auth-tab:hover {
+  color: #f1e6cf;
+}
+
+.auth-card--game .auth-tab--on {
+  background: #2e261c;
+  color: #f3d27a;
+  box-shadow: 0 0 0 1px #5a4a33 inset;
+}
+
+.auth-card--game .auth-tab:focus-visible,
+.auth-card--game .retro-btn:focus-visible {
+  outline: 2px solid #e0b96a;
+  outline-offset: 2px;
+}
+
+.auth-card--game .auth-subtitle {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #b8a888;
+  text-align: center;
+}
+
+.auth-card--game .auth-field {
+  gap: 6px;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a8987a;
+}
+
+.auth-card--game .auth-field input {
+  font-size: 1rem;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 11px 12px;
+  background: #120e0a;
+  border: 1px solid #4a3d2c;
+  border-radius: 6px;
+  color: #f1e6cf;
+  caret-color: #e0b96a;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.auth-card--game .auth-field input:focus {
+  outline: none;
+  border-color: #e0b96a;
+  box-shadow: 0 0 0 3px rgba(224, 185, 106, 0.18);
+}
+
+/* A browser that fills the password in paints the field its own bright blue (or yellow) and
+   ignores `background`; an inset shadow is the one thing drawn over it. */
+.auth-card--game .auth-field input:-webkit-autofill,
+.auth-card--game .auth-field input:-webkit-autofill:hover,
+.auth-card--game .auth-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1e6cf;
+  -webkit-box-shadow: 0 0 0 1000px #120e0a inset;
+  box-shadow: 0 0 0 1000px #120e0a inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
+.auth-card--game .auth-field input:-webkit-autofill:focus {
+  -webkit-box-shadow:
+    0 0 0 1000px #120e0a inset,
+    0 0 0 3px rgba(224, 185, 106, 0.18);
+  box-shadow:
+    0 0 0 1000px #120e0a inset,
+    0 0 0 3px rgba(224, 185, 106, 0.18);
+}
+
+.auth-card--game .auth-field input:autofill {
+  -webkit-text-fill-color: #f1e6cf;
+  box-shadow: 0 0 0 1000px #120e0a inset;
+}
+
+.auth-card--game .auth-submit {
+  align-self: stretch;
+  margin-top: 4px;
+  padding: 12px 18px;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  text-align: center;
+  background: linear-gradient(180deg, #ecc77a, #c99a45);
+  border: 1px solid #f3d27a;
+  border-radius: 6px;
+  color: #1d1408;
+  box-shadow: 0 2px 10px rgba(224, 185, 106, 0.18);
+}
+
+.auth-card--game .auth-submit:hover {
+  background: linear-gradient(180deg, #f3d27a, #d4a650);
+  color: #1d1408;
+}
+
+.auth-card--game .auth-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.auth-card--game .auth-error {
+  font-size: 0.95rem;
+  padding: 10px 12px;
+  background: rgba(224, 122, 106, 0.1);
+  border: 1px solid rgba(224, 122, 106, 0.35);
+  border-radius: 6px;
+}
+
+.auth-card--game .auth-signedin {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.auth-card--game .auth-links .retro-btn {
+  border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+  .auth-card--game {
+    padding: 22px 18px 20px;
+  }
+}

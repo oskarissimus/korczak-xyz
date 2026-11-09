@@ -52,6 +52,21 @@ denial. An account created straight in the console writes nothing here, so it to
 **Adding a `match` block without `approved()` in it re-opens that path to anyone who can fill in a
 sign-up form.** There is no catch-all that grants.
 
+### Every RPG has no gate (Nov 2026)
+
+Owner, 9 Nov 2026: "remove approval gate" — for the game. On everyrpg.korczak.xyz a new account
+works the moment it is made; korczak.xyz still waits for the owner. It is **one ruleset with one
+line of difference**: `selfAdmission()` in `firestore.rules` returns false, and the game's release
+workflow (`rpg-release.yml`, *Let new accounts in*) seds it to true before deploying to
+`korczak-rpg`, failing if the line is gone. All it changes is that a sign-up may create its row with
+`approved: true`; the game's build writes it that way (`SELF_ADMISSION` in `lib/account.ts`, mode
+`rpg`) and treats a missing row as *checking* rather than flashing the waiting screen. So revoking
+still works there — an admin sets the row to false and the subject cannot set it back.
+
+It costs the owner nothing because nothing an account does in the game spends his keys: `payer`
+in `functions/src/rpg/gateway.ts` takes the account's own key or the reader's, and the demo is
+capped per address with or without an account. `rules.test.ts` runs the rules both ways.
+
 ### The rules have a test, and the deploy waits for it
 
 `functions/src/rules.test.ts` runs the whole policy against the real rules engine in the Firestore

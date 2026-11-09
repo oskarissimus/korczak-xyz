@@ -255,3 +255,68 @@ maybe('firestore.rules', () => {
     await assertFails(getDoc(doc(stranger(), 'users/owner/progress/p1')));
   });
 });
+
+/** The line `.github/workflows/rpg-release.yml` rewrites before deploying to korczak-rpg. */
+const SELF_ADMISSION_OFF = 'return false; // SELF_ADMISSION';
+const SELF_ADMISSION_ON = 'return true; // SELF_ADMISSION';
+
+maybe('firestore.rules as deployed to the game (korczak-rpg)', () => {
+  let env: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    const rules = fs.readFileSync(RULES, 'utf8');
+    if (!rules.includes(SELF_ADMISSION_OFF)) throw new Error('the self-admission line the release rewrites is gone');
+    env = await initializeTestEnvironment({
+      projectId: 'demo-rules-rpg',
+      firestore: { rules: rules.replace(SELF_ADMISSION_OFF, SELF_ADMISSION_ON) },
+    });
+  });
+
+  afterAll(async () => {
+    await env?.cleanup();
+  });
+
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'admins/owner'), { email: 'owner@example.com' });
+      await setDoc(doc(db, 'accounts/owner'), account('owner@example.com'));
+      await setDoc(
+        doc(db, 'accounts/revoked'),
+        account('revoked@example.com', { approved: false, emailTrusted: false, createdAt: 5 })
+      );
+    });
+  });
+
+  const as = (uid: string, email: string) => env.authenticatedContext(uid, { email, email_verified: false }).firestore();
+  const fresh = () => as('fresh', 'fresh@example.com');
+  const row = (extra: Partial<Record<string, unknown>> = {}) =>
+    account('fresh@example.com', { emailTrusted: false, createdAt: 10, lastSeenAt: 10, ...extra });
+
+  it('a sign-up creates its own row approved, and can use the game at once', async () => {
+    await assertFails(setDoc(doc(fresh(), 'users/fresh/rpgSaves/w1'), { quest: '{}' }));
+    await assertSucceeds(setDoc(doc(fresh(), 'accounts/fresh'), row()));
+    await assertSucceeds(setDoc(doc(fresh(), 'users/fresh/rpgSaves/w1'), { quest: '{}' }));
+    await assertSucceeds(getDoc(doc(fresh(), 'users/fresh/rpgSaves/w1')));
+  });
+
+  it('an older client writing a pending row still may', async () => {
+    await assertSucceeds(setDoc(doc(fresh(), 'accounts/fresh'), row({ approved: false })));
+  });
+
+  it('still cannot trust its own address, impersonate anybody, or read anybody else', async () => {
+    await assertFails(setDoc(doc(fresh(), 'accounts/fresh'), row({ emailTrusted: true })));
+    await assertFails(setDoc(doc(fresh(), 'accounts/owner'), row()));
+    await assertSucceeds(setDoc(doc(fresh(), 'accounts/fresh'), row()));
+    await assertFails(getDoc(doc(fresh(), 'accounts/owner')));
+    await assertFails(getDocs(collection(fresh(), 'accounts')));
+  });
+
+  it('an account the admin has turned away cannot let itself back in', async () => {
+    const revoked = as('revoked', 'revoked@example.com');
+    await assertFails(updateDoc(doc(revoked, 'accounts/revoked'), { approved: true }));
+    await assertFails(setDoc(doc(revoked, 'users/revoked/rpgSaves/w1'), { quest: '{}' }));
+    await assertSucceeds(updateDoc(doc(as('owner', 'owner@example.com'), 'accounts/revoked'), { approved: true }));
+  });
+});

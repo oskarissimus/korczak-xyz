@@ -127,6 +127,13 @@ jobs:
       # Only the game's three functions: the rest of the codebase is the site's and has no business
       # in this project (and its secrets do not exist here). No storage rules either — the one
       # bucket here is written by these functions alone and read by download-token URL.
+      # The game lets every account in on sign-up (owner, 9 Nov 2026); korczak.xyz does not. One
+      # line of firestore.rules says which, and this is where it is turned on — see selfAdmission()
+      # there. grep fails the job if the line ever moves, rather than deploying the site's gate.
+      - name: Let new accounts in (the game's project only)
+        run: |
+          sed -i 's|return false; // SELF_ADMISSION|return true; // SELF_ADMISSION|' firestore.rules
+          grep -q 'return true; // SELF_ADMISSION' firestore.rules
       - name: Deploy rules and the game's functions
         run: >-
           npx --yes firebase-tools@15 deploy

@@ -39,14 +39,15 @@ const translations = {
     unavailable: 'Login is not configured.',
     tabSignIn: 'Sign in',
     tabSignUp: 'Create account',
-    signUpSubtitle:
-      'Anyone can make an account here. Nothing works until Oskar approves it by hand — that is on purpose.',
+    signUpSubtitle: 'New accounts are reviewed by hand. You can sign in right away, and saving starts once yours is approved.',
+    gameSubtitle: 'Sign in to keep your worlds and quests on every device.',
+    gameSignUpSubtitle: 'Create an account to keep your worlds and quests on every device. It is ready the moment you make it.',
     createAccount: 'Create account',
     creating: 'Creating…',
     mismatch: 'The two passwords are different.',
     pendingHeading: 'Waiting for approval',
     pendingBody:
-      'Your account exists and you are signed in. It cannot read or write anything until Oskar approves it — this page will change by itself the moment he does.',
+      'Your account is ready and you are signed in. It will be able to save once it has been approved — this page updates by itself when that happens.',
     pendingVerified: 'Email address confirmed.',
     pendingUnverified: 'Check your inbox and confirm your address — approval usually waits for it.',
     resend: 'Send that email again',
@@ -80,14 +81,15 @@ const translations = {
     unavailable: 'Logowanie nie jest skonfigurowane.',
     tabSignIn: 'Logowanie',
     tabSignUp: 'Nowe konto',
-    signUpSubtitle:
-      'Konto może założyć każdy. Nic nie działa, dopóki Oskar go ręcznie nie zatwierdzi — i tak ma być.',
+    signUpSubtitle: 'Nowe konta są zatwierdzane ręcznie. Zalogujesz się od razu, a zapisywanie ruszy po akceptacji.',
+    gameSubtitle: 'Zaloguj się, aby mieć swoje światy i questy na każdym urządzeniu.',
+    gameSignUpSubtitle: 'Załóż konto, aby mieć swoje światy i questy na każdym urządzeniu. Działa od razu po założeniu.',
     createAccount: 'Załóż konto',
     creating: 'Zakładam…',
     mismatch: 'Hasła się różnią.',
     pendingHeading: 'Czeka na zatwierdzenie',
     pendingBody:
-      'Konto istnieje i jesteś zalogowany. Nic nie odczyta ani nie zapisze, dopóki Oskar go nie zatwierdzi — ta strona zmieni się sama, gdy to zrobi.',
+      'Konto jest gotowe i jesteś zalogowany. Zapisywanie ruszy po zatwierdzeniu konta — ta strona odświeży się sama, gdy to nastąpi.',
     pendingVerified: 'Adres e-mail potwierdzony.',
     pendingUnverified: 'Sprawdź skrzynkę i potwierdź adres — zwykle to warunek zatwierdzenia.',
     resend: 'Wyślij ten e-mail jeszcze raz',
@@ -132,6 +134,9 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
     resendVerification,
   } = useAuth();
   const t = translations[lang];
+  // everyrpg.korczak.xyz draws these in the game's own card (src-rpg/styles/pages.css); the site
+  // keeps its Windows 95 dialog, so the modifier is the only thing the two variants differ by.
+  const card = game ? 'auth-card auth-card--game' : 'auth-card';
   const homePath = lang === 'en' ? '/' : '/pl/';
   const typingPath = lang === 'en' ? '/apps/typing/' : '/pl/apps/typing/';
   const adminPath = lang === 'en' ? '/apps/admin/' : '/pl/apps/admin/';
@@ -157,7 +162,7 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
 
   if (user) {
     return (
-      <div className="auth-card">
+      <div className={card}>
         <p className="auth-signedin">
           <span className="auth-cloud">☁</span> {t.signedInAs} <strong>{user.email}</strong>
         </p>
@@ -193,7 +198,7 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
     };
 
     return (
-      <div className="auth-card">
+      <div className={card}>
         <p className="auth-signedin">
           <strong>⏳ {t.pendingHeading}</strong>
         </p>
@@ -248,7 +253,7 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
   };
 
   return (
-    <form className="auth-card auth-form" onSubmit={submit}>
+    <form className={`${card} auth-form`} onSubmit={submit}>
       <div className="auth-tabs" role="tablist">
         <button
           type="button"
@@ -269,7 +274,9 @@ export default function LoginForm({ lang, variant = 'site' }: LoginFormProps) {
           {t.tabSignUp}
         </button>
       </div>
-      <p className="auth-subtitle">{mode === 'up' ? t.signUpSubtitle : t.subtitle}</p>
+      <p className="auth-subtitle">
+        {mode === 'up' ? (game ? t.gameSignUpSubtitle : t.signUpSubtitle) : game ? t.gameSubtitle : t.subtitle}
+      </p>
       <label className="auth-field">
         <span>{t.email}</span>
         <input
