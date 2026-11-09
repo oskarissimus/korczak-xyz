@@ -134,6 +134,13 @@ household out of its own shopping list on the deploy that shipped this. **For an
 through the site, leave it off** — their verification mail is better evidence than a memory of who
 asked.
 
+**The game's build sends no verification mail** (`SEND_VERIFICATION` in `src/hooks/useAuth.ts`,
+off in mode `rpg`). On korczak-rpg accounts let themselves in and there is no household share, so
+nothing reads `email_verified` there, and the mail — from `noreply@korczak-rpg.firebaseapp.com` —
+went straight to Gmail's spam (9 Nov 2026). korczak.xyz still sends it, from its own
+`firebaseapp.com` address, with the same spam risk; the fix for either project is a custom sender
+domain with DKIM (Firebase console → Authentication → Templates → Customize domain).
+
 ### Where the panel is
 
 `/apps/admin/`, and it is in the list at `/apps/` like everything else — as a card `AdminAppCard`

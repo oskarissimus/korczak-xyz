@@ -22,6 +22,9 @@ import { installFirestoreWatchdog } from '../lib/firestoreHealth';
 import { installLogDebug } from '../lib/logDebug';
 import { describeError, log, setLogUid } from '../lib/logger';
 
+// Off in the game's build — see signUp below.
+const SEND_VERIFICATION = import.meta.env.MODE !== 'rpg';
+
 // Minimal user shape we pass around (subset of the Firebase User).
 export interface AuthUser {
   uid: string;
@@ -229,6 +232,14 @@ export function useAuth(): AuthApi {
    * owner is — but it is what lets the panel show a verified address, and it is the difference
    * between a household share that can be claimed by whoever types the address first and one that
    * cannot. A mail that fails to send must not fail the sign-up: the account exists by then.
+   *
+   * The game's build (`MODE === 'rpg'`, everyrpg.korczak.xyz) sends none. Accounts there let
+   * themselves in (`SELF_ADMISSION` in lib/account.ts) and there is no household share, so nothing
+   * on that project ever reads `email_verified` — and the mail itself, from
+   * noreply@korczak-rpg.firebaseapp.com, landed in Gmail's spam (owner, 9 Nov 2026). A mail that
+   * changes nothing and arrives as spam is worse than no mail. If the game ever needs one (a
+   * password reset, say), give it a sender domain with DKIM first: Authentication → Templates →
+   * Customize domain in the Firebase console.
    */
   const signUp = useCallback(async (email: string, password: string) => {
     if (!firebaseEnabled || !auth) return;
@@ -236,10 +247,12 @@ export function useAuth(): AuthApi {
     try {
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       log.info('auth.signup.ok', { uid: credential.user.uid });
-      try {
-        await sendEmailVerification(credential.user);
-      } catch (e) {
-        log.warn('auth.signup.verifyMailFailed', describeError(e));
+      if (SEND_VERIFICATION) {
+        try {
+          await sendEmailVerification(credential.user);
+        } catch (e) {
+          log.warn('auth.signup.verifyMailFailed', describeError(e));
+        }
       }
     } catch (e) {
       log.warn('auth.signup.fail', describeError(e));
