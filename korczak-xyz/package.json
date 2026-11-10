@@ -32,7 +32,7 @@
     "@nanostores/react": "^2.0.1",
     "@sentry/browser": "^11.10.0",
     "@types/three": "^0.187.0",
-    "astro": "^7.4.4",
+    "astro": "^7.4.7",
     "autoprefixer": "^10.6.2",
     "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
