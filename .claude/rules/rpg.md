@@ -111,7 +111,9 @@ Every `People.template` is followed from the scene's ask to the template (`utils
 `trackRig`), the GLB's fetch, the worker and SkinTokens' half a minute included, its fallback too,
 and each is a `rig` task in the row *Riggowanie postaci*: running, ✓, or ✗ when even the fallback
 failed. Until one ends that person is not in the scene, so the panel says *Świat gotowy* only once
-the last is in. A person/hero/enemy piece still being made is a queued rig after fal's line
+the last is in. **Since 10 Nov 2026 a rig no longer keeps anyone out of the scene, and the bar counts a person in
+once they move** (*A person comes in stages*, under *What it looks like*); the full rig after that is
+the console's. A person/hero/enemy piece still being made is a queued rig after fal's line
 (`afterFal`), and the hero's before the preview; the usual time is `rig` in `rpg-typical` (default
 30 s, learnt only from rigs that worked rather than came from a cache). A rig's own console row
 (`self-rig`, Meshy's) no longer counts as a failed piece — a SkinTokens failure there falls back to
@@ -975,8 +977,37 @@ content-hashed and immutable.
     stands turned 42° at the hips, and that turn came out as a twist in every bone mid-air.
     `rpg-people.mjs` rewrites `people_clips.json` without them, so run the jump script after it.
     The kit people take the same three clips straight from the pack (`rpg-characters.mjs`).
-  - **Nothing stands there until the model is ready** (`PersonBody {wait}` in `RpgScene.ts`): the
-    group is empty, `nearestNpc`, `attack` and `updateEnemies` skip an empty one. The kit appears
+  - **A person comes in stages** (owner, 10 Nov 2026: "put the models up static as soon as they are
+    generated, then the quick rig, then the one from our backend — improve it step by step; at first
+    a stickman on the rig, static, before the model has even loaded"). `People.staged` brings each
+    person in four steps, each shown over the last and none blocking the game: **a stickman** on the
+    donor's skeleton at the person's height (`People.stickman`, chalk-pale cylinders and a ball of a
+    head, A-posed, still) — also everything `PersonBody {wait}` shows while the model is being made,
+    for people and the hero (an enemy has no wait of its own and starts from its model); **the model
+    standing still** once its GLB is read, checked as one person and turned to face +Z
+    (`staticModel`, no rig, so a person walking their routine slides for those seconds); **our quick
+    rig** (`fit`, ~1–4 s in the worker); and **the rig the settings ask for** when it is a better one
+    — SkinTokens' weights (which reuse the quick rig's joints and positions rather than working them
+    out a second time) or Meshy's. With `fit` or `voxel` chosen the third step is the last. A stage
+    is never shown over one as good or better, a caller that comes late gets the best so far at once,
+    and one chain is shared by everyone asking for the same model, body, height and rigger (the
+    beat's enemies). The console's remake (model for model) keeps the old person until the new one
+    moves; a stickman of the wait stays until the model's first stage replaces it. **If no rig at all
+    can be made, a person already standing as their static model stays so** rather than turning into
+    the kit; before their model has shown (it would not load, or is not one person) it is the kit as
+    before. The lab's `People.template` still gives the best rig in one go.
+  - **How long each stage took is measured** (owner, same message: "we should have a metric for the
+    rigging time"). Each is kept on the rig's job (`rigStage` in `utils/rpg/rigging.ts`: ms from the
+    ask to the stickman, the static model, the quick rig, the full rig). The Start tab's rig line has
+    a second line with the slowest person's time to each stage (`stageSummary`), and every worked-out
+    rig is still its own `self-rig` row — SkinTokens' now a row of its own, its time being the wait
+    for the service. Once a person's last rig is in, `rpg.rig` goes to Sentry (`recordMeasurement`,
+    so a Sentry log, not an event): `label`, `rigger`, `reached`, `failed`/`error`, `stickmanMs`,
+    `staticMs`, `fastMs`, `fullMs`, `totalMs`, `fastWorkMs`, `lastWorkMs` and SkinTokens' own
+    `skinMs` — only when something was worked out, so a load from the cache sends nothing.
+  - **Before 10 Nov 2026 nothing stood there until the model was rigged** (`PersonBody {wait}`): the
+    group was empty, and `nearestNpc`, `attack` and `updateEnemies` skip an empty one — which now
+    holds only for an enemy whose model is still being made. The kit appears
     only in the classic world, with no fal key, or when a model fails to load or rig (and a mesh
     with other than one head is refused as "not one standing person" — FLUX did once draw two).
     `heads()` counts the separate lumps across 86–96 % of the height, above where T-pose arms

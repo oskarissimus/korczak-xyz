@@ -26,7 +26,7 @@ import {
   type Obstacle,
 } from './placeBuilder';
 import { Characters, HAIR_COLORS, type Look, type Part, type Rig } from './characters';
-import { People, PERSON_HEIGHT, type Body, type Rigger } from './people';
+import { People, PERSON_HEIGHT, STAGE_RANK, type Body, type Rigger } from './people';
 import { breakTiling, cutOut, seamless, surfaceMat } from './surfaces';
 import { dressCreature, disposeCreature, moveCreature, prepareCreature, type CreatureBody } from './creatureBody';
 import { disposeHubModel, disposeTreeParts, FOREST_FIT, hubFit, loadForestTree, loadHubModel, type TreePart } from './hubModels';
@@ -50,10 +50,11 @@ import { PLACE_FLAT, Terrain, VILLAGE_FLAT, reliefFor, terrainSeed, type Clearin
 export type Prompt = 'talk' | 'pickup' | 'examine';
 
 /**
- * Who a person is drawn as: their fal.ai model (`url`, rigged in `people.ts`), nothing at all while it
- * is being made (`wait`), or else Quaternius's kit — only where no model will ever come: the classic
- * world, a reader without a fal.ai key (owner, 28 Oct 2026: "no Quaternius characters; nothing until
- * it is generated, then it is there"), and a model that would not load or rig.
+ * Who a person is drawn as: their fal.ai model (`url`, brought in stage by stage in `people.ts`), a
+ * still stickman on the donor's skeleton while it is being made (`wait`; owner, 10 Nov 2026 — it was
+ * nothing at all before), or else Quaternius's kit — only where no model will ever come: the classic
+ * world, a reader without a fal.ai key (owner, 28 Oct 2026: "no Quaternius characters"), and a model
+ * that would not load.
  */
 export interface PersonBody {
   url?: string;
@@ -2057,26 +2058,40 @@ export class RpgScene {
     if (!npc) return;
     const want = wanted(body);
     if (want === npc.want) return;
-    // One model for another (the console's remake): the old one stands until the new one is rigged.
+    // One model for another (the console's remake): the old one stands until the new one moves.
     const swap = isModel(npc.want) && isModel(want);
+    // The stickman of the wait stays until the model's first stage replaces it.
+    const keep = swap || (npc.want === 'wait' && isModel(want));
     npc.want = want;
     const token = ++npc.token;
     const current = () => this.npcs.get(name) === npc && npc.token === token;
-    if (!swap) {
+    if (!keep) {
       npc.group.clear();
       npc.rig = null;
     }
-    if (want === 'wait') return;
+    if (want === 'wait') {
+      this.people.stickman(npc.gender, HEIGHT[npc.gender]).then(
+        (t) => {
+          if (current()) npc.rig = this.people.wear(npc.group, t);
+        },
+        () => {},
+      );
+      return;
+    }
     if (want !== 'kit') {
+      let shown = -1;
       try {
-        const template = await this.people.template(want, npc.gender, HEIGHT[npc.gender], 'person', body.picture);
-        if (current()) {
-          npc.group.clear();
-          npc.rig = this.people.dress(npc.group, template);
-        }
+        // Stickman, the model standing still, the quick rig, the full rig: each over the last.
+        await this.people.staged(want, npc.gender, HEIGHT[npc.gender], 'person', body.picture, (template, stage) => {
+          if (!current() || (swap && STAGE_RANK[stage] < STAGE_RANK.fast)) return;
+          shown = STAGE_RANK[stage];
+          npc.rig = this.people.wear(npc.group, template);
+        });
         return;
       } catch (err) {
         if (!current()) return;
+        // Their own model, still, rather than the kit: it is them, only not moving.
+        if (shown >= STAGE_RANK.static) throw err;
         npc.want = 'kit';
         npc.group.clear();
         npc.rig = null;
@@ -2154,23 +2169,40 @@ export class RpgScene {
     const want = wanted(body);
     if (want === this.heroWant) return;
     const swap = isModel(this.heroWant) && isModel(want);
+    const keep = swap || (this.heroWant === 'wait' && isModel(want));
     this.heroWant = want;
     const token = ++this.heroToken;
-    if (!swap) {
+    if (!keep) {
       this.clearPlayer();
       this.playerRig = null;
     }
-    if (want === 'wait') return;
+    const gender = heroBody(description);
+    const put = (template: Parameters<People['wear']>[1]) => {
+      this.clearPlayer();
+      this.playerRig = this.people.wear(this.player, template);
+      if (this.playerRig) this.gripSword(this.playerRig);
+    };
+    if (want === 'wait') {
+      this.people.stickman(gender, HEIGHT.hero).then(
+        (t) => {
+          if (token === this.heroToken) put(t);
+        },
+        () => {},
+      );
+      return;
+    }
     if (want !== 'kit') {
+      let shown = -1;
       try {
-        const template = await this.people.template(want, heroBody(description), HEIGHT.hero, 'hero', body.picture);
-        if (token !== this.heroToken) return;
-        this.clearPlayer();
-        this.playerRig = this.people.dress(this.player, template);
-        this.gripSword(this.playerRig);
+        await this.people.staged(want, gender, HEIGHT.hero, 'hero', body.picture, (template, stage) => {
+          if (token !== this.heroToken || (swap && STAGE_RANK[stage] < STAGE_RANK.fast)) return;
+          shown = STAGE_RANK[stage];
+          put(template);
+        });
         return;
       } catch (err) {
         if (token !== this.heroToken) return;
+        if (shown >= STAGE_RANK.static) throw err;
         this.heroWant = 'kit';
         this.clearPlayer();
         this.playerRig = null;
@@ -2605,10 +2637,13 @@ export class RpgScene {
           return;
         }
         try {
-          const template = await this.people.template(want, 'male', HEIGHT.enemy, 'enemy', this.enemyPicture);
-          if (token !== this.enemyToken || enemy.hp <= 0) return;
-          this.undressEnemy(enemy);
-          enemy.rig = this.people.dress(enemy.mesh, template);
+          // Stage by stage like a person (`People.staged`), from the model standing still: an enemy
+          // has no wait of its own to stand a stickman in.
+          await this.people.staged(want, 'male', HEIGHT.enemy, 'enemy', this.enemyPicture, (template, stage) => {
+            if (token !== this.enemyToken || enemy.hp <= 0 || stage === 'stickman') return;
+            this.undressEnemy(enemy);
+            enemy.rig = this.people.wear(enemy.mesh, template);
+          });
           return;
         } catch (err) {
           // Its own model unrigged, moved from outside, rather than the kit's body (owner, 2 Nov 2026:

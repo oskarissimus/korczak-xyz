@@ -105,7 +105,7 @@ import {
 } from '../../utils/rpg/landmark3d';
 import { recordQuest, recordWorld, watchBeat } from '../../utils/rpg/questLog';
 import { rememberTiming, type Task } from '../../utils/rpg/progress';
-import { rigsOfStart } from '../../utils/rpg/rigging';
+import { moving, rigsOfStart } from '../../utils/rpg/rigging';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
 import { LANGUAGES, guessLang, nativeName, startingLang, storeLangChoice } from '../../utils/rpg/language';
@@ -1704,12 +1704,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       // Composed for the world's first quest, once the world is written.
       tasks.push({ kind: 'music', state: 'queued', since: null, afterWorld: true });
     }
-    // Every generated person being rigged (`utils/rpg/rigging.ts`): until it ends they are not in the
-    // scene, and with SkinTokens that is half a minute or more after their model came (owner, 2 Nov
-    // 2026: "our rigging endpoint is outside the main loading bar … put it in"). A world with models
-    // kept and no key rigs too, so these come before the key's check.
+    // Every generated person being rigged (`utils/rpg/rigging.ts`), until they move (owner, 2 Nov
+    // 2026: "our rigging endpoint is outside the main loading bar … put it in"). They stand as a
+    // stickman and then a static model before that, and SkinTokens' or Meshy's rig comes after it
+    // without holding the bar (owner, 10 Nov 2026: stage by stage). A world with models kept and no
+    // key rigs too, so these come before the key's check.
     for (const r of rigsOfStart(line?.since ?? null, Date.now())) {
-      tasks.push({ kind: 'rig', state: r.endedAt === null ? 'running' : r.failed ? 'failed' : 'done', since: r.endedAt === null ? r.startedAt : null });
+      const going = moving(r);
+      tasks.push({ kind: 'rig', state: !going ? 'running' : r.failed ? 'failed' : 'done', since: !going ? r.startedAt : null });
     }
     if (!falKey) return tasks;
     const pending = falPending();

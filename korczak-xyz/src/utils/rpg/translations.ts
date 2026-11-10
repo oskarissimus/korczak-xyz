@@ -31,6 +31,8 @@ const en = {
     `usual here: world ${world}, opening ${quest}, ground ${ground}, 3D model ${model}, rig ${rig}`,
   devRigs: (count: number, worked: number, span: string, longest: string) =>
     `rigging: ${count} ${count === 1 ? 'character' : 'characters'} (${worked} worked out, ${count - worked} from cache) · ${span} first to last · longest ${longest}`,
+  devRigStages: (stickman: string, still: string, fast: string, full: string) =>
+    `stages, slowest character: stickman ${stickman} · static model ${still} · quick rig ${fast} · full rig ${full}`,
   progressDone: 'World ready — this is everything',
   progressWorld: 'The world',
   progressQuest: 'The quest’s first step',
@@ -402,6 +404,8 @@ const pl: typeof en = {
   devTypical: (world, quest, ground, model, rig) => `zwykle tu: świat ${world}, początek ${quest}, podłoże ${ground}, model 3D ${model}, rig ${rig}`,
   devRigs: (count, worked, span, longest) =>
     `riggowanie: ${count} ${count === 1 ? 'postać' : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? 'postacie' : 'postaci'} (${worked} liczone, ${count - worked} z cache) · ${span} od pierwszej do ostatniej · najdłuższa ${longest}`,
+  devRigStages: (stickman, still, fast, full) =>
+    `etapy, najwolniejsza postać: ludzik ${stickman} · model statyczny ${still} · szybki rig ${fast} · pełny rig ${full}`,
   progressDone: 'Świat gotowy — to już wszystko',
   progressWorld: 'Świat',
   progressQuest: 'Początek questa',

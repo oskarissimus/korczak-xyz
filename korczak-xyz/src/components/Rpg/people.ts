@@ -38,8 +38,18 @@ import { accountHasMeshyRig, fetchSelfRig, keepSelfRig } from '../../utils/rpg/a
 import { retargetClips, aimedLike, type PoseSkeleton } from '../../utils/rpg/retarget';
 import { parseDonor, selfRig, type Donor, type SelfRig, type SelfRigOptions } from '../../utils/rpg/selfRig';
 import { skinTokensWeights, wakeSkinTokens } from '../../utils/rpg/skinWeights';
-import { trackRig } from '../../utils/rpg/rigging';
+import { endRig, rigStage, startRig, trackRig, type RigStage } from '../../utils/rpg/rigging';
+import { recordMeasurement } from '../../lib/sentry';
 import { Rig } from './characters';
+
+export type { RigStage } from '../../utils/rpg/rigging';
+
+/**
+ * How far along a person is, worst to best (owner, 10 Nov 2026: "a stickman on the rig, static,
+ * before the model has loaded, then the model, then the model with the simple rig, then with the
+ * advanced one"): a stage is shown only over a lower one, never over one as good or better.
+ */
+export const STAGE_RANK: Record<RigStage, number> = { stickman: 0, static: 1, fast: 2, full: 3 };
 
 export type Body = 'male' | 'female';
 
@@ -62,7 +72,32 @@ export interface PersonTemplate {
   clips: Map<string, THREE.AnimationClip>;
   /** How long working out the rig took, 0 when it came from the cache. */
   ms: number;
+  /** SkinTokens' own time on the server, when its weights are in this rig. */
+  skinMs?: number;
 }
+
+/** A rig as `template` makes it, and whether it is the fitted rig standing in for a better one that failed. */
+interface Made {
+  template: PersonTemplate;
+  fallback: boolean;
+}
+
+/** The TRELLIS model as `standing` reads it: its mesh, its geometry stood up the right way round. */
+interface Standing {
+  mesh: THREE.Mesh;
+  geometry: THREE.BufferGeometry;
+  turned: boolean;
+}
+
+/** One person being brought in stage by stage (`People.staged`), shared by everyone who asks for them. */
+interface Chain {
+  best: { stage: RigStage; template: PersonTemplate } | null;
+  listeners: Set<(t: PersonTemplate, stage: RigStage) => void>;
+  done: Promise<PersonTemplate>;
+}
+
+/** The stickman's look: chalk-pale, matte, so it reads as a placeholder and not as somebody. */
+const STICK_MATERIAL = new THREE.MeshStandardMaterial({ color: 0xe6e1d3, roughness: 0.85, metalness: 0 });
 
 interface ClipData {
   name: string;
@@ -422,7 +457,12 @@ async function turnedRound(url: string, mesh: THREE.Mesh, geometry: THREE.Buffer
 
 export class People {
   private loaded: Promise<{ donors: Record<Body, Donor>; clips: ClipData[] }> | null = null;
-  private templates = new Map<string, Promise<PersonTemplate>>();
+  private templates = new Map<string, Promise<Made>>();
+  private chains = new Map<string, Chain>();
+  private sticks = new Map<string, Promise<PersonTemplate>>();
+  private stood = new Map<string, Promise<Standing>>();
+  /** The quick rig's raw result, shared with the SkinTokens rig built on its joints. */
+  private fitRigs = new Map<string, Promise<{ rig: SelfRig; ms: number }>>();
   private tPosed: Partial<Record<Body, Donor>> = {};
   /** The picture each model was made from, as last told, for a re-rig asked without one (`RpgScene.setRigger`). */
   private pictures = new Map<string, string>();
@@ -477,35 +517,230 @@ export class People {
     return accountHasMeshyRig(url, height);
   }
 
+  /** Which rig `rigger` and the fal key make in the end: Meshy with no key to pay with is `fit`. */
+  private finalMode(): 'meshy' | 'voxel' | 'fit' | 'skin' {
+    return this.rigger === 'meshy' ? (this.falKey ? 'meshy' : 'fit') : this.rigger;
+  }
+
   /**
    * A person from their GLB, rigged on `body`'s donor at `height` metres; once per model and body.
    * Working out a rig is a row in the console (kind `fal`, `label` as the piece's): model `self-rig`,
    * with its time and a price of nothing, or Meshy's with its $0.20; one from the cache is not.
+   * The lab's way in: the best rig in one go, with no stages (`staged` is the game's).
    */
   template(url: string, body: Body, height: number, label = 'person', picture?: string): Promise<PersonTemplate> {
+    if (picture) this.pictures.set(url, picture);
+    else picture = this.pictures.get(url);
+    const { made, fresh } = this.rig(url, body, height, label, picture);
+    const t = made.then((m) => m.template);
+    // In the start's progress until it is there (`utils/rpg/rigging.ts`), the fallback included.
+    if (fresh) trackRig(label, url, t);
+    return t;
+  }
+
+  /** The rig keyed as `rigger` asks; `fresh` when this call is the one that started it. */
+  private rig(url: string, body: Body, height: number, label: string, picture?: string): { made: Promise<Made>; fresh: boolean } {
     // A query, not a fragment: the Cache API drops fragments, and the GLB itself is kept under its URL.
     // Meshy with no fal.ai key, or Meshy failing, rigs as `fit` (the first way, the donor's weights
     // copied, was taken out on 1 Nov 2026: "it still mangles the character").
-    if (picture) this.pictures.set(url, picture);
-    else picture = this.pictures.get(url);
-    const mode = this.rigger === 'meshy' ? 'fit' : this.rigger;
+    const final = this.finalMode();
+    const mode = final === 'meshy' ? 'fit' : final;
     const own = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}&w=${mode}`;
-    const falKey = this.rigger === 'meshy' ? this.falKey : null;
-    const key = falKey ? `${url}?meshy=1&height=${height}` : own;
+    const key = final === 'meshy' ? `${url}?meshy=1&height=${height}` : own;
+    let t = this.templates.get(key);
+    if (t) return { made: t, fresh: false };
+    const fitted = () => this.fitTemplate(url, body, height, label, picture).then((template) => ({ template, fallback: true }));
+    t =
+      final === 'meshy'
+        ? this.buildMeshy(this.falKey!, url, key, height, label, picture).then((template) => ({ template, fallback: false }), fitted)
+        : mode === 'skin'
+          ? this.build(url, key, body, height, label, 'skin', picture).then((template) => ({ template, fallback: false }), fitted)
+          : mode === 'fit'
+            ? this.fitTemplate(url, body, height, label, picture).then((template) => ({ template, fallback: false }))
+            : this.build(url, key, body, height, label, mode, picture).then((template) => ({ template, fallback: false }));
+    t.catch(() => this.templates.delete(key));
+    this.templates.set(key, t);
+    return { made: t, fresh: true };
+  }
+
+  /** The quick rig of our own (`fit`: fitted joints, voxel weights, ~1–4 s in the worker), once per model and body. */
+  private fitTemplate(url: string, body: Body, height: number, label: string, picture?: string): Promise<PersonTemplate> {
+    const key = `${url}?rig=${RIG_VERSION}&body=${body}&height=${height}&w=fit`;
     let t = this.templates.get(key);
     if (!t) {
-      const fitted = () => this.build(url, own.replace('&w=skin', '&w=fit'), body, height, label, 'fit', picture);
-      t = falKey
-        ? this.buildMeshy(falKey, url, key, height, label, picture).catch(fitted)
-        : mode === 'skin'
-          ? this.build(url, key, body, height, label, 'skin', picture).catch(fitted)
-          : this.build(url, key, body, height, label, mode, picture);
+      t = this.build(url, key, body, height, label, 'fit', picture).then((template) => ({ template, fallback: false }));
       t.catch(() => this.templates.delete(key));
       this.templates.set(key, t);
-      // In the start's progress until it is there (`utils/rpg/rigging.ts`), the fallback included.
-      trackRig(label, url, t);
+    }
+    return t.then((m) => m.template);
+  }
+
+  /**
+   * A person brought in stage by stage, each shown as it comes and none blocking the game (owner,
+   * 10 Nov 2026: "put the models up static as soon as they are generated, then the quick rig, then
+   * the one from our backend — improve it step by step"): a static stickman on the donor's skeleton
+   * at once, the model standing still once its GLB is read, our quick `fit` rig a second or a few
+   * later, and then the rig the settings ask for (SkinTokens behind the gateway, or Meshy) when it is
+   * a better one. `show` is called with each better stage, the best so far at once for a caller that
+   * comes late. Settles with the last rig, and rejects only when no rig at all could be made (the
+   * static model may still be standing then; what to do is the caller's).
+   *
+   * Every stage's time from the ask is recorded on the rig's job (`rigStage`) for the console, and
+   * once the last is in, as `rpg.rig` in Sentry (`recordMeasurement`) when anything was worked out.
+   */
+  staged(url: string, body: Body, height: number, label: string, picture: string | undefined, show: (t: PersonTemplate, stage: RigStage) => void): Promise<PersonTemplate> {
+    if (picture) this.pictures.set(url, picture);
+    else picture = this.pictures.get(url);
+    const final = this.finalMode();
+    const key = `${url}|${body}|${height}|${label}|${final}`;
+    let chain = this.chains.get(key);
+    if (!chain) chain = this.chain(key, url, body, height, label, picture, final);
+    if (chain.best) show(chain.best.template, chain.best.stage);
+    chain.listeners.add(show);
+    void chain.done.then(
+      () => chain!.listeners.delete(show),
+      () => chain!.listeners.delete(show),
+    );
+    return chain.done;
+  }
+
+  private chain(key: string, url: string, body: Body, height: number, label: string, picture: string | undefined, final: ReturnType<People['finalMode']>): Chain {
+    const job = startRig(label, url);
+    const started = performance.now();
+    const at: Partial<Record<RigStage, number>> = {};
+    const chain: Chain = { best: null, listeners: new Set(), done: null as unknown as Promise<PersonTemplate> };
+    const offer = (stage: RigStage, template: PersonTemplate) => {
+      at[stage] ??= Math.round(performance.now() - started);
+      rigStage(job, stage, template.ms > 0);
+      if (chain.best && STAGE_RANK[stage] <= STAGE_RANK[chain.best.stage]) return;
+      chain.best = { stage, template };
+      for (const l of chain.listeners) l(template, stage);
+    };
+    this.stickman(body, height).then((t) => offer('stickman', t), () => undefined);
+    this.staticModel(url, height, label, picture).then(
+      (t) => offer('static', t),
+      () => undefined,
+    );
+    // Two rigs only when the last is better than our quick one: SkinTokens' weights, or Meshy's.
+    const twoRigs = final === 'skin' || final === 'meshy';
+    let fastMs = 0;
+    if (twoRigs)
+      this.fitTemplate(url, body, height, label, picture).then(
+        (t) => {
+          fastMs = t.ms;
+          offer('fast', t);
+        },
+        () => undefined,
+      );
+    const { made } = this.rig(url, body, height, label, picture);
+    chain.done = made.then(({ template, fallback }) => {
+      offer(twoRigs && !fallback ? 'full' : 'fast', template);
+      return template;
+    });
+    this.chains.set(key, chain);
+    const measure = (template: PersonTemplate | null, error?: string) => {
+      const worked = !template || template.ms > 0 || fastMs > 0;
+      if (!worked) return;
+      recordMeasurement('rpg.rig', {
+        label,
+        rigger: final,
+        reached: chain.best?.stage ?? 'none',
+        failed: !template,
+        error,
+        stickmanMs: at.stickman,
+        staticMs: at.static,
+        fastMs: at.fast,
+        fullMs: at.full,
+        totalMs: Math.round(performance.now() - started),
+        fastWorkMs: Math.round(fastMs),
+        lastWorkMs: template ? Math.round(template.ms) : undefined,
+        skinMs: template?.skinMs,
+      });
+    };
+    chain.done.then(
+      (t) => {
+        endRig(job, t.ms);
+        measure(t);
+        this.stood.delete(`${url}|${label === 'enemy' ? 'enemy' : 'person'}`);
+      },
+      (err) => {
+        endRig(job, null);
+        measure(null, err instanceof Error ? err.message : String(err));
+        this.chains.delete(key);
+      },
+    );
+    return chain;
+  }
+
+  /**
+   * The first thing that stands for a person: the donor's skeleton as a stickman, static, at the
+   * person's height — before their model has even been made. Once per body and height.
+   */
+  stickman(body: Body, height: number): Promise<PersonTemplate> {
+    const key = `${body}@${height}`;
+    let t = this.sticks.get(key);
+    if (!t) {
+      t = this.load().then(({ donors }) => {
+        const bones = donors[body].bones;
+        const top = bones.find((b) => b.name === 'head_end')?.world[1] ?? 1.73;
+        const s = height / top;
+        const at = (i: number) => new THREE.Vector3().fromArray(bones[i].world).multiplyScalar(s);
+        const group = new THREE.Group();
+        const r = 0.022 * (height / 1.8);
+        const up = new THREE.Vector3(0, 1, 0);
+        bones.forEach((b, i) => {
+          if (b.parent < 0 || b.name === 'head_end' || b.name === 'headfront') return;
+          const from = at(b.parent);
+          const to = at(i);
+          const length = from.distanceTo(to);
+          if (length < 0.01) return;
+          const limb = new THREE.Mesh(new THREE.CylinderGeometry(r, r, length, 6), STICK_MATERIAL);
+          limb.position.copy(from).add(to).multiplyScalar(0.5);
+          limb.quaternion.setFromUnitVectors(up, to.clone().sub(from).normalize());
+          limb.castShadow = true;
+          group.add(limb);
+          const knot = new THREE.Mesh(new THREE.SphereGeometry(r * 1.4, 8, 6), STICK_MATERIAL);
+          knot.position.copy(to);
+          group.add(knot);
+        });
+        const head = bones.findIndex((b) => b.name === 'Head');
+        const crown = bones.findIndex((b) => b.name === 'head_end');
+        if (head >= 0 && crown >= 0) {
+          const a = at(head);
+          const c = at(crown);
+          const skull = new THREE.Mesh(new THREE.SphereGeometry(a.distanceTo(c) * 0.5, 14, 10), STICK_MATERIAL);
+          skull.position.copy(a).add(c).multiplyScalar(0.5);
+          skull.castShadow = true;
+          group.add(skull);
+        }
+        return { group, clips: new Map(), ms: 0 };
+      });
+      t.catch(() => this.sticks.delete(key));
+      this.sticks.set(key, t);
     }
     return t;
+  }
+
+  /** The person's model as it came, unrigged and still: stood on the origin, `height` tall, facing +Z. */
+  private staticModel(url: string, height: number, label: string, picture?: string): Promise<PersonTemplate> {
+    return this.standing(url, label, picture).then(({ mesh, geometry }) => {
+      const g = geometry.clone();
+      g.computeBoundingBox();
+      const box = g.boundingBox!;
+      const s = height / Math.max(box.max.y - box.min.y, 1e-3);
+      const centre = box.getCenter(new THREE.Vector3());
+      g.translate(-centre.x, -box.min.y, -centre.z);
+      g.scale(s, s, s);
+      g.computeBoundingSphere();
+      const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone() as THREE.MeshStandardMaterial;
+      // TRELLIS writes no metallic factor, which glTF reads as fully metallic: black, with no environment map.
+      if (typeof material.metalness === 'number') material.metalness = 0;
+      const still = new THREE.Mesh(g, material);
+      still.castShadow = true;
+      const group = new THREE.Group();
+      group.add(still);
+      return { group, clips: new Map(), ms: 0 };
+    });
   }
 
   /**
@@ -513,7 +748,19 @@ export class People {
    * Not an enemy's: a rusted automaton with an exhaust pipe beside its head counted two (2 Nov 2026),
    * and an ogre may have two heads; FLUX drawing two people is a risk of the quest's characters.
    */
-  private async standing(url: string, label: string, picture?: string): Promise<{ mesh: THREE.Mesh; geometry: THREE.BufferGeometry; turned: boolean }> {
+  private standing(url: string, label: string, picture?: string): Promise<Standing> {
+    // Read once for the static model and the rigs that follow it (each rig clones the geometry).
+    const key = `${url}|${label === 'enemy' ? 'enemy' : 'person'}`;
+    let s = this.stood.get(key);
+    if (!s) {
+      s = this.readStanding(url, label, picture);
+      s.catch(() => this.stood.delete(key));
+      this.stood.set(key, s);
+    }
+    return s;
+  }
+
+  private async readStanding(url: string, label: string, picture?: string): Promise<Standing> {
     const bytes = await loadLandmarkBytes(url);
     const gltf = await new GLTFLoader().parseAsync(bytes, '');
     gltf.scene.updateMatrixWorld(true);
@@ -586,7 +833,10 @@ export class People {
   }
 
   private async build(url: string, key: string, wanted: Body, height: number, label: string, mode: 'voxel' | 'fit' | 'skin', picture?: string): Promise<PersonTemplate> {
-    const [{ donors, clips }, { mesh, geometry, turned }] = await Promise.all([this.load(), this.standing(url, label, picture)]);
+    const [{ donors, clips }, stood] = await Promise.all([this.load(), this.standing(url, label, picture)]);
+    const { mesh, turned } = stood;
+    // Each rig its own copy: the static model and the other rigs are made from the same one.
+    const geometry = stood.geometry.clone();
     // A T-posed model gets the donor stood in a T-pose (`tPoseDonor`), and a rig kept apart from the A-pose's.
     const tPosed = armsOut(geometry);
     // Fitted joints need no donor's shape, only its skeleton: the male one's, which the clips were
@@ -597,34 +847,53 @@ export class People {
     const fit = (mode === 'fit' || mode === 'skin') && tPosed;
     const body: Body = fit ? 'male' : wanted;
     const donor = tPosed ? (this.tPosed[body] ??= tPoseDonor(donors[body])) : donors[body];
-    let pose = `${turned ? 'turned round (it faced −Z), ' : ''}${tPosed ? 'T-posed' : 'A-posed'}${fit ? ', fitted joints' : ''}, voxel weights`;
+    const pose = `${turned ? 'turned round (it faced −Z), ' : ''}${tPosed ? 'T-posed' : 'A-posed'}${fit ? ', fitted joints' : ''}, voxel weights`;
     const target = new Float32Array(geometry.attributes.position.array as ArrayLike<number>);
     const index = geometry.index ? new Uint32Array(geometry.index.array as ArrayLike<number>) : null;
     // A turned model is a rig of its own: one worked out before on it facing −Z is the backward one.
-    const { rig, ms } = await cachedRig(`${key}${tPosed ? '&pose=t' : ''}${turned ? '&turn=1' : ''}`, async () => {
-      const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
-      try {
-        const made = await rigOffThread(donor, target, height, { index, joints: fit ? 'fit' : 'warp' });
-        if (mode === 'skin' && index) {
+    const suffix = `${tPosed ? '&pose=t' : ''}${turned ? '&turn=1' : ''}`;
+    // Our own rig, worked out once per key even when the quick stage and SkinTokens' rig both ask.
+    const selfRigged = (rigKey: string) => {
+      let r = this.fitRigs.get(rigKey);
+      if (!r) {
+        r = cachedRig(rigKey, async () => {
+          const entry = startRequest('fal', 'self-rig', null, `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices`, label);
           try {
-            const skin = await skinTokensWeights(made.positions, index, made.joints, donor.bones.map((b) => b.parent));
-            made.skinIndex = skin.skinIndex;
-            made.skinWeight = skin.skinWeight;
-            pose += `, SkinTokens weights (${(skin.ms / 1000).toFixed(0)} s)`;
+            const made = await rigOffThread(donor, target, height, { index, joints: fit ? 'fit' : 'warp' });
+            endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
+            return made;
           } catch (err) {
-            // Not kept under this rig's key: `template` falls back to the fitted rig (voxel weights), and the next
-            // visit asks SkinTokens again.
-            pose += `, no SkinTokens weights`;
+            endRequest(entry, err instanceof Error ? err.message : String(err));
             throw err;
           }
-        }
-        endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose}, ${target.length / 3} vertices → ${donor.bones.length} bones` });
-        return made;
-      } catch (err) {
-        endRequest(entry, err instanceof Error ? err.message : String(err));
-        throw err;
+        });
+        r.catch(() => this.fitRigs.delete(rigKey));
+        this.fitRigs.set(rigKey, r);
       }
-    });
+      return r;
+    };
+    let skinMs: number | undefined;
+    // A turned model is a rig of its own: one worked out before on it facing −Z is the backward one.
+    // SkinTokens' rig is the quick one's joints and positions with the service's weights in place of the
+    // voxel ones, so it waits on that rig (shared, not worked out twice) and then only on the service.
+    const { rig, ms } =
+      mode === 'skin'
+        ? await cachedRig(`${key}${suffix}`, async () => {
+            const base = (await selfRigged(`${key.replace('&w=skin', '&w=fit')}${suffix}`)).rig;
+            if (!index) throw new Error('SkinTokens needs an indexed mesh');
+            const entry = startRequest('fal', 'self-rig', null, `← ${url}\nSkinTokens weights on the fitted joints (${pose.replace(', voxel weights', '')}), ${target.length / 3} vertices`, label);
+            try {
+              const skin = await skinTokensWeights(base.positions, index, base.joints, donor.bones.map((b) => b.parent));
+              skinMs = skin.ms;
+              endRequest(entry, null, { cost: 0, text: `← ${url}\n${body} donor, ${pose.replace(', voxel weights', '')}, SkinTokens weights (${(skin.ms / 1000).toFixed(0)} s on the service), ${target.length / 3} vertices → ${donor.bones.length} bones` });
+              return { ...base, skinIndex: skin.skinIndex, skinWeight: skin.skinWeight };
+            } catch (err) {
+              // Not kept under this rig's key: the quick rig (voxel weights) stays, and the next visit asks SkinTokens again.
+              endRequest(entry, err instanceof Error ? err.message : String(err));
+              throw err;
+            }
+          })
+        : await selfRigged(`${key}${suffix}`);
 
     geometry.setAttribute('position', new THREE.BufferAttribute(rig.positions, 3));
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(rig.skinIndex, 4));
@@ -669,14 +938,25 @@ export class People {
     // head 121° off, her upper spine 82°), so copied as they are her head went back and her arms
     // twisted (owner, 31 Oct 2026, over a maid in a dress). Carried across like Meshy's (`meshyClips`).
     const fitted = body === 'male' ? clips : meshyClips(clips, donors.male, bones[0]);
-    return { group, clips: fitClips(fitted, bones[0].position), ms };
+    return { group, clips: fitClips(fitted, bones[0].position), ms, skinMs };
   }
 
   /** A copy of the person into `group` (emptied first), idling somewhere in the loop. */
   dress(group: THREE.Group, template: PersonTemplate): Rig {
+    const rig = this.wear(group, template);
+    if (!rig) throw new Error('a stage with no rig has nothing to animate');
+    return rig;
+  }
+
+  /**
+   * A copy of any stage into `group` (emptied first): the rigged ones idling somewhere in the loop,
+   * the stickman and the static model standing still, with no rig to drive.
+   */
+  wear(group: THREE.Group, template: PersonTemplate): Rig | null {
     const model = SkeletonUtils.clone(template.group) as THREE.Group;
     group.clear();
     group.add(model);
+    if (template.clips.size === 0) return null;
     const rig = new Rig(model, template.clips, 'RightHand');
     rig.play('Idle_Loop', { fade: 0 });
     rig.update(Math.random() * 2);

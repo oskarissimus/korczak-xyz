@@ -10,8 +10,18 @@
  * cache too, so the bar knows it ended — with how long it took and whether any work was done.
  * A rig that did work teaches the usual time (`rememberTiming('rig')`), the whole of it from the
  * ask, since that is the wait the bar estimates. No DOM beyond that localStorage, so it can be tested.
+ *
+ * STAGES (owner, 10 Nov 2026: "a stickman on the rig before the model, then the model, then the model
+ * with the simple rig, then with the advanced one"). A person in the game is brought in stage by stage
+ * (`People.staged`), and each stage's time from the ask is kept on the job (`rigStage`): the stickman,
+ * the static model, our quick rig (`fit`), and the full one (SkinTokens or Meshy). The person moves
+ * from the first rig on, so that — not the full rig — is when the start's bar counts them in
+ * (`moving`), and what teaches the usual time. The full rig carries on after, in the console.
  */
 import { rememberTiming } from './progress';
+
+/** How far along a person is, worst to best: see `STAGE_RANK` in `components/Rpg/people.ts`. */
+export type RigStage = 'stickman' | 'static' | 'fast' | 'full';
 
 export interface RigJob {
   id: number;
@@ -24,6 +34,13 @@ export interface RigJob {
   failed: boolean;
   /** The rig's own work in ms; 0 when it came from this browser's cache or the account. */
   workMs: number;
+  /** When each stage first came, in ms from `startedAt` (`rigStage`); empty for the lab's one-go rigs. */
+  stages: Partial<Record<RigStage, number>>;
+}
+
+/** The person moves: a rig is in (either one), or the job has ended. */
+export function moving(job: RigJob): boolean {
+  return job.endedAt !== null || job.stages.fast !== undefined || job.stages.full !== undefined;
 }
 
 let jobs: RigJob[] = [];
@@ -34,23 +51,42 @@ function changed(): void {
   for (const l of listeners) l();
 }
 
-/** Follows `made` (the template's promise) from now until it settles. */
-export function trackRig(label: string, url: string, made: Promise<{ ms: number }>, now: () => number = Date.now): RigJob {
-  const job: RigJob = { id: nextId++, label, url, startedAt: now(), endedAt: null, failed: false, workMs: 0 };
+/** A rig asked for now, ended by `endRig`. */
+export function startRig(label: string, url: string, now: () => number = Date.now): RigJob {
+  const job: RigJob = { id: nextId++, label, url, startedAt: now(), endedAt: null, failed: false, workMs: 0, stages: {} };
   jobs = [...jobs.slice(-199), job];
   changed();
+  return job;
+}
+
+/**
+ * A stage of the person came (`People.staged`). The first rig to come teaches the usual time when it
+ * was worked out rather than read from a cache (`worked`), since it is what the start's bar waits for.
+ */
+export function rigStage(job: RigJob, stage: RigStage, worked: boolean, now: () => number = Date.now): void {
+  if (job.stages[stage] !== undefined) return;
+  const wasMoving = moving(job);
+  job.stages[stage] = now() - job.startedAt;
+  if (!wasMoving && (stage === 'fast' || stage === 'full') && worked) rememberTiming('rig', job.stages[stage]!);
+  changed();
+}
+
+/** The last rig is in with `workMs` of its own work, or (`null`) not even the fallback could be made. */
+export function endRig(job: RigJob, workMs: number | null, now: () => number = Date.now): void {
+  const wasMoving = moving(job);
+  job.endedAt = now();
+  job.failed = workMs === null;
+  job.workMs = workMs ?? 0;
+  if (!wasMoving && workMs) rememberTiming('rig', job.endedAt - job.startedAt);
+  changed();
+}
+
+/** Follows `made` (the template's promise) from now until it settles. */
+export function trackRig(label: string, url: string, made: Promise<{ ms: number }>, now: () => number = Date.now): RigJob {
+  const job = startRig(label, url, now);
   made.then(
-    (t) => {
-      job.endedAt = now();
-      job.workMs = t.ms;
-      if (t.ms > 0) rememberTiming('rig', job.endedAt - job.startedAt);
-      changed();
-    },
-    () => {
-      job.endedAt = now();
-      job.failed = true;
-      changed();
-    },
+    (t) => endRig(job, t.ms, now),
+    () => endRig(job, null, now),
   );
   return job;
 }
@@ -95,6 +131,17 @@ export function rigSummary(list: readonly RigJob[], now: number): { count: numbe
     if (j.workMs > 0) worked++;
   }
   return { count: list.length, worked, spanMs: last - first, longestMs };
+}
+
+/**
+ * For the console: the longest time from the ask to each stage across `list` (the slowest person is
+ * what the reader waited for), `null` where no person has reached that stage.
+ */
+export function stageSummary(list: readonly RigJob[]): Record<RigStage, number | null> {
+  const out: Record<RigStage, number | null> = { stickman: null, static: null, fast: null, full: null };
+  for (const j of list)
+    for (const [stage, ms] of Object.entries(j.stages) as [RigStage, number][]) out[stage] = Math.max(out[stage] ?? 0, ms);
+  return out;
 }
 
 export function resetRigs(): void {

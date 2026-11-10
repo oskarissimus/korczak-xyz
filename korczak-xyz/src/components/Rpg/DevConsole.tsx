@@ -34,7 +34,7 @@ import {
 } from '../../utils/rpg/funds';
 import type { WorldBible } from '../../utils/rpg/genesis';
 import { countOf, loadTypical, progressOf, roughly, type Task, type TaskKind } from '../../utils/rpg/progress';
-import { rigsOfStart, rigSummary } from '../../utils/rpg/rigging';
+import { rigsOfStart, rigSummary, stageSummary } from '../../utils/rpg/rigging';
 import { personaLabel } from '../../utils/rpg/persona';
 import type { Beat, Character, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
@@ -432,11 +432,17 @@ function RigStats({ lang, since }: { lang: Lang; since: number }) {
   if (list.length === 0) return null;
   const s = rigSummary(list, now);
   const failed = list.filter((j) => j.failed).length;
+  // The slowest person's time to each stage (`People.staged`): stickman, static model, quick rig, full rig.
+  const stages = stageSummary(list);
+  const at = (ms: number | null) => (ms === null ? '—' : formatMs(ms));
   return (
     <div className="rpg-dev-start-eta">
       {running ? '⏳ ' : ''}
       {t.devRigs(s.count, s.worked, formatMs(s.spanMs), formatMs(s.longestMs))}
       {failed > 0 ? ` · ${t.progressFailed(failed)}` : ''}
+      {stages.static !== null || stages.fast !== null ? (
+        <div>{t.devRigStages(at(stages.stickman), at(stages.static), at(stages.fast), at(stages.full))}</div>
+      ) : null}
     </div>
   );
 }
