@@ -6,9 +6,7 @@ import { useTranslations, type Lang } from '../../src/i18n';
 import islandRecovery from '../../src/scripts/island-recovery.js?raw';
 import { iconUrl } from '../../src/utils/pwa/iconUrl';
 import BuildStamp from '../components/BuildStamp.astro';
-import DesignPreview from '../components/DesignPreview.astro';
-import { DESIGN_IDS, DESIGN_STORAGE_KEY } from '../../src/utils/rpg/designs';
-import '../../src/styles/rpg-designs.css';
+import '../../src/styles/rpg-theme.css';
 
 interface Props {
   title: string;
@@ -55,23 +53,6 @@ const recoveryStrings = {
       window.__islandRecoveryI18n = recoveryStrings;
     </script>
     <script is:inline set:html={islandRecovery}></script>
-    <!-- The candidate looks (src/utils/rpg/designs.ts): `?design=<id or 1-10>` turns one on and this
-         browser remembers it, `?design=off` forgets it. Before the first paint, so the page never
-         flashes the old look. Without either, nothing is set and the game looks as it always has. -->
-    <script is:inline define:vars={{ designIds: DESIGN_IDS, designKey: DESIGN_STORAGE_KEY }}>
-      try {
-        const asked = new URLSearchParams(location.search).get('design');
-        const pick = (v) => (designIds.includes(v) ? v : designIds[Number(v) - 1] ?? null);
-        if (asked !== null) {
-          if (pick(asked)) localStorage.setItem(designKey, pick(asked));
-          else localStorage.removeItem(designKey);
-        }
-        const id = pick(localStorage.getItem(designKey) ?? '');
-        if (id) document.documentElement.dataset.rpgDesign = id;
-      } catch {
-        // No storage (a private window): the default look.
-      }
-    </script>
     <script>
       import { initSentry } from '../../src/lib/sentry';
 
@@ -80,7 +61,6 @@ const recoveryStrings = {
   </head>
   <body>
     <slot />
-    <DesignPreview lang={lang} />
     <BuildStamp />
   </body>
 </html>
@@ -109,9 +89,9 @@ const recoveryStrings = {
   html,
   body {
     margin: 0;
-    background: #000;
-    color: #f1e6cf;
-    font-family: Georgia, 'Times New Roman', serif;
+    background: #0b0b0d;
+    color: #f4f4f5;
+    font-family: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
 
   body {
@@ -119,6 +99,6 @@ const recoveryStrings = {
   }
 
   a {
-    color: #e0b96a;
+    color: #fff;
   }
 </style>

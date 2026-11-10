@@ -1,5 +1,5 @@
 /*
- * The four proposed worlds on top of the menu (`utils/rpg/proposals.ts`, drawn from the server's
+ * The four proposed worlds along the bottom of the home screen (`utils/rpg/proposals.ts`, drawn from the server's
  * daily pool): a card each with its cover, name, genre and pitch; a tap makes that world.
  *
  * Always four cards of one fixed size (owner, 9 Nov 2026: "everything on this screen loads at once,
@@ -21,6 +21,9 @@ interface Props {
   disabled: boolean;
   onPick: (p: PoolItem) => void;
   onRefresh: () => void;
+  /** How many worlds the library holds, and the way to it: beside the cards' heading. */
+  worlds: number;
+  onWorlds: () => void;
 }
 
 /** The cover, faded in once it has loaded, over the card's own colours. */
@@ -29,7 +32,7 @@ function Cover({ src }: { src: string }) {
   return <img src={src} alt="" decoding="async" className={loaded ? 'rpg-proposal-loaded' : undefined} onLoad={() => setLoaded(true)} />;
 }
 
-export default function WorldProposals({ lang, disabled, onPick, onRefresh }: Props) {
+export default function WorldProposals({ lang, disabled, onPick, onRefresh, worlds, onWorlds }: Props) {
   const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
   const items = v.lang === lang ? v.items : [];
@@ -38,10 +41,16 @@ export default function WorldProposals({ lang, disabled, onPick, onRefresh }: Pr
   return (
     <section className="rpg-proposals" aria-label={t.proposalsTitle} aria-busy={!items.length}>
       <div className="rpg-proposals-head">
-        <h3>{t.proposalsTitle}</h3>
-        <button type="button" className="rpg-proposals-refresh" onClick={onRefresh} disabled={v.pool.length <= PROPOSAL_COUNT} title={t.proposalsRefresh}>
-          ↻ {t.proposalsRefresh}
-        </button>
+        <h3>{t.homeReady}</h3>
+        <div className="rpg-proposals-tools">
+          {/* Always there, so a library the account brings in a moment later changes a number, not the row. */}
+          <button type="button" className="rpg-proposals-worlds" onClick={onWorlds} disabled={worlds === 0}>
+            {t.homeWorlds(worlds)}
+          </button>
+          <button type="button" className="rpg-proposals-refresh" onClick={onRefresh} disabled={v.pool.length <= PROPOSAL_COUNT} title={t.proposalsRefresh} aria-label={t.proposalsRefresh}>
+            ↻
+          </button>
+        </div>
       </div>
       <div className="rpg-proposals-grid">
         {slots.map((p, i) =>

@@ -62,7 +62,7 @@ import {
   validSpend,
 } from '../../utils/rpg/devlog';
 import { outOfFunds } from '../../utils/rpg/funds';
-import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, drawLight, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
+import { addModelSpend, clampExotic, classicWorld, DEFAULT_EXOTIC, drawLight, WISH_MAX, type GroundTexture, type LandmarkModel, type WorldBible } from '../../utils/rpg/genesis';
 import { ensureGroundTexture, groundState } from '../../utils/rpg/groundTexture';
 import { coverState, ensureGroundCover, hasCover } from '../../utils/rpg/groundCover';
 import { EMPTY_LAYOUT, hubLayout } from '../../utils/rpg/hubLayout';
@@ -2947,24 +2947,40 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // controls — each with its own Back.
   const mainMenu = (
     <nav className="rpg-menu" aria-label={t.title}>
-      {pendingGenesis &&
-        (creatable || !keysReady) &&
-        item('finish', t.menuFinishWorld, () => finishGenesis(pendingGenesis), {
-          primary: true,
-          sub: pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40),
-          waiting: !keysReady,
-        })}
-      {ownSave && item('continue', t.menuContinue, () => resume(ownSave), { primary: true, sub: ownSave.beats[ownSave.beats.length - 1].title, waiting: !keysReady })}
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { primary: !ownSave && !pendingGenesis, waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
-      {(creatable || !keysReady) && item('world', t.menuNewWorld, () => setMenu('world'), { primary: !world && !ownSave && !proposing, sub: proposing ? t.proposalsOwnIdea : undefined, waiting: !keysReady })}
-      {/* Always there, so a library the account brings in a moment later changes a number, not the menu's height. */}
-      {item('library', t.menuWorlds, () => setMenu('library'), { sub: t.menuWorldsCount(libraryRows.length), disabled: libraryRows.length === 0 })}
+      {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
+      {(creatable || !keysReady) && item('world', t.homeMore, () => setMenu('world'), { sub: wish.words.length ? wish.words.join(', ') : undefined, waiting: !keysReady })}
       {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
       {item('controls', t.menuControls, () => setMenu('controls'))}
     </nav>
   );
+
+  // The one way back into play, top right (the home screen's layout, Nov 2026): the world being born
+  // if there is one, else the quest in progress, with the world's cover-like colour and its name.
+  const resumeEntry = pendingGenesis && (creatable || !keysReady)
+    ? { key: 'finish', label: t.menuFinishWorld, sub: pendingGenesis.seeds.join(', ') || clip(pendingGenesis.wish ?? '', 40), go: () => finishGenesis(pendingGenesis) }
+    : ownSave
+      ? { key: 'continue', label: t.menuContinue, sub: world?.name ?? ownSave.beats[ownSave.beats.length - 1].title, go: () => resume(ownSave) }
+      : null;
+  const resumePill = resumeEntry && (
+    <button
+      type="button"
+      className={`rpg-home-resume${keysReady ? '' : ' rpg-menu-waiting'}`}
+      data-key={resumeEntry.key}
+      aria-disabled={!keysReady || undefined}
+      onClick={keysReady ? resumeEntry.go : undefined}
+    >
+      <span>▶ {resumeEntry.label}</span>
+      {resumeEntry.sub && <small>{resumeEntry.sub}</small>}
+    </button>
+  );
+  // What the field offers to type: a few worlds in the menu's language, tapped into the field.
+  const ideas = t.homeIdeas.split('|').map((s) => s.trim()).filter(Boolean);
+  const createFromField = () => {
+    if (!keysReady || !creatable) return;
+    begin(true);
+  };
 
   // The account, under the menu, on the standalone site only (see the props above). Links rather
   // than buttons: sign-in and the keys are their own pages there (`src-rpg/pages`).
@@ -2976,9 +2992,13 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <div className="rpg-account">
         {auth.user ? (
           <>
-            <small className="rpg-account-who">{auth.user.email}</small>
-            <a className="rpg-account-link" href={`${accountRoot}account/`}>
-              {t.menuAccount}
+            <a
+              className="rpg-account-avatar"
+              href={`${accountRoot}account/`}
+              title={`${t.menuAccount} · ${auth.user.email ?? ''}`}
+              aria-label={t.menuAccount}
+            >
+              {(auth.user.email ?? '?').slice(0, 1).toUpperCase()}
             </a>
             <button type="button" className="rpg-account-link" onClick={() => void auth.signOut()}>
               {t.menuSignOut}
@@ -3183,6 +3203,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           🗑 {t.menuTrash} · {t.menuTrashCount(trashRows.length)}
         </button>
       </p>
+      {/* Also here: on a phone the home screen's top bar has room for the account's initial only. */}
+      {standalone && auth.user && (
+        <p className="rpg-trash-link">
+          <button type="button" onClick={() => void auth.signOut()}>
+            {t.menuSignOut} · {auth.user.email}
+          </button>
+        </p>
+      )}
       <div className="rpg-panel-actions">{back}</div>
     </div>
   );
@@ -3228,17 +3256,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       </p>
       <div className="rpg-panel-actions">{back}</div>
     </div>
-  );
-
-  const worldCard = world && storyProvider !== 'static' && (
-    <details className="rpg-world">
-      <summary>
-        <strong>{world.name}</strong>
-        <span className="rpg-world-you"> · {world.player.split(/[;,.]/)[0]}</span>
-      </summary>
-      <p>{world.pitch}</p>
-      <p className="rpg-world-you">{t.worldYou(world.player)}</p>
-    </details>
   );
 
   return (
@@ -3493,22 +3510,67 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           ) : (
             <>
               {menu === 'main' && (
-                <>
-                  <h2 className="rpg-menu-title">{t.title}</h2>
-                  {worldCard}
-                  {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
-                  <WorldProposals lang={gameLang} disabled={keysReady && !creatable} onPick={pickProposal} onRefresh={otherProposals} />
-                  {/* The badge's row is there before the tank or the demo has answered (and stays, empty, on one's own keys). */}
-                  {diesel && plantState(diesel.litres) === 'stopped' ? (
-                    <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
-                  ) : (
-                    <div className="rpg-dz-slot">
-                      {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
+                <div className="rpg-home">
+                  <header className="rpg-home-bar">
+                    <span className="rpg-home-logo">{t.title}</span>
+                    <div className="rpg-home-bar-end">
+                      {resumePill}
+                      {accountBar}
                     </div>
-                  )}
-                  {mainMenu}
-                  {accountBar}
-                </>
+                  </header>
+                  <section className="rpg-home-hero">
+                    <h2 className="rpg-menu-title">{t.homeAsk}</h2>
+                    <form
+                      className="rpg-home-field"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        createFromField();
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={wish.text}
+                        maxLength={WISH_MAX}
+                        placeholder={t.homePlaceholder}
+                        aria-label={t.homePlaceholder}
+                        enterKeyHint="go"
+                        // The game's keys must not walk the hero while a world is typed.
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onChange={(e) => pickWish({ ...wish, text: e.target.value.slice(0, WISH_MAX) })}
+                      />
+                      <button type="submit" className="rpg-home-create" disabled={keysReady && !creatable} aria-disabled={!keysReady || undefined}>
+                        {t.homeCreate} ✦
+                        {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel, priceParts))}</small>}
+                      </button>
+                    </form>
+                    <div className="rpg-home-try">
+                      <span>{t.homeTry}</span>
+                      {ideas.map((idea) => (
+                        <button key={idea} type="button" onClick={() => pickWish({ ...wish, text: idea })}>
+                          {idea}
+                        </button>
+                      ))}
+                    </div>
+                    {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
+                    {/* The badge's row is there before the tank or the demo has answered (and stays, empty, on one's own keys). */}
+                    {diesel && plantState(diesel.litres) === 'stopped' ? (
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
+                    ) : (
+                      <div className="rpg-dz-slot">
+                        {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
+                      </div>
+                    )}
+                    {mainMenu}
+                  </section>
+                  <WorldProposals
+                    lang={gameLang}
+                    disabled={keysReady && !creatable}
+                    onPick={pickProposal}
+                    onRefresh={otherProposals}
+                    worlds={libraryRows.length}
+                    onWorlds={() => setMenu('library')}
+                  />
+                </div>
               )}
               {menu === 'diesel' && (dieselMenu || mainMenu)}
               {menu === 'world' && worldMenu}

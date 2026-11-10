@@ -253,7 +253,7 @@ the overlay is `.rpg-intro` in `Rpg.tsx`.
 Owner, 2 Nov 2026: "the player opens the game and has four proposed worlds generated for them — not
 whole worlds with a bible and assets, only proposals a world can be generated from — each with a cover
 picture, and under them the menu as it is, where you can still type your own idea". `WorldProposals.tsx`
-over the main menu, `utils/rpg/proposals.ts` reads the pool and draws, `proposalScript.ts` is the prompt and reader.
+along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and draws, `proposalScript.ts` is the prompt and reader.
 
 - **A proposal is a premise**: a name, a pitch of at most 30 words, a genre, two colours and an English
   cover description. Tapping one is *New world* with the proposal as the player's description
@@ -293,6 +293,37 @@ over the main menu, `utils/rpg/proposals.ts` reads the pool and draws, `proposal
   pool file (`window.__rpgPool`). Measured on a local build: CLS 0.0003.
 - **In the console**: the Start tab's `ProposalStats` says where the four came from (`kept`, `file`,
   `server`), the pool's size and language, when it was written, how long the file took, and errors.
+
+## The look: one design, "Czysty"
+
+Owner, 9–10 Nov 2026: "a design overhaul with soul, inviting, not too much at once, above all on the
+start screen; guidelines so the whole UI is consistent", then "the main selling point is the worlds:
+the home page should above all show worlds and generating your own from a prompt; Continue and My
+worlds second". Ten looks, then ten home-screen layouts, then ten details of the chosen one were
+mocked up (PC, iPhone SE and greyscale each; `rpg/strona-glowna-uklady/` in the project files); he
+picked layout 1 (a prompt field and a scrolling row of worlds), detail 1.1 *Czysty*, with corners
+less rounded ("pills look like slop") but not sharp ("too sharp I don't like either"), and a lighter
+dialogue ("too many boxes"). `styles/rpg-theme.css` is all of it, imported after `rpg.css` on both
+hosts; the ten looks, `?design=` and `/designs/` are gone.
+
+- **Black and white.** One white primary per screen (white with black text), everything else quiet;
+  state in glyphs and words (✓, ◆ decyzja), never a hue: the owner's phone is greyscale.
+- **Cormorant Garamond for names** — the home screen's question, the speaker, headings — **Manrope
+  for everything pressed or read in the UI.** Self-hosted (`@fontsource`, latin and latin-ext only).
+- **Corners 8 px (buttons, fields, chips) and 10 px (panels, cards)**; round only for the account's
+  initial and the touch controls. One dark surface with a hairline; frosted only over the 3D scene.
+- **The home screen** (`menu === 'main'` in `Rpg.tsx`): the logo, and top right the way back into
+  play (`resumePill`: the world being born, else Continue with the world's name) and the account (a
+  round initial once signed in; on a phone sign-out moves to Settings). In the middle the question,
+  a field that is the wish's description (`wish.text`, so *New world* and the field are one
+  description) with *Create the world*, and *Try:* ideas that fill it (`homeIdeas`, `|`-separated
+  so the server translates one string). Under them the diesel row and the rest of the menu as a
+  quiet row of words (New quest in the current world, *More world options* — the slider and the
+  words — language, Settings, Controls). Along the bottom the proposed worlds as a row that
+  scrolls sideways, with *My worlds (n)* and ↻ beside its heading.
+- **The dialogue is one panel with a list in it**: dim numbers, a light row for focus, the typed line
+  under a hairline rather than in a box.
+- `src-rpg/components/MenuSkeleton.astro` draws the same boxes before the bundle runs; change both.
 
 ## The world grows
 
