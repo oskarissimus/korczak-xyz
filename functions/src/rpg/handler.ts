@@ -32,7 +32,10 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 
-import { tokenCost } from '../../../korczak-xyz/src/utils/rpg/cost';
+import { tokenCost, tokenPrice, USD_PER_VOICE_CREDIT, voiceCreditsPerChar } from '../../../korczak-xyz/src/utils/rpg/cost';
+import { safeHeaders, tokenBasis, type LoggedUsage, type PriceSource } from '../../../korczak-xyz/src/utils/rpg/requestLog';
+import type { GatewayProvider } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
+import { keptBody, logRequest } from './requestLog';
 import {
   BadContext,
   DEMO_MODELS,
@@ -92,6 +95,66 @@ function cors(req: Request, res: Response): boolean {
 async function readSettings(): Promise<RpgDemoSettings> {
   const snap = await db.collection(SETTINGS_PATH[0]).doc(SETTINGS_PATH[1]).get();
   return normalizeRpgDemo(snap.exists ? snap.data() : {});
+}
+
+/**
+ * A demo request into the request log (`requestLog.ts`), payer `demo`: the server's keys, a player
+ * known only by the day's address hash. Awaited before the answer ends, never throws.
+ */
+function logDemoRequest(o: {
+  at: number;
+  ip: string;
+  provider: GatewayProvider;
+  host: string;
+  path: string;
+  model: string;
+  status: number;
+  usd: number;
+  source: PriceSource;
+  basis: string;
+  usage?: LoggedUsage;
+  reservedUsd: number;
+  requestBytes: number;
+  url: string;
+  sent: unknown;
+  upstream: globalThis.Response | null;
+  contentType: string;
+  bytes: Buffer;
+  total: number;
+}): Promise<void> {
+  return logRequest(
+    {
+      at: o.at,
+      uid: null,
+      ip: o.ip,
+      payer: 'demo',
+      provider: o.provider,
+      host: o.host,
+      method: 'POST',
+      path: o.path,
+      model: o.model,
+      status: o.status,
+      ms: Date.now() - o.at,
+      world: null,
+      quest: null,
+      usd: o.usd,
+      source: o.source,
+      basis: o.basis,
+      usage: o.usage,
+      reservedUsd: o.reservedUsd,
+      requestBytes: o.requestBytes,
+      responseBytes: o.total,
+      contentType: o.contentType || null,
+    },
+    {
+      request: { method: 'POST', url: o.url, headers: { 'content-type': 'application/json' }, body: o.sent },
+      response: {
+        status: o.status,
+        headers: o.upstream ? safeHeaders(o.upstream.headers.entries()) : {},
+        body: keptBody(o.contentType, o.bytes, o.total),
+      },
+    },
+  );
 }
 
 function counters(day: string, ip: string) {
@@ -255,28 +318,57 @@ async function generate(
       return;
     }
     const gemma = model.startsWith('gemma');
-    const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': google },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature,
-            maxOutputTokens: MAX_OUTPUT_TOKENS,
-            ...(gemma
-              ? {}
-              : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true, ...(thinking ? { thinkingLevel: thinking } : {}) } }),
-          },
-        }),
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+    const sent = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        ...(gemma
+          ? {}
+          : { responseMimeType: 'application/json', thinkingConfig: { includeThoughts: true, ...(thinking ? { thinkingLevel: thinking } : {}) } }),
       },
-    );
+    };
+    const sentText = JSON.stringify(sent);
+    const started = Date.now();
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': google },
+      body: sentText,
+    });
+    const demoLog = (status: number, contentType: string, bytes: Buffer, total: number, usd: number, servedBy: string, usage: { input: number; output: number; thoughts: number } | null) =>
+      logDemoRequest({
+        at: started,
+        ip: ipKey(ip, day),
+        provider: 'google',
+        host: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models/${model}:streamGenerateContent`,
+        model: servedBy,
+        status,
+        usd,
+        source: usage ? 'usage' : 'list',
+        basis: usage
+          ? `${servedBy}: ${tokenBasis(servedBy, usage, tokenPrice(servedBy, started) ?? tokenPrice(priceAs(model), started))}`
+          : status >= 400
+            ? 'refused: nothing paid'
+            : 'no usage in the answer: the whole reservation kept',
+        usage: usage ?? undefined,
+        reservedUsd: reservation,
+        requestBytes: sentText.length,
+        url,
+        sent,
+        upstream,
+        contentType,
+        bytes,
+        total,
+      });
     if (!upstream.ok || !upstream.body) {
       // Nothing was generated: a refusal costs nothing. Passed on with Google's status, so the game
       // moves to its next model on a 404, 429 or 503 as it would on its own key.
       spent = 0;
       const text = await upstream.text().catch(() => '');
+      const refused = Buffer.from(text);
+      await demoLog(upstream.status, upstream.headers.get('content-type') ?? '', refused, refused.length, 0, model, null);
       res.status(upstream.status || 502).type('application/json').send(text || '{}');
       return;
     }
@@ -304,10 +396,14 @@ async function generate(
         /* a keep-alive */
       }
     };
+    const kept: Buffer[] = [];
+    let total = 0;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       res.write(value);
+      total += value.length;
+      if (total <= 4_000_000) kept.push(Buffer.from(value));
       buffer += decoder.decode(value, { stream: true });
       let newline: number;
       while ((newline = buffer.indexOf('\n')) >= 0) {
@@ -316,9 +412,11 @@ async function generate(
       }
     }
     watch(buffer);
-    res.end();
     // Settled at the model that answered, or at what was asked for when the answer did not say.
     if (usage) spent = tokenCost(servedBy ?? priceAs(model), usage) ?? tokenCost(priceAs(model), usage) ?? reservation;
+    // Logged before the end: on Cloud Run work after it may be frozen half done.
+    await demoLog(200, 'text/event-stream', Buffer.concat(kept), total, spent, servedBy ?? model, usage);
+    res.end();
   } finally {
     await settle(day, ip, reservation, spent).catch((e) => reportError('rpgDemo.settle', e));
   }
@@ -408,6 +506,7 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   // reservation is the tagged price, and a fall back to Flash settles at Flash's.
   let said = voicing(text);
   const cost = clipCost(said.text.length, said.model);
+  const started = Date.now();
 
   const settings = await readSettings();
   const day = dayKey();
@@ -458,13 +557,46 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     }
     const spoken = upstream ? 'library' : 'premade';
     upstream ??= await send(DEMO_VOICES[voice]);
+    const voiceId = library && spoken === 'library' ? library : DEMO_VOICES[voice];
+    const answered = upstream;
+    const clipLog = (status: number, bytes: Buffer, usd: number) => {
+      const credits = Number(answered.headers.get('character-cost') ?? NaN);
+      const perK = `$${Math.round(USD_PER_VOICE_CREDIT * 1e9) / 1e6}/1k credits`;
+      return logDemoRequest({
+        at: started,
+        ip: ipKey(ip, day),
+        provider: 'elevenlabs',
+        host: 'api.elevenlabs.io',
+        path: `/v1/text-to-speech/${voiceId}`,
+        model: said.model,
+        status,
+        usd,
+        source: 'list',
+        basis:
+          status >= 400
+            ? 'refused: nothing paid'
+            : `${said.text.length} chars × ${voiceCreditsPerChar(said.model)} credit (${said.model}) × ${perK}` +
+              (Number.isFinite(credits) ? ` · ElevenLabs said ${credits} credits` : ''),
+        usage: { chars: said.text.length, ...(Number.isFinite(credits) ? { credits } : {}) },
+        reservedUsd: cost,
+        requestBytes: said.text.length,
+        url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        sent: { text: said.text, model_id: said.model, voice: spoken, lang },
+        upstream: answered,
+        contentType: answered.headers.get('content-type') ?? '',
+        bytes,
+        total: bytes.length,
+      });
+    };
     if (!upstream.ok) {
       spent = 0;
       reportError('rpgDemo.voice', new Error(`ElevenLabs ${upstream.status}`), { status: upstream.status });
+      await clipLog(upstream.status, Buffer.from(await upstream.text().catch(() => '')), 0);
       res.status(502).json({ reason: 'provider', detail: { message: `ElevenLabs ${upstream.status}` } });
       return;
     }
     const audio = Buffer.from(await upstream.arrayBuffer());
+    await clipLog(200, audio, spent);
     res.status(200);
     res.set('Content-Type', 'audio/mpeg');
     res.set('x-demo-cost', String(spent));

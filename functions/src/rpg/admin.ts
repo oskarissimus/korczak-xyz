@@ -40,6 +40,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { grantUsd, topUpDiesel } from './wallet';
 import { testServerKeys } from './keyTest';
 import { SETTINGS_PATH } from '../demo/handler';
+import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
+import { ADMIN_REQUEST_PATH, ADMIN_REQUESTS_PATH } from '../../../korczak-xyz/src/utils/rpg/requestLog';
+import { listRequests, readRequest } from './requestLog';
 import { db } from '../runtime';
 
 /** A document by its path, through `collection().doc()` — the one form every test's Firestore fake has. */
@@ -115,11 +118,27 @@ function bodyJson(req: Request): unknown {
   }
 }
 
-/** `/admin/config`, for a uid the gateway has already verified. */
-export async function handleAdmin(req: Request, res: Response, uid: string | null): Promise<void> {
+/** `/admin/config`, `/admin/requests` and `/admin/request`, for a uid the gateway has already verified. */
+export async function handleAdmin(req: Request, res: Response, uid: string | null, path = ADMIN_PATH, query = ''): Promise<void> {
   if (!uid) throw new AdminRefusal(401, 'auth', 'admin: sign in first');
   if (!(await isAdminUid(uid))) throw new AdminRefusal(403, 'not-admin', 'admin: this account is not an admin');
   res.set('Cache-Control', 'no-store');
+  // The request log (`requestLog.ts`): the records of a range, and one record with its bodies.
+  if (path === ADMIN_REQUESTS_PATH) {
+    const q = new URLSearchParams(query);
+    const to = Number(q.get('to')) || Date.now();
+    const from = Number(q.get('from')) || to - 7 * 86_400_000;
+    if (!(from <= to) || to - from > 400 * 86_400_000) throw new AdminRefusal(400, 'bad-range', 'admin: bad range');
+    res.status(200).json(await listRequests(from, to));
+    return;
+  }
+  if (path === ADMIN_REQUEST_PATH) {
+    const found = await readRequest(new URLSearchParams(query).get('id') ?? '');
+    if (!found) throw new AdminRefusal(404, 'no-request', 'admin: no such request');
+    res.status(200).json(found);
+    return;
+  }
+  if (path !== ADMIN_PATH) throw new AdminRefusal(404, 'route', 'admin: no such section');
   if (req.method === 'POST') {
     let patch;
     try {

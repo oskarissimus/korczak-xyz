@@ -37,9 +37,9 @@ export function formatLitres(l: number, lang: string): string {
  * A typical step: a late beat's prompt is ~8k tokens (the chronicle and the story so far) and the
  * answer ~1.2k with ~0.8k of thinking — $0.014 on 3.8 Flash, what the console measured (Oct 2026).
  */
-const TYPICAL_BEAT = { input: 8_000, output: 1_200, thoughts: 800 };
+export const TYPICAL_BEAT = { input: 8_000, output: 1_200, thoughts: 800 };
 /** A typical spoken line, in characters. */
-const TYPICAL_LINE = 150;
+export const TYPICAL_LINE = 150;
 
 /*
  * WHAT A QUEST AND A WORLD REALLY COST, beyond the model's words (owner, 9 Nov 2026: "quest and world

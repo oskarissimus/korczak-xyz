@@ -31,6 +31,13 @@ import {
 } from './gatewayRoutes';
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
+import {
+  ADMIN_REQUEST_PATH,
+  ADMIN_REQUESTS_PATH,
+  type RequestBodies,
+  type RequestLogEntry,
+  type RequestsPage,
+} from './requestLog';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
 import { REFUEL_PATH, WALLET_PATH, type WalletStatus } from './wallet';
 
@@ -172,6 +179,23 @@ export async function adminConfig(patch?: AdminPatch, signal?: AbortSignal): Pro
     });
   }
   return body;
+}
+
+async function adminGet<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await signedInCall(path, 'GET', signal);
+  const body = (await response.json().catch(() => null)) as (T & { reason?: string; error?: { message?: string } }) | null;
+  if (!response.ok || !body) throw new Error(body?.error?.message ?? `gateway: admin ${response.status}`);
+  return body;
+}
+
+/** The request log of a range (`requestLog.ts`), newest first; admins only. */
+export function adminRequests(from: number, to: number, signal?: AbortSignal): Promise<RequestsPage> {
+  return adminGet<RequestsPage>(`${ADMIN_REQUESTS_PATH}?from=${Math.floor(from)}&to=${Math.ceil(to)}`, signal);
+}
+
+/** One logged request with what was sent and what came back; admins only. */
+export function adminRequest(id: string, signal?: AbortSignal): Promise<{ entry: RequestLogEntry; bodies: RequestBodies | null }> {
+  return adminGet(`${ADMIN_REQUEST_PATH}?id=${encodeURIComponent(id)}`, signal);
 }
 
 /** What the gateway says of the account's keys — never a key, only which exist and their last four characters. */

@@ -17,7 +17,7 @@ export interface Usage {
 }
 
 /** US dollars per 1M tokens, prompts up to 200k (a beat is ~5k). Longest prefix wins. */
-const PER_MILLION: [prefix: string, input: number, output: number][] = [
+export const PER_MILLION: [prefix: string, input: number, output: number][] = [
   ['gemini-3.1-pro', 2, 12],
   ['gemini-4-argon', 2, 10],
   ['gemini-3.8-flash', 0.75, 3.75],
@@ -34,17 +34,45 @@ const PER_MILLION: [prefix: string, input: number, output: number][] = [
   ['gpt-4.1', 2, 8],
 ];
 
-export function tokenPrice(model: string): { input: number; output: number } | null {
+/**
+ * Prices Google has already announced, from the day they apply (ai.google.dev pricing page, read
+ * 10 Nov 2026: "$2.00 through November 30, 2026. $4.00 starting December 1, 2026." and the same
+ * shape for 3.8 / 3.6 Flash from 1 Jan 2027). A request is priced at the rate of the moment it was
+ * made, so the ledger, diesel and the request log move on the day without a deploy.
+ */
+export const PRICE_CHANGES: { prefix: string; from: string; input: number; output: number }[] = [
+  { prefix: 'gemini-4-argon', from: '2026-12-01', input: 4, output: 20 },
+  { prefix: 'gemini-3.8-flash', from: '2027-01-01', input: 1.5, output: 7.5 },
+  { prefix: 'gemini-3.6-flash', from: '2027-01-01', input: 1.5, output: 7.5 },
+];
+
+/** The row a model is priced by: the longest matching prefix, or null. */
+export function priceRowOf(model: string): (typeof PER_MILLION)[number] | null {
   let best: (typeof PER_MILLION)[number] | null = null;
   for (const row of PER_MILLION) {
     if (model.startsWith(row[0]) && (!best || row[0].length > best[0].length)) best = row;
   }
-  return best ? { input: best[1], output: best[2] } : null;
+  return best;
+}
+
+/** The price per 1M tokens at `at` (ms, default now): the row's, or the latest announced change in force. */
+export function tokenPrice(model: string, at: number = Date.now()): { input: number; output: number } | null {
+  const best = priceRowOf(model);
+  if (!best) return null;
+  let price = { input: best[1], output: best[2] };
+  let since = '';
+  for (const c of PRICE_CHANGES) {
+    if (c.prefix === best[0] && Date.parse(`${c.from}T00:00:00Z`) <= at && c.from > since) {
+      price = { input: c.input, output: c.output };
+      since = c.from;
+    }
+  }
+  return price;
 }
 
 /** Dollars for one request, or null when the model has no price here. */
-export function tokenCost(model: string, usage: Usage): number | null {
-  const price = tokenPrice(model);
+export function tokenCost(model: string, usage: Usage, at: number = Date.now()): number | null {
+  const price = tokenPrice(model, at);
   if (!price) return null;
   return (usage.input * price.input + (usage.output + usage.thoughts) * price.output) / 1_000_000;
 }

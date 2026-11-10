@@ -1,0 +1,219 @@
+/* The admin panel's costs (`components/Rpg/AdminCosts.tsx`): the dashboard, the request list and the
+   price list. Built on the account page's sheet (`account.css`) — the same cards, the same type —
+   with only what a table and a chart need on top. The tables scroll inside their own box on a phone,
+   never the page. */
+
+.rpg-costs-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.rpg-costs-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Which range is on is said by the border, not by colour alone: pressed is inset, the rest outset. */
+.rpg-costs-toggle .retro-btn[aria-pressed='true'] {
+  border-style: inset;
+  font-weight: bold;
+}
+
+.rpg-costs-by {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.rpg-costs-total {
+  margin: 0;
+  color: var(--retro-white);
+}
+
+.rpg-costs .acct-numbers dd,
+.rpg-costs .acct-numbers dt {
+  color: var(--retro-black);
+}
+
+.rpg-costs-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  background: var(--retro-gray);
+  border: 2px outset var(--retro-white);
+}
+
+.rpg-costs-provider {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  margin: 6px 8px 0;
+  color: var(--retro-navy);
+}
+
+.rpg-costs-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 1.05rem;
+  color: var(--retro-black);
+}
+
+.rpg-costs-table th,
+.rpg-costs-table td {
+  padding: 3px 8px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--retro-dark-gray);
+}
+
+.rpg-costs-table th {
+  background: var(--retro-white);
+  position: sticky;
+  top: 0;
+}
+
+.rpg-costs-table .acct-dim {
+  color: #3a3a3a;
+}
+
+.rpg-costs-wrap {
+  white-space: normal !important;
+  min-width: 9rem;
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+
+.rpg-costs-prices .rpg-costs-wrap {
+  min-width: 12rem;
+}
+
+.rpg-costs-verbatim q {
+  display: block;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.rpg-costs-verbatim a,
+.rpg-costs-table a {
+  color: var(--retro-navy);
+  text-decoration: underline;
+}
+
+.rpg-costs-typical {
+  display: block;
+  margin-top: 4px;
+  color: #3a3a3a;
+}
+
+.rpg-costs-price {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 0 8px;
+  margin: 0;
+}
+
+.rpg-costs-price dt {
+  color: #3a3a3a;
+}
+
+.rpg-costs-price dd {
+  margin: 0;
+}
+
+/* On the window's teal: the dimmed words beside the total and the picker's label read light. */
+.rpg-costs-total .acct-dim,
+.rpg-costs-by .acct-dim {
+  color: var(--retro-gray);
+}
+
+.rpg-costs-note {
+  display: block;
+  margin-top: 4px;
+  color: #900000;
+}
+
+/* The picked row and the open request: a heavier rule and the ▶/▼ glyph in the markup, not a tint alone. */
+.rpg-costs-picked td {
+  background: var(--retro-white);
+  border-bottom: 2px solid var(--retro-black);
+}
+
+.rpg-costs-link {
+  font: inherit;
+  color: var(--retro-navy);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.rpg-costs-share {
+  display: inline-block;
+  height: 0.7em;
+  background: var(--retro-navy);
+  vertical-align: middle;
+}
+
+.rpg-costs-detail td {
+  background: var(--retro-white);
+  white-space: normal;
+}
+
+.rpg-costs-bodies h4 {
+  margin: 8px 0 2px;
+}
+
+.rpg-costs-bodies pre {
+  margin: 0 0 6px;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 6px;
+  background: var(--retro-black);
+  color: var(--retro-green);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The chart sits on the black panel every chart here does. */
+.rpg-cost-chart {
+  background: var(--retro-black);
+  border: 2px inset var(--retro-dark-gray);
+  padding: 6px 6px 2px;
+}
+
+.rpg-cost-chart svg {
+  display: block;
+  touch-action: pan-y;
+}
+
+.rpg-cost-grid {
+  stroke: #2a2a2a;
+  stroke-width: 1;
+}
+
+.rpg-cost-tick {
+  fill: var(--retro-gray);
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+}
+
+.rpg-cost-bar {
+  fill: var(--retro-green);
+}
+
+.rpg-cost-bar--hit {
+  fill: var(--retro-white);
+}
+
+/* The whole day behind a picked group: hollow against the group's filled bar, so the two read apart in grayscale. */
+.rpg-cost-bar--whole {
+  fill: none;
+  stroke: var(--retro-gray);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}

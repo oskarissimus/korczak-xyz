@@ -304,6 +304,11 @@ export class UsageMeter {
   usage: Usage | null = null;
   private image: GeminiImageUsage | null = null;
 
+  /** True once the answer reported picture tokens (a Gemini image model). */
+  get isImage(): boolean {
+    return this.image !== null;
+  }
+
   constructor(
     private readonly provider: GatewayProvider,
     private readonly askedModel: string,

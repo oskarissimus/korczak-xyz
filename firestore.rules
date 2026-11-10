@@ -305,6 +305,13 @@ service cloud.firestore {
     }
 
     /*
+     * The request log, `rpgRequests/{id}` (`functions/src/rpg/requestLog.ts`): every paid request
+     * with its price, and `rpgFx/usd`, the NBP rate it was priced in złoty at. Deliberately NO match
+     * block for either: the log names accounts and holds what was sent, and the admin panel reads it
+     * through the gateway's `/admin/requests`, which checks `admins/` itself.
+     */
+
+    /*
      * The RPG's kept assets (`korczak-xyz/src/utils/rpg/assetStore.ts`): what made each picture,
      * model, rig, line and track in the account's bucket — prompt, model, parameters, cost — and
      * which request each one answers (`requests/{fingerprint}`). The gateway answers a request from

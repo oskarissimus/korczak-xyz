@@ -11,6 +11,7 @@ const written: { path: string; data: Record<string, unknown> }[] = [];
 const reserve = vi.fn();
 const settle = vi.fn(async () => {});
 const topUp = vi.fn(async () => 3);
+const logged = vi.fn(async (..._a: unknown[]) => {});
 
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { increment: (n: number) => ({ __inc: n }), serverTimestamp: () => ({ __now: true }), delete: () => ({ __del: true }) },
@@ -45,6 +46,11 @@ vi.mock('./assets', () => ({
   handleSelfRig: vi.fn(),
   keepAudio: vi.fn(),
   keepJson: async () => null,
+}));
+vi.mock('./requestLog', () => ({
+  logRequest: (...a: unknown[]) => logged(...a),
+  keptBody: (_t: unknown, b: Buffer | null) => (b ? b.toString('utf8') : null),
+  requestBodies: (method: string, url: string) => ({ method, url, headers: {}, body: null }),
 }));
 vi.mock('./admin', () => ({
   AdminRefusal: class extends Error {},
@@ -132,6 +138,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   forgetCachedKeys();
+  logged.mockClear();
   store.clear();
   written.length = 0;
   reserve.mockReset();
@@ -164,6 +171,13 @@ describe('diesel', () => {
     expect(settle).toHaveBeenCalledWith('u2', reserved, expect.closeTo(0.0045, 6));
     expect(res.body()).not.toContain('AIza-server');
     expect(written.find((w) => w.path.startsWith('rpgLedger/u2/days/'))?.data.byPayer).toEqual({ diesel: { __inc: expect.closeTo(0.0045, 6) } });
+    // Into the request log, as diesel, priced by its usage — with the bodies and never the key.
+    const [entry, bodies] = logged.mock.calls.at(-1) as [Record<string, unknown>, { request: { url: string }; response: { body: string } }];
+    expect(entry).toMatchObject({ uid: 'u2', payer: 'diesel', provider: 'google', status: 200, source: 'usage', usd: expect.closeTo(0.0045, 6) });
+    expect(entry.basis).toContain('× $3.75/1M');
+    expect(bodies.request.url).toContain('streamGenerateContent');
+    expect(bodies.response.body).toContain('usageMetadata');
+    expect(JSON.stringify([entry, bodies])).not.toContain('AIza-server');
   });
 
   it('refuses an empty tank in words the game reads as diesel, without asking the provider', async () => {
@@ -197,6 +211,10 @@ describe('diesel', () => {
     await handleRpgApi(req('/queue.fal.run/fal-ai/trellis/requests/abc/status', { method: 'GET', headers: GAME }), fakeRes() as any);
     expect(reserve.mock.calls[1].slice(1)).toEqual([0, true]);
     expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Key fal-server');
+    // The submit is logged at its list price; the free status poll is not logged at all.
+    const fal = logged.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e.provider === 'fal');
+    expect(fal).toHaveLength(1);
+    expect(fal[0]).toMatchObject({ payer: 'diesel', source: 'list', usd: expect.closeTo(0.02, 6) });
   });
 
   it('pays nothing for another app’s request, a key the server lacks, or a signed-out page', async () => {

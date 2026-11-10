@@ -86,6 +86,8 @@ import {
   type DieselKey,
 } from '../../../korczak-xyz/src/utils/rpg/wallet';
 import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
+import { describePrice, isPaidRequest, safeHeaders, type LogPayer } from '../../../korczak-xyz/src/utils/rpg/requestLog';
+import { keptBody, logRequest, requestBodies } from './requestLog';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
 
@@ -427,6 +429,18 @@ function costText(usd: number | null): string {
   return usd === null ? '' : usd.toFixed(6);
 }
 
+/**
+ * Which requests go in the request log (`requestLog.ts`), and as whose: the server's keys on diesel,
+ * and the game's own requests on a signed-in reader's key. Never a signed-out reader's own key, never
+ * a free request.
+ */
+export function logPayerOf(who: Payer, target: GatewayTarget, method: string, keep: boolean): LogPayer | null {
+  if (!who.uid || !isPaidRequest(target, method)) return null;
+  if (who.kind === 'diesel') return 'diesel';
+  if (who.kind === 'account' && keep && target.provider !== 'audioguide') return 'account';
+  return null;
+}
+
 async function pass(
   req: Request,
   res: Response,
@@ -438,11 +452,74 @@ async function pass(
   const body = bodyOf(req);
   const json = jsonOf(body);
   const header = (name: string) => (typeof req.headers[name] === 'string' ? (req.headers[name] as string) : null);
+  const started = Date.now();
+  const logAs = logPayerOf(who, target, req.method, header(KEEP_HEADER) === '1');
+  const url = `https://${target.host}${target.path}${query ? `?${query}` : ''}`;
+  /** Into the request log, before the answer ends (`requestLog.ts`). Nothing when this request is not one to keep. */
+  const log = async (r: {
+    status: number;
+    headers: Headers | null;
+    contentType: string | null;
+    bytes: Buffer | null;
+    responseBytes: number;
+    usd: number | null;
+    model: string;
+    meter?: UsageMeter | null;
+    reused?: boolean;
+  }) => {
+    if (!logAs) return;
+    const credits = r.headers ? Number(r.headers.get('character-cost') ?? NaN) : NaN;
+    const price = describePrice(target, json, {
+      usd: r.usd,
+      model: r.model,
+      usage: r.meter?.usage ?? null,
+      image: r.meter?.isImage ?? false,
+      credits: Number.isFinite(credits) ? credits : null,
+      at: started,
+    });
+    await logRequest(
+      {
+        at: started,
+        uid: who.uid,
+        payer: logAs,
+        provider: target.provider,
+        host: target.host,
+        method: req.method,
+        path: target.path,
+        model: r.model,
+        status: r.status,
+        ms: Date.now() - started,
+        world: ledgerId(header(WORLD_HEADER)),
+        quest: ledgerId(header(QUEST_HEADER)),
+        usd: r.usd,
+        source: r.reused ? 'list' : price.source,
+        basis: r.reused ? 'answered from the bucket (kept asset): nothing paid' : price.basis,
+        usage: price.usage,
+        reservedUsd: who.reservedUsd,
+        reused: r.reused || undefined,
+        requestBytes: body?.length ?? 0,
+        responseBytes: r.responseBytes,
+        contentType: r.contentType,
+      },
+      {
+        request: requestBodies(req.method, url, headers, json, body),
+        response: {
+          status: r.status,
+          headers: r.headers ? safeHeaders(r.headers.entries()) : {},
+          body: keptBody(r.contentType, r.bytes, r.responseBytes),
+        },
+      },
+    );
+  };
+  const asked = UsageMeter.asked(target, json) || (target.provider === 'fal' ? target.path.slice(1) : target.path);
   // The RPG's kept assets (`assets.ts`): a request made before is answered from the bucket, for nothing.
+  const headers: Record<string, string> = {};
   if (await serveReusedQueue(who.uid, target, req.method, res)) return 0;
   const assets: AssetContext | null = await assetContext(who.uid, target, req.method, json, query, header, who.kind);
-  if (assets && (await serveReused(assets, res))) return 0;
-  const headers: Record<string, string> = {};
+  if (assets && (await serveReused(assets, res))) {
+    await log({ status: 200, headers: null, contentType: null, bytes: null, responseBytes: 0, usd: 0, model: asked, reused: true });
+    return 0;
+  }
   for (const h of FORWARDED_HEADERS) {
     const v = req.headers[h];
     if (typeof v === 'string') headers[h] = v;
@@ -454,7 +531,7 @@ async function pass(
   res.on('close', () => {
     if (!res.writableFinished) controller.abort();
   });
-  const upstream = await fetch(`https://${target.host}${target.path}${query ? `?${query}` : ''}`, {
+  const upstream = await fetch(url, {
     method: req.method,
     headers,
     body: body ? new Uint8Array(body) : undefined,
@@ -466,10 +543,14 @@ async function pass(
     const v = upstream.headers.get(h);
     if (v !== null) res.set(h, v);
   }
+  const type = upstream.headers.get('content-type') ?? '';
   if (!upstream.ok || !upstream.body) {
-    res.send(Buffer.from(await upstream.arrayBuffer()));
+    const refused = Buffer.from(await upstream.arrayBuffer());
     // A refusal costs nothing (Google's, ElevenLabs'); an empty 200 has nothing to price either.
-    return upstream.ok ? null : 0;
+    const usd = upstream.ok ? null : 0;
+    await log({ status: upstream.status, headers: upstream.headers, contentType: type, bytes: refused, responseBytes: refused.length, usd, model: asked });
+    res.send(refused);
+    return usd;
   }
 
   const spend = (usd: number | null, model: string): Spend => ({
@@ -480,9 +561,6 @@ async function pass(
     world: header(WORLD_HEADER),
     quest: header(QUEST_HEADER),
   });
-  const asked = UsageMeter.asked(target, json) || (target.provider === 'fal' ? target.path.slice(1) : target.path);
-
-  const type = upstream.headers.get('content-type') ?? '';
   const upfront = voiceCostFromHeader(upstream.headers.get('character-cost')) ?? costUpfront(target, json);
 
   if (type.includes('text/event-stream')) {
@@ -492,15 +570,21 @@ async function pass(
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    const kept: Buffer[] = [];
+    let total = 0;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      res.write(Buffer.from(value));
+      const chunk = Buffer.from(value);
+      res.write(chunk);
+      total += chunk.length;
+      if (logAs && total <= 4_000_000) kept.push(chunk);
       buffer = meter.feedEvents(buffer + decoder.decode(value, { stream: true }));
     }
     meter.feedEvents(`${buffer}\n`);
     const usd = meter.cost() ?? upfront;
     await record(who.uid, spend(usd, meter.model));
+    await log({ status: upstream.status, headers: upstream.headers, contentType: type, bytes: Buffer.concat(kept), responseBytes: total, usd, model: meter.model, meter });
     res.write(`\n${COST_EVENT}${JSON.stringify({ usd, model: meter.model })}\n\n`);
     res.end();
     return usd;
@@ -509,16 +593,18 @@ async function pass(
   if (type.includes('json')) {
     const bytes = Buffer.from(await upstream.arrayBuffer());
     let usd = upfront;
-    if (usd === null && (target.provider === 'google' || target.provider === 'openai' || target.provider === 'deepseek')) {
-      const meter = new UsageMeter(target.provider, asked);
+    let meter: UsageMeter | null = null;
+    if (target.provider === 'google' || target.provider === 'openai' || target.provider === 'deepseek') {
+      meter = new UsageMeter(target.provider, asked);
       try {
         meter.feed(JSON.parse(bytes.toString('utf8')));
       } catch {
         /* not priced */
       }
-      usd = meter.cost();
+      if (usd === null) usd = meter.cost();
     }
     await record(who.uid, spend(usd, asked));
+    await log({ status: upstream.status, headers: upstream.headers, contentType: type, bytes, responseBytes: bytes.length, usd, model: meter?.model ?? asked, meter });
     if (usd !== null) res.set(COST_HEADER, costText(usd));
     const kept = assets ? await keepJson(assets, bytes, usd) : null;
     if (kept?.assetId) res.set(ASSET_HEADER, kept.assetId);
@@ -531,15 +617,26 @@ async function pass(
   await record(who.uid, spend(upfront, typeof json.model_id === 'string' ? json.model_id : asked));
   const reader = upstream.body.getReader();
   const chunks: Buffer[] = [];
+  let total = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     const chunk = Buffer.from(value);
+    total += chunk.length;
     if (assets) chunks.push(chunk);
     res.write(chunk);
   }
   // Kept before the end, while the request still holds the instance's CPU (`assets.ts`).
   if (assets) await keepAudio(assets, Buffer.concat(chunks), type, upfront);
+  await log({
+    status: upstream.status,
+    headers: upstream.headers,
+    contentType: type,
+    bytes: Buffer.alloc(0),
+    responseBytes: total,
+    usd: upfront,
+    model: typeof json.model_id === 'string' ? json.model_id : asked,
+  });
   res.end();
   return upfront;
 }
@@ -634,9 +731,9 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     return;
   }
   // The game's admin panel (`admin.ts`): the server's keys and the demo's dials, admins only.
-  if (path === ADMIN_PATH && (req.method === 'GET' || req.method === 'POST')) {
+  if (path.startsWith('/admin/') && (req.method === 'GET' || (req.method === 'POST' && path === ADMIN_PATH))) {
     try {
-      await handleAdmin(req, res, await uidOf(req));
+      await handleAdmin(req, res, await uidOf(req), path, query);
     } catch (e) {
       if (e instanceof GatewayRefusal || e instanceof AdminRefusal) {
         res.status(e.status).json({ reason: e.reason, error: { message: e.message } });

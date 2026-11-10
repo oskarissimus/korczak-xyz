@@ -7,6 +7,8 @@
  * `admins/{uid}` itself — this page deciding what to draw is not the boundary. A key typed here is
  * sent once and never comes back: the answer carries its last four characters.
  *
+ * The costs — the dashboard, every paid request and the price list — are `AdminCosts.tsx`, mounted last.
+ *
  * A NEW SECTION is a field in `utils/rpg/adminConfig.ts` (status, patch, parser), a branch in
  * `admin.ts`, and one more `<section>` below that sends `{ <name>: … }` through `save`.
  */
@@ -14,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
+import AdminCosts from './AdminCosts';
 import { describeError, log } from '../../lib/logger';
 import { adminConfig } from '../../utils/rpg/gateway';
 import { SERVER_KEY_NAMES, type AdminPatch, type AdminStatus, type ServerKeyName } from '../../utils/rpg/adminConfig';
@@ -240,6 +243,7 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
           <KeysSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'keys'} save={save} />
           <DemoSection status={status} t={t} busy={busy} saved={savedAt === 'demo'} save={save} />
           <DieselSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'diesel'} save={save} />
+          <AdminCosts lang={lang} />
         </>
       )}
     </div>

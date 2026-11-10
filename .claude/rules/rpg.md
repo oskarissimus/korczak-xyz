@@ -1710,6 +1710,47 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
   `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
 
+### Every paid request is logged, priced and shown
+
+Owner, 10 Nov 2026: "every request to an outside API we pay for should be saved — request, response
+and price; if the response states the price, good, if not we need a price list and a way of computing
+it", with a dashboard of costs over time split by account / world / quest / provider, every request
+listed with its price in the original currency, in diesel and in złoty, and a price list with the
+provider's words verbatim beside the normalised price per request and the diesel it costs.
+
+- **What is logged** (`utils/rpg/requestLog.ts`, `functions/src/rpg/requestLog.ts`): every request
+  that can cost money (`isPaidRequest`: a model's answer, a line, the score, a voice design, a fal.ai
+  submit — never a poll, a list or a search) on the server's keys — `diesel` through the gateway,
+  `demo` in `rpgDemo` (a beat, a world, a clip) — and the game's own requests (`x-rpg-keep`) on a
+  signed-in reader's own key, `account`, which is how the owner's play on korczak.xyz shows up. A
+  signed-out reader's own key (`byok`) is never kept. A kept asset answered from the bucket is logged
+  at $0 with `reused`. **Not logged yet**: `rpgJob` (the account's own keys, in the background) and the
+  panel's key test.
+- **Where**: the record in `rpgRequests/{id}` (id sortable by time) — who, world, quest, provider,
+  endpoint, model, status, ms, `usage`, `usd`, `source` (`provider`: ElevenLabs' `character-cost`;
+  `usage`: token counts × `cost.ts`; `list`: priced before the answer; `none`), `basis` (the arithmetic
+  as text) and `usdPln`/`fxDate`; the bodies in the game's bucket, `requests/{day}/{id}.json`
+  (keys never: `safeHeaders` drops any header naming key/auth/token; inline base64 cut by `trimForLog`;
+  audio kept as its size). No Firestore rule for either; the panel reads them through
+  `GET /admin/requests?from&to` and `GET /admin/request?id` on the gateway (`admin.ts`, admins only).
+  Written **before** the answer ends, never failing it (`rpgRequests.*` in Sentry).
+- **The złoty** are NBP's table A mid rate (`fx.ts`, `api.nbp.pl`, keyless), asked at most every 6 h
+  per instance, the last good one kept in `rpgFx/usd`; a record without one is shown at today's rate.
+- **The price list** is `utils/rpg/priceList.ts`: verbatim text copied off each provider's page on
+  `CHECKED`, the normalised price for a typical request computed by **the same functions** that price
+  a real one (a test holds the list equal to `PER_MILLION` and to `falCost`'s cases), gross = net +
+  23% VAT, litres from net. Where the verbatim and the code disagree, the row carries a red note — on
+  10 Nov 2026: ElevenLabs' Creator is now $22 for 121k credits against the 300k `USD_PER_VOICE_CREDIT`
+  assumes; Hunyuan3D $0.16 against $0.48; text-to-3D adds a rig; nano-banana-lite is "$1 per unit".
+- **Announced price changes apply on their day** (`PRICE_CHANGES` in `cost.ts`, `tokenPrice(model,
+  at)`): Gemini 4 Argon doubles on 1 Dec 2026, 3.8/3.6 Flash on 1 Jan 2027 — so the ledger, diesel and
+  the log move without a deploy.
+- **The panel** (`components/Rpg/AdminCosts.tsx`, mounted last by `AdminPanel`): range 24 h–90 days,
+  a group picker, one series of daily bars (`CostChart.tsx`; a picked group is filled against the
+  whole day hollow), the group table (click a row to filter the chart and the list), every request
+  with its arithmetic and its bodies on demand, then the price list. Its sheet is
+  `styles/rpgAdminCosts.css`, imported by the four admin pages.
+
 ### The content rules: every person is invented
 
 Owner, Nov 2026, readying the game for Paddle's review of AI products (generated human faces are a
