@@ -344,8 +344,12 @@ async function ownClip(key: string, line: SpokenLine, lang: Lang, said = voicing
   return speak(key, VOICES[line.voice], said.text, lang, said.model);
 }
 
+function clipKey(line: SpokenLine, lang: Lang): string {
+  return `${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
+}
+
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
-  const cacheKey = `${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
+  const cacheKey = clipKey(line, lang);
   let clip = clips.get(cacheKey);
   // No credits left on the reader's account (`funds.ts`): every line would fail the same way, so
   // none is asked and the game reads in silence. The demo speaks on the owner's account, not theirs.
@@ -357,6 +361,22 @@ function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
     clip.catch(() => clips.delete(cacheKey));
   }
   return clip;
+}
+
+/**
+ * Asks for a line's clip now, so it is in hand by the time the line is spoken (`speakLines` finds it
+ * under the same key). The answer to a typed line is fetched while the hero's own line is still being
+ * read (owner, 10 Nov 2026). Resolves true once the clip is ready, false if it could not be made.
+ */
+export function prefetchLine(key: string, line: SpokenLine, lang: Lang): Promise<boolean> {
+  try {
+    return clipFor(key, line, lang).then(
+      () => true,
+      () => false,
+    );
+  } catch {
+    return Promise.resolve(false);
+  }
 }
 
 /**
@@ -399,12 +419,15 @@ export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): v
   }
 }
 
-/** Plays one clip to its end, or until `signal` aborts. */
-function play(el: HTMLAudioElement, url: string, signal: AbortSignal): Promise<void> {
+/** Plays one clip to its end, or until `signal` aborts. `onPlaying` is told when its sound starts. */
+function play(el: HTMLAudioElement, url: string, signal: AbortSignal, onPlaying?: () => void): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    const playing = () => onPlaying?.();
+    if (onPlaying) el.addEventListener('playing', playing, { once: true });
     const done = (err?: Error) => {
       el.onended = null;
       el.onerror = null;
+      el.removeEventListener('playing', playing);
       signal.removeEventListener('abort', onAbort);
       if (err) reject(err);
       else resolve();
@@ -433,20 +456,55 @@ export async function speakLines(
   lines: SpokenLine[],
   lang: Lang,
   onStart?: (line: SpokenLine) => void,
+  onPlaying?: (timing: LineTiming) => void,
 ): Promise<void> {
   stopVoice();
   const el = element();
   if (!el || lines.length === 0) return;
   const controller = new AbortController();
   current = controller;
-  const pending = lines.map((line) => clipFor(key, line, lang));
+  const t0 = performance.now();
+  const ready: number[] = [];
+  const cached = lines.map((line) => clips.has(clipKey(line, lang)));
+  const pending = lines.map((line, i) =>
+    clipFor(key, line, lang).then((url) => {
+      ready[i] = performance.now();
+      return url;
+    }),
+  );
   for (const [i, clip] of pending.entries()) {
+    const turnAt = performance.now();
     const url = await clip;
     if (controller.signal.aborted) return;
+    const startAt = performance.now();
     onStart?.(lines[i]);
-    await play(el, url, controller.signal);
+    await play(
+      el,
+      url,
+      controller.signal,
+      onPlaying &&
+        (() =>
+          onPlaying({ line: lines[i], index: i, t0, readyAt: ready[i] ?? startAt, turnAt, startAt, playingAt: performance.now(), cached: cached[i] })),
+    );
     if (controller.signal.aborted) return;
   }
+}
+
+/**
+ * When one line of `speakLines` became sound, on `performance.now()`'s clock: the call (`t0`), its
+ * clip in hand (`readyAt`), the line before it heard to the end (`turnAt`, `t0` for the first),
+ * `play()` asked (`startAt`, the later of the two) and the element's `playing` (`playingAt`).
+ * `cached`: the clip was already asked for (a prefetch, or the same line before) when the call came.
+ */
+export interface LineTiming {
+  line: SpokenLine;
+  index: number;
+  t0: number;
+  readyAt: number;
+  turnAt: number;
+  startAt: number;
+  playingAt: number;
+  cached: boolean;
 }
 
 /*

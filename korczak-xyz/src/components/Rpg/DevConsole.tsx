@@ -38,6 +38,7 @@ import { rigsOfStart, rigSummary } from '../../utils/rpg/rigging';
 import { personaLabel } from '../../utils/rpg/persona';
 import type { Beat, Character, Lang, StepRecord } from '../../utils/rpg/quest';
 import { subscribeTranscript, transcript, transcriptVersion, type TranscriptLine } from '../../utils/rpg/transcript';
+import { lagFor, subscribeVoiceLags, summarize, voiceLags, voiceLagVersion } from '../../utils/rpg/voiceLag';
 import { PIXEL_RATIOS, saveQuality, type FrameStats } from './frames';
 import type { Mesher, PersonPainter } from '../../utils/rpg/landmark3d';
 import type { Rigger } from './people';
@@ -111,6 +112,16 @@ export function FundsBanner({ lang }: { lang: Lang }) {
       ))}
     </div>
   );
+}
+
+/** How long a character's line was on screen before its voice (`voiceLag.ts`), under the line. */
+function LagNote({ lang, who, text }: { lang: Lang; who: string; text: string }) {
+  useSyncExternalStore(subscribeVoiceLags, voiceLagVersion, voiceLagVersion);
+  const lag = lagFor(who, text);
+  if (!lag) return null;
+  const parts = [ui(lang).devVoiceLag(formatMs(lag.lagMs), lag.cached)];
+  if (lag.afterHeroMs !== null) parts.push(`⏸ ${formatMs(lag.afterHeroMs)}`);
+  return <span className="rpg-dev-lag">{parts.join(' · ')}</span>;
 }
 
 function useTranscript(): readonly TranscriptLine[] {
@@ -286,6 +297,11 @@ function PerfTab({
     setVersion((n) => n + 1);
   };
   const land = scene.terrainReport();
+  const lags = voiceLags();
+  const lagLine = (values: number[]) => {
+    const sum = summarize(values);
+    return sum.median === null || sum.p90 === null ? t.perfLagNone : t.perfLagLine(formatMs(sum.median), formatMs(sum.p90), sum.n);
+  };
   const device = Math.min(window.devicePixelRatio, 2);
   const rows: [string, string][] = [
     ['FPS', Math.round(f.fps).toString()],
@@ -298,6 +314,8 @@ function PerfTab({
     [t.perfPlaces, String(scene.placeCount())],
     [t.perfTerrain, t.perfTerrainLine(t.reliefName[land.relief] ?? land.relief, land.max.toFixed(1), Math.round(land.hilly * 100), Math.round(land.ms))],
     [t.perfGround, t.perfGroundLine(land.heroY.toFixed(1), Math.round(land.heroSlope * 100))],
+    [t.perfVoiceLag, lagLine(lags.map((l) => l.lagMs))],
+    [t.perfVoiceAfterHero, lagLine(lags.flatMap((l) => (l.afterHeroMs === null ? [] : [l.afterHeroMs])))],
   ];
   return (
     <div className="rpg-dev-list rpg-dev-perf">
@@ -759,6 +777,7 @@ export function DevConsole({
                     ) : (
                       <div key={i} className={`rpg-dev-line rpg-dev-line-${l.kind}`}>
                         <b>{l.kind === 'decision' ? `${l.speaker} ⚑` : l.speaker}:</b> {l.text}
+                        {l.kind === 'npc' && <LagNote lang={lang} who={l.speaker} text={l.text} />}
                       </div>
                     ),
                   )}

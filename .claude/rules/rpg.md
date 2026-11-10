@@ -764,6 +764,18 @@ there, a field takes a line of up to `FREE_MAX` (200) characters, and one short 
   `free: true`, so the autosave's `decision` index, `deadInSave` and `mendSave` find it as they find
   a picked one, and it is never offered as an option.
 
+**The typed line is heard before it is answered** (owner, 10 Nov 2026: "when I write my own question
+the NPC is thinking at the bottom, then their answer appears and only then is my question read, then
+their answer"). On ↵ the dialogue becomes a screen of its own with the hero's line (`Dialogue.hero`,
+no choices), read at once in the hero's voice while the model answers. The answer's clip is asked
+for the moment the answer parses (`prefetchLine` in `voice.ts`), so it is mostly fetched while the
+hero still speaks. The character's answer replaces the screen only once the hero has finished
+**and** its clip is in hand (at most `FREE_CLIP_WAIT_MS`, 4 s, after both), so text and voice start
+together; until then, once the hero has finished, *X zastanawia się…* with the stream under it
+(`freeState` `'waiting'`). A failure goes back to the screen it was typed on, the text kept. Esc
+drops it all (`freeAskRef`). Not a streamed TTS of a half-written answer: `parseFree` may still
+refuse it and hand it to the next model, and that clip would be paid for and thrown away.
+
 The prompt holds only what has been heard (the story, the clues examined, the witness and the
 questions asked, earlier typed lines) and the same rules as a beat's: spoken, first person, audio
 tags, no culprit nobody named. `parseFree` refuses narration and a route the beat lacks, and the
@@ -2030,6 +2042,16 @@ cut to the usable ids. The game asks for them when voice is on with the reader's
 (`prefetchVoices`), stores them in `rpg-voice-lists` (a day), and searches with that key only for
 what they did not cover. The demo voice picks on the function's side from the same cache. A search
 costs no credits, and the week bounds how often the owner's key makes eight of them.
+
+**How long a line waits for its voice is measured** (owner, 10 Nov 2026; `utils/rpg/voiceLag.ts`).
+`speakLines` reports each line's moments (`LineTiming`: asked, clip in hand, the line before it
+ended, `play()`, the element's `playing`), and `measureVoice` in `Rpg.tsx` turns a character's line
+into `lagMs` (text on screen → sound; a line held behind the hero's was shown when it started),
+`fetchMs`, `startMs` and `afterHeroMs` (the silence after the hero's picked or typed line), with
+whether the clip was already asked for. In the `~` console: under each character's line in
+*Dialogue* (`🔊 0.3 s po tekście · ⏸ 0.4 s`) and the session's median and p90 in *Performance*.
+Sentry Logs `rpg.voice.lag` carries the same numbers, `after` (`pick`/`free`/`none`), `cached`
+and the line's length — never its words.
 
 **Nor for a cold voice.** The search was half of it. ElevenLabs is also slow the first time an
 account speaks with a library voice: 11–17 s for that clip, then ~1 s for every later one whatever

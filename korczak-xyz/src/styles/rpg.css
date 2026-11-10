@@ -1001,6 +1001,12 @@ ul.rpg-source {
   text-decoration: underline;
 }
 
+.rpg-dev-lag {
+  display: block;
+  color: #8f8674;
+  font-size: 0.9em;
+}
+
 .rpg-dev-line-clue {
   color: #a9b8c9;
   font-style: italic;
