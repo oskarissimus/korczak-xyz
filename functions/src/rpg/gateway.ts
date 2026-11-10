@@ -86,6 +86,7 @@ import {
   type DieselKey,
 } from '../../../korczak-xyz/src/utils/rpg/wallet';
 import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
+import { ADMIN_WALLETS_PATH } from '../../../korczak-xyz/src/utils/rpg/wallets';
 import { describePrice, isPaidRequest, safeHeaders, type LogPayer } from '../../../korczak-xyz/src/utils/rpg/requestLog';
 import { keptBody, logRequest, requestBodies } from './requestLog';
 import { db } from '../runtime';
@@ -731,7 +732,7 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
     return;
   }
   // The game's admin panel (`admin.ts`): the server's keys and the demo's dials, admins only.
-  if (path.startsWith('/admin/') && (req.method === 'GET' || (req.method === 'POST' && path === ADMIN_PATH))) {
+  if (path.startsWith('/admin/') && (req.method === 'GET' || (req.method === 'POST' && (path === ADMIN_PATH || path === ADMIN_WALLETS_PATH)))) {
     try {
       await handleAdmin(req, res, await uidOf(req), path, query);
     } catch (e) {

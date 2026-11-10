@@ -43,6 +43,8 @@ import { SETTINGS_PATH } from '../demo/handler';
 import { ADMIN_PATH } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { ADMIN_REQUEST_PATH, ADMIN_REQUESTS_PATH } from '../../../korczak-xyz/src/utils/rpg/requestLog';
 import { listRequests, readRequest } from './requestLog';
+import { ADMIN_WALLETS_PATH } from '../../../korczak-xyz/src/utils/rpg/wallets';
+import { WalletRefusal, handleWallets } from './wallets';
 import { db } from '../runtime';
 
 /** A document by its path, through `collection().doc()` — the one form every test's Firestore fake has. */
@@ -118,7 +120,7 @@ function bodyJson(req: Request): unknown {
   }
 }
 
-/** `/admin/config`, `/admin/requests` and `/admin/request`, for a uid the gateway has already verified. */
+/** `/admin/config`, `/admin/requests`, `/admin/request` and `/admin/wallets`, for a uid the gateway has already verified. */
 export async function handleAdmin(req: Request, res: Response, uid: string | null, path = ADMIN_PATH, query = ''): Promise<void> {
   if (!uid) throw new AdminRefusal(401, 'auth', 'admin: sign in first');
   if (!(await isAdminUid(uid))) throw new AdminRefusal(403, 'not-admin', 'admin: this account is not an admin');
@@ -136,6 +138,16 @@ export async function handleAdmin(req: Request, res: Response, uid: string | nul
     const found = await readRequest(new URLSearchParams(query).get('id') ?? '');
     if (!found) throw new AdminRefusal(404, 'no-request', 'admin: no such request');
     res.status(200).json(found);
+    return;
+  }
+  // The providers' wallets against the log's estimate (`wallets.ts`).
+  if (path === ADMIN_WALLETS_PATH) {
+    try {
+      await handleWallets(req, res, uid, req.method === 'POST' ? bodyJson(req) : null);
+    } catch (e) {
+      if (e instanceof WalletRefusal) throw new AdminRefusal(e.status, e.reason, e.message);
+      throw e;
+    }
     return;
   }
   if (path !== ADMIN_PATH) throw new AdminRefusal(404, 'route', 'admin: no such section');

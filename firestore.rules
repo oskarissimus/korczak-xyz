@@ -308,7 +308,9 @@ service cloud.firestore {
      * The request log, `rpgRequests/{id}` (`functions/src/rpg/requestLog.ts`): every paid request
      * with its price, and `rpgFx/usd`, the NBP rate it was priced in złoty at. Deliberately NO match
      * block for either: the log names accounts and holds what was sent, and the admin panel reads it
-     * through the gateway's `/admin/requests`, which checks `admins/` itself.
+     * through the gateway's `/admin/requests`, which checks `admins/` itself. The same for
+     * `rpgWalletKeys/config` (keys that read the providers' wallets) and `rpgWallets/{id}` (their
+     * readings), which only `/admin/wallets` touches (`functions/src/rpg/wallets.ts`).
      */
 
     /*

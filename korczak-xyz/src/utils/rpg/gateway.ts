@@ -31,6 +31,7 @@ import {
 } from './gatewayRoutes';
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
+import { ADMIN_WALLETS_PATH, type WalletPatch, type WalletsPage } from './wallets';
 import {
   ADMIN_REQUEST_PATH,
   ADMIN_REQUESTS_PATH,
@@ -181,8 +182,8 @@ export async function adminConfig(patch?: AdminPatch, signal?: AbortSignal): Pro
   return body;
 }
 
-async function adminGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await signedInCall(path, 'GET', signal);
+async function adminGet<T>(path: string, signal?: AbortSignal, patch?: unknown): Promise<T> {
+  const response = await signedInCall(path, patch ? 'POST' : 'GET', signal, patch);
   const body = (await response.json().catch(() => null)) as (T & { reason?: string; error?: { message?: string } }) | null;
   if (!response.ok || !body) throw new Error(body?.error?.message ?? `gateway: admin ${response.status}`);
   return body;
@@ -226,4 +227,9 @@ export function serverCost(response: Response): number | null {
   if (v === null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/** The providers' wallets beside the log's estimate (`wallets.ts`); with a patch, applied first. Admins only. */
+export function adminWallets(patch?: WalletPatch, signal?: AbortSignal): Promise<WalletsPage> {
+  return adminGet<WalletsPage>(ADMIN_WALLETS_PATH, signal, patch);
 }

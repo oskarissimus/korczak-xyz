@@ -1751,6 +1751,27 @@ provider's words verbatim beside the normalised price per request and the diesel
   with its arithmetic and its bodies on demand, then the price list. Its sheet is
   `styles/rpgAdminCosts.css`, imported by the four admin pages.
 
+#### The providers' wallets, and the drift
+
+Owner, 10 Nov 2026: a key per provider that only reads its wallet, with the scope it needs, a place
+to type a balance in where no API says, and the drift between the real and the estimated spend.
+`utils/rpg/wallets.ts` (shapes, arithmetic, parsers — tested), `functions/src/rpg/wallets.ts`
+(`GET`/`POST /admin/wallets`), `components/Rpg/AdminWallets.tsx` under the price list.
+
+- **The reading keys are not the spending keys.** `rpgWalletKeys/config`, no rule, Admin SDK only,
+  answered as their last four characters. OpenAI: an admin key, reads month-to-date spend from
+  `/v1/organization/costs` (no API reads its prepaid credit). ElevenLabs: a key restricted to
+  *User: read*, reads credits left from `/v1/user/subscription`. fal: an ADMIN-scope key, reads
+  dollars left from `rest.alpha.fal.ai/billing/user_balance` (a bare number, checked 10 Nov 2026).
+  Google: nothing — Gemini API billing is Cloud Billing, which no key reads; typed in by hand.
+- **Two kinds of reading** in `rpgWallets`: *spent* from `from` to `at` (compared on its own) and
+  *balance* at `at` (consecutive pairs of one provider make a window; a rise is a top-up and is not
+  called a drift). ElevenLabs credits are priced at `USD_PER_VOICE_CREDIT`, so a wrong credit price
+  shows up as drift.
+- **Only the server's keys are estimated** (`OWN_PAYERS`: diesel, demo, key test). A player's own
+  key spends their wallet. Anything else on the same provider account is in the provider's figure
+  only, and a window opening before the first logged request is flagged rather than trusted.
+
 ### The content rules: every person is invented
 
 Owner, Nov 2026, readying the game for Paddle's review of AI products (generated human faces are a

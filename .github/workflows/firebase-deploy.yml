@@ -92,6 +92,7 @@ on:
       - "korczak-xyz/src/utils/rpg/assetStore.ts"
       # The request log's shape and its pricing arithmetic, which the gateway and the demo write by.
       - "korczak-xyz/src/utils/rpg/requestLog.ts"
+      - "korczak-xyz/src/utils/rpg/wallets.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
       # The RPG production project has its own workflow (rpg-terraform.yml) and nothing here reads it.

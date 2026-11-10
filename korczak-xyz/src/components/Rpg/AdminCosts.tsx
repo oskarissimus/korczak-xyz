@@ -28,6 +28,7 @@ import {
   type RequestLogEntry,
   type RequestsPage,
 } from '../../utils/rpg/requestLog';
+import AdminWallets from './AdminWallets';
 import CostChart from './CostChart';
 
 type Lang = 'en' | 'pl';
@@ -249,6 +250,7 @@ export default function AdminCosts({ lang }: { lang: Lang }) {
       </section>
       {page && <RequestList page={page} by={by} picked={picked} t={t} lang={lang} />}
       <PriceList rate={rate} fxDate={page?.fx?.date ?? null} t={t} lang={lang} />
+      <AdminWallets lang={lang} />
     </>
   );
 }
