@@ -373,11 +373,10 @@ const en = {
   homeAsk: 'Which world do you want to play in today?',
   homePlaceholder: 'Describe a world in one sentence…',
   homeCreate: 'Create the world',
-  homeTry: 'Try:',
-  homeIdeas: 'pirates on a sea of sand|a detective story in 1920s Kraków|dragons and railways|a tea house in the afterlife',
-  homeReady: 'Or step into a ready one',
   homeMore: 'More world options',
   homeWorlds: (n: number) => `My worlds (${n})`,
+  homeOrTry: 'Or try one of these',
+  homeMenu: 'More',
 };
 
 const pl: typeof en = {
@@ -745,11 +744,10 @@ const pl: typeof en = {
   homeAsk: 'W jakim świecie chcesz dziś zagrać?',
   homePlaceholder: 'Opisz świat jednym zdaniem…',
   homeCreate: 'Stwórz świat',
-  homeTry: 'Spróbuj:',
-  homeIdeas: 'piraci na pustyni|kryminał w Krakowie 1920|smoki i kolej|herbaciarnia w zaświatach',
-  homeReady: 'Albo wejdź do gotowego',
   homeMore: 'Więcej opcji świata',
   homeWorlds: (n) => `Moje światy (${n})`,
+  homeOrTry: 'Albo spróbuj',
+  homeMenu: 'Więcej',
 };
 
 export const translations = { en, pl };

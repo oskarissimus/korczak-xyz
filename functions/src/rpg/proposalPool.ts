@@ -22,7 +22,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { asLang, languageName, LANGUAGES } from '../../../korczak-xyz/src/utils/rpg/language';
 import { FAL_IMAGE_MODEL } from '../../../korczak-xyz/src/utils/rpg/falPrompts';
 import { drawWords } from '../../../korczak-xyz/src/utils/rpg/seedWords';
-import { coverPrompt, parseProposals, PROPOSAL_KINDS, proposalPrompt } from '../../../korczak-xyz/src/utils/rpg/proposalScript';
+import { coverPrompt, IDEA_MAX, ideaPrompt, parseProposals, PROPOSAL_KINDS, proposalPrompt } from '../../../korczak-xyz/src/utils/rpg/proposalScript';
 import {
   coverPath,
   fromTranslation,
@@ -203,7 +203,12 @@ async function translate(google: string, lang: string, items: PoolItem[]): Promi
 async function syncLanguage(google: string, lang: string, source: PoolItem[], have: Pool | null): Promise<Pool> {
   // An item still in English (its slice failed last time) is not had: it is asked for again.
   const english = new Map(source.map((p) => [p.id, p]));
-  const kept = new Map((have?.items ?? []).filter((p) => english.has(p.id) && english.get(p.id)!.pitch !== p.pitch).map((p) => [p.id, p]));
+  // So is one without the idea its English has gained since (`withIdeas`).
+  const kept = new Map(
+    (have?.items ?? [])
+      .filter((p) => english.has(p.id) && english.get(p.id)!.pitch !== p.pitch && (p.idea || !english.get(p.id)!.idea))
+      .map((p) => [p.id, p]),
+  );
   const missing = source.filter((p) => !kept.has(p.id));
   const fresh = missing.length ? await translate(google, lang, missing) : [];
   for (const p of fresh) kept.set(p.id, p);
@@ -214,6 +219,25 @@ async function syncLanguage(google: string, lang: string, source: PoolItem[], ha
 async function keys(): Promise<{ google: string | null; fal: string | null }> {
   const k = await readServerKeys();
   return { google: k.google, fal: k.fal };
+}
+
+/**
+ * Items from before `idea` given theirs, in one request; whatever does not come back stays without
+ * one (its card shows the name) and is asked again on the next run.
+ */
+async function withIdeas(google: string, items: PoolItem[]): Promise<PoolItem[]> {
+  const missing = items.filter((p) => !p.idea);
+  if (!missing.length) return items;
+  try {
+    const raw = JSON.parse(await gemini(google, ideaPrompt(missing), { temperature: 0.4, json: true })) as Record<string, unknown>;
+    return items.map((p) => {
+      const idea = !p.idea && typeof raw[p.id] === 'string' ? (raw[p.id] as string).trim().slice(0, IDEA_MAX) : '';
+      return idea ? { ...p, idea } : p;
+    });
+  } catch (e) {
+    reportError('rpgProposals.ideas', e, { missing: missing.length });
+    return items;
+  }
 }
 
 /** The day's run: new proposals in front of the pool, then every language's file brought up to it. */
@@ -229,7 +253,7 @@ export async function growPool(count = POOL_DAILY): Promise<{ added: number; siz
     if (b.status === 'fulfilled') fresh.push(...b.value);
     else reportError('rpgProposals.write', b.reason);
   }
-  const items = mergePool(source, fresh);
+  const items = await withIdeas(google, mergePool(source, fresh));
   await writeSource(items);
   await writeFile('en', items);
   const [files] = await bucket().getFiles({ prefix: `${POOL_DIR}/`, delimiter: '/' });

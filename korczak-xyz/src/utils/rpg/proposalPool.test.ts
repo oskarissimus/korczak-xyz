@@ -6,6 +6,7 @@ const item = (id: string, kind: number, name = `World ${id}`): PoolItem => ({
   kind,
   at: 1,
   name,
+  idea: '',
   pitch: `Pitch of ${id}.`,
   genre: 'dark fantasy',
   colors: ['#112233', '#445566'],
@@ -50,6 +51,17 @@ describe('translation', () => {
     const pool = withTranslation(source, translated);
     expect(pool[0].name).toBe('Świat a');
     expect(pool[1].name).toBe('World b');
+  });
+
+  it('carries the idea through, and keeps it out of an item that has none', () => {
+    const source = [{ ...item('a', 0), idea: 'pirates on a sea of sand' }, item('b', 1)];
+    const entries = translationEntries(source);
+    expect(entries['a.s']).toBe('pirates on a sea of sand');
+    expect(entries['b.s']).toBeUndefined();
+    const answer = { 'a.n': 'Świat a', 'a.s': 'piraci na pustyni', 'a.p': 'Opis a.', 'b.n': 'Świat b', 'b.p': 'Opis b.' };
+    const pool = withTranslation(source, fromTranslation(source, answer));
+    expect(pool.map((p) => p.idea)).toEqual(['piraci na pustyni', '']);
+    expect(readPool({ items: [{ ...source[0] }] })?.items[0].idea).toBe('pirates on a sea of sand');
   });
 });
 

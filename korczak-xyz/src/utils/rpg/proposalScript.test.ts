@@ -3,6 +3,7 @@ import { fallbackColors, parseProposals, PROPOSAL_COUNT, proposalPrompt, proposa
 
 const ANSWER = [
   'N: Kraina Mgieł',
+  'S: łowcy świetlików na bagnach',
   'P: Bagna pod wieczną mgłą, gdzie łowcy polują na świetliki wielkie jak psy.',
   'G: mroczne fantasy',
   'C: #223344 #88AA66',
@@ -23,6 +24,12 @@ describe('parseProposals', () => {
     expect(out[1].name).toBe('Solne Wybrzeże');
     expect(out[1].pitch).toBe('Archipelag kupców soli i piratów.');
     expect(out[1].colors[0]).toBe('#ffffff');
+  });
+
+  it('reads the idea, and leaves it empty when a block has none', () => {
+    const out = parseProposals(ANSWER, true);
+    expect(out[0].idea).toBe('łowcy świetlików na bagnach');
+    expect(out[1].idea).toBe('');
   });
 
   it('counts only whole lines while streaming', () => {

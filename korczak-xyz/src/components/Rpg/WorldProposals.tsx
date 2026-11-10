@@ -1,6 +1,8 @@
 /*
  * The four proposed worlds along the bottom of the home screen (`utils/rpg/proposals.ts`, drawn from the server's
- * daily pool): a card each with its cover, name, genre and pitch; a tap makes that world.
+ * daily pool): a small card each, its cover and its idea ("pirates on a sea of sand"); a tap puts the idea in
+ * the field (owner, 10 Nov 2026: "proposals with a picture, but with the texts that used to sit under the
+ * prompt"). An item from before ideas shows its name and a tap makes it as it did.
  *
  * Always four cards of one fixed size (owner, 9 Nov 2026: "everything on this screen loads at once,
  * and what cannot has a placeholder, so nothing shifts"): a card with no proposal yet is the same box
@@ -19,11 +21,11 @@ interface Props {
   lang: Lang;
   /** Nothing can make a world now (no key, no demo): the cards show but do not take a tap. */
   disabled: boolean;
+  /** A proposal from before ideas: a tap makes the world from its name and pitch. */
   onPick: (p: PoolItem) => void;
+  /** A proposal with an idea: a tap puts the idea in the field. */
+  onIdea: (p: PoolItem) => void;
   onRefresh: () => void;
-  /** How many worlds the library holds, and the way to it: beside the cards' heading. */
-  worlds: number;
-  onWorlds: () => void;
 }
 
 /** The cover, faded in once it has loaded, over the card's own colours. */
@@ -32,7 +34,7 @@ function Cover({ src }: { src: string }) {
   return <img src={src} alt="" decoding="async" className={loaded ? 'rpg-proposal-loaded' : undefined} onLoad={() => setLoaded(true)} />;
 }
 
-export default function WorldProposals({ lang, disabled, onPick, onRefresh, worlds, onWorlds }: Props) {
+export default function WorldProposals({ lang, disabled, onPick, onIdea, onRefresh }: Props) {
   const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
   const items = v.lang === lang ? v.items : [];
@@ -41,12 +43,8 @@ export default function WorldProposals({ lang, disabled, onPick, onRefresh, worl
   return (
     <section className="rpg-proposals" aria-label={t.proposalsTitle} aria-busy={!items.length}>
       <div className="rpg-proposals-head">
-        <h3>{t.homeReady}</h3>
+        <h3>{t.homeOrTry}</h3>
         <div className="rpg-proposals-tools">
-          {/* Always there, so a library the account brings in a moment later changes a number, not the row. */}
-          <button type="button" className="rpg-proposals-worlds" onClick={onWorlds} disabled={worlds === 0}>
-            {t.homeWorlds(worlds)}
-          </button>
           <button type="button" className="rpg-proposals-refresh" onClick={onRefresh} disabled={v.pool.length <= PROPOSAL_COUNT} title={t.proposalsRefresh} aria-label={t.proposalsRefresh}>
             ↻
           </button>
@@ -59,17 +57,17 @@ export default function WorldProposals({ lang, disabled, onPick, onRefresh, worl
               key={p.id}
               type="button"
               className="rpg-proposal"
-              disabled={disabled}
-              onClick={() => onPick(p)}
+              // An idea only fills the field, which needs no keys; a proposal from before makes a world.
+              disabled={disabled && !p.idea}
+              onClick={() => (p.idea ? onIdea(p) : onPick(p))}
+              title={p.idea ? p.pitch : undefined}
               style={{ background: `linear-gradient(160deg, ${p.colors[0]}, ${p.colors[1]})` }}
             >
               <span className="rpg-proposal-cover" aria-hidden="true">
                 {p.image && <Cover src={p.image} />}
-                {p.genre && <span className="rpg-proposal-genre">{p.genre}</span>}
               </span>
               <span className="rpg-proposal-text">
-                <strong>{p.name}</strong>
-                <span>{p.pitch}</span>
+                <strong>{p.idea || p.name}</strong>
               </span>
             </button>
           ) : (

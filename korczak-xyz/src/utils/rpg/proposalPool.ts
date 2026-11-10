@@ -19,7 +19,7 @@
  */
 
 import { downloadUrl } from './assetStore';
-import { fallbackColors, PROPOSAL_COUNT, PROPOSAL_KINDS, type Proposal } from './proposalScript';
+import { fallbackColors, IDEA_MAX, PROPOSAL_COUNT, PROPOSAL_KINDS, type Proposal } from './proposalScript';
 
 /** How many proposals the pool keeps: the newest, about twelve days of them. */
 export const POOL_SIZE = 100;
@@ -90,6 +90,7 @@ export function poolItem(raw: unknown): PoolItem | null {
     kind: Number.isInteger(kind) && kind >= 0 && kind < PROPOSAL_KINDS.length ? kind : 0,
     at: Number(r.at) || 0,
     name,
+    idea: str(r.idea, IDEA_MAX),
     pitch,
     genre: str(r.genre, 40),
     colors,
@@ -150,15 +151,16 @@ export function withTranslation(source: PoolItem[], translated: PoolItem[]): Poo
   const byId = new Map(translated.map((p) => [p.id, p]));
   return source.map((p) => {
     const t = byId.get(p.id);
-    return t ? { ...p, name: t.name || p.name, pitch: t.pitch || p.pitch, genre: t.genre || p.genre } : p;
+    return t ? { ...p, name: t.name || p.name, idea: t.idea || p.idea, pitch: t.pitch || p.pitch, genre: t.genre || p.genre } : p;
   });
 }
 
-/** The words of some items as one flat object for a translation: `<id>.n`, `<id>.p`, `<id>.g`. */
+/** The words of some items as one flat object for a translation: `<id>.n`, `<id>.s`, `<id>.p`, `<id>.g`. */
 export function translationEntries(items: PoolItem[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const p of items) {
     out[`${p.id}.n`] = p.name;
+    if (p.idea) out[`${p.id}.s`] = p.idea;
     out[`${p.id}.p`] = p.pitch;
     if (p.genre) out[`${p.id}.g`] = p.genre;
   }
@@ -173,6 +175,7 @@ export function fromTranslation(items: PoolItem[], raw: unknown): PoolItem[] {
     .map((p) => ({
       ...p,
       name: field(`${p.id}.n`, 60),
+      idea: p.idea ? field(`${p.id}.s`, IDEA_MAX) : '',
       pitch: field(`${p.id}.p`, 300),
       genre: p.genre ? field(`${p.id}.g`, 40) : '',
     }))
@@ -182,10 +185,11 @@ export function fromTranslation(items: PoolItem[], raw: unknown): PoolItem[] {
 export function poolTranslationPrompt(languageName: string, entries: Record<string, string>): string {
   return [
     `Translate these proposed worlds for a role-playing video game from English into ${languageName}.`,
-    'Each world has a name (`.n`), a pitch of one or two sentences (`.p`) and a genre in a few words (`.g`).',
+    'Each world has a name (`.n`), an idea of a few words (`.s`), a pitch of one or two sentences (`.p`) and a genre in a few words (`.g`).',
     `Answer with a JSON object with exactly the same keys, each value in natural, vivid ${languageName} as a native game localiser would write it.`,
     '- A name is invented: render it as a native speaker would name such a place — translate its meaning where it has one, keep it short and evocative.',
     '- A pitch keeps its length, tone and every concrete detail.',
+    '- An idea stays two to six plain, lower-case words, as a player would type it ("piraci na pustyni", "kryminał w Krakowie 1920").',
     '- A genre stays two to four plain words.',
     '',
     JSON.stringify(entries),

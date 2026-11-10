@@ -257,8 +257,15 @@ whole worlds with a bible and assets, only proposals a world can be generated fr
 picture, and under them the menu as it is, where you can still type your own idea". `WorldProposals.tsx`
 along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and draws, `proposalScript.ts` is the prompt and reader.
 
-- **A proposal is a premise**: a name, a pitch of at most 30 words, a genre, two colours and an English
-  cover description. Tapping one is *New world* with the proposal as the player's description
+- **A proposal is a premise**: a name, an **idea**, a pitch of at most 30 words, a genre, two colours
+  and an English cover description. The idea is two to six words as a player would type the world
+  ("piraci na pustyni", "kryminał w Krakowie 1920" — owner, 10 Nov 2026: "proposals with a picture,
+  but with the texts that used to sit under the prompt"; the `homeIdeas` chips they replace are gone).
+  It is the card's caption, and **a tap puts it in the field** to be made or changed, as the chips did;
+  only an item from before ideas (no `idea`) shows its name and is made at once from the premise as
+  below. `growPool` gives every item that lacks one its idea in one request (`ideaPrompt`), and a
+  language file is translated again for an item whose idea it lacks; `rpg-release.yml` starts that run
+  right after a deploy while the Polish file still has an item without one. Tapping one is *New world* with the proposal as the player's description
   (`proposalWish`: "The world is called „…” (genre). pitch", into `GenesisContext.wish`, so it takes
   the `playerLines` path and the intro hears it too) at `PROPOSAL_EXOTIC` 25 — the well-loved version
   of what the proposal says, since it is already the premise. The slider and `WorldWish` are untouched
@@ -289,8 +296,7 @@ along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and
 - **Nothing on the menu moves** when something answers: the cards are a fixed box (`.rpg-proposal-text`
   has one height whatever the pitch), the diesel badge has its row (`.rpg-dz-slot`) before the tank or
   the demo answers, the entries that wait for the keys are there already (`waiting` in `item`, not
-  dimmed), *My worlds* is always listed (disabled at 0), and the account bar keeps its room while
-  auth loads. Before the bundle runs at all, `src-rpg/components/MenuSkeleton.astro` is the island's
+  dimmed), and *My worlds* is always in the sheet behind ⋯ (disabled at 0). Before the bundle runs at all, `src-rpg/components/MenuSkeleton.astro` is the island's
   fallback — the same boxes in the same classes — and its inline script has already asked for the
   pool file (`window.__rpgPool`). Measured on a local build: CLS 0.0003.
 - **In the console**: the Start tab's `ProposalStats` says where the four came from (`kept`, `file`,
@@ -314,15 +320,19 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   for everything pressed or read in the UI.** Self-hosted (`@fontsource`, latin and latin-ext only).
 - **Corners 8 px (buttons, fields, chips) and 10 px (panels, cards)**; round only for the account's
   initial and the touch controls. One dark surface with a hairline; frosted only over the 3D scene.
-- **The home screen** (`menu === 'main'` in `Rpg.tsx`): the logo, and top right the way back into
-  play (`resumePill`: the world being born, else Continue with the world's name) and the account (a
-  round initial once signed in; on a phone sign-out moves to Settings). In the middle the question,
-  a field that is the wish's description (`wish.text`, so *New world* and the field are one
-  description) with *Create the world*, and *Try:* ideas that fill it (`homeIdeas`, `|`-separated
-  so the server translates one string). Under them the diesel row and the rest of the menu as a
-  quiet row of words (New quest in the current world, *More world options* — the slider and the
-  words — language, Settings, Controls). Along the bottom the proposed worlds as a row that
-  scrolls sideways, with *My worlds (n)* and ↻ beside its heading.
+- **The home screen** (`menu === 'main'` in `Rpg.tsx`) is two things and a button (owner, 10 Nov 2026:
+  "too much on it — only the main prompt box and a carousel of proposed worlds, the rest under three
+  dots"; four mockups at iPhone SE size, `rpg/ekran-startowy-prosty/` in the project files). In the
+  middle, with room around it, the question and the field: a pill (the one round thing in the look,
+  asked for twice — "round it more") whose description is the wish's (`wish.text`), with *Create the
+  world* as a round ✦ inside it on the right (its name only for screen readers and the title, where
+  the diesel price went). Along the bottom a low strip of proposed worlds, a cover and an idea each,
+  with ↻. Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
+  under the button wider): the way back into play as its one white button (`resumeEntry`: the world
+  being born, else Continue), the account (sign in, sign up, or the account and sign-out), *My worlds
+  (n)*, a new quest in the current world, *More world options*, the diesel badge, language, Settings,
+  Controls. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
+  the screen itself, since then nothing can be made.
 - **The dialogue is one panel with a list in it**: dim numbers, a light row for focus, the typed line
   under a hairline rather than in a box.
 - `src-rpg/components/MenuSkeleton.astro` draws the same boxes before the bundle runs; change both.

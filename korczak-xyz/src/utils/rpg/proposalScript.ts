@@ -14,11 +14,20 @@ import type { Lang } from './quest';
 import { languageName } from './language';
 
 export const PROPOSAL_COUNT = 4;
+/** The longest idea kept: a few words, never a sentence. */
+export const IDEA_MAX = 60;
 
 /** One proposed world: a premise to make a world from, never the world itself. */
 export interface Proposal {
   /** The world's name, in the game's language. */
   name: string;
+  /**
+   * The world as a player would type it into the field, two to six words ("pirates on a sea of sand",
+   * "a detective story in 1920s Kraków"): the card's caption and what a tap puts in the field (owner,
+   * 10 Nov 2026: "proposals with a picture, but with the texts that used to sit under the prompt").
+   * Empty on an item made before it, which shows its name and is made as before.
+   */
+  idea: string;
   /** One or two sentences: what it is and why one would go there. */
   pitch: string;
   /** Its genre in two to four words, for the card's corner. */
@@ -64,7 +73,7 @@ export function proposalPrompt(ask: ProposalAsk): string {
   const lines = [
     'You propose worlds for a role-playing game. The player opens the game and picks one of your proposals;',
     'only then is the whole world written. So each proposal is a premise, not a world: a name, a pitch that',
-    'makes one want to go there, its genre, two colours and a cover picture.',
+    'makes one want to go there, a short idea, its genre, two colours and a cover picture.',
     '',
     `Write ${PROPOSAL_COUNT} proposals, as different from one another as you can make them:`,
   ];
@@ -90,12 +99,15 @@ export function proposalPrompt(ask: ProposalAsk): string {
     'existing books, films, games or comics. A feel is welcome; a borrowed name is not.',
     '',
     `In ${language}: the name (one to four words, invented, evocative), the pitch (one or two sentences, at most`,
-    '30 words, concrete: the land, its people, its trouble — no "a world where…" opener), the genre (two to four',
+    '30 words, concrete: the land, its people, its trouble — no "a world where…" opener), the idea (two to six',
+    'words, lower case, how a player would type the world into a search box: "pirates on a sea of sand",',
+    '"a detective story in 1920s Kraków", "dragons and railways", "a tea house in the afterlife"), the genre (two to four',
     'words, plain, no English loanwords). The colours are two hex colours of its look. The cover is IN ENGLISH, at most 35 words: one wide',
     'cinematic scene of the world for an image model — its land, its light, a figure or a settlement in it.',
     '',
-    `Answer in exactly this format, ${PROPOSAL_COUNT} blocks of five lines and nothing else:`,
+    `Answer in exactly this format, ${PROPOSAL_COUNT} blocks of six lines and nothing else:`,
     'N: <name>',
+    'S: <idea>',
     'P: <pitch>',
     'G: <genre>',
     'C: <#rrggbb> <#rrggbb>',
@@ -105,7 +117,7 @@ export function proposalPrompt(ask: ProposalAsk): string {
 }
 
 /** `N:` … `I:` at the start of a line, forgiving the decorations models add: bold, a number, a dash. */
-const LINE = /^\s*(?:[-*>]\s*)?(?:\d+[.)]\s*)?(?:\*\*)?\s*([NPGCI])\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?\s*(.*)$/i;
+const LINE = /^\s*(?:[-*>]\s*)?(?:\d+[.)]\s*)?(?:\*\*)?\s*([NSPGCI])\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?\s*(.*)$/i;
 const HEX = /#[0-9a-f]{6}\b/gi;
 
 function clean(text: string): string {
@@ -152,12 +164,13 @@ export function parseProposals(soFar: string, final = false): Proposal[] {
     if (key === 'N') {
       if (out.length >= PROPOSAL_COUNT) break;
       colors = null;
-      out.push({ name: body.slice(0, 60), pitch: '', genre: '', colors: fallbackColors(body), picture: null, image: null });
+      out.push({ name: body.slice(0, 60), idea: '', pitch: '', genre: '', colors: fallbackColors(body), picture: null, image: null });
       continue;
     }
     const p = out[out.length - 1];
     if (!p) continue;
-    if (key === 'P' && !p.pitch) p.pitch = body.slice(0, 300);
+    if (key === 'S' && !p.idea) p.idea = body.slice(0, IDEA_MAX);
+    else if (key === 'P' && !p.pitch) p.pitch = body.slice(0, 300);
     else if (key === 'G' && !p.genre) p.genre = body.slice(0, 40);
     else if (key === 'C' && !colors) {
       colors = body.match(HEX) ?? [];
@@ -180,6 +193,21 @@ export function proposalWish(p: Pick<Proposal, 'name' | 'pitch' | 'genre'>, lang
   return text.slice(0, 600);
 }
 
+/**
+ * The prompt that gives items from before `idea` theirs (`growPool` on the server, once): one JSON
+ * object, id to idea, in English like the source.
+ */
+export function ideaPrompt(items: { id: string; name: string; pitch: string; genre: string }[]): string {
+  return [
+    'These are proposed worlds for a role-playing video game. For each, write its idea: two to six words, lower case,',
+    'how a player would type that world into a search box — "pirates on a sea of sand", "a detective story in 1920s',
+    'Kraków", "dragons and railways", "a tea house in the afterlife". Plain and concrete, no invented names.',
+    'Answer with a JSON object: each id as a key, its idea as the value.',
+    '',
+    JSON.stringify(Object.fromEntries(items.map((p) => [p.id, `${p.name} (${p.genre}): ${p.pitch}`]))),
+  ].join('\n');
+}
+
 /** The slider position a picked proposal is made at: the well-loved version of what it says, since it is already the premise. */
 export const PROPOSAL_EXOTIC = 25;
 
@@ -194,6 +222,7 @@ export function validProposal(raw: unknown): Proposal | null {
       : fallbackColors(r.name);
   return {
     name: r.name.slice(0, 60),
+    idea: typeof r.idea === 'string' ? r.idea.slice(0, IDEA_MAX) : '',
     pitch: r.pitch.slice(0, 300),
     genre: typeof r.genre === 'string' ? r.genre.slice(0, 40) : '',
     colors,

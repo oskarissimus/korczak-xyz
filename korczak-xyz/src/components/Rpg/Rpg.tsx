@@ -719,6 +719,23 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
   const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'language' | 'controls' | 'trash' | 'diesel'>('main');
+  /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
+  const [sheet, setSheet] = useState(false);
+  /** The home screen's field, which a proposal's idea is put into. */
+  const fieldRef = useRef<HTMLInputElement>(null);
+  // Any screen the sheet leads to closes it, so Back returns to the home screen as it was first seen.
+  useEffect(() => setSheet(false), [menu, started]);
+  useEffect(() => {
+    if (!sheet) return;
+    const close = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setSheet(false);
+      }
+    };
+    window.addEventListener('keydown', close, true);
+    return () => window.removeEventListener('keydown', close, true);
+  }, [sheet]);
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -3045,64 +3062,72 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     : ownSave
       ? { key: 'continue', label: t.menuContinue, sub: world?.name ?? ownSave.beats[ownSave.beats.length - 1].title, go: () => resume(ownSave) }
       : null;
-  const resumePill = resumeEntry && (
-    <button
-      type="button"
-      className={`rpg-home-resume${keysReady ? '' : ' rpg-menu-waiting'}`}
-      data-key={resumeEntry.key}
-      aria-disabled={!keysReady || undefined}
-      onClick={keysReady ? resumeEntry.go : undefined}
-    >
-      <span>▶ {resumeEntry.label}</span>
-      {resumeEntry.sub && <small>{resumeEntry.sub}</small>}
-    </button>
+  // Sign-in and the keys are their own pages on the standalone site (`src-rpg/pages`).
+  const accountRoot = gameLang === 'pl' ? '/pl/' : '/';
+  // The sheet behind ⋯ on the home screen (owner, 10 Nov 2026, from the accepted mockup): the way back
+  // into play first, as the one white button, then the account, the library and the rest of the menu.
+  const sheetAccount = !standalone || auth.loading
+    ? null
+    : auth.user
+      ? [
+          <a key="account" className="rpg-menu-item" href={`${accountRoot}account/`}>
+            <span>{t.menuAccount}</span>
+            <small>{auth.user.email ?? ''}</small>
+          </a>,
+          item('signout', t.menuSignOut, () => void auth.signOut()),
+        ]
+      : auth.identity
+        ? [
+            <a key="pending" className="rpg-menu-item" href={`${accountRoot}login/`}>
+              <span>{t.menuPending}</span>
+            </a>,
+          ]
+        : [
+            <a key="signin" className="rpg-menu-item rpg-home-sheet-strong" href={`${accountRoot}login/`}>
+              <span>{t.menuSignIn}</span>
+            </a>,
+            <a key="signup" className="rpg-menu-item" href={`${accountRoot}login/?mode=up`}>
+              <span>{t.menuSignUp}</span>
+            </a>,
+          ];
+  const homeSheet = (
+    <div className="rpg-home-sheet-layer">
+      <div className="rpg-home-scrim" aria-hidden="true" onClick={() => setSheet(false)} />
+      <nav id="rpg-home-sheet" className="rpg-home-sheet rpg-menu" aria-label={t.homeMenu}>
+        {resumeEntry && (
+          <button
+            type="button"
+            className={`rpg-home-resume${keysReady ? '' : ' rpg-menu-waiting'}`}
+            data-key={resumeEntry.key}
+            aria-disabled={!keysReady || undefined}
+            onClick={keysReady ? resumeEntry.go : undefined}
+          >
+            <span>▶ {resumeEntry.label}</span>
+            {resumeEntry.sub && <small>{resumeEntry.sub}</small>}
+          </button>
+        )}
+        {keysReady && storyProvider === 'static' && item('start', t.start, () => begin())}
+        {sheetAccount}
+        {item('library', t.homeWorlds(libraryRows.length), () => setMenu('library'), { disabled: libraryRows.length === 0 })}
+        {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
+        {(creatable || !keysReady) && item('world', t.homeMore, () => setMenu('world'), { sub: wish.words.length ? wish.words.join(', ') : undefined, waiting: !keysReady })}
+        {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
+        {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
+        {item('settings', t.menuSettings, () => setMenu('settings'))}
+        {item('controls', t.menuControls, () => setMenu('controls'))}
+      </nav>
+    </div>
   );
-  // What the field offers to type: a few worlds in the menu's language, tapped into the field.
-  const ideas = t.homeIdeas.split('|').map((s) => s.trim()).filter(Boolean);
+  // A proposal's idea goes into the field, to be made as it is or changed first (owner, 10 Nov 2026).
+  const pickIdea = (p: PoolItem) => {
+    pickedProposal(p.id);
+    pickWish({ ...wish, text: p.idea.slice(0, WISH_MAX) });
+    fieldRef.current?.focus({ preventScroll: true });
+  };
   const createFromField = () => {
     if (!keysReady || !creatable) return;
     begin(true);
   };
-
-  // The account, under the menu, on the standalone site only (see the props above). Links rather
-  // than buttons: sign-in and the keys are their own pages there (`src-rpg/pages`).
-  const accountRoot = gameLang === 'pl' ? '/pl/' : '/';
-  const accountBar = standalone && auth.loading ? (
-    // Its room kept while the account answers, so the menu above does not move when it has.
-    <div className="rpg-account rpg-account-waiting" aria-hidden="true" />
-  ) : standalone ? (
-      <div className="rpg-account">
-        {auth.user ? (
-          <>
-            <a
-              className="rpg-account-avatar"
-              href={`${accountRoot}account/`}
-              title={`${t.menuAccount} · ${auth.user.email ?? ''}`}
-              aria-label={t.menuAccount}
-            >
-              {(auth.user.email ?? '?').slice(0, 1).toUpperCase()}
-            </a>
-            <button type="button" className="rpg-account-link" onClick={() => void auth.signOut()}>
-              {t.menuSignOut}
-            </button>
-          </>
-        ) : auth.identity ? (
-          // Signed up and waiting for approval: the sign-in page is where that is said.
-          <a className="rpg-account-link" href={`${accountRoot}login/`}>
-            {t.menuPending}
-          </a>
-        ) : (
-          <>
-            <a className="rpg-account-link rpg-account-primary" href={`${accountRoot}login/`}>
-              {t.menuSignIn}
-            </a>
-            <a className="rpg-account-link" href={`${accountRoot}login/?mode=up`}>
-              {t.menuSignUp}
-            </a>
-          </>
-        )}
-      </div>
-    ) : null;
 
   const worldMenu = (
     <div className="rpg-panel">
@@ -3593,12 +3618,22 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
             <>
               {menu === 'main' && (
                 <div className="rpg-home">
+                  {/* Only the field and the proposals on the screen (owner, 10 Nov 2026: "this front page has too
+                      many things on it — only the main prompt box and a carousel of proposed worlds, the rest
+                      hidden under three dots"); everything else is in the sheet behind ⋯ (`homeSheet`). */}
                   <header className="rpg-home-bar">
                     <span className="rpg-home-logo">{t.title}</span>
-                    <div className="rpg-home-bar-end">
-                      {resumePill}
-                      {accountBar}
-                    </div>
+                    <button
+                      type="button"
+                      className={`rpg-home-more${sheet ? ' rpg-home-more-on' : ''}`}
+                      aria-label={t.homeMenu}
+                      title={t.homeMenu}
+                      aria-expanded={sheet}
+                      aria-controls="rpg-home-sheet"
+                      onClick={() => setSheet((on) => !on)}
+                    >
+                      <span aria-hidden="true">•••</span>
+                    </button>
                   </header>
                   <section className="rpg-home-hero">
                     <h2 className="rpg-menu-title">{t.homeAsk}</h2>
@@ -3610,6 +3645,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                       }}
                     >
                       <input
+                        ref={fieldRef}
                         type="text"
                         value={wish.text}
                         maxLength={WISH_MAX}
@@ -3620,38 +3656,31 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                         onKeyDown={(e) => e.stopPropagation()}
                         onChange={(e) => pickWish({ ...wish, text: e.target.value.slice(0, WISH_MAX) })}
                       />
-                      <button type="submit" className="rpg-home-create" disabled={keysReady && !creatable} aria-disabled={!keysReady || undefined}>
-                        {t.homeCreate} ✦
-                        {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel, priceParts))}</small>}
+                      <button
+                        type="submit"
+                        className="rpg-home-create"
+                        disabled={keysReady && !creatable}
+                        aria-disabled={!keysReady || undefined}
+                        aria-label={t.homeCreate}
+                        title={diesel && dieselModel ? `${t.homeCreate} · ${dieselTag(gameLang, worldLitres(dieselModel, priceParts))}` : t.homeCreate}
+                      >
+                        <span aria-hidden="true">✦</span>
                       </button>
                     </form>
-                    <div className="rpg-home-try">
-                      <span>{t.homeTry}</span>
-                      {ideas.map((idea) => (
-                        <button key={idea} type="button" onClick={() => pickWish({ ...wish, text: idea })}>
-                          {idea}
-                        </button>
-                      ))}
-                    </div>
                     {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
-                    {/* The badge's row is there before the tank or the demo has answered (and stays, empty, on one's own keys). */}
-                    {diesel && plantState(diesel.litres) === 'stopped' ? (
+                    {/* A dark plant is the one thing about the diesel the screen must say: nothing can be made. */}
+                    {diesel && plantState(diesel.litres) === 'stopped' && (
                       <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
-                    ) : (
-                      <div className="rpg-dz-slot">
-                        {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
-                      </div>
                     )}
-                    {mainMenu}
                   </section>
                   <WorldProposals
                     lang={gameLang}
                     disabled={keysReady && !creatable}
                     onPick={pickProposal}
+                    onIdea={pickIdea}
                     onRefresh={otherProposals}
-                    worlds={libraryRows.length}
-                    onWorlds={() => setMenu('library')}
                   />
+                  {sheet && homeSheet}
                 </div>
               )}
               {menu === 'diesel' && (dieselMenu || mainMenu)}

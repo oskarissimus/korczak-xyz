@@ -574,6 +574,7 @@
 }
 
 :root:root .rpg-home {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -597,52 +598,41 @@
   white-space: nowrap;
 }
 
-:root:root .rpg-home-bar-end {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-/* Continue: the one way back into play, not a menu entry. */
-:root:root .rpg-home-resume {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-  max-width: min(360px, 60vw);
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--d-btn-line);
+/* ⋯: the one way to everything that is not the field or the worlds. */
+:root:root .rpg-home-more {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--d-line);
   border-radius: var(--d-radius-sm);
-  background: var(--d-btn-bg);
+  background: var(--d-well);
   color: var(--d-ink);
-  font: 700 14px/44px var(--d-font-ui);
+  font: 800 11px/1 var(--d-font-ui);
+  letter-spacing: 0.08em;
   cursor: pointer;
-  -webkit-backdrop-filter: var(--d-blur);
-  backdrop-filter: var(--d-blur);
 }
 
-:root:root .rpg-home-resume span {
-  white-space: nowrap;
-}
-
-:root:root .rpg-home-resume small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 400;
-  font-size: 13px;
-  opacity: 0.7;
-}
-
-:root:root .rpg-home-resume:hover,
-:root:root .rpg-home-resume:focus-visible {
-  background: var(--d-btn-bg-hover);
-  border-color: var(--d-accent);
+:root:root .rpg-home-more:hover,
+:root:root .rpg-home-more:focus-visible {
+  border-color: rgba(255, 255, 255, 0.6);
   outline: none;
 }
 
+/* Open, it is the screen's one white thing above the sheet, and closes it again. */
+:root:root .rpg-home-more-on {
+  position: relative;
+  z-index: 3;
+  border-color: #fff;
+  background: #fff;
+  color: #0b0b0d;
+}
+
+/* The field in the middle of the screen with room around it: this is where the eye goes (owner,
+   10 Nov 2026: "the prompt window should have more empty space around — this is where I want most
+   attention"). */
 :root:root .rpg-home-hero {
   flex: 1 0 auto;
   display: flex;
@@ -650,7 +640,7 @@
   align-items: center;
   justify-content: center;
   gap: 14px;
-  padding: 8px 32px 24px;
+  padding: 24px 32px 40px;
   text-align: center;
 }
 
@@ -658,20 +648,22 @@
   max-width: 11em;
   /* Two lines whatever the language, so the field below never moves when the words do. */
   min-height: 2.1em;
-  margin: 0 0 8px;
+  margin: 0 0 14px;
   color: var(--d-ink-strong);
   font-size: clamp(36px, 5vw, 68px) !important;
   line-height: 1.05;
   text-wrap: balance;
 }
 
+/* A pill with a round button inside on the right (owner, 10 Nov 2026: "round it more, and more",
+   "the button on the right instead of under it, only an icon"): the one place the look is round. */
 :root:root .rpg-home-field {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(100%, 700px);
-  padding: 6px;
-  border-radius: var(--d-radius-sm);
+  width: min(100%, 640px);
+  padding: 7px 7px 7px 10px;
+  border-radius: 999px;
   background: #fff;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
@@ -680,11 +672,12 @@
   flex: 1;
   min-width: 0;
   min-height: 46px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 0;
   background: transparent;
   color: #0b0b0d;
   font: 400 17px var(--d-font-ui);
+  text-overflow: ellipsis;
   outline: none;
 }
 
@@ -697,15 +690,17 @@
 }
 
 :root:root .rpg-home-create {
+  display: grid;
+  place-items: center;
   flex: none;
-  min-height: 46px;
-  padding: 0 20px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 50%;
   background: #0b0b0d;
   color: #fff;
-  font: 700 16px var(--d-font-ui);
-  white-space: nowrap;
+  font: 400 20px/1 var(--d-font-ui);
   cursor: pointer;
 }
 
@@ -719,161 +714,130 @@
   cursor: default;
 }
 
-:root:root .rpg-home-create .rpg-dz-tag {
-  font-weight: 400;
-  opacity: 0.7;
+/* The sheet behind ⋯: from the bottom on a phone, under the button on a wider screen. */
+:root:root .rpg-home-sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
 }
 
-:root:root .rpg-home-try {
+:root:root .rpg-home-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 8, 0.62);
+}
+
+:root:root .rpg-home .rpg-home-sheet {
+  position: absolute;
+  top: 72px;
+  right: 32px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: 340px;
+  max-height: calc(100% - 96px);
+  overflow-y: auto;
+  padding: 8px 14px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: #17171a;
+  box-shadow: var(--d-shadow);
+  text-align: left;
+}
+
+:root:root .rpg-home-sheet .rpg-menu-item,
+:root:root .rpg-home-sheet .rpg-dz-badge {
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  max-width: 760px;
-}
-
-:root:root .rpg-home-try > span {
-  color: var(--d-ink-dim);
-  font-size: 14px;
-}
-
-:root:root .rpg-home-try button {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  border-radius: var(--d-radius-sm);
-  background: transparent;
-  color: var(--d-ink);
-  font: 400 13.5px var(--d-font-ui);
-  cursor: pointer;
-}
-
-:root:root .rpg-home-try button:hover,
-:root:root .rpg-home-try button:focus-visible {
-  border-color: #fff;
-  background: var(--d-btn-bg);
-  outline: none;
-}
-
-:root:root .rpg-home-hero .rpg-dz-slot {
-  min-height: 34px;
-}
-
-/* The rest of the menu: a quiet row of words, not a column of boxes. */
-:root:root .rpg-home .rpg-menu {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0 6px;
-  width: min(100%, 760px);
-}
-
-:root:root .rpg-home .rpg-menu-item,
-:root:root .rpg-home .rpg-menu-primary {
-  flex: 0 0 auto;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 10px;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 2px;
   border: 0;
-  border-radius: var(--d-radius-sm);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   color: var(--d-ink);
-  opacity: 0.8;
-  font: 600 14px/40px var(--d-font-ui);
-}
-
-:root:root .rpg-home .rpg-menu-item small {
-  font-family: var(--d-font-ui);
-  font-size: 13px;
-  font-weight: 400;
-  opacity: 0.7;
-}
-
-:root:root .rpg-home .rpg-menu-item:hover:not(:disabled),
-:root:root .rpg-home .rpg-menu-item:focus-visible {
-  border: 0;
-  background: var(--d-btn-bg);
-  color: #fff;
-  opacity: 1;
-  outline: none;
-}
-
-/* The language entry says the language itself ("🌐 Polski"), not the word "Language". */
-:root:root .rpg-menu-item[data-key='language'] > span {
-  display: none;
-}
-
-:root:root .rpg-menu-item[data-key='language'] small {
-  font-size: inherit !important;
-  font-weight: inherit !important;
-  opacity: 1 !important;
-}
-
-:root:root .rpg-menu-item[data-key='language'] small::before {
-  content: '🌐 ';
-}
-
-/* The account, top right: a round initial once signed in, words before. */
-:root:root .rpg-home-bar .rpg-account {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  min-height: 44px;
-}
-
-:root:root .rpg-home-bar .rpg-account-waiting {
-  width: 44px;
-}
-
-:root:root .rpg-account-avatar {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #fff;
-  color: #0b0b0d !important;
-  font: 800 16px var(--d-font-ui);
+  font: 600 15px var(--d-font-ui);
+  text-align: left;
   text-decoration: none;
-}
-
-:root:root .rpg-account-link {
-  min-height: 40px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--d-radius-sm);
-  background: transparent;
-  color: var(--d-ink) !important;
-  opacity: 0.8;
-  font: 600 14px var(--d-font-ui);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
   cursor: pointer;
 }
 
-:root:root .rpg-account-primary {
-  border: 1px solid var(--d-btn-line);
-  background: var(--d-btn-bg);
+:root:root .rpg-home-sheet > :last-child {
+  border-bottom: 0;
+}
+
+:root:root .rpg-home-sheet .rpg-menu-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--d-ink-dim);
+  font: 600 14px var(--d-font-ui);
   opacity: 1;
 }
 
-:root:root .rpg-account-link:hover,
-:root:root .rpg-account-link:focus-visible {
-  background: var(--d-btn-bg-hover);
-  opacity: 1;
+:root:root .rpg-home-sheet .rpg-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:root:root .rpg-home-sheet .rpg-menu-item:hover:not(:disabled),
+:root:root .rpg-home-sheet .rpg-menu-item:focus-visible,
+:root:root .rpg-home-sheet .rpg-dz-badge:hover,
+:root:root .rpg-home-sheet .rpg-dz-badge:focus-visible {
+  background: var(--d-accent-soft);
   outline: none;
 }
 
-/* The proposed worlds: a row along the bottom that scrolls sideways. */
+:root:root .rpg-home-sheet .rpg-dz-badge {
+  justify-content: flex-start;
+}
+
+:root:root .rpg-home-sheet-strong > span {
+  font-weight: 800;
+}
+
+/* The language row says the language itself ("🌐 Polski"), not the word "Language". */
+:root:root .rpg-home-sheet .rpg-menu-item[data-key='language'] > span::before {
+  content: '🌐 ';
+}
+
+/* Continue, or the world being born: the sheet's one white button. */
+:root:root .rpg-home-sheet .rpg-home-resume {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 6px 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--d-radius);
+  background: #fff;
+  color: #0b0b0d;
+  font: 800 15px var(--d-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+:root:root .rpg-home-sheet .rpg-home-resume small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #55555b;
+  font: 600 12.5px var(--d-font-ui);
+}
+
+/* The proposed worlds: a low strip along the bottom that scrolls sideways, a cover and a few words each. */
 :root:root .rpg-home .rpg-proposals {
   width: 100%;
   padding: 0 0 28px;
@@ -886,36 +850,16 @@
 }
 
 :root:root .rpg-home .rpg-proposals-head h3 {
-  font: 700 15px var(--d-font-ui);
+  font: 700 13px var(--d-font-ui);
   letter-spacing: 0;
   text-transform: none;
-  color: var(--d-ink);
+  color: var(--d-ink-dim);
 }
 
 :root:root .rpg-proposals-tools {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-:root:root .rpg-proposals-worlds {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--d-radius-sm);
-  background: transparent;
-  color: var(--d-ink);
-  font: 600 14px var(--d-font-ui);
-  cursor: pointer;
-}
-
-:root:root .rpg-proposals-worlds:hover:not(:disabled) {
-  background: var(--d-btn-bg);
-}
-
-:root:root .rpg-proposals-worlds:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 :root:root .rpg-home .rpg-proposals-refresh {
@@ -942,7 +886,7 @@
 }
 
 :root:root .rpg-home .rpg-proposal {
-  flex: 0 0 clamp(200px, 18vw, 264px);
+  flex: 0 0 clamp(140px, 13vw, 190px);
   scroll-snap-align: start;
   border: 1px solid var(--d-line);
   border-radius: var(--d-radius);
@@ -961,36 +905,32 @@
   transition: transform 0.18s, border-color 0.18s;
 }
 
+:root:root .rpg-home .rpg-proposal-cover {
+  aspect-ratio: 16 / 9;
+}
+
+/* Two lines of the idea, whatever its length, so a card is one size full or empty. */
 :root:root .rpg-home .rpg-proposal-text {
-  --pitch-lines: 2;
-  gap: 2px;
-  height: calc(16px + 22px + 4px + var(--pitch-lines) * 13px * 1.35 + 14px);
-  padding: 10px 14px 12px;
+  height: calc(2 * 19px + 18px);
+  padding: 9px 11px;
   background: transparent;
 }
 
 :root:root .rpg-home .rpg-proposal-text strong {
-  font: 700 16px/22px var(--d-font-ui);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  font: 700 14px/19px var(--d-font-ui);
   color: var(--d-ink-strong);
 }
 
-:root:root .rpg-home .rpg-proposal-text span {
-  font-size: 13px;
+:root:root .rpg-home .rpg-proposal-text > span {
+  font-size: 12px;
+  line-height: 1.3;
   color: var(--d-ink-dim);
   opacity: 1;
-}
-
-/* The genre over the name, in small capitals, rather than a tag on the picture. */
-:root:root .rpg-home .rpg-proposal-genre {
-  left: 10px;
-  bottom: 8px;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(11, 11, 13, 0.72);
-  color: #fff;
-  font: 700 10.5px var(--d-font-ui);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 :root:root .rpg-home .rpg-proposal-empty {
@@ -1002,10 +942,6 @@
   display: block;
   flex: 1;
   height: 46px;
-}
-
-:root:root .rpg-home-try:has(> span:only-child) {
-  min-height: 36px;
 }
 
 /* --- the dialogue: one panel, a list in it (owner, 9 Nov 2026: "too many boxes") ------------- */
@@ -1091,64 +1027,34 @@
     padding: 12px 16px;
   }
 
-  :root:root .rpg-home-resume {
-    padding: 0 12px;
-    max-width: 52vw;
-  }
-
-  :root:root .rpg-home-resume small {
-    display: none;
-  }
-
   :root:root .rpg-home-hero {
-    justify-content: flex-start;
-    gap: 12px;
-    padding: 16px 16px 20px;
+    padding: 16px 16px 28px;
   }
 
   :root:root .rpg-home-hero .rpg-menu-title {
-    font-size: 34px !important;
-    margin-bottom: 0;
+    font-size: 36px !important;
   }
 
-  /* Two ideas on a phone, not four. */
-  :root:root .rpg-home-try button:nth-of-type(n + 3) {
-    display: none;
+  :root:root .rpg-home-field input {
+    font-size: 16px;
   }
 
-  :root:root .rpg-home-field {
-    flex-direction: column;
-    align-items: stretch;
+  :root:root .rpg-home .rpg-home-sheet {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 88%;
+    /* Clear of the corner's ⛶ and ~, which stay over everything. */
+    padding: 8px 16px calc(60px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 14px 14px 0 0;
   }
 
-  :root:root .rpg-home-create {
-    min-height: 48px;
-  }
-
-  :root:root .rpg-home-try button {
-    min-height: 44px;
-  }
-
-  :root:root .rpg-home .rpg-menu {
-    gap: 0;
-  }
-
-  :root:root .rpg-home .rpg-menu-item {
-    min-height: 44px;
-    padding: 0 8px;
-    line-height: 44px;
-    font-size: 13px;
-  }
-
-  :root:root .rpg-home .rpg-proposals-head h3 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  :root:root .rpg-proposals-worlds {
-    white-space: nowrap;
-    padding: 0 8px;
+  /* The strip stops above the corner's ⛶ and ~ rather than under them. */
+  :root:root .rpg-home .rpg-proposals {
+    padding-bottom: 58px;
   }
 
   :root:root .rpg-home .rpg-proposals-head,
@@ -1163,12 +1069,7 @@
   }
 
   :root:root .rpg-home .rpg-proposal {
-    flex-basis: 64vw;
-  }
-
-  /* The initial and one word: sign-up is on the sign-in page, sign-out in Settings. */
-  :root:root .rpg-account-link:not(.rpg-account-primary) {
-    display: none;
+    flex-basis: 132px;
   }
 
   :root:root .rpg-dialogue-choices button {
