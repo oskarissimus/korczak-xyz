@@ -8,6 +8,13 @@
  *
  * Plain lines rather than JSON, as the intro's narration (`introScript.ts`): a card shows the moment
  * its lines end and its cover starts drawing then, while the next one is still being written.
+ *
+ * **Since 10 Nov 2026 a proposal is a few words and a picture, nothing more** (owner: "simplify it to
+ * what it was with Kraków and so on — those were very good suggestions; no description any more, only
+ * the phrase and the picture per proposal"). The worlds had been an invented name and a 30-word pitch
+ * packed with dice words, two of the four kinds asked to be strange: they read overwrought next to the
+ * four hand-written phrases they replaced. `name`, `pitch` and `genre` stay only so a pool or a kept
+ * proposal from before still reads; nothing writes them now.
  */
 
 import type { Lang } from './quest';
@@ -19,18 +26,18 @@ export const IDEA_MAX = 60;
 
 /** One proposed world: a premise to make a world from, never the world itself. */
 export interface Proposal {
-  /** The world's name, in the game's language. */
+  /** The world's name, in the game's language. Before 10 Nov 2026 only; '' since. */
   name: string;
   /**
    * The world as a player would type it into the field, two to six words ("pirates on a sea of sand",
    * "a detective story in 1920s Kraków"): the card's caption and what a tap puts in the field (owner,
    * 10 Nov 2026: "proposals with a picture, but with the texts that used to sit under the prompt").
-   * Empty on an item made before it, which shows its name and is made as before.
+   * Since then the whole proposal, with its picture. Empty only on an item older than ideas.
    */
   idea: string;
-  /** One or two sentences: what it is and why one would go there. */
+  /** One or two sentences: what it is and why one would go there. Before 10 Nov 2026 only; '' since. */
   pitch: string;
-  /** Its genre in two to four words, for the card's corner. */
+  /** Its genre in two to four words. Before 10 Nov 2026 only; '' since. */
   genre: string;
   /** Two colours for the card while (or when there is no) cover. */
   colors: [string, string];
@@ -41,25 +48,21 @@ export interface Proposal {
 }
 
 /**
- * How the four spread from the familiar to the strange, one each, so the menu always offers a world
- * anybody knows at once beside one nobody has seen (the slider's three bands, `genesis.ts`, plus a
- * second familiar one outside fantasy, since a classic RPG setting is the likeliest pick).
+ * Four kinds, one of each in a batch of four, so the strip mixes them the way the hand-written four
+ * did: dragons and railways, pirates on a sea of sand, a detective story in 1920s Kraków, a tea house
+ * in the afterlife. Each is a familiar thing with one twist, never a strange thing for its own sake.
  */
 export const PROPOSAL_KINDS = [
-  'a classic RPG setting players love at once — high or dark fantasy, sword and sorcery, a gothic land, a northern saga — fresh through its details; the genre’s staples welcome',
-  'another well-loved genre that is NOT medieval fantasy — a pirate archipelago, a desert of sultanates, a mythic antiquity, a wuxia realm, a frontier, a space station, a gaslit city — with one small twist of its own',
-  'a familiar genre with ONE strong, unusual twist built from its seeds, which makes it its own',
-  'anything at all, as far from a stock setting as its seeds can carry it: any era, scale or place, no clichés (no dark lord, chosen one, floating islands, generic cyberpunk)',
+  'classic fantasy with one unexpected twist (like "dragons and railways")',
+  'another well-loved genre — pirates, a western, noir, space, myth, samurai, post-apocalypse — with one twist (like "pirates on a sea of sand")',
+  'a real place and time anybody knows, made into an adventure (like "a detective story in 1920s Kraków")',
+  'something cosy, gentle or funny (like "a tea house in the afterlife")',
 ] as const;
 
 export interface ProposalAsk {
   lang: Lang;
-  /** Two dice words per proposal, in `PROPOSAL_KINDS` order: what keeps four from being the four a model always writes. */
-  seeds: string[][];
-  /** Worlds to be unlike ("name: pitch"): ones this reader already had, or the pool's newest. */
+  /** Ideas already in the pool, which a new one must not repeat. */
   avoid: string[];
-  /** The avoid list is the pool's own proposals, not worlds a player has been to (`proposalPool.ts`). */
-  avoidPool?: boolean;
 }
 
 export const COVER_STYLE = 'painterly fantasy book cover art, wide establishing shot, dramatic atmospheric light, rich colour, no text, no letters, no title';
@@ -71,47 +74,32 @@ export function coverPrompt(picture: string): string {
 export function proposalPrompt(ask: ProposalAsk): string {
   const language = languageName(ask.lang);
   const lines = [
-    'You propose worlds for a role-playing game. The player opens the game and picks one of your proposals;',
-    'only then is the whole world written. So each proposal is a premise, not a world: a name, a pitch that',
-    'makes one want to go there, a short idea, its genre, two colours and a cover picture.',
+    'You suggest worlds for a role-playing game. The player sees a few short ideas under a field where they',
+    'describe the world they want, each with a picture, and taps one to put it in the field.',
     '',
-    `Write ${PROPOSAL_COUNT} proposals, as different from one another as you can make them:`,
+    'An idea is two to six plain words, lower case, the way a player would type it: one familiar thing and one',
+    'twist, concrete and instantly clear, that makes one smile or want to go there. Exactly like these four:',
+    '- pirates on a sea of sand',
+    '- a detective story in 1920s Kraków',
+    '- dragons and railways',
+    '- a tea house in the afterlife',
+    'No invented names, no franchise, no adjective pile-ups, nothing that needs explaining.',
+    '',
+    `Write ${PROPOSAL_COUNT} ideas, one of each kind, in this order:`,
+    ...PROPOSAL_KINDS.map((kind, i) => `${i + 1}. ${kind}`),
   ];
-  PROPOSAL_KINDS.forEach((kind, i) => {
-    // The familiar two take their dice as flavour only: as the premise, salt and pollen made the "classic" one a strange desert.
-    const how = i < 2 ? 'only as small flavour — a custom, a trade, a landmark — never as the premise' : 'transformed and combined, never literal';
-    const seeds = ask.seeds[i]?.length ? ` Seeds, drawn by dice, used ${how}: ${ask.seeds[i].join(', ')}.` : '';
-    lines.push(`${i + 1}. ${kind}.${seeds}`);
-  });
   if (ask.avoid.length) {
-    lines.push(
-      '',
-      ask.avoidPool
-        ? 'These worlds are ALREADY PROPOSED; every new proposal must be unlike all of them — another land, another trouble, other names:'
-        : 'The player has ALREADY BEEN to these worlds; every proposal must be unlike all of them:',
-    );
-    for (const w of ask.avoid.slice(ask.avoidPool ? 0 : -8, ask.avoidPool ? 24 : undefined)) lines.push(`- ${w.slice(0, 160)}`);
+    lines.push('', 'These are already suggested; every new idea must be clearly different from all of them:');
+    for (const w of ask.avoid.slice(0, 40)) lines.push(`- ${w.slice(0, 80)}`);
   }
   lines.push(
     '',
-    'Every world must be playable as this game: a landscape to walk, a settlement, people who talk, something',
-    'dangerous to fight and things to gather. None is a franchise: no names, places, creatures or terms from',
-    'existing books, films, games or comics. A feel is welcome; a borrowed name is not.',
+    `The idea in ${language}. The picture IN ENGLISH, at most 35 words: one wide cinematic scene of that world`,
+    'for an image model — its land, its light, a figure or a building in it.',
     '',
-    `In ${language}: the name (one to four words, invented, evocative), the pitch (one or two sentences, at most`,
-    '30 words, concrete: the land, its people, its trouble — no "a world where…" opener), the idea (two to six',
-    'words, lower case, how a player would type the world into a search box: "pirates on a sea of sand",',
-    '"a detective story in 1920s Kraków", "dragons and railways", "a tea house in the afterlife"), the genre (two to four',
-    'words, plain, no English loanwords). The colours are two hex colours of its look. The cover is IN ENGLISH, at most 35 words: one wide',
-    'cinematic scene of the world for an image model — its land, its light, a figure or a settlement in it.',
-    '',
-    `Answer in exactly this format, ${PROPOSAL_COUNT} blocks of six lines and nothing else:`,
-    'N: <name>',
+    `Answer in exactly this format, ${PROPOSAL_COUNT} blocks of two lines and nothing else:`,
     'S: <idea>',
-    'P: <pitch>',
-    'G: <genre>',
-    'C: <#rrggbb> <#rrggbb>',
-    'I: <cover picture>',
+    'I: <picture>',
   );
   return lines.join('\n');
 }
@@ -147,8 +135,9 @@ export function fallbackColors(name: string): [string, string] {
 
 /**
  * The proposals in the answer so far. Only whole lines count until `final` (the stream's last line
- * may be half a word); a proposal starts at its `N:` and the lines after it are its own; anything
- * else is ignored. A proposal with no pitch yet is left out. At most `PROPOSAL_COUNT`.
+ * may be half a word); a proposal starts at its `S:` (or, from before ideas, its `N:`) and the lines
+ * after it are its own; anything else is ignored. One with neither an idea nor a pitch yet is left
+ * out. At most `PROPOSAL_COUNT`.
  */
 export function parseProposals(soFar: string, final = false): Proposal[] {
   const lines = soFar.split('\n');
@@ -161,13 +150,23 @@ export function parseProposals(soFar: string, final = false): Proposal[] {
     const key = m[1].toUpperCase();
     const body = clean(m[2]);
     if (!body) continue;
-    if (key === 'N') {
+    // `S:` starts a proposal; so does `N:`, the name an answer from before ideas opened with.
+    const p = out[out.length - 1];
+    const starts = key === 'S' ? !p || Boolean(p.idea) || Boolean(p.picture) : key === 'N';
+    if (starts) {
       if (out.length >= PROPOSAL_COUNT) break;
       colors = null;
-      out.push({ name: body.slice(0, 60), idea: '', pitch: '', genre: '', colors: fallbackColors(body), picture: null, image: null });
+      out.push({
+        name: key === 'N' ? body.slice(0, 60) : '',
+        idea: key === 'S' ? body.slice(0, IDEA_MAX) : '',
+        pitch: '',
+        genre: '',
+        colors: fallbackColors(body),
+        picture: null,
+        image: null,
+      });
       continue;
     }
-    const p = out[out.length - 1];
     if (!p) continue;
     if (key === 'S' && !p.idea) p.idea = body.slice(0, IDEA_MAX);
     else if (key === 'P' && !p.pitch) p.pitch = body.slice(0, 300);
@@ -178,7 +177,7 @@ export function parseProposals(soFar: string, final = false): Proposal[] {
       else if (colors.length === 1) p.colors = [colors[0].toLowerCase(), p.colors[1]];
     } else if (key === 'I' && !p.picture) p.picture = body.slice(0, 300);
   }
-  return out.filter((p) => p.pitch);
+  return out.filter((p) => p.idea || p.pitch);
 }
 
 /**
@@ -193,21 +192,6 @@ export function proposalWish(p: Pick<Proposal, 'name' | 'pitch' | 'genre'>, lang
   return text.slice(0, 600);
 }
 
-/**
- * The prompt that gives items from before `idea` theirs (`growPool` on the server, once): one JSON
- * object, id to idea, in English like the source.
- */
-export function ideaPrompt(items: { id: string; name: string; pitch: string; genre: string }[]): string {
-  return [
-    'These are proposed worlds for a role-playing video game. For each, write its idea: two to six words, lower case,',
-    'how a player would type that world into a search box — "pirates on a sea of sand", "a detective story in 1920s',
-    'Kraków", "dragons and railways", "a tea house in the afterlife". Plain and concrete, no invented names.',
-    'Answer with a JSON object: each id as a key, its idea as the value.',
-    '',
-    JSON.stringify(Object.fromEntries(items.map((p) => [p.id, `${p.name} (${p.genre}): ${p.pitch}`]))),
-  ].join('\n');
-}
-
 /** The slider position a picked proposal is made at: the well-loved version of what it says, since it is already the premise. */
 export const PROPOSAL_EXOTIC = 25;
 
@@ -215,15 +199,18 @@ export const PROPOSAL_EXOTIC = 25;
 export function validProposal(raw: unknown): Proposal | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (typeof r.name !== 'string' || typeof r.pitch !== 'string' || !r.name || !r.pitch) return null;
+  const name = typeof r.name === 'string' ? r.name.slice(0, 60) : '';
+  const idea = typeof r.idea === 'string' ? r.idea.slice(0, IDEA_MAX) : '';
+  const pitch = typeof r.pitch === 'string' ? r.pitch.slice(0, 300) : '';
+  if (!idea && !(name && pitch)) return null;
   const colors =
     Array.isArray(r.colors) && r.colors.length === 2 && r.colors.every((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c))
       ? (r.colors as [string, string])
-      : fallbackColors(r.name);
+      : fallbackColors(idea || name);
   return {
-    name: r.name.slice(0, 60),
-    idea: typeof r.idea === 'string' ? r.idea.slice(0, IDEA_MAX) : '',
-    pitch: r.pitch.slice(0, 300),
+    name,
+    idea,
+    pitch,
     genre: typeof r.genre === 'string' ? r.genre.slice(0, 40) : '',
     colors,
     picture: typeof r.picture === 'string' ? r.picture.slice(0, 300) : null,

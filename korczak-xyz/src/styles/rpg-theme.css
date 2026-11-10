@@ -944,6 +944,86 @@
   height: 46px;
 }
 
+:root:root .rpg-library > ul.rpg-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+/* My worlds: a picture and a name per world, nothing else (owner, 10 Nov 2026). */
+:root:root .rpg-library > ul > li.rpg-library-card {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-strong);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root:root .rpg-library > ul > li.rpg-library-current {
+  border: 2px solid #fff !important;
+}
+
+:root:root .rpg-library-open {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--d-ink-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+:root:root .rpg-library-open:disabled {
+  cursor: default;
+}
+
+:root:root .rpg-library-picture {
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
+:root:root .rpg-library-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:root:root .rpg-library-open strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: calc(2 * 1.15em + 20px);
+  padding: 10px 12px;
+  background: var(--d-surface-strong);
+  font: 600 19px/1.15 var(--d-font-display);
+}
+
+:root:root .rpg-library-card .rpg-library-trash {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--d-radius-sm);
+  background: rgba(11, 11, 13, 0.6);
+  font-size: 15px;
+  cursor: pointer;
+}
+
 /* --- the dialogue: one panel, a list in it (owner, 9 Nov 2026: "too many boxes") ------------- */
 
 :root:root .rpg-dialogue {
@@ -1046,15 +1126,13 @@
     left: 0;
     width: auto;
     max-height: 88%;
-    /* Clear of the corner's ⛶ and ~, which stay over everything. */
-    padding: 8px 16px calc(60px + env(safe-area-inset-bottom));
+    padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
     border-width: 1px 0 0;
     border-radius: 14px 14px 0 0;
   }
 
-  /* The strip stops above the corner's ⛶ and ~ rather than under them. */
   :root:root .rpg-home .rpg-proposals {
-    padding-bottom: 58px;
+    padding-bottom: 16px;
   }
 
   :root:root .rpg-home .rpg-proposals-head,

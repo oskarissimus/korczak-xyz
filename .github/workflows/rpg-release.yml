@@ -155,16 +155,16 @@ jobs:
           npx --yes firebase-tools@15 deploy
           --only firestore:rules,firestore:indexes,functions:rpgDemo,functions:rpgApi,functions:rpgJob,functions:rpgProposals
           --project "$GCP_PROJECT" --non-interactive --force
-      # The home screen's cards show each proposal's `idea` (Nov 2026). A pool written before it has
-      # none, and the daily run that fills them in is at 04:30 Warsaw; so while any item lacks one,
-      # the run is started now instead (~3 cents). Once every item has its idea this does nothing.
-      - name: Fill in the proposals' ideas if the pool has none yet
+      # The home screen's cards are short ideas with a picture, nothing more (10 Nov 2026). A pool still
+      # holding the named, pitched worlds from before is replaced by the daily run, at 04:30 Warsaw; so
+      # while it holds any, the run is started now instead (~5 cents). Once it is all ideas this does nothing.
+      - name: Replace the pool's old proposals with ideas
         # Never what holds a release back: without it the cards show names until 04:30.
         continue-on-error: true
         run: |
           url="https://firebasestorage.googleapis.com/v0/b/${GCP_PROJECT}-rpg/o/proposals%2Fpl.json?alt=media&token=every-rpg-proposal-pool"
-          missing=$(curl -fsS "$url" | jq '[.items[] | select((.idea // "") == "")] | length' || echo 0)
-          echo "Proposals without an idea: $missing"
+          missing=$(curl -fsS "$url" | jq '[.items[] | select((.idea // "") == "" or (.pitch // "") != "")] | length' || echo 0)
+          echo "Proposals from before ideas: $missing"
           if [ "$missing" -gt 0 ]; then
             gcloud scheduler jobs run firebase-schedule-rpgProposals-europe-central2 \
               --location europe-central2 --project "$GCP_PROJECT"

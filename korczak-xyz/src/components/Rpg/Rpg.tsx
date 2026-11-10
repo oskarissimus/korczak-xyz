@@ -3664,7 +3664,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                         aria-label={t.homeCreate}
                         title={diesel && dieselModel ? `${t.homeCreate} · ${dieselTag(gameLang, worldLitres(dieselModel, priceParts))}` : t.homeCreate}
                       >
-                        <span aria-hidden="true">✦</span>
+                        {/* Drawn, not a glyph: ✦ sat off centre in the round button (owner, 10 Nov 2026). */}
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+                        </svg>
                       </button>
                     </form>
                     {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
@@ -3806,7 +3809,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         </button>
       )}
 
-      {!immersive && (
+      {/* Not on the home screen (owner, 10 Nov 2026: "remove that button from the bottom-right corner"). */}
+      {!immersive && started && (
         <button type="button" className="rpg-fullscreen" onClick={fullscreen} title={t.fullscreen}>
           ⛶
         </button>

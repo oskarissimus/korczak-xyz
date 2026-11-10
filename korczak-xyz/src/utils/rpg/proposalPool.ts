@@ -78,19 +78,21 @@ export function poolItem(raw: unknown): PoolItem | null {
   const r = raw as Record<string, unknown>;
   const id = str(r.id, 40);
   const name = str(r.name, 60);
+  const idea = str(r.idea, IDEA_MAX);
   const pitch = str(r.pitch, 300);
-  if (!id || !name || !pitch) return null;
+  // An idea is a whole proposal (since 10 Nov 2026); a name and a pitch were one before it.
+  if (!id || !(idea || (name && pitch))) return null;
   const colors =
     Array.isArray(r.colors) && r.colors.length === 2 && r.colors.every((c) => typeof c === 'string' && HEX.test(c))
       ? (r.colors as [string, string])
-      : fallbackColors(name);
+      : fallbackColors(idea || name);
   const kind = Number(r.kind);
   return {
     id,
     kind: Number.isInteger(kind) && kind >= 0 && kind < PROPOSAL_KINDS.length ? kind : 0,
     at: Number(r.at) || 0,
     name,
-    idea: str(r.idea, IDEA_MAX),
+    idea,
     pitch,
     genre: str(r.genre, 40),
     colors,
@@ -108,13 +110,13 @@ export function readPool(raw: unknown): Pool | null {
   return { lang: str(r.lang, 16) || 'en', at: Number(r.at) || 0, items };
 }
 
-/** The new items in front of the old, one of each id and of each name, the newest `size` kept. */
+/** The new items in front of the old, one of each id and of each idea (or name), the newest `size` kept. */
 export function mergePool(old: PoolItem[], fresh: PoolItem[], size = POOL_SIZE): PoolItem[] {
   const ids = new Set<string>();
   const names = new Set<string>();
   const out: PoolItem[] = [];
   for (const p of [...fresh, ...old]) {
-    const name = p.name.toLowerCase();
+    const name = (p.idea || p.name).toLowerCase();
     if (ids.has(p.id) || names.has(name)) continue;
     ids.add(p.id);
     names.add(name);
@@ -159,9 +161,9 @@ export function withTranslation(source: PoolItem[], translated: PoolItem[]): Poo
 export function translationEntries(items: PoolItem[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const p of items) {
-    out[`${p.id}.n`] = p.name;
+    if (p.name) out[`${p.id}.n`] = p.name;
     if (p.idea) out[`${p.id}.s`] = p.idea;
-    out[`${p.id}.p`] = p.pitch;
+    if (p.pitch) out[`${p.id}.p`] = p.pitch;
     if (p.genre) out[`${p.id}.g`] = p.genre;
   }
   return out;
@@ -174,18 +176,19 @@ export function fromTranslation(items: PoolItem[], raw: unknown): PoolItem[] {
   return items
     .map((p) => ({
       ...p,
-      name: field(`${p.id}.n`, 60),
+      name: p.name ? field(`${p.id}.n`, 60) : '',
       idea: p.idea ? field(`${p.id}.s`, IDEA_MAX) : '',
-      pitch: field(`${p.id}.p`, 300),
+      pitch: p.pitch ? field(`${p.id}.p`, 300) : '',
       genre: p.genre ? field(`${p.id}.g`, 40) : '',
     }))
-    .filter((p) => p.name && p.pitch);
+    // Every field the English has must have come back.
+    .filter((t, i) => (!items[i].idea || t.idea) && (!items[i].name || t.name) && (!items[i].pitch || t.pitch));
 }
 
 export function poolTranslationPrompt(languageName: string, entries: Record<string, string>): string {
   return [
     `Translate these proposed worlds for a role-playing video game from English into ${languageName}.`,
-    'Each world has a name (`.n`), an idea of a few words (`.s`), a pitch of one or two sentences (`.p`) and a genre in a few words (`.g`).',
+    'Each is an idea of a few words (`.s`); an older one may also have a name (`.n`), a pitch of one or two sentences (`.p`) and a genre (`.g`).',
     `Answer with a JSON object with exactly the same keys, each value in natural, vivid ${languageName} as a native game localiser would write it.`,
     '- A name is invented: render it as a native speaker would name such a place — translate its meaning where it has one, keep it short and evocative.',
     '- A pitch keeps its length, tone and every concrete detail.',

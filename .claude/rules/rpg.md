@@ -257,23 +257,28 @@ whole worlds with a bible and assets, only proposals a world can be generated fr
 picture, and under them the menu as it is, where you can still type your own idea". `WorldProposals.tsx`
 along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and draws, `proposalScript.ts` is the prompt and reader.
 
-- **A proposal is a premise**: a name, an **idea**, a pitch of at most 30 words, a genre, two colours
-  and an English cover description. The idea is two to six words as a player would type the world
-  ("piraci na pustyni", "kryminał w Krakowie 1920" — owner, 10 Nov 2026: "proposals with a picture,
-  but with the texts that used to sit under the prompt"; the `homeIdeas` chips they replace are gone).
-  It is the card's caption, and **a tap puts it in the field** to be made or changed, as the chips did;
-  only an item from before ideas (no `idea`) shows its name and is made at once from the premise as
-  below. `growPool` gives every item that lacks one its idea in one request (`ideaPrompt`), and a
-  language file is translated again for an item whose idea it lacks; `rpg-release.yml` starts that run
-  right after a deploy while the Polish file still has an item without one. Tapping one is *New world* with the proposal as the player's description
-  (`proposalWish`: "The world is called „…” (genre). pitch", into `GenesisContext.wish`, so it takes
-  the `playerLines` path and the intro hears it too) at `PROPOSAL_EXOTIC` 25 — the well-loved version
-  of what the proposal says, since it is already the premise. The slider and `WorldWish` are untouched
-  and still behind *New world* (*Or your own idea of a world* under it).
-- **Spread on purpose** (`PROPOSAL_KINDS`): a classic RPG setting, a well-loved genre that is not
-  medieval fantasy, a familiar genre with a strong twist, and anything at all. Two dice words each
-  (`drawWords`, no Wikipedia, for speed) — flavour only for the first two, since as the premise salt
-  and pollen made the "classic" one a strange desert — and the pool's newest 24 as "avoid".
+- **A proposal is a few words and a picture, nothing more** (owner, 10 Nov 2026: "simplify it to what
+  it was with Kraków and so on — those were very good suggestions; no description any more, only the
+  phrase and the picture"). An **idea** of two to six words as a player would type it, and an English
+  picture description. Until that day a proposal was an invented name, a 30-word pitch, a genre and two
+  colours, written from two dice words each, two of the four kinds asked to be strange, against an
+  *avoid* list of the pool's newest 24 — every day further out, and overwrought next to the four
+  hand-written `homeIdeas` chips ("piraci na pustyni", "kryminał w Krakowie 1920", "smoki i kolej",
+  "herbaciarnia w zaświatach") they had replaced. Those four are now the prompt's examples, and the
+  chips themselves are gone.
+  The idea is the card's caption, and **a tap puts it in the field** to be made or changed, as the
+  chips did. `name`/`pitch`/`genre` are still read, so an item or a kept pool from before still shows
+  (its name) and still makes its world at once from `proposalWish` at `PROPOSAL_EXOTIC` 25; nothing
+  writes them now.
+- **Spread on purpose** (`PROPOSAL_KINDS`), one of each in a batch of four, each a familiar thing with
+  one twist: classic fantasy, another well-loved genre, a real place and time, and something cosy or
+  funny. No dice words. The pool's ideas (up to 40, and in a run every batch before) are the *avoid*
+  list, so a run never repeats itself; the batches go one after another for that reason.
+- **The old worlds were dropped, not converted**: `growPool` keeps only items with an idea and no
+  pitch, and fills a pool left short back to `POOL_START` (24) in the same run; a run that wrote
+  nothing leaves the files as they were. `rpg-release.yml` starts that run right after a deploy while
+  the Polish file still holds an item from before, so the game's pool turned over at once; the site's
+  own project turns over at its next 04:30.
 - **A pool on the server, not a model on the page** (owner, 9 Nov 2026: "the start screen loads at
   once and does not wait for anything; the proposals can be static on the server, a cron makes them
   once a day into a queue of the last 100, and the player gets four drawn from it"). `rpgProposals`
@@ -325,8 +330,9 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   dots"; four mockups at iPhone SE size, `rpg/ekran-startowy-prosty/` in the project files). In the
   middle, with room around it, the question and the field: a pill (the one round thing in the look,
   asked for twice — "round it more") whose description is the wish's (`wish.text`), with *Create the
-  world* as a round ✦ inside it on the right (its name only for screen readers and the title, where
-  the diesel price went). Along the bottom a low strip of proposed worlds, a cover and an idea each,
+  world* as a round button inside it on the right, an arrow drawn in SVG (✦ sat off centre; its name
+  only for screen readers and the title, where the diesel price went). The corner's ⛶ is not shown
+  on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
   with ↻. Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
   being born, else Continue), the account (sign in, sign up, or the account and sign-out), *My worlds
@@ -1971,9 +1977,12 @@ writing browser's clock:
 **The library** (`worldSave.ts`, `library` in `rpg-worlds`, 60 worlds at most):
 - It holds every invented world played here or on the account, newest played first. `saveWorld`
   and `playedWorld` order it.
-- The intro shows "📚 Moje światy (n)" (`WorldLibrary.tsx`). Each world is shown with its finished
-  quests (its chronicle) and its quest in progress, from here or from the account (`accountSaves`).
-- "Kontynuuj" resumes that save and "Nowy quest w tym świecie" starts one. Either one first makes
+- *My worlds* (`WorldLibrary.tsx`, from the sheet behind ⋯) is a grid of cards, each the world's
+  picture (`landmarkModel.image`, else its sky-to-ground gradient) and its name, nothing more (owner,
+  10 Nov 2026: "only the title and the picture, without the description"). No pitch, no quest count,
+  no date; the current world has a white border, and the bin sits on the picture's corner.
+- Tapping a card resumes its quest in progress (from here or the account, `accountSaves`) when it
+  has one, else starts a new quest there. Either one first makes
   the world current, switching the game's language if it is the other one (`openingRef` waits for
   that render).
 - `resume` now finds a save's world in the library rather than falling back to the classic one,

@@ -47,12 +47,19 @@ describe('parseProposals', () => {
 });
 
 describe('proposalPrompt', () => {
-  it('names the language, the seeds and the worlds to avoid', () => {
-    const prompt = proposalPrompt({ lang: 'pl', seeds: [['salt', 'bell'], ['moth', 'tide'], [], []], avoid: ['Old: a world'] });
-    expect(prompt).toContain('In Polish');
-    expect(prompt).toContain('salt, bell');
-    expect(prompt).toContain('- Old: a world');
-    expect(prompt).toContain('N: <name>');
+  it('asks for ideas and pictures only, in the language, unlike the pool', () => {
+    const prompt = proposalPrompt({ lang: 'pl', avoid: ['smoki i kolej'] });
+    expect(prompt).toContain('The idea in Polish');
+    expect(prompt).toContain('- smoki i kolej');
+    expect(prompt).toContain('S: <idea>');
+    expect(prompt).not.toContain('N: <name>');
+  });
+
+  it('reads a new answer: an idea and a picture per proposal', () => {
+    const out = parseProposals('S: pirates on a sea of sand\nI: a galleon on dunes\nS: dragons and railways\nI: a train under a dragon\n', true);
+    expect(out.map((p) => p.idea)).toEqual(['pirates on a sea of sand', 'dragons and railways']);
+    expect(out[1].picture).toBe('a train under a dragon');
+    expect(out[0].name).toBe('');
   });
 });
 

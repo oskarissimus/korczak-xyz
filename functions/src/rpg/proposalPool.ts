@@ -3,8 +3,8 @@
  * the why and the file format). `rpgProposals` runs `growPool` once a day; rpgDemo's
  * `{kind:'proposals', lang}` runs `poolFor` when a language has no file yet.
  *
- * - **On the server's keys** (`readServerKeys`, the admin panel's): Google writes the proposals and
- *   translates them, fal.ai draws the covers. A day costs about three cents: two short answers and
+ * - **On the server's keys** (`readServerKeys`, the admin panel's): Google writes the ideas and
+ *   translates them, fal.ai draws the pictures. A day costs about three cents: two short answers and
  *   eight FLUX schnell pictures at $0.003.
  * - **Everything is a file in the game's bucket** under `proposals/`, with the fixed token the page
  *   builds its URL from. The covers are copied there too, so a cover outlives fal.ai's own URL.
@@ -21,8 +21,7 @@ import { getStorage } from 'firebase-admin/storage';
 
 import { asLang, languageName, LANGUAGES } from '../../../korczak-xyz/src/utils/rpg/language';
 import { FAL_IMAGE_MODEL } from '../../../korczak-xyz/src/utils/rpg/falPrompts';
-import { drawWords } from '../../../korczak-xyz/src/utils/rpg/seedWords';
-import { coverPrompt, IDEA_MAX, ideaPrompt, parseProposals, PROPOSAL_KINDS, proposalPrompt } from '../../../korczak-xyz/src/utils/rpg/proposalScript';
+import { coverPrompt, parseProposals, PROPOSAL_KINDS, proposalPrompt } from '../../../korczak-xyz/src/utils/rpg/proposalScript';
 import {
   coverPath,
   fromTranslation,
@@ -48,6 +47,8 @@ const MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3-flash-previ
 const COVER_SIZE = { width: 768, height: 432 };
 /** Items per translation request: ~40 short fields, well inside one answer. */
 const TRANSLATE_SLICE = 15;
+/** The fewest a run leaves the pool with: enough for ↻ to have something new several times over. */
+const POOL_START = 24;
 
 function bucket() {
   return getStorage().bucket(RPG_BUCKET);
@@ -163,23 +164,19 @@ async function drawCover(fal: string, id: string, picture: string): Promise<stri
   }
 }
 
-/** `PROPOSAL_KINDS.length` new proposals in English, unlike the pool's newest; their covers drawn. */
+/** `PROPOSAL_KINDS.length` new ideas in English, unlike the pool's; their pictures drawn. */
 async function writeBatch(google: string, fal: string | null, avoid: PoolItem[]): Promise<PoolItem[]> {
-  const words = drawWords(PROPOSAL_KINDS.length * 2);
-  const prompt = proposalPrompt({
-    lang: 'en',
-    seeds: PROPOSAL_KINDS.map((_, i) => words.slice(i * 2, i * 2 + 2)),
-    avoid: avoid.map((p) => `${p.name}: ${p.pitch}`),
-    avoidPool: true,
-  });
-  const text = await gemini(google, prompt, { temperature: 1.2, json: false });
+  const prompt = proposalPrompt({ lang: 'en', avoid: avoid.map((p) => p.idea).filter(Boolean) });
+  const text = await gemini(google, prompt, { temperature: 1.0, json: false });
   const at = Date.now();
-  const items: PoolItem[] = parseProposals(text, true).map((p, kind) => ({
-    ...p,
-    id: `${new Date(at).toISOString().slice(0, 10).replace(/-/g, '')}-${randomUUID().slice(0, 8)}`,
-    kind,
-    at,
-  }));
+  const items: PoolItem[] = parseProposals(text, true)
+    .filter((p) => p.idea)
+    .map((p, kind) => ({
+      ...p,
+      id: `${new Date(at).toISOString().slice(0, 10).replace(/-/g, '')}-${randomUUID().slice(0, 8)}`,
+      kind,
+      at,
+    }));
   if (!fal) return items;
   return Promise.all(items.map(async (p) => (p.picture ? { ...p, image: await drawCover(fal, p.id, p.picture) } : p)));
 }
@@ -203,12 +200,11 @@ async function translate(google: string, lang: string, items: PoolItem[]): Promi
 async function syncLanguage(google: string, lang: string, source: PoolItem[], have: Pool | null): Promise<Pool> {
   // An item still in English (its slice failed last time) is not had: it is asked for again.
   const english = new Map(source.map((p) => [p.id, p]));
-  // So is one without the idea its English has gained since (`withIdeas`).
-  const kept = new Map(
-    (have?.items ?? [])
-      .filter((p) => english.has(p.id) && english.get(p.id)!.pitch !== p.pitch && (p.idea || !english.get(p.id)!.idea))
-      .map((p) => [p.id, p]),
-  );
+  const translated = (p: PoolItem) => {
+    const e = english.get(p.id);
+    return Boolean(e) && (e!.idea ? Boolean(p.idea) && p.idea !== e!.idea : e!.pitch !== p.pitch);
+  };
+  const kept = new Map((have?.items ?? []).filter(translated).map((p) => [p.id, p]));
   const missing = source.filter((p) => !kept.has(p.id));
   const fresh = missing.length ? await translate(google, lang, missing) : [];
   for (const p of fresh) kept.set(p.id, p);
@@ -221,39 +217,26 @@ async function keys(): Promise<{ google: string | null; fal: string | null }> {
   return { google: k.google, fal: k.fal };
 }
 
-/**
- * Items from before `idea` given theirs, in one request; whatever does not come back stays without
- * one (its card shows the name) and is asked again on the next run.
- */
-async function withIdeas(google: string, items: PoolItem[]): Promise<PoolItem[]> {
-  const missing = items.filter((p) => !p.idea);
-  if (!missing.length) return items;
-  try {
-    const raw = JSON.parse(await gemini(google, ideaPrompt(missing), { temperature: 0.4, json: true })) as Record<string, unknown>;
-    return items.map((p) => {
-      const idea = !p.idea && typeof raw[p.id] === 'string' ? (raw[p.id] as string).trim().slice(0, IDEA_MAX) : '';
-      return idea ? { ...p, idea } : p;
-    });
-  } catch (e) {
-    reportError('rpgProposals.ideas', e, { missing: missing.length });
-    return items;
-  }
-}
-
 /** The day's run: new proposals in front of the pool, then every language's file brought up to it. */
 export async function growPool(count = POOL_DAILY): Promise<{ added: number; size: number; langs: string[] }> {
   const { google, fal } = await keys();
   if (!google) throw new Error('rpgProposals: the server has no Google key (admin panel)');
-  const source = await readSource();
-  const batches = await Promise.allSettled(
-    Array.from({ length: Math.ceil(count / PROPOSAL_KINDS.length) }, (_, i) => writeBatch(google, fal, i === 0 ? source.slice(0, 24) : source.slice(24, 48))),
-  );
+  // Only ideas (10 Nov 2026): the named, pitched worlds from before are dropped, and a pool left too
+  // small by that is filled back to `POOL_START` in this one run.
+  const source = (await readSource()).filter((p) => p.idea && !p.pitch);
+  const want = Math.max(count, POOL_START - source.length);
+  // One batch after another, each told what the ones before it wrote, so a run never repeats itself.
   const fresh: PoolItem[] = [];
-  for (const b of batches) {
-    if (b.status === 'fulfilled') fresh.push(...b.value);
-    else reportError('rpgProposals.write', b.reason);
+  for (let i = 0; i < Math.ceil(want / PROPOSAL_KINDS.length); i++) {
+    try {
+      fresh.push(...(await writeBatch(google, fal, [...fresh, ...source].slice(0, 40))));
+    } catch (e) {
+      reportError('rpgProposals.write', e);
+    }
   }
-  const items = await withIdeas(google, mergePool(source, fresh));
+  const items = mergePool(source, fresh);
+  // Never an empty file over the one the page reads: a run that made nothing leaves the pool as it was.
+  if (!items.length) throw new Error('rpgProposals: no ideas were written');
   await writeSource(items);
   await writeFile('en', items);
   const [files] = await bucket().getFiles({ prefix: `${POOL_DIR}/`, delimiter: '/' });
