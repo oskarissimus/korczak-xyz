@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { ACCOUNT_KEY, refuelWallet, setGatewayContext } from '../../utils/rpg/gateway';
@@ -722,7 +722,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
   /** The home screen's field, which a proposal's idea is put into. */
-  const fieldRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  // The field grows with its text (max-height in rpg-theme.css caps it, then it scrolls), and the
+  // pill becomes a rounded box once it holds more than one line.
+  useLayoutEffect(() => {
+    const field = fieldRef.current;
+    if (!field) return;
+    // Empty, it is the stylesheet's one line: a placeholder too long for the width would count.
+    field.style.height = '';
+    if (field.value) {
+      field.style.height = 'auto';
+      field.style.height = `${field.scrollHeight}px`;
+    }
+    field.parentElement?.toggleAttribute('data-tall', field.offsetHeight > 52);
+  }, [wish.text, menu, started]);
   // Any screen the sheet leads to closes it, so Back returns to the home screen as it was first seen.
   useEffect(() => setSheet(false), [menu, started]);
   useEffect(() => {
@@ -3644,17 +3657,26 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                         createFromField();
                       }}
                     >
-                      <input
+                      {/* Wraps and grows with the text, up to five lines (owner, 11 Nov 2026: "multiline,
+                          and it should grow, it fits too little"). Enter still creates: a world is one
+                          wish, so a line break would only be noise in the prompt. */}
+                      <textarea
                         ref={fieldRef}
-                        type="text"
+                        rows={1}
                         value={wish.text}
                         maxLength={WISH_MAX}
                         placeholder={t.homePlaceholder}
                         aria-label={t.homePlaceholder}
                         enterKeyHint="go"
-                        // The game's keys must not walk the hero while a world is typed.
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onChange={(e) => pickWish({ ...wish, text: e.target.value.slice(0, WISH_MAX) })}
+                        onKeyDown={(e) => {
+                          // The game's keys must not walk the hero while a world is typed.
+                          e.stopPropagation();
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            e.preventDefault();
+                            e.currentTarget.form?.requestSubmit();
+                          }
+                        }}
+                        onChange={(e) => pickWish({ ...wish, text: e.target.value.replace(/\s*\n\s*/g, ' ').slice(0, WISH_MAX) })}
                       />
                       <button
                         type="submit"

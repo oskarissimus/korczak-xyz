@@ -331,7 +331,10 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   middle, with room around it, the question and the field: a pill (the one round thing in the look,
   asked for twice — "round it more") whose description is the wish's (`wish.text`), with *Create the
   world* as a round button inside it on the right, an arrow drawn in SVG (✦ sat off centre; its name
-  only for screen readers and the title, where the diesel price went). The corner's ⛶ is not shown
+  only for screen readers and the title, where the diesel price went). The field is a one-row
+  textarea that grows with the text up to five lines and then scrolls, the pill turning into a box
+  rounded 28px once it holds two (11 Nov 2026: "it fits too little"); Enter still creates, and a
+  pasted line break becomes a space. The corner's ⛶ is not shown
   on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
   with ↻. Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
