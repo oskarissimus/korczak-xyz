@@ -3263,146 +3263,221 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </div>
   );
 
-  const settingsMenu = (
-    <div className="rpg-panel">
-      <h3>{t.menuSettings}</h3>
-      {languagePicker}
-      <label className="rpg-model">
-        <input type="checkbox" checked={jumping} onChange={(e) => pickJumping(e.target.checked)} /> {t.jumpSetting}
+  // Settings in groups, every row left-aligned, one font and one kind of control (owner, 11 Nov 2026,
+  // from the accepted iPhone SE mockup, rpg/ustawienia/ in the project files: "on a small screen the
+  // boxes are cut off, everything centred, no groups, every line a different font").
+  const settingSelect = (label: string, control: React.ReactNode, extra?: React.ReactNode) => (
+    <div className="rpg-set-row">
+      <label className="rpg-set-field">
+        <span className="rpg-set-label">{label}</span>
+        <span className="rpg-set-select">{control}</span>
       </label>
-      {keysReady && models.length > 0 && (
-        <label className="rpg-model">
-          {t.model}:{' '}
-          <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
-            <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : storyProvider === 'demo' ? 'demo' : 'google', null)[0])}</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {keysReady && storyProvider !== 'static' && storyProvider !== 'openai' && (
-        <label className="rpg-model">
-          <input type="checkbox" checked={fastStart} onChange={(e) => pickFastStart(e.target.checked)} /> {t.fastStart(FAST_MODEL)}
-        </label>
-      )}
-      {keysReady && storyProvider === 'google' && (
-        <label className="rpg-model">
-          <input type="checkbox" checked={introOn} onChange={(e) => pickIntro(e.target.checked)} /> {t.introSetting}
-        </label>
-      )}
-      {keysReady && falKey && (
-        <label className="rpg-model">
-          {t.rigger}:{' '}
-          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'meshy' || e.target.value === 'voxel' || e.target.value === 'fit' ? e.target.value : 'skin')}>
-            <option value="skin">{t.riggerSkin}</option>
-            <option value="fit">{t.riggerFit}</option>
-            <option value="voxel">{t.riggerVoxel}</option>
-            <option value="meshy">{t.riggerMeshy}</option>
-          </select>
-        </label>
-      )}
-      {keysReady && falKey && (
-        <label className="rpg-model">
-          {t.mesher}:{' '}
-          <select value={mesher} onChange={(e) => pickMesher(e.target.value === 'meshy' ? 'meshy' : 'trellis')}>
-            <option value="trellis">{t.mesherTrellis}</option>
-            <option value="meshy">{t.mesherMeshy}</option>
-          </select>
-          <small> {t.mesherNote}</small>
-        </label>
-      )}
-      {keysReady && falKey && (
-        <label className="rpg-model">
-          {t.painter}:{' '}
-          <select value={painter} onChange={(e) => pickPainter(e.target.value as PersonPainter)}>
-            {(Object.keys(PERSON_PAINTERS) as PersonPainter[]).map((p) => (
-              <option key={p} value={p}>
-                {t.painters[p]}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {keysReady && falKey && (
-        <div className="rpg-model">
-          <label>
-            {t.pose}:{' '}
-            <select value={pose} onChange={(e) => pickPose(e.target.value === 'apose' ? 'apose' : 'tpose')}>
-              <option value="tpose">{t.poses.tpose}</option>
-              <option value="apose">{t.poses.apose}</option>
-            </select>
-          </label>
-          <small> {t.mesherNote}</small>
-          {(['tpose', 'apose'] as const).map((p) => (
-            <details key={p} className="rpg-pose-prompt">
-              <summary>{t.posePrompt(t.poses[p])}</summary>
-              <p>{PERSON_POSES[p]}</p>
-            </details>
-          ))}
-        </div>
-      )}
-      {keysReady ? (
-        <ul className="rpg-source">
-          <li>
-            {onDiesel && fueled
-              ? t.dieselQuest(formatLitres(diesel?.litres ?? 0, gameLang))
-              : onDiesel
-                ? t.dieselTankEmpty
-                : storyProvider === 'static'
-              ? t.staticQuest
-              : storyProvider === 'demo' && demo
-                ? t.demoQuest(formatLitres(diesel?.litres ?? 0, gameLang), formatLitres(diesel?.capacity ?? 0, gameLang))
-                : t.aiQuest(storyProvider)}
-          </li>
-          {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
-          <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !account.keys.elevenLabs ? t.dieselVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
-          {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
-            <li>
-              <a href={lang === 'pl' ? '/pl/account/' : '/account/'}>{storyProvider === 'demo' ? t.ownKey : t.addKey}</a>
-            </li>
-          )}
-          <li>
-            <a href={rulesHref}>{t.rulesLink}</a>
-          </li>
-        </ul>
-      ) : (
-        <p className="rpg-source">{t.readingKeys}</p>
-      )}
-      {chronicle.length > 0 && (
-        <p className="rpg-chronicle">
-          {t.chronicle(chronicle.length)}{' '}
-          <button
-            type="button"
-            onClick={() => {
-              clearChronicle(worldId);
-              setChronicle([]);
-            }}
-          >
-            {t.forget}
-          </button>
-        </p>
-      )}
-      {demo?.today && (
-        <p className="rpg-today">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</p>
-      )}
-      {!touch && <p className="rpg-dev-hint">{t.devHint}</p>}
-      <p className="rpg-trash-link">
-        <button type="button" onClick={() => setMenu('trash')}>
-          🗑 {t.menuTrash} · {t.menuTrashCount(trashRows.length)}
+      {extra}
+    </div>
+  );
+  const settingSwitch = (title: string, note: string, checked: boolean, onChange: (on: boolean) => void) => (
+    <label className="rpg-set-row rpg-set-toggle">
+      <span className="rpg-set-text">
+        <span className="rpg-set-label">{title}</span>
+        <span className="rpg-set-note">{note}</span>
+      </span>
+      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  );
+  const settingGroup = (title: string, rows: React.ReactNode) => (
+    <section className="rpg-set-group">
+      <h4>{title}</h4>
+      <div className="rpg-set-card">{rows}</div>
+    </section>
+  );
+  const peopleSettings = keysReady && falKey;
+  const settingsMenu = (
+    <div className="rpg-settings">
+      <header className="rpg-settings-bar">
+        <button type="button" className="rpg-settings-back" aria-label={t.menuBack} title={t.menuBack} onClick={() => setMenu('main')}>
+          ←
         </button>
-      </p>
-      {/* Also here: on a phone the home screen's top bar has room for the account's initial only. */}
-      {standalone && auth.user && (
-        <p className="rpg-trash-link">
-          <button type="button" onClick={() => void auth.signOut()}>
-            {t.menuSignOut} · {auth.user.email}
-          </button>
-        </p>
+        <h3>{t.menuSettings}</h3>
+      </header>
+
+      {settingGroup(
+        t.settingsGame,
+        <>
+          {settingSelect(
+            t.language,
+            <select value={gameLang} onChange={(e) => chooseLang(e.target.value)}>
+              {languageOptions.map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>,
+            <>
+              {uiPending(gameLang) && <p className="rpg-set-note">{t.languageTranslating}</p>}
+              {guessed !== gameLang && (
+                <button type="button" className="rpg-set-button" onClick={() => chooseLang(guessed)}>
+                  {t.languageBrowser(nativeName(guessed))}
+                </button>
+              )}
+              <p className="rpg-set-note">{t.languageHint}</p>
+            </>,
+          )}
+          {settingSwitch(t.jumpTitle, t.jumpNote, jumping, pickJumping)}
+        </>,
       )}
-      <div className="rpg-panel-actions">{back}</div>
+
+      {keysReady &&
+        (models.length > 0 || storyProvider === 'google' || storyProvider === 'demo') &&
+        settingGroup(
+          t.settingsStory,
+          <>
+            {models.length > 0 &&
+              settingSelect(
+                t.model,
+                <select value={models.some((m) => m.id === chosenModel) ? chosenModel! : ''} onChange={(e) => pickModel(e.target.value)}>
+                  <option value="">{t.modelDefault(modelChain(storyProvider === 'openai' ? 'openai' : storyProvider === 'demo' ? 'demo' : 'google', null)[0])}</option>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.id}
+                    </option>
+                  ))}
+                </select>,
+              )}
+            {storyProvider !== 'static' && storyProvider !== 'openai' && settingSwitch(t.fastStartTitle, t.fastStartNote(FAST_MODEL), fastStart, pickFastStart)}
+            {storyProvider === 'google' && settingSwitch(t.introTitle, t.introNote, introOn, pickIntro)}
+          </>,
+        )}
+
+      {peopleSettings &&
+        settingGroup(
+          t.settingsPeople,
+          <>
+            {settingSelect(
+              t.painter,
+              <select value={painter} onChange={(e) => pickPainter(e.target.value as PersonPainter)}>
+                {(Object.keys(PERSON_PAINTERS) as PersonPainter[]).map((p) => (
+                  <option key={p} value={p}>
+                    {t.painters[p]}
+                  </option>
+                ))}
+              </select>,
+            )}
+            {settingSelect(
+              t.mesher,
+              <select value={mesher} onChange={(e) => pickMesher(e.target.value === 'meshy' ? 'meshy' : 'trellis')}>
+                <option value="trellis">{t.mesherTrellis}</option>
+                <option value="meshy">{t.mesherMeshy}</option>
+              </select>,
+            )}
+            {settingSelect(
+              t.rigger,
+              <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'meshy' || e.target.value === 'voxel' || e.target.value === 'fit' ? e.target.value : 'skin')}>
+                <option value="skin">{t.riggerSkin}</option>
+                <option value="fit">{t.riggerFit}</option>
+                <option value="voxel">{t.riggerVoxel}</option>
+                <option value="meshy">{t.riggerMeshy}</option>
+              </select>,
+            )}
+            {settingSelect(
+              t.pose,
+              <select value={pose} onChange={(e) => pickPose(e.target.value === 'apose' ? 'apose' : 'tpose')}>
+                <option value="tpose">{t.poses.tpose}</option>
+                <option value="apose">{t.poses.apose}</option>
+              </select>,
+              (['tpose', 'apose'] as const).map((p) => (
+                <details key={p} className="rpg-set-fold">
+                  <summary>{t.posePrompt(t.poses[p])}</summary>
+                  <p>{PERSON_POSES[p]}</p>
+                </details>
+              )),
+            )}
+            <div className="rpg-set-row">
+              <p className="rpg-set-note">{t.mesherNote}</p>
+            </div>
+          </>,
+        )}
+
+      {settingGroup(
+        t.settingsAccount,
+        <>
+          <div className="rpg-set-row">
+            {keysReady ? (
+              <ul className="rpg-set-status">
+                <li>
+                  {onDiesel && fueled
+                    ? t.dieselQuest(formatLitres(diesel?.litres ?? 0, gameLang))
+                    : onDiesel
+                      ? t.dieselTankEmpty
+                      : storyProvider === 'static'
+                        ? t.staticQuest
+                        : storyProvider === 'demo' && demo
+                          ? t.demoQuest(formatLitres(diesel?.litres ?? 0, gameLang), formatLitres(diesel?.capacity ?? 0, gameLang))
+                          : t.aiQuest(storyProvider)}
+                </li>
+                {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
+                <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !account.keys.elevenLabs ? t.dieselVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
+                {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
+                  <li className="rpg-set-note">{storyProvider === 'demo' ? t.ownKey : t.addKey}</li>
+                )}
+                {demo?.today && <li className="rpg-set-note">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</li>}
+              </ul>
+            ) : (
+              <p className="rpg-set-note">{t.readingKeys}</p>
+            )}
+          </div>
+          <a className="rpg-set-row rpg-set-link" href={lang === 'pl' ? '/pl/account/' : '/account/'}>
+            {t.keysLink}
+          </a>
+          <a className="rpg-set-row rpg-set-link" href={rulesHref}>
+            {t.rulesLink}
+          </a>
+          {/* Also here: on a phone the home screen's top bar has room for the account's initial only. */}
+          {standalone && auth.user && (
+            <div className="rpg-set-row rpg-set-line">
+              <span className="rpg-set-text">
+                <span className="rpg-set-label">{t.signedInAs}</span>
+                <span className="rpg-set-note">{auth.user.email}</span>
+              </span>
+              <button type="button" className="rpg-set-button" onClick={() => void auth.signOut()}>
+                {t.menuSignOut}
+              </button>
+            </div>
+          )}
+        </>,
+      )}
+
+      {settingGroup(
+        t.settingsData,
+        <>
+          {chronicle.length > 0 && (
+            <div className="rpg-set-row rpg-set-line">
+              <span className="rpg-set-text">
+                <span className="rpg-set-label">{t.chronicleTitle}</span>
+                <span className="rpg-set-note">{t.chronicle(chronicle.length)}</span>
+              </span>
+              <button
+                type="button"
+                className="rpg-set-button"
+                title={t.forget}
+                onClick={() => {
+                  clearChronicle(worldId);
+                  setChronicle([]);
+                }}
+              >
+                {t.forgetShort}
+              </button>
+            </div>
+          )}
+          <button type="button" className="rpg-set-row rpg-set-link" onClick={() => setMenu('trash')}>
+            🗑 {t.menuTrash} · {t.menuTrashCount(trashRows.length)}
+          </button>
+          {!touch && (
+            <div className="rpg-set-row">
+              <p className="rpg-set-note">{t.devHint}</p>
+            </div>
+          )}
+        </>,
+      )}
     </div>
   );
 

@@ -349,6 +349,14 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   (n)*, a new quest in the current world, *More world options*, the diesel badge, language, Settings,
   Controls. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
   the screen itself, since then nothing can be made.
+- **Settings are groups of rows** (owner, 11 Nov 2026: "on a small screen the boxes are cut off,
+  everything centred, no groups, every line a different font"; the accepted iPhone SE mockup is in
+  `rpg/ustawienia/` in the project files). `settingsMenu` in `Rpg.tsx`: ← and the title at the top,
+  then *Game* (language, jumping), *Story* (model, quick start, intro), *Characters* (picture, model,
+  rig, pose — only with a fal key), *Account and keys*, *Data* (chronicle, trash), each a card of rows
+  built by `settingSelect`/`settingSwitch`/`settingGroup`, all left-aligned and in Manrope. A select
+  is its card's full width and ends a long option in "…" (16 px, so iOS does not zoom); a checkbox is
+  a switch, white when on. The styles are `.rpg-set-*` at the end of `rpg-theme.css`.
 - **The dialogue is one panel with a list in it**: dim numbers, a light row for focus, the typed line
   under a hairline rather than in a box.
 - `src-rpg/components/MenuSkeleton.astro` draws the same boxes before the bundle runs; change both.

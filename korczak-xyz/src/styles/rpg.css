@@ -422,11 +422,6 @@
   line-height: 1.9;
 }
 
-.rpg-source {
-  font-size: 13px;
-  opacity: 0.85;
-}
-
 .rpg-start {
   margin-top: 8px;
   padding: 8px 28px;
@@ -479,13 +474,6 @@
 
 .rpg-lang-note {
   opacity: 0.75;
-}
-
-ul.rpg-source {
-  list-style: none;
-  margin: 4px 0;
-  padding: 0;
-  line-height: 1.6;
 }
 
 .rpg-voice,
@@ -687,29 +675,8 @@ ul.rpg-source {
   }
 }
 
-.rpg-today {
-  font-size: 0.85rem;
-  opacity: 0.85;
-}
-
 .rpg-ending-play {
   font-weight: bold;
-}
-
-.rpg-chronicle {
-  font-size: 0.9rem;
-}
-
-.rpg-chronicle button {
-  margin-left: 0.4rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
 }
 
 .rpg-ending {
@@ -1185,38 +1152,6 @@ ul.rpg-source {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   cursor: pointer;
   z-index: 31;
-}
-
-.rpg-dev-hint {
-  font-size: 0.85em;
-  opacity: 0.7;
-}
-
-.rpg-model select {
-  max-width: 100%;
-  padding: 3px 6px;
-  border: 1px solid #6b5b3e;
-  background: #1c160d;
-  color: #e6dcc6;
-  font: inherit;
-}
-
-/* Each pose's prompt, word for word, folded until asked for. */
-.rpg-pose-prompt {
-  margin-top: 4px;
-  font-size: 0.85em;
-}
-
-.rpg-pose-prompt summary {
-  cursor: pointer;
-}
-
-.rpg-pose-prompt p {
-  margin: 4px 0 0;
-  padding: 6px 8px;
-  max-width: 60ch;
-  background: rgba(0, 0, 0, 0.35);
-  line-height: 1.4;
 }
 
 .rpg-summary {
@@ -1819,7 +1754,6 @@ body:has(.rpg-immersive) .safe-top-band {
 }
 
 .rpg-library-foot button,
-.rpg-trash-link button,
 .rpg-trash-sweep > button {
   min-height: 36px;
   padding: 4px 12px;
