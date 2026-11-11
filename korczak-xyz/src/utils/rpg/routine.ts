@@ -150,6 +150,11 @@ export class Routine {
     this.step = this.rest();
   }
 
+  /** Where the quest put them, which they never stray more than `REACH` from. */
+  get homeAt(): Ground {
+    return { ...this.home };
+  }
+
   /** Where their station stands, or null when it is gone: the scene builds it, and moves it with home. */
   setStation(station: (Ground & { r: number }) | null) {
     this.station = station && { ...station };

@@ -978,6 +978,14 @@ content-hashed and immutable.
     every obstacle, a landmark's keep-out, other people and their stations, and a bare place's tree
     and piece spots *before they have loaded* (they come up round whoever already stands there).
     Blocked, they take the nearest free point on rings 1.5 m apart, out to 9 m.
+    **And nobody stays inside what comes up later** (owner, 11 Nov 2026, Weronika in a tree's trunk:
+    "don't let people walk into trees"). The forest stands at r 0 until its model comes, a hub spot
+    blocks nothing until its model stands, a place's pieces only once loaded — so a spot free at
+    `placeNpc` can be a trunk a minute on. Every change to what blocks (`plantTrees`,
+    `plantPlaceTrees`, `refreshHub`, `setPlaceModel`) sets `crowdDirty`, and the next frame's
+    `settleCrowd` moves anyone standing (or at home) inside something to `standingSpot` round their
+    home, station with them, and sets up again a station something came up on. `standingSpot` also
+    counts the waiting forest at its planted radius.
   - **The rig costs nothing.** Meshy's rigging was used once, to rig two donor bodies (a guard and
     a wanderer) and make the clip library on the male one; `scripts/rpg-people.mjs` turns those
     into `src/assets/rpg/people/` (two ~70 KB donors, clips ~110 KB gzipped) and regenerates them
@@ -1449,7 +1457,11 @@ in `placeNpc` and driven by `RpgScene.updateNpcs`:
   ground and is never worked at.
 - **Nobody goes further than `REACH` (9 m) from where the quest put them**, so the one the marker
   points at is still there; the marker's beam follows them anyway. A walk is taken only if
-  `clearWay` finds no wall, tree or rock across the straight line (people do not count).
+  `clearWay` finds no wall, tree or rock across the straight line (people do not count) **and
+  does not end inside one** — it used to skip whatever the walk ended in, so a stroll's random
+  point in a trunk was walked to (`BODY`, 0.3 m; a station's ring excepted, being worked inside).
+  A walker who meets something that came up since the walk was chosen stops at its edge and
+  chooses again (`blocked` in `updateNpcs`).
 - **The hero stops a walker.** Within `HALT` (4.2 m, a little past `TALK_RANGE`) a walking or
   standing character stops and turns to face the hero, so whoever you came to talk to does not
   walk off as you reach them; a worker keeps working on the spot. On E they turn to you and talk;

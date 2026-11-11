@@ -172,6 +172,9 @@ interface Tree {
 
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
+/** How far a character's body reaches from where they stand: closer than this to a thing's ring is in it. */
+const BODY = 0.3;
+
 /*
  * The scattered trees and the ground cover are instanced, and an instanced mesh is culled as one
  * thing: planted over the whole map, its bounds were the whole map, so every tree and every tuft
@@ -676,6 +679,7 @@ export class RpgScene {
       tree.slot = undefined;
       tree.obstacle.r = bare ? 0 : tree.r;
     }
+    this.crowdDirty = true;
     if (bare) return;
     const rand = rng(7);
     const byKind = new Map<string, Tree[]>();
@@ -1481,6 +1485,7 @@ export class RpgScene {
         else s.obstacle.off = true;
       }
     }
+    this.crowdDirty = true;
   }
 
   // --- where the village stands (`utils/rpg/hubLayout.ts`) ---------------------------------------
@@ -1762,6 +1767,7 @@ export class RpgScene {
       o.off = model.radius < 0.6;
     });
     place.group.add(group);
+    this.crowdDirty = true;
   }
 
   /**
@@ -1781,6 +1787,7 @@ export class RpgScene {
       bare.treeObstacles.push({ x: t.x + place.center.x, z: t.z + place.center.z, r: t.r });
     }
     place.obstacles.push(...bare.treeObstacles);
+    this.crowdDirty = true;
   }
 
   /** A place out of the scene, and what was its own freed; kit pieces and the forest's trees share theirs. */
@@ -1878,6 +1885,8 @@ export class RpgScene {
     const blocks: { x: number; z: number; r: number }[] = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)]
       .flat()
       .filter((o) => o !== self && !o.off);
+    // The forest before its model has come stands at r 0 (`plantTrees`), but it will stand there.
+    for (const tree of this.trees) if (!tree.obstacle.off && tree.obstacle.r === 0 && tree.r > 0) blocks.push({ x: tree.obstacle.x, z: tree.obstacle.z, r: tree.r });
     for (const place of this.places.values()) {
       const { x, z } = place.center;
       if (place.keepOut) blocks.push(place.keepOut);
@@ -1995,6 +2004,7 @@ export class RpgScene {
    */
   private clearWay(from: Ground, to: Ground): boolean {
     const people = new Set([...this.npcs.values()].map((n) => n.obstacle));
+    const stations = new Set([...this.npcs.values()].map((n) => n.station?.obstacle));
     const all = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)];
     const dx = to.x - from.x;
     const dz = to.z - from.z;
@@ -2002,7 +2012,11 @@ export class RpgScene {
     for (const o of all.flat()) {
       if (o.off || people.has(o)) continue;
       const r = o.r + 0.35;
-      if (Math.hypot(from.x - o.x, from.z - o.z) < r || Math.hypot(to.x - o.x, to.z - o.z) < r + 0.4) continue;
+      const end = Math.hypot(to.x - o.x, to.z - o.z);
+      // Never a walk that ends inside a trunk, a wall or a rock (a stroll's random point did, and
+      // the one thing it was in was the one thing this skipped); a station is stood inside its ring.
+      if (end < o.r + BODY && !stations.has(o)) return false;
+      if (Math.hypot(from.x - o.x, from.z - o.z) < r || end < r + 0.4) continue;
       const t = Math.max(0, Math.min(1, ((o.x - from.x) * dx + (o.z - from.z) * dz) / len2));
       if (Math.hypot(from.x + dx * t - o.x, from.z + dz * t - o.z) < r) return false;
     }
@@ -2013,6 +2027,63 @@ export class RpgScene {
     spots: (home: Ground, reach: number) => this.spotsNear(home, reach),
     clear: (from: Ground, to: Ground) => this.clearWay(from, to),
   };
+
+  /** Set when something that blocks walking has come up: everyone is checked on the next frame. */
+  private crowdDirty = false;
+
+  /**
+   * Whether a character at (x, z) would stand inside something solid: a tree, a wall, a rock, a
+   * place's thing, someone else's station. Other people do not count, nor their own station, whose
+   * ring they work inside.
+   */
+  private blocked(x: number, z: number, npc: Npc): boolean {
+    const people = new Set([...this.npcs.values()].map((n) => n.obstacle));
+    const all = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)];
+    for (const list of all) {
+      for (const o of list) {
+        if (o.off || o.r <= 0 || people.has(o) || o === npc.station?.obstacle) continue;
+        if (Math.hypot(x - o.x, z - o.z) < o.r + BODY) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whoever something has come up on is moved out of it (owner, 11 Nov 2026, a screenshot of
+   * Weronika standing in a tree's trunk: "don't let people walk into trees"). Things load after the
+   * people are put down — the world's trees, a hub model, a place's pieces, and a forest planted
+   * at r 0 until its model comes — so a spot that was free when `placeNpc` chose it can be a trunk a
+   * minute later. Someone inside is put on the nearest free spot round where the quest put them
+   * (`standingSpot`), their station with them; a station something came up on is set up again.
+   */
+  private settleCrowd() {
+    this.crowdDirty = false;
+    for (const [name, npc] of this.npcs) {
+      // Not while they are talking: the next change, or the dialogue's end, finds them.
+      if (name === this.talking) {
+        this.crowdDirty = true;
+        continue;
+      }
+      const r = npc.routine;
+      if (this.blocked(r.x, r.z, npc) || this.blocked(r.homeAt.x, r.homeAt.z, npc)) {
+        const home = r.homeAt;
+        const pos = this.standingSpot(new THREE.Vector3(home.x, 0, home.z), npc.obstacle);
+        npc.group.position.set(pos.x, this.groundAt(pos.x, pos.z), pos.z);
+        npc.obstacle.x = pos.x;
+        npc.obstacle.z = pos.z;
+        r.setHome(pos);
+        this.putStation(name, npc);
+        continue;
+      }
+      const station = npc.station?.obstacle;
+      if (station) {
+        const others = [this.obstacles, this.hubObstacles, ...[...this.places.values()].map((p) => p.obstacles)].flat();
+        const people = new Set([...this.npcs.values()].map((n) => n.obstacle));
+        const hit = others.some((o) => o !== station && !o.off && o.r > 0 && !people.has(o) && Math.hypot(o.x - station.x, o.z - station.z) < o.r + station.r);
+        if (hit) this.putStation(name, npc);
+      }
+    }
+  }
 
   /**
    * Everyone about their day: walking, working, standing. A walker the hero comes up to stops and
@@ -2029,7 +2100,15 @@ export class RpgScene {
         npc.rig?.play('Idle_Loop', { fade: 0.4 });
         face = Math.atan2(hero.x - r.x, hero.z - r.z);
       } else {
+        const was = { x: r.x, z: r.z };
         const act = r.tick(dt, this.surroundings);
+        // Something came up across the way since the walk was chosen (a tree, a house loading in):
+        // they stop at its edge and choose again, rather than walk into it.
+        if (r.walking && this.blocked(r.x, r.z, npc) && !this.blocked(was.x, was.z, npc)) {
+          r.x = was.x;
+          r.z = was.z;
+          r.linger(0.5 + Math.random());
+        }
         npc.rig?.play(act.clip, { speed: act.speed ?? 1, fade: 0.35 });
         if (act.strike) npc.rig?.once(act.strike.clip, act.strike.seconds, { fade: 0.2 });
         face = r.facing;
@@ -3044,6 +3123,7 @@ export class RpgScene {
       const started = this.frames.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
       if (this.terrainDirty) this.step('terrain', () => this.refreshTerrain());
+      if (this.crowdDirty) this.step('crowd', () => this.settleCrowd());
       // A step that throws is reported once and the frame is still drawn: before this, one thrown
       // every frame stopped the drawing, and the canvas kept the last picture with the HUD alive
       // over it — the previous world, a hero who would not move (owner, 30 Oct 2026).
