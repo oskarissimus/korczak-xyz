@@ -871,19 +871,6 @@
   color: var(--d-ink-dim);
 }
 
-:root:root .rpg-proposals-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-:root:root .rpg-home .rpg-proposals-refresh {
-  width: 40px;
-  min-height: 40px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 16px;
-}
 
 :root:root .rpg-home .rpg-proposals-grid {
   display: flex;

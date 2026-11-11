@@ -275,17 +275,22 @@ along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and
   funny. No dice words. The pool's ideas (up to 40, and in a run every batch before) are the *avoid*
   list, so a run never repeats itself; the batches go one after another for that reason.
 - **The old worlds were dropped, not converted**: `growPool` keeps only items with an idea and no
-  pitch, and fills a pool left short back to `POOL_START` (24) in the same run; a run that wrote
+  pitch, and fills a pool left short back to `POOL_START` (48 since 11 Nov 2026, "a big pool") in the same run; a run that wrote
   nothing leaves the files as they were. `rpg-release.yml` starts that run right after a deploy while
-  the Polish file still holds an item from before, so the game's pool turned over at once; the site's
+  the Polish file still holds an item from before or fewer than 48, so the game's pool turned over at once; the site's
   own project turns over at its next 04:30.
 - **A pool on the server, not a model on the page** (owner, 9 Nov 2026: "the start screen loads at
   once and does not wait for anything; the proposals can be static on the server, a cron makes them
   once a day into a queue of the last 100, and the player gets four drawn from it"). `rpgProposals`
   (`functions/src/rpg/proposalPool.ts`, 04:30 Warsaw) writes eight in English, two of each kind,
   each cover FLUX schnell copied into the bucket, on the **server's** keys (~3¢ a day), and keeps the
-  newest `POOL_SIZE` 100. `utils/rpg/proposalPool.ts` is the shared half: the format, `drawFour`,
-  the merge and the translation prompt.
+  newest `POOL_SIZE` 400. `utils/rpg/proposalPool.ts` is the shared half: the format, `drawFour`,
+  `dealPool`, the merge and the translation prompt.
+- **More only now and then** (owner, 11 Nov 2026: "drawn from a big pool, and only sometimes new
+  ones generated"): a player who scrolls past the whole pool makes the page ask rpgDemo
+  `{kind:'proposals-more', lang}` once per visit. `morePool` writes one batch (four ideas, ~1.5¢,
+  every language synced) only when the English file is older than `GROW_EVERY_MS` (30 min), the
+  file's `at` being the clock every instance shares, so scrolling can cost at most ~70¢ a day.
 - **Files, not a function**: `proposals/{lang}.json` in `<project>-rpg` with the fixed download token
   `POOL_TOKEN`, so the page knows the URL at build time and nothing has a cold start. English is the
   source (`proposals/source.json` keeps the cover prompts the public files drop). Polish is made
@@ -296,8 +301,10 @@ along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and
   A card tapped before the keys have answered is made once they have (`queuedPick`).
 - **Kept and drawn here**: localStorage `rpg-proposal-pool` (the last language's pool) gives a
   returning player their four on the first frame; the file is read again behind it and only fills
-  cards that are still empty. A pick goes to `rpg-proposals-used` and is never drawn again; ↻ draws
-  four others from the pool at once.
+  cards that are still empty. A pick goes to `rpg-proposals-used` and is dealt after everything else.
+  The carousel has no ↻ and no end (`moreProposals`): eight cards, then six more each time it is
+  scrolled within two cards of its end, dealt from the whole pool one kind at a time; past the end
+  of the pool the deal starts over, and new items from the server are dealt next.
 - **Nothing on the menu moves** when something answers: the cards are a fixed box (`.rpg-proposal-text`
   has one height whatever the pitch), the diesel badge has its row (`.rpg-dz-slot`) before the tank or
   the demo answers, the entries that wait for the keys are there already (`waiting` in `item`, not
@@ -336,7 +343,7 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   rounded 28px once it holds two (11 Nov 2026: "it fits too little"); Enter still creates, and a
   pasted line break becomes a space. The corner's ⛶ is not shown
   on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
-  with ↻. Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
+  scrolled without end (no ↻). Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
   being born, else Continue), the account (sign in, sign up, or the account and sign-out), *My worlds
   (n)*, a new quest in the current world, *More world options*, the diesel badge, language, Settings,

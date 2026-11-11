@@ -12,8 +12,11 @@
  *   English is the source; every other language is the same items translated, by id. Polish is made
  *   with every run; any other language the first time a player in it asks (`{kind:'proposals'}` on
  *   rpgDemo), and from then on with every run.
- * - **The page draws four** (`drawFour`): one of each kind where it can, never one this browser has
- *   already picked, and ↻ draws four others — no model, no wait.
+ * - **The page deals the whole pool** (`dealPool`) into an endless carousel (owner, 11 Nov 2026: "no
+ *   refresh button, new ones should load as you scroll further, drawn from a big pool, and only
+ *   sometimes generated"): one of each kind at a time, the ones this browser has not picked first.
+ *   Scrolling past all of it asks the server for one batch more (`{kind:'proposals-more'}`), which
+ *   it makes at most every `GROW_EVERY_MS` for everybody; until then the deal starts over.
  *
  * Shared by the page and the functions, so nothing here touches the network.
  */
@@ -21,8 +24,10 @@
 import { downloadUrl } from './assetStore';
 import { fallbackColors, IDEA_MAX, PROPOSAL_COUNT, PROPOSAL_KINDS, type Proposal } from './proposalScript';
 
-/** How many proposals the pool keeps: the newest, about twelve days of them. */
-export const POOL_SIZE = 100;
+/** How many proposals the pool keeps: the newest, a big pool to draw from (owner, 11 Nov 2026). */
+export const POOL_SIZE = 400;
+/** The least time between two batches a scrolling player asks for: a bound on what the button-less carousel can spend. */
+export const GROW_EVERY_MS = 30 * 60_000;
 /** How many a day's run adds: two of each kind. */
 export const POOL_DAILY = PROPOSAL_KINDS.length * 2;
 /**
@@ -144,6 +149,23 @@ export function drawFour(items: PoolItem[], skip: ReadonlySet<string> = new Set(
     const p = pick(from.filter((x) => !out.includes(x)));
     if (!p) break;
     out.push(p);
+  }
+  return out;
+}
+
+/**
+ * The whole pool in the order the carousel shows it: rounds of one of each kind, shuffled, with
+ * the ones in `skip` (picked here before) after all the others.
+ */
+export function dealPool(items: PoolItem[], skip: ReadonlySet<string> = new Set(), random: () => number = Math.random): PoolItem[] {
+  const out: PoolItem[] = [];
+  for (const part of [items.filter((p) => !skip.has(p.id)), items.filter((p) => skip.has(p.id))]) {
+    let left = [...part];
+    while (left.length) {
+      const round = drawFour(left, new Set(), random);
+      out.push(...round);
+      left = left.filter((p) => !round.includes(p));
+    }
   }
   return out;
 }

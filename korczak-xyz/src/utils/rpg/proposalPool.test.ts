@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drawFour, fromTranslation, mergePool, poolUrl, readPool, translationEntries, withTranslation, type PoolItem } from './proposalPool';
+import { dealPool, drawFour, fromTranslation, mergePool, poolUrl, readPool, translationEntries, withTranslation, type PoolItem } from './proposalPool';
 
 const item = (id: string, kind: number, name = `World ${id}`): PoolItem => ({
   id,
@@ -30,6 +30,17 @@ describe('drawFour', () => {
   it('brings the skipped back rather than show fewer than four', () => {
     expect(drawFour(pool, new Set(['a', 'b', 'c', 'd', 'e']))).toHaveLength(4);
     expect(drawFour(pool.slice(0, 2))).toHaveLength(2);
+  });
+});
+
+describe('dealPool', () => {
+  const pool = [item('a', 0), item('b', 0), item('c', 1), item('d', 2), item('e', 3), item('f', 3)];
+
+  it('deals every item once, a kind of each first, the picked ones last', () => {
+    const dealt = dealPool(pool, new Set(['c']), () => 0);
+    expect(dealt.map((p) => p.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+    expect(dealt.slice(0, 3).map((p) => p.kind)).toEqual([0, 2, 3]);
+    expect(dealt.at(-1)?.id).toBe('c');
   });
 });
 

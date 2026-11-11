@@ -12,24 +12,32 @@
  * - **A first visit** shows four placeholder cards of the same size until the file comes, ~100 ms.
  * - **A language with no file yet** shows the English pool at once and asks rpgDemo to translate it
  *   (`{kind:'proposals', lang}`); the same four cards then change their words, not their size.
- * - **Picked once, not offered again**: a tap keeps the id in `rpg-proposals-used`, which `drawFour`
- *   skips. ↻ draws four others from the pool — no model, no wait, no cost.
+ * - **Picked once, offered last**: a tap keeps the id in `rpg-proposals-used`, which `dealPool` puts
+ *   after everything else.
+ * - **An endless carousel, no ↻** (owner, 11 Nov 2026): the first `FIRST` cards, then `STEP` more
+ *   each time the carousel nears its end (`moreProposals`), dealt from the whole pool. Running out of
+ *   pool asks the server once per visit for a batch more (`{kind:'proposals-more'}` on rpgDemo, made
+ *   at most every `GROW_EVERY_MS` for everybody, so the pool grows only now and then); new items are
+ *   dealt next, and meanwhile the deal starts over.
  * - **In the `~` console**: `ProposalStats` says where the four came from, how big the pool is, when
  *   it was written and how long the file took.
  */
 
 import { rpgSet } from './storage';
-import { drawFour, poolUrl, readPool, type Pool, type PoolItem } from './proposalPool';
+import { dealPool, poolUrl, readPool, type Pool, type PoolItem } from './proposalPool';
 import { rpgDemoUrl } from './demo';
 import type { Lang } from './quest';
 
 export const POOL_KEY = 'rpg-proposal-pool';
 export const USED_KEY = 'rpg-proposals-used';
 const USED_MAX = 300;
+/** Cards on the first frame, and how many each scroll near the end adds. */
+const FIRST = 8;
+const STEP = 6;
 
 export interface ProposalsView {
   lang: Lang | null;
-  /** The four on screen. */
+  /** The cards in the carousel, in order: they only grow while it is scrolled. */
   items: PoolItem[];
   /** The whole pool they were drawn from. */
   pool: PoolItem[];
@@ -48,6 +56,17 @@ export interface ProposalsView {
 const EMPTY: ProposalsView = { lang: null, items: [], pool: [], poolLang: null, at: null, source: null, ms: null, loading: false, error: null };
 
 let view: ProposalsView = EMPTY;
+/** What the carousel shows next, dealt from the pool. */
+let queue: PoolItem[] = [];
+/** The server was asked for more on this visit already. */
+let askedMore = false;
+
+/** The first cards of a fresh deal, the rest queued. */
+function first(pool: PoolItem[]): PoolItem[] {
+  const dealt = dealPool(pool, usedIds());
+  queue = dealt.slice(FIRST);
+  return dealt.slice(0, FIRST);
+}
 const listeners = new Set<() => void>();
 
 export function subscribeProposals(listener: () => void): () => void {
@@ -128,7 +147,15 @@ function absorb(lang: Lang, pool: Pool, source: ProposalsView['source']): void {
   if (view.lang !== lang || !pool.items.length) return;
   if (pool.lang === lang) keep(pool);
   const byId = new Map(pool.items.map((p) => [p.id, p]));
-  const items = view.items.length ? view.items.map((p) => byId.get(p.id) ?? p) : drawFour(pool.items, usedIds());
+  let items: PoolItem[];
+  if (view.items.length) {
+    // Words in this language for what is shown and queued; items the carousel has not had are next.
+    const had = new Set(view.pool.map((p) => p.id));
+    items = view.items.map((p) => byId.get(p.id) ?? p);
+    queue = [...dealPool(pool.items.filter((p) => !had.has(p.id)), usedIds()), ...queue.map((p) => byId.get(p.id) ?? p)];
+  } else {
+    items = first(pool.items);
+  }
   set({ items, pool: pool.items, poolLang: pool.lang, at: pool.at, source: view.items.length ? view.source : source });
 }
 
@@ -144,7 +171,9 @@ export function ensureProposals(lang: Lang): void {
     /* a blocked store */
   }
   const kept = readKept(lang);
-  view = { ...EMPTY, lang, ...(kept ? { items: drawFour(kept.items, usedIds()), pool: kept.items, poolLang: lang, at: kept.at, source: 'kept' as const } : {}) };
+  queue = [];
+  askedMore = false;
+  view = { ...EMPTY, lang, ...(kept ? { items: first(kept.items), pool: kept.items, poolLang: lang, at: kept.at, source: 'kept' as const } : {}) };
   for (const l of listeners) l();
   void refresh(lang);
 }
@@ -178,12 +207,30 @@ async function refresh(lang: Lang): Promise<void> {
   }
 }
 
-/** ↻: four others from the pool, none of the four on screen. */
-export function otherProposals(): void {
-  if (!view.pool.length) return;
-  const skip = usedIds();
-  for (const p of view.items) skip.add(p.id);
-  set({ items: drawFour(view.pool, skip) });
+/** The carousel nears its end: `STEP` more cards, and once the pool is all shown, the server asked for more. */
+export function moreProposals(): void {
+  const lang = view.lang;
+  if (!lang || !view.pool.length) return;
+  if (queue.length < STEP && !askedMore && view.poolLang === lang) {
+    askedMore = true;
+    void askMore(lang);
+  }
+  // Seen it all: the deal starts over (new items from the server go in front of it when they come).
+  if (queue.length < STEP) queue.push(...dealPool(view.pool, usedIds()));
+  set({ items: [...view.items, ...queue.splice(0, STEP)] });
+}
+
+async function askMore(lang: Lang): Promise<void> {
+  const url = rpgDemoUrl();
+  if (!url) return;
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'proposals-more', lang }) });
+    if (!r.ok) return;
+    const pool = readPool(await r.json());
+    if (pool?.items.length && pool.lang === lang) absorb(lang, pool, view.source);
+  } catch {
+    /* the carousel goes on with what it has */
+  }
 }
 
 /** A proposal was picked: never offered here again, and the next visit draws four others. */
@@ -191,6 +238,7 @@ export function pickedProposal(id: string): void {
   const used = [...usedIds()].filter((x) => x !== id);
   used.push(id);
   rpgSet(USED_KEY, JSON.stringify(used.slice(-USED_MAX)));
+  queue = [];
   view = { ...EMPTY };
   for (const l of listeners) l();
 }

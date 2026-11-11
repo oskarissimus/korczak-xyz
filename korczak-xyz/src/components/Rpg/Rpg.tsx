@@ -116,7 +116,7 @@ import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
 import WorldWish from './WorldWish';
 import WorldProposals from './WorldProposals';
-import { ensureProposals, otherProposals, pickedProposal } from '../../utils/rpg/proposals';
+import { ensureProposals, pickedProposal } from '../../utils/rpg/proposals';
 import type { PoolItem } from '../../utils/rpg/proposalPool';
 import { PROPOSAL_EXOTIC, proposalWish, type Proposal } from '../../utils/rpg/proposalScript';
 import WorldLibrary, { type LibraryRow } from './WorldLibrary';
@@ -3703,7 +3703,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                     disabled={keysReady && !creatable}
                     onPick={pickProposal}
                     onIdea={pickIdea}
-                    onRefresh={otherProposals}
                   />
                   {sheet && homeSheet}
                 </div>

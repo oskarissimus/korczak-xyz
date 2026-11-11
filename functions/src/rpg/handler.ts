@@ -70,7 +70,7 @@ import { SETTINGS_PATH } from '../demo/handler';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { db } from '../runtime';
 import { demoKeys } from './admin';
-import { poolFor } from './proposalPool';
+import { morePool, poolFor } from './proposalPool';
 import { uiStrings } from './ui';
 import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
@@ -630,6 +630,14 @@ async function proposals(res: Response, body: Record<string, unknown>): Promise<
   res.status(200).json(pool);
 }
 
+/** A player scrolled past the whole pool: a batch more, now and then (`morePool`). */
+async function proposalsMore(res: Response, body: Record<string, unknown>): Promise<void> {
+  const pool = await morePool(body.lang);
+  if (!pool) throw new BadRequest('Unknown language');
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json(pool);
+}
+
 function parseBody(raw: unknown): Record<string, unknown> {
   let value = raw;
   if (Buffer.isBuffer(value)) value = value.toString('utf8');
@@ -670,6 +678,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     else if (body.kind === 'voices') await voices(res, body);
     else if (body.kind === 'ui') await ui(res, body);
     else if (body.kind === 'proposals') await proposals(res, body);
+    else if (body.kind === 'proposals-more') await proposalsMore(res, body);
     else throw new BadRequest('Unknown kind');
   } catch (e) {
     if (e instanceof BadRequest) {

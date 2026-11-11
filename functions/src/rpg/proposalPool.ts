@@ -1,7 +1,8 @@
 /*
  * The menu's proposed worlds, made on the server (`korczak-xyz/src/utils/rpg/proposalPool.ts` has
  * the why and the file format). `rpgProposals` runs `growPool` once a day; rpgDemo's
- * `{kind:'proposals', lang}` runs `poolFor` when a language has no file yet.
+ * `{kind:'proposals', lang}` runs `poolFor` when a language has no file yet, and
+ * `{kind:'proposals-more', lang}` runs `morePool` when a player has scrolled past the whole pool.
  *
  * - **On the server's keys** (`readServerKeys`, the admin panel's): Google writes the ideas and
  *   translates them, fal.ai draws the pictures. A day costs about three cents: two short answers and
@@ -25,6 +26,7 @@ import { coverPrompt, parseProposals, PROPOSAL_KINDS, proposalPrompt } from '../
 import {
   coverPath,
   fromTranslation,
+  GROW_EVERY_MS,
   mergePool,
   POOL_DAILY,
   POOL_DIR,
@@ -47,8 +49,8 @@ const MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3-flash-previ
 const COVER_SIZE = { width: 768, height: 432 };
 /** Items per translation request: ~40 short fields, well inside one answer. */
 const TRANSLATE_SLICE = 15;
-/** The fewest a run leaves the pool with: enough for ↻ to have something new several times over. */
-const POOL_START = 24;
+/** The fewest a run leaves the pool with: a big pool from the first day (owner, 11 Nov 2026). */
+const POOL_START = 48;
 
 function bucket() {
   return getStorage().bucket(RPG_BUCKET);
@@ -288,4 +290,24 @@ export function poolFor(rawLang: unknown): Promise<Pool | null> {
     () => building.delete(lang),
   );
   return job;
+}
+
+let growing: Promise<unknown> | null = null;
+
+/**
+ * A player scrolled past the whole pool: one batch more (`PROPOSAL_KINDS.length` ideas, ~1.5 cents),
+ * unless the pool grew less than `GROW_EVERY_MS` ago, for anybody — the English file's `at` is that
+ * clock, so every instance keeps it. Either way `lang`'s file as it now is.
+ */
+export async function morePool(rawLang: unknown): Promise<Pool | null> {
+  const lang = asLang(rawLang);
+  if (!lang || !LANGUAGES.includes(lang)) return null;
+  const english = await readFile('en');
+  if (english && Date.now() - english.at >= GROW_EVERY_MS) {
+    growing ??= growPool(PROPOSAL_KINDS.length).finally(() => {
+      growing = null;
+    });
+    await growing.catch((e) => reportError('rpgProposals.more', e, { lang }));
+  }
+  return (await readFile(lang)) ?? poolFor(lang);
 }
