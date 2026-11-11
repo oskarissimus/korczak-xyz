@@ -233,12 +233,11 @@ async function askMore(lang: Lang): Promise<void> {
   }
 }
 
-/** A proposal was picked: never offered here again, and the next visit draws four others. */
+/** A proposal was picked: dealt last from now on, the cards on screen left where they are. */
 export function pickedProposal(id: string): void {
   const used = [...usedIds()].filter((x) => x !== id);
   used.push(id);
   rpgSet(USED_KEY, JSON.stringify(used.slice(-USED_MAX)));
-  queue = [];
-  view = { ...EMPTY };
-  for (const l of listeners) l();
+  // The carousel stays as it is (owner, 11 Nov 2026: "after a tap everything vanished and was drawn
+  // again; it should stay, and draw only when scrolled right"): the pick counts from the next deal.
 }

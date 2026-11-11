@@ -301,7 +301,7 @@ along the bottom of the home screen, `utils/rpg/proposals.ts` reads the pool and
   A card tapped before the keys have answered is made once they have (`queuedPick`).
 - **Kept and drawn here**: localStorage `rpg-proposal-pool` (the last language's pool) gives a
   returning player their four on the first frame; the file is read again behind it and only fills
-  cards that are still empty. A pick goes to `rpg-proposals-used` and is dealt after everything else.
+  cards that are still empty. A pick goes to `rpg-proposals-used` and is dealt after everything else, from the next deal on: the carousel on screen does not change (owner, 11 Nov 2026).
   The carousel has no ↻ and no end (`moreProposals`): eight cards, then six more each time it is
   scrolled within two cards of its end, dealt from the whole pool one kind at a time; past the end
   of the pool the deal starts over, and new items from the server are dealt next.
