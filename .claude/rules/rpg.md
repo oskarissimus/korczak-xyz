@@ -1865,7 +1865,14 @@ to type a balance in where no API says, and the drift between the real and the e
   `/v1/organization/costs` (no API reads its prepaid credit). ElevenLabs: a key restricted to
   *User: read*, reads credits left from `/v1/user/subscription`. fal: an ADMIN-scope key, reads
   dollars left from `rest.alpha.fal.ai/billing/user_balance` (a bare number, checked 10 Nov 2026).
-  Google: nothing — Gemini API billing is Cloud Billing, which no key reads; typed in by hand.
+  Google: no key can — Gemini API billing is Cloud Billing. The billing account's standard
+  usage-cost export to BigQuery is read instead (`terraform/rpg/billing.tf`: dataset
+  `billing_export` in `korczak-rpg`, `dataViewer` on it and `jobUser` in the project for both
+  projects' function identities), as the function itself with a token from the metadata server, no
+  library: Gemini API (and its old name) cost plus credits, divided by `currency_conversion_rate`
+  back to dollars, month to date, the reading's `at` being where the export's data ends (it runs
+  hours behind). The export itself is a console switch with no API, made once by the owner (11 Nov
+  2026: asked to); until it is on, the check says so and Google is typed in by hand.
 - **Two kinds of reading** in `rpgWallets`: *spent* from `from` to `at` (compared on its own) and
   *balance* at `at` (consecutive pairs of one provider make a window; a rise is a top-up and is not
   called a drift). ElevenLabs credits are priced at `USD_PER_VOICE_CREDIT`, so a wrong credit price

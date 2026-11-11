@@ -54,7 +54,7 @@ export interface WalletReading {
   by: string | null;
 }
 
-export type WalletCheck = { provider: WalletKeyProvider; check: 'ok' | 'refused' | 'failed' | 'no-key'; reason: string | null };
+export type WalletCheck = { provider: WalletProvider; check: 'ok' | 'refused' | 'failed' | 'no-key'; reason: string | null };
 
 export interface WalletsPage {
   hints: Record<WalletKeyProvider, string | null>;
@@ -252,4 +252,44 @@ export function parseOpenAiSpent(json: unknown): { usd: number; next: string | n
 export function startOfUtcMonth(ms: number): number {
   const d = new Date(ms);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+}
+
+// --- Google: the Cloud Billing export in BigQuery (no key reads Gemini API billing) ------------
+
+/** Where the billing account's standard usage-cost export lands (`terraform/rpg/billing.tf`). */
+export const BILLING_PROJECT = 'korczak-rpg';
+export const BILLING_DATASET = 'billing_export';
+export const BILLING_LOCATION = 'EU';
+/** The Gemini API's service in the export; it was the Generative Language API before the rename. */
+export const GEMINI_SERVICES = ['Gemini API', 'Generative Language API'] as const;
+
+/**
+ * Gemini API spend since `fromMs`, in dollars, credits included, across every project on the
+ * billing account. The export is in the account's own currency (`currency_conversion_rate` is
+ * local per dollar), so each row is divided back. `at` is where the export's data ends — it runs
+ * hours behind — so the log is compared over the same window.
+ */
+export function geminiBillingSql(fromMs: number): string {
+  const from = new Date(fromMs).toISOString();
+  const services = GEMINI_SERVICES.map((s) => `'${s}'`).join(', ');
+  return `SELECT
+  SUM((cost + IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) / IF(currency_conversion_rate > 0, currency_conversion_rate, 1)) AS usd,
+  UNIX_MILLIS(MAX(usage_end_time)) AS until,
+  STRING_AGG(DISTINCT project.id) AS projects,
+  ANY_VALUE(currency) AS currency
+FROM \`${BILLING_PROJECT}.${BILLING_DATASET}.gcp_billing_export_v1_*\`
+WHERE service.description IN (${services})
+  AND usage_start_time >= TIMESTAMP('${from}')`;
+}
+
+/** One row of `jobs.query`'s answer: `{ rows: [{ f: [{ v }] }] }`, every value a string or null. */
+export function parseGeminiBilling(json: unknown): { usd: number; until: number | null; projects: string | null; currency: string | null } | null {
+  const rows = (json as { rows?: { f?: { v?: unknown }[] }[] } | null)?.rows;
+  const f = rows?.[0]?.f;
+  if (!f) return { usd: 0, until: null, projects: null, currency: null };
+  const str = (i: number) => (typeof f[i]?.v === 'string' ? (f[i].v as string) : null);
+  const usd = str(0) == null ? 0 : Number(str(0));
+  const until = str(1) == null ? null : Number(str(1));
+  if (!Number.isFinite(usd) || (until !== null && !Number.isFinite(until))) return null;
+  return { usd, until, projects: str(2), currency: str(3) };
 }

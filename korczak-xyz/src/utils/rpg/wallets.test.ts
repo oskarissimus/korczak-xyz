@@ -4,6 +4,8 @@ import { USD_PER_VOICE_CREDIT } from './cost';
 import {
   BadWalletPatch,
   driftRows,
+  geminiBillingSql,
+  parseGeminiBilling,
   ownSpend,
   parseElevenLabsLeft,
   parseFalBalance,
@@ -101,5 +103,21 @@ describe('the drift', () => {
     expect(el.beforeLogging).toBe(true);
     const g = rows.find((r) => r.provider === 'google')!;
     expect(g.driftUsd).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe('Google’s billing export', () => {
+  it('asks for the Gemini API since the start of the window, in dollars, credits included', () => {
+    const sql = geminiBillingSql(Date.parse('2026-11-01T00:00:00Z'));
+    expect(sql).toContain("'Gemini API', 'Generative Language API'");
+    expect(sql).toContain("TIMESTAMP('2026-11-01T00:00:00.000Z')");
+    expect(sql).toContain('/ IF(currency_conversion_rate > 0, currency_conversion_rate, 1)');
+    expect(sql).toContain('`korczak-rpg.billing_export.gcp_billing_export_v1_*`');
+  });
+
+  it('reads the one row BigQuery answers', () => {
+    const json = { rows: [{ f: [{ v: '1.25' }, { v: '1762858800000' }, { v: 'korczak-rpg' }, { v: 'PLN' }] }] };
+    expect(parseGeminiBilling(json)).toEqual({ usd: 1.25, until: 1762858800000, projects: 'korczak-rpg', currency: 'PLN' });
+    expect(parseGeminiBilling({ rows: [{ f: [{ v: null }, { v: null }, { v: null }, { v: null }] }] })).toEqual({ usd: 0, until: null, projects: null, currency: null });
   });
 });
