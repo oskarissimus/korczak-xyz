@@ -1231,4 +1231,41 @@
   :root:root .rpg-touch .rpg-music {
     left: calc(80px + var(--safe-left, 0px));
   }
+
+  /* The game's own screens over the scene: the journal, settings, controls, the menu's sheet. */
+  :root:root .rpg-overlay {
+    gap: 6px;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  :root:root .rpg-overlay h2 {
+    font-size: 22px;
+  }
+
+  :root:root .rpg-panel {
+    gap: 8px;
+  }
+
+  :root:root .rpg-panel h3 {
+    font-size: 17px;
+  }
+
+  :root:root .rpg-log-page {
+    padding: 14px 14px;
+  }
+
+  :root:root .rpg-home .rpg-home-sheet {
+    padding: 4px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  :root:root .rpg-home-sheet .rpg-menu-item,
+  :root:root .rpg-home-sheet .rpg-dz-badge {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  :root:root .rpg-home-sheet .rpg-menu-item small {
+    font-size: 13px;
+  }
 }

@@ -294,3 +294,65 @@ body::before {
 .rpg-page .admin-account-warn {
   color: #f0a090;
 }
+
+/* --- A small phone (owner, 11 Nov 2026, the admin page on an iPhone SE: "on so small a screen,
+   smaller fonts and margins everywhere"). account.css, auth.css and the admin panel size their
+   text in rem, so the root size scales all of it at once; only these pages import this file, so
+   the game's own screen keeps 16px. The margins and padding go down with it. ------------------ */
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+
+  .rpg-page {
+    padding: calc(14px + var(--safe-top)) calc(12px + var(--safe-right)) calc(20px + var(--safe-bottom))
+      calc(12px + var(--safe-left));
+    line-height: 1.4;
+  }
+
+  .rpg-page:not(:has(.auth-card--game)) {
+    margin-top: calc(8px + var(--safe-top));
+    margin-bottom: 8px;
+  }
+
+  .rpg-page h1 {
+    margin-bottom: 12px;
+    font-size: 1.9rem;
+  }
+
+  .retro-btn {
+    padding: 6px 12px;
+  }
+
+  .rpg-page .acct {
+    gap: 10px;
+  }
+
+  .rpg-page .acct-section {
+    gap: 6px;
+  }
+
+  .rpg-page .acct-heading {
+    margin-top: 4px;
+  }
+
+  .rpg-page .acct-card {
+    padding: 8px;
+  }
+
+  .auth-card--game {
+    gap: 12px;
+    padding: 16px 14px;
+  }
+
+  /* Under 16px iOS zooms the page in when a field takes focus. */
+  .rpg-page input,
+  .rpg-page select,
+  .rpg-page textarea,
+  .auth-card--game .auth-field input,
+  .rpg-page .acct-field input,
+  .rpg-page .acct-field select {
+    font-size: 16px;
+  }
+}
