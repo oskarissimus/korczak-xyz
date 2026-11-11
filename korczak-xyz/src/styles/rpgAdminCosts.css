@@ -241,3 +241,34 @@
   list-style: none;
   margin: 0 0 8px;
 }
+
+/* The admin panel's tabs (`AdminPanel.tsx`): one row of buttons that wraps on a phone, the picked
+   one pressed in — said by the border and the weight, not by colour alone. */
+.rpg-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rpg-admin-tabs .retro-btn[aria-selected='true'] {
+  border-style: inset;
+  font-weight: bold;
+}
+
+.rpg-admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.rpg-admin-panel[hidden] {
+  display: none;
+}
+
+/* The request list scrolls in a box of its own height, so a hundred rows do not push the page
+   down; the header row stays put (sticky at the top of this box). */
+.rpg-costs-scroll--requests {
+  max-height: min(60vh, 34rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}

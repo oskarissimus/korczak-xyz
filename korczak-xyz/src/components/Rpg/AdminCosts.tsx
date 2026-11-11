@@ -33,6 +33,10 @@ import CostChart from './CostChart';
 
 type Lang = 'en' | 'pl';
 
+/** The admin panel's tabs this file fills: the dashboard with the requests, the wallets, the price list. */
+export type CostsTab = 'costs' | 'wallets' | 'prices';
+type PanelProps = { id: string; role: string; 'aria-labelledby': string; hidden: boolean; className: string };
+
 const RANGES = [1, 7, 30, 90] as const;
 const GROUPS: GroupBy[] = ['provider', 'model', 'user', 'world', 'quest', 'payer'];
 const PAGE = 100;
@@ -170,7 +174,7 @@ function usageText(e: RequestLogEntry): string {
   return parts.join(' · ');
 }
 
-export default function AdminCosts({ lang }: { lang: Lang }) {
+export default function AdminCosts({ lang, panel }: { lang: Lang; panel: (name: CostsTab) => PanelProps }) {
   const t = translations[lang];
   const [days, setDays] = useState<(typeof RANGES)[number]>(7);
   const [by, setBy] = useState<GroupBy>('provider');
@@ -213,44 +217,50 @@ export default function AdminCosts({ lang }: { lang: Lang }) {
 
   return (
     <>
-      <section className="acct-section rpg-costs">
-        <div className="acct-heading-row">
-          <h2 className="acct-heading">{t.dashTitle}</h2>
-          <button type="button" className="retro-btn" disabled={loading} onClick={() => void load()}>
-            {t.reload}
-          </button>
-        </div>
-        <p className="acct-dim">{t.dashBlurb}</p>
-        <div className="rpg-costs-controls">
-          <div className="rpg-costs-toggle" role="group">
-            {RANGES.map((d) => (
-              <button key={d} type="button" className="retro-btn" aria-pressed={days === d} onClick={() => setDays(d)}>
-                {t.range(d)}
-              </button>
-            ))}
+      <div {...panel('costs')}>
+        <section className="acct-section rpg-costs">
+          <div className="acct-heading-row">
+            <h2 className="acct-heading">{t.dashTitle}</h2>
+            <button type="button" className="retro-btn" disabled={loading} onClick={() => void load()}>
+              {t.reload}
+            </button>
           </div>
-          <label className="acct-field rpg-costs-by">
-            <span className="acct-dim">{t.groupBy}</span>
-            <select value={by} onChange={(e) => setBy(e.target.value as GroupBy)}>
-              {GROUPS.map((g) => (
-                <option key={g} value={g}>
-                  {t.group[g]}
-                </option>
+          <p className="acct-dim">{t.dashBlurb}</p>
+          <div className="rpg-costs-controls">
+            <div className="rpg-costs-toggle" role="group">
+              {RANGES.map((d) => (
+                <button key={d} type="button" className="retro-btn" aria-pressed={days === d} onClick={() => setDays(d)}>
+                  {t.range(d)}
+                </button>
               ))}
-            </select>
-          </label>
-        </div>
-        {error && (
-          <p className="acct-warn">
-            {t.failed} {error}
-          </p>
-        )}
-        {!page && !error && <p className="acct-dim">{t.loading}</p>}
-        {page && range && <Dashboard page={page} range={range} by={by} picked={picked} setPicked={setPicked} name={name} t={t} lang={lang} />}
-      </section>
-      {page && <RequestList page={page} by={by} picked={picked} t={t} lang={lang} />}
-      <PriceList rate={rate} fxDate={page?.fx?.date ?? null} t={t} lang={lang} />
-      <AdminWallets lang={lang} />
+            </div>
+            <label className="acct-field rpg-costs-by">
+              <span className="acct-dim">{t.groupBy}</span>
+              <select value={by} onChange={(e) => setBy(e.target.value as GroupBy)}>
+                {GROUPS.map((g) => (
+                  <option key={g} value={g}>
+                    {t.group[g]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {error && (
+            <p className="acct-warn">
+              {t.failed} {error}
+            </p>
+          )}
+          {!page && !error && <p className="acct-dim">{t.loading}</p>}
+          {page && range && <Dashboard page={page} range={range} by={by} picked={picked} setPicked={setPicked} name={name} t={t} lang={lang} />}
+        </section>
+        {page && <RequestList page={page} by={by} picked={picked} t={t} lang={lang} />}
+      </div>
+      <div {...panel('wallets')}>
+        <AdminWallets lang={lang} />
+      </div>
+      <div {...panel('prices')}>
+        <PriceList rate={rate} fxDate={page?.fx?.date ?? null} t={t} lang={lang} />
+      </div>
     </>
   );
 }
@@ -369,7 +379,7 @@ function RequestList({ page, by, picked, t, lang }: { page: RequestsPage; by: Gr
     <section className="acct-section rpg-costs">
       <h2 className="acct-heading">{t.reqTitle}</h2>
       <p className="acct-dim">{t.reqBlurb}</p>
-      <div className="rpg-costs-scroll">
+      <div className="rpg-costs-scroll rpg-costs-scroll--requests" tabIndex={0} role="region" aria-label={t.reqTitle}>
         <table className="rpg-costs-table rpg-costs-requests">
           <thead>
             <tr>

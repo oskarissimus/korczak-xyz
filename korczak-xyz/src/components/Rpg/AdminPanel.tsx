@@ -11,21 +11,36 @@
  *
  * A NEW SECTION is a field in `utils/rpg/adminConfig.ts` (status, patch, parser), a branch in
  * `admin.ts`, and one more `<section>` below that sends `{ <name>: … }` through `save`.
+ *
+ * The sections are tabs (owner, 11 Nov 2026: "too much to scroll"). Every tab stays mounted and the
+ * others are only `hidden`, so a half-typed key, the costs already read and the open request survive
+ * a switch, and nothing is fetched again. The tab is in the URL's hash (`#costs`), so a reload or a
+ * bookmark opens the same one. A new section is a new tab: a name in `TABS`, its label, a panel.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
-import AdminCosts from './AdminCosts';
+import AdminCosts, { type CostsTab } from './AdminCosts';
 import { describeError, log } from '../../lib/logger';
 import { adminConfig } from '../../utils/rpg/gateway';
 import { SERVER_KEY_NAMES, type AdminPatch, type AdminStatus, type ServerKeyName } from '../../utils/rpg/adminConfig';
 
 type Lang = 'en' | 'pl';
 
+const TABS = ['keys', 'demo', 'diesel', 'costs', 'wallets', 'prices'] as const;
+type Tab = (typeof TABS)[number];
+
+function tabFromHash(): Tab {
+  const h = typeof location === 'undefined' ? '' : location.hash.slice(1);
+  return (TABS as readonly string[]).includes(h) ? (h as Tab) : 'keys';
+}
+
 const translations = {
   en: {
     siteHeading: 'Every RPG',
+    tabsLabel: 'Admin sections',
+    tabs: { keys: 'Keys', demo: 'Demo', diesel: 'Diesel', costs: 'Costs', wallets: 'Wallets', prices: 'Prices' } as Record<Tab, string>,
     loading: 'Reading…',
     signedOut: 'Sign in with an admin account first.',
     signIn: 'Sign in',
@@ -83,6 +98,8 @@ const translations = {
   },
   pl: {
     siteHeading: 'Every RPG',
+    tabsLabel: 'Sekcje panelu admina',
+    tabs: { keys: 'Klucze', demo: 'Demo', diesel: 'Dizel', costs: 'Koszty', wallets: 'Portfele', prices: 'Cennik' } as Record<Tab, string>,
     loading: 'Czytam…',
     signedOut: 'Najpierw zaloguj się kontem admina.',
     signIn: 'Zaloguj się',
@@ -158,6 +175,23 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(tabFromHash);
+
+  useEffect(() => {
+    const onHash = () => setTab(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const pick = (next: Tab) => {
+    setTab(next);
+    // replaceState, not location.hash: no history entry per tab, and no jump to an element by that id.
+    try {
+      history.replaceState(null, '', `${location.pathname}${location.search}#${next}`);
+    } catch {
+      /* a sandboxed frame may refuse; the tab still switches */
+    }
+  };
 
   const reload = useCallback(async () => {
     setError(null);
@@ -240,12 +274,56 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
         !error && <p className="acct-dim">{t.loading}</p>
       ) : (
         <>
-          <KeysSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'keys'} save={save} />
-          <DemoSection status={status} t={t} busy={busy} saved={savedAt === 'demo'} save={save} />
-          <DieselSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'diesel'} save={save} />
-          <AdminCosts lang={lang} />
+          <Tabs tab={tab} pick={pick} t={t} />
+          <div {...panel('keys', tab)}>
+            <KeysSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'keys'} save={save} />
+          </div>
+          <div {...panel('demo', tab)}>
+            <DemoSection status={status} t={t} busy={busy} saved={savedAt === 'demo'} save={save} />
+          </div>
+          <div {...panel('diesel', tab)}>
+            <DieselSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'diesel'} save={save} />
+          </div>
+          <AdminCosts lang={lang} panel={(name: CostsTab) => panel(name, tab)} />
         </>
       )}
+    </div>
+  );
+}
+
+/** The attributes of one tab's panel: hidden unless it is the tab picked. */
+function panel(name: Tab, tab: Tab) {
+  return { id: `admin-panel-${name}`, role: 'tabpanel', 'aria-labelledby': `admin-tab-${name}`, hidden: name !== tab, className: 'rpg-admin-panel' };
+}
+
+/** A row of buttons, the picked one pressed in; ← and → move along it as a tablist should. */
+function Tabs({ tab, pick, t }: { tab: Tab; pick: (t: Tab) => void; t: T }) {
+  const move = (e: KeyboardEvent, i: number) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = TABS[(i + step + TABS.length) % TABS.length];
+    pick(next);
+    document.getElementById(`admin-tab-${next}`)?.focus();
+  };
+  return (
+    <div className="rpg-admin-tabs" role="tablist" aria-label={t.tabsLabel}>
+      {TABS.map((name, i) => (
+        <button
+          key={name}
+          id={`admin-tab-${name}`}
+          type="button"
+          role="tab"
+          className="retro-btn"
+          aria-selected={tab === name}
+          aria-controls={`admin-panel-${name}`}
+          tabIndex={tab === name ? 0 : -1}
+          onClick={() => pick(name)}
+          onKeyDown={(e) => move(e, i)}
+        >
+          {t.tabs[name]}
+        </button>
+      ))}
     </div>
   );
 }

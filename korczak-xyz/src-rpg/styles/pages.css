@@ -295,6 +295,25 @@ body::before {
   color: #f0a090;
 }
 
+/* --- The admin panel's tabs, in the game's look: the picked one is the white one, as the sign-in
+   card's tabs are (rpg-theme.css); rpgAdminCosts.css also presses its border in. --- */
+:root:root .rpg-page .rpg-admin-tabs {
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--d-line);
+}
+
+:root:root .rpg-page .rpg-admin-tabs .retro-btn {
+  padding: 6px 14px;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-page .rpg-admin-tabs .retro-btn[aria-selected='true'] {
+  border-color: var(--d-accent);
+  background: var(--d-accent);
+  color: #0b0b0d;
+}
+
 /* --- A small phone (owner, 11 Nov 2026, the admin page on an iPhone SE: "on so small a screen,
    smaller fonts and margins everywhere"). account.css, auth.css and the admin panel size their
    text in rem, so the root size scales all of it at once; only these pages import this file, so
@@ -339,6 +358,10 @@ body::before {
 
   .rpg-page .acct-card {
     padding: 8px;
+  }
+
+  :root:root .rpg-page .rpg-admin-tabs .retro-btn {
+    padding: 5px 10px;
   }
 
   .auth-card--game {
