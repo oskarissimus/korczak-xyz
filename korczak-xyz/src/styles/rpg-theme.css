@@ -1156,3 +1156,79 @@
     min-height: 44px;
   }
 }
+
+/* --- a small phone: the world first (owner, 11 Nov 2026, an iPhone SE screenshot: "on so small a
+   screen, smaller fonts, margins and spacing"). The dialogue took 40% of a 375×667 screen for three
+   lines and two choices, and the HUD's buttons were a thumb's width each. Same breakpoint as the
+   phone layout in rpg.css; after everything above, so it wins at the same specificity. ---------- */
+
+@media (max-width: 480px), (max-height: 480px) {
+  :root:root .rpg-dialogue {
+    padding: 10px 14px calc(6px + var(--safe-bottom, 0px));
+    font-size: 14px;
+  }
+
+  :root:root .rpg-dialogue-speaker {
+    font-size: 19px;
+    line-height: 1.1;
+    margin-bottom: 3px;
+  }
+
+  :root:root .rpg-dialogue-text {
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+
+  :root:root .rpg-dialogue-choices {
+    margin: 0 -8px;
+  }
+
+  /* 36 px a row: under the 44 px guideline, still a fingertip, and each row is the full width. */
+  :root:root .rpg-dialogue-choices button {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+
+  :root:root .rpg-dialogue-free {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  :root:root .rpg-journal {
+    padding: 5px 9px;
+  }
+
+  :root:root .rpg-journal-objective {
+    font-size: 12px;
+  }
+
+  /* The HUD's buttons: 30 px squares, a row of them under ✕ at the same pitch. */
+  :root:root .rpg-leave {
+    width: 30px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  :root:root .rpg-immersive .rpg-hp {
+    top: calc(17px + var(--safe-top, 0px));
+    left: calc(46px + var(--safe-left, 0px));
+  }
+
+  :root:root .rpg-touch .rpg-voice,
+  :root:root .rpg-touch .rpg-music,
+  :root:root .rpg-touch .rpg-devtoggle {
+    top: calc(40px + var(--safe-top, 0px));
+    height: 28px;
+    min-width: 30px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  :root:root .rpg-touch .rpg-devtoggle {
+    left: calc(44px + var(--safe-left, 0px));
+  }
+
+  :root:root .rpg-touch .rpg-music {
+    left: calc(80px + var(--safe-left, 0px));
+  }
+}
