@@ -1076,9 +1076,14 @@ content-hashed and immutable.
     reach, and within 0.35 of the height of the middle, since the palms-forward T-pose's thumbs rise
     into that band at the arms' ends (it refused one as "3 heads", 30 Oct 2026); it replaced "wider than 0.85× its height", which refused Nano Banana's T-pose and its
     wide stance (0.99 and 0.55 of the height across), both one person.
-  - **Or Meshy, and Meshy by default** (owner, 29 Oct 2026: "a toggle in the settings, our own rig
+  - **Or Meshy, as an option only** (owner, 29 Oct 2026: "a toggle in the settings, our own rig
     or Meshy via fal.ai; ours is weak, maybe Meshy is better, I want to try; Meshy by default").
-    *Character rig* in the settings (`rpg-rigger` in localStorage, absent = `meshy`, shown only with
+    **It was the default until 11 Nov 2026** (owner: "a lot of diesel went on the Meshy rig; make ours
+    the default, Meshy only as an option in the settings" — the admin's paid-request log was full of
+    `fal-ai/meshy` rigs on diesel). The default is now `skin` (`DEFAULT_RIGGER` in `people.ts`), and
+    `rpg-rigger` absent means `skin`, so everyone who never chose left Meshy with that deploy; Meshy
+    is stored as `meshy` and is the last entry of the list.
+    *Character rig* in the settings (`rpg-rigger` in localStorage, shown only with
     a fal key): with Meshy, `people.ts` sends the TRELLIS GLB to `fal-ai/meshy/rigging`
     (`rigWithMeshy` in `landmark3d.ts`, the queue, **$0.20 a person**, ~1.5 min measured) and loads
     the rigged GLB it answers: Meshy's own 24 bones under the names the donors have, so the same
@@ -1252,8 +1257,8 @@ content-hashed and immutable.
     smoothing walks only edges under 3 voxels. Replaces copying the nearest donor point's weights,
     measured through the air, which tore shards off the sleeves and split the apron. ~3–4 s in the
     worker. *Character rig* has it as a choice (`rpg-rigger` = `voxel`), keyed apart in the
-    cache (`&w=voxel`); the lab's rig switch too. The game still defaults to Meshy until it is
-    judged there.
+    cache (`&w=voxel`); the lab's rig switch too. The game defaulted to Meshy until 11 Nov 2026,
+    and to `skin` since.
   - **Or the joints fitted to the T-pose** (`fit`, owner, 1 Nov 2026: "TRELLIS gives a T-pose as we
     want: start from a standard human and fit it, scaling head, limbs and torso; only the big joints
     need to be right"). `utils/rpg/tposeJoints.ts` reads them off the mesh, no warp: the arms along

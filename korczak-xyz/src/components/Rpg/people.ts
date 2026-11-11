@@ -14,8 +14,8 @@
  * The files are `src/assets/rpg/people/`, made by `scripts/rpg-people.mjs`: two donors (~70 KB each)
  * and the clips (~110 KB gzipped).
  *
- * OR MESHY, BY DEFAULT (owner, 29 Oct 2026: "a toggle in the settings to choose our own rig or Meshy
- * via fal.ai; ours is weak, maybe Meshy will be better, I'd like to try; Meshy by default"). With
+ * OR MESHY, AS AN OPTION (owner, 29 Oct 2026: "a toggle in the settings to choose our own rig or Meshy
+ * via fal.ai"; the default until 11 Nov 2026, when it was found eating the diesel — `DEFAULT_RIGGER`). With
  * `rigger` 'meshy' and a fal key, the TRELLIS model goes to Meshy's auto-rig (`rigWithMeshy`, $0.20,
  * 1–3 min) and comes back with the very skeleton the donors were cut from, so the same clips fit it
  * with nothing but the hips' height. The rigged GLB's URL is kept in the Cache API beside the GLB, so a
@@ -60,7 +60,11 @@ export type Body = 'male' | 'female';
  * read off a T-posed mesh against a standard body (`fit`, `tPoseJoints`; owner, 1 Nov 2026).
  */
 export type Rigger = 'meshy' | 'voxel' | 'fit' | 'skin';
-export const DEFAULT_RIGGER: Rigger = 'meshy';
+/**
+ * Ours, with SkinTokens' weights from the backend (owner, 11 Nov 2026: "a lot of diesel went on the Meshy
+ * rig; make ours the default, Meshy only as an option in the settings"). Meshy was the default from 29 Oct.
+ */
+export const DEFAULT_RIGGER: Rigger = 'skin';
 
 /** Heights a person is rigged at, feet to crown, by who they are. */
 export const PERSON_HEIGHT = { male: 1.78, female: 1.68, hero: 1.85, enemy: 1.8 } as const;

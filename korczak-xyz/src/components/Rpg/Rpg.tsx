@@ -290,7 +290,11 @@ function clip(text: string, n: number): string {
 
 /** The exotic slider's last position (`GenesisContext.exotic`). */
 const EXOTIC_KEY = 'rpg-exotic';
-/** Who rigs the generated people (`Rigger` in `people.ts`); Meshy unless 'voxel', 'fit' or 'skin'; the 'self' and 'pose' of before 1 Nov 2026 read as 'fit'. */
+/**
+ * Who rigs the generated people (`Rigger` in `people.ts`); ours (`skin`) unless 'meshy', 'voxel' or 'fit'; the
+ * 'self' and 'pose' of before 1 Nov 2026 read as 'fit'. Absent meant Meshy until 11 Nov 2026, so nobody who
+ * never chose is left on Meshy's $0.20 a person.
+ */
 const RIGGER_KEY = 'rpg-rigger';
 /** Whether the hero can jump (Space, the ⇧ button); off unless '1' (owner, 30 Oct 2026). */
 const JUMP_KEY = 'rpg-jump';
@@ -2581,7 +2585,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
       setIntroOn(localStorage.getItem(INTRO_KEY) !== '0');
       const keptRigger = localStorage.getItem(RIGGER_KEY);
-      setRigger(keptRigger === 'voxel' || keptRigger === 'fit' || keptRigger === 'skin' ? keptRigger : keptRigger === 'self' || keptRigger === 'pose' ? 'fit' : DEFAULT_RIGGER);
+      setRigger(keptRigger === 'meshy' || keptRigger === 'voxel' || keptRigger === 'fit' || keptRigger === 'skin' ? keptRigger : keptRigger === 'self' || keptRigger === 'pose' ? 'fit' : DEFAULT_RIGGER);
       setJumping(localStorage.getItem(JUMP_KEY) === '1');
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const keptPainter = localStorage.getItem(PAINTER_KEY);
@@ -3292,11 +3296,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {keysReady && falKey && (
         <label className="rpg-model">
           {t.rigger}:{' '}
-          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'voxel' || e.target.value === 'fit' || e.target.value === 'skin' ? e.target.value : 'meshy')}>
-            <option value="meshy">{t.riggerMeshy}</option>
-            <option value="voxel">{t.riggerVoxel}</option>
-            <option value="fit">{t.riggerFit}</option>
+          <select value={rigger} onChange={(e) => pickRigger(e.target.value === 'meshy' || e.target.value === 'voxel' || e.target.value === 'fit' ? e.target.value : 'skin')}>
             <option value="skin">{t.riggerSkin}</option>
+            <option value="fit">{t.riggerFit}</option>
+            <option value="voxel">{t.riggerVoxel}</option>
+            <option value="meshy">{t.riggerMeshy}</option>
           </select>
         </label>
       )}
