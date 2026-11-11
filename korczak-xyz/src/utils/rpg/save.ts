@@ -159,7 +159,7 @@ export function deadInSave(game: SavedGame): string[] {
   const names = [
     ...(game.dead ?? []),
     ...decided.flatMap((b, i) => [
-      slainBy(b.job),
+      game.history[i]?.left ? null : slainBy(b.job),
       ...(b.dead ?? []),
       ...(b.decisions.find((d) => d.label === game.history[i]?.chose)?.dies ?? []),
     ]),
@@ -176,7 +176,7 @@ export function deadInSave(game: SavedGame): string[] {
 export function mendSave(game: SavedGame, dead: readonly string[]): SavedGame {
   const history = game.history.map((step, i) => {
     const done = game.beats[i] ? jobDone(game.beats[i].job) : null;
-    return step.done || !done ? step : { ...step, done };
+    return step.done || step.left || !done ? step : { ...step, done };
   });
   const current = game.beats[game.beats.length - 1];
   const before = game.beats[game.beats.length - 2];

@@ -901,8 +901,9 @@ export async function generateFree(keys: StoryKeys, ctx: FreeContext, chosen: st
     temperature: 0.9,
     demo: null,
     parse: (raw) => parseFree(raw, ctx),
-    beat: ctx.beat.index,
-    label: 'free line',
+    beat: ctx.beat?.index ?? null,
+    // Whom it was said to, so the console tells a word with the quest's character from one with anyone else.
+    label: `free line · ${(ctx.to ?? ctx.beat?.npc)?.name ?? '?'}`,
     what: 'a playable answer',
     job: { parse: 'beat', ctx: null },
     local: true,

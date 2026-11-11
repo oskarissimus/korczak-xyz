@@ -64,6 +64,8 @@ export interface DialogueOption {
   label: string;
   /** What the NPC answers. */
   reply: string;
+  /** Who answered a typed line, when it was not the step's own character (`freeLine.ts`). */
+  with?: string;
 }
 
 export interface Character {
@@ -129,6 +131,8 @@ export interface Decision {
    * the autosave's index finds it, and never offered as an option.
    */
   free?: true;
+  /** Whom a typed decision was said to, when not the step's own character (`freeLine.ts`). */
+  to?: string;
 }
 
 /** Whom a talk step is with, as the decision before it set out. */
@@ -244,6 +248,10 @@ export interface StepRecord {
   meet?: Meeting;
   /** The hero decided in their own words, not from the offered decisions (`freeLine.ts`). */
   own?: true;
+  /** Whom the decision was said to, when not `npcName` (a typed line to anyone, `freeLine.ts`). */
+  to?: string;
+  /** The step's job was left undone: the hero typed a course of their own before finishing it. */
+  left?: true;
 }
 
 /** A finished quest, as every later quest is told it. */
@@ -384,12 +392,14 @@ export function heardAside(
     const o = b.smallTalk[i];
     if (o) parts.push(`asked "${o.label}", ${b.npc.name}: ${o.reply}`);
   }
-  for (const o of free) parts.push(`the hero said "${o.label}", ${b.npc.name}: ${o.reply}`);
+  for (const o of free) {
+    parts.push(o.with ? `the hero said to ${o.with} "${o.label}", ${o.with}: ${o.reply}` : `the hero said "${o.label}", ${b.npc.name}: ${o.reply}`);
+  }
   return parts.join(' | ').slice(0, HEARD_MAX);
 }
 
 /** How much of what else was heard is kept per step, as the game sends it and the demo accepts it. */
-export const HEARD_MAX = 700;
+export const HEARD_MAX = 1200;
 /** How much of a step's story is kept (it was 300, which cut the elder off mid-word). */
 export const SITUATION_MAX = 700;
 
@@ -809,9 +819,9 @@ export function beatPrompt(ctx: BeatContext): string {
     lines.push(`THIS QUEST SO FAR ("${ctx.title ?? ''}"):`);
     ctx.history.forEach((s, i) => {
       lines.push(
-        `${i + 1}. At ${s.placeName ?? world.hub}${s.done ? `, where the hero ${s.done}` : ''}, ${s.npcName}: ${s.situation}`,
+        `${i + 1}. At ${s.placeName ?? world.hub}${s.done ? `, where the hero ${s.done}` : s.left ? ', where the hero left the job undone' : ''}, ${s.npcName}: ${s.situation}`,
         ...(s.heard ? [`   Also heard there: ${s.heard}`] : []),
-        `   The hero decided${s.own ? ' in their own words' : ''} (said to ${s.npcName}): "${s.chose}" — ${s.consequence}`,
+        `   The hero decided${s.own ? ' in their own words' : ''} (said to ${s.to ?? s.npcName}): "${s.chose}" — ${s.consequence}`,
         ...(s.meet ? [`   and set out to meet: ${meetingWords(s.meet)}`] : []),
       );
     });

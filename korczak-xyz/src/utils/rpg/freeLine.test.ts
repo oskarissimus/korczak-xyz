@@ -27,7 +27,7 @@ const ctx = (said: string, b: Beat = beat): FreeContext => ({
 describe('freePrompt', () => {
   it('holds what was said, what was typed and where each offered decision leads', () => {
     const p = freePrompt(ctx('How much do you pay?'));
-    expect(p).toContain('THE HERO NOW SAYS: "How much do you pay?"');
+    expect(p).toContain(`THE HERO NOW SAYS to ${beat.npc.name}: "How much do you pay?"`);
     expect(p).toContain(beat.story[0].say);
     expect(p).toContain('1. "I will kill them." → the quest goes on: a step of defeating 3 hostile foes');
     expect(p).toContain('2. "Find someone else." → the quest ENDS here');
@@ -97,6 +97,49 @@ describe('parseFree', () => {
   });
 });
 
+describe('a typed line to anyone, at any step', () => {
+  const smith = { name: 'Dobromir', gender: 'male' as const, color: '#884422', voice: 'a gruff old smith' };
+
+  it('is answered by whoever it was said to, who knows only their own part', () => {
+    const c: FreeContext = { ...ctx('Heard anything about the drowners?'), to: smith, their: { line: 'Mind the forge.', place: null } };
+    const p = freePrompt(c);
+    expect(p).toContain('THE HERO IS TALKING TO Dobromir (a gruff old smith), someone in this world.');
+    expect(p).toContain('The last thing Dobromir said to the hero: "Mind the forge."');
+    expect(p).toContain('the player may push the story through anyone');
+    expect(p).toContain('not what others told the hero in private');
+    expect(parseFree('{"kind": "talk", "reply": "Only that they stink."}', c)).toEqual({ kind: 'talk', reply: 'Only that they stink.' });
+    expect(parseFree('{"kind": "talk", "reply": "Dobromir says that they stink."}', c)).toBeNull();
+  });
+
+  it('steers the quest from someone else, who answers it', () => {
+    const c: FreeContext = { ...ctx('Come with me to the lake, smith.'), to: smith };
+    const a = parseFree('{"kind": "decision", "lead": 1, "reply": "Fine, I bring the hammer.", "consequence": "The hunter went to the lake with the smith."}', c);
+    if (a?.kind !== 'decision') throw new Error('not a decision');
+    expect(freeDecision(c.said, a, smith.name)).toMatchObject({ to: 'Dobromir', free: true, next: { kind: 'slay', count: 3 } });
+  });
+
+  it('is only talk where the step cannot be decided, or with no step at all', () => {
+    const decided: FreeContext = { ...ctx('I will burn the reeds.'), to: smith, decide: false };
+    const p = freePrompt(decided);
+    expect(p).not.toContain('THE DECISIONS');
+    expect(p).not.toContain('"kind": "decision"');
+    const plan = '{"kind": "decision", "lead": "slay", "reply": "Burn them, then.", "consequence": "c"}';
+    expect(parseFree(plan, decided)).toEqual({ kind: 'talk', reply: 'Burn them, then.' });
+    const none: FreeContext = { ...ctx('Nice weather.'), beat: null, to: smith, title: null };
+    expect(freePrompt(none)).toContain('no step of a quest is in play');
+    expect(parseFree(plan, none)).toEqual({ kind: 'talk', reply: 'Burn them, then.' });
+  });
+
+  it('holds only the parts of the story told so far, and says when the job is not done', () => {
+    const two = { ...beat, story: [{ ask: 'What happened?', say: 'FIRST PART' }, { ask: 'And then?', say: 'SECOND PART' }] };
+    const p = freePrompt({ ...ctx('Wait, who are you?', two), told: 1, jobLeft: true });
+    expect(p).toContain('FIRST PART');
+    expect(p).not.toContain('SECOND PART');
+    expect(p).toContain('has not told the rest yet');
+    expect(p).toContain('The job here is not done yet');
+  });
+});
+
 describe('beatPrompt', () => {
   it('tells the next beat the player steered it', () => {
     const base: BeatContext = {
@@ -114,5 +157,10 @@ describe('heardAside', () => {
   it('passes on what the hero said in their own words', () => {
     const heard = heardAside(beat, false, [], [{ label: 'Is the lake deep?', reply: 'Deep enough.' }]);
     expect(heard).toBe(`the hero said "Is the lake deep?", ${beat.npc.name}: Deep enough.`);
+  });
+
+  it('says who answered a line said to someone else', () => {
+    const heard = heardAside(beat, false, [], [{ label: 'Seen the drowners?', reply: 'Twice.', with: 'Dobromir' }]);
+    expect(heard).toBe('the hero said to Dobromir "Seen the drowners?", Dobromir: Twice.');
   });
 });

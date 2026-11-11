@@ -183,6 +183,8 @@ function step(value: unknown): StepRecord {
     ...(text(r.witnessName, 60) && { witnessName: text(r.witnessName, 60) }),
     ...(meet(r.meet) && { meet: meet(r.meet)! }),
     ...(r.own === true && { own: true as const }),
+    ...(text(r.to, 60) && { to: text(r.to, 60) }),
+    ...(r.left === true && { left: true as const }),
   };
 }
 

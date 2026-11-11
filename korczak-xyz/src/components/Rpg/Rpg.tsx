@@ -570,6 +570,13 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const askedTalkRef = useRef(new Set<number>());
   /** What the hero said in their own words at the current beat, and what they were answered. */
   const freeTalkRef = useRef<DialogueOption[]>([]);
+  /**
+   * Typed talk with anyone while no step can take it (the opening still being written, a decision
+   * made and the next step on its way): handed to the next step as heard there, so it reaches the story.
+   */
+  const carryTalkRef = useRef<DialogueOption[]>([]);
+  /** How many parts of the step's story the hero has heard, for a typed line before the whole of it. */
+  const toldRef = useRef(0);
   /** Bumped when a dialogue closes, so an answer to a typed line arriving after it is dropped. */
   const freeAskRef = useRef(0);
   /** A typed line being answered (`busy`), or why its answer failed. */
@@ -1102,7 +1109,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       heardRef.current = false;
       witnessHeardRef.current = false;
       askedTalkRef.current = new Set();
-      freeTalkRef.current = [];
+      freeTalkRef.current = carryTalkRef.current;
+      carryTalkRef.current = [];
+      toldRef.current = 0;
       if (b.witness) {
         const w = b.witness;
         putNpc(w.npc, b.place?.name ?? null, 1);
@@ -1163,6 +1172,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     placesRef.current = [];
     charactersRef.current = [];
     lastLinesRef.current.clear();
+    carryTalkRef.current = [];
     whereRef.current.clear();
     spokenRef.current.clear();
     askedRef.current.clear();
@@ -2177,19 +2187,29 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         ...(b.witness && { witnessName: b.witness.npc.name }),
         ...(d.meet && { meet: d.meet }),
         ...(d.free && { own: true as const }),
+        ...(d.to && { to: d.to }),
       };
+      // Said to someone else (a typed line, `freeLine.ts`): they answer it.
+      const by = (d.to && (b.witness?.npc.name === d.to ? b.witness.npc : charactersRef.current.find((c) => c.name === d.to))) || b.npc;
+      // A job left for a course of the hero's own is not done, and its foes or things leave with it.
+      const left = b.job ? progressRef.current < b.job.count : false;
+      if (left) {
+        delete step.done;
+        step.left = true;
+        sceneRef.current?.clearObjective();
+      }
       // A single foe killed by name, and whoever this choice kills. The one answering stays on screen.
-      bury([slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);
+      bury([left ? null : slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, by.name, ...(b.witness ? [b.witness.npc.name] : [])]);
       const steps = [...historyRef.current, step];
       historyRef.current = steps;
       setHistory(steps);
-      lastLinesRef.current.set(b.npc.name, d.reply);
+      lastLinesRef.current.set(by.name, d.reply);
       decidedRef.current = true;
       decisionRef.current = b.decisions.indexOf(d);
       persist();
-      const line: DialogueLine = { speaker: b.npc.name, voice: b.npc.gender, text: d.reply, who: b.npc };
+      const line: DialogueLine = { speaker: by.name, voice: by.gender, text: d.reply, who: by };
       if (!d.next) {
-        setDialogue({ line, choices: [{ label: t.theEnd, action: () => finish(b, b.npc.name, d.reply, steps) }] });
+        setDialogue({ line, choices: [{ label: t.theEnd, action: () => finish(b, by.name, d.reply, steps) }] });
         return;
       }
       // Asked now, so most of it is written while the answer is being read and spoken.
@@ -2202,22 +2222,29 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   );
 
   /**
-   * What the hero typed, answered by the model as the character (`freeLine.ts`): talk, and the
-   * conversation goes back to `back`; or a decision, kept on the beat and carried out as a picked one.
+   * What the hero typed, answered by the model as whoever they speak to (`freeLine.ts`; owner, 11 Nov
+   * 2026: "with any npc there is a free-text option… at every stage you can talk with any npc, make
+   * small talk or push the story"). Talk, and the conversation goes back to `back`, kept as heard so
+   * the story can take it up; or, while the step can still be decided, a decision, kept on the beat
+   * and carried out as a picked one, answered by whoever heard it.
    */
   const askFree = useCallback(
-    async (b: Beat, said: string, back: () => void) => {
+    async (b: Beat | null, to: Character, said: string, back: () => void, told?: number) => {
       const ask = ++freeAskRef.current;
       const token = questTokenRef.current;
-      const stale = () => ask !== freeAskRef.current || token !== questTokenRef.current || beatRef.current !== b || decidedRef.current;
+      const canDecide = Boolean(b) && !decidedRef.current;
+      const stale = () =>
+        ask !== freeAskRef.current || token !== questTokenRef.current || (canDecide && (beatRef.current !== b || decidedRef.current));
       const previous = dialogueRef.current;
       const lang = gameLangRef.current;
       const { on, key } = speechRef.current;
+      const own = Boolean(b && to.name === b.npc.name);
+      const witness = Boolean(b?.witness && to.name === b.witness.npc.name);
       freeHeroEndRef.current = null;
       // The hero's line on a screen of its own at once, read in the hero's voice while the model
       // answers (owner, 10 Nov 2026); the character's answer comes only once the hero has finished.
       setFreeState('busy');
-      setDialogue({ line: { speaker: tRef.current.hunter, voice: 'player', text: said }, choices: [], hero: b.npc.name });
+      setDialogue({ line: { speaker: tRef.current.hunter, voice: 'player', text: said }, choices: [], hero: to.name });
       let heroEnd = performance.now();
       let heroLine: Promise<void> = Promise.resolve();
       if (on && key) {
@@ -2231,16 +2258,29 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         if (ask === freeAskRef.current) setFreeState((s) => (s === 'busy' ? 'waiting' : s));
       });
       const keys = { google: apiKeys.google, openai: apiKeys.openai };
+      const heard = b
+        ? heardAside(b, witnessHeardRef.current, askedTalkRef.current, decidedRef.current ? [...freeTalkRef.current, ...carryTalkRef.current] : freeTalkRef.current)
+        : carryTalkRef.current.map((o) => `the hero said to ${o.with} "${o.label}", ${o.with}: ${o.reply}`).join(' | ');
       const attempt = await generateFree(
         keys,
         {
           lang,
           ...(worldRef.current && { world: worldRef.current }),
-          title: b.title,
+          title: b?.title ?? null,
           ...(moodRef.current && { mood: moodRef.current }),
           history: historyRef.current,
           beat: b,
-          heard: heardAside(b, witnessHeardRef.current, askedTalkRef.current, freeTalkRef.current),
+          to,
+          ...(!own && !witness && {
+            their: {
+              line: lastLinesRef.current.get(to.name),
+              ...(whereRef.current.has(to.name) && { place: whereRef.current.get(to.name) ?? null }),
+            },
+          }),
+          ...(told !== undefined && { told }),
+          ...(b?.job && progressRef.current < b.job.count && { jobLeft: true }),
+          decide: canDecide,
+          heard,
           seen: [...seenRef.current],
           characters: charactersRef.current,
           dead: deadRef.current,
@@ -2257,41 +2297,46 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       const answer = attempt?.answer;
       if (!answer) {
         const error = (attempt?.error ?? 'crashed').slice(0, 160);
-        log.warn('rpg.free.failed', { error, model: attempt?.model ?? null });
+        log.warn('rpg.free.failed', { error, model: attempt?.model ?? null, to: to.name });
         // Back to where it was typed, the text still in the field, with the reason under it.
         if (previous) setDialogue(previous);
         setFreeState({ error });
         return;
       }
-      const d = answer.kind === 'talk' ? null : freeDecision(said, answer);
-      const reply = d ? d.reply : answer.kind === 'talk' ? answer.reply : '';
+      const d = answer.kind === 'talk' || !b ? null : freeDecision(said, answer, own ? undefined : to.name);
+      const reply = answer.reply;
       // The answer's voice is asked for now, while the hero is still speaking, so it starts with its text.
-      const clip = on && key && reply ? prefetchLine(key, { text: reply, voice: b.npc.gender, who: b.npc }, lang) : Promise.resolve(true);
+      const clip = on && key && reply ? prefetchLine(key, { text: reply, voice: to.gender, who: to }, lang) : Promise.resolve(true);
       await heroDone;
       await Promise.race([clip, new Promise((resolve) => window.setTimeout(resolve, FREE_CLIP_WAIT_MS))]);
       if (stale()) return;
       setFreeState(null);
       setFreeText('');
       freeHeroEndRef.current = on && key ? heroEnd : null;
-      if (answer.kind === 'talk') {
-        recordLine({ kind: 'ask', beat: b.index, speaker: tRef.current.hunter, text: said });
-        freeTalkRef.current = [...freeTalkRef.current, { label: said, reply: answer.reply }];
-        lastLinesRef.current.set(b.npc.name, answer.reply);
+      if (!d) {
+        // Heard at the step still open, or carried to the next one when none is (`carryTalkRef`).
+        const open = beatRef.current && !decidedRef.current ? beatRef.current : null;
+        const entry: DialogueOption = { label: said, reply, ...(!(open && to.name === open.npc.name) && { with: to.name }) };
+        if (open) freeTalkRef.current = [...freeTalkRef.current, entry];
+        else carryTalkRef.current = [...carryTalkRef.current, entry];
+        const at = beatRef.current ?? b;
+        if (at) recordLine({ kind: 'ask', beat: at.index, speaker: tRef.current.hunter, text: said });
+        lastLinesRef.current.set(to.name, reply);
         persist();
         setDialogue({
-          line: { speaker: b.npc.name, voice: b.npc.gender, text: answer.reply, who: b.npc },
+          line: { speaker: to.name, voice: to.gender, text: reply, who: to },
           choices: [{ label: tRef.current.back, action: back }],
-          free: (next) => void askFreeRef.current(b, next, back),
+          free: (next) => void askFreeRef.current(b, to, next, back, told),
         });
         return;
       }
-      recordLine({ kind: 'decision', beat: b.index, speaker: tRef.current.hunter, text: said });
+      recordLine({ kind: 'decision', beat: b!.index, speaker: tRef.current.hunter, text: said });
       // On the beat, so the autosave's index and every later reading of the step find it.
-      const kept: Beat = { ...b, decisions: [...b.decisions, d!] };
+      const kept: Beat = { ...b!, decisions: [...b!.decisions, d] };
       beatRef.current = kept;
       beatsRef.current = beatsRef.current.map((x) => (x === b ? kept : x));
       setBeat(kept);
-      decide(kept, d!);
+      decide(kept, d);
     },
     [apiKeys.google, apiKeys.openai, decide, persist],
   );
@@ -2301,11 +2346,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const openTalk = useCallback(
     (name: string) => {
       const b = beatRef.current;
-      if (!b || endingRef.current) return;
+      if (endingRef.current) return;
       const bye: Choice = { label: t.goodbye, action: close };
+      // Anyone may be told anything, at every step, on the reader's own key: the demo's function
+      // writes beats and worlds, nothing else.
+      const typed = ownStoryRef.current && !staticRef.current;
+      const say = (to: Character, back: () => void, told?: number): Pick<Dialogue, 'free'> =>
+        typed ? { free: (said: string) => void askFree(b, to, said, back, told) } : {};
+      // What the hero knows of this step's story, for whoever else they talk to.
+      const known = (): number | undefined => (heardRef.current ? undefined : toldRef.current);
       const who = charactersRef.current.find((c) => c.name === name);
-      const w = b.witness;
-      if (w && name === w.npc.name && !decidedRef.current) {
+      const w = b?.witness;
+      if (b && w && name === w.npc.name && !decidedRef.current) {
         // Somebody else at the place, with their own side of it.
         const line = (text: string): DialogueLine => ({ speaker: w.npc.name, voice: w.npc.gender, text, who: w.npc });
         const root = (): void =>
@@ -2315,10 +2367,12 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               ...w.talk.map((o) => ({
                 label: o.label,
                 kind: 'ask' as const,
-                action: () => setDialogue({ line: line(o.reply), choices: [{ label: t.back, action: root }, bye] }),
+                action: () =>
+                  setDialogue({ line: line(o.reply), choices: [{ label: t.back, action: root }, bye], ...say(w.npc, root, known()) }),
               })),
               bye,
             ],
+            ...say(w.npc, root, known()),
           });
         lastLinesRef.current.set(w.npc.name, w.greeting);
         if (!witnessHeardRef.current) {
@@ -2328,23 +2382,32 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         root();
         return;
       }
-      if (name !== b.npc.name || decidedRef.current) {
-        setDialogue({
-          line: { speaker: name, voice: who?.gender ?? 'male', text: lastLinesRef.current.get(name) ?? t.nothingMore, who },
-          choices: [bye],
-        });
+      if (!b || name !== b.npc.name || decidedRef.current) {
+        // Anyone else in the world: their last line, and whatever the hero wants to say to them.
+        const to = who ?? (b?.npc.name === name ? b.npc : b?.witness?.npc.name === name ? b.witness.npc : undefined);
+        const other = (): void => {
+          const last = lastLinesRef.current.get(name);
+          setDialogue({
+            line: { speaker: name, voice: to?.gender ?? 'male', text: last ?? (typed && to ? t.listening : t.nothingMore), who: to },
+            choices: [bye],
+            ...(to && say(to, other, b ? known() : undefined)),
+          });
+        };
+        other();
         return;
       }
       const npc = (text: string): DialogueLine => ({ speaker: b.npc.name, voice: b.npc.gender, text, who: b.npc });
 
       if (b.job && progressRef.current < b.job.count) {
-        setDialogue({ line: npc(b.waitingLine), choices: [bye] });
+        const waiting = (): void => setDialogue({ line: npc(b.waitingLine), choices: [bye], ...say(b.npc, waiting, known()) });
+        waiting();
         return;
       }
       // The story comes out in parts, one question at a time; the decisions, the questions and
       // what the clues opened up come only after the last part. Questions offered beside the
       // greeting named a silence and a girl the hunter had not heard of yet (owner, Oct 2026), and
-      // a whole story in one line read as a summary, not a person (owner, Oct 2026).
+      // a whole story in one line read as a summary, not a person (owner, Oct 2026). A typed line
+      // may be said on every screen of it, and the answer knows only the parts told so far.
       const last = b.story.length - 1;
       const followUps = (): Choice[] => [
         ...b.smallTalk.map((o, i) => ({
@@ -2355,7 +2418,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               askedTalkRef.current.add(i);
               persist();
             }
-            setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }] });
+            setDialogue({ line: npc(o.reply), choices: [{ label: t.back, action: ending }], ...say(b.npc, ending) });
           },
         })),
         ...b.clues
@@ -2363,7 +2426,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           .map((c) => ({
             label: c.ask,
             kind: 'ask' as const,
-            action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }] }),
+            action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }], ...say(b.npc, ending) }),
           })),
       ];
       // A decision waits for what it rests on: the gate the model set, and any word of its label
@@ -2390,8 +2453,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
             ...followUps(),
             bye,
           ],
-          // Only on the reader's own key: the demo's function writes beats and worlds, nothing else.
-          ...(ownStoryRef.current && !staticRef.current && { free: (said: string) => void askFree(b, said, ending) }),
+          ...say(b.npc, ending),
         });
       };
       const part = (i: number): void => {
@@ -2399,9 +2461,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           ending();
           return;
         }
+        toldRef.current = Math.max(toldRef.current, i + 1);
         setDialogue({
           line: npc(b.story[i].say),
           choices: [{ label: b.story[i + 1].ask, kind: 'ask', action: () => part(i + 1) }, bye],
+          ...say(b.npc, () => part(i), i + 1),
         });
       };
       if (!b.greeting) {
@@ -2409,13 +2473,16 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         else part(0);
         return;
       }
-      setDialogue({
-        line: npc(b.greeting),
-        choices: [
-          heardRef.current ? { label: t.backToIt, action: ending } : { label: b.story[0].ask, kind: 'ask', action: () => part(0) },
-          bye,
-        ],
-      });
+      const greet = (): void =>
+        setDialogue({
+          line: npc(b.greeting),
+          choices: [
+            heardRef.current ? { label: t.backToIt, action: ending } : { label: b.story[0].ask, kind: 'ask', action: () => part(0) },
+            bye,
+          ],
+          ...say(b.npc, greet, known()),
+        });
+      greet();
     },
     [askFree, close, decide, persist, t],
   );

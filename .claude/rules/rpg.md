@@ -771,12 +771,12 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   `piece`, outcome, ms, `costUsd`.
 
 The dialogue is a menu of lines the beat already contains, not a chat: talking costs no request;
-deciding costs one. The one exception is a line the reader types, below.
+deciding costs one. The one exception is a line the reader types, below, to anyone.
 
 **The hero may say it in their own words** (owner, 29 Oct 2026: "add a free-text option to the
-dialogue options"; `utils/rpg/freeLine.ts`). Under the decisions, where they are offered and only
-there, a field takes a line of up to `FREE_MAX` (200) characters, and one short request
-(`generateFree`) answers it as the character. The model says what the line was:
+dialogue options"; `utils/rpg/freeLine.ts`). A field under the options takes a line of up to
+`FREE_MAX` (200) characters, and one short request (`generateFree`) answers it as the character.
+The model says what the line was:
 - **talk** — a question, a remark, a joke: the character answers, the conversation goes on (`↵`
   again, or Back), and the exchange is passed on with the step like a small-talk answer
   (`heardAside`'s fourth argument, `SavedGame.freeTalk`).
@@ -791,6 +791,34 @@ there, a field takes a line of up to `FREE_MAX` (200) characters, and one short 
   consequence, `dies` and `meet` are the model's. It is appended to the beat with
   `free: true`, so the autosave's `decision` index, `deadInSave` and `mendSave` find it as they find
   a picked one, and it is never offered as an option.
+
+**Anyone may be told anything, at every step** (owner, 11 Nov 2026: "with any npc there is a free-text
+option and all of it can shape the story: at every stage you can talk with any npc, make small talk or
+push the story"). Until then the field was under the decisions only. Now it is on every screen of
+every character on the reader's own key: the step's character from the greeting on (the answer knows
+only the story parts told so far, `FreeContext.told`, kept in `toldRef`), while the job waits
+(`jobLeft`), after the step is decided; the witness; and anyone else in the atlas, who says
+*Słucham?* / *Yes?* when they have no last line yet. The prompt (`freePrompt`) changes with whom
+(`FreeContext.to`): someone who is not the step's character gets their last line and place
+(`their`), knows only what they lived through and what a person like them would know, and never what
+others told the hero in private.
+- **Talk with anyone is heard by the story.** It goes into the open step's `freeTalk` with `with`
+  naming who answered, so `heardAside` passes it on as `the hero said to X "…", X: …` and the next
+  beat's prompt has it (`HEARD_MAX` went from 700 to 1200 for it). Typed while no step can take it —
+  the opening still being written, a decision made and its next step on the way, no quest — it waits
+  in `carryTalkRef` and becomes heard at the next step (`setupBeat`). Not in the autosave: a reload
+  in that gap loses it.
+- **A decision can be said to anyone** while the step is undecided (`FreeContext.decide`). The
+  witness or an old acquaintance may be told "come with me to the lake" and the quest goes that way:
+  `Decision.to` / `StepRecord.to` name who heard it, they answer it on screen (`decide` looks them up),
+  and the next beat's history says `said to X`. Where nothing can be decided, a plan is still
+  answered and `parseFree` turns it into talk, heard by the next step.
+- **A job may be left for a course of the hero's own**: before it is done, the prompt says that a
+  line about doing it is talk, and only a clear change of course decides. Leaving it clears its foes
+  and things (`clearObjective`), and the step carries `left: true` instead of `done`, so neither the
+  next prompt nor `deadInSave`/`mendSave` count a foe nobody killed.
+- **In the console** the row is `free line · <name>`, so a word to the quest's character and one to
+  anyone else are told apart; tokens, cost, stream and time as every other model row.
 
 **The typed line is heard before it is answered** (owner, 10 Nov 2026: "when I write my own question
 the NPC is thinking at the bottom, then their answer appears and only then is my question read, then
