@@ -365,6 +365,7 @@ function humanoid(body: number, head: number, height = 1.8): THREE.Group {
   skull.position.y = height - 0.12;
   skull.castShadow = true;
   group.add(torso, skull);
+  group.userData.pill = true;
   return group;
 }
 
@@ -3239,10 +3240,12 @@ export class RpgScene {
       else if (moving) this.playerRig.play('Jog_Fwd_Loop', { speed: running ? 2.1 : 1.4 });
       else this.playerRig.play('Sword_Idle');
     } else {
-      // The capsule: a little bob while walking, and the sword's quick arc on a swing. Nobody at all
-      // while the world's own hero is being made (`setHero`, 'wait'), and the hunter walks anyway.
+      // The capsule: a little bob while walking, and the sword's quick arc on a swing. Only the pill
+      // itself: a body with no rig is also the stickman and the still model of a hero being made
+      // (`People.staged`), which stand on their feet at 0 — lifting them to the old capsule's 0.725
+      // flew the hero (owner, 12 Nov 2026: "it looks like I'm flying").
       const capsule = this.player.children[0];
-      if (capsule) capsule.position.y = 0.725 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0);
+      if (capsule?.userData.pill) capsule.position.y = moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0;
       this.sword.rotation.y = this.swing > 0 ? Math.sin(this.swing * Math.PI) * 1.8 - 0.6 : 0;
     }
 
