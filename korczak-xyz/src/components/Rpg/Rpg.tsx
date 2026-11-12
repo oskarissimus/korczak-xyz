@@ -51,7 +51,6 @@ import {
   addGenerationTime,
   beginQuestSpend,
   beginTimeline,
-  devRequests,
   markStage,
   NO_SPEND,
   onRequestEnd,
@@ -92,6 +91,7 @@ import {
   type Mesher,
   ensurePlaceModel,
   falPending,
+  falPiecesEnded,
   heroLook,
   personLook,
   personPrompt,
@@ -176,7 +176,7 @@ import {
 import { prefetchLine, prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { recordVoiceLag } from '../../utils/rpg/voiceLag';
 import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
-import { FAL_PRICES, FAL_RIG_MODEL, type PersonSlot } from '../../utils/rpg/falPrompts';
+import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
 import { recordMeasurement } from '../../lib/sentry';
 import { introSketch, introView, shownImage, startIntro, stopIntro, subscribeIntro } from '../../utils/rpg/intro';
@@ -187,8 +187,6 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
-/** The console rows of a rig (`people.ts`), counted in the progress as rigs and not as pieces. */
-const RIG_MODELS = new Set(['self-rig', FAL_RIG_MODEL]);
 import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
 import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
@@ -1800,16 +1798,15 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       }
     }
     for (const p of pending) {
-      if (/^(clue|place|person|hero|enemy|weapon)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
+      if (/^(clue|place|person|hero|enemy|creature|weapon)\//.test(p.id)) tasks.push({ kind: 'piece', state: p.since === null ? 'queued' : 'running', since: p.since });
       // A person still being made is a rig still to come, after it.
       if (/^(person|hero|enemy)\//.test(p.id)) tasks.push({ kind: 'rig', state: 'queued', since: null, afterFal: true });
     }
-    for (const r of devRequests()) {
-      if (r.kind !== 'fal' || !PIECE_LABELS.has(r.label ?? '') || (line && r.startedAt < line.since)) continue;
-      // A rig's own row is the rig's row above; a SkinTokens failure there falls back, it is no failed piece.
-      if (RIG_MODELS.has(r.model)) continue;
-      if (r.status === 'ok' && r.model.includes('trellis')) tasks.push({ kind: 'piece', state: 'done', since: null });
-      else if (r.status === 'error') tasks.push({ kind: 'piece', state: 'failed', since: null });
+    // A piece counts once, by how its last try ended (`falPiecesEnded`): a try that failed and was
+    // asked again, or a job the server handed back to the browser, is the console's, not the player's.
+    for (const e of falPiecesEnded()) {
+      if (!PIECE_LABELS.has(e.id.split('/')[0]) || (line && e.asked < line.since)) continue;
+      tasks.push({ kind: 'piece', state: e.ok ? 'done' : 'failed', since: null });
     }
     return tasks;
   }, [creating, generating, falKey, world, music, musicKey, musicOn]);

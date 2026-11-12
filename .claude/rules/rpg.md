@@ -612,6 +612,21 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
   ground and the ground cover alike. Each try is its own pair of rows in the console, marked
   `retry 2/3 ·`, so the failure that caused it stays readable above; the progress panel keeps the
   piece ⏳ until the last try has ended.
+  **Only a transient failure is tried again, and only a piece's last outcome reaches the player**
+  (owner, 12 Nov 2026, "7 nie wyszło" with no reason: "a transient error should be retried; one that
+  is not goes to Sentry, and only then do we tell the player — a retry that worked is not mentioned").
+  `transientFailure` says which: a 4xx other than 408/409/425/429 (a refused key, no credits, a bad
+  body, a route the gateway lacks) stops at once; a 5xx, a 429, a dropped connection, a queue
+  timeout or a bad answer is asked again. A piece that ends failed is a Sentry event
+  (`rpg.piece.failed`, `reportPieceFailure`: piece, id, error, transient, attempts) — hub, quest
+  pieces, ground and cover — except a skip after an earlier refusal or an empty balance. The
+  progress counts quest pieces by how they ended (`falPiecesEnded`), not by the console's error
+  rows: until then every failed try that a retry fixed, and every row a server job handed back,
+  read as a piece that did not come. That day's seven were exactly the latter: the account had no
+  fal.ai key (diesel pays through the gateway), so each server job answered `noKey` in half a
+  second and showed as `error · handed back to the browser`, while the browser then made every
+  piece. A handed-back row is now taken out of the console (`dropRequest`), and after one `noKey`
+  the server is not asked for that provider for 10 minutes (`noKeyUntil` in `serverJobs.ts`).
 - **And the forest** (owner, 26 Oct 2026: "generate the world's trees — now they are static
   assets"). The ~400 trees across the map were the kit's, in the world's flora; now they are the
   hub's `tree` model and two more of its kind made after the hub, `tree2` a young one and `tree3`

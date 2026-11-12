@@ -30,6 +30,7 @@ import {
   personPrompt,
   rigWithMeshy,
   drawImage,
+  transientFailure,
   withRetries,
   ensurePlaceModel,
 } from './landmark3d';
@@ -388,6 +389,41 @@ describe('withRetries', () => {
       }, noWait),
     ).rejects.toThrow('402');
     expect(tries).toBe(1);
+  });
+
+  it('never asks again a request the provider refused as such, and says how many tries it took', async () => {
+    let tries = 0;
+    const err = await withRetries(async () => {
+      tries++;
+      throw new Error('422 {"detail":"image_size invalid"}');
+    }, noWait).catch((e: unknown) => e);
+    expect(tries).toBe(1);
+    expect((err as { attempts?: number }).attempts).toBe(1);
+  });
+
+  it('asks again past a 429 and a dropped connection', async () => {
+    const errors = ['429 concurrent_requests_limit', 'Load failed'];
+    let tries = 0;
+    const out = await withRetries(async () => {
+      tries++;
+      if (errors.length) throw new Error(errors.shift());
+      return 'glb';
+    }, noWait);
+    expect(out).toBe('glb');
+    expect(tries).toBe(3);
+  });
+});
+
+describe('transientFailure', () => {
+  it('is false for a refusal of the request itself and for a skip', () => {
+    for (const m of ['401 bad key', '402 rpg-credits', '403 User is locked', '400 bad body', '404 no route', '422 invalid', 'skipped: no money left on fal.ai']) {
+      expect(transientFailure(m)).toBe(false);
+    }
+  });
+  it('is true for a server error, a rate limit, a timeout, a dropped connection or a bad answer', () => {
+    for (const m of ['500 internal', '503 unavailable', '429 limit', '408 timeout', 'timed out in the queue', 'Load failed', 'came back as a flat card', 'no model in the answer']) {
+      expect(transientFailure(m)).toBe(true);
+    }
   });
 });
 

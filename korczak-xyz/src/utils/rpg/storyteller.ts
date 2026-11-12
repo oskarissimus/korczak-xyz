@@ -45,7 +45,7 @@ import {
   type HubSizes,
   type WorldBible,
 } from './genesis';
-import { appendText, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
+import { appendText, dropRequest, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
 import { demoRefusal, rpgDemoUrl } from './demo';
 import { DEMO_MODELS, type RpgDemoReason } from './demoLimits';
@@ -721,7 +721,7 @@ async function askServer<T>(provider: 'google' | 'openai', models: string[], ask
   });
   if (!job) {
     // The browser asks after all: whatever the server had begun is not this attempt's.
-    for (const t of entries.values()) if (!t.ended) endRequest(t.entry, 'handed back to the browser');
+    for (const t of entries.values()) if (!t.ended) dropRequest(t.entry);
     return null;
   }
   for (const t of entries.values()) if (!t.ended) endRequest(t.entry, job.error ?? null);

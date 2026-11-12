@@ -38,7 +38,7 @@
 
 import { log } from '../../lib/logger';
 import { recordMeasurement } from '../../lib/sentry';
-import { endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
+import { dropRequest, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import { apiFetch, serverCost } from './gateway';
 import { FRESH_HEADER, meshyRigBody } from './assetStore';
 import { geminiImageCost, type GeminiImageUsage } from './gatewayRoutes';
@@ -86,6 +86,21 @@ function tryMark(o: FalOptions): string {
 /** fal.ai's balance is empty (`funds.ts`): nothing more is asked of it this sitting, whatever it is for. */
 const NO_FUNDS = 'skipped: no money left on fal.ai';
 
+/**
+ * Whether asking again can help (owner, 12 Nov 2026: "a transient error should be retried; one that
+ * is not goes to Sentry, and only then is the player told"). A provider's refusal of the request
+ * itself — a 4xx other than a timeout, a conflict or its rate limit: a refused key, no credits, a bad
+ * body, a route the gateway does not have — comes back the same however often it is asked. Anything
+ * else is worth another try: a 5xx, a 429 past `drawImage`'s own waits, a dropped connection, fal's
+ * queue timing out, and a bad answer (crossed cards, no model, two people), which a fresh request
+ * draws again from a new picture.
+ */
+export function transientFailure(message: string): boolean {
+  if (message.startsWith('skipped')) return false;
+  const status = /^(\d{3})\b/.exec(message)?.[1];
+  return !status || !status.startsWith('4') || ['408', '409', '425', '429'].includes(status);
+}
+
 /** Runs a piece up to `PIECE_TRIES` times, a pause between, passing each try its number. */
 export async function withRetries<T>(run: (o: FalOptions) => Promise<T>, o: FalOptions = {}): Promise<T> {
   const sleep = o.sleep ?? wait;
@@ -95,10 +110,31 @@ export async function withRetries<T>(run: (o: FalOptions) => Promise<T>, o: FalO
       return await run({ ...o, attempt });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (attempt >= PIECE_TRIES || o.signal?.aborted || /^40[123]\b/.test(message) || message.startsWith('skipped')) throw err;
+      if (attempt >= PIECE_TRIES || o.signal?.aborted || !transientFailure(message)) {
+        if (err instanceof Error) Object.assign(err, { attempts: attempt });
+        throw err;
+      }
       await sleep(RETRY_AFTER_MS[attempt - 1] ?? RETRY_AFTER_MS[RETRY_AFTER_MS.length - 1]);
     }
   }
+}
+
+/**
+ * A piece that will not come this session, after its retries or at a refusal no retry can help: a
+ * Sentry event (`log.error`), the one place the reason is kept, before the player is shown it as
+ * not made. A piece skipped because fal.ai already refused the key or has no money left is not
+ * reported again — the first refusal was, and the funds banner says the rest.
+ */
+export function reportPieceFailure(piece: string, id: string, err: unknown, aborted = false): void {
+  const message = err instanceof Error ? err.message : String(err);
+  if (aborted || message.startsWith('skipped')) return;
+  log.error('rpg.piece.failed', {
+    piece,
+    id: id.slice(0, 120),
+    error: message.slice(0, 300),
+    transient: transientFailure(message),
+    attempts: (err as { attempts?: number } | null)?.attempts ?? null,
+  });
 }
 
 function headers(key: string, o: FalOptions = {}): Record<string, string> {
@@ -672,7 +708,7 @@ async function serverPiece(scope: string, spec: FalSpec, running?: () => void): 
   });
   const open = [e.image, e.mesh].filter((r): r is DevRequest => r !== null && r.status !== 'ok' && r.status !== 'error');
   if (!job) {
-    open.forEach((r) => endRequest(r, 'handed back to the browser'));
+    open.forEach(dropRequest);
     return null;
   }
   open.forEach((r) => endRequest(r, job.error));
@@ -887,6 +923,7 @@ export function ensureHubModels(
       (model) => onModel(slot, model),
       (err) => {
         failed.add(id);
+        reportPieceFailure(slot, id, err, o.signal?.aborted);
         onError(slot, err);
       },
     );
@@ -1073,6 +1110,18 @@ export function personModelMayCome(label: PersonSlot, id: string): boolean {
   return !refused.has(label) && !outOfFunds('fal') && !failed.has(`${label}/${id}`);
 }
 
+/**
+ * How each quest piece ended, once its last try had (the start's progress, `progress.ts`). The
+ * progress used to count the console's error rows, so a try that failed and was retried with
+ * success, or a job the server handed back to the browser, was told to the player as a piece that
+ * did not come (owner, 12 Nov 2026: "7 failed" over pieces that were all there).
+ */
+const ended: { id: string; asked: number; ok: boolean }[] = [];
+
+export function falPiecesEnded(): readonly { id: string; asked: number; ok: boolean }[] {
+  return ended;
+}
+
 function ensurePiece(
   key: string,
   label: 'clue' | 'place' | 'creature' | 'weapon' | PersonSlot,
@@ -1106,10 +1155,19 @@ function ensurePiece(
     }
   }).finally(() => inFlight.delete(slot));
   inFlight.set(slot, p);
-  p.then(onModel, (err) => {
-    failed.add(slot);
-    onError(err);
-  });
+  const asked = Date.now();
+  p.then(
+    (model) => {
+      ended.push({ id: slot, asked, ok: true });
+      onModel(model);
+    },
+    (err) => {
+      failed.add(slot);
+      ended.push({ id: slot, asked, ok: false });
+      reportPieceFailure(label, slot, err, o.signal?.aborted);
+      onError(err);
+    },
+  );
   return true;
 }
 

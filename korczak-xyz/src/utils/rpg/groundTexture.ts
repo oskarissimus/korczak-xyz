@@ -24,7 +24,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
 import { paletteLine } from './falPrompts';
-import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
+import { drawImage, imageCost, reportPieceFailure, withRetries, type FalOptions } from './landmark3d';
 
 export type { GroundTexture };
 
@@ -97,6 +97,7 @@ export function ensureGroundTexture(
       },
       (err) => {
         failed.add(world.id);
+        reportPieceFailure('ground', world.id, err, o.signal?.aborted);
         recordMeasurement('rpg.landmark', {
           outcome: 'failed',
           piece: 'ground',

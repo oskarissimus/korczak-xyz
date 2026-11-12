@@ -329,6 +329,17 @@ export function endRequest(entry: DevRequest, error: string | null, patch: Parti
   for (const l of endListeners) l(entry);
 }
 
+/**
+ * Takes a row out of the console without ending it: a server job that handed its work back to the
+ * browser (no key on the account — diesel pays through the gateway instead) failed at nothing, and a
+ * row ended as an error said "error" and counted as a piece that did not come (owner, 12 Nov 2026:
+ * "7 failed, but nobody knows why"). The browser's own request follows as its own row.
+ */
+export function dropRequest(entry: DevRequest): void {
+  requests = requests.filter((r) => r !== entry);
+  changed();
+}
+
 /** A clip's credits: ElevenLabs' own count where its response says, else the model's list rate. */
 export function voiceCredits(chars: number, header: string | null, perChar = VOICE_CREDITS_PER_CHAR): number {
   const charged = header === null ? NaN : Number(header);

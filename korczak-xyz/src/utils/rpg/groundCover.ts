@@ -22,7 +22,7 @@
 import { recordMeasurement } from '../../lib/sentry';
 import type { GroundTexture, WorldBible } from './genesis';
 import { paletteLine } from './falPrompts';
-import { drawImage, imageCost, withRetries, type FalOptions } from './landmark3d';
+import { drawImage, imageCost, reportPieceFailure, withRetries, type FalOptions } from './landmark3d';
 
 /** Square: the clump is cropped out of it in the browser. Below a megapixel, so the cheapest picture. */
 export const COVER_SIZE = 512;
@@ -108,6 +108,7 @@ export function ensureGroundCover(
       if (!sprites.length) {
         failed.add(world.id);
         const err = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
+        reportPieceFailure('cover', world.id, err, o.signal?.aborted);
         recordMeasurement('rpg.landmark', {
           outcome: 'failed',
           piece: 'cover',

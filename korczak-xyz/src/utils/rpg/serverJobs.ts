@@ -30,6 +30,16 @@ export function jobsOn(): boolean {
   return account !== null && typeof window !== 'undefined' && getDb() !== null;
 }
 
+/**
+ * A provider whose key the account does not hold (owner, 12 Nov 2026: every piece of a quest went to
+ * the server, came back "no fal.ai key on the account" in half a second, and only then was asked
+ * here — diesel pays through the gateway, which needs no key on the account). After one such answer
+ * the server is not asked for that provider for a while; a key pasted meanwhile is used from then.
+ */
+const NO_KEY_MS = 10 * 60_000;
+const noKeyUntil = new Map<string, number>();
+const providerOfSpec = (spec: JobSpec): string => (spec.kind === 'llm' ? spec.provider : 'fal');
+
 /** When the page last came to the front: a frozen page's clock says nothing about a job's runner. */
 let visibleSince = Date.now();
 if (typeof document !== 'undefined') {
@@ -48,6 +58,7 @@ export async function runServerJob(id: string, spec: JobSpec, onDoc: (job: JobDo
   const uid = account;
   const db = getDb();
   if (!uid || !db) return null;
+  if ((noKeyUntil.get(providerOfSpec(spec)) ?? 0) > Date.now()) return null;
   const ref = doc(db, 'users', uid, JOBS, id);
   let createdAt: number;
   try {
@@ -91,7 +102,10 @@ export async function runServerJob(id: string, spec: JobSpec, onDoc: (job: JobDo
       fresh = !snap.metadata.fromCache;
       onDoc(job);
       if (job.status === 'done') finish(job);
-      else if (job.status === 'failed') finish(job.noKey || job.crashed ? null : job);
+      else if (job.status === 'failed') {
+        if (job.noKey) noKeyUntil.set(providerOfSpec(spec), Date.now() + NO_KEY_MS);
+        finish(job.noKey || job.crashed ? null : job);
+      }
       else if (job.status === 'abandoned' || job.createdAt !== createdAt) {
         // Abandoned, or replaced by another tab's or the server's newer one: follow that instead.
         if (job.status === 'abandoned') finish(null);
