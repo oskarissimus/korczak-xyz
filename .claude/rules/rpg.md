@@ -89,7 +89,10 @@ what I see is already everything, and roughly how long it takes"). `WorldProgres
 `DevConsole.tsx`) sits at the top of the journal, and on the genesis screen while that runs: a
 headline with the time left (*Generuję świat · zostało ok. 1 min 20 s*), a bar, and a row per kind
 of work — the world, the quest's first step, the ground, the hub's 3D models `n/N`, the quest's own
-places and things — each ✓, ⏳ (running), … (waiting) or ✗, never colour alone. Once all of it has
+places and things — each ⏳ (running) or … (waiting), never colour alone. A row whose work has all
+come leaves the list (owner, 12 Nov 2026: "what has loaded can go, so only what is still loading
+stays"), and the banners (`.rpg-notice`, `.rpg-toast`, z-index 4) sit over the journal (2), which
+on a phone reached down to the middle banner and covered it. Once all of it has
 come it says *World ready — this is everything* with the total time for 10 s and goes. The tasks
 are built in `Rpg.tsx` (`progressTasks`) from what is already tracked: `creating`/`generating`, the
 world or the genesis preview (`previewRef`; before even that, every `HUB_SLOTS` assumed), what fal.ai

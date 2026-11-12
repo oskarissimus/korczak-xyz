@@ -924,11 +924,12 @@ export function WorldProgress({ lang, tasks, since }: { lang: Lang; tasks: () =>
       {PROGRESS_ROWS.map(({ kinds, key }) => {
         const c = countOf(list, kinds);
         if (c.total === 0) return null;
-        const ended = c.done + c.failed === c.total;
-        const mark = !ended ? (c.running > 0 ? '⏳' : '…') : c.failed === c.total ? '✗' : '✓';
+        // A kind of work that has all come leaves the list (owner, 12 Nov 2026: "what has loaded can
+        // go, so only what is still loading stays"); the bar and the closing line still count it.
+        if (c.done + c.failed === c.total) return null;
         return (
-          <div key={key} className={`rpg-progress-row${ended ? ' rpg-progress-ended' : ''}`}>
-            {mark} {t[key]}
+          <div key={key} className="rpg-progress-row">
+            {c.running > 0 ? '⏳' : '…'} {t[key]}
             {c.total > 1 ? ` ${c.done}/${c.total}` : ''}
             {c.failed > 0 ? ` · ${t.progressFailed(c.failed)}` : ''}
           </div>
