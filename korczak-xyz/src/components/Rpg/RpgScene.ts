@@ -45,6 +45,8 @@ import { HALT, Routine, type Spot, type SpotKind } from '../../utils/rpg/routine
 import { CRAFT_SPECS, type Craft } from '../../utils/rpg/craft';
 import { DEATH_SECONDS, RUN_SPEED, type CreatureShape } from '../../utils/rpg/creature';
 import { buildStation, buildTool, disposeCraft, holdTool } from './crafts';
+import { makeRagdoll, type Ragdoll } from './ragdoll';
+import { GRAVITY as FALL_GRAVITY, toppleAngle } from '../../utils/rpg/ragdoll';
 import { PLACE_FLAT, Terrain, VILLAGE_FLAT, reliefFor, terrainSeed, type Clearing, type Relief } from '../../utils/rpg/terrain';
 
 export type Prompt = 'talk' | 'pickup' | 'examine';
@@ -236,6 +238,35 @@ interface Enemy {
   flash: number;
 }
 
+/**
+ * Someone killed, lying where they fell until they sink away (owner, 12 Nov 2026: "Dodajmy ragdoll jak
+ * jest fragowane"). How they fall depends on what they are: a skeleton goes limp (`ragdoll`), a
+ * creature rolls over while the blow throws it (`fly`), and anything with neither — the block, a still
+ * model, the capsule — tips over stiff from its feet (`topple`).
+ */
+interface Corpse {
+  mesh: THREE.Group;
+  rig: Rig | null;
+  creature: CreatureBody | null;
+  /** Seconds until it is gone; the last `SINK_SECONDS` of them it sinks into the ground. */
+  left: number;
+  ragdoll: Ragdoll | null;
+  fly: THREE.Vector3 | null;
+  topple: { t: number; axis: THREE.Vector3; base: THREE.Quaternion; height: number } | null;
+}
+
+/** How long a body lies before it is taken away, the sinking at the end included. */
+const CORPSE_SECONDS = 9;
+const SINK_SECONDS = 1.5;
+/** More bodies than this and the oldest start sinking at once: a massacre should not cost a phone frames. */
+const MAX_CORPSES = 8;
+/** How hard the killing blow throws a body, m/s: the sword's, a punch's (the hero), a death in a story (no blow). */
+const SWORD_BLOW = 3;
+const PUNCH_BLOW = 2.6;
+const STORY_BLOW = 0.8;
+/** Seconds the hero lies before getting up at the spawn. */
+const DOWNED_SECONDS = 3;
+
 interface Pickup {
   mesh: THREE.Object3D;
   phase: number;
@@ -393,8 +424,11 @@ export class RpgScene {
   private houseObstacles: Obstacle[] = [];
   /** Null until the models load, and for good if they fail (the hunter is then a capsule). */
   private playerRig: Rig | null = null;
-  /** Killed enemies playing their death before they are taken away, seconds left. */
-  private dying: { mesh: THREE.Group; rig: Rig | null; creature: CreatureBody | null; left: number }[] = [];
+  /** The killed, lying where they fell before they are taken away (`Corpse`). */
+  private dying: Corpse[] = [];
+  /** Seconds the hero still lies beaten before getting up at the spawn; 0 standing. */
+  private downed = 0;
+  private heroFall: Corpse | null = null;
   private npcs = new Map<string, Npc>();
   private marker: THREE.Mesh;
   private yaw = 0;
@@ -2325,6 +2359,9 @@ export class RpgScene {
     this.sword.removeFromParent();
     this.handGrip = null;
     this.player.clear();
+    // The body that lay there is gone; whatever comes next stands (the timer still gets him up).
+    if (this.heroFall?.topple) this.player.quaternion.copy(this.heroFall.topple.base);
+    this.heroFall = null;
   }
 
   /**
@@ -2482,11 +2519,20 @@ export class RpgScene {
     this.held = thing;
   }
 
-  /** Takes one character out of the world for good: they are dead. */
-  removeNpc(name: string) {
+  /**
+   * Takes one character out of the world for good: they are dead. With `fall` they die here and now,
+   * in front of the hero, and drop where they stand before they are taken away; without it (a save
+   * resumed, a death told of) they are simply gone.
+   */
+  removeNpc(name: string, fall = false) {
     const npc = this.npcs.get(name);
     if (!npc) return;
-    this.scene.remove(npc.group);
+    if (fall && npc.group.children.length > 0) {
+      const away = npc.group.position.clone().sub(this.player.position).setY(0);
+      this.fell(npc.group, npc.rig, null, away.lengthSq() > 1e-6 ? away.normalize().multiplyScalar(STORY_BLOW) : new THREE.Vector3(0, 0, STORY_BLOW));
+    } else {
+      this.scene.remove(npc.group);
+    }
     npc.obstacle.off = true;
     this.obstacles = this.obstacles.filter((o) => o !== npc.obstacle);
     this.dropStation(npc);
@@ -2952,7 +2998,7 @@ export class RpgScene {
 
   /** Swings the sword now, as a click would. */
   attack() {
-    if (this.paused || this.attackTimer > 0) return;
+    if (this.paused || this.attackTimer > 0 || this.downed > 0) return;
     this.attackTimer = ATTACK_COOLDOWN;
     this.swing = 1;
     this.playerRig?.once('Sword_Attack', ATTACK_COOLDOWN);
@@ -2967,19 +3013,15 @@ export class RpgScene {
       if (dist > 0.8 && to.normalize().dot(forward) < 0.2) continue;
       enemy.hp -= 1;
       enemy.flash = 0.15;
+      const away = to.clone().setY(0);
+      if (away.lengthSq() < 1e-6) away.copy(forward);
+      away.normalize();
       enemy.mesh.position.add(to.multiplyScalar(1.2));
       if (enemy.hp <= 0) {
+        // It falls where the blow sends it; it stops being a target at once.
         this.enemies = this.enemies.filter((e) => e !== enemy);
-        if (enemy.rig) {
-          // It falls before it goes; it stops being a target at once.
-          enemy.rig.once('Death01', 1.4, { final: true });
-          this.dying.push({ mesh: enemy.mesh, rig: enemy.rig, creature: null, left: 2.2 });
-        } else if (enemy.creature) {
-          enemy.creature.state.death = 0;
-          this.dying.push({ mesh: enemy.mesh, rig: null, creature: enemy.creature, left: DEATH_SECONDS });
-        } else {
-          this.scene.remove(enemy.mesh);
-        }
+        enemy.mesh.scale.setScalar(enemy.size);
+        this.fell(enemy.mesh, enemy.rig, enemy.creature, away.multiplyScalar(SWORD_BLOW));
         this.cb.onProgress();
       } else {
         enemy.rig?.once('Hit_Chest', 0.3);
@@ -2990,7 +3032,7 @@ export class RpgScene {
 
   /** Leaves the ground, as Space does; only from the ground, so there is no climbing on air. */
   jump() {
-    if (!this.canJump || this.paused || this.airborne) return;
+    if (!this.canJump || this.paused || this.airborne || this.downed > 0) return;
     this.airborne = true;
     this.vy = JUMP_SPEED;
     this.playerRig?.once('Jump_Start', JUMP_START_SECONDS);
@@ -3158,15 +3200,15 @@ export class RpgScene {
 
   private animate(dt: number) {
     this.weather?.update(dt, this.player.position);
-    this.playerRig?.update(dt);
+    if (this.heroFall) this.moveCorpse(this.heroFall, dt);
+    else this.playerRig?.update(dt);
     for (const npc of this.npcs.values()) npc.rig?.update(dt);
     for (const enemy of this.enemies) {
       enemy.rig?.update(dt);
       if (enemy.creature) moveCreature(enemy.creature, dt, this.paused ? 0 : enemy.speed);
     }
     for (const d of this.dying) {
-      d.rig?.update(dt);
-      if (d.creature) moveCreature(d.creature, dt, 0);
+      this.moveCorpse(d, dt);
       d.left -= dt;
       if (d.left <= 0) {
         this.scene.remove(d.mesh);
@@ -3174,6 +3216,85 @@ export class RpgScene {
       }
     }
     this.dying = this.dying.filter((d) => d.left > 0);
+  }
+
+  /** How someone killed falls (`Corpse`): the blow is m/s along the ground, away from whoever struck. */
+  private fall(mesh: THREE.Group, rig: Rig | null, creature: CreatureBody | null, blow: THREE.Vector3): Corpse {
+    const corpse: Corpse = { mesh, rig, creature, left: CORPSE_SECONDS, ragdoll: null, fly: null, topple: null };
+    if (creature) {
+      // A creature has no bones to go limp: it rolls over and sinks (`creature.ts`) while the blow throws it.
+      creature.state.death = 0;
+      corpse.fly = blow.clone().multiplyScalar(0.6).setY(2.2);
+      corpse.left = DEATH_SECONDS;
+      return corpse;
+    }
+    if (rig) {
+      corpse.ragdoll = makeRagdoll(rig.model, blow, (x, z) => this.groundAt(x, z));
+      if (corpse.ragdoll) return corpse;
+      // A skeleton without the joints a ragdoll needs plays the old fall.
+      rig.once('Death01', 1.4, { final: true });
+    }
+    const height = Math.max(0.4, new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3()).y / Math.max(1e-3, mesh.scale.y));
+    // Tipping over along the blow: about the line across it, through the feet.
+    const axis = new THREE.Vector3(0, 1, 0).cross(blow.lengthSq() > 1e-6 ? blow.clone().normalize() : new THREE.Vector3(0, 0, 1)).normalize();
+    corpse.topple = rig ? null : { t: 0, axis, base: mesh.quaternion.clone(), height: height * mesh.scale.y };
+    return corpse;
+  }
+
+  /** Someone dies here: falls (`fall`) and lies among the dead until they sink away. */
+  private fell(mesh: THREE.Group, rig: Rig | null, creature: CreatureBody | null, blow: THREE.Vector3) {
+    this.dying.push(this.fall(mesh, rig, creature, blow));
+    // The oldest go first once there are too many, sinking from now.
+    const lying = this.dying.filter((d) => d.left > SINK_SECONDS);
+    for (const d of lying.slice(0, Math.max(0, lying.length - MAX_CORPSES))) d.left = SINK_SECONDS;
+  }
+
+  private moveCorpse(d: Corpse, dt: number) {
+    const sinking = d.left <= SINK_SECONDS;
+    if (d.ragdoll) {
+      if (!sinking) d.ragdoll.update(dt);
+    } else {
+      d.rig?.update(dt);
+    }
+    if (d.creature) moveCreature(d.creature, dt, 0);
+    if (d.fly) {
+      const p = d.mesh.position;
+      p.addScaledVector(d.fly, dt);
+      d.fly.y -= FALL_GRAVITY * dt;
+      const floor = this.groundAt(p.x, p.z);
+      if (p.y <= floor && d.fly.y < 0) {
+        p.y = floor;
+        d.fly = null;
+      }
+    }
+    if (d.topple) {
+      d.topple.t += dt;
+      d.mesh.quaternion.setFromAxisAngle(d.topple.axis, toppleAngle(d.topple.t, d.topple.height)).multiply(d.topple.base);
+    }
+    // A creature sinks by itself (`creature.ts`); the rest go down into the ground at the end.
+    if (sinking && !d.creature) d.mesh.position.y -= dt * 0.4;
+  }
+
+  /** The hero beaten: down where he stood, for `DOWNED_SECONDS`, then `getUp`. */
+  private knockDown(blow: THREE.Vector3) {
+    if (this.downed > 0) return;
+    this.downed = DOWNED_SECONDS;
+    this.airborne = false;
+    this.vy = 0;
+    this.heroFall = this.player.children.length > 0 ? this.fall(this.player, this.playerRig, null, blow) : null;
+  }
+
+  private getUp() {
+    this.downed = 0;
+    const fall = this.heroFall;
+    this.heroFall = null;
+    fall?.ragdoll?.restore();
+    if (fall?.topple) this.player.quaternion.copy(fall.topple.base);
+    this.player.position.copy(SPAWN);
+    this.land();
+    this.hp = MAX_HP;
+    this.cb.onDeath();
+    this.cb.onHealth(this.hp);
   }
 
   private collide(pos: THREE.Vector3, radius = 0.45) {
@@ -3194,6 +3315,16 @@ export class RpgScene {
   }
 
   private update(dt: number) {
+    if (this.downed > 0) {
+      // Beaten: he lies there, the foes stand over him, and then he is up again at the spawn.
+      this.downed -= dt;
+      for (const enemy of this.enemies) {
+        enemy.speed = 0;
+        enemy.rig?.play('Idle_Loop');
+      }
+      if (this.downed <= 0) this.getUp();
+      return;
+    }
     const k = this.keys;
     const stick = Math.hypot(this.stick.x, this.stick.y);
     const onStick = stick > 0.18;
@@ -3325,13 +3456,7 @@ export class RpgScene {
         if (enemy.creature) enemy.creature.state.bite = 0;
         this.hp = Math.max(0, this.hp - 12);
         this.cb.onHealth(this.hp);
-        if (this.hp === 0) {
-          this.player.position.copy(SPAWN);
-          this.land();
-          this.hp = MAX_HP;
-          this.cb.onDeath();
-          this.cb.onHealth(this.hp);
-        }
+        if (this.hp === 0) this.knockDown(toPlayer.clone().setY(0).normalize().multiplyScalar(PUNCH_BLOW));
       }
     }
     // Slow regeneration out of combat.

@@ -1379,7 +1379,24 @@ content-hashed and immutable.
   classic world, without a fal key and once the weapon failed this session (`weaponModelMayCome`).
   It is a `piece` in the start's loading bar and a `fal` row in the console like any other.
 - **Humanoid enemies** are the bare base body washed in the target's colour, jogging, punching,
-  flinching and falling (`Death01`, then gone after 2.2 s; they stop being targets at once).
+  flinching and falling; they stop being targets at once.
+- **The killed fall as bodies** (owner, 12 Nov 2026: "Dodajmy ragdoll jak jest fragowane"). No
+  physics engine: `utils/rpg/ragdoll.ts` is Verlet points and sticks (Jakobsen's Hitman ragdoll,
+  fixed 1/60 s steps, 8 relaxation passes, the ground as `groundAt`, asleep once still), tested;
+  `components/Rpg/ragdoll.ts` makes 17 points of a skeleton's big joints (donor names and
+  Quaternius's both, so generated people, Meshy's rig and the kit alike) plus a crown, ~38 sticks —
+  bones rigid, a torso that bends a little and does not twist apart, limits so no elbow, knee or neck
+  folds flat — and turns each bone every frame so its segment points where its points fell; the
+  bones under a segment (fingers, clavicles) turn with it. The mixer is simply no longer updated.
+  The blow throws the top of the body away from whoever struck and buckles the knees the other way.
+  `RpgScene.fall` picks how: a skeleton goes limp; a creature keeps its roll-and-sink and is thrown
+  (`fly`); anything without bones (the block, a still model, the capsule) tips over stiff from its
+  feet (`toppleAngle`); a skeleton missing a joint plays `Death01` as before. A body lies
+  `CORPSE_SECONDS` (9) and sinks over the last 1.5; past `MAX_CORPSES` (8) the oldest sink at once.
+  Who: enemies killed by the sword; a character the chosen decision kills (`bury(…, true)` →
+  `removeNpc(name, true)`; a save resumed or a death only told of still just removes them); and the
+  hero, who lies `DOWNED_SECONDS` (3) with input off and the foes idle, then gets up at the spawn
+  (`knockDown`/`getUp`, the bones put back as they were).
 - **A generated enemy never falls back to the kit's body** (owner, 2 Nov 2026: "the enemy is still
   some Quaternius model, not generated"). The *mechaniczny wartownik* of quest `q-mvz194tz-u1mvm`
   had its model (`job.model.glb`, made 16:22 UTC) — a rusted automaton with an exhaust pipe standing

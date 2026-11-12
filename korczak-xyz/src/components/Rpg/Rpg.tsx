@@ -810,16 +810,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
 
   /**
    * Adds to the dead and takes them out of the scene, all but `spare`: the one speaking now, whose
-   * death in an ending is told while they are still on screen.
+   * death in an ending is told while they are still on screen. With `fall` they die now, in front of
+   * the hero, and fall rather than vanish.
    */
-  const bury = useCallback((names: (string | null | undefined)[], spare: string[] = []) => {
+  const bury = useCallback((names: (string | null | undefined)[], spare: string[] = [], fall = false) => {
     for (const name of names) {
       if (!name || deadRef.current.some((d) => d.toLowerCase() === name.toLowerCase())) continue;
       deadRef.current = [...deadRef.current, name];
     }
     for (const c of charactersRef.current) {
       if (spare.includes(c.name) || !isDead(c.name, deadRef.current)) continue;
-      sceneRef.current?.removeNpc(c.name);
+      // Killed by the choice just made: they drop where they stand (`removeNpc`'s ragdoll).
+      sceneRef.current?.removeNpc(c.name, fall);
       whereRef.current.delete(c.name);
     }
   }, []);
@@ -2200,7 +2202,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         sceneRef.current?.clearObjective();
       }
       // A single foe killed by name, and whoever this choice kills. The one answering stays on screen.
-      bury([left ? null : slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, by.name, ...(b.witness ? [b.witness.npc.name] : [])]);
+      bury([left ? null : slainBy(b.job), ...(d.dies ?? [])], [b.npc.name, by.name, ...(b.witness ? [b.witness.npc.name] : [])], true);
       const steps = [...historyRef.current, step];
       historyRef.current = steps;
       setHistory(steps);
