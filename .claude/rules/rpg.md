@@ -922,6 +922,19 @@ So it is fixed twice over:
   nobody says anywhere gates nothing. It is checked when the options are drawn, so saves from before
   it are gated too. Unlike `after`, it may leave no decision open until something has been asked:
   every source it waits for is reachable at the beat, so the beat can still always be finished.
+  A clue's answer counts as heard only once its question has been asked (`askedClues` in the
+  autosave, `Heard.clueAsked`), not when the clue is examined: examining shows the thing and offers
+  the question. Until 14 Nov 2026 it was counted at examining, and in `rpgSaves/wmwd5yxfy1` (korczak-rpg)
+  "Oczyszczę drogę do Rdzenia z agresywnych węgorzy elektrycznych." was on screen while "Znalazłem
+  maskę Miry…" — whose answer is the only line with "elektrycznych" — was still unasked. A save
+  without the field counts every examined clue as asked, as it was.
+- **A decision to meet someone new names nobody** (owner, 12 Nov 2026, the same quest: "Pójdę do
+  Tuneli Koralowych porozmawiać z Mechanikiem Janosem." when nobody had said "Janos"). The word
+  gate cannot catch it, since nothing will ever say the name. The prompt says such a label describes
+  the person as the hero knows them, and `parseBeat` refuses a beat where a talk decision without
+  `meet.name` carries a capitalised word past the first that nothing in the beat, the atlas, the
+  history, the chronicle or the world says (`unsaidName`, all but the last letter up to four, so
+  Mirę matches Mira and Rdzeniu Rdzeń); the next model is asked.
 
 **E reaches the nearest thing**, character, clue or thing to pick up (`nearestThing`): with a
 witness and clues at a place, a character standing among the herbs swallowed every press.

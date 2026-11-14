@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Beat, Decision } from './quest';
-import { decisionOpen, knownBefore, type Heard } from './unlock';
+import { decisionOpen, knownBefore, unsaidName, type Heard } from './unlock';
 
 const npc = (name: string) => ({ name, gender: 'male' as const, color: '#000', voice: '', appearance: '' });
 
@@ -83,7 +83,13 @@ describe('decisionOpen', () => {
 
   it('opens it once anyone has said it: the witness or the clue will do', () => {
     expect(decisionOpen(suchy, antidote, { ...nothing, witness: true }, before)).toBe(true);
-    expect(decisionOpen(suchy, antidote, { ...nothing, seen: new Set([0]) }, before)).toBe(true);
+    expect(decisionOpen(suchy, antidote, { ...nothing, seen: new Set([0]), clueAsked: new Set([0]) }, before)).toBe(true);
+  });
+
+  it('hears a clue’s answer only once its question is asked, not when it is examined', () => {
+    // The antidote is only in Suchy's answer about the dust, not in the dust itself.
+    expect(decisionOpen(suchy, antidote, { ...nothing, seen: new Set([0]), clueAsked: new Set() }, before)).toBe(false);
+    expect(decisionOpen(suchy, antidote, { ...nothing, seen: new Set([0]), clueAsked: new Set([0]) }, before)).toBe(true);
   });
 
   it('keeps back what follows the witness until the witness has been spoken to', () => {
@@ -105,5 +111,21 @@ describe('decisionOpen', () => {
     const d = decision('Wrócę do Puszki.', { after: { ask: 1 } });
     expect(decisionOpen(suchy, d, nothing, before)).toBe(false);
     expect(decisionOpen(suchy, d, { ...nothing, asked: new Set([1]) }, before)).toBe(true);
+  });
+});
+
+describe('unsaidName', () => {
+  /** Abridged from the owner's quest, `rpgSaves/wmwd5yxfy1`, 12 Nov 2026. */
+  const said =
+    'Moja stara uczennica, Mira, poszła sprawdzić Rdzeń Magnetyczny przy Tunelach Koralowych. ' +
+    'Widziałam ją, jak rozmawiała z mechanicznym strażnikiem przy wejściu do tuneli.';
+
+  it('finds a name nobody has said', () => {
+    expect(unsaidName('Pójdę do Tuneli Koralowych porozmawiać z Mechanikiem Janosem.', said)).toBe('Janosem');
+  });
+
+  it('lets through what was said, in any ending, and the first word', () => {
+    expect(unsaidName('Pójdę do Tuneli Koralowych poszukać kogoś, kto pilnuje śluz.', said)).toBeNull();
+    expect(unsaidName('Odnajdę Mirę przy Rdzeniu.', said)).toBeNull();
   });
 });

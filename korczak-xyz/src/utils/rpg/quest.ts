@@ -43,6 +43,7 @@ import { personaWords, type Persona } from './persona';
 import { asCraft, craftLines, type Craft } from './craft';
 import { base, languageName, type BaseLang, type Lang } from './language';
 import { CONTENT_RULES } from './contentPolicy';
+import { unsaidName } from './unlock';
 
 const TAG_LIST = TAGS.map((t) => `[${t}]`).join(', ');
 
@@ -871,6 +872,9 @@ export function beatPrompt(ctx: BeatContext): string {
     'Every decision is said to the npc, who answers it ("reply"); never address the witness in a label. A decision',
     'that follows up something the witness said speaks of them in the third person ("I will find the friend Tiago',
     'spoke of.") and sets "after": "witness".',
+    'A decision that sends the hero to meet someone NEW says who they are as the hero knows them ("I will find',
+    'whoever keeps the sluices.", "I will ask the old miner Elara spoke of.") and never gives them a name nobody',
+    'has said: the hero cannot know it yet. The npc may name them in the "reply", and the next step gives the name.',
     'Each decision rests on the npc’s greeting and story parts by default. A decision that only makes sense',
     'after something optional — the witness, a clue, or the answer to a "smallTalk" question — sets "after":',
     '"witness", "clue 1", "clue 2", "question 1" or "question 2" (smallTalk in order), and the game offers it only',
@@ -1279,6 +1283,26 @@ export function parseBeat(reply: string, ctx: BeatContext): Beat | null {
     ...clues.map((c) => c.reply),
   ];
   if (spoken.some((line) => narrated(line, npc.name))) return null;
+
+  // A decision that sends the hero to someone new may not name them: nobody has, and the hero
+  // cannot know the name before the next step gives it (`unsaidName`). The next model may do better.
+  const said = [
+    title,
+    text(r.objectiveText) ?? '',
+    npc.name,
+    place?.name ?? '',
+    greeting,
+    ...story.flatMap((p) => [p.ask, p.say]),
+    ...smallTalk.flatMap((o) => [o.label, o.reply]),
+    ...clues.flatMap((c) => [c.name, c.text, c.ask, c.reply]),
+    ...(witness ? [witness.npc.name, witness.greeting, ...witness.talk.flatMap((o) => [o.label, o.reply])] : []),
+    ...ctx.characters.map((c) => c.name),
+    ...ctx.places.map((p) => p.name),
+    JSON.stringify(ctx.history),
+    JSON.stringify(ctx.chronicle),
+    ctx.world ? JSON.stringify(ctx.world) : '',
+  ].join(' ');
+  if (decisions.some((d) => d.next?.kind === 'talk' && !d.meet?.name && unsaidName(d.label, said))) return null;
 
   // Whoever is standing there talking is not dead, whatever the list says.
   const dead = names(r.dead).filter((n) => !same(n, npc.name) && !(witness && same(n, witness.npc.name)));

@@ -570,6 +570,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const witnessHeardRef = useRef(false);
   /** The current beat's small-talk questions asked, by index, which a decision may wait for. */
   const askedTalkRef = useRef(new Set<number>());
+  /** The current beat's clues whose question was asked, by index (`Heard.clueAsked`). */
+  const askedCluesRef = useRef(new Set<number>());
   /** What the hero said in their own words at the current beat, and what they were answered. */
   const freeTalkRef = useRef<DialogueOption[]>([]);
   /**
@@ -1020,6 +1022,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       heard: heardRef.current,
       witnessHeard: witnessHeardRef.current,
       askedTalk: [...askedTalkRef.current],
+      askedClues: [...askedCluesRef.current],
       freeTalk: freeTalkRef.current,
       decision: decisionRef.current,
       playMs: playedNow(),
@@ -1113,6 +1116,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       heardRef.current = false;
       witnessHeardRef.current = false;
       askedTalkRef.current = new Set();
+      askedCluesRef.current = new Set();
       freeTalkRef.current = carryTalkRef.current;
       carryTalkRef.current = [];
       toldRef.current = 0;
@@ -2425,11 +2429,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           },
         })),
         ...b.clues
-          .filter((_, i) => seenRef.current.has(i))
-          .map((c) => ({
+          .map((c, i) => ({ c, i }))
+          .filter(({ i }) => seenRef.current.has(i))
+          .map(({ c, i }) => ({
             label: c.ask,
             kind: 'ask' as const,
-            action: () => setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }], ...say(b.npc, ending) }),
+            action: () => {
+              if (!askedCluesRef.current.has(i)) {
+                askedCluesRef.current.add(i);
+                persist();
+              }
+              setDialogue({ line: npc(c.reply), choices: [{ label: t.back, action: ending }], ...say(b.npc, ending) });
+            },
           })),
       ];
       // A decision waits for what it rests on: the gate the model set, and any word of its label
@@ -2439,7 +2450,13 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         decisionOpen(
           b,
           d,
-          { witness: witnessHeardRef.current, seen: seenRef.current, asked: askedTalkRef.current, free: freeTalkRef.current },
+          {
+            witness: witnessHeardRef.current,
+            seen: seenRef.current,
+            clueAsked: askedCluesRef.current,
+            asked: askedTalkRef.current,
+            free: freeTalkRef.current,
+          },
           before,
         );
       const ending = (): void => {
@@ -2856,6 +2873,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     heardRef.current = game.heard;
     witnessHeardRef.current = game.witnessHeard ?? false;
     askedTalkRef.current = new Set(game.askedTalk ?? []);
+    // A save from before it was kept: what was examined counts as asked, as it did then.
+    askedCluesRef.current = new Set(game.askedClues ?? game.seen);
     freeTalkRef.current = game.freeTalk ?? [];
     const d = game.decision === null ? null : current.decisions[game.decision];
     decisionRef.current = d ? game.decision : null;

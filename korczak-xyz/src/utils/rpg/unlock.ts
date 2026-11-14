@@ -21,6 +21,11 @@ export interface Heard {
   witness: boolean;
   /** Clues examined, by index. */
   seen: ReadonlySet<number>;
+  /**
+   * Clues whose question has been put to the npc, by index (`askedClues`). Examining a clue shows
+   * only its `text`; its `reply` is heard once its question is asked. Absent: taken as `seen`.
+   */
+  clueAsked?: ReadonlySet<number>;
   /** Small-talk questions asked, by index. */
   asked: ReadonlySet<number>;
   /** What the hero said in their own words and was answered (`freeTalk`). */
@@ -74,7 +79,10 @@ function heardText(b: Beat, h: Heard): string {
     ...b.story.flatMap((p) => [p.ask, p.say]),
     // The questions are on screen beside the decisions; only an answer waits to be asked.
     ...b.smallTalk.flatMap((o, i) => (h.asked.has(i) ? [o.label, o.reply] : [o.label])),
-    ...b.clues.flatMap((c, i) => (h.seen.has(i) ? [c.name, c.text, c.ask, c.reply] : [])),
+    // Examining shows the thing and offers its question; the npc's answer waits to be asked (owner,
+    // 12 Nov 2026: Heliodor's "To pot zmutowanych węgorzy elektrycznych!" opened "Oczyszczę drogę
+    // do Rdzenia z agresywnych węgorzy elektrycznych." while the question about the mask was unasked).
+    ...b.clues.flatMap((c, i) => (!h.seen.has(i) ? [] : clueAsked(h).has(i) ? [c.name, c.text, c.ask, c.reply] : [c.name, c.text, c.ask])),
     ...(w && h.witness ? [w.greeting, ...w.talk.flatMap((o) => [o.label, o.reply])] : []),
     ...(h.free ?? []).flatMap((o) => [o.label, o.reply]),
   ].join(' ');
@@ -84,9 +92,32 @@ function unheardText(b: Beat, h: Heard): string {
   const w = b.witness;
   return [
     ...b.smallTalk.flatMap((o, i) => (h.asked.has(i) ? [] : [o.reply])),
-    ...b.clues.flatMap((c, i) => (h.seen.has(i) ? [] : [c.name, c.text, c.ask, c.reply])),
+    ...b.clues.flatMap((c, i) => (!h.seen.has(i) ? [c.name, c.text, c.ask, c.reply] : clueAsked(h).has(i) ? [] : [c.reply])),
     ...(w && !h.witness ? [w.npc.name, w.greeting, ...w.talk.flatMap((o) => [o.label, o.reply])] : []),
   ].join(' ');
+}
+
+/**
+ * A name in a decision's label that nothing says: a capitalised word past the first whose stem is in
+ * none of `said`. For a decision that sends the hero to someone new, whom the next step names (owner,
+ * 12 Nov 2026: Heliodor offered "Pójdę do Tuneli Koralowych porozmawiać z Mechanikiem Janosem." when
+ * nobody in the quest had said "Janos"; the word gate cannot hold it back, since nothing will ever
+ * say it). Returns the word, or null.
+ */
+export function unsaidName(label: string, said: string): string | null {
+  const known = (said.match(/\p{L}+/gu) ?? []).map((w) => w.toLowerCase());
+  const words = label.match(/\p{L}+/gu) ?? [];
+  for (const w of words.slice(1)) {
+    if (w.length < 4 || w[0] === w[0].toLowerCase() || COMMON.has(stem(w))) continue;
+    // A name's ending moves too (Mira, Mirę; Rdzeń, Rdzeniu), so all but its last letter, up to four.
+    const prefix = w.toLowerCase().slice(0, Math.min(4, w.length - 1));
+    if (!known.some((k) => k.startsWith(prefix))) return w;
+  }
+  return null;
+}
+
+function clueAsked(h: Heard): ReadonlySet<number> {
+  return h.clueAsked ?? h.seen;
 }
 
 /**

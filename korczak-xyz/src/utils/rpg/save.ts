@@ -47,6 +47,8 @@ export interface SavedGame {
   witnessHeard?: boolean;
   /** The current beat's small-talk questions asked, by index; absent in older saves. */
   askedTalk?: number[];
+  /** The current beat's clues whose question was asked, by index; absent in older saves. */
+  askedClues?: number[];
   /** What the hero said in their own words at the current beat, and was answered (`freeLine.ts`). */
   freeTalk?: DialogueOption[];
   /** The current beat's decision, by index, once made. */
@@ -193,6 +195,7 @@ export function mendSave(game: SavedGame, dead: readonly string[]): SavedGame {
     heard: true,
     witnessHeard: false,
     askedTalk: [],
+    askedClues: [],
     freeTalk: [],
     decision: chose,
   };
