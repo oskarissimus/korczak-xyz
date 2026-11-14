@@ -12,6 +12,10 @@
  *   set when it opened the checkout, the litres are on the prices (`litresOf`). A paid transaction
  *   with neither is kept as an orphan and reported, and still answered 200 — Paddle retrying it
  *   would not add the missing uid. Anything that failed on our side is a 500, so Paddle retries.
+ * - **The monthly delivery** (`SUBSCRIPTION`) is a transaction like any other with a `subscription_id`:
+ *   its litres replace what is left of the last delivery (`creditPurchase`), and a renewal finds its
+ *   account in `rpgSubscriptions/{id}`. `subscription.*` keeps the page's view of it on the ledger and
+ *   takes the last delivery's rest away when it ends — subscription diesel does not carry over.
  * - **A refund or a chargeback takes its share back** (`adjustment.created`/`updated` once
  *   approved): the adjustment's total over the transaction's, of the litres bought.
  */
@@ -21,7 +25,8 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 
 import { PADDLE_CONFIG_DOC, PURCHASES_COLLECTION, litresOf, parseSignature } from '../../../korczak-xyz/src/utils/rpg/paddle';
-import { creditPurchase, debitAdjustment } from './wallet';
+import { creditPurchase, debitAdjustment, endSubscription, showSubscription, subscriptionOwner } from './wallet';
+import type { SubscriptionView } from '../../../korczak-xyz/src/utils/rpg/paddle';
 import { db } from '../runtime';
 import { reportError } from '../sentry';
 
@@ -68,7 +73,10 @@ async function onPaid(event: PaddleEvent): Promise<string> {
   const data = event.data ?? {};
   const txnId = str(data.id);
   if (!txnId) return 'no-id';
-  const uid = str((data.custom_data as Record<string, unknown> | null)?.uid);
+  const subscriptionId = str(data.subscription_id);
+  // A renewal names its account through the subscription; the first payment names it itself.
+  const named = str((data.custom_data as Record<string, unknown> | null)?.uid);
+  const uid = subscriptionId ? await subscriptionOwner(subscriptionId, named) : named;
   const litres = litresOf(data.items);
   const details = data.details as { totals?: { grand_total?: unknown } } | undefined;
   const totalMinor = str(details?.totals?.grand_total);
@@ -85,7 +93,45 @@ async function onPaid(event: PaddleEvent): Promise<string> {
     reportError('rpgApi.paddle.orphan', new Error(`paddle: paid transaction ${txnId} has ${uid ? 'no litres' : 'no uid'}`), { txnId });
     return 'orphan';
   }
-  return creditPurchase({ txnId, uid, litres, totalMinor, currency, eventId: str(event.event_id), priceIds });
+  return creditPurchase({ txnId, uid, litres, totalMinor, currency, eventId: str(event.event_id), priceIds, subscriptionId });
+}
+
+function viewOf(data: Record<string, unknown>): SubscriptionView | null {
+  const id = str(data.id);
+  const status = str(data.status);
+  if (!id || !status) return null;
+  const urls = (data.management_urls ?? {}) as Record<string, unknown>;
+  const change = data.scheduled_change as { action?: unknown; effective_at?: unknown } | null | undefined;
+  return {
+    id,
+    status,
+    nextBilledAt: str(data.next_billed_at),
+    endsAt: change && change.action === 'cancel' ? str(change.effective_at) : null,
+    cancelUrl: str(urls.cancel),
+    updatePaymentUrl: str(urls.update_payment_method),
+  };
+}
+
+/**
+ * `subscription.created`/`updated`/`canceled`: the subscription as the page shows it (with Paddle's
+ * own cancel link — the gateway holds no Paddle API key to open a customer portal), and on the end
+ * of it, the rest of its last delivery taken away.
+ */
+async function onSubscription(event: PaddleEvent): Promise<string> {
+  const data = event.data ?? {};
+  const view = viewOf(data);
+  if (!view) return 'no-id';
+  const uid = await subscriptionOwner(view.id, str((data.custom_data as Record<string, unknown> | null)?.uid));
+  if (!uid) {
+    reportError('rpgApi.paddle.subscription', new Error(`paddle: subscription ${view.id} has no account`), { subscriptionId: view.id });
+    return 'orphan';
+  }
+  if (view.status === 'canceled') {
+    await endSubscription(uid, view);
+    return 'ended';
+  }
+  await showSubscription(uid, view);
+  return 'shown';
 }
 
 async function onAdjustment(event: PaddleEvent): Promise<string> {
@@ -127,6 +173,8 @@ export async function handlePaddleWebhook(req: Request, res: Response, raw: Buff
       ? await onPaid(event)
       : type === 'adjustment.created' || type === 'adjustment.updated'
         ? await onAdjustment(event)
-        : 'ignored';
+        : type === 'subscription.created' || type === 'subscription.updated' || type === 'subscription.canceled'
+          ? await onSubscription(event)
+          : 'ignored';
   res.status(200).json({ ok: true, outcome });
 }

@@ -3117,6 +3117,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           return outcome;
         }
       : undefined;
+  const subscribeDiesel =
+    onDiesel && auth.user
+      ? async () => {
+          const user = auth.user!;
+          log.info('rpg.diesel.subscribe');
+          const { subscribeMonthly } = await import('../../utils/rpg/paddleCheckout');
+          const outcome = await subscribeMonthly(user.uid, user.email, gameLang);
+          log.info('rpg.diesel.subscribe.end', { outcome });
+          return outcome;
+        }
+      : undefined;
+  const dieselSub = onDiesel ? { subscription: wallet!.subscription ?? null, subLitres: litres(wallet!.subUsd ?? 0) } : {};
   const dieselModel = modelChain(onDiesel ? (wallet!.server.google ? 'google' : 'openai') : 'demo', chosenModel)[0] ?? null;
   // What a quest and a world cost in all, not only the model's words: the lines, the score and the
   // models are most of it (`questLitres`, measured on the ledger) — and only what is on for this reader.
@@ -3526,7 +3538,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselMenu = diesel && (
     <div className="rpg-panel">
       <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} showCanisters />
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <p className="rpg-dz-note">
@@ -3853,7 +3865,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                     {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
                     {/* A dark plant is the one thing about the diesel the screen must say: nothing can be made. */}
                     {diesel && plantState(diesel.litres) === 'stopped' && (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} />
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} />
                     )}
                   </section>
                   <WorldProposals
@@ -3880,7 +3892,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
-          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} />}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>

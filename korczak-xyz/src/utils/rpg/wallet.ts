@@ -61,6 +61,10 @@ export interface WalletStatus {
   grantUsd: number;
   /** Which of the server's keys exist: diesel stands in only for those. */
   server: Record<DieselKey, boolean>;
+  /** Of `balanceUsd`, this month's subscription delivery, which expires (`paddle.ts`); read live off the ledger. */
+  subUsd?: number;
+  /** The monthly delivery, when there is one (read live off the ledger). */
+  subscription?: import('./paddle').SubscriptionView | null;
 }
 
 /**

@@ -78,7 +78,16 @@ function load(): Promise<PaddleJs> {
 }
 
 /** Opens the overlay for one canister, for the signed-in account `uid`. */
-export async function buyCanister(c: Canister, uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
+export function buyCanister(c: Canister, uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
+  return openCheckout(PADDLE.prices[c.id], { uid, canister: c.id }, email, lang);
+}
+
+/** Opens the overlay for the monthly delivery (`SUBSCRIPTION`); renewals pour by webhook with no page open. */
+export function subscribeMonthly(uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
+  return openCheckout(PADDLE.subscription, { uid, canister: 'monthly' }, email, lang);
+}
+
+async function openCheckout(priceId: string, customData: Record<string, string>, email: string | null, lang: string): Promise<CheckoutOutcome> {
   let paddle: PaddleJs;
   try {
     paddle = await load();
@@ -90,8 +99,8 @@ export async function buyCanister(c: Canister, uid: string, email: string | null
     pending = resolve;
     try {
       paddle.Checkout.open({
-        items: [{ priceId: PADDLE.prices[c.id], quantity: 1 }],
-        customData: { uid, canister: c.id },
+        items: [{ priceId, quantity: 1 }],
+        customData,
         ...(email ? { customer: { email } } : {}),
         settings: { displayMode: 'overlay', theme: 'dark', locale: lang === 'pl' ? 'pl' : 'en', allowLogout: false },
       });

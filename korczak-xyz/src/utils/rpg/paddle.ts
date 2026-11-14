@@ -27,6 +27,8 @@ export const PADDLE = {
     barrel: 'pri_01m7daxkda4nmg96q4r6eq8y8v',
     tank: 'pri_01m7daxke7fw2e6fmhvj4kyqgw',
   } satisfies Record<Canister['id'], string>,
+  /** The monthly delivery (`SUBSCRIPTION`), product "Diesel — monthly delivery", `pro_01m7dfqz9y0tgqhkdcnwvnh45d`. */
+  subscription: 'pri_01m7dfqzb598m25cr5r2ze7hh5',
 };
 
 /** Where Paddle sends its webhooks: `rpgApi/paddle/webhook`, outside CORS (no Origin, a signature instead). */
@@ -37,6 +39,49 @@ export const PADDLE_CONFIG_DOC = ['rpgPaddle', 'config'] as const;
 
 /** One document per Paddle transaction, `rpgPurchases/{txn_id}`, no rule: what makes a webhook idempotent. */
 export const PURCHASES_COLLECTION = 'rpgPurchases';
+
+/** Which account a Paddle subscription pours into, `rpgSubscriptions/{sub_id}`, no rule: a renewal finds its uid here. */
+export const SUBSCRIPTIONS_COLLECTION = 'rpgSubscriptions';
+
+/** On `rpgLedger/{uid}`: the part of `dieselUsd` that is this period's delivery, and expires with it. */
+export const SUB_BALANCE_FIELD = 'dieselSubUsd';
+/** On `rpgLedger/{uid}`: the subscription as the page shows it (`SubscriptionView`). */
+export const SUB_FIELD = 'dieselSub';
+
+/** What the reader's own ledger document says about their subscription; the page reads it live. */
+export interface SubscriptionView {
+  id: string;
+  /** Paddle's: `active`, `trialing`, `past_due`, `paused`, `canceled`. */
+  status: string;
+  /** When the next delivery comes (and this one's litres expire), ISO; null once it ends. */
+  nextBilledAt: string | null;
+  /** Set when a cancellation is scheduled for the period's end, ISO. */
+  endsAt: string | null;
+  /** Paddle's own page to cancel, and to change the card — from the subscription's `management_urls`. */
+  cancelUrl: string | null;
+  updatePaymentUrl: string | null;
+}
+
+/** The delivery still in the tank: never more than the tank itself (spending may have run ahead). */
+export function subLeftOf(data: Record<string, unknown> | undefined, balance: number): number {
+  const v = data?.[SUB_BALANCE_FIELD];
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(balance, v)) : 0;
+}
+
+/** The subscription off the ledger document, or null when there is none to show. */
+export function subscriptionOf(data: Record<string, unknown> | undefined): SubscriptionView | null {
+  const v = data?.[SUB_FIELD] as Partial<SubscriptionView> | undefined;
+  return v && typeof v.id === 'string' && typeof v.status === 'string' && v.status !== 'canceled'
+    ? {
+        id: v.id,
+        status: v.status,
+        nextBilledAt: typeof v.nextBilledAt === 'string' ? v.nextBilledAt : null,
+        endsAt: typeof v.endsAt === 'string' ? v.endsAt : null,
+        cancelUrl: typeof v.cancelUrl === 'string' ? v.cancelUrl : null,
+        updatePaymentUrl: typeof v.updatePaymentUrl === 'string' ? v.updatePaymentUrl : null,
+      }
+    : null;
+}
 
 interface PaddleItem {
   quantity?: unknown;

@@ -2013,6 +2013,19 @@ individual one and **still in the sandbox** until Paddle verifies it for live pa
 - **The plant**: the overlay up says "opening the checkout", `checkout.completed` plays the pouring
   and says the litres are on their way, and the tank's snapshot raises the gauge when the webhook
   lands a second or two later. In the sandbox a note gives the test card (4242 4242 4242 4242).
+- **And one subscription, 39 zł a month for 600 L that do not carry over** (owner, 14 Nov 2026: "one
+  subscription, 39 PLN, and diesel does not carry over to the next month"; `SUBSCRIPTION`, product
+  `pro_01m7dfqz9y0tgqhkdcnwvnh45d`). About 6 zł a month is left if every litre is used (27.93 zł after
+  VAT and Paddle against 21.90 zł of model cost), more for every litre that expires. Each delivery is a
+  `transaction.completed` with a `subscription_id`: its litres **replace** what is left of the last
+  delivery (`creditPurchase`, `expiredUsd` on the purchase), and a renewal names its account through
+  `rpgSubscriptions/{sub_id}` (written from the first payment's `custom_data.uid`). The part of the tank
+  that is the delivery is `rpgLedger/{uid}.dieselSubUsd`: `settleDiesel` takes what was spent off it
+  first (it may go below zero for an account with none; `subLeftOf` reads it clamped to the balance),
+  and `subscription.canceled` takes what is left of it away (`endSubscription`). Bought canisters never
+  expire. `subscription.created`/`updated` keep `dieselSub` on the ledger — status, next billing, a
+  scheduled cancel, and Paddle's own `management_urls.cancel` — which the plant shows with a cancel
+  link, since the gateway holds no Paddle API key to open the customer portal.
 - **Two destinations, one per project**: korczak-xyz-501720's `rpgApi` and korczak-rpg's, each with its
   own secret in its own `rpgPaddle/config`. Both point at the same sandbox account and prices.
 

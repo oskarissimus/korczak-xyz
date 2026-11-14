@@ -109,6 +109,13 @@ export const CANISTERS: readonly Canister[] = [
   { id: 'tank', litres: 1400, pln: 99 },
 ];
 
+/**
+ * The monthly delivery (owner, 14 Nov 2026: "one subscription, 39 PLN, and diesel does not carry over
+ * to the next month"): 600 L each billing period, spent before bought litres, and whatever is left
+ * of it when the period renews or the subscription ends is gone. Bought canisters never expire.
+ */
+export const SUBSCRIPTION = { id: 'monthly' as const, litres: 600, pln: 39 };
+
 export type PlantState = 'running' | 'stopped';
 
 export function plantState(l: number): PlantState {

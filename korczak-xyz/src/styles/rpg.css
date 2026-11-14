@@ -2417,6 +2417,15 @@ body:has(.rpg-immersive) .safe-top-band {
   text-align: center;
 }
 
+/* The monthly delivery: the shop's fourth offer, a row of its own under the canisters. */
+.rpg-dz-offer-monthly {
+  margin: 4px auto 0;
+}
+
+.rpg-dz-sub a {
+  color: inherit;
+}
+
 /* An admin's free canisters under the shop: links, so the paid buttons stay the shop. */
 .rpg-dz-free {
   background: none;

@@ -23,7 +23,14 @@ import {
   type WalletStatus,
 } from '../../../korczak-xyz/src/utils/rpg/wallet';
 import { LITRES_PER_USD } from '../../../korczak-xyz/src/utils/rpg/diesel';
-import { PURCHASES_COLLECTION } from '../../../korczak-xyz/src/utils/rpg/paddle';
+import {
+  PURCHASES_COLLECTION,
+  SUBSCRIPTIONS_COLLECTION,
+  SUB_BALANCE_FIELD,
+  SUB_FIELD,
+  subLeftOf,
+  type SubscriptionView,
+} from '../../../korczak-xyz/src/utils/rpg/paddle';
 import { readServerKeys } from './admin';
 import { db } from '../runtime';
 
@@ -79,7 +86,13 @@ export async function reserveDiesel(uid: string, usd: number, free = false): Pro
 export async function settleDiesel(uid: string, reserved: number, actual: number | null): Promise<void> {
   const spent = actual === null ? reserved : Math.min(reserved, Math.max(0, actual));
   const refund = reserved - spent;
-  const write: Record<string, unknown> = { dieselSpentUsd: FieldValue.increment(spent), dieselUpdatedAt: Date.now() };
+  // The month's delivery is spent first (`SUBSCRIPTION`): what it held goes down by what was spent.
+  // It may run below zero for an account with none; it is read clamped (`subLeftOf`).
+  const write: Record<string, unknown> = {
+    dieselSpentUsd: FieldValue.increment(spent),
+    [SUB_BALANCE_FIELD]: FieldValue.increment(-spent),
+    dieselUpdatedAt: Date.now(),
+  };
   if (refund > 0) write[BALANCE_FIELD] = FieldValue.increment(refund);
   await walletDoc(uid).set(write, { merge: true });
 }
@@ -121,6 +134,8 @@ export interface Purchase {
   currency: string | null;
   eventId: string | null;
   priceIds: string[];
+  /** A subscription's delivery: it replaces what is left of the last one instead of adding to it. */
+  subscriptionId?: string | null;
 }
 
 /**
@@ -136,11 +151,17 @@ export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplica
     const [done, snap] = await Promise.all([tx.get(purchase), tx.get(ref)]);
     if (done.exists) return 'duplicate' as const;
     const known = balanceOf(snap.data());
-    tx.set(purchase, { ...p, usd, status: 'credited', at: Date.now(), adjustments: {} });
+    const balance = known ?? grant;
+    // A delivery: last period's litres that were not spent expire as this one comes in.
+    const expired = p.subscriptionId ? subLeftOf(snap.data(), balance) : 0;
+    tx.set(purchase, { ...p, subscriptionId: p.subscriptionId ?? null, usd, expiredUsd: expired, status: 'credited', at: Date.now(), adjustments: {} });
     tx.set(
       ref,
       {
-        [BALANCE_FIELD]: (known ?? grant) + usd,
+        [BALANCE_FIELD]: balance - expired + usd,
+        ...(p.subscriptionId
+          ? { [SUB_BALANCE_FIELD]: usd, dieselSubExpiredUsd: FieldValue.increment(expired) }
+          : {}),
         dieselBoughtUsd: FieldValue.increment(usd),
         dieselUpdatedAt: Date.now(),
         ...(known === null ? { [GRANTED_FIELD]: Date.now(), dieselGrantUsd: grant } : {}),
@@ -174,5 +195,40 @@ export async function debitAdjustment(
     tx.set(purchase, { adjustments: { ...(data.adjustments ?? {}), [adjustmentId]: { action, share, usd, taken, at: Date.now() } }, status: share >= 1 ? action : `partial-${action}` }, { merge: true });
     tx.set(ref, { [BALANCE_FIELD]: balance - taken, dieselRefundedUsd: FieldValue.increment(usd), dieselUpdatedAt: Date.now() }, { merge: true });
     return 'debited' as const;
+  });
+}
+
+/** The account a subscription belongs to, written on its first event and read by every renewal. */
+export async function subscriptionOwner(subscriptionId: string, uid: string | null): Promise<string | null> {
+  const ref = db.collection(SUBSCRIPTIONS_COLLECTION).doc(subscriptionId);
+  if (uid) {
+    await ref.set({ uid, at: Date.now() }, { merge: true });
+    return uid;
+  }
+  const owner = (await ref.get()).data()?.uid;
+  return typeof owner === 'string' && owner ? owner : null;
+}
+
+/** The subscription as the page shows it, on the reader's own ledger document. */
+export async function showSubscription(uid: string, view: SubscriptionView): Promise<void> {
+  await walletDoc(uid).set({ [SUB_FIELD]: view, dieselUpdatedAt: Date.now() }, { merge: true });
+}
+
+/**
+ * The subscription ended: what is left of its last delivery goes with it (owner: diesel from the
+ * subscription does not carry over). Bought litres stay.
+ */
+export async function endSubscription(uid: string, view: SubscriptionView): Promise<number> {
+  const ref = walletDoc(uid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const balance = balanceOf(snap.data()) ?? 0;
+    const expired = subLeftOf(snap.data(), balance);
+    tx.set(
+      ref,
+      { [BALANCE_FIELD]: balance - expired, [SUB_BALANCE_FIELD]: 0, [SUB_FIELD]: view, dieselSubExpiredUsd: FieldValue.increment(expired), dieselUpdatedAt: Date.now() },
+      { merge: true },
+    );
+    return expired;
   });
 }

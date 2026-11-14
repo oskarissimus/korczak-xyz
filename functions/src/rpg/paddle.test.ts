@@ -142,6 +142,46 @@ describe('the Paddle webhook', () => {
     expect(store.get('rpgLedger/u1')?.dieselUsd).toBe(0);
   });
 
+  it('pours a monthly delivery that replaces what was left of the last one, never bought litres', async () => {
+    const delivery = (txn: string, uid: string | null) =>
+      JSON.stringify({
+        event_type: 'transaction.completed',
+        data: {
+          id: txn,
+          subscription_id: 'sub_1',
+          custom_data: uid ? { uid } : null,
+          items: [{ quantity: 1, price: { id: 'pri_monthly', custom_data: { litres: 600, kind: 'subscription' } } }],
+          details: { totals: { grand_total: '3900' } },
+        },
+      });
+    store.set('rpgLedger/u1', { dieselUsd: 0, dieselGrantedAt: 1 });
+    await deliver(paid('txn_b', 'u1', 250));
+    expect((await deliver(delivery('txn_s1', 'u1'))).json.outcome).toBe('credited');
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(8.5);
+    // Two dollars of it spent, then the renewal — which names no account; the subscription does.
+    store.set('rpgLedger/u1', { ...store.get('rpgLedger/u1'), dieselUsd: 6.5, dieselSubUsd: 4 });
+    expect((await deliver(delivery('txn_s2', null))).json.outcome).toBe('credited');
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(2.5 + 6);
+    expect(store.get('rpgLedger/u1')?.dieselSubUsd).toBeCloseTo(6);
+    expect(store.get('rpgPurchases/txn_s2')?.expiredUsd).toBeCloseTo(4);
+  });
+
+  it('shows the subscription on the ledger, and its end takes the rest of the delivery away', async () => {
+    store.set('rpgLedger/u1', { dieselUsd: 8, dieselSubUsd: 5, dieselGrantedAt: 1 });
+    const sub = (type: string, status: string, extra: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        event_type: type,
+        data: { id: 'sub_9', status, custom_data: { uid: 'u1' }, next_billed_at: '2026-12-14T16:00:00Z', management_urls: { cancel: 'https://sandbox-buyer-portal.paddle.com/x', update_payment_method: null }, ...extra },
+      });
+    expect((await deliver(sub('subscription.created', 'active'))).json.outcome).toBe('shown');
+    expect(store.get('rpgLedger/u1')?.dieselSub).toMatchObject({ id: 'sub_9', status: 'active', cancelUrl: 'https://sandbox-buyer-portal.paddle.com/x', endsAt: null });
+    await deliver(sub('subscription.updated', 'active', { scheduled_change: { action: 'cancel', effective_at: '2026-12-14T16:00:00Z' } }));
+    expect(store.get('rpgLedger/u1')?.dieselSub).toMatchObject({ endsAt: '2026-12-14T16:00:00Z' });
+    expect((await deliver(JSON.stringify({ event_type: 'subscription.canceled', data: { id: 'sub_9', status: 'canceled' } }))).json.outcome).toBe('ended');
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(3);
+    expect(store.get('rpgLedger/u1')?.dieselSubUsd).toBe(0);
+  });
+
   it('ignores events it has nothing to do with', async () => {
     expect((await deliver(JSON.stringify({ event_type: 'customer.created', data: {} }))).json.outcome).toBe('ignored');
   });
