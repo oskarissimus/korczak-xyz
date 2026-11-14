@@ -1174,7 +1174,13 @@ content-hashed and immutable.
     people only; anything but schnell is drawn in the browser, as Meshy's mesh
     is, since the server's job only knows schnell. Measured on the blacksmith: Nano Banana's wide
     pose through TRELLIS, $0.06 in all, one person with a gap at every limb.
-    **Nano Banana Lite is the game's default since 30 Oct 2026** (owner: "nb2.1 minimal and Flash
+    **FLUX schnell is the game's default again since 14 Nov 2026** (owner: "character pictures can
+    default to fal.ai like the other assets — with the T-pose FLUX schnell is enough, and it saves a
+    bit"): the ledger had Nano Banana Lite at ~$0.21 of a $1.20 world and its first quest, against
+    $0.003 a picture on schnell (`GAME_PAINTER` in `landmark3d.ts`). A stored `rpg-painter` still wins;
+    one that chose Nano Banana Lite while it was the default was never stored, so it is schnell now.
+    The lab keeps Nano Banana Lite (`DEFAULT_PAINTER`), and the weapon too (`WEAPON_PAINTER`).
+    **Nano Banana Lite was the game's default from 30 Oct 2026** (owner: "nb2.1 minimal and Flash
     Lite are fine — add both to the settings, Flash Lite Image the default"), and the lab's too.
     Six people in the strict T-pose, two pictures each, judged at full size: Nano Banana drew the
     palms down in 12 of 12 whatever the prompt says; `nanoBanana21` (Gemini's

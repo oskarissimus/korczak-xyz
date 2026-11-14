@@ -227,10 +227,17 @@ export const PERSON_PAINTERS = {
   },
 } as const;
 export type PersonPainter = keyof typeof PERSON_PAINTERS;
+/** The lab's default: it compares models, so it starts from the painter that holds the pose best. */
 export const DEFAULT_PAINTER: PersonPainter = 'nanoBananaLite';
+/**
+ * The game's default (owner, 14 Nov 2026: "character pictures can default to fal.ai like the other
+ * assets — with the T-pose FLUX schnell is enough, and it saves a bit"). $0.003 a picture against
+ * ~$0.034–0.042, and the server's job runner can draw it; Nano Banana Lite stays in the settings.
+ */
+export const GAME_PAINTER: PersonPainter = 'schnell';
 /** Who draws the hero's weapon (`utils/rpg/weapon.ts`), whatever the people's switch says. */
 export const WEAPON_PAINTER: PersonPainter = 'nanoBananaLite';
-let personPainter: PersonPainter = DEFAULT_PAINTER;
+let personPainter: PersonPainter = GAME_PAINTER;
 let googleKey: string | null = null;
 /** The account's Gemini key, if it has one: Google's own painters are then asked at Google rather than through fal. */
 export function setGoogleImageKey(key: string | null | undefined) {

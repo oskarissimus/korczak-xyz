@@ -136,8 +136,8 @@ describe('landmark3d', () => {
     const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       calls.push(url);
-      // The game's painter, Nano Banana Lite, through fal while the account has no Gemini key.
-      if (url === 'https://fal.run/fal-ai/nano-banana-lite') return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
+      // The game's painter, FLUX schnell (`GAME_PAINTER`).
+      if (url === 'https://fal.run/fal-ai/flux/schnell') return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
       if (url === `https://queue.fal.run/${FAL_PERSON_MESH_MODEL}`) {
         bodies.mesh = JSON.parse(String(init?.body));
         return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
@@ -152,13 +152,13 @@ describe('landmark3d', () => {
         ensurePersonModel('k', 'person', 'w1/Jagna', 'a woman', resolve, reject, { ...now, fetchImpl: f as typeof fetch }),
       );
       expect(model.glb).toBe('https://fal.media/meshy.glb');
-      expect(model.costUsd).toBeCloseTo(0.842);
+      expect(model.costUsd).toBeCloseTo(0.803);
       // The game's pose is the T-pose by default, and Meshy is told so.
       expect(bodies.mesh).toMatchObject({ image_url: 'https://fal.media/img.jpg', pose_mode: 't-pose' });
       expect(model.prompt).toContain('in a T-pose: arms straight out');
       expect(calls).not.toContain(`https://queue.fal.run/${FAL_MESH_MODEL}`);
       expect(devRequests().map((e) => [e.model, e.status, e.cost])).toEqual([
-        ['fal-ai/nano-banana-lite', 'ok', 0.042],
+        ['fal-ai/flux/schnell', 'ok', 0.003],
         [FAL_PERSON_MESH_MODEL, 'ok', 0.8],
       ]);
       const hub = await generateLandmark('k', world(), { ...now, fetchImpl: falFetch([]) as typeof fetch });

@@ -71,7 +71,7 @@ import {
   ensureClueModel,
   ensureHubModels,
   DEFAULT_MESHER,
-  DEFAULT_PAINTER,
+  GAME_PAINTER,
   PERSON_PAINTERS,
   setPersonPainter,
   setGoogleImageKey,
@@ -463,7 +463,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   riggerRef.current = rigger;
   const [mesher, setMesher] = useState<Mesher>(DEFAULT_MESHER);
   setPersonMesher(mesher);
-  const [painter, setPainter] = useState<PersonPainter>(DEFAULT_PAINTER);
+  const [painter, setPainter] = useState<PersonPainter>(GAME_PAINTER);
   setPersonPainter(painter);
   setGoogleImageKey(apiKeys.google);
   const [pose, setPose] = useState<PersonPose>(DEFAULT_POSE);
@@ -2588,7 +2588,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       setJumping(localStorage.getItem(JUMP_KEY) === '1');
       setMesher(localStorage.getItem(MESHER_KEY) === 'meshy' ? 'meshy' : DEFAULT_MESHER);
       const keptPainter = localStorage.getItem(PAINTER_KEY);
-      setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : DEFAULT_PAINTER);
+      setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : GAME_PAINTER);
       setPose(localStorage.getItem(POSE_KEY) === 'apose' ? 'apose' : DEFAULT_POSE);
       const kept = localStorage.getItem(EXOTIC_KEY);
       if (kept !== null) setExotic(clampExotic(kept));
@@ -2652,7 +2652,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const pickPainter = (value: PersonPainter) => {
     setPainter(value);
     try {
-      if (value === DEFAULT_PAINTER) localStorage.removeItem(PAINTER_KEY);
+      if (value === GAME_PAINTER) localStorage.removeItem(PAINTER_KEY);
       else localStorage.setItem(PAINTER_KEY, value);
     } catch {
       /* forgotten on reload */
