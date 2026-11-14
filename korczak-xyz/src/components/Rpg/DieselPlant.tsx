@@ -2,15 +2,19 @@
  * The diesel plant (`utils/rpg/diesel.ts`): the demo's budget for today drawn as a data centre on a
  * smoking generator. Running, the generator shakes and smokes, current runs along the cable and the
  * racks blink; empty, everything is dark and still, and the canisters to buy come up underneath.
- * When the tank goes from empty to something (a new day, later a purchase), a little man walks in
- * with a canister, pours, and the lights come back on along the cable.
+ * When the tank goes from empty to something (a new day, a purchase), a little man walks in with a
+ * canister, pours, and the lights come back on along the cable.
  *
- * No payment provider sells the canisters yet, so a canister's button plays the refuelling as a
- * preview and says so, then the plant goes back to what is really in the tank.
+ * Signed in on the account's tank, a canister is bought through Paddle's overlay (`onBuy`,
+ * `paddleCheckout.ts`); the litres arrive by webhook and the tank's snapshot raises the gauge. An
+ * admin also gets the free canisters (`onRefuel`) as a line of links under the shop. On the demo,
+ * with no account to pour into, a canister's button plays the refuelling as a preview and says so.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { CANISTERS, formatLitres, plantState, type Canister } from '../../utils/rpg/diesel';
+import { PADDLE } from '../../utils/rpg/paddle';
+import type { CheckoutOutcome } from '../../utils/rpg/paddleCheckout';
 import type { Lang } from '../../utils/rpg/quest';
 import { ui } from './ui';
 
@@ -75,6 +79,7 @@ export default function DieselPlant({
   showCanisters = false,
   tank = false,
   onRefuel,
+  onBuy,
 }: {
   lang: Lang;
   litres: number;
@@ -85,6 +90,8 @@ export default function DieselPlant({
   tank?: boolean;
   /** An admin's canister is poured for real and for free (`/wallet/refuel`); resolves whether it was. */
   onRefuel?: (c: Canister) => Promise<boolean>;
+  /** A canister bought through Paddle's checkout; resolves how the checkout ended. */
+  onBuy?: (c: Canister) => Promise<CheckoutOutcome>;
 }) {
   const t = ui(lang);
   const real = plantState(litres);
@@ -92,6 +99,8 @@ export default function DieselPlant({
   const [preview, setPreview] = useState<Canister | null>(null);
   /** The admin's canister poured for real, and how it went: the line under the plant says so. */
   const [poured, setPoured] = useState<{ c: Canister; ok: boolean | null } | null>(null);
+  /** A checkout open or just finished: `null` outcome while the overlay is up. */
+  const [bought, setBought] = useState<{ c: Canister; outcome: CheckoutOutcome | null } | null>(null);
   const before = useRef(real);
   const timers = useRef<number[]>([]);
 
@@ -113,18 +122,38 @@ export default function DieselPlant({
     // `later` only schedules; the effect is about the tank.
   }, [real, preview]);
 
+  const pour = (c: Canister) => {
+    if (phase === 'refuel' || !onRefuel) return;
+    setPoured({ c, ok: null });
+    setPhase('refuel');
+    const started = Date.now();
+    void onRefuel(c).then((ok) => {
+      setPoured({ c, ok });
+      // The man finishes pouring before the lights come on, however fast the server was.
+      later(() => setPhase(ok ? 'running' : plantState(litres)), Math.max(0, REFUEL_MS - (Date.now() - started)));
+      later(() => setPoured(null), REFUEL_MS + PREVIEW_HOLD_MS * 2);
+    });
+  };
+
   const buy = (c: Canister) => {
-    if (phase === 'refuel') return;
-    if (onRefuel) {
-      setPoured({ c, ok: null });
-      setPhase('refuel');
-      const started = Date.now();
-      void onRefuel(c).then((ok) => {
-        setPoured({ c, ok });
-        // The man finishes pouring before the lights come on, however fast the server was.
-        later(() => setPhase(ok ? 'running' : plantState(litres)), Math.max(0, REFUEL_MS - (Date.now() - started)));
-        later(() => setPoured(null), REFUEL_MS + PREVIEW_HOLD_MS * 2);
+    if (phase === 'refuel' || (bought && bought.outcome === null)) return;
+    if (onBuy) {
+      setBought({ c, outcome: null });
+      void onBuy(c).then((outcome) => {
+        setBought(outcome === 'closed' ? null : { c, outcome });
+        if (outcome === 'paid') {
+          // Paid: the man pours now; the webhook's litres land on the gauge as he does.
+          setPhase('refuel');
+          later(() => setPhase('running'), REFUEL_MS);
+          later(() => setBought(null), REFUEL_MS + PREVIEW_HOLD_MS * 3);
+        } else if (outcome === 'failed') {
+          later(() => setBought(null), PREVIEW_HOLD_MS * 2);
+        }
       });
+      return;
+    }
+    if (onRefuel) {
+      pour(c);
       return;
     }
     setPreview(c);
@@ -217,7 +246,13 @@ export default function DieselPlant({
         </g>
       </svg>
       <p className="rpg-dz-status">
-        {poured && poured.ok !== null
+        {bought
+          ? bought.outcome === null
+            ? t.dieselCheckout
+            : bought.outcome === 'paid'
+              ? t.dieselPaid(formatLitres(bought.c.litres, lang))
+              : t.dieselCheckoutFailed
+          : poured && poured.ok !== null
           ? poured.ok
             ? t.dieselAdminPoured(formatLitres(poured.c.litres, lang))
             : t.dieselAdminFailed
@@ -235,7 +270,7 @@ export default function DieselPlant({
         <>
           <div className="rpg-dz-shop">
             {CANISTERS.map((c) => (
-              <button type="button" key={c.id} className={`rpg-dz-offer rpg-dz-offer-${c.id}`} onClick={() => buy(c)} disabled={phase === 'refuel'}>
+              <button type="button" key={c.id} className={`rpg-dz-offer rpg-dz-offer-${c.id}`} onClick={() => buy(c)} disabled={phase === 'refuel' || (bought !== null && bought.outcome === null)}>
                 <CanisterIcon size={c.id === 'can' ? 18 : c.id === 'barrel' ? 22 : 26} />
                 <strong>{t.dieselCanister[c.id]}</strong>
                 <span>{formatLitres(c.litres, lang)}</span>
@@ -243,7 +278,27 @@ export default function DieselPlant({
               </button>
             ))}
           </div>
-          <p className="rpg-dz-note">{onRefuel ? t.dieselAdminNote : tank ? t.dieselTankSoon : t.dieselSoon}</p>
+          {onBuy ? (
+            <>
+              <p className="rpg-dz-note">{t.dieselBuyNote}</p>
+              {PADDLE.environment === 'sandbox' && <p className="rpg-dz-note">{t.dieselSandboxNote}</p>}
+              {onRefuel && (
+                <p className="rpg-dz-note">
+                  {t.dieselAdminFree}{' '}
+                  {CANISTERS.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ' · '}
+                      <button type="button" className="rpg-dz-free" onClick={() => pour(c)} disabled={phase === 'refuel'}>
+                        {t.dieselCanister[c.id]}
+                      </button>
+                    </span>
+                  ))}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="rpg-dz-note">{onRefuel ? t.dieselAdminNote : tank ? t.dieselTankSoon : t.dieselSoon}</p>
+          )}
         </>
       )}
     </div>

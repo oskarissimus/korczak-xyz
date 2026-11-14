@@ -22,6 +22,8 @@ import {
   grantOf,
   type WalletStatus,
 } from '../../../korczak-xyz/src/utils/rpg/wallet';
+import { LITRES_PER_USD } from '../../../korczak-xyz/src/utils/rpg/diesel';
+import { PURCHASES_COLLECTION } from '../../../korczak-xyz/src/utils/rpg/paddle';
 import { readServerKeys } from './admin';
 import { db } from '../runtime';
 
@@ -82,7 +84,7 @@ export async function settleDiesel(uid: string, reserved: number, actual: number
   await walletDoc(uid).set(write, { merge: true });
 }
 
-/** Adds to an account's tank (the panel's top-up; later, a purchase). Grants the first tank too. */
+/** Adds to an account's tank (the panel's top-up, an admin's free canister; a purchase is `creditPurchase`). Grants the first tank too. */
 export async function topUpDiesel(uid: string, usd: number): Promise<number> {
   const grant = await grantUsd();
   const ref = walletDoc(uid);
@@ -107,4 +109,70 @@ export async function walletStatus(uid: string): Promise<WalletStatus> {
     grantUsd: grant,
     server: Object.fromEntries(DIESEL_KEYS.map((n) => [n, Boolean(keys[n])])) as WalletStatus['server'],
   };
+}
+
+/** What a paid transaction left behind, `rpgPurchases/{txnId}` (`utils/rpg/paddle.ts`). */
+export interface Purchase {
+  txnId: string;
+  uid: string;
+  litres: number;
+  /** Paddle's grand total, in the currency's minor units (grosze), as a string; refunds are a share of it. */
+  totalMinor: string | null;
+  currency: string | null;
+  eventId: string | null;
+  priceIds: string[];
+}
+
+/**
+ * Pours a purchase into the tank, once: the purchase document and the litres are one transaction, so
+ * a webhook Paddle delivers twice (it retries until a 200) pours once. Grants the first tank too.
+ */
+export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplicate'> {
+  const grant = await grantUsd();
+  const ref = walletDoc(p.uid);
+  const purchase = db.collection(PURCHASES_COLLECTION).doc(p.txnId);
+  const usd = p.litres / LITRES_PER_USD;
+  return db.runTransaction(async (tx) => {
+    const [done, snap] = await Promise.all([tx.get(purchase), tx.get(ref)]);
+    if (done.exists) return 'duplicate' as const;
+    const known = balanceOf(snap.data());
+    tx.set(purchase, { ...p, usd, status: 'credited', at: Date.now(), adjustments: {} });
+    tx.set(
+      ref,
+      {
+        [BALANCE_FIELD]: (known ?? grant) + usd,
+        dieselBoughtUsd: FieldValue.increment(usd),
+        dieselUpdatedAt: Date.now(),
+        ...(known === null ? { [GRANTED_FIELD]: Date.now(), dieselGrantUsd: grant } : {}),
+      },
+      { merge: true },
+    );
+    return 'credited' as const;
+  });
+}
+
+/**
+ * Takes a refund or a chargeback back out of the tank: `share` (0–1) of the purchase's litres, never
+ * below an empty tank — litres already burnt are not clawed back from nothing. Once per adjustment.
+ */
+export async function debitAdjustment(
+  txnId: string,
+  adjustmentId: string,
+  share: number,
+  action: string,
+): Promise<'debited' | 'duplicate' | 'unknown'> {
+  const purchase = db.collection(PURCHASES_COLLECTION).doc(txnId);
+  return db.runTransaction(async (tx) => {
+    const done = await tx.get(purchase);
+    const data = done.data() as (Purchase & { adjustments?: Record<string, unknown> }) | undefined;
+    if (!done.exists || !data) return 'unknown' as const;
+    if (data.adjustments?.[adjustmentId]) return 'duplicate' as const;
+    const ref = walletDoc(data.uid);
+    const balance = balanceOf((await tx.get(ref)).data()) ?? 0;
+    const usd = (Math.max(0, Math.min(1, share)) * data.litres) / LITRES_PER_USD;
+    const taken = Math.min(balance, usd);
+    tx.set(purchase, { adjustments: { ...(data.adjustments ?? {}), [adjustmentId]: { action, share, usd, taken, at: Date.now() } }, status: share >= 1 ? action : `partial-${action}` }, { merge: true });
+    tx.set(ref, { [BALANCE_FIELD]: balance - taken, dieselRefundedUsd: FieldValue.increment(usd), dieselUpdatedAt: Date.now() }, { merge: true });
+    return 'debited' as const;
+  });
 }

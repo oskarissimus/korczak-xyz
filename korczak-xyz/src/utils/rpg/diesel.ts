@@ -10,8 +10,10 @@
  * so the two can never disagree. The tags (a world, a step, a spoken line) are estimates from a
  * typical request, said as "about" on screen; the console keeps the real bill.
  *
- * The canisters are the packs the payment comparison proposed (10/20/49 zł). Nothing sells them yet:
- * there is no payment provider behind the button, and the panel says so.
+ * The canisters are the packs sold through Paddle (`paddle.ts`; owner, 14 Nov 2026): 20 zł for 250 L,
+ * 40 zł for 550 L, 99 zł for 1400 L, VAT included. The first 10/20/49 zł packs lost money once the
+ * 23% VAT and Paddle's 5% + $0.50 came off; these keep about 30% over what the litres cost at list
+ * price. `pln` is only what the button says — the price charged is the Paddle price's own.
  */
 
 import { tokenCost } from './cost';
@@ -102,9 +104,9 @@ export interface Canister {
 }
 
 export const CANISTERS: readonly Canister[] = [
-  { id: 'can', litres: 200, pln: 10 },
-  { id: 'barrel', litres: 450, pln: 20 },
-  { id: 'tank', litres: 1200, pln: 49 },
+  { id: 'can', litres: 250, pln: 20 },
+  { id: 'barrel', litres: 550, pln: 40 },
+  { id: 'tank', litres: 1400, pln: 99 },
 ];
 
 export type PlantState = 'running' | 'stopped';

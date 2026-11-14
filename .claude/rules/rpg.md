@@ -1850,7 +1850,7 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   no page or coding session reads them back.
 - **Diesel**: the first tank a new account gets (`rpgDiesel/config.grantUsd`, default $1 = 100 L, at
   most $20) and a top-up of one account by its e-mail (`topUp`, at most $100 a go) — how the owner
-  pours diesel in until canisters are on sale.
+  pours diesel in by hand (a gift, a fix); canisters are bought through Paddle (*Buying diesel*).
 - **The demo section** writes `apps.rpg`, `rpgPerIpUsd`, `rpgDailyUsd` into `demo/config` merged, so
   the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
   `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
@@ -1974,13 +1974,47 @@ the price of a world or a beat is in it too."
 - **An admin's canister is real and free** (owner, 9 Nov 2026: "when I click refuel and I'm admin I
   should get more fuel without needing to pay"): on the account's tank, a tap posts `/wallet/refuel`,
   the gateway checks `admins/{uid}` and pours the canister's litres in (`topUpDiesel`); the plant
-  plays the pouring and the live snapshot raises the gauge. Anyone else still gets the preview.
+  plays the pouring and the live snapshot raises the gauge. Since the canisters went on sale, the
+  admin's buttons buy like anyone's and the free pours are a line of links under the shop.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
-- **Nothing sells the canisters yet.** The three packs (200 L / 10 zł, 450 L / 20 zł, 1200 L / 49 zł)
-  are the ones the payment comparison proposed; a tap plays the refuelling as a preview, says so,
-  and goes back to the real tank. Wiring a provider means a purchase raising the balance, and the
-  plant already animates any rise from empty.
+- **On the demo a canister is still a preview**: there is no account to pour into, so a tap plays the
+  refuelling, says to sign in to buy, and goes back to the real day.
+
+### Buying diesel (Paddle)
+
+Owner, 14 Nov 2026: three packs, **250 L for 20 zł, 550 L for 40 zł, 1400 L for 99 zł**, VAT included
+(`CANISTERS`). The first proposal (200/10, 450/20, 1200/49) lost money on every pack once 23% VAT and
+Paddle's 5% + $0.50 came off; these keep about 30% over the litres' list cost. Paddle is the merchant
+of record (it charges, adds and remits VAT, handles refunds and chargebacks); the account is an
+individual one and **still in the sandbox** until Paddle verifies it for live payments.
+
+- **The page names a price, never litres.** A signed-in reader on their tank taps a canister, Paddle.js
+  is loaded from Paddle's CDN on that first tap (`paddleCheckout.ts`; not with the game, and not
+  self-hosted, which Paddle asks against) and opens the overlay with the canister's price id and
+  `customData.uid`. The litres are `custom_data.litres` on the Paddle price itself, so what is poured
+  is what was paid for whatever the page sent. Token and price ids are in `utils/rpg/paddle.ts`, public
+  by design; going live is a new token, three live price ids and `environment: 'production'` there.
+- **The webhook pours, not the page** (`functions/src/rpg/paddle.ts`, `rpgApi/paddle/webhook`). It is
+  routed in `handleRpgApi` **before the CORS gate** — Paddle sends no Origin — and the only thing that
+  lets a body in is `Paddle-Signature` (HMAC-SHA256 of `ts:rawBody`, at most five minutes old) under
+  the destination's endpoint secret in **`rpgPaddle/config.webhookSecret`** (or a `webhookSecrets`
+  list while rotating). Firestore rather than Secret Manager so a project without one still deploys
+  and simply answers 401. No rule, Admin SDK only.
+- **Once per transaction.** `transaction.paid` and `transaction.completed` both pour, whichever comes
+  first; `rpgPurchases/{txn_id}` is written in the same transaction as the litres (`creditPurchase`),
+  so the second event and every Paddle retry find it and do nothing. A paid transaction with no uid or
+  no litres is kept there as `status: 'orphan'`, reported to Sentry, and still answered 200 (a retry
+  would not add the uid) — sort it out by hand with the panel's top-up. Our own failures are a 500,
+  so Paddle retries them.
+- **Refunds and chargebacks take their share back** (`adjustment.created`/`updated` once
+  `approved`): the adjustment's total over the transaction's grand total, of the litres bought, once
+  per adjustment id, and **never below an empty tank** — litres already burnt are not clawed back.
+- **The plant**: the overlay up says "opening the checkout", `checkout.completed` plays the pouring
+  and says the litres are on their way, and the tank's snapshot raises the gauge when the webhook
+  lands a second or two later. In the sandbox a note gives the test card (4242 4242 4242 4242).
+- **Two destinations, one per project**: korczak-xyz-501720's `rpgApi` and korczak-rpg's, each with its
+  own secret in its own `rpgPaddle/config`. Both point at the same sandbox account and prices.
 
 ### Signed in, the tank pays
 

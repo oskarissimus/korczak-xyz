@@ -244,7 +244,7 @@ describe('diesel', () => {
     let res = fakeRes();
     await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'barrel' } }), res as any);
     expect(res.statusCode).toBe(200);
-    expect(topUp).toHaveBeenCalledWith('u1', 4.5);
+    expect(topUp).toHaveBeenCalledWith('u1', 5.5);
     res = fakeRes();
     await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer keyless' }, body: { canister: 'barrel' } }), res as any);
     expect(res.statusCode).toBe(403);
@@ -252,5 +252,13 @@ describe('diesel', () => {
     await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'truck' } }), res as any);
     expect(res.statusCode).toBe(400);
     expect(topUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets Paddle’s webhook past the origin gate, where only its signature can let it in', async () => {
+    const res = fakeRes();
+    const r = req('/paddle/webhook', { body: { event_type: 'transaction.completed' } });
+    delete r.headers.origin;
+    await handleRpgApi(r, res as any);
+    expect(res.statusCode).toBe(401);
   });
 });

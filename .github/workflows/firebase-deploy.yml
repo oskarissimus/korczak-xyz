@@ -93,6 +93,12 @@ on:
       # The request log's shape and its pricing arithmetic, which the gateway and the demo write by.
       - "korczak-xyz/src/utils/rpg/requestLog.ts"
       - "korczak-xyz/src/utils/rpg/wallets.ts"
+      # The diesel tank and its purchases: the litres and the packs, the balance's names and reservation,
+      # Paddle's webhook shape, and the language table `diesel.ts` formats with.
+      - "korczak-xyz/src/utils/rpg/diesel.ts"
+      - "korczak-xyz/src/utils/rpg/wallet.ts"
+      - "korczak-xyz/src/utils/rpg/paddle.ts"
+      - "korczak-xyz/src/utils/rpg/language.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
       # The RPG production project has its own workflow (rpg-terraform.yml) and nothing here reads it.

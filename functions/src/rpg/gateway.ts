@@ -74,6 +74,8 @@ import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
 import { AdminRefusal, handleAdmin, isAdminUid, readServerKeys } from './admin';
 import { reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
+import { handlePaddleWebhook } from './paddle';
+import { PADDLE_WEBHOOK_PATH } from '../../../korczak-xyz/src/utils/rpg/paddle';
 import { CANISTERS, LITRES_PER_USD } from '../../../korczak-xyz/src/utils/rpg/diesel';
 import {
   DIESEL_KEYS,
@@ -670,12 +672,12 @@ async function wallet(req: Request, res: Response): Promise<void> {
 
 /**
  * `/wallet/refuel`: a canister poured into an admin's own tank, for nothing. Admin is `admins/{uid}`,
- * checked here; anyone else is a 403 — buying is for the payment provider, when there is one.
+ * checked here; anyone else is a 403 — everyone else buys through Paddle (`paddle.ts`).
  */
 async function refuel(req: Request, res: Response): Promise<void> {
   const uid = await uidOf(req);
   if (!uid) throw new GatewayRefusal(401, 'auth', 'rpg wallet: sign in first');
-  if (!(await isAdminUid(uid))) throw new GatewayRefusal(403, 'not-admin', 'rpg wallet: canisters are not on sale yet');
+  if (!(await isAdminUid(uid))) throw new GatewayRefusal(403, 'not-admin', 'rpg wallet: free canisters are for admins; buy one through the checkout');
   const id = jsonOf(bodyOf(req)).canister;
   const canister = CANISTERS.find((c) => c.id === id);
   if (!canister) throw new GatewayRefusal(400, 'bad-canister', 'rpg wallet: no such canister');
@@ -685,6 +687,17 @@ async function refuel(req: Request, res: Response): Promise<void> {
 }
 
 export async function handleRpgApi(req: Request, res: Response): Promise<void> {
+  // Paddle's webhook comes from Paddle's servers, with no Origin: its signature is its gate (`paddle.ts`).
+  if (gatewayPathOf(req.url).path === PADDLE_WEBHOOK_PATH) {
+    try {
+      await handlePaddleWebhook(req, res, bodyOf(req));
+    } catch (e) {
+      reportError('rpgApi.paddle', e);
+      await flushSentry();
+      if (!res.headersSent) res.status(500).json({ reason: 'failed' });
+    }
+    return;
+  }
   const allowed = cors(req, res);
   if (req.method === 'OPTIONS') {
     res.status(204).send('');

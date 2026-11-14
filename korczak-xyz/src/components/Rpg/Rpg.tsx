@@ -189,7 +189,7 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
-import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from '../../utils/rpg/diesel';
+import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
   speaker: string;
@@ -3104,6 +3104,19 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // An admin's canister pours real diesel into their own tank, free (`/wallet/refuel`; the server
   // checks `admins/`). The tank's live snapshot raises the gauge.
   const adminRefuel = onDiesel && auth.isAdmin ? async (c: { id: string }) => Boolean(await refuelWallet(c.id)) : undefined;
+  // Anyone on their own tank buys canisters through Paddle (`paddleCheckout.ts`); the webhook pours
+  // the litres and the same snapshot raises the gauge. Loaded on the first buy, not with the game.
+  const buyDiesel =
+    onDiesel && auth.user
+      ? async (c: Canister) => {
+          const user = auth.user!;
+          log.info('rpg.diesel.checkout', { canister: c.id });
+          const { buyCanister } = await import('../../utils/rpg/paddleCheckout');
+          const outcome = await buyCanister(c, user.uid, user.email, gameLang);
+          log.info('rpg.diesel.checkout.end', { canister: c.id, outcome });
+          return outcome;
+        }
+      : undefined;
   const dieselModel = modelChain(onDiesel ? (wallet!.server.google ? 'google' : 'openai') : 'demo', chosenModel)[0] ?? null;
   // What a quest and a world cost in all, not only the model's words: the lines, the score and the
   // models are most of it (`questLitres`, measured on the ledger) — and only what is on for this reader.
@@ -3513,7 +3526,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselMenu = diesel && (
     <div className="rpg-panel">
       <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} showCanisters />
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <p className="rpg-dz-note">
@@ -3840,7 +3853,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                     {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
                     {/* A dark plant is the one thing about the diesel the screen must say: nothing can be made. */}
                     {diesel && plantState(diesel.litres) === 'stopped' && (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} />
                     )}
                   </section>
                   <WorldProposals
@@ -3867,7 +3880,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
-          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} />}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>
