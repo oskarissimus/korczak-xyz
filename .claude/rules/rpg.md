@@ -360,6 +360,13 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   built by `settingSelect`/`settingSwitch`/`settingGroup`, all left-aligned and in Manrope. A select
   is its card's full width and ends a long option in "…" (16 px, so iOS does not zoom); a checkbox is
   a switch, white when on. The styles are `.rpg-set-*` at the end of `rpg-theme.css`.
+- **The account page wears the settings' look** (owner, 14 Nov 2026: "this page in the same style
+  as the settings"; iPhone SE shots in `rpg/konto-styl-ustawien/`). `src-rpg/pages/account.astro`
+  draws the ← and the title in `.rpg-settings-bar` before the island runs; `GameAccount` in
+  `Account.tsx` gives *Sign-in* (email, Sign out, Admin panel) and *API keys* (blurb, sync, Check
+  again) as `.rpg-set-*` groups; the provider cards are still the site's markup, restyled into the
+  same kind of card by `.acct-game` at the end of `src-rpg/styles/pages.css`. No panel over the
+  village there: the settings' own dark screen.
 - **The dialogue is one panel with a list in it**: dim numbers, a light row for focus, the typed line
   under a hairline rather than in a box.
 - `src-rpg/components/MenuSkeleton.astro` draws the same boxes before the bundle runs; change both.

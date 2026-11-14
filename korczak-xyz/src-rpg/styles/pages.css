@@ -379,3 +379,217 @@ body::before {
     font-size: 16px;
   }
 }
+
+/* --- The account page in the settings' look (owner, 14 Nov 2026: "this page in the same style as
+   the settings"). No panel over the village: the settings' own dark screen, the ← and the title
+   in a bar, groups of rows in cards (`.rpg-set-*`, rpg-theme.css). The provider cards are the
+   site's markup (Account.tsx), so they are restyled here into the same kind of card: a title and
+   a status chip, the key field, then the numbers and the links under a hairline. Every size is in
+   px, so the small-phone root size above does not shrink them a second time. ------------------ */
+
+:root:root:root body:has(.rpg-page--settings)::before {
+  background: var(--d-scrim), var(--d-bg);
+}
+
+:root:root:root .rpg-page.rpg-page--settings {
+  max-width: none;
+  margin: 0;
+  padding: 0 var(--safe-right) 0 var(--safe-left);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root:root:root .rpg-page--settings .rpg-settings-bar h1 {
+  /* The settings' serif title; everything else on these pages is forced to inherit above. */
+  font-family: var(--d-font-display) !important;
+  text-align: left;
+  text-shadow: none;
+  color: var(--d-ink-strong);
+}
+
+.acct-game-wait {
+  margin-top: 22px;
+}
+
+.acct-game-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+:root:root .acct-game .acct-warn {
+  color: var(--d-danger);
+}
+
+:root:root .acct-game .acct-ok {
+  color: #9fe0ae;
+}
+
+:root:root .acct-game .acct-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  color: var(--d-ink);
+  font: 400 14px/1.45 var(--d-font);
+}
+
+:root:root .acct-game .acct-card > * {
+  margin: 0;
+  padding: 10px 14px 0;
+}
+
+:root:root .acct-game .acct-card > :last-child {
+  padding-bottom: 14px;
+}
+
+:root:root .acct-game .acct-card > .acct-card-head {
+  align-items: center;
+  flex-wrap: nowrap;
+  padding-top: 14px;
+}
+
+:root:root .acct-game .acct-card h3 {
+  min-width: 0;
+  font: 600 16px/1.3 var(--d-font);
+  color: var(--d-ink-strong);
+}
+
+:root:root .acct-game .acct-chip {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--d-line);
+  border-radius: 999px;
+  background: var(--d-well);
+  color: var(--d-ink-dim);
+  font: 600 12px/1.3 var(--d-font);
+}
+
+:root:root .acct-game .acct-chip.acct-ok {
+  border-color: rgba(159, 224, 174, 0.4);
+  color: #9fe0ae;
+}
+
+:root:root .acct-game .acct-chip.acct-warn {
+  border-color: rgba(255, 180, 168, 0.4);
+  color: var(--d-danger);
+}
+
+:root:root .acct-game .acct-dim,
+:root:root .acct-game .acct-numbers dt {
+  color: var(--d-ink-dim);
+}
+
+:root:root .acct-game .acct-card > .acct-dim,
+:root:root .acct-game .acct-details > .acct-dim {
+  font-size: 13px;
+}
+
+/* The key: its label, then the field and its buttons on one line. */
+:root:root .acct-game .acct-field {
+  gap: 8px;
+}
+
+:root:root .acct-game .acct-field label {
+  font: 600 14px/1.3 var(--d-font);
+  color: var(--d-ink);
+}
+
+:root:root .acct-game .acct-field-row {
+  gap: 8px;
+}
+
+:root:root .acct-game .acct-field input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-well);
+  color: var(--d-ink);
+  font: 400 16px/1 var(--d-font);
+  caret-color: var(--d-accent);
+}
+
+:root:root .acct-game .acct-field input::placeholder {
+  color: var(--d-ink-dim);
+}
+
+:root:root .acct-game .acct-field input:focus {
+  border-color: var(--d-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--d-accent-soft);
+}
+
+:root:root .acct-game .acct-field .retro-btn {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--d-btn-line);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-btn-bg);
+  color: var(--d-ink);
+  font: 600 14px/1 var(--d-font);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root:root .acct-game .acct-field .retro-btn:hover {
+  border-color: var(--d-accent);
+  background: var(--d-btn-bg-hover);
+}
+
+:root:root .acct-game .acct-prefix {
+  color: var(--d-ink-dim);
+  font-size: 16px;
+}
+
+/* What was spent and what is left, under a hairline, a small label over each value. */
+:root:root .acct-game .acct-card > .acct-numbers,
+:root:root .acct-game .acct-card > .acct-details {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--d-line);
+}
+
+:root:root .acct-game .acct-numbers {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+:root:root .acct-game .acct-numbers dt {
+  font: 600 13px/1.3 var(--d-font);
+}
+
+:root:root .acct-game .acct-numbers dd {
+  margin-bottom: 8px;
+}
+
+:root:root .acct-game .acct-numbers dd:last-child {
+  margin-bottom: 0;
+}
+
+:root:root .acct-game .acct-card a {
+  color: var(--d-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--d-ink-dim);
+  text-underline-offset: 3px;
+}
+
+:root:root .acct-game .acct-card a:hover {
+  text-decoration-color: var(--d-ink);
+}
+
+:root:root .acct-game .acct-details {
+  gap: 10px;
+}
+
+:root:root .acct-game .acct-details summary {
+  color: var(--d-ink-dim);
+  font: 600 13px/1.4 var(--d-font);
+}

@@ -13,7 +13,7 @@
  * editable here too.
  */
 
-import { useCallback, useEffect, useId, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useId, useState, type ComponentType, type ReactNode } from 'react';
 
 import { useAccountKeys, type AccountKeysApi } from '../../hooks/useAccountKeys';
 import { useAuth } from '../../hooks/useAuth';
@@ -778,6 +778,123 @@ const SYNC_LABEL = {
   error: 'syncError',
 } as const;
 
+const CARDS: Record<Provider, ComponentType<CardProps>> = {
+  google: GoogleCard,
+  elevenLabs: ElevenLabsCard,
+  openai: OpenAiCard,
+  deepseek: DeepSeekCard,
+  fal: FalCard,
+};
+
+/**
+ * everyrpg.korczak.xyz's account page, in the look of the game's settings (owner, 14 Nov 2026: "this
+ * page in the same style as the settings"): groups of rows in cards under small uppercase headings,
+ * everything left-aligned, Manrope. The page draws the ← and the title itself (`src-rpg/pages/account.astro`),
+ * so they are there before this island runs. The provider cards are the site's, restyled in
+ * `src-rpg/styles/pages.css` (`.acct-game`).
+ */
+function GameAccount({
+  auth,
+  api,
+  refresh,
+  onRefresh,
+  t,
+  lang,
+}: {
+  auth: ReturnType<typeof useAuth>;
+  api: AccountKeysApi;
+  refresh: number;
+  onRefresh: () => void;
+  t: Translation;
+  lang: Lang;
+}) {
+  const prefix = lang === 'pl' ? '/pl' : '';
+  const group = (title: string, rows: ReactNode) => (
+    <section className="rpg-set-group">
+      <h4>{title}</h4>
+      <div className="rpg-set-card">{rows}</div>
+    </section>
+  );
+
+  if (auth.loading) {
+    return (
+      <div className="acct-game">
+        <p className="rpg-set-note acct-game-wait">{t.checking}</p>
+      </div>
+    );
+  }
+
+  if (!auth.user) {
+    return (
+      <div className="acct-game">
+        {group(
+          t.signInGroup,
+          <>
+            <div className="rpg-set-row">
+              <p className="rpg-set-note">{t.signedOut}</p>
+            </div>
+            <a className="rpg-set-row rpg-set-link" href={`${prefix}/login/`}>
+              {t.signIn}
+            </a>
+          </>,
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="acct-game">
+      {group(
+        t.signInGroup,
+        <>
+          <div className="rpg-set-row rpg-set-line">
+            <span className="rpg-set-text">
+              <span className="rpg-set-label">{t.signedInAs}</span>
+              <span className="rpg-set-note">{auth.user.email}</span>
+            </span>
+            <button type="button" className="rpg-set-button" onClick={() => void auth.signOut()}>
+              {t.signOut}
+            </button>
+          </div>
+          {auth.isAdmin && (
+            <a className="rpg-set-row rpg-set-link" href={`${prefix}/admin/`}>
+              {t.adminPanel}
+            </a>
+          )}
+        </>,
+      )}
+
+      {group(
+        t.keysTitle,
+        <>
+          <div className="rpg-set-row">
+            <p className="rpg-set-note">{t.keysBlurbGame}</p>
+          </div>
+          <div className="rpg-set-row rpg-set-line">
+            <span className="rpg-set-text">
+              <span className={api.sync === 'error' ? 'rpg-set-label acct-warn' : 'rpg-set-label'}>
+                {t[SYNC_LABEL[api.sync]]}
+              </span>
+            </span>
+            <button type="button" className="rpg-set-button" onClick={onRefresh}>
+              {t.refresh}
+            </button>
+          </div>
+        </>,
+      )}
+
+      {api.ready && (
+        <div className="acct-game-cards">
+          {GAME_PROVIDERS.map((provider) => {
+            const Card = CARDS[provider];
+            return <Card key={provider} api={api} usedBy={null} refresh={refresh} t={t} lang={lang} />;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Account({ lang, variant = 'site' }: AccountProps) {
   const t = translations[lang];
   const game = variant === 'game';
@@ -785,23 +902,9 @@ export default function Account({ lang, variant = 'site' }: AccountProps) {
   const api = useAccountKeys(auth.user);
   // The game's page never shows the other apps' settings, so it does not read them either.
   const apps = useAppConfigs(game ? null : (auth.user?.uid ?? null));
-  const home = lang === 'pl' ? '/pl/' : '/';
-  const back = game && (
-    <p>
-      <a className="retro-btn" href={home}>
-        {t.backToGame}
-      </a>
-      {auth.isAdmin && (
-        <>
-          {' '}
-          <a className="retro-btn" href={lang === 'pl' ? '/pl/admin/' : '/admin/'}>
-            {t.adminPanel}
-          </a>
-        </>
-      )}
-    </p>
-  );
   const [refresh, setRefresh] = useState(0);
+
+  if (game) return <GameAccount auth={auth} api={api} refresh={refresh} onRefresh={() => setRefresh((n) => n + 1)} t={t} lang={lang} />;
 
   if (auth.loading) return <p className="acct-dim">{t.checking}</p>;
 
@@ -814,23 +917,13 @@ export default function Account({ lang, variant = 'site' }: AccountProps) {
             {t.signIn}
           </a>
         </p>
-        {back}
       </div>
     );
   }
 
   const uses = usedBy(apps, api.value.audioGuideWriter, t);
-  const cards: Record<Provider, ComponentType<CardProps>> = {
-    google: GoogleCard,
-    elevenLabs: ElevenLabsCard,
-    openai: OpenAiCard,
-    deepseek: DeepSeekCard,
-    fal: FalCard,
-  };
-
   return (
     <div className="acct">
-      {back}
       <p className="acct-dim">
         {t.signedInAs} <strong>{auth.user.email}</strong>
       </p>
@@ -842,18 +935,18 @@ export default function Account({ lang, variant = 'site' }: AccountProps) {
             {t.refresh}
           </button>
         </div>
-        <p className="acct-dim">{game ? t.keysBlurbGame : t.keysBlurb}</p>
+        <p className="acct-dim">{t.keysBlurb}</p>
         <p className={api.sync === 'error' ? 'acct-dim acct-warn' : 'acct-dim'}>
           {t[SYNC_LABEL[api.sync]]}
         </p>
         {api.ready &&
-          (game ? GAME_PROVIDERS : PROVIDERS).map((provider) => {
-            const Card = cards[provider];
+          PROVIDERS.map((provider) => {
+            const Card = CARDS[provider];
             return (
               <Card
                 key={provider}
                 api={api}
-                usedBy={game ? null : uses[provider]}
+                usedBy={uses[provider]}
                 refresh={refresh}
                 t={t}
                 lang={lang}
@@ -862,7 +955,7 @@ export default function Account({ lang, variant = 'site' }: AccountProps) {
           })}
       </section>
 
-      {!game && <AppsSection api={api} apps={apps} t={t} lang={lang} />}
+      <AppsSection api={api} apps={apps} t={t} lang={lang} />
     </div>
   );
 }

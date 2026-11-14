@@ -1316,13 +1316,18 @@
   cursor: pointer;
 }
 
+:root:root a.rpg-settings-back {
+  text-decoration: none;
+}
+
 :root:root .rpg-settings-back:hover,
 :root:root .rpg-settings-back:focus-visible {
   border-color: rgba(255, 255, 255, 0.6);
   outline: none;
 }
 
-:root:root .rpg-settings-bar h3 {
+:root:root .rpg-settings-bar h3,
+:root:root .rpg-settings-bar h1 {
   margin: 0;
   font: 600 30px/1.1 var(--d-font-display);
   letter-spacing: 0;

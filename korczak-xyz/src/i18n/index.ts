@@ -100,6 +100,7 @@ export const ui = {
     'Logout': 'Logout',
     'auth.accounts': 'Accounts',
     'auth.account': 'Account',
+    'auth.backToGame': 'Back to the game',
     'rpg.admin': 'Admin panel',
 
     // Apps
@@ -442,6 +443,7 @@ export const ui = {
     'Logout': 'Wyloguj',
     'auth.accounts': 'Konta',
     'auth.account': 'Konto',
+    'auth.backToGame': 'Wróć do gry',
     'rpg.admin': 'Panel admina',
 
     // Apps

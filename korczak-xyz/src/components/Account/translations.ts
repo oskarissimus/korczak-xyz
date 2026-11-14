@@ -24,8 +24,9 @@ const en = {
     'pictures and models on fal.ai. Kept in this browser and in your account, readable by you ' +
     'alone. The numbers come straight from each provider; where a provider does not say, this page ' +
     'says so instead of guessing.',
-  backToGame: '← Back to the game',
   adminPanel: 'Admin panel',
+  signInGroup: 'Sign-in',
+  signOut: 'Sign out',
   syncLocal: 'This browser only',
   syncSyncing: 'Checking the account…',
   syncSynced: 'Saved to your account',
@@ -134,8 +135,9 @@ const pl: Translation = {
     'obrazy i modele na fal.ai. Trzymane w tej przeglądarce i na twoim koncie, widoczne tylko dla ' +
     'ciebie. Liczby pochodzą prosto od dostawców; gdy dostawca czegoś nie podaje, strona to mówi ' +
     'zamiast zgadywać.',
-  backToGame: '← Wróć do gry',
   adminPanel: 'Panel admina',
+  signInGroup: 'Logowanie',
+  signOut: 'Wyloguj',
   syncLocal: 'Tylko ta przeglądarka',
   syncSyncing: 'Sprawdzam konto…',
   syncSynced: 'Zapisane na koncie',
