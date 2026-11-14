@@ -367,6 +367,15 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   again) as `.rpg-set-*` groups; the provider cards are still the site's markup, restyled into the
   same kind of card by `.acct-game` at the end of `src-rpg/styles/pages.css`. No panel over the
   village there: the settings' own dark screen.
+- **So do the admin panel, Language and Controls** (owner, 14 Nov 2026; shots in
+  `rpg/admin-sterowanie-jezyk/`). `src-rpg/pages/admin.astro` draws the same bar; `AdminPanel` puts
+  `acct-game` on its root in the game variant and `acct-group` around Demo's and Diesel's loose
+  fields (the demo's checkbox is `acct-switch`), and everything else — section titles as small
+  uppercase headings, tabs and the costs' range as pills with the picked one white, the tables and
+  the chart on the card surface — is CSS scoped to `.acct-game` in `pages.css`, so korczak.xyz's own
+  `/apps/admin/` keeps its Windows 95 look. `languageMenu` and `controlsMenu` in `Rpg.tsx` are
+  `.rpg-settings` screens built with `settingsBar`; a control is a row with its keys on the right
+  (`.rpg-set-keys`).
 - **The dialogue is one panel with a list in it**: dim numbers, a light row for focus, the typed line
   under a hairline rather than in a box.
 - `src-rpg/components/MenuSkeleton.astro` draws the same boxes before the bundle runs; change both.

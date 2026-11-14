@@ -13,8 +13,13 @@ const t = useTranslations(lang);
 ---
 
 <Game title={`${t('rpg.admin')} · ${t('Rpg')}`} lang={lang} path="/admin/" noindex>
-  <main class="rpg-page">
-    <h1>{t('rpg.admin')}</h1>
-    <AdminPanel client:only="react" lang={lang} variant="game" />
+  <main class="rpg-page rpg-page--settings">
+    <div class="rpg-settings">
+      <header class="rpg-settings-bar">
+        <a class="rpg-settings-back" href="/" aria-label={t('auth.backToGame')} title={t('auth.backToGame')}>←</a>
+        <h1>{t('rpg.admin')}</h1>
+      </header>
+      <AdminPanel client:only="react" lang={lang} variant="game" />
+    </div>
   </main>
 </Game>

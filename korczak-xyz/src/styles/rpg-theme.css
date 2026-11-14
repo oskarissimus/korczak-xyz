@@ -1578,3 +1578,31 @@
   color: var(--d-ink-dim);
   font: 400 12px/1.45 var(--d-font);
 }
+
+/* Controls: what a key does on the left, the keys on the right (or a line each on a phone). */
+:root:root .rpg-set-control {
+  font: 400 14px/1.45 var(--d-font);
+  color: var(--d-ink);
+}
+
+:root:root .rpg-set-keys {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 50%;
+}
+
+:root:root .rpg-set-keys kbd {
+  min-width: 28px;
+  margin: 0;
+  padding: 4px 7px;
+  border: 1px solid var(--d-line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--d-well);
+  color: var(--d-ink);
+  font: 600 12px/1 var(--d-font);
+  text-align: center;
+}

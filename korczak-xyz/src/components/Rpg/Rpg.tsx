@@ -3274,38 +3274,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </div>
   );
 
-  // Every language on the list, by its own name (owner, 9 Nov 2026: "change language in main menu to
-  // any language"). English and Polish are written by hand; any other is translated on the server the
-  // first time somebody picks it, and the menu says so while it is.
-  const languagePicker = (
-    <div className="rpg-lang">
-      <label>
-        {t.language}:{' '}
-        <select value={gameLang} onChange={(e) => chooseLang(e.target.value)}>
-          {languageOptions.map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {uiPending(gameLang) && <small className="rpg-lang-note">{t.languageTranslating}</small>}
-      {guessed !== gameLang && (
-        <button type="button" className="rpg-lang-guess" onClick={() => chooseLang(guessed)}>
-          {t.languageBrowser(nativeName(guessed))}
-        </button>
-      )}
-      <small className="rpg-lang-note">{t.languageHint}</small>
-    </div>
-  );
-  const languageMenu = (
-    <div className="rpg-panel">
-      <h3>🌐 {t.language}</h3>
-      {languagePicker}
-      <div className="rpg-panel-actions">{back}</div>
-    </div>
-  );
-
   // Settings in groups, every row left-aligned, one font and one kind of control (owner, 11 Nov 2026,
   // from the accepted iPhone SE mockup, rpg/ustawienia/ in the project files: "on a small screen the
   // boxes are cut off, everything centred, no groups, every line a different font").
@@ -3333,15 +3301,18 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <div className="rpg-set-card">{rows}</div>
     </section>
   );
+  const settingsBar = (title: string) => (
+    <header className="rpg-settings-bar">
+      <button type="button" className="rpg-settings-back" aria-label={t.menuBack} title={t.menuBack} onClick={() => setMenu('main')}>
+        ←
+      </button>
+      <h3>{title}</h3>
+    </header>
+  );
   const peopleSettings = keysReady && falKey;
   const settingsMenu = (
     <div className="rpg-settings">
-      <header className="rpg-settings-bar">
-        <button type="button" className="rpg-settings-back" aria-label={t.menuBack} title={t.menuBack} onClick={() => setMenu('main')}>
-          ←
-        </button>
-        <h3>{t.menuSettings}</h3>
-      </header>
+      {settingsBar(t.menuSettings)}
 
       {settingGroup(
         t.settingsGame,
@@ -3524,32 +3495,89 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </div>
   );
 
-  const controlsMenu = (
-    <div className="rpg-panel">
-      <h3>{t.menuControls}</h3>
-      {touch ? (
-        <ul className="rpg-controls">
-          <li>{t.touchMove}</li>
-          <li>{t.touchLook}</li>
-          <li>{t.touchAct}</li>
-          {jumping && <li>{t.touchJump}</li>}
-          <li>{t.touchSenses}</li>
-          <li>{t.touchJournal}</li>
-        </ul>
-      ) : (
-        <ul className="rpg-controls">
-          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t.move}</li>
-          <li><kbd>Shift</kbd> {t.run}</li>
-          <li>{t.mouse}</li>
-          <li><kbd>LMB</kbd> {t.attack}</li>
-          {jumping && <li><kbd>Space</kbd> {t.jumpHelp}</li>}
-          <li><kbd>E</kbd> {t.interact}</li>
-          <li><kbd>Q</kbd> {t.sensesHelp}</li>
-          <li><kbd>J</kbd> {t.journal}</li>
-        </ul>
+  // Every language on the list, by its own name (owner, 9 Nov 2026: "change language in main menu to
+  // any language"). English and Polish are written by hand; any other is translated on the server the
+  // first time somebody picks it, and the menu says so while it is.
+  // Language and Controls in the settings' look too (owner, 14 Nov 2026): the same bar, a card of rows.
+  const languageMenu = (
+    <div className="rpg-settings">
+      {settingsBar(t.language)}
+      <section className="rpg-set-group">
+        <div className="rpg-set-card">
+          {settingSelect(
+            t.language,
+            <select value={gameLang} onChange={(e) => chooseLang(e.target.value)}>
+              {languageOptions.map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>,
+            <>
+              {uiPending(gameLang) && <p className="rpg-set-note">{t.languageTranslating}</p>}
+              {guessed !== gameLang && (
+                <button type="button" className="rpg-set-button" onClick={() => chooseLang(guessed)}>
+                  {t.languageBrowser(nativeName(guessed))}
+                </button>
+              )}
+              <p className="rpg-set-note">{t.languageHint}</p>
+            </>,
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
+  // A key and what it does, the action on the left and its keys on the right; on a phone, a line each.
+  const controlRow = (text: string, keys: string[] = []) => (
+    <div key={text} className="rpg-set-row rpg-set-line">
+      <span className="rpg-set-text">
+        <span className="rpg-set-control">{text}</span>
+      </span>
+      {keys.length > 0 && (
+        <span className="rpg-set-keys">
+          {keys.map((k) => (
+            <kbd key={k}>{k}</kbd>
+          ))}
+        </span>
       )}
-      <p className="rpg-panel-note">{t.intro}</p>
-      <div className="rpg-panel-actions">{back}</div>
+    </div>
+  );
+  const controlsMenu = (
+    <div className="rpg-settings">
+      {settingsBar(t.menuControls)}
+      <section className="rpg-set-group">
+        <div className="rpg-set-card">
+          {touch ? (
+            <>
+              {controlRow(t.touchMove)}
+              {controlRow(t.touchLook)}
+              {controlRow(t.touchAct)}
+              {jumping && controlRow(t.touchJump)}
+              {controlRow(t.touchSenses)}
+              {controlRow(t.touchJournal)}
+            </>
+          ) : (
+            <>
+              {controlRow(t.move, ['W', 'A', 'S', 'D'])}
+              {controlRow(t.run, ['Shift'])}
+              {controlRow(t.mouse)}
+              {controlRow(t.attack, ['LMB'])}
+              {jumping && controlRow(t.jumpHelp, ['Space'])}
+              {controlRow(t.interact, ['E'])}
+              {controlRow(t.sensesHelp, ['Q'])}
+              {controlRow(t.journal, ['J'])}
+            </>
+          )}
+        </div>
+      </section>
+      <section className="rpg-set-group">
+        <div className="rpg-set-card">
+          <div className="rpg-set-row">
+            <p className="rpg-set-note">{t.intro}</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 

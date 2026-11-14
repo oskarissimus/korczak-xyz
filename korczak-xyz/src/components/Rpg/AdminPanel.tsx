@@ -45,7 +45,6 @@ const translations = {
     signedOut: 'Sign in with an admin account first.',
     signIn: 'Sign in',
     notAdmin: 'This account is not an admin.',
-    back: '← Back to the game',
     failed: 'That did not work:',
     saved: 'Saved.',
     save: 'Save',
@@ -104,7 +103,6 @@ const translations = {
     signedOut: 'Najpierw zaloguj się kontem admina.',
     signIn: 'Zaloguj się',
     notAdmin: 'To konto nie jest adminem.',
-    back: '← Wróć do gry',
     failed: 'Nie udało się:',
     saved: 'Zapisano.',
     save: 'Zapisz',
@@ -226,19 +224,14 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
     }
   };
 
-  const home = lang === 'pl' ? '/pl/' : '/';
-  const back = variant === 'game' && (
-    <p>
-      <a className="retro-btn" href={home}>
-        {t.back}
-      </a>
-    </p>
-  );
+  // On everyrpg.korczak.xyz the page draws ← and the title itself (src-rpg/pages/admin.astro), and
+  // `acct-game` puts the panel in the settings' look (src-rpg/styles/pages.css).
+  const root = variant === 'game' ? 'acct acct-game' : 'acct';
 
   if (loading) return <p className="acct-dim">{t.loading}</p>;
   if (!identity) {
     return (
-      <div className="acct">
+      <div className={root}>
         <p>{t.signedOut}</p>
         {variant === 'game' && (
           <p>
@@ -247,23 +240,20 @@ export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; var
             </a>
           </p>
         )}
-        {back}
       </div>
     );
   }
   if (!isAdmin) {
     // On korczak.xyz the panel is one section among the site's; a non-admin sees the heading's refusal there.
     return variant === 'game' ? (
-      <div className="acct">
+      <div className={root}>
         <p>{t.notAdmin}</p>
-        {back}
       </div>
     ) : null;
   }
 
   return (
-    <div className="acct">
-      {back}
+    <div className={root}>
       {variant === 'site' && <h2 className="admin-accounts-heading">{t.siteHeading}</h2>}
       {error && (
         <p className="acct-warn">
@@ -451,54 +441,58 @@ function DieselSection({ status, t, lang, busy, saved, save }: SectionProps & { 
     <section className="acct-section">
       <h2 className="acct-heading">⛽ {t.dieselTitle}</h2>
       <p className="acct-dim">{t.dieselBlurb}</p>
-      <div className="acct-field">
-        <label>{t.grant}</label>
-        <div className="acct-field-row">
-          <input
-            type="number"
-            aria-label={t.grant}
-            min={0}
-            max={status.limits.maxGrantUsd * 100}
-            step={10}
-            value={grant}
-            onChange={(e) => setGrant(e.target.value)}
-          />
-          <span className="acct-prefix">L</span>
-          <button type="button" className="retro-btn" disabled={busy} onClick={() => void save('diesel', { diesel: { grantUsd: Number(grant) / 100 } })}>
-            {t.save}
-          </button>
+      <div className="acct-group">
+        <div className="acct-field">
+          <label>{t.grant}</label>
+          <div className="acct-field-row">
+            <input
+              type="number"
+              aria-label={t.grant}
+              min={0}
+              max={status.limits.maxGrantUsd * 100}
+              step={10}
+              value={grant}
+              onChange={(e) => setGrant(e.target.value)}
+            />
+            <span className="acct-prefix">L</span>
+            <button type="button" className="retro-btn" disabled={busy} onClick={() => void save('diesel', { diesel: { grantUsd: Number(grant) / 100 } })}>
+              {t.save}
+            </button>
+          </div>
         </div>
+        {saved && !status.topUp && <p className="acct-dim">{t.saved}</p>}
       </div>
-      {saved && !status.topUp && <p className="acct-dim">{t.saved}</p>}
-      <h3>{t.topUpTitle}</h3>
-      <div className="acct-field">
-        <label>{t.topUpEmail}</label>
-        <input type="email" aria-label={t.topUpEmail} value={email} autoComplete="off" onChange={(e) => setEmail(e.target.value)} />
-      </div>
-      <div className="acct-field">
-        <label>{t.topUpLitres}</label>
-        <div className="acct-field-row">
-          <input
-            type="number"
-            aria-label={t.topUpLitres}
-            min={1}
-            max={status.limits.maxTopUpUsd * 100}
-            step={10}
-            value={add}
-            onChange={(e) => setAdd(e.target.value)}
-          />
-          <span className="acct-prefix">L</span>
-          <button
-            type="button"
-            className="retro-btn"
-            disabled={busy || !email.trim() || !(Number(add) > 0)}
-            onClick={() => void save('diesel', { topUp: { email: email.trim(), usd: Number(add) / 100 } })}
-          >
-            {t.topUp}
-          </button>
+      <h3 className="acct-heading">{t.topUpTitle}</h3>
+      <div className="acct-group">
+        <div className="acct-field">
+          <label>{t.topUpEmail}</label>
+          <input type="email" aria-label={t.topUpEmail} value={email} autoComplete="off" onChange={(e) => setEmail(e.target.value)} />
         </div>
+        <div className="acct-field">
+          <label>{t.topUpLitres}</label>
+          <div className="acct-field-row">
+            <input
+              type="number"
+              aria-label={t.topUpLitres}
+              min={1}
+              max={status.limits.maxTopUpUsd * 100}
+              step={10}
+              value={add}
+              onChange={(e) => setAdd(e.target.value)}
+            />
+            <span className="acct-prefix">L</span>
+            <button
+              type="button"
+              className="retro-btn"
+              disabled={busy || !email.trim() || !(Number(add) > 0)}
+              onClick={() => void save('diesel', { topUp: { email: email.trim(), usd: Number(add) / 100 } })}
+            >
+              {t.topUp}
+            </button>
+          </div>
+        </div>
+        {status.topUp && <p className="acct-dim">{t.toppedUp(status.topUp.email, litresOf(status.topUp.balanceUsd))}</p>}
       </div>
-      {status.topUp && <p className="acct-dim">{t.toppedUp(status.topUp.email, litresOf(status.topUp.balanceUsd))}</p>}
     </section>
   );
 }
@@ -524,39 +518,41 @@ function DemoSection({ status, t, busy, saved, save }: SectionProps) {
       <p className="acct-dim">{t.demoBlurb}</p>
       <p className={status.demo.payer === 'nobody' ? 'acct-warn' : 'acct-dim'}>{t.payer[status.demo.payer]}</p>
       {!status.demo.enabled && <p className="acct-warn">{t.masterOff}</p>}
-      <div className="acct-field">
-        <label>
-          <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /> {t.demoOn}
-        </label>
-      </div>
-      <div className="acct-field">
-        <label>{t.perIp}</label>
-        <div className="acct-field-row">
-          <span className="acct-prefix">$</span>
-          <input
-            type="number"
-            aria-label={t.perIp}
-            min={0}
-            max={status.limits.maxPerIpUsd}
-            step={0.5}
-            value={perIp}
-            onChange={(e) => setPerIp(e.target.value)}
-          />
+      <div className="acct-group">
+        <div className="acct-field">
+          <label className="acct-switch">
+            <input type="checkbox" role="switch" checked={on} onChange={(e) => setOn(e.target.checked)} /> {t.demoOn}
+          </label>
         </div>
-      </div>
-      <div className="acct-field">
-        <label>{t.daily}</label>
-        <div className="acct-field-row">
-          <span className="acct-prefix">$</span>
-          <input
-            type="number"
-            aria-label={t.daily}
-            min={0}
-            max={status.limits.maxDailyUsd}
-            step={1}
-            value={daily}
-            onChange={(e) => setDaily(e.target.value)}
-          />
+        <div className="acct-field">
+          <label>{t.perIp}</label>
+          <div className="acct-field-row">
+            <span className="acct-prefix">$</span>
+            <input
+              type="number"
+              aria-label={t.perIp}
+              min={0}
+              max={status.limits.maxPerIpUsd}
+              step={0.5}
+              value={perIp}
+              onChange={(e) => setPerIp(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="acct-field">
+          <label>{t.daily}</label>
+          <div className="acct-field-row">
+            <span className="acct-prefix">$</span>
+            <input
+              type="number"
+              aria-label={t.daily}
+              min={0}
+              max={status.limits.maxDailyUsd}
+              step={1}
+              value={daily}
+              onChange={(e) => setDaily(e.target.value)}
+            />
+          </div>
         </div>
       </div>
       <p>
