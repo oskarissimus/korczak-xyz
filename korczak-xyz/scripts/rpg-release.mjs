@@ -32,6 +32,9 @@ export const EXPECTED = [
   // payment provider's review of the game.
   'rules/index.html',
   'pl/rules/index.html',
+  // Terms, privacy, refunds and prices (components/Rpg/RpgLegal.astro), linked from every page's
+  // bottom strip: what Paddle's domain review reads, and what a buyer is owed.
+  ...['terms', 'privacy', 'refunds', 'pricing'].flatMap((p) => [`${p}/index.html`, `pl/${p}/index.html`]),
 ];
 
 /** Every .html under `dir`, relative and with forward slashes. */

@@ -1,0 +1,19 @@
+---
+import Game from '../../layouts/Game.astro';
+import RpgLegal from '../../../src/components/Rpg/RpgLegal.astro';
+import '../../styles/pages.css';
+
+const lang = 'pl';
+const titles = {
+  terms: { en: 'Terms of service', pl: 'Regulamin' },
+  privacy: { en: 'Privacy policy', pl: 'Polityka prywatności' },
+  refunds: { en: 'Refund policy', pl: 'Polityka zwrotów' },
+  pricing: { en: 'Pricing', pl: 'Cennik' },
+};
+---
+
+<Game title={`${titles.terms[lang]} · Every RPG`} lang={lang} path="/terms/">
+  <main class="rpg-page rpg-rules">
+    <RpgLegal kind="terms" lang={lang} />
+  </main>
+</Game>

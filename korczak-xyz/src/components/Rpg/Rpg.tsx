@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { ACCOUNT_KEY, refuelWallet, setGatewayContext } from '../../utils/rpg/gateway';
@@ -338,6 +338,9 @@ function withMade(w: WorldBible, kept: EarlyMade | undefined): WorldBible {
 export default function Rpg({ lang, standalone = false }: { lang: Lang; standalone?: boolean }) {
   /** The content rules (`components/Rpg/RpgRules.astro`), at the root of everyrpg and under the game here. */
   const rulesHref = `${lang === 'pl' ? '/pl' : ''}${standalone ? '' : '/apps/rpg'}/rules/`;
+  /** Terms, privacy, refunds, pricing (`components/Rpg/RpgLegal.astro`): everyrpg's pages, from either host. */
+  const legalHref = (page: 'terms' | 'privacy' | 'refunds' | 'pricing') =>
+    `${standalone ? '' : 'https://everyrpg.korczak.xyz'}${lang === 'pl' ? '/pl' : ''}/${page}/`;
   // The game's language, any language (`utils/rpg/language.ts`): chosen on the menu and kept in this
   // browser and on the account; until somebody chooses, guessed from the browser, English failing that.
   // The page's own locale only says where `/pl/` starts.
@@ -3445,6 +3448,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <a className="rpg-set-row rpg-set-link" href={rulesHref}>
             {t.rulesLink}
           </a>
+          <a className="rpg-set-row rpg-set-link" href={legalHref('terms')}>
+            {t.legalLink}
+          </a>
           {/* Also here: on a phone the home screen's top bar has room for the account's initial only. */}
           {standalone && auth.user && (
             <div className="rpg-set-row rpg-set-line">
@@ -3590,6 +3596,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <p className="rpg-dz-note">
         <a href={rulesHref}>{t.rulesLink}</a>
+      </p>
+      <p className="rpg-dz-note">
+        {(['pricing', 'terms', 'refunds', 'privacy'] as const).map((page, i) => (
+          <Fragment key={page}>
+            {i > 0 && ' · '}
+            <a href={legalHref(page)}>{t.legalLinks[page]}</a>
+          </Fragment>
+        ))}
       </p>
       <div className="rpg-panel-actions">{back}</div>
     </div>

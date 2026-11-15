@@ -946,3 +946,61 @@ body::before {
 :root:root:root .acct-game .acct-warn {
   color: var(--d-danger);
 }
+
+/* The content rules and the legal pages (components/Rpg/RpgRules.astro, RpgLegal.astro). */
+.rpg-rules .legal-updated {
+  text-align: center;
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin: -12px 0 24px;
+}
+.rpg-rules .legal-section h2 {
+  font-size: 1.1em;
+  margin: 24px 0 8px;
+  color: #e0b96a;
+}
+.rpg-rules .legal-section p {
+  margin: 0 0 10px;
+}
+.rpg-rules a {
+  color: #f1e6cf;
+}
+.legal-prices {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 8px;
+}
+.legal-prices th,
+.legal-prices td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(241, 230, 207, 0.15);
+  font-weight: normal;
+}
+.legal-prices td:not(:first-of-type) {
+  text-align: right;
+}
+.legal-dim {
+  opacity: 0.6;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+.legal-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(241, 230, 207, 0.15);
+  font-size: 0.9em;
+}
+.legal-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 10px;
+}
+.legal-footer [aria-current] {
+  opacity: 0.6;
+}
+.legal-footer p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}

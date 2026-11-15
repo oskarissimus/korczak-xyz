@@ -6,12 +6,12 @@ import '../styles/pages.css';
 
 const lang = 'en';
 const t = useTranslations(lang);
-const title = 'Wanderer: content rules';
+const title = 'Every RPG: content rules';
 ---
 
 <Game title={`${title} · ${t('Rpg')}`} lang={lang} path="/rules/">
   <main class="rpg-page rpg-rules">
     <h1>{title}</h1>
-    <RpgRules lang={lang} gameHref="/" termsHref="https://korczak.xyz/terms/" />
+    <RpgRules lang={lang} gameHref="/" termsHref="/terms/" />
   </main>
 </Game>

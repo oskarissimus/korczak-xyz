@@ -2024,6 +2024,17 @@ Paddle's 5% + $0.50 came off; these keep about 30% over the litres' list cost. P
 of record (it charges, adds and remits VAT, handles refunds and chargebacks); the account is an
 individual one and **still in the sandbox** until Paddle verifies it for live payments.
 
+**The legal pages** (owner, 15 Nov 2026: terms, privacy, refunds and a public price list, with the
+business's name, NIP and email and **no address** — the business has no seat, only an address
+registered for VAT). `components/Rpg/RpgLegal.astro` is all four, in both locales, at
+everyrpg's `/terms/`, `/privacy/`, `/refunds/`, `/pricing/` (in `rpg-release.mjs`'s `EXPECTED`);
+who sells is `utils/rpg/seller.ts`, its `nip` shown only once set. Every page's bottom strip
+(`BuildStamp.astro`) links them, so they are one tap from the home screen without adding to it;
+the diesel panel and the settings link them too (from korczak.xyz, to everyrpg's). The refund
+policy promises a full refund within 14 days, no reason needed — what `debitAdjustment` does — and
+the terms carry Paddle's required reseller sentence. Keep the pages true to the code: the prices
+are read from `diesel.ts`, but every sentence about expiry, cancelling and refunds is hand-written.
+
 - **The page names a price, never litres.** A signed-in reader on their tank taps a canister, Paddle.js
   is loaded from Paddle's CDN on that first tap (`paddleCheckout.ts`; not with the game, and not
   self-hosted, which Paddle asks against) and opens the overlay with the canister's price id and

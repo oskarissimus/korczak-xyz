@@ -1,0 +1,467 @@
+---
+/*
+ * Every RPG's terms, privacy policy, refund policy and price list, on everyrpg.korczak.xyz
+ * (`src-rpg/pages/{terms,privacy,refunds,pricing}.astro`), written for players and for Paddle's
+ * domain review: the seller named, the prices public, a refund policy, how to cancel.
+ *
+ * Keep them true to the code: the litres and prices come from `utils/rpg/diesel.ts`, what a refund
+ * takes back is `debitAdjustment`, what a subscription's end takes away is `endSubscription`
+ * (`functions/src/rpg/wallet.ts`). Who sells is `utils/rpg/seller.ts`, with no address (see there).
+ */
+import type { Lang } from '../../i18n';
+import { CANISTERS, SUBSCRIPTION } from '../../utils/rpg/diesel';
+import { SELLER } from '../../utils/rpg/seller';
+
+export type LegalKind = 'terms' | 'privacy' | 'refunds' | 'pricing';
+
+interface Props {
+  kind: LegalKind;
+  lang: Lang;
+}
+
+const { kind, lang } = Astro.props;
+const pl = lang === 'pl';
+const prefix = pl ? '/pl' : '';
+const href = (page: string) => `${prefix}/${page}/`;
+const nip = SELLER.nip ? (pl ? `, NIP ${SELLER.nip}` : `, tax ID (NIP) ${SELLER.nip}`) : '';
+const who = pl
+  ? `${SELLER.name}, jednoosobowa działalność gospodarcza${nip}`
+  : `${SELLER.name}, a sole trader registered in Poland${nip}`;
+const mail = SELLER.email;
+const zl = (n: number) => `${n} zł`;
+const packNames = pl
+  ? { can: 'Kanister', barrel: 'Beczka', tank: 'Cysterna' }
+  : { can: 'Canister', barrel: 'Barrel', tank: 'Tanker' };
+
+type Section = [string, string[]];
+
+const updated = pl ? 'Ostatnia aktualizacja: 15 listopada 2026' : 'Last updated: 15 November 2026';
+
+const en: Record<LegalKind, { title: string; sections: Section[] }> = {
+  terms: {
+    title: 'Every RPG: terms of service',
+    sections: [
+      [
+        'Who runs the game',
+        [
+          `Every RPG at everyrpg.korczak.xyz is run by ${who}. Write to ${mail} about anything: questions, problems, complaints.`,
+        ],
+      ],
+      [
+        'What the game is',
+        [
+          'A role-playing game that AI models write and draw while you play: the world, the quest, the dialogue, the voices, the pictures and the 3D models. What it generates follows the content rules, which are part of these terms.',
+          'Generating costs real money at the model providers, and diesel is how the game pays for it (below). Some of the game can be played without paying, with your own provider keys or within a free allowance, as the game says at the time.',
+        ],
+      ],
+      [
+        'Your account',
+        [
+          'Buying diesel needs an account, signed in with an email address you control. An account is for one person. Keep your password to yourself; what is done from your account is taken to be done by you.',
+          'An account used to break the content rules, to attack the game or to get diesel without paying for it may be suspended. Unspent diesel that was paid for is then refunded in proportion, unless the law says otherwise.',
+        ],
+      ],
+      [
+        'Diesel',
+        [
+          'Diesel is the game’s fuel: every request to a model is paid for from your tank in litres, and the game shows an estimate before the larger things (a new world, a new quest). One litre is one US cent of what the providers charge.',
+          'Diesel can only be spent on generating in this game. It is not money, cannot be withdrawn, exchanged, transferred to another account or given as a code.',
+          'Litres from a pack do not expire for as long as the game runs. Litres from the monthly delivery are valid until the next billing date and do not carry over: the next delivery replaces whatever is left of the last one, and when the subscription ends what is left of it is removed.',
+        ],
+      ],
+      [
+        'Buying',
+        [
+          'Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.',
+          'Paddle takes the payment (card, BLIK, Apple Pay, Google Pay, PayPal and others where offered), issues the receipt or invoice and charges the VAT. Paddle’s buyer terms apply to the purchase itself. Prices are on the pricing page, in Polish złoty, VAT included. The diesel is poured into your tank as soon as Paddle confirms the payment, usually within seconds.',
+        ],
+      ],
+      [
+        'The monthly delivery',
+        [
+          `${zl(SUBSCRIPTION.pln)} a month for ${SUBSCRIPTION.litres} L, renewed automatically each month until you cancel. Cancel any time with the link in the game’s diesel panel or in Paddle’s emails; the subscription then ends at the end of the period already paid for, and its litres are usable until then.`,
+        ],
+      ],
+      [
+        'Refunds',
+        ['As in the refund policy: any purchase can be refunded within 14 days, with no reason needed.'],
+      ],
+      [
+        'What you generate',
+        [
+          'What the game writes and draws for you is yours to keep and share, within the law and the content rules. It is made by models and may be wrong, odd or similar to what someone else generated; it is a game, not advice.',
+        ],
+      ],
+      [
+        'Availability and changes',
+        [
+          'The game is run with care but without a guarantee that it is always available or free of faults. Models, features and prices may change; a price change applies to purchases made after it.',
+          'If a generation fails on our side and diesel was taken for it, write and it is put back. If the game is ever closed, it will be announced at least 30 days ahead, and bought diesel can be spent until then.',
+        ],
+      ],
+      [
+        'Complaints and law',
+        [
+          `Complaints go to ${mail}; they are answered within 14 days. Polish law applies. If you buy as a consumer, nothing here takes away the rights the law of your country gives you.`,
+          'These terms may change; the date above says when they last did, and a change that matters is announced in the game first.',
+        ],
+      ],
+    ],
+  },
+  privacy: {
+    title: 'Every RPG: privacy policy',
+    sections: [
+      [
+        'Who is responsible',
+        [
+          `The controller of your personal data in Every RPG is ${who}. Write to ${mail} about anything in this policy.`,
+        ],
+      ],
+      [
+        'What is kept, and why',
+        [
+          'Your account: your email address and an account id (Firebase Authentication), to sign you in. Your game: your worlds, quests and settings, kept on the account so they follow you between devices, and in your browser’s storage.',
+          'Your tank: what diesel was poured in and spent, per world and quest, and each purchase’s Paddle transaction id, amount and currency, to keep the balance right and to answer refunds. Card or bank details never reach us.',
+          'Error reports (Sentry): what broke and in which browser, to fix it. No screen recordings and no tracking or advertising cookies.',
+        ],
+      ],
+      [
+        'What goes to the models',
+        [
+          'To generate the game, what you type — a world’s description, a line said to a character — and the story so far are sent to the AI providers that write, voice and draw it. They are not sent your email address. Do not type anything into the game you would not want a model to read.',
+        ],
+      ],
+      [
+        'Who else handles it',
+        [
+          'Paddle (paddle.com) sells the diesel as merchant of record and is a controller of the data you give at checkout in its own right, under its own privacy policy.',
+          'On our behalf: Google Cloud and Firebase (accounts, the database, the servers, Gemini models), Cloudflare (serving the site), ElevenLabs (voices), fal.ai (pictures and 3D models), OpenAI (only when you play on your own OpenAI key) and Sentry (error reports, EU region). Some of them are in the United States; transfers rely on the EU–US Data Privacy Framework or the European Commission’s standard contractual clauses.',
+        ],
+      ],
+      [
+        'On what basis',
+        [
+          'Running the game you signed up for (Art. 6(1)(b) GDPR); keeping it working and secure, and fixing errors (legitimate interest, Art. 6(1)(f)); and keeping records the law requires (Art. 6(1)(c)).',
+        ],
+      ],
+      [
+        'For how long',
+        [
+          'For as long as the account exists. Delete your worlds in the game at any time; ask and the whole account is deleted within 30 days, apart from purchase records the law requires to be kept, and backups, which expire within 14 weeks.',
+        ],
+      ],
+      [
+        'Your rights',
+        [
+          `You may ask for a copy of your data, for it to be corrected or deleted, to restrict or object to its use, and to have it in a portable form: write to ${mail}. You may also complain to the President of the Personal Data Protection Office (UODO, uodo.gov.pl) or the authority of your own country.`,
+        ],
+      ],
+      [
+        'Your browser',
+        [
+          'The game keeps its settings and a copy of your game in your browser’s local storage; clearing it removes them from that browser. Signing in stores Firebase’s session there too. Paddle’s checkout, when you open it, sets its own cookies.',
+        ],
+      ],
+    ],
+  },
+  refunds: {
+    title: 'Every RPG: refund policy',
+    sections: [
+      [
+        '14 days, no reason needed',
+        [
+          'Any purchase — a pack or a monthly payment — can be refunded in full within 14 days of buying it, without giving a reason. The diesel that purchase poured in is taken back out of your tank when the refund goes through.',
+        ],
+      ],
+      [
+        'How to ask',
+        [
+          `Use the link in the receipt email from Paddle, ask at paddle.net, or write to ${mail} with the email you paid with. Paddle, our merchant of record, makes the refund to the way you paid, usually within 5–10 working days depending on your bank.`,
+        ],
+      ],
+      [
+        'The monthly delivery',
+        [
+          'Cancelling stops the next renewals, with the link in the game’s diesel panel or in Paddle’s emails; the period already paid for runs to its end. A monthly payment can be refunded within 14 days like any other, and its litres are then removed.',
+        ],
+      ],
+      [
+        'After 14 days',
+        [
+          'Diesel is used up as it is spent, so later refunds are not given as a rule. If something went wrong on our side — diesel taken for a generation that failed, a payment charged twice — write and it is put right whenever it happened.',
+        ],
+      ],
+      [
+        'Chargebacks',
+        [
+          'Please write before disputing a payment with your bank: a refund is quicker. A disputed payment’s diesel is taken back as a refund’s is.',
+        ],
+      ],
+    ],
+  },
+  pricing: {
+    title: 'Every RPG: pricing',
+    sections: [
+      [
+        'What a litre buys',
+        [
+          'Everything the game generates is paid for in diesel. A new world with its first quest usually uses 120–180 L, and the game shows an estimate before you start one. One litre is one US cent of what the model providers charge.',
+          'Prices are in Polish złoty and include VAT. Paddle, our merchant of record, takes the payment.',
+        ],
+      ],
+    ],
+  },
+};
+
+const plText: Record<LegalKind, { title: string; sections: Section[] }> = {
+  terms: {
+    title: 'Every RPG: regulamin',
+    sections: [
+      [
+        'Kto prowadzi grę',
+        [
+          `Every RPG pod adresem everyrpg.korczak.xyz prowadzi ${who}. W każdej sprawie — pytania, problemy, reklamacje — napisz na ${mail}.`,
+        ],
+      ],
+      [
+        'Czym jest gra',
+        [
+          'To gra RPG, którą modele AI piszą i rysują w trakcie gry: świat, quest, dialogi, głosy, obrazy i modele 3D. To, co generuje, podlega zasadom treści, które są częścią tego regulaminu.',
+          'Generowanie kosztuje prawdziwe pieniądze u dostawców modeli, a gra płaci za nie dizlem (niżej). Część gry działa bez płacenia — na własnych kluczach do dostawców albo w darmowym limicie, jeśli gra go akurat oferuje.',
+        ],
+      ],
+      [
+        'Twoje konto',
+        [
+          'Do kupienia dizla potrzebne jest konto, logowane adresem e-mail, do którego masz dostęp. Konto jest dla jednej osoby. Nie udostępniaj hasła: to, co zrobiono z Twojego konta, uznaje się za zrobione przez Ciebie.',
+          'Konto użyte do łamania zasad treści, atakowania gry albo zdobywania dizla bez płacenia może zostać zawieszone. Niewydany, opłacony dizel jest wtedy zwracany proporcjonalnie, chyba że prawo stanowi inaczej.',
+        ],
+      ],
+      [
+        'Dizel',
+        [
+          'Dizel to paliwo gry: każde zapytanie do modelu jest opłacane z Twojego baku w litrach, a przed większymi rzeczami (nowy świat, nowy quest) gra pokazuje szacunek. Litr to jeden cent amerykański z tego, ile liczą dostawcy.',
+          'Dizel można wydać tylko na generowanie w tej grze. Nie jest pieniądzem; nie da się go wypłacić, wymienić, przenieść na inne konto ani podarować jako kodu.',
+          'Litry z pakietu nie wygasają, dopóki gra działa. Litry z dostawy miesięcznej są ważne do kolejnej płatności i nie przechodzą na następny miesiąc: kolejna dostawa zastępuje to, co zostało z poprzedniej, a gdy subskrypcja się kończy, jej resztka znika.',
+        ],
+      ],
+      [
+        'Zakupy',
+        [
+          'Zamówienia realizuje nasz sprzedawca internetowy Paddle.com, który jest stroną sprzedaży (Merchant of Record) dla wszystkich naszych zamówień. Paddle obsługuje zapytania klientów i zwroty.',
+          'Paddle przyjmuje płatność (karta, BLIK, Apple Pay, Google Pay, PayPal i inne, jeśli są dostępne), wystawia paragon lub fakturę i nalicza VAT. Do samego zakupu stosuje się warunki Paddle dla kupujących. Ceny są w cenniku, w złotych, z VAT. Dizel trafia do baku, gdy tylko Paddle potwierdzi płatność, zwykle po kilku sekundach.',
+        ],
+      ],
+      [
+        'Dostawa miesięczna',
+        [
+          `${zl(SUBSCRIPTION.pln)} miesięcznie za ${SUBSCRIPTION.litres} L, odnawiana co miesiąc, dopóki jej nie anulujesz. Anulujesz w każdej chwili linkiem w panelu dizla w grze albo w mailach od Paddle; subskrypcja kończy się wtedy z końcem opłaconego okresu, a jej litry działają do tego czasu.`,
+        ],
+      ],
+      ['Zwroty', ['Zgodnie z polityką zwrotów: każdy zakup można zwrócić w ciągu 14 dni, bez podawania przyczyny.']],
+      [
+        'To, co wygenerujesz',
+        [
+          'To, co gra napisze i narysuje dla Ciebie, możesz zachować i udostępniać w granicach prawa i zasad treści. Tworzą to modele, więc może być błędne, dziwne albo podobne do tego, co wygenerował ktoś inny; to gra, nie porada.',
+        ],
+      ],
+      [
+        'Dostępność i zmiany',
+        [
+          'Gra jest prowadzona starannie, ale bez gwarancji, że zawsze działa i nie ma błędów. Modele, funkcje i ceny mogą się zmieniać; zmiana ceny dotyczy zakupów po niej.',
+          'Jeśli generowanie nie udało się z naszej winy, a dizel za nie pobrano, napisz, a zostanie oddany. Gdyby gra miała zostać zamknięta, ogłosimy to co najmniej 30 dni wcześniej, a kupiony dizel będzie można do tego czasu wydać.',
+        ],
+      ],
+      [
+        'Reklamacje i prawo',
+        [
+          `Reklamacje wysyłaj na ${mail}; odpowiadamy w ciągu 14 dni. Obowiązuje prawo polskie. Jeśli kupujesz jako konsument, nic tutaj nie odbiera Ci praw, które daje Ci prawo Twojego kraju.`,
+          'Regulamin może się zmienić; data powyżej mówi kiedy, a istotną zmianę gra najpierw ogłosi.',
+        ],
+      ],
+    ],
+  },
+  privacy: {
+    title: 'Every RPG: polityka prywatności',
+    sections: [
+      [
+        'Kto odpowiada',
+        [`Administratorem Twoich danych osobowych w Every RPG jest ${who}. W sprawach tej polityki pisz na ${mail}.`],
+      ],
+      [
+        'Co przechowujemy i po co',
+        [
+          'Konto: adres e-mail i identyfikator konta (Firebase Authentication), żeby Cię zalogować. Gra: Twoje światy, questy i ustawienia, na koncie, żeby szły za Tobą między urządzeniami, oraz w pamięci przeglądarki.',
+          'Bak: ile dizla wlano i wydano, z podziałem na światy i questy, oraz przy każdym zakupie identyfikator transakcji Paddle, kwotę i walutę, żeby saldo się zgadzało i żeby obsłużyć zwroty. Dane karty ani konta bankowego nigdy do nas nie trafiają.',
+          'Raporty błędów (Sentry): co się zepsuło i w jakiej przeglądarce, żeby to naprawić. Bez nagrywania ekranu i bez ciasteczek śledzących czy reklamowych.',
+        ],
+      ],
+      [
+        'Co trafia do modeli',
+        [
+          'Żeby wygenerować grę, to, co wpisujesz — opis świata, kwestię do postaci — oraz dotychczasowa opowieść trafiają do dostawców AI, którzy ją piszą, czytają na głos i rysują. Nie dostają Twojego adresu e-mail. Nie wpisuj do gry niczego, czego nie chcesz dać do przeczytania modelowi.',
+        ],
+      ],
+      [
+        'Kto jeszcze ma do nich dostęp',
+        [
+          'Paddle (paddle.com) sprzedaje dizel jako strona sprzedaży i jest samodzielnym administratorem danych podanych przy płatności, na zasadach własnej polityki prywatności.',
+          'W naszym imieniu: Google Cloud i Firebase (konta, baza danych, serwery, modele Gemini), Cloudflare (serwowanie strony), ElevenLabs (głosy), fal.ai (obrazy i modele 3D), OpenAI (tylko gdy grasz na własnym kluczu OpenAI) i Sentry (raporty błędów, region UE). Część z nich działa w Stanach Zjednoczonych; przekazanie opiera się na EU–US Data Privacy Framework albo standardowych klauzulach umownych Komisji Europejskiej.',
+        ],
+      ],
+      [
+        'Na jakiej podstawie',
+        [
+          'Świadczenie gry, na którą się zapisujesz (art. 6 ust. 1 lit. b RODO); utrzymanie jej działania i bezpieczeństwa oraz naprawianie błędów (prawnie uzasadniony interes, art. 6 ust. 1 lit. f); prowadzenie ewidencji wymaganej prawem (art. 6 ust. 1 lit. c).',
+        ],
+      ],
+      [
+        'Jak długo',
+        [
+          'Dopóki istnieje konto. Światy usuniesz w grze w każdej chwili; na prośbę całe konto zostanie usunięte w ciągu 30 dni, poza zapisami zakupów, które prawo każe przechowywać, i kopiami zapasowymi, które wygasają w ciągu 14 tygodni.',
+        ],
+      ],
+      [
+        'Twoje prawa',
+        [
+          `Możesz żądać kopii swoich danych, ich sprostowania lub usunięcia, ograniczenia przetwarzania, wnieść sprzeciw i dostać dane w przenośnej formie: napisz na ${mail}. Możesz też złożyć skargę do Prezesa Urzędu Ochrony Danych Osobowych (uodo.gov.pl) albo organu w swoim kraju.`,
+        ],
+      ],
+      [
+        'Twoja przeglądarka',
+        [
+          'Gra trzyma ustawienia i kopię gry w pamięci lokalnej przeglądarki; jej wyczyszczenie usuwa je z tej przeglądarki. Logowanie zapisuje tam też sesję Firebase. Płatność Paddle, gdy ją otworzysz, ustawia własne ciasteczka.',
+        ],
+      ],
+    ],
+  },
+  refunds: {
+    title: 'Every RPG: polityka zwrotów',
+    sections: [
+      [
+        '14 dni, bez podawania przyczyny',
+        [
+          'Każdy zakup — pakiet albo miesięczną płatność — można zwrócić w całości w ciągu 14 dni od zakupu, bez podawania przyczyny. Dizel wlany tym zakupem zostaje zabrany z baku, gdy zwrot przejdzie.',
+        ],
+      ],
+      [
+        'Jak poprosić',
+        [
+          `Skorzystaj z linku w mailu z potwierdzeniem od Paddle, zgłoś to na paddle.net albo napisz na ${mail} z adresu użytego przy płatności. Zwrot robi Paddle, nasza strona sprzedaży, tą samą metodą, którą zapłacono, zwykle w 5–10 dni roboczych, zależnie od banku.`,
+        ],
+      ],
+      [
+        'Dostawa miesięczna',
+        [
+          'Anulowanie zatrzymuje kolejne odnowienia — linkiem w panelu dizla w grze albo w mailach od Paddle; opłacony okres trwa do końca. Miesięczną płatność można zwrócić w ciągu 14 dni jak każdą inną; jej litry są wtedy zabierane.',
+        ],
+      ],
+      [
+        'Po 14 dniach',
+        [
+          'Dizel zużywa się w miarę wydawania, więc późniejszych zwrotów co do zasady nie ma. Jeśli coś poszło nie tak po naszej stronie — dizel pobrany za generowanie, które się nie udało, płatność pobrana dwa razy — napisz, a naprawimy to bez względu na to, kiedy się stało.',
+        ],
+      ],
+      [
+        'Obciążenia zwrotne',
+        [
+          'Zanim zakwestionujesz płatność w banku, napisz: zwrot będzie szybszy. Dizel z zakwestionowanej płatności jest zabierany tak jak przy zwrocie.',
+        ],
+      ],
+    ],
+  },
+  pricing: {
+    title: 'Every RPG: cennik',
+    sections: [
+      [
+        'Na co starcza litr',
+        [
+          'Wszystko, co gra generuje, opłaca się dizlem. Nowy świat z pierwszym questem zużywa zwykle 120–180 L, a gra pokazuje szacunek, zanim go zaczniesz. Litr to jeden cent amerykański z tego, ile liczą dostawcy modeli.',
+          'Ceny są w złotych i zawierają VAT. Płatność przyjmuje Paddle, nasza strona sprzedaży.',
+        ],
+      ],
+    ],
+  },
+};
+
+const text = (pl ? plText : en)[kind];
+const links: [LegalKind | 'rules', string][] = pl
+  ? [
+      ['terms', 'Regulamin'],
+      ['privacy', 'Prywatność'],
+      ['refunds', 'Zwroty'],
+      ['pricing', 'Cennik'],
+      ['rules', 'Zasady treści'],
+    ]
+  : [
+      ['terms', 'Terms'],
+      ['privacy', 'Privacy'],
+      ['refunds', 'Refunds'],
+      ['pricing', 'Pricing'],
+      ['rules', 'Content rules'],
+    ];
+const perL = (litres: number, pln: number) =>
+  `${((pln / litres) * 100).toLocaleString(pl ? 'pl-PL' : 'en-GB', { maximumFractionDigits: 1 })} gr / L`;
+---
+
+<h1>{text.title}</h1>
+<p class="legal-updated">{updated}</p>
+{
+  kind === 'pricing' && (
+    <section class="legal-section">
+      <h2>{pl ? 'Pakiety' : 'Packs'}</h2>
+      <table class="legal-prices">
+        <tbody>
+          {CANISTERS.map((c) => (
+            <tr>
+              <th scope="row">{packNames[c.id]}</th>
+              <td>{c.litres} L</td>
+              <td>{zl(c.pln)}</td>
+              <td class="legal-dim">{perL(c.litres, c.pln)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>{pl ? 'Jednorazowo. Litry z pakietu nie wygasają.' : 'One-off. Litres from a pack do not expire.'}</p>
+      <h2>{pl ? 'Dostawa miesięczna' : 'Monthly delivery'}</h2>
+      <table class="legal-prices">
+        <tbody>
+          <tr>
+            <th scope="row">{pl ? 'Subskrypcja' : 'Subscription'}</th>
+            <td>{SUBSCRIPTION.litres} L</td>
+            <td>{pl ? `${zl(SUBSCRIPTION.pln)} / mies.` : `${zl(SUBSCRIPTION.pln)} / month`}</td>
+            <td class="legal-dim">{perL(SUBSCRIPTION.litres, SUBSCRIPTION.pln)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        {pl
+          ? 'Odnawia się co miesiąc, anulujesz w każdej chwili. Litry są ważne do kolejnej płatności i nie przechodzą na następny miesiąc.'
+          : 'Renews monthly, cancel any time. Its litres are valid until the next billing date and do not carry over.'}
+      </p>
+    </section>
+  )
+}
+{
+  text.sections.map(([title, paras]) => (
+    <section class="legal-section">
+      <h2>{title}</h2>
+      {paras.map((p) => (
+        <p>{p}</p>
+      ))}
+    </section>
+  ))
+}
+<footer class="legal-footer">
+  <nav>
+    {
+      links.map(([page, label]) =>
+        page === kind ? <span aria-current="page">{label}</span> : <a href={href(page)}>{label}</a>,
+      )
+    }
+  </nav>
+  <p>
+    Every RPG · {SELLER.name}{SELLER.nip ? ` · NIP ${SELLER.nip}` : ''} · <a href={`mailto:${mail}`}>{mail}</a>
+  </p>
+  <p><a href={`${prefix}/`}>← {pl ? 'Wróć do gry' : 'Back to the game'}</a></p>
+</footer>
