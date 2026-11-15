@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { USD_PER_VOICE_CREDIT } from './cost';
 import {
+  comparableFrom,
+  DAY_MS,
+  HOUR_MS,
   BadWalletPatch,
   driftRows,
   geminiBillingSql,
@@ -119,5 +122,23 @@ describe('Google’s billing export', () => {
     const json = { rows: [{ f: [{ v: '1.25' }, { v: '1762858800000' }, { v: 'korczak-rpg' }, { v: 'PLN' }] }] };
     expect(parseGeminiBilling(json)).toEqual({ usd: 1.25, until: 1762858800000, projects: 'korczak-rpg', currency: 'PLN' });
     expect(parseGeminiBilling({ rows: [{ f: [{ v: null }, { v: null }, { v: null }, { v: null }] }] })).toEqual({ usd: 0, until: null, projects: null, currency: null });
+  });
+});
+
+describe('comparableFrom', () => {
+  const month = Date.UTC(2026, 10, 1);
+  const logged = Date.UTC(2026, 10, 10, 9, 22, 16);
+  it('starts at the first whole hour after the first logged request', () => {
+    expect(comparableFrom(month, logged, HOUR_MS)).toBe(Date.UTC(2026, 10, 10, 10));
+  });
+  it('and at the first whole day for a provider that counts by the day', () => {
+    expect(comparableFrom(month, logged, DAY_MS)).toBe(Date.UTC(2026, 10, 11));
+  });
+  it('keeps the month once the log reaches back past it', () => {
+    expect(comparableFrom(Date.UTC(2026, 11, 1), logged, HOUR_MS)).toBe(Date.UTC(2026, 11, 1));
+  });
+  it('keeps the month with no log at all, and a log starting on the hour', () => {
+    expect(comparableFrom(month, null, HOUR_MS)).toBe(month);
+    expect(comparableFrom(month, Date.UTC(2026, 10, 10, 9), HOUR_MS)).toBe(Date.UTC(2026, 10, 10, 9));
   });
 });

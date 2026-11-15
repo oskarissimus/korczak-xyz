@@ -254,6 +254,22 @@ export function startOfUtcMonth(ms: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
 }
 
+export const HOUR_MS = 3_600_000;
+export const DAY_MS = 86_400_000;
+
+/**
+ * Where a provider's own window may start so the log can answer for all of it: `start` (the month),
+ * or the first whole `bucketMs` after the first logged request, whichever is later. A provider counts
+ * in buckets (Cloud Billing's export by the hour, OpenAI's costs by the UTC day), and a bucket that
+ * straddles the first logged request holds spend the log never saw. Before this, Google's reading ran
+ * from the 1st of the month while the log began on 10 Nov 2026 09:22 UTC, and the $2.15 Gemini spent
+ * before it stood in every row as drift (the part after it matched the log to the cent).
+ */
+export function comparableFrom(start: number, loggingSince: number | null, bucketMs: number): number {
+  if (loggingSince == null) return start;
+  return Math.max(start, Math.ceil(loggingSince / bucketMs) * bucketMs);
+}
+
 // --- Google: the Cloud Billing export in BigQuery (no key reads Gemini API billing) ------------
 
 /** Where the billing account's standard usage-cost export lands (`terraform/rpg/billing.tf`). */

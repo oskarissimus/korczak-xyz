@@ -6,12 +6,14 @@
  * Admin SDK only), answered as their last four characters and never whole. Each one is asked one
  * read-only question:
  *
- *   OpenAI      admin key → `GET /v1/organization/costs` from the start of this UTC month: spent.
+ *   OpenAI      admin key → `GET /v1/organization/costs` from the start of this UTC month (or the
+ *               first whole day the request log covers, if later): spent.
  *   ElevenLabs  key with User: read → `GET /v1/user/subscription`: credits left this period.
  *   fal         admin-scoped key → `GET rest.alpha.fal.ai/billing/user_balance`: dollars left.
  *   Google      no key: the Gemini API's billing is Cloud Billing, which no API key reads. The
  *               billing account's export to BigQuery is read instead, as the function itself
- *               (`terraform/rpg/billing.tf` grants it), month to date; by hand until it is on.
+ *               (`terraform/rpg/billing.tf` grants it), month to date or from the first
+ *               whole hour the request log covers, if later; by hand until it is on.
  */
 
 import type { Request } from 'firebase-functions/v2/https';
@@ -27,6 +29,9 @@ import {
   WALLET_DAYS,
   WALLET_KEY_PROVIDERS,
   WALLET_READINGS,
+  DAY_MS,
+  HOUR_MS,
+  comparableFrom,
   ownSpend,
   geminiBillingSql,
   parseElevenLabsLeft,
@@ -85,8 +90,9 @@ async function fetchJson(url: string, headers: Record<string, string>): Promise<
 
 type Read = { reading: Omit<WalletReading, 'id' | 'by'> } | { check: 'refused' | 'failed'; reason: string | null };
 
-async function readOpenAi(key: string, now: number): Promise<Read> {
-  const from = startOfUtcMonth(now);
+async function readOpenAi(key: string, now: number, loggingSince: number | null): Promise<Read> {
+  const from = comparableFrom(startOfUtcMonth(now), loggingSince, DAY_MS);
+  if (from >= now) return { check: 'failed', reason: 'the log starts today: the first whole day to compare begins tomorrow' };
   let usd = 0;
   let page: string | null = null;
   for (let i = 0; i < 5; i++) {
@@ -118,7 +124,7 @@ async function readFal(key: string, now: number): Promise<Read> {
   return { reading: { provider: 'fal', kind: 'balance', unit: 'usd', amount: usd, at: now, from: null, source: 'api', note: null } };
 }
 
-const READERS: Record<WalletKeyProvider, (key: string, now: number) => Promise<Read>> = {
+const READERS: Record<WalletKeyProvider, (key: string, now: number, loggingSince: number | null) => Promise<Read>> = {
   openai: readOpenAi,
   elevenlabs: readElevenLabs,
   fal: readFal,
@@ -139,11 +145,15 @@ async function ownToken(): Promise<string | null> {
   }
 }
 
-/** Gemini API spend this month from the billing export in BigQuery (`terraform/rpg/billing.tf`). */
-async function readGoogle(now: number): Promise<Read> {
+/**
+ * Gemini API spend this month from the billing export in BigQuery (`terraform/rpg/billing.tf`), from
+ * the first whole hour the request log covers (`comparableFrom`), so the window is one the log can
+ * answer for.
+ */
+async function readGoogle(now: number, loggingSince: number | null): Promise<Read> {
   const token = await ownToken();
   if (!token) return { check: 'failed', reason: 'no service identity here (only on Cloud Run)' };
-  const from = startOfUtcMonth(now);
+  const from = comparableFrom(startOfUtcMonth(now), loggingSince, HOUR_MS);
   try {
     const res = await fetch(`https://bigquery.googleapis.com/bigquery/v2/projects/${BILLING_PROJECT}/queries`, {
       method: 'POST',
@@ -177,7 +187,7 @@ function newId(at: number): string {
 
 /** Every key asked once, in parallel; each answer that came back is stored as a reading. */
 async function checkWallets(uid: string): Promise<WalletCheck[]> {
-  const keys = await readKeys();
+  const [keys, loggingSince] = await Promise.all([readKeys(), firstLogged()]);
   const now = Date.now();
   const keep = async (provider: WalletProvider, r: Read): Promise<WalletCheck> => {
     if ('check' in r) return { provider, check: r.check, reason: r.reason };
@@ -186,24 +196,29 @@ async function checkWallets(uid: string): Promise<WalletCheck[]> {
     return { provider, check: 'ok', reason: null };
   };
   return Promise.all([
-    readGoogle(now).then((r) => keep('google', r)),
+    readGoogle(now, loggingSince).then((r) => keep('google', r)),
     ...WALLET_KEY_PROVIDERS.map(async (provider): Promise<WalletCheck> => {
       const key = keys[provider];
       if (!key) return { provider, check: 'no-key', reason: null };
-      return keep(provider, await READERS[provider](key, now));
+      return keep(provider, await READERS[provider](key, now, loggingSince));
     }),
   ]);
 }
 
+/** When the request log's first record was made, or null before there is one. */
+async function firstLogged(): Promise<number | null> {
+  const first = await db.collection(REQUEST_LOG_COLLECTION).orderBy('at', 'asc').limit(1).get();
+  return first.docs[0] ? (first.docs[0].data() as RequestLogEntry).at : null;
+}
+
 async function walletsPage(): Promise<WalletsPage> {
   const since = Date.now() - WALLET_DAYS * 86_400_000;
-  const [keys, readingsSnap, first] = await Promise.all([
+  const [keys, readingsSnap, loggingSince] = await Promise.all([
     readKeys(),
     db.collection(WALLET_READINGS).where('at', '>=', since).orderBy('at', 'desc').limit(500).get(),
-    db.collection(REQUEST_LOG_COLLECTION).orderBy('at', 'asc').limit(1).get(),
+    firstLogged(),
   ]);
   const readings = readingsSnap.docs.map((d) => d.data() as WalletReading);
-  const loggingSince = first.docs[0] ? (first.docs[0].data() as RequestLogEntry).at : null;
   // The log over the widest window any reading covers, cut to provider, time and price.
   const from = Math.min(...readings.map((r) => r.from ?? r.at), Date.now());
   const to = Math.max(...readings.map((r) => r.at), 0);
