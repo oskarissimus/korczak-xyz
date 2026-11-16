@@ -8,6 +8,6 @@
  */
 export const SELLER = {
   name: 'Oskar Korczak',
-  nip: null as string | null,
+  nip: '7981456475' as string | null,
   email: 'oskar.jan.korczak@gmail.com',
 };
