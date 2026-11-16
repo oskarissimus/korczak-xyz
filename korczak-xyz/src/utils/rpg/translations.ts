@@ -91,7 +91,7 @@ const en = {
   dieselPlantTitle: 'Diesel',
   dieselPrices: (world: string, quest: string, step: string, line: string) =>
     `A new world with its first quest ~${world} · a new quest ~${quest} · of which a step of the story ~${step} and a spoken line ~${line}`,
-  dieselNote: 'One litre of diesel is one cent of what the models cost.',
+  dieselNote: 'Everything the game generates is paid for in litres of diesel.',
   rulesLink: 'Content rules: what the game generates and what it never will',
   legalLink: 'Terms, privacy and refunds',
   legalLinks: { pricing: 'Pricing', terms: 'Terms', refunds: 'Refunds', privacy: 'Privacy' },
@@ -487,7 +487,7 @@ const pl: typeof en = {
   dieselPlantTitle: 'Dizel',
   dieselPrices: (world, quest, step, line) =>
     `Nowy świat z pierwszym questem ~${world} · nowy quest ~${quest} · w tym krok opowieści ~${step} i kwestia czytana na głos ~${line}`,
-  dieselNote: 'Litr dizla to jeden cent z tego, co kosztują modele.',
+  dieselNote: 'Wszystko, co gra generuje, opłaca się litrami dizla.',
   rulesLink: 'Zasady treści: co gra generuje, a czego nigdy',
   legalLink: 'Regulamin, prywatność i zwroty',
   legalLinks: { pricing: 'Cennik', terms: 'Regulamin', refunds: 'Zwroty', privacy: 'Prywatność' },

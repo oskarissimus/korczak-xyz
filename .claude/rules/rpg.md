@@ -2034,6 +2034,10 @@ the diesel panel and the settings link them too (from korczak.xyz, to everyrpg's
 policy promises a full refund within 14 days, no reason needed — what `debitAdjustment` does — and
 the terms carry Paddle's required reseller sentence. Keep the pages true to the code: the prices
 are read from `diesel.ts`, but every sentence about expiry, cancelling and refunds is hand-written.
+**No page a player sees says what a litre is worth in dollars** (owner, 16 Nov 2026: it shows the
+margin and ties our hands if the rate ever changes). `LITRES_PER_USD` stays the code's own rate; the
+terms say only that what a thing takes depends on the models and may change. The admin panel may
+still say it.
 
 - **The page names a price, never litres.** A signed-in reader on their tank taps a canister, Paddle.js
   is loaded from Paddle's CDN on that first tap (`paddleCheckout.ts`; not with the game, and not
