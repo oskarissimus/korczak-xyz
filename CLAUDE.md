@@ -44,7 +44,9 @@ www.korczak.xyz  CNAME  korczak.xyz     proxied   <- exists only to be proxied; 
 media            (R2 custom domain)     proxied   <- the songbook's videos, bucket korczak-xyz-media
 everyrpg.korczak.xyz  AAAA   100::           proxied   <- Cloudflare-managed, the korczak-xyz-rpg Worker
 dresden          A      34.66.172.112   proxied   <- unrelated to this site
-korczak.xyz      TXT    v=spf1 -all     _dmarc p=reject   <- the domain sends no mail
+korczak.xyz      MX     route{1,2,3}.mx.cloudflare.net   <- Email Routing's own, locked: contact@ -> Gmail
+korczak.xyz      TXT    v=spf1 include:_spf.mx.cloudflare.net ~all   _dmarc p=reject   <- receives, sends nothing
+mail.korczak.xyz SPF + DKIM for Firebase Auth's mail   <- terraform/cloudflare/mail.tf
 ```
 
 `100::` is the IPv6 discard prefix, and it is not a placeholder to be tidied away: a Worker custom
