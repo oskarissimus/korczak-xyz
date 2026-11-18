@@ -40,7 +40,12 @@ vi.mock('../runtime', () => {
   };
 });
 
-import { handlePaddleWebhook, verifySignature } from './paddle';
+import { handlePaddleWebhook, inCidrs, resetPaddleIps, verifySignature } from './paddle';
+
+const PADDLE_IP = '34.237.3.244';
+let ipsAnswer: () => Promise<Response> = async () =>
+  new Response(JSON.stringify({ data: { ipv4_cidrs: [`${PADDLE_IP}/32`, '3.208.120.145/32'] } }), { status: 200 });
+vi.stubGlobal('fetch', (() => ipsAnswer()) as typeof fetch);
 
 const SECRET = 'pdl_ntfset_test_secret';
 
@@ -62,7 +67,7 @@ function paid(txn = 'txn_1', uid: string | null = 'u1', litres = 250, type = 'tr
   });
 }
 
-async function deliver(body: string, signature: string | null = sign(body)) {
+async function deliver(body: string, signature: string | null = sign(body), from = PADDLE_IP) {
   let status = 0;
   let json: unknown = null;
   const res = {
@@ -76,7 +81,9 @@ async function deliver(body: string, signature: string | null = sign(body)) {
       return this;
     },
   };
-  await handlePaddleWebhook({ method: 'POST', headers: signature ? { 'paddle-signature': signature } : {} } as never, res as never, Buffer.from(body));
+  const headers: Record<string, string> = { 'x-forwarded-for': `1.2.3.4, ${from}` };
+  if (signature) headers['paddle-signature'] = signature;
+  await handlePaddleWebhook({ method: 'POST', headers } as never, res as never, Buffer.from(body));
   return { status, json: json as { outcome?: string } };
 }
 
@@ -97,6 +104,36 @@ describe('the Paddle webhook', () => {
     expect(verifySignature(body, sign('{"a":1}', SECRET, Math.floor(Date.now() / 1000) - 3600), [SECRET])).toBe(false);
     expect(verifySignature(body, undefined, [SECRET])).toBe(false);
     expect(verifySignature(body, sign('{"a":1}'), [])).toBe(false);
+  });
+
+  it('matches addresses against CIDRs', () => {
+    expect(inCidrs('34.237.3.244', ['34.237.3.244/32'])).toBe(true);
+    expect(inCidrs('::ffff:34.237.3.244', ['34.237.3.244/32'])).toBe(true);
+    expect(inCidrs('34.237.3.245', ['34.237.3.244/32'])).toBe(false);
+    expect(inCidrs('10.1.2.3', ['10.0.0.0/8'])).toBe(true);
+    expect(inCidrs('unknown', ['10.0.0.0/8'])).toBe(false);
+  });
+
+  it('refuses a signed body from anywhere but Paddle, judged by the last forwarded address', async () => {
+    resetPaddleIps();
+    expect((await deliver(paid(), sign(paid()), '5.6.7.8')).status).toBe(403);
+    expect(store.get('rpgLedger/u1')).toBeUndefined();
+    // A spoofed first entry does not help: the last one is what Google saw.
+    expect((await deliver(paid(), sign(paid()), `${PADDLE_IP}, 5.6.7.8`)).status).toBe(403);
+    expect((await deliver(paid(), sign(paid()), '3.208.120.145')).status).toBe(200);
+  });
+
+  it('falls back to the signature alone when Paddle\'s list cannot be read', async () => {
+    resetPaddleIps();
+    const ok = ipsAnswer;
+    ipsAnswer = async () => new Response('down', { status: 503 });
+    try {
+      expect((await deliver(paid(), sign(paid()), '5.6.7.8')).status).toBe(200);
+      expect(reported).toContain('rpgPaddle.ips');
+    } finally {
+      ipsAnswer = ok;
+      resetPaddleIps();
+    }
   });
 
   it('refuses an unsigned body and pours nothing', async () => {

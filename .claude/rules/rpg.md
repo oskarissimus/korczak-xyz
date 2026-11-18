@@ -2056,7 +2056,11 @@ still say it.
   lets a body in is `Paddle-Signature` (HMAC-SHA256 of `ts:rawBody`, at most five minutes old) under
   the destination's endpoint secret in **`rpgPaddle/config.webhookSecret`** (or a `webhookSecrets`
   list while rotating). Firestore rather than Secret Manager so a project without one still deploys
-  and simply answers 401. No rule, Admin SDK only.
+  and simply answers 401. No rule, Admin SDK only. **Before the signature, the sender** (the last
+  `x-forwarded-for` entry, `callerIp`) must be in Paddle's own published list — `api.paddle.com/ips`
+  and `sandbox-api.paddle.com/ips` both, read hourly, never written in the code (owner, 18 Nov 2026);
+  anyone else is a 403 and a Sentry event `rpgPaddle.source`. If the list cannot be read at all the
+  signature alone decides (`rpgPaddle.ips` reported), since refusing would lose paid deliveries.
 - **Once per transaction.** `transaction.paid` and `transaction.completed` both pour, whichever comes
   first; `rpgPurchases/{txn_id}` is written in the same transaction as the litres (`creditPurchase`),
   so the second event and every Paddle retry find it and do nothing. A paid transaction with no uid or
