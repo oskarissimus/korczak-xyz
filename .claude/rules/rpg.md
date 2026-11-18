@@ -2026,10 +2026,10 @@ individual one and **still in the sandbox** until Paddle verifies it for live pa
 
 **The legal pages** (owner, 15 Nov 2026: terms, privacy, refunds and a public price list, with the
 business's name, NIP and email). The business has no seat and no fixed place of business; since
-18 Nov 2026 its address for service is a virtual office, and the pages give **the town of residence
-and that office as the correspondence address** — art. 5 ust. 2 pkt 2 of the e-services act asks a
-sole trader for both, and Paddle being the merchant of record does not lift it, the game being our
-own service. **The home address appears nowhere on the site.** `components/Rpg/RpgLegal.astro` is all four, in both locales, at
+18 Nov 2026 its address for service is a virtual office, and the pages give **that office as the
+correspondence address and no town of residence** (owner, 18 Nov 2026, knowing art. 5 ust. 2 pkt 2
+of the e-services act reads "miejsce zamieszkania i adres"). **The home address appears nowhere on
+the site.** `components/Rpg/RpgLegal.astro` is all four, in both locales, at
 everyrpg's `/terms/`, `/privacy/`, `/refunds/`, `/pricing/` (in `rpg-release.mjs`'s `EXPECTED`);
 who sells is `utils/rpg/seller.ts`, its `nip` shown only once set. Every page's bottom strip
 (`BuildStamp.astro`) links them, so they are one tap from the home screen without adding to it;
