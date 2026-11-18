@@ -51,7 +51,8 @@ resource "cloudflare_dns_record" "apex_spf" {
 
 resource "cloudflare_email_routing_dns" "korczak_xyz" {
   zone_id = data.cloudflare_zone.korczak_xyz.zone_id
-  name    = "korczak.xyz"
+  // No `name`: it is for routing a subdomain, and the API refuses the apex there (2007, "must be a
+  // subdomains of korczak.xyz"). Left out, it enables the zone itself.
 
   depends_on = [cloudflare_dns_record.apex_spf]
 }
