@@ -6,7 +6,8 @@
  *
  * Keep them true to the code: the litres and prices come from `utils/rpg/diesel.ts`, what a refund
  * takes back is `debitAdjustment`, what a subscription's end takes away is `endSubscription`
- * (`functions/src/rpg/wallet.ts`). Who sells is `utils/rpg/seller.ts`, with no address (see there).
+ * (`functions/src/rpg/wallet.ts`). Who sells is `utils/rpg/seller.ts`, with the town of residence and
+ * the correspondence address that art. 5 of the e-services act asks for (see there).
  */
 import type { Lang } from '../../i18n';
 import { CANISTERS, SUBSCRIPTION } from '../../utils/rpg/diesel';
@@ -25,8 +26,8 @@ const prefix = pl ? '/pl' : '';
 const href = (page: string) => `${prefix}/${page}/`;
 const nip = SELLER.nip ? (pl ? `, NIP ${SELLER.nip}` : `, tax ID (NIP) ${SELLER.nip}`) : '';
 const who = pl
-  ? `${SELLER.name}, jednoosobowa działalność gospodarcza${nip}`
-  : `${SELLER.name}, a sole trader registered in Poland${nip}`;
+  ? `${SELLER.name}, jednoosobowa działalność gospodarcza${nip}, zam. w ${SELLER.residence.pl}, adres do korespondencji: ${SELLER.address}`
+  : `${SELLER.name}, a sole trader registered in Poland${nip}, resident in ${SELLER.residence.en}, correspondence address: ${SELLER.address}, Poland`;
 const mail = SELLER.email;
 const zl = (n: number) => `${n} zł`;
 const packNames = pl
@@ -35,7 +36,7 @@ const packNames = pl
 
 type Section = [string, string[]];
 
-const updated = pl ? 'Ostatnia aktualizacja: 16 listopada 2026' : 'Last updated: 16 November 2026';
+const updated = pl ? 'Ostatnia aktualizacja: 18 listopada 2026' : 'Last updated: 18 November 2026';
 
 const en: Record<LegalKind, { title: string; sections: Section[] }> = {
   terms: {
@@ -489,7 +490,8 @@ const perL = (litres: number, pln: number) =>
     }
   </nav>
   <p>
-    Every RPG · {SELLER.name}{SELLER.nip ? ` · NIP ${SELLER.nip}` : ''} · <a href={`mailto:${mail}`}>{mail}</a>
+    Every RPG · {SELLER.name}{SELLER.nip ? ` · NIP ${SELLER.nip}` : ''} · {SELLER.address} ·{' '}
+    <a href={`mailto:${mail}`}>{mail}</a>
   </p>
   <p><a href={`${prefix}/`}>← {pl ? 'Wróć do gry' : 'Back to the game'}</a></p>
 </footer>
