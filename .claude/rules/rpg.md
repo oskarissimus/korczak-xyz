@@ -2046,8 +2046,11 @@ still say it.
   is loaded from Paddle's CDN on that first tap (`paddleCheckout.ts`; not with the game, and not
   self-hosted, which Paddle asks against) and opens the overlay with the canister's price id and
   `customData.uid`. The litres are `custom_data.litres` on the Paddle price itself, so what is poured
-  is what was paid for whatever the page sent. Token and price ids are in `utils/rpg/paddle.ts`, public
-  by design; going live is a new token, three live price ids and `environment: 'production'` there.
+  is what was paid for whatever the page sent. Token and price ids are `PUBLIC_PADDLE_*` in the build's
+  env, read by `utils/rpg/paddleConfig.ts` (browser only: `paddle.ts` is compiled into the functions,
+  which have no `import.meta.env`), sandbox when unset; public by design. **The token decides the
+  environment**: a `live_` token is production, anything else sandbox, so the two cannot be mixed and
+  `Paddle.Environment.set('sandbox')` runs only for a sandbox token.
 - **The webhook pours, not the page** (`functions/src/rpg/paddle.ts`, `rpgApi/paddle/webhook`). It is
   routed in `handleRpgApi` **before the CORS gate** — Paddle sends no Origin — and the only thing that
   lets a body in is `Paddle-Signature` (HMAC-SHA256 of `ts:rawBody`, at most five minutes old) under
@@ -2081,6 +2084,13 @@ still say it.
   link, since the gateway holds no Paddle API key to open the customer portal.
 - **Two destinations, one per project**: korczak-xyz-501720's `rpgApi` and korczak-rpg's, each with its
   own secret in its own `rpgPaddle/config`. Both point at the same sandbox account and prices.
+- **Going live is everyrpg only** (owner, 18 Nov 2026). korczak.xyz stays on the sandbox for good
+  (`.env.production` sets no `PUBLIC_PADDLE_*`); the live account (`slr_01m7b7z99033w9e6xkd41bmrv2`)
+  gets one destination, korczak-rpg's, whose secret goes into korczak-rpg's `rpgPaddle/config`
+  (added to `webhookSecrets` beside the sandbox one, so sandbox deliveries still verify). The live
+  token and price ids go into the commented block at the end of `.env.rpg` **only after** Paddle has
+  verified the account and approved everyrpg.korczak.xyz as a checkout domain, since every push to
+  main deploys that build. No Paddle API key anywhere: the server only receives webhooks.
 
 ### Signed in, the tank pays
 

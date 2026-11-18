@@ -11,25 +11,9 @@
  * litres are `custom_data.litres` on the price inside Paddle, so what is poured is what was paid
  * for, whatever the page sent. The webhook is signed with a secret only the gateway holds.
  *
- * SANDBOX FOR NOW: the account is not verified for live payments yet. The token and the price ids
- * below are sandbox objects (product "Diesel", `pro_01m7daxkazw506xzkp27r7ynq4`) and are public by
- * design — a client-side token can only open a checkout. Going live is a new token and three new
- * price ids here, `environment: 'production'`, and a live notification destination.
+ * The token and the price ids are in `paddleConfig.ts`, read from the build's env: this file is
+ * compiled into the functions too, where there is no `import.meta.env`.
  */
-
-import type { Canister } from './diesel';
-
-export const PADDLE = {
-  environment: 'sandbox' as 'sandbox' | 'production',
-  token: 'test_a6f1d7ba50e4f6e6de42e33bf37',
-  prices: {
-    can: 'pri_01m7daxkc4b6w327j494v88pyr',
-    barrel: 'pri_01m7daxkda4nmg96q4r6eq8y8v',
-    tank: 'pri_01m7daxke7fw2e6fmhvj4kyqgw',
-  } satisfies Record<Canister['id'], string>,
-  /** The monthly delivery (`SUBSCRIPTION`), product "Diesel — monthly delivery", `pro_01m7dfqz9y0tgqhkdcnwvnh45d`. */
-  subscription: 'pri_01m7dfqzb598m25cr5r2ze7hh5',
-};
 
 /** Where Paddle sends its webhooks: `rpgApi/paddle/webhook`, outside CORS (no Origin, a signature instead). */
 export const PADDLE_WEBHOOK_PATH = '/paddle/webhook';

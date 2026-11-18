@@ -13,7 +13,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CANISTERS, SUBSCRIPTION, formatLitres, plantState, type Canister } from '../../utils/rpg/diesel';
-import { PADDLE, type SubscriptionView } from '../../utils/rpg/paddle';
+import { type SubscriptionView } from '../../utils/rpg/paddle';
+import { PADDLE } from '../../utils/rpg/paddleConfig';
 import type { CheckoutOutcome } from '../../utils/rpg/paddleCheckout';
 import type { Lang } from '../../utils/rpg/quest';
 import { ui } from './ui';

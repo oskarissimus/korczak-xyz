@@ -1,5 +1,5 @@
 /*
- * Paddle's overlay checkout, in the browser (`paddle.ts` holds the token and the prices).
+ * Paddle's overlay checkout, in the browser (`paddleConfig.ts` holds the token and the prices).
  *
  * Paddle.js is loaded from Paddle's CDN the first time a canister is bought, not with the game: most
  * sittings never open the shop, and the script is Paddle's to version (`/paddle/v2/` is the stable
@@ -11,7 +11,7 @@
  * the tank's live snapshot (`useDieselWallet`) raises the gauge when it lands, a second or two later.
  */
 
-import { PADDLE } from './paddle';
+import { PADDLE } from './paddleConfig';
 import type { Canister } from './diesel';
 
 const SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js';
