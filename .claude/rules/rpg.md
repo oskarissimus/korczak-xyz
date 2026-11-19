@@ -2084,8 +2084,14 @@ still say it.
   first (it may go below zero for an account with none; `subLeftOf` reads it clamped to the balance),
   and `subscription.canceled` takes what is left of it away (`endSubscription`). Bought canisters never
   expire. `subscription.created`/`updated` keep `dieselSub` on the ledger — status, next billing, a
-  scheduled cancel, and Paddle's own `management_urls.cancel` — which the plant shows with a cancel
-  link, since the gateway holds no Paddle API key to open the customer portal.
+  scheduled cancel, and a cancel link the plant shows. **A webhook carries no `management_urls`**
+  (Paddle puts them only on an API read, and the gateway holds no key), so the links are built from
+  the account's customer portal (`PADDLE_PORTALS`, chosen by which secret verified the delivery:
+  `webhookSecret` is sandbox, `webhookSecrets` live) — the portal asks for the buyer's email and opens
+  on that subscription. **The first payment waits for `transaction.completed`**: its
+  `transaction.paid` arrives before the subscription exists and has no `subscription_id` (live test,
+  19 Nov 2026), and poured then it was 600 L of bought diesel that never expire. A paid transaction
+  whose price has a `billing_cycle` and no `subscription_id` is answered `awaiting-subscription`.
 - **Two destinations, one per project**: korczak-xyz-501720's `rpgApi` and korczak-rpg's, each with its
   own secret in its own `rpgPaddle/config`. Both point at the same sandbox account and prices.
 - **Going live is everyrpg only** (owner, 18 Nov 2026). korczak.xyz stays on the sandbox for good

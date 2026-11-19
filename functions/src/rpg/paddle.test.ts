@@ -203,6 +203,36 @@ describe('the Paddle webhook', () => {
     expect(store.get('rpgPurchases/txn_s2')?.expiredUsd).toBeCloseTo(4);
   });
 
+  it('waits for the subscription before pouring its first payment, so it is a delivery and not bought diesel', async () => {
+    const first = (type: string, sub: string | null) =>
+      JSON.stringify({
+        event_type: type,
+        data: {
+          id: 'txn_f1',
+          subscription_id: sub,
+          custom_data: { uid: 'u1' },
+          items: [{ quantity: 1, price: { id: 'pri_monthly', billing_cycle: { interval: 'month', frequency: 1 }, custom_data: { litres: 600, kind: 'subscription' } } }],
+          details: { totals: { grand_total: '0' } },
+        },
+      });
+    store.set('rpgLedger/u1', { dieselUsd: 1, dieselGrantedAt: 1 });
+    expect((await deliver(first('transaction.paid', null))).json.outcome).toBe('awaiting-subscription');
+    expect(store.get('rpgPurchases/txn_f1')).toBeUndefined();
+    expect((await deliver(first('transaction.completed', 'sub_f'))).json.outcome).toBe('credited');
+    expect(store.get('rpgPurchases/txn_f1')?.subscriptionId).toBe('sub_f');
+    expect(store.get('rpgLedger/u1')?.dieselSubUsd).toBeCloseTo(6);
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(7);
+  });
+
+  it('builds the portal links when the webhook carries none', async () => {
+    store.set('rpgLedger/u1', { dieselUsd: 0, dieselGrantedAt: 1 });
+    await deliver(JSON.stringify({ event_type: 'subscription.created', data: { id: 'sub_p', status: 'active', custom_data: { uid: 'u1' } } }));
+    expect(store.get('rpgLedger/u1')?.dieselSub).toMatchObject({
+      cancelUrl: 'https://sandbox-customer-portal.paddle.com/cpl_01m7b8bt52r2dvgkpxhzs5wcqy?action=cancel_subscription&subscription_id=sub_p',
+      updatePaymentUrl: 'https://sandbox-customer-portal.paddle.com/cpl_01m7b8bt52r2dvgkpxhzs5wcqy?action=update_subscription_payment_method&subscription_id=sub_p',
+    });
+  });
+
   it('shows the subscription on the ledger, and its end takes the rest of the delivery away', async () => {
     store.set('rpgLedger/u1', { dieselUsd: 8, dieselSubUsd: 5, dieselGrantedAt: 1 });
     const sub = (type: string, status: string, extra: Record<string, unknown> = {}) =>

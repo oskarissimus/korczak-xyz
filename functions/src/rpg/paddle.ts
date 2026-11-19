@@ -7,7 +7,8 @@
  *   lives in `rpgPaddle/config.webhookSecret` (Firestore rather than Secret Manager, so a project
  *   without it — the game's own, before its destination exists — still deploys and simply refuses).
  * - **`transaction.paid` and `transaction.completed` both pour**, whichever comes first; the second
- *   finds `rpgPurchases/{txn}` and does nothing (`creditPurchase`).
+ *   finds `rpgPurchases/{txn}` and does nothing (`creditPurchase`) — except a subscription's first
+ *   payment, whose `transaction.paid` has no `subscription_id` yet and waits for `completed`.
  * - **Who and how much come from Paddle's own record**: the account is `custom_data.uid` the page
  *   set when it opened the checkout, the litres are on the prices (`litresOf`). A paid transaction
  *   with neither is kept as an orphan and reported, and still answered 200 — Paddle retrying it
@@ -41,15 +42,33 @@ import { reportError } from '../sentry';
 /** How old a signature may be: Paddle signs each delivery afresh, retries included. */
 const MAX_AGE_S = 300;
 
-let secretCache: { at: number; secrets: string[] } | null = null;
-async function webhookSecrets(): Promise<string[]> {
+type PaddleEnv = 'sandbox' | 'production';
+interface Secrets {
+  /** `webhookSecret`: the sandbox destination's, the one every project started with. */
+  sandbox: string[];
+  /** `webhookSecrets`: the live account's destinations (korczak-rpg only). */
+  production: string[];
+}
+let secretCache: { at: number; secrets: Secrets } | null = null;
+async function webhookSecrets(): Promise<Secrets> {
   if (secretCache && Date.now() - secretCache.at < 60_000) return secretCache.secrets;
   const data = (await db.doc(PADDLE_CONFIG_DOC.join('/')).get()).data() ?? {};
-  const raw = [data.webhookSecret, ...(Array.isArray(data.webhookSecrets) ? data.webhookSecrets : [])];
-  const secrets = raw.filter((s): s is string => typeof s === 'string' && s.length > 0);
+  const keep = (raw: unknown[]) => raw.filter((s): s is string => typeof s === 'string' && s.length > 0);
+  const secrets = { sandbox: keep([data.webhookSecret]), production: keep(Array.isArray(data.webhookSecrets) ? data.webhookSecrets : []) };
   secretCache = { at: Date.now(), secrets };
   return secrets;
 }
+
+/**
+ * Each account's customer portal. A webhook's subscription carries no `management_urls` (Paddle
+ * puts them only on an API read, which needs a key the gateway does not hold), so the page's cancel
+ * and card links are built from these: the portal asks the buyer for their email and opens on that
+ * subscription. Public, like the client token.
+ */
+export const PADDLE_PORTALS: Record<PaddleEnv, string> = {
+  sandbox: 'https://sandbox-customer-portal.paddle.com/cpl_01m7b8bt52r2dvgkpxhzs5wcqy',
+  production: 'https://customer-portal.paddle.com/cpl_01m7b7zdkaxzp9yd2qkp9p8k2e',
+};
 
 /** Paddle's published sender addresses: the source of truth, never a list in the code. */
 export const PADDLE_IP_LISTS = ['https://api.paddle.com/ips', 'https://sandbox-api.paddle.com/ips'];
@@ -133,6 +152,10 @@ async function onPaid(event: PaddleEvent): Promise<string> {
   const txnId = str(data.id);
   if (!txnId) return 'no-id';
   const subscriptionId = str(data.subscription_id);
+  // A subscription's first payment is `transaction.paid` before the subscription exists, so it has
+  // no `subscription_id` yet (live, 19 Nov 2026). Poured then, it would be bought diesel that never
+  // expires; `transaction.completed` names the subscription and pours it as the delivery it is.
+  if (!subscriptionId && recurring(data.items)) return 'awaiting-subscription';
   // A renewal names its account through the subscription; the first payment names it itself.
   const named = str((data.custom_data as Record<string, unknown> | null)?.uid);
   const uid = subscriptionId ? await subscriptionOwner(subscriptionId, named) : named;
@@ -155,11 +178,20 @@ async function onPaid(event: PaddleEvent): Promise<string> {
   return creditPurchase({ txnId, uid, litres, totalMinor, currency, eventId: str(event.event_id), priceIds, subscriptionId });
 }
 
-function viewOf(data: Record<string, unknown>): SubscriptionView | null {
+function recurring(items: unknown): boolean {
+  return Array.isArray(items) && items.some((i) => !!(i as { price?: { billing_cycle?: unknown } } | null)?.price?.billing_cycle);
+}
+
+function viewOf(data: Record<string, unknown>, env: PaddleEnv): SubscriptionView | null {
   const id = str(data.id);
   const status = str(data.status);
   if (!id || !status) return null;
-  const urls = (data.management_urls ?? {}) as Record<string, unknown>;
+  const given = (data.management_urls ?? {}) as Record<string, unknown>;
+  const portal = (action: string) => `${PADDLE_PORTALS[env]}?action=${action}&subscription_id=${encodeURIComponent(id)}`;
+  const urls = {
+    cancel: str(given.cancel) ?? portal('cancel_subscription'),
+    update_payment_method: str(given.update_payment_method) ?? portal('update_subscription_payment_method'),
+  };
   const change = data.scheduled_change as { action?: unknown; effective_at?: unknown } | null | undefined;
   return {
     id,
@@ -176,9 +208,9 @@ function viewOf(data: Record<string, unknown>): SubscriptionView | null {
  * own cancel link — the gateway holds no Paddle API key to open a customer portal), and on the end
  * of it, the rest of its last delivery taken away.
  */
-async function onSubscription(event: PaddleEvent): Promise<string> {
+async function onSubscription(event: PaddleEvent, env: PaddleEnv): Promise<string> {
   const data = event.data ?? {};
-  const view = viewOf(data);
+  const view = viewOf(data, env);
   if (!view) return 'no-id';
   const uid = await subscriptionOwner(view.id, str((data.custom_data as Record<string, unknown> | null)?.uid));
   if (!uid) {
@@ -221,8 +253,14 @@ export async function handlePaddleWebhook(req: Request, res: Response, raw: Buff
     res.status(403).json({ reason: 'source' });
     return;
   }
-  const header = req.headers['paddle-signature'];
-  if (!verifySignature(raw, typeof header === 'string' ? header : undefined, await webhookSecrets())) {
+  const header = typeof req.headers['paddle-signature'] === 'string' ? req.headers['paddle-signature'] : undefined;
+  const secrets = await webhookSecrets();
+  const env: PaddleEnv | null = verifySignature(raw, header, secrets.production)
+    ? 'production'
+    : verifySignature(raw, header, secrets.sandbox)
+      ? 'sandbox'
+      : null;
+  if (!env) {
     res.status(401).json({ reason: 'signature' });
     return;
   }
@@ -240,7 +278,7 @@ export async function handlePaddleWebhook(req: Request, res: Response, raw: Buff
       : type === 'adjustment.created' || type === 'adjustment.updated'
         ? await onAdjustment(event)
         : type === 'subscription.created' || type === 'subscription.updated' || type === 'subscription.canceled'
-          ? await onSubscription(event)
+          ? await onSubscription(event, env)
           : 'ignored';
   res.status(200).json({ ok: true, outcome });
 }
