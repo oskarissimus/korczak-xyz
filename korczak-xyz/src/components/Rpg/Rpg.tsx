@@ -350,6 +350,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   tRef.current = t;
   const gameLangRef = useRef(gameLang);
   gameLangRef.current = gameLang;
+  // everyrpg's bottom strip links the legal pages in the game's language, not the page's (BuildStamp.astro).
+  useEffect(() => {
+    document.documentElement.dataset.gameLang = gameLang;
+  }, [gameLang]);
   /** The autosaved quest, offered on the intro screen. */
   const [saved, setSaved] = useState<SavedGame | null>(null);
   /**

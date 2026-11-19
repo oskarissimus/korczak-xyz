@@ -11,6 +11,12 @@
  * The strip also carries the legal pages (components/Rpg/RpgLegal.astro) on the left, the one
  * thing on it that takes a tap (owner, 15 Nov 2026: terms, privacy, refunds and prices for Paddle,
  * reachable from every page, the home screen included, without adding to it).
+ *
+ * The links follow THE GAME'S language, not the page's (owner, 19 Nov 2026: the game in English on
+ * /pl/ still offered "Cennik", which opened the Polish price list he had to paste into Paddle). The
+ * game's language is its own choice (`rpg-lang`, `startingLang`), so the game publishes it as
+ * `<html data-game-lang>` and the strip follows it; on a page without the game, the stored choice.
+ * Only English and Polish have legal pages, so any other language gets the English ones.
  */
 import { execSync } from 'node:child_process';
 import type { Lang } from '../../src/i18n';
@@ -42,13 +48,36 @@ const built = new Date().toISOString();
 ---
 
 <div class="build-stamp" data-commit={commit} data-built={built}>
-  <nav class="build-legal">{legal.map(([page, label]) => <a href={`${prefix}/${page}/`}>{label}</a>)}</nav>
+  <nav class="build-legal">{legal.map(([page, label]) => <a href={`${prefix}/${page}/`} data-page={page}>{label}</a>)}</nav>
   <span class="build-id" aria-hidden="true">
     {commit}<span class="build-time"> · <time datetime={built}>{built.slice(0, 16).replace('T', ' ')} UTC</time></span>
   </span>
 </div>
 
 <script>
+  const LEGAL: Record<'en' | 'pl', Record<string, string>> = {
+    en: { terms: 'Terms', privacy: 'Privacy', refunds: 'Refunds', pricing: 'Pricing' },
+    pl: { terms: 'Regulamin', privacy: 'Prywatność', refunds: 'Zwroty', pricing: 'Cennik' },
+  };
+  function legalIn(game: string | undefined) {
+    const l = game === 'pl' ? 'pl' : 'en';
+    for (const a of document.querySelectorAll<HTMLAnchorElement>('.build-legal a[data-page]')) {
+      const page = a.dataset.page ?? '';
+      a.textContent = LEGAL[l][page] ?? a.textContent;
+      a.href = `${l === 'pl' ? '/pl' : ''}/${page}/`;
+    }
+  }
+  const root = document.documentElement;
+  let stored: string | undefined;
+  try {
+    const chosen = JSON.parse(localStorage.getItem('rpg-lang') || 'null');
+    if (chosen && typeof chosen.lang === 'string') stored = chosen.lang;
+  } catch {
+    /* a blocked store: the page's language */
+  }
+  legalIn(root.dataset.gameLang ?? stored ?? root.lang);
+  new MutationObserver(() => legalIn(root.dataset.gameLang)).observe(root, { attributes: true, attributeFilter: ['data-game-lang'] });
+
   for (const el of document.querySelectorAll<HTMLElement>('.build-stamp time')) {
     const at = new Date(el.dateTime);
     if (!Number.isNaN(at.getTime())) {

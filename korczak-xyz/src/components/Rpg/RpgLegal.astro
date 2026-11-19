@@ -433,6 +433,24 @@ const perL = (litres: number, pln: number) =>
   `${((pln / litres) * 100).toLocaleString(pl ? 'pl-PL' : 'en-GB', { maximumFractionDigits: 1 })} gr / L`;
 ---
 
+<a class="legal-close" href={`${prefix}/`} aria-label={pl ? 'Zamknij i wróć do gry' : 'Close and go back to the game'} title={pl ? 'Zamknij' : 'Close'}>✕</a>
+<script>
+  // ✕ goes back where the reader came from when that was this site (the game, another legal page),
+  // else to the game's start: a link pasted into Paddle's form has no game behind it.
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('.legal-close')) {
+    a.addEventListener('click', (e) => {
+      try {
+        if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) {
+          e.preventDefault();
+          history.back();
+        }
+      } catch {
+        /* a bad referrer: follow the link */
+      }
+    });
+  }
+</script>
+
 <h1>{text.title}</h1>
 <p class="legal-updated">{updated}</p>
 {
@@ -495,3 +513,34 @@ const perL = (litres: number, pln: number) =>
   </p>
   <p><a href={`${prefix}/`}>← {pl ? 'Wróć do gry' : 'Back to the game'}</a></p>
 </footer>
+
+<style>
+  /* The ✕ at the card's top right (owner, 19 Nov 2026). `.rpg-page` is the card; it is made the
+     anchor here so nothing else on the page moves. */
+  :global(.rpg-page:has(.legal-close)) {
+    position: relative;
+  }
+  :global(.rpg-page:has(.legal-close) > h1) {
+    padding: 0 44px;
+  }
+  .legal-close {
+    position: absolute;
+    top: calc(12px + var(--safe-top, 0px));
+    right: calc(12px + var(--safe-right, 0px));
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    font-size: 20px;
+    line-height: 1;
+    color: #f1e6cf;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .legal-close:hover,
+  .legal-close:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+  }
+</style>
