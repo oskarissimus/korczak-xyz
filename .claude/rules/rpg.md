@@ -2098,9 +2098,9 @@ still say it.
   (`.env.production` sets no `PUBLIC_PADDLE_*`); the live account (`slr_01m7b7z99033w9e6xkd41bmrv2`)
   gets one destination, korczak-rpg's, whose secret goes into korczak-rpg's `rpgPaddle/config`
   (added to `webhookSecrets` beside the sandbox one, so sandbox deliveries still verify). The live
-  token and price ids go into the commented block at the end of `.env.rpg` **only after** Paddle has
-  verified the account and approved everyrpg.korczak.xyz as a checkout domain, since every push to
-  main deploys that build. No Paddle API key anywhere: the server only receives webhooks.
+  token and price ids are at the end of `.env.rpg`, **live for every player since 19 Nov 2026** after a
+  real checkout was tested end to end (100% code, scheduled and immediate cancel). `PUBLIC_PADDLE_PREVIEW=1`
+  there puts the live shop back behind `?paddle=live` for one browser (`paddleConfig.ts`). No Paddle API key anywhere: the server only receives webhooks.
 
 ### Signed in, the tank pays
 
