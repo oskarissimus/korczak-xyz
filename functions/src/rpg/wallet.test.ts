@@ -33,7 +33,7 @@ vi.mock('../runtime', () => {
   };
 });
 
-import { reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
+import { redeemCode, reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
 
 beforeEach(() => store.clear());
 
@@ -72,5 +72,19 @@ describe('the diesel tank', () => {
   it('tops up on top of the first tank', async () => {
     expect(await topUpDiesel('u9', 2)).toBe(3);
     expect(await topUpDiesel('u9', 1)).toBe(4);
+  });
+
+  it('pours a promo code once per account and never past its uses or its date', async () => {
+    store.set('rpgCodes/BETA', { litres: 1200, maxUses: 2, uses: 0 });
+    expect(await redeemCode('u1', 'NOPE')).toEqual({ ok: false, reason: 'unknown' });
+    expect(await redeemCode('u1', 'BETA')).toEqual({ ok: true, litres: 1200, balanceUsd: 13 });
+    expect(store.get('rpgLedger/u1')?.dieselCodeUsd).toBe(12);
+    expect(await redeemCode('u1', 'BETA')).toEqual({ ok: false, reason: 'used' });
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBe(13);
+    expect((await redeemCode('u2', 'BETA')).ok).toBe(true);
+    expect(await redeemCode('u3', 'BETA')).toEqual({ ok: false, reason: 'exhausted' });
+    expect(store.get('rpgCodes/BETA')?.uses).toBe(2);
+    store.set('rpgCodes/OLD', { litres: 100, expiresAt: 1000 });
+    expect(await redeemCode('u1', 'OLD', 2000)).toEqual({ ok: false, reason: 'expired' });
   });
 });

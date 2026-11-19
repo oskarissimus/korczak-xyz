@@ -11,12 +11,13 @@
  * with no account to pour into, a canister's button plays the refuelling as a preview and says so.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CANISTERS, SUBSCRIPTION, formatLitres, plantState, type Canister } from '../../utils/rpg/diesel';
 import { type SubscriptionView } from '../../utils/rpg/paddle';
 import { PADDLE } from '../../utils/rpg/paddleConfig';
 import type { CheckoutOutcome } from '../../utils/rpg/paddleCheckout';
 import type { Lang } from '../../utils/rpg/quest';
+import type { RedeemRefusal } from '../../utils/rpg/wallet';
 import { ui } from './ui';
 
 /** How long the man takes: walk in, pour, walk out. Matches `rpg-dz-walk` in rpg.css. */
@@ -90,6 +91,7 @@ export default function DieselPlant({
   onSubscribe,
   subscription = null,
   subLitres = 0,
+  onRedeem,
 }: {
   lang: Lang;
   litres: number;
@@ -108,6 +110,8 @@ export default function DieselPlant({
   subscription?: SubscriptionView | null;
   /** Litres of this month's delivery still in the tank (they expire with the month). */
   subLitres?: number;
+  /** A promo code poured into the account's tank (`/wallet/redeem`). */
+  onRedeem?: (code: string) => Promise<{ ok: true; litres: number } | { ok: false; reason: RedeemRefusal | null }>;
 }) {
   const t = ui(lang);
   const real = plantState(litres);
@@ -117,6 +121,9 @@ export default function DieselPlant({
   const [poured, setPoured] = useState<{ c: Canister; ok: boolean | null } | null>(null);
   /** A checkout open or just finished: `null` outcome while the overlay is up. */
   const [bought, setBought] = useState<{ litres: number; outcome: CheckoutOutcome | null } | null>(null);
+  const [code, setCode] = useState('');
+  /** The code's answer: `null` while it is being checked. */
+  const [redeemed, setRedeemed] = useState<{ text: string } | null | undefined>(undefined);
   const before = useRef(real);
   const timers = useRef<number[]>([]);
 
@@ -163,6 +170,22 @@ export default function DieselPlant({
         later(() => setBought(null), REFUEL_MS + PREVIEW_HOLD_MS * 3);
       } else if (outcome === 'failed') {
         later(() => setBought(null), PREVIEW_HOLD_MS * 2);
+      }
+    });
+  };
+
+  const redeem = (e: FormEvent) => {
+    e.preventDefault();
+    if (!onRedeem || !code.trim() || redeemed === null) return;
+    setRedeemed(null);
+    void onRedeem(code.trim()).then((r) => {
+      if (r.ok) {
+        setCode('');
+        setRedeemed({ text: t.dieselCodeDone(formatLitres(r.litres, lang)) });
+        setPhase('refuel');
+        later(() => setPhase('running'), REFUEL_MS);
+      } else {
+        setRedeemed({ text: t.dieselCodeRefused[r.reason ?? 'failed'] });
       }
     });
   };
@@ -331,6 +354,26 @@ export default function DieselPlant({
                 ))}
               {onSubscribe && !subscription && <p className="rpg-dz-note">{t.dieselSubNote}</p>}
               <p className="rpg-dz-note">{t.dieselBuyNote}</p>
+              {onRedeem && (
+                <form className="rpg-dz-code" onSubmit={redeem}>
+                  <label htmlFor="rpg-dz-code">{t.dieselCodeLabel}</label>
+                  <input
+                    id="rpg-dz-code"
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder={t.dieselCodePlaceholder}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={40}
+                  />
+                  <button type="submit" disabled={!code.trim() || redeemed === null}>
+                    {t.dieselCodeSubmit}
+                  </button>
+                  {redeemed && <span className="rpg-dz-code-said" role="status">{redeemed.text}</span>}
+                </form>
+              )}
               {PADDLE.environment === 'sandbox' && <p className="rpg-dz-note">{t.dieselSandboxNote}</p>}
               {onRefuel && (
                 <p className="rpg-dz-note">

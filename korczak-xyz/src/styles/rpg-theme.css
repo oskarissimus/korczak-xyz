@@ -1606,3 +1606,44 @@
   font: 600 12px/1 var(--d-font);
   text-align: center;
 }
+
+/* A promo code (`DieselPlant`, `/wallet/redeem`): one row under the shop, a field and a button. */
+:root:root .rpg-dz-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+}
+:root:root .rpg-dz-code input {
+  width: 9.5em;
+  min-width: 0;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 16px;
+  text-transform: uppercase;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+}
+:root:root .rpg-dz-code button {
+  padding: 6px 12px;
+  font: inherit;
+  color: #000;
+  background: #fff;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+:root:root .rpg-dz-code button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+:root:root .rpg-dz-code-said {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.85;
+}

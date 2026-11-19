@@ -14,12 +14,14 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 import {
   BALANCE_FIELD,
+  CODES_COLLECTION,
   DIESEL_CONFIG_DOC,
   DIESEL_KEYS,
   GRANTED_FIELD,
   WALLET_COLLECTION,
   balanceOf,
   grantOf,
+  type RedeemRefusal,
   type WalletStatus,
 } from '../../../korczak-xyz/src/utils/rpg/wallet';
 import { LITRES_PER_USD } from '../../../korczak-xyz/src/utils/rpg/diesel';
@@ -111,6 +113,38 @@ export async function topUpDiesel(uid: string, usd: number): Promise<number> {
       { merge: true },
     );
     return next;
+  });
+}
+
+/**
+ * `/wallet/redeem`: a promotional code's litres into the account's tank, once per account and never
+ * past the code's `maxUses` — both decided in the one transaction that pours, so two taps or two
+ * testers at once cannot get round either. Bought diesel, in effect: it never expires.
+ */
+export async function redeemCode(uid: string, code: string, now = Date.now()): Promise<{ ok: true; litres: number; balanceUsd: number } | { ok: false; reason: RedeemRefusal }> {
+  const grant = await grantUsd();
+  const ref = walletDoc(uid);
+  const codeRef = db.collection(CODES_COLLECTION).doc(code);
+  return db.runTransaction(async (tx) => {
+    const [codeSnap, snap] = await Promise.all([tx.get(codeRef), tx.get(ref)]);
+    const c = codeSnap.data();
+    const litres = Number(c?.litres);
+    if (!c || !(litres > 0)) return { ok: false as const, reason: 'unknown' as const };
+    const redeemed = (c.redeemedBy ?? {}) as Record<string, unknown>;
+    if (redeemed[uid] !== undefined) return { ok: false as const, reason: 'used' as const };
+    if (typeof c.expiresAt === 'number' && now > c.expiresAt) return { ok: false as const, reason: 'expired' as const };
+    const uses = Number(c.uses) || 0;
+    if (typeof c.maxUses === 'number' && uses >= c.maxUses) return { ok: false as const, reason: 'exhausted' as const };
+    const usd = litres / LITRES_PER_USD;
+    const known = balanceOf(snap.data());
+    const next = (known ?? grant) + usd;
+    tx.set(
+      ref,
+      { [BALANCE_FIELD]: next, dieselCodeUsd: FieldValue.increment(usd), dieselUpdatedAt: now, ...(known === null ? { [GRANTED_FIELD]: now, dieselGrantUsd: grant } : {}) },
+      { merge: true },
+    );
+    tx.set(codeRef, { uses: uses + 1, redeemedBy: { [uid]: now } }, { merge: true });
+    return { ok: true as const, litres, balanceUsd: next };
   });
 }
 

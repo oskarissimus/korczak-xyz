@@ -14,7 +14,7 @@
 import React, { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
-import { ACCOUNT_KEY, refuelWallet, setGatewayContext } from '../../utils/rpg/gateway';
+import { ACCOUNT_KEY, redeemWalletCode, refuelWallet, setGatewayContext } from '../../utils/rpg/gateway';
 import { useDieselWallet } from '../../hooks/useDieselWallet';
 import { fuelKeys } from '../../utils/rpg/wallet';
 import { useAuth } from '../../hooks/useAuth';
@@ -3134,6 +3134,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // An admin's canister pours real diesel into their own tank, free (`/wallet/refuel`; the server
   // checks `admins/`). The tank's live snapshot raises the gauge.
   const adminRefuel = onDiesel && auth.isAdmin ? async (c: { id: string }) => Boolean(await refuelWallet(c.id)) : undefined;
+  // A promo code (beta testers, owner 19 Nov 2026) pours into the same tank; the snapshot raises the gauge.
+  const redeemDiesel = onDiesel && auth.user ? (code: string) => redeemWalletCode(code) : undefined;
   // Anyone on their own tank buys canisters through Paddle (`paddleCheckout.ts`); the webhook pours
   // the litres and the same snapshot raises the gauge. Loaded on the first buy, not with the game.
   const buyDiesel =
@@ -3599,7 +3601,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselMenu = diesel && (
     <div className="rpg-panel">
       <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} showCanisters />
+      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} onRedeem={redeemDiesel} {...dieselSub} showCanisters />
       {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
       <p className="rpg-dz-note">{t.dieselNote}</p>
       <p className="rpg-dz-note">
@@ -3934,7 +3936,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                     {fullNote && <p className="rpg-storage-full" role="alert">{fullNote}</p>}
                     {/* A dark plant is the one thing about the diesel the screen must say: nothing can be made. */}
                     {diesel && plantState(diesel.litres) === 'stopped' && (
-                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} />
+                      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} onRedeem={redeemDiesel} {...dieselSub} />
                     )}
                   </section>
                   <WorldProposals
@@ -3961,7 +3963,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           <h2>{t.questComplete}</h2>
           <p className="rpg-ending-title">{ending.title}</p>
           {ending.cut && <p className="rpg-ending-note">{ending.cut}</p>}
-          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} />}
+          {diesel && <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onRefuel={adminRefuel} onBuy={buyDiesel} onSubscribe={subscribeDiesel} onRedeem={redeemDiesel} {...dieselSub} />}
           <blockquote>
             <p>{ending.text}</p>
             <footer>{ending.speaker}</footer>

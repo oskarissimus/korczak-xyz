@@ -40,7 +40,7 @@ import {
   type RequestsPage,
 } from './requestLog';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
-import { REFUEL_PATH, WALLET_PATH, type WalletStatus } from './wallet';
+import { REDEEM_PATH, REFUEL_PATH, WALLET_PATH, type RedeemRefusal, type WalletStatus } from './wallet';
 
 export { ACCOUNT_KEY };
 
@@ -166,6 +166,19 @@ export async function refuelWallet(canister: string): Promise<WalletStatus | nul
     return (await response.json()) as WalletStatus;
   } catch {
     return null;
+  }
+}
+
+/** A promo code poured into the reader's tank (`/wallet/redeem`): its litres, or why it poured nothing (`null`: the network or the server). */
+export async function redeemWalletCode(code: string): Promise<{ ok: true; litres: number } | { ok: false; reason: RedeemRefusal | null }> {
+  try {
+    const response = await signedInCall(REDEEM_PATH, 'POST', undefined, { code });
+    const body = (await response.json().catch(() => null)) as { litres?: number; reason?: string } | null;
+    if (response.ok && typeof body?.litres === 'number') return { ok: true, litres: body.litres };
+    const reason = body?.reason;
+    return { ok: false, reason: reason === 'unknown' || reason === 'used' || reason === 'exhausted' || reason === 'expired' ? reason : null };
+  } catch {
+    return { ok: false, reason: null };
   }
 }
 
