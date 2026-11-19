@@ -30,7 +30,28 @@ const SANDBOX = {
   monthly: 'pri_01m7dfqzb598m25cr5r2ze7hh5',
 };
 
-const env = (v: unknown, fallback: string) => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
+/*
+ * LIVE FOR ONE BROWSER FIRST (owner, 19 Nov 2026: test live end to end before customers see it). With
+ * `PUBLIC_PADDLE_PREVIEW=1` in the build, the env's values are used only in a browser that opted in
+ * by opening any page with `?paddle=live` (kept in localStorage `rpg-paddle-live`; `?paddle=sandbox`
+ * forgets it); everyone else keeps the sandbox. Opening live to everyone is deleting that one line.
+ */
+const PREVIEW_KEY = 'rpg-paddle-live';
+function optedIn(): boolean {
+  try {
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('paddle');
+      if (q === 'live') localStorage.setItem(PREVIEW_KEY, '1');
+      else if (q === 'sandbox') localStorage.removeItem(PREVIEW_KEY);
+    }
+    return typeof localStorage !== 'undefined' && localStorage.getItem(PREVIEW_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+const useEnv = import.meta.env.PUBLIC_PADDLE_PREVIEW !== '1' || optedIn();
+
+const env = (v: unknown, fallback: string) => (useEnv && typeof v === 'string' && v.trim() ? v.trim() : fallback);
 
 const token = env(import.meta.env.PUBLIC_PADDLE_CLIENT_TOKEN, SANDBOX.token);
 
