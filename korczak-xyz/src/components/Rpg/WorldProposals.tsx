@@ -6,6 +6,12 @@
  *
  * An endless carousel with no ↻ (owner, 11 Nov 2026): nearing its end adds more (`moreProposals`).
  *
+ * A plain vertical wheel moves it (owner, 19 Nov 2026: "it should work with just scroll"): a browser only
+ * turns the wheel sideways with a modifier held, so `useWheelSideways` does it, for a mouse and a trackpad
+ * alike. Snapping is off while the wheel turns and back on once it stops, so a trackpad glides and a
+ * mouse's notch lands on the nearest card rather than being pulled back to the one it left. At either end
+ * the wheel is the page's again.
+ *
  * Cards of one fixed size (owner, 9 Nov 2026: "everything on this screen loads at once,
  * and what cannot has a placeholder, so nothing shifts"): a card with no proposal yet is the same box
  * pulsing, a cover not yet loaded is the card's two colours, and the text box is a fixed height
@@ -35,12 +41,40 @@ function Cover({ src }: { src: string }) {
   return <img src={src} alt="" decoding="async" className={loaded ? 'rpg-proposal-loaded' : undefined} onLoad={() => setLoaded(true)} />;
 }
 
+/** A vertical wheel over `rail` scrolls it sideways, while it can still go that way. */
+function useWheelSideways(rail: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const el = rail.current;
+    if (!el) return;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (e: WheelEvent) => {
+      // Ctrl is the browser's zoom; a sideways swipe the browser already handles.
+      if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      const dy = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? el.clientWidth : 1);
+      if ((dy < 0 && el.scrollLeft <= 0) || (dy > 0 && el.scrollLeft >= max - 1)) return;
+      e.preventDefault();
+      el.style.scrollSnapType = 'none';
+      el.scrollLeft += dy;
+      clearTimeout(settle);
+      settle = setTimeout(() => (el.style.scrollSnapType = ''), 160);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      clearTimeout(settle);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [rail]);
+}
+
 export default function WorldProposals({ lang, disabled, onPick, onIdea }: Props) {
   const t = ui(lang);
   const v = useSyncExternalStore(subscribeProposals, proposalsView, proposalsView);
   const items = v.lang === lang ? v.items : [];
   const slots: (PoolItem | null)[] = items.length ? items : Array.from({ length: PROPOSAL_COUNT }, () => null);
   const rail = useRef<HTMLDivElement>(null);
+  useWheelSideways(rail);
   // Within about two cards of the end: more. Also after each render, for a screen wide enough to show them all.
   const nearEnd = useCallback(() => {
     const el = rail.current;
