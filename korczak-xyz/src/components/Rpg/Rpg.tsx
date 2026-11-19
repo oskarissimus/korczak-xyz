@@ -354,6 +354,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   useEffect(() => {
     document.documentElement.dataset.gameLang = gameLang;
   }, [gameLang]);
+  // A Paddle payment link (`?_ptxn=`) lands on the game's start; Paddle.js opens it (paddleCheckout.ts).
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('_ptxn')) void import('../../utils/rpg/paddleCheckout').then((m) => m.openPaymentLink());
+  }, []);
   /** The autosaved quest, offered on the intro screen. */
   const [saved, setSaved] = useState<SavedGame | null>(null);
   /**

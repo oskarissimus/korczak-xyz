@@ -77,6 +77,17 @@ function load(): Promise<PaddleJs> {
   return ready;
 }
 
+/**
+ * The default payment link (Paddle's checkout settings, everyrpg.korczak.xyz/): links Paddle sends —
+ * an invoice, a payment to retry — come back as `?_ptxn=txn_…`, and Paddle.js opens that transaction's
+ * checkout by itself once it is initialised on the page. Paddle.js is otherwise loaded only on a tap,
+ * so the page loads it at once when the parameter is there. Nothing to pour here: the webhook does.
+ */
+export function openPaymentLink(): void {
+  if (typeof location === 'undefined' || !new URLSearchParams(location.search).has('_ptxn')) return;
+  load().catch(() => {});
+}
+
 /** Opens the overlay for one canister, for the signed-in account `uid`. */
 export function buyCanister(c: Canister, uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
   return openCheckout(PADDLE.prices[c.id], { uid, canister: c.id }, email, lang);
