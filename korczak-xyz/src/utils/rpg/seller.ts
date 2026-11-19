@@ -11,6 +11,6 @@
 export const SELLER = {
   name: 'Oskar Korczak',
   nip: '7981456475' as string | null,
-  email: 'oskar.jan.korczak@gmail.com',
+  email: 'contact@korczak.xyz',
   address: 'Al. Jerozolimskie 109/70, 02-011 Warszawa',
 };

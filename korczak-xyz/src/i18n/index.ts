@@ -315,7 +315,7 @@ export const ui = {
     'privacy.title': 'Privacy',
     'privacy.updated': 'Last updated: 8 September 2026',
     'privacy.who.title': 'Who runs this site',
-    'privacy.who.body': 'korczak.xyz is a personal site run by Oskar Korczak. Anything on this page can be asked about at oskar.jan.korczak@gmail.com.',
+    'privacy.who.body': 'korczak.xyz is a personal site run by Oskar Korczak. Anything on this page can be asked about at contact@korczak.xyz.',
     'privacy.publicPages.title': 'What the public pages collect',
     'privacy.publicPages.body': 'Nothing. The blog, the songbook, the course notes and the rest of the public pages carry no analytics, no advertising and no third-party tracking scripts. The visitor counter in the footer is a decoration from 1997 and counts nobody.',
     'privacy.localData.title': 'The apps keep their data in your browser',
@@ -327,7 +327,7 @@ export const ui = {
     'privacy.hosting.title': 'Hosting',
     'privacy.hosting.body': 'Cloudflare serves the site and sees what any web server sees — your IP address, the page you asked for, your browser’s user agent — and uses it to deliver pages and to block attacks.',
     'privacy.contact.title': 'Your data and your choices',
-    'privacy.contact.body': 'Clearing your browser storage removes the local copy of everything the apps hold. To ask what is stored under an account, or to have it deleted, write to oskar.jan.korczak@gmail.com. If this page changes, the date above changes with it.',
+    'privacy.contact.body': 'Clearing your browser storage removes the local copy of everything the apps hold. To ask what is stored under an account, or to have it deleted, write to contact@korczak.xyz. If this page changes, the date above changes with it.',
 
     // Terms page
     'terms.title': 'Terms',
@@ -345,7 +345,7 @@ export const ui = {
     'terms.liability.title': 'Liability',
     'terms.liability.body': 'So far as the law allows, I am not liable for any loss arising from using this site — lost data, a missed notification, or anything you trusted one of the apps to remember.',
     'terms.contact.title': 'Contact and changes',
-    'terms.contact.body': 'Questions go to oskar.jan.korczak@gmail.com. These terms may change, and the date above says when they last did. Polish law applies.',
+    'terms.contact.body': 'Questions go to contact@korczak.xyz. These terms may change, and the date above says when they last did. Polish law applies.',
 
     // Footer
     'footer.marquee': '*** Welcome to korczak.xyz! *** 7 years of coding experience *** Python, JavaScript, Docker, Kubernetes *** Contact me for mentoring! *** Best viewed in Netscape Navigator 4.0 ***',
@@ -658,7 +658,7 @@ export const ui = {
     'privacy.title': 'Prywatność',
     'privacy.updated': 'Ostatnia aktualizacja: 8 września 2026',
     'privacy.who.title': 'Kto prowadzi tę stronę',
-    'privacy.who.body': 'korczak.xyz to prywatna strona prowadzona przez Oskara Korczaka. O wszystko, co jest na tej stronie, można zapytać pod adresem oskar.jan.korczak@gmail.com.',
+    'privacy.who.body': 'korczak.xyz to prywatna strona prowadzona przez Oskara Korczaka. O wszystko, co jest na tej stronie, można zapytać pod adresem contact@korczak.xyz.',
     'privacy.publicPages.title': 'Co zbierają publiczne podstrony',
     'privacy.publicPages.body': 'Nic. Blog, śpiewnik, notatki z kursów i pozostałe publiczne podstrony nie mają analityki, reklam ani skryptów śledzących innych firm. Licznik odwiedzin w stopce to ozdoba z 1997 roku i nikogo nie liczy.',
     'privacy.localData.title': 'Aplikacje trzymają dane w Twojej przeglądarce',
@@ -670,7 +670,7 @@ export const ui = {
     'privacy.hosting.title': 'Hosting',
     'privacy.hosting.body': 'Stronę serwuje Cloudflare, który widzi to, co widzi każdy serwer WWW — Twój adres IP, żądaną podstronę, identyfikator przeglądarki — i używa tego do dostarczania stron oraz blokowania ataków.',
     'privacy.contact.title': 'Twoje dane i Twoje wybory',
-    'privacy.contact.body': 'Wyczyszczenie pamięci przeglądarki usuwa lokalną kopię wszystkiego, co trzymają aplikacje. Żeby zapytać, co jest zapisane przy koncie, albo poprosić o usunięcie, napisz na oskar.jan.korczak@gmail.com. Jeśli ta strona się zmieni, zmieni się też data powyżej.',
+    'privacy.contact.body': 'Wyczyszczenie pamięci przeglądarki usuwa lokalną kopię wszystkiego, co trzymają aplikacje. Żeby zapytać, co jest zapisane przy koncie, albo poprosić o usunięcie, napisz na contact@korczak.xyz. Jeśli ta strona się zmieni, zmieni się też data powyżej.',
 
     // Terms page
     'terms.title': 'Regulamin',
@@ -688,7 +688,7 @@ export const ui = {
     'terms.liability.title': 'Odpowiedzialność',
     'terms.liability.body': 'W zakresie dozwolonym przez prawo nie odpowiadam za szkody wynikające z korzystania z tej strony — utracone dane, nieotrzymane powiadomienie ani cokolwiek, o czym zawierzyłeś, że aplikacja to zapamięta.',
     'terms.contact.title': 'Kontakt i zmiany',
-    'terms.contact.body': 'Pytania na oskar.jan.korczak@gmail.com. Regulamin może się zmienić, a data powyżej mówi, kiedy zmienił się ostatnio. Obowiązuje prawo polskie.',
+    'terms.contact.body': 'Pytania na contact@korczak.xyz. Regulamin może się zmienić, a data powyżej mówi, kiedy zmienił się ostatnio. Obowiązuje prawo polskie.',
 
     // Footer
     'footer.marquee': '*** Witaj na korczak.xyz! *** 7 lat doświadczenia w programowaniu *** Python, JavaScript, Docker, Kubernetes *** Napisz do mnie w sprawie mentoringu! *** Najlepiej oglądać w Netscape Navigator 4.0 ***',
