@@ -2006,11 +2006,12 @@ the price of a world or a beat is in it too."
   people and places on fal.ai ($0.05) (`questLitres`); a world is one more request, its village's
   pieces ($0.2) and its first quest (`worldLitres`) — about 75 L and 53 L on 3.8 Flash. Only what is
   on for the reader counts (`PriceParts`): the demo has no score and no models, ~37 L a world.
-- **An admin's canister is real and free** (owner, 9 Nov 2026: "when I click refuel and I'm admin I
-  should get more fuel without needing to pay"): on the account's tank, a tap posts `/wallet/refuel`,
-  the gateway checks `admins/{uid}` and pours the canister's litres in (`topUpDiesel`); the plant
-  plays the pouring and the live snapshot raises the gauge. Since the canisters went on sale, the
-  admin's buttons buy like anyone's and the free pours are a line of links under the shop.
+- **Nothing is poured for free outside Paddle, not even for an admin** (owner, 20 Nov 2026: "codes at
+  Paddle's level; drop the code concept from the site, and the admin's free top-up too — that goes
+  through Paddle as well"). The admin's free canisters (`/wallet/refuel`, 9 Nov 2026) and the game's
+  own promo codes (`rpgCodes`, one day) are gone: an admin buys like anyone, with a 100% discount
+  code made in Paddle, and so do beta testers. The admin panel's *Top up an account* by e-mail stays,
+  as the one support tool for putting litres back by hand.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
 - **On the demo a canister is still a preview**: there is no account to pour into, so a tap plays the
@@ -2100,14 +2101,7 @@ still say it.
   (added to `webhookSecrets` beside the sandbox one, so sandbox deliveries still verify). The live
   token and price ids are at the end of `.env.rpg`, **live for every player since 19 Nov 2026** after a
   real checkout was tested end to end (100% code, scheduled and immediate cancel). `PUBLIC_PADDLE_PREVIEW=1`
-  there puts the live shop back behind `?paddle=live` for one browser (`paddleConfig.ts`).
-- **Promo codes are the game's, not Paddle's** (owner, 19 Nov 2026: "a single-use code for beta
-  testers, 1200 L"). No canister is 1200 L and a 0 zł checkout still asks for an address, so a code is
-  `rpgCodes/{CODE}` in the project's Firestore — `litres`, `maxUses`, `uses`, optional `expiresAt`
-  (ms), `redeemedBy` {uid: ms} — made by hand in the console, and *Have a code?* under the shop posts
-  it to `/wallet/redeem` (`redeemCode` in `wallet.ts`): once per account, never past `maxUses`, both
-  decided in the transaction that pours. The litres never expire and are counted in
-  `rpgLedger.dieselCodeUsd`. No Firestore rule: the reader cannot list or read codes. No Paddle API key anywhere: the server only receives webhooks.
+  there puts the live shop back behind `?paddle=live` for one browser (`paddleConfig.ts`). No Paddle API key anywhere: the server only receives webhooks.
 
 ### Signed in, the tank pays
 

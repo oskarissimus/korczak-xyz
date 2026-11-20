@@ -240,18 +240,11 @@ describe('diesel', () => {
     expect(reserve).not.toHaveBeenCalled();
   });
 
-  it('pours an admin’s canister for free, and refuses anyone else', async () => {
-    let res = fakeRes();
+  it('pours nothing for free, not even for an admin: every canister goes through Paddle', async () => {
+    const res = fakeRes();
     await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'barrel' } }), res as any);
-    expect(res.statusCode).toBe(200);
-    expect(topUp).toHaveBeenCalledWith('u1', 5.5);
-    res = fakeRes();
-    await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer keyless' }, body: { canister: 'barrel' } }), res as any);
-    expect(res.statusCode).toBe(403);
-    res = fakeRes();
-    await handleRpgApi(req('/wallet/refuel', { headers: { authorization: 'Bearer good' }, body: { canister: 'truck' } }), res as any);
-    expect(res.statusCode).toBe(400);
-    expect(topUp).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(404);
+    expect(topUp).not.toHaveBeenCalled();
   });
 
   it('lets Paddle’s webhook past the origin gate, where only its signature can let it in', async () => {

@@ -72,18 +72,14 @@ import { dayKey } from '../demo/limits';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
-import { AdminRefusal, handleAdmin, isAdminUid, readServerKeys } from './admin';
-import { redeemCode, reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
+import { AdminRefusal, handleAdmin, readServerKeys } from './admin';
+import { reserveDiesel, settleDiesel, walletStatus } from './wallet';
 import { handlePaddleWebhook } from './paddle';
 import { PADDLE_WEBHOOK_PATH } from '../../../korczak-xyz/src/utils/rpg/paddle';
-import { CANISTERS, LITRES_PER_USD } from '../../../korczak-xyz/src/utils/rpg/diesel';
 import {
   DIESEL_KEYS,
   NO_DIESEL,
   WALLET_PATH,
-  REFUEL_PATH,
-  REDEEM_PATH,
-  normaliseCode,
   dieselReservation,
   dieselRoute,
   isFollowUp,
@@ -672,36 +668,6 @@ async function wallet(req: Request, res: Response): Promise<void> {
   res.status(200).json(await walletStatus(uid));
 }
 
-/**
- * `/wallet/refuel`: a canister poured into an admin's own tank, for nothing. Admin is `admins/{uid}`,
- * checked here; anyone else is a 403 — everyone else buys through Paddle (`paddle.ts`).
- */
-async function refuel(req: Request, res: Response): Promise<void> {
-  const uid = await uidOf(req);
-  if (!uid) throw new GatewayRefusal(401, 'auth', 'rpg wallet: sign in first');
-  if (!(await isAdminUid(uid))) throw new GatewayRefusal(403, 'not-admin', 'rpg wallet: free canisters are for admins; buy one through the checkout');
-  const id = jsonOf(bodyOf(req)).canister;
-  const canister = CANISTERS.find((c) => c.id === id);
-  if (!canister) throw new GatewayRefusal(400, 'bad-canister', 'rpg wallet: no such canister');
-  await topUpDiesel(uid, canister.litres / LITRES_PER_USD);
-  res.set('Cache-Control', 'no-store');
-  res.status(200).json(await walletStatus(uid));
-}
-
-/** `/wallet/redeem`: a promotional code poured into the reader's own tank (`redeemCode`). */
-async function redeem(req: Request, res: Response): Promise<void> {
-  const uid = await uidOf(req);
-  if (!uid) throw new GatewayRefusal(401, 'auth', 'rpg wallet: sign in first');
-  const code = normaliseCode(jsonOf(bodyOf(req)).code);
-  res.set('Cache-Control', 'no-store');
-  const result = code ? await redeemCode(uid, code) : { ok: false as const, reason: 'unknown' as const };
-  if (!result.ok) {
-    res.status(result.reason === 'unknown' ? 404 : 409).json({ reason: result.reason, error: { message: `rpg wallet: code ${result.reason}` } });
-    return;
-  }
-  res.status(200).json({ litres: result.litres, ...(await walletStatus(uid)) });
-}
-
 export async function handleRpgApi(req: Request, res: Response): Promise<void> {
   // Paddle's webhook comes from Paddle's servers, with no Origin: its signature is its gate (`paddle.ts`).
   if (gatewayPathOf(req.url).path === PADDLE_WEBHOOK_PATH) {
@@ -778,20 +744,14 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
   if (
     (path === ACCOUNT_STATUS_PATH && req.method === 'GET') ||
     (path === LIVE_TOKEN_PATH && req.method === 'POST') ||
-    (path === WALLET_PATH && req.method === 'GET') ||
-    (path === REFUEL_PATH && req.method === 'POST') ||
-    (path === REDEEM_PATH && req.method === 'POST')
+    (path === WALLET_PATH && req.method === 'GET')
   ) {
     try {
       await (path === ACCOUNT_STATUS_PATH
         ? accountStatus(req, res)
         : path === WALLET_PATH
           ? wallet(req, res)
-          : path === REFUEL_PATH
-            ? refuel(req, res)
-            : path === REDEEM_PATH
-              ? redeem(req, res)
-              : liveToken(req, res));
+          : liveToken(req, res));
     } catch (e) {
       if (e instanceof GatewayRefusal) {
         res.status(e.status).json({ reason: e.reason, error: { message: e.message } });

@@ -25,25 +25,6 @@ import type { KeyName } from '../accountKeys/keys';
 
 /** The gateway's own endpoint: the balance, granting the first tank to a new account. */
 export const WALLET_PATH = '/wallet';
-/** An admin's canister: poured for free, no payment (owner, 9 Nov 2026: "when I click refuel and I'm admin I should get more fuel without needing to pay"). */
-export const REFUEL_PATH = '/wallet/refuel';
-/**
- * A promotional code poured into the reader's own tank (owner, 19 Nov 2026: "a single-use promo code
- * I give to beta testers, 1200 L of diesel"). `rpgCodes/{CODE}`: `litres`, `maxUses`, `uses`,
- * optional `expiresAt` (ms), and `redeemedBy` {uid: ms} — each account may use a code once, and
- * nobody past `maxUses`. Admin SDK only (no Firestore rule); codes are made by hand in the console.
- */
-export const REDEEM_PATH = '/wallet/redeem';
-export const CODES_COLLECTION = 'rpgCodes';
-/** Why a code poured nothing: no such code, this account already used it, all uses gone, past its date. */
-export type RedeemRefusal = 'unknown' | 'used' | 'exhausted' | 'expired';
-
-/** What the reader typed, as the code's id: trimmed, upper case, letters, digits and dashes only. */
-export function normaliseCode(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const code = raw.trim().toUpperCase();
-  return /^[A-Z0-9-]{3,40}$/.test(code) ? code : null;
-}
 
 /** Where the balance sits: `rpgLedger/{uid}`, fields below. */
 export const WALLET_COLLECTION = 'rpgLedger';

@@ -6,18 +6,17 @@
  * canister, pours, and the lights come back on along the cable.
  *
  * Signed in on the account's tank, a canister is bought through Paddle's overlay (`onBuy`,
- * `paddleCheckout.ts`); the litres arrive by webhook and the tank's snapshot raises the gauge. An
- * admin also gets the free canisters (`onRefuel`) as a line of links under the shop. On the demo,
- * with no account to pour into, a canister's button plays the refuelling as a preview and says so.
+ * `paddleCheckout.ts`); the litres arrive by webhook and the tank's snapshot raises the gauge — an
+ * admin too, with a 100% code in Paddle (owner, 20 Nov 2026: nothing is poured for free outside
+ * Paddle). On the demo, with no account to pour into, a canister's button plays the refuelling as a preview and says so.
  */
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CANISTERS, SUBSCRIPTION, formatLitres, plantState, type Canister } from '../../utils/rpg/diesel';
 import { type SubscriptionView } from '../../utils/rpg/paddle';
 import { PADDLE } from '../../utils/rpg/paddleConfig';
 import type { CheckoutOutcome } from '../../utils/rpg/paddleCheckout';
 import type { Lang } from '../../utils/rpg/quest';
-import type { RedeemRefusal } from '../../utils/rpg/wallet';
 import { ui } from './ui';
 
 /** How long the man takes: walk in, pour, walk out. Matches `rpg-dz-walk` in rpg.css. */
@@ -86,12 +85,10 @@ export default function DieselPlant({
   capacity,
   showCanisters = false,
   tank = false,
-  onRefuel,
   onBuy,
   onSubscribe,
   subscription = null,
   subLitres = 0,
-  onRedeem,
 }: {
   lang: Lang;
   litres: number;
@@ -100,8 +97,6 @@ export default function DieselPlant({
   showCanisters?: boolean;
   /** The account's own tank (`wallet.ts`) rather than the demo's day: nothing comes at midnight. */
   tank?: boolean;
-  /** An admin's canister is poured for real and for free (`/wallet/refuel`); resolves whether it was. */
-  onRefuel?: (c: Canister) => Promise<boolean>;
   /** A canister bought through Paddle's checkout; resolves how the checkout ended. */
   onBuy?: (c: Canister) => Promise<CheckoutOutcome>;
   /** The monthly delivery through Paddle's checkout (`SUBSCRIPTION`). */
@@ -110,20 +105,13 @@ export default function DieselPlant({
   subscription?: SubscriptionView | null;
   /** Litres of this month's delivery still in the tank (they expire with the month). */
   subLitres?: number;
-  /** A promo code poured into the account's tank (`/wallet/redeem`). */
-  onRedeem?: (code: string) => Promise<{ ok: true; litres: number } | { ok: false; reason: RedeemRefusal | null }>;
 }) {
   const t = ui(lang);
   const real = plantState(litres);
   const [phase, setPhase] = useState<Phase>(real);
   const [preview, setPreview] = useState<Canister | null>(null);
-  /** The admin's canister poured for real, and how it went: the line under the plant says so. */
-  const [poured, setPoured] = useState<{ c: Canister; ok: boolean | null } | null>(null);
   /** A checkout open or just finished: `null` outcome while the overlay is up. */
   const [bought, setBought] = useState<{ litres: number; outcome: CheckoutOutcome | null } | null>(null);
-  const [code, setCode] = useState('');
-  /** The code's answer: `null` while it is being checked. */
-  const [redeemed, setRedeemed] = useState<{ text: string } | null | undefined>(undefined);
   const before = useRef(real);
   const timers = useRef<number[]>([]);
 
@@ -145,19 +133,6 @@ export default function DieselPlant({
     // `later` only schedules; the effect is about the tank.
   }, [real, preview]);
 
-  const pour = (c: Canister) => {
-    if (phase === 'refuel' || !onRefuel) return;
-    setPoured({ c, ok: null });
-    setPhase('refuel');
-    const started = Date.now();
-    void onRefuel(c).then((ok) => {
-      setPoured({ c, ok });
-      // The man finishes pouring before the lights come on, however fast the server was.
-      later(() => setPhase(ok ? 'running' : plantState(litres)), Math.max(0, REFUEL_MS - (Date.now() - started)));
-      later(() => setPoured(null), REFUEL_MS + PREVIEW_HOLD_MS * 2);
-    });
-  };
-
   const checkout = (litres: number, open: () => Promise<CheckoutOutcome>) => {
     if (phase === 'refuel' || (bought && bought.outcome === null)) return;
     setBought({ litres, outcome: null });
@@ -174,30 +149,10 @@ export default function DieselPlant({
     });
   };
 
-  const redeem = (e: FormEvent) => {
-    e.preventDefault();
-    if (!onRedeem || !code.trim() || redeemed === null) return;
-    setRedeemed(null);
-    void onRedeem(code.trim()).then((r) => {
-      if (r.ok) {
-        setCode('');
-        setRedeemed({ text: t.dieselCodeDone(formatLitres(r.litres, lang)) });
-        setPhase('refuel');
-        later(() => setPhase('running'), REFUEL_MS);
-      } else {
-        setRedeemed({ text: t.dieselCodeRefused[r.reason ?? 'failed'] });
-      }
-    });
-  };
-
   const buy = (c: Canister) => {
     if (phase === 'refuel' || (bought && bought.outcome === null)) return;
     if (onBuy) {
       checkout(c.litres, () => onBuy(c));
-      return;
-    }
-    if (onRefuel) {
-      pour(c);
       return;
     }
     setPreview(c);
@@ -296,10 +251,6 @@ export default function DieselPlant({
             : bought.outcome === 'paid'
               ? t.dieselPaid(formatLitres(bought.litres, lang))
               : t.dieselCheckoutFailed
-          : poured && poured.ok !== null
-          ? poured.ok
-            ? t.dieselAdminPoured(formatLitres(poured.c.litres, lang))
-            : t.dieselAdminFailed
           : preview && phase !== 'stopped'
           ? t.dieselPreview(formatLitres(preview.litres, lang))
           : phase === 'refuel'
@@ -354,43 +305,10 @@ export default function DieselPlant({
                 ))}
               {onSubscribe && !subscription && <p className="rpg-dz-note">{t.dieselSubNote}</p>}
               <p className="rpg-dz-note">{t.dieselBuyNote}</p>
-              {onRedeem && (
-                <form className="rpg-dz-code" onSubmit={redeem}>
-                  <label htmlFor="rpg-dz-code">{t.dieselCodeLabel}</label>
-                  <input
-                    id="rpg-dz-code"
-                    type="text"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder={t.dieselCodePlaceholder}
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                    maxLength={40}
-                  />
-                  <button type="submit" disabled={!code.trim() || redeemed === null}>
-                    {t.dieselCodeSubmit}
-                  </button>
-                  {redeemed && <span className="rpg-dz-code-said" role="status">{redeemed.text}</span>}
-                </form>
-              )}
               {PADDLE.environment === 'sandbox' && <p className="rpg-dz-note">{t.dieselSandboxNote}</p>}
-              {onRefuel && (
-                <p className="rpg-dz-note">
-                  {t.dieselAdminFree}{' '}
-                  {CANISTERS.map((c, i) => (
-                    <span key={c.id}>
-                      {i > 0 && ' · '}
-                      <button type="button" className="rpg-dz-free" onClick={() => pour(c)} disabled={phase === 'refuel'}>
-                        {t.dieselCanister[c.id]}
-                      </button>
-                    </span>
-                  ))}
-                </p>
-              )}
             </>
           ) : (
-            <p className="rpg-dz-note">{onRefuel ? t.dieselAdminNote : tank ? t.dieselTankSoon : t.dieselSoon}</p>
+            <p className="rpg-dz-note">{tank ? t.dieselTankSoon : t.dieselSoon}</p>
           )}
         </>
       )}
