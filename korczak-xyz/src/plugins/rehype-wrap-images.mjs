@@ -2,7 +2,7 @@ import { visit } from 'unist-util-visit';
 
 /**
  * Rehype plugin to wrap images in a span with class "image-frame"
- * This allows borders to be on the wrapper (unaffected by dither filter)
+ * This keeps the border on the wrapper
  * rather than on the img element itself.
  */
 export default function rehypeWrapImages() {

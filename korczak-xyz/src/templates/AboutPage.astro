@@ -22,7 +22,7 @@ const t = useTranslations(lang);
           <Image
             src={oskarImage}
             alt="Oskar Korczak"
-            width={300}
+            width={600}
           />
         </ImageFrame>
       </div>
@@ -54,13 +54,17 @@ const t = useTranslations(lang);
     }
   }
 
+  /* The frame sizes the photo (ImageFrame makes the img fill it), so the width lives here:
+     the whole column on a phone, 300px beside the text on a wide screen. */
   .about-image {
     flex-shrink: 0;
+    width: 100%;
   }
 
-  .about-image img {
-    width: 100%;
-    max-width: 300px;
+  @media (min-width: 768px) {
+    .about-image {
+      width: 300px;
+    }
   }
 
   .about-text {

@@ -43,7 +43,7 @@
     color: var(--retro-yellow);
 }
 
-/* Image wrapper from rehype plugin - border on wrapper to avoid dither filter */
+/* Image wrapper from rehype plugin - border on the wrapper, not the img */
 /* Use span.image-frame to target only markdown images wrapped by rehype plugin */
 /* div.image-frame from Gallery component should NOT have width: fit-content */
 .blog_post span.image-frame {
