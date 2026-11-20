@@ -17,6 +17,7 @@
  */
 
 import { USD_PER_VOICE_CREDIT } from './cost';
+import type { WalletAlarm } from './fundsSigns';
 import type { LogPayer, RequestLogEntry } from './requestLog';
 
 export const WALLETS_DOC = ['rpgWalletKeys', 'config'] as const;
@@ -54,7 +55,16 @@ export interface WalletReading {
   by: string | null;
 }
 
-export type WalletCheck = { provider: WalletProvider; check: 'ok' | 'refused' | 'failed' | 'no-key'; reason: string | null };
+/** What one read gave, before it is stored (or, on a peek, instead of being stored). */
+export type WalletValue = Omit<WalletReading, 'id' | 'by'>;
+
+export type WalletCheck = {
+  provider: WalletProvider;
+  check: 'ok' | 'refused' | 'failed' | 'no-key';
+  reason: string | null;
+  /** The figure itself, when the check was `ok`. */
+  reading?: WalletValue;
+};
 
 export interface WalletsPage {
   hints: Record<WalletKeyProvider, string | null>;
@@ -64,6 +74,8 @@ export interface WalletsPage {
   /** The first logged request: a window starting before it has nothing to compare against. */
   loggingSince: number | null;
   checks?: WalletCheck[];
+  /** The last refusal for want of money on our own keys, per provider (`walletAlarm.ts`). */
+  alarms?: WalletAlarm[];
 }
 
 export interface WalletPatch {
@@ -71,6 +83,8 @@ export interface WalletPatch {
   reading?: Omit<WalletReading, 'id' | 'source' | 'by'>;
   remove?: string;
   check?: boolean;
+  /** With `check`: ask every provider, answer the figures, store none (the panel's top, on every open). */
+  peek?: boolean;
 }
 
 export class BadWalletPatch extends Error {}
@@ -116,6 +130,7 @@ export function parseWalletPatch(raw: unknown, now = Date.now()): WalletPatch {
     out.remove = body.remove;
   }
   if (body.check !== undefined) out.check = body.check === true;
+  if (body.peek !== undefined) out.peek = body.peek === true;
   return out;
 }
 
@@ -213,6 +228,107 @@ export function driftRows(page: Pick<WalletsPage, 'readings' | 'logged' | 'loggi
     }
   }
   return rows.sort((x, y) => y.to - x.to);
+}
+
+// --- How much is left, at a glance (owner, 20 Nov 2026: "na górze od razu widoczne, u którego
+// dostawcy ile jest pieniędzy, żebym wiedział, że trzeba zaraz doładować") ---------------------
+
+/** Below this many dollars a wallet is shown as low: about a day of the game's own spend. */
+export const LOW_USD = 5;
+/** Below this, as empty: a world's worth or less. */
+export const EMPTY_USD = 0.5;
+
+/** How long a refusal for want of money stays on its tile. */
+export const ALARM_SHOWN_MS = 86_400_000;
+
+export type WalletLevel = 'ok' | 'low' | 'empty' | 'unknown';
+
+export interface WalletStanding {
+  provider: WalletProvider;
+  /**
+   * - `live` — the provider's own balance, read just now;
+   * - `read` — its balance as last read or typed, with nothing logged on our keys since;
+   * - `estimate` — that balance minus what the request log priced on our keys since (no API reads
+   *   the balance, or the read failed);
+   * - `spent` — only what was spent is known (OpenAI's costs, Google's billing export): no balance;
+   * - `none` — nothing read or typed yet.
+   */
+  basis: 'live' | 'read' | 'estimate' | 'spent' | 'none';
+  /** Dollars left (for `spent`, dollars spent); null for `none`. */
+  usd: number | null;
+  /** The same in credits, for ElevenLabs. */
+  credits: number | null;
+  /** When the figure it stands on was read, and how. */
+  at: number | null;
+  source: 'api' | 'manual' | null;
+  /** For `spent`: where the spent window starts. */
+  from: number | null;
+  /** For `estimate`: what the log priced since the reading, and whether the log covers all of it. */
+  loggedUsd: number;
+  partial: boolean;
+  level: WalletLevel;
+  /** The last refusal for want of money in the past day; newer than the figure, it outranks it. */
+  alarm: WalletAlarm | null;
+}
+
+function levelOf(usd: number): WalletLevel {
+  return usd < EMPTY_USD ? 'empty' : usd < LOW_USD ? 'low' : 'ok';
+}
+
+/**
+ * Where one provider's wallet stands: a live balance if one was just read, else the newest balance
+ * reading less the log since, else what was last read as spent. A refusal for want of money newer
+ * than the figure makes it empty whatever the figure says.
+ */
+export function walletStanding(
+  page: Pick<WalletsPage, 'readings' | 'logged' | 'loggingSince' | 'alarms'>,
+  provider: WalletProvider,
+  now: number,
+  live: WalletValue[] = [],
+): WalletStanding {
+  const base = { provider, credits: null, from: null, loggedUsd: 0, partial: false } as const;
+  // The last refusal is shown for a day; it makes the wallet empty only while nothing newer was read.
+  const alarm = page.alarms?.find((a) => a.provider === provider && now - a.at < ALARM_SHOWN_MS) ?? null;
+  const withAlarm = (s: WalletStanding): WalletStanding =>
+    alarm ? { ...s, alarm, level: alarm.at > (s.at ?? 0) ? 'empty' : s.level } : s;
+  const liveBalance = live.find((v) => v.provider === provider && v.kind === 'balance');
+  if (liveBalance) {
+    const usd = usdOfAmount(liveBalance.amount, liveBalance.unit);
+    return withAlarm({
+      ...base,
+      basis: 'live',
+      usd,
+      credits: liveBalance.unit === 'credits' ? liveBalance.amount : null,
+      at: liveBalance.at,
+      source: 'api',
+      level: levelOf(usd),
+      alarm: null,
+    });
+  }
+  // Readings are newest first.
+  const balance = page.readings.find((r) => r.provider === provider && r.kind === 'balance');
+  if (balance) {
+    const since = loggedBetween(page.logged, provider, balance.at, now);
+    const usd = usdOfAmount(balance.amount, balance.unit) - since.usd;
+    return withAlarm({
+      ...base,
+      basis: since.calls > 0 ? 'estimate' : 'read',
+      usd,
+      credits: balance.unit === 'credits' ? balance.amount - since.usd / USD_PER_VOICE_CREDIT : null,
+      at: balance.at,
+      source: balance.source,
+      loggedUsd: since.usd,
+      partial: since.unpriced > 0 || page.loggingSince == null || page.loggingSince > balance.at,
+      level: levelOf(usd),
+      alarm: null,
+    });
+  }
+  const spent =
+    live.find((v) => v.provider === provider && v.kind === 'spent') ?? page.readings.find((r) => r.provider === provider && r.kind === 'spent');
+  if (spent) {
+    return withAlarm({ ...base, basis: 'spent', usd: usdOfAmount(spent.amount, spent.unit), at: spent.at, source: spent.source, from: spent.from, level: 'unknown', alarm: null });
+  }
+  return withAlarm({ ...base, basis: 'none', usd: null, at: null, source: null, level: 'unknown', alarm: null });
 }
 
 // --- What each provider's API says, parsed (the server fetches; these are pure and tested) ---

@@ -43,6 +43,7 @@ import { downloadUrl } from '../../../korczak-xyz/src/utils/rpg/assetStore';
 import { readServerKeys } from './admin';
 import { RPG_BUCKET } from '../runtime';
 import { reportError } from '../sentry';
+import { noteRefusal } from './walletAlarm';
 
 /** Tried in order: a model that refuses or is gone hands the work to the next. */
 const MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3-flash-preview'];
@@ -118,7 +119,9 @@ async function gemini(key: string, prompt: string, opts: { temperature: number; 
         }),
       });
       if (!r.ok) {
-        lastError = new Error(`${model}: ${r.status} ${(await r.text().catch(() => '')).slice(0, 200)}`);
+        const body = await r.text().catch(() => '');
+        await noteRefusal('google', r.status, body.slice(0, 2000), 'proposals');
+        lastError = new Error(`${model}: ${r.status} ${body.slice(0, 200)}`);
         continue;
       }
       const data = (await r.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
@@ -145,7 +148,11 @@ async function drawCover(fal: string, id: string, picture: string): Promise<stri
       if (response.status !== 429) break;
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
-    if (!response?.ok) throw new Error(`fal ${response?.status} ${((await response?.text().catch(() => '')) ?? '').slice(0, 200)}`);
+    if (!response?.ok) {
+      const body = (await response?.text().catch(() => '')) ?? '';
+      await noteRefusal('fal', response?.status ?? null, body.slice(0, 2000), 'proposals');
+      throw new Error(`fal ${response?.status} ${body.slice(0, 200)}`);
+    }
     const url = ((await response.json()) as { images?: { url?: string }[] }).images?.[0]?.url;
     if (!url) throw new Error('fal: no image in the answer');
     const image = await fetch(url);

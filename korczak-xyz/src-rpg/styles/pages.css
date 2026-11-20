@@ -943,6 +943,48 @@ body::before {
   color: var(--d-ink);
 }
 
+/* The balances at the top of the wallets: the settings' card surface; state in words and glyphs, the
+   border doubled when empty and dashed when low (the owner's phone is greyscale). */
+:root:root:root .acct-game .rpg-wallet-tile {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  color: var(--d-ink);
+  padding: 14px;
+}
+
+:root:root:root .acct-game .rpg-wallet-tile[data-level='low'] {
+  border: 1px dashed var(--d-ink);
+}
+
+:root:root:root .acct-game .rpg-wallet-tile[data-level='empty'] {
+  border: 3px double var(--d-ink);
+}
+
+:root:root:root .acct-game .rpg-wallet-figure {
+  font: 600 30px/1.1 var(--d-font);
+}
+
+:root:root:root .acct-game .rpg-wallet-credits {
+  font: 400 13px/1.3 var(--d-font);
+  color: var(--d-ink-dim);
+}
+
+:root:root:root .acct-game .rpg-wallet-tile-head {
+  font: 600 15px/1.3 var(--d-font);
+}
+
+:root:root:root .acct-game .rpg-wallet-level {
+  font-weight: 400;
+  color: var(--d-ink-dim);
+}
+
+:root:root:root .acct-game .rpg-wallet-tile[data-level='low'] .rpg-wallet-level,
+:root:root:root .acct-game .rpg-wallet-tile[data-level='empty'] .rpg-wallet-level {
+  font-weight: 700;
+  color: var(--d-ink);
+}
+
 :root:root:root .acct-game .acct-warn {
   color: var(--d-danger);
 }

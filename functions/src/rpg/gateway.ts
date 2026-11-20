@@ -91,6 +91,7 @@ import { describePrice, isPaidRequest, safeHeaders, type LogPayer } from '../../
 import { keptBody, logRequest, requestBodies } from './requestLog';
 import { db } from '../runtime';
 import { flushSentry, reportError } from '../sentry';
+import { noteRefusal } from './walletAlarm';
 
 /** Response headers worth passing on: what the page reads besides the body. */
 const PASSED_HEADERS = [
@@ -550,6 +551,8 @@ async function pass(
     // A refusal costs nothing (Google's, ElevenLabs'); an empty 200 has nothing to price either.
     const usd = upstream.ok ? null : 0;
     await log({ status: upstream.status, headers: upstream.headers, contentType: type, bytes: refused, responseBytes: refused.length, usd, model: asked });
+    // The server's own key refused for want of money: our wallet, an incident at once (`walletAlarm.ts`).
+    if (!upstream.ok && who.kind === 'diesel') await noteRefusal(target.provider, upstream.status, refused.toString('utf8').slice(0, 2000), 'gateway');
     res.send(refused);
     return usd;
   }

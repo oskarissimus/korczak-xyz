@@ -14,10 +14,12 @@ import {
   parseFalBalance,
   parseOpenAiSpent,
   parseWalletPatch,
+  walletStanding,
   type WalletReading,
   type WalletsPage,
 } from './wallets';
 import type { RequestLogEntry } from './requestLog';
+import { fundsProviderOf, isProviderFundsError } from './fundsSigns';
 
 const H = 3_600_000;
 const now = Date.parse('2026-11-10T12:00:00Z');
@@ -140,5 +142,98 @@ describe('comparableFrom', () => {
   it('keeps the month with no log at all, and a log starting on the hour', () => {
     expect(comparableFrom(month, null, HOUR_MS)).toBe(month);
     expect(comparableFrom(month, Date.UTC(2026, 10, 10, 9), HOUR_MS)).toBe(Date.UTC(2026, 10, 10, 9));
+  });
+});
+
+describe('walletStanding: how much is left, at a glance', () => {
+  const now = Date.UTC(2026, 10, 20, 20, 0);
+  const reading = (over: Partial<WalletReading>): WalletReading => ({
+    id: Math.random().toString(36),
+    provider: 'fal',
+    kind: 'balance',
+    unit: 'usd',
+    amount: 10,
+    at: now - 3_600_000,
+    from: null,
+    source: 'manual',
+    note: null,
+    by: null,
+    ...over,
+  });
+
+  it('takes a live balance as it is', () => {
+    const st = walletStanding({ readings: [], logged: [], loggingSince: 0 }, 'fal', now, [
+      { provider: 'fal', kind: 'balance', unit: 'usd', amount: 3.2, at: now, from: null, source: 'api', note: null },
+    ]);
+    expect(st.basis).toBe('live');
+    expect(st.usd).toBeCloseTo(3.2);
+    expect(st.level).toBe('low');
+  });
+
+  it('takes what the log priced on our keys since the newest balance off it', () => {
+    const page = {
+      readings: [reading({ amount: 10 })],
+      logged: [
+        { provider: 'fal' as const, at: now - 7_200_000, usd: 5 }, // before the reading: not taken off
+        { provider: 'fal' as const, at: now - 600_000, usd: 4.8 },
+        { provider: 'google' as const, at: now - 600_000, usd: 1 },
+      ],
+      loggingSince: 0,
+    };
+    const st = walletStanding(page, 'fal', now);
+    expect(st.basis).toBe('estimate');
+    expect(st.usd).toBeCloseTo(5.2);
+    expect(st.loggedUsd).toBeCloseTo(4.8);
+    expect(st.level).toBe('ok');
+    expect(st.partial).toBe(false);
+  });
+
+  it('counts ElevenLabs in credits and dollars both', () => {
+    const st = walletStanding({ readings: [reading({ provider: 'elevenlabs', unit: 'credits', amount: 30_000 })], logged: [], loggingSince: 0 }, 'elevenlabs', now);
+    expect(st.basis).toBe('read');
+    expect(st.credits).toBe(30_000);
+    expect(st.usd).toBeCloseTo(2.2);
+    expect(st.level).toBe('low');
+  });
+
+  it('says only what was spent where no API gives a balance', () => {
+    const st = walletStanding(
+      { readings: [reading({ provider: 'openai', kind: 'spent', amount: 1.5, from: now - 86_400_000, source: 'api' })], logged: [], loggingSince: 0 },
+      'openai',
+      now,
+    );
+    expect(st.basis).toBe('spent');
+    expect(st.level).toBe('unknown');
+    expect(walletStanding({ readings: [], logged: [], loggingSince: 0 }, 'google', now).basis).toBe('none');
+  });
+
+  it('is empty whatever the figure once a request was refused for money after it', () => {
+    const alarm = { provider: 'fal' as const, at: now - 60_000, status: 403, error: 'User is locked. Reason: TOP_UP.', where: 'gateway', count: 2 };
+    const st = walletStanding({ readings: [reading({ amount: 50 })], logged: [], loggingSince: 0, alarms: [alarm] }, 'fal', now);
+    expect(st.level).toBe('empty');
+    expect(st.alarm).toEqual(alarm);
+    // An alarm older than the reading (the owner topped up since) does not count.
+    const after = walletStanding({ readings: [reading({ amount: 50, at: now - 30_000 })], logged: [], loggingSince: 0, alarms: [alarm] }, 'fal', now);
+    expect(after.level).toBe('ok');
+    expect(after.alarm).toEqual(alarm);
+    // And a day on it is gone from the tile.
+    expect(walletStanding({ readings: [reading({ amount: 50 })], logged: [], loggingSince: 0, alarms: [alarm] }, 'fal', now + 86_400_000).alarm).toBeNull();
+  });
+
+  it('takes a peek from the panel', () => {
+    expect(parseWalletPatch({ check: true, peek: true })).toEqual({ check: true, peek: true });
+  });
+});
+
+describe('a provider’s empty wallet, told apart from everything else', () => {
+  it('reads the provider’s words and never our own gateway’s', () => {
+    expect(isProviderFundsError('fal', '403 {"detail":"User is locked. Reason: TOP_UP."}')).toBe(true);
+    expect(isProviderFundsError('elevenlabs', '401 {"detail":{"status":"quota_exceeded"}}')).toBe(true);
+    expect(isProviderFundsError('google', '429 Your prepayment credits are depleted.')).toBe(true);
+    expect(isProviderFundsError('google', '429 You exceeded your current quota, please check your plan and billing details.')).toBe(false);
+    expect(isProviderFundsError('fal', '402 rpg-credits (no-diesel)')).toBe(true); // a bare 402 is fal's money
+    expect(isProviderFundsError('openai', '402 rpg-credits')).toBe(false);
+    expect(fundsProviderOf('deepseek')).toBeNull();
+    expect(fundsProviderOf('fal')).toBe('fal');
   });
 });

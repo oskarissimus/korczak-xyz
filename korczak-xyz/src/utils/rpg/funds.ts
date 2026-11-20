@@ -20,7 +20,9 @@
 
 import { log } from '../../lib/logger';
 
-export type FundsProvider = 'fal' | 'elevenlabs' | 'google' | 'openai';
+import { PROVIDER_SIGNS, TOP_UP, type FundsProvider } from './fundsSigns';
+
+export { TOP_UP, type FundsProvider };
 
 export interface FundsAlert {
   provider: FundsProvider;
@@ -31,27 +33,11 @@ export interface FundsAlert {
   count: number;
 }
 
-/** Where each provider's balance is topped up: the banner's link. */
-export const TOP_UP: Record<FundsProvider, { name: string; url: string }> = {
-  fal: { name: 'fal.ai', url: 'https://fal.ai/dashboard/billing' },
-  elevenlabs: { name: 'ElevenLabs', url: 'https://elevenlabs.io/app/subscription' },
-  google: { name: 'Google AI Studio', url: 'https://aistudio.google.com/usage' },
-  openai: { name: 'OpenAI', url: 'https://platform.openai.com/settings/organization/billing' },
-};
-
 /**
- * What each provider says when the money is gone, as of Oct 2026. Narrow on purpose: Google's
- * per-model 429 ends "please check your plan and billing details" too, and is only a quota the chain
- * moves past, so for Google only the prepayment and billing wording counts. OpenAI's same sentence is
- * `insufficient_quota`, which is the balance. And for every provider the RPG's own gateway, when
- * nobody pays for a request (`NO_CREDITS` in `gatewayRoutes.ts`: no key, and later no credits).
+ * The provider's words (`fundsSigns.ts`), and for every provider the RPG's own gateway, when nobody
+ * pays for a request (`NO_CREDITS` in `gatewayRoutes.ts`: no key, and later no credits).
  */
-const SIGNS: Record<FundsProvider, RegExp> = {
-  fal: /user is locked|top_?up|exhausted balance|insufficient (?:balance|credits|funds)|^402\b|rpg-credits/i,
-  elevenlabs: /quota_exceeded|exceeds your quota|payment_required|insufficient[_ ](?:credits|funds)|^(?:ElevenLabs )?402\b|rpg-credits/i,
-  google: /credits are depleted|prepayment|requires billing|billing_disabled|billing (?:is )?(?:not enabled|disabled)|rpg-credits/i,
-  openai: /insufficient_quota|exceeded your current quota|billing_hard_limit|rpg-credits/i,
-};
+const OWN_GATEWAY = /rpg-credits/i;
 
 /** Whose request a console entry is, by its kind and the model asked. */
 export function providerOf(kind: 'model' | 'voice' | 'fal' | 'music', model: string): FundsProvider {
@@ -63,7 +49,7 @@ export function providerOf(kind: 'model' | 'voice' | 'fal' | 'music', model: str
 
 /** Whether an error reads as the account having no money left. */
 export function isFundsError(provider: FundsProvider, error: string): boolean {
-  return SIGNS[provider].test(error.trim());
+  return PROVIDER_SIGNS[provider].test(error.trim()) || OWN_GATEWAY.test(error);
 }
 
 let alerts: FundsAlert[] = [];

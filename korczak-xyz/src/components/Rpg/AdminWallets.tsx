@@ -9,9 +9,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { describeError, log } from '../../lib/logger';
+import { TOP_UP } from '../../utils/rpg/fundsSigns';
 import { adminWallets } from '../../utils/rpg/gateway';
 import {
   driftRows,
+  walletStanding,
   startOfUtcMonth,
   usdOfAmount,
   WALLET_KEY_PROVIDERS,
@@ -22,7 +24,11 @@ import {
   type WalletProvider,
   type WalletReading,
   type WalletsPage,
+  type WalletCheck,
+  type WalletLevel,
+  type WalletStanding,
   type WalletUnit,
+  type WalletValue,
 } from '../../utils/rpg/wallets';
 
 type Lang = 'en' | 'pl';
@@ -37,6 +43,20 @@ const LINK: Record<WalletProvider, string> = {
 
 const translations = {
   en: {
+    glanceTitle: 'Balances',
+    level: { ok: '✓ fine', low: '⚠ low — top up soon', empty: '‼ empty — top up now', unknown: '? balance not known' } as Record<WalletLevel, string>,
+    topUpBtn: 'Top up ↗',
+    peeking: 'Reading the providers live…',
+    peekedAt: (w: string) => `Read live at ${w}. Nothing is stored until “Read the wallets now”.`,
+    basisLive: (w: string) => `balance, read live · ${w}`,
+    basisRead: (w: string, src: string) => `balance, ${src} · ${w}`,
+    basisEstimate: (w: string, src: string, logged: string, partial: boolean) =>
+      `estimate: the balance ${src} at ${w}, less ${logged} the log priced on our keys since${partial ? ' (the log is incomplete there)' : ''}`,
+    basisSpent: (spent: string, from: string) =>
+      `No API gives the balance — ${spent} spent since ${from}. Type the balance in below once and the log is taken off it from then on.`,
+    basisNone: 'Nothing read yet: add a reading key below, or type the balance in.',
+    liveFailed: (why: string) => `live read: ${why}`,
+    alarm: (w: string, n: number) => `‼ requests refused for lack of money · last ${w}${n > 1 ? ` (×${n} in all)` : ''}`,
     title: 'Provider wallets',
     blurb:
       'What each provider itself says, against what the request log priced. A key here only reads — it is kept apart from the keys that spend, and never comes back to this page. Where no API will say, type the figure off the provider’s billing page. Drift is the provider’s figure minus the log’s: above zero, the log under-prices.',
@@ -91,6 +111,20 @@ const translations = {
     failed: 'Could not read the wallets:',
   },
   pl: {
+    glanceTitle: 'Stan portfeli',
+    level: { ok: '✓ w porządku', low: '⚠ mało — doładuj niedługo', empty: '‼ pusto — doładuj teraz', unknown: '? salda nie widać' } as Record<WalletLevel, string>,
+    topUpBtn: 'Doładuj ↗',
+    peeking: 'Czytam dostawców na żywo…',
+    peekedAt: (w: string) => `Odczyt na żywo o ${w}. Nic nie jest zapisywane, dopóki nie klikniesz „Odczytaj portfele teraz”.`,
+    basisLive: (w: string) => `saldo, odczyt na żywo · ${w}`,
+    basisRead: (w: string, src: string) => `saldo, ${src} · ${w}`,
+    basisEstimate: (w: string, src: string, logged: string, partial: boolean) =>
+      `szacunek: saldo ${src} z ${w} minus ${logged}, które log wycenił od tego czasu na naszych kluczach${partial ? ' (log jest tam niepełny)' : ''}`,
+    basisSpent: (spent: string, from: string) =>
+      `Żadne API nie podaje salda — wydano ${spent} od ${from}. Wpisz saldo ręcznie niżej raz, a od tej chwili odejmę od niego log.`,
+    basisNone: 'Jeszcze bez odczytu: dodaj niżej klucz do odczytu albo wpisz saldo ręcznie.',
+    liveFailed: (why: string) => `odczyt na żywo: ${why}`,
+    alarm: (w: string, n: number) => `‼ requesty odrzucone z braku środków · ostatni ${w}${n > 1 ? ` (łącznie ×${n})` : ''}`,
     title: 'Portfele u dostawców',
     blurb:
       'Co mówi sam dostawca, wobec tego, co wycenił log requestów. Klucz tutaj tylko czyta — trzymamy go osobno od kluczy, które wydają, i nigdy nie wraca na tę stronę. Gdzie żadne API nie powie, wpisz kwotę ze strony rozliczeń dostawcy. Drift to kwota dostawcy minus kwota z logu: powyżej zera log zaniża.',
@@ -183,11 +217,34 @@ export default function AdminWallets({ lang }: { lang: Lang }) {
     note: '',
   }));
 
+  const [live, setLive] = useState<WalletCheck[] | null>(null);
+  const [peekedAt, setPeekedAt] = useState<number | null>(null);
+
+  /** Every provider asked live, nothing stored: the top of the page, on every open. */
+  const peek = useCallback(async () => {
+    try {
+      const answer = await adminWallets({ check: true, peek: true });
+      const { checks, ...rest } = answer;
+      setPage(rest);
+      setLive(checks ?? []);
+      setPeekedAt(Date.now());
+    } catch (e) {
+      log.warn('rpg.admin.wallets.peek.failed', describeError(e));
+      setLive([]);
+    }
+  }, []);
+
   const run = useCallback(async (patch?: WalletPatch) => {
     setBusy(true);
     setError(null);
     try {
-      setPage(await adminWallets(patch));
+      const answer = await adminWallets(patch);
+      setPage(answer);
+      // A stored read is as live as a peek: the top shows it at once.
+      if (patch?.check && answer.checks) {
+        setLive(answer.checks);
+        setPeekedAt(Date.now());
+      }
       return true;
     } catch (e) {
       log.warn('rpg.admin.wallets.failed', describeError(e));
@@ -199,8 +256,10 @@ export default function AdminWallets({ lang }: { lang: Lang }) {
   }, []);
 
   useEffect(() => {
-    void run();
-  }, [run]);
+    void run().then((ok) => {
+      if (ok) void peek();
+    });
+  }, [run, peek]);
 
   const rows = useMemo(() => (page ? driftRows(page) : []), [page]);
   const changed = WALLET_KEY_PROVIDERS.filter((p) => drafts[p].trim());
@@ -226,8 +285,61 @@ export default function AdminWallets({ lang }: { lang: Lang }) {
 
   const latest = (p: WalletProvider) => page?.readings.find((r) => r.provider === p) ?? null;
 
+  const liveValues = useMemo(() => (live ?? []).flatMap((c) => (c.reading ? [c.reading as WalletValue] : [])), [live]);
+  const standings = useMemo(
+    () => (page ? WALLET_PROVIDERS.map((p) => walletStanding(page, p, Date.now(), liveValues)) : []),
+    [page, liveValues],
+  );
+
+  const sourceWord = (src: WalletStanding['source']) => (src === 'manual' ? (lang === 'pl' ? 'wpisane ręcznie' : 'typed in') : lang === 'pl' ? 'z API' : 'from the API');
+
+  const basisText = (st: WalletStanding): string => {
+    const w = st.at != null ? when(st.at) : '';
+    switch (st.basis) {
+      case 'live':
+        return t.basisLive(w);
+      case 'read':
+        return t.basisRead(w, sourceWord(st.source));
+      case 'estimate':
+        return t.basisEstimate(w, sourceWord(st.source), usd(st.loggedUsd), st.partial);
+      case 'spent':
+        return t.basisSpent(usd(st.usd ?? 0), st.from != null ? when(st.from) : w);
+      default:
+        return t.basisNone;
+    }
+  };
+
   return (
     <section className="acct-section rpg-costs">
+      <h2 className="acct-heading">{t.glanceTitle}</h2>
+      {page && (
+        <ul className="rpg-wallet-tiles">
+          {standings.map((st) => {
+            const check = live?.find((c) => c.provider === st.provider);
+            const failed = check && (check.check === 'refused' || check.check === 'failed') ? (check.reason ?? t.checkResult[check.check]) : null;
+            return (
+              <li key={st.provider} className="rpg-wallet-tile" data-level={st.level}>
+                <div className="rpg-wallet-tile-head">
+                  <strong>{LABEL[st.provider]}</strong>
+                  <span className="rpg-wallet-level">{t.level[st.level]}</span>
+                </div>
+                <div className="rpg-wallet-figure">
+                  {st.usd == null ? '—' : st.basis === 'spent' ? `−${usd(st.usd)}` : `${st.basis === 'estimate' ? '≈ ' : ''}${usd(st.usd)}`}
+                  {st.credits != null && <span className="rpg-wallet-credits">{t.credits(Math.round(st.credits))}</span>}
+                </div>
+                <p className="acct-dim rpg-wallet-basis">{basisText(st)}</p>
+                {failed && st.basis !== 'live' && <p className="acct-dim rpg-wallet-basis">{t.liveFailed(failed.slice(0, 160))}</p>}
+                {st.alarm && <p className="acct-warn rpg-wallet-alarm">{t.alarm(when(st.alarm.at), st.alarm.count)}</p>}
+                <a className="retro-btn rpg-wallet-topup" href={TOP_UP[st.provider].url} target="_blank" rel="noopener noreferrer">
+                  {t.topUpBtn}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {page && <p className="acct-dim">{live === null ? t.peeking : peekedAt != null ? t.peekedAt(when(peekedAt)) : null}</p>}
+
       <h2 className="acct-heading">{t.title}</h2>
       <p className="acct-dim">{t.blurb}</p>
       {error && (

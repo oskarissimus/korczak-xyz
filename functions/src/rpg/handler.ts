@@ -74,6 +74,7 @@ import { morePool, poolFor } from './proposalPool';
 import { uiStrings } from './ui';
 import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
+import { noteRefusal } from './walletAlarm';
 
 const VOICE_MODEL = FLASH_MODEL;
 
@@ -369,6 +370,7 @@ async function generate(
       const text = await upstream.text().catch(() => '');
       const refused = Buffer.from(text);
       await demoLog(upstream.status, upstream.headers.get('content-type') ?? '', refused, refused.length, 0, model, null);
+      await noteRefusal('google', upstream.status, text.slice(0, 2000), 'demo');
       res.status(upstream.status || 502).type('application/json').send(text || '{}');
       return;
     }
@@ -454,7 +456,11 @@ async function readVoiceLists(lang: string, elevenLabs: () => Promise<string | n
     await Promise.all(
       voiceQueries(lang).map(async (url) => {
         const r = await fetch(url, { headers: { 'xi-api-key': key } });
-        if (!r.ok) throw new Error(`ElevenLabs ${r.status}`);
+        if (!r.ok) {
+          const body = await r.text().catch(() => '');
+          await noteRefusal('elevenlabs', r.status, body.slice(0, 2000), 'demo');
+          throw new Error(`ElevenLabs ${r.status}`);
+        }
         fresh[url] = usableIds(sharedVoicesOf(await r.json()), lang, VOICE_MODEL);
       }),
     );

@@ -46,6 +46,7 @@ import {
   type WalletReading,
   type WalletsPage,
 } from '../../../korczak-xyz/src/utils/rpg/wallets';
+import { WALLET_ALARMS, type WalletAlarm } from '../../../korczak-xyz/src/utils/rpg/fundsSigns';
 import { db } from '../runtime';
 
 const TIMEOUT_MS = 8000;
@@ -185,15 +186,21 @@ function newId(at: number): string {
   return `${at.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Every key asked once, in parallel; each answer that came back is stored as a reading. */
-async function checkWallets(uid: string): Promise<WalletCheck[]> {
+/**
+ * Every key asked once, in parallel; each answer that came back is stored as a reading — unless this
+ * is a peek (the panel's top on every open), which answers the figures and stores nothing, so opening
+ * the page does not fill the drift table with readings nobody asked to keep.
+ */
+async function checkWallets(uid: string, store: boolean): Promise<WalletCheck[]> {
   const [keys, loggingSince] = await Promise.all([readKeys(), firstLogged()]);
   const now = Date.now();
   const keep = async (provider: WalletProvider, r: Read): Promise<WalletCheck> => {
     if ('check' in r) return { provider, check: r.check, reason: r.reason };
-    const id = newId(now);
-    await db.collection(WALLET_READINGS).doc(id).set({ ...r.reading, id, by: uid });
-    return { provider, check: 'ok', reason: null };
+    if (store) {
+      const id = newId(now);
+      await db.collection(WALLET_READINGS).doc(id).set({ ...r.reading, id, by: uid });
+    }
+    return { provider, check: 'ok', reason: null, reading: r.reading };
   };
   return Promise.all([
     readGoogle(now, loggingSince).then((r) => keep('google', r)),
@@ -213,15 +220,18 @@ async function firstLogged(): Promise<number | null> {
 
 async function walletsPage(): Promise<WalletsPage> {
   const since = Date.now() - WALLET_DAYS * 86_400_000;
-  const [keys, readingsSnap, loggingSince] = await Promise.all([
+  const [keys, readingsSnap, loggingSince, alarmsSnap] = await Promise.all([
     readKeys(),
     db.collection(WALLET_READINGS).where('at', '>=', since).orderBy('at', 'desc').limit(500).get(),
     firstLogged(),
+    db.collection(WALLET_ALARMS).get(),
   ]);
   const readings = readingsSnap.docs.map((d) => d.data() as WalletReading);
-  // The log over the widest window any reading covers, cut to provider, time and price.
+  const alarms = alarmsSnap.docs.map((d) => d.data() as WalletAlarm).sort((a, b) => b.at - a.at);
+  // The log over the widest window any reading covers, and on to now (`walletStanding` takes the
+  // spend since the newest balance off it), cut to provider, time and price.
   const from = Math.min(...readings.map((r) => r.from ?? r.at), Date.now());
-  const to = Math.max(...readings.map((r) => r.at), 0);
+  const to = readings.length ? Date.now() : 0;
   let logged: WalletsPage['logged'] = [];
   if (readings.length && loggingSince != null && to > Math.max(from, loggingSince)) {
     const snap = await db
@@ -232,7 +242,7 @@ async function walletsPage(): Promise<WalletsPage> {
       .get();
     logged = ownSpend(snap.docs.map((d) => d.data() as RequestLogEntry));
   }
-  return { hints: Object.fromEntries(WALLET_KEY_PROVIDERS.map((p) => [p, hint(keys[p])])) as WalletsPage['hints'], readings, logged, loggingSince };
+  return { hints: Object.fromEntries(WALLET_KEY_PROVIDERS.map((p) => [p, hint(keys[p])])) as WalletsPage['hints'], readings, logged, loggingSince, alarms };
 }
 
 export class WalletRefusal extends Error {
@@ -261,7 +271,7 @@ export async function handleWallets(req: Request, res: Response, uid: string, bo
       await db.collection(WALLET_READINGS).doc(id).set({ ...patch.reading, id, source: 'manual', by: uid });
     }
     if (patch.remove) await db.collection(WALLET_READINGS).doc(patch.remove).delete();
-    if (patch.check) checks = await checkWallets(uid);
+    if (patch.check) checks = await checkWallets(uid, !patch.peek);
   }
   res.status(200).json({ ...(await walletsPage()), ...(checks ? { checks } : {}) });
 }

@@ -1960,6 +1960,29 @@ to type a balance in where no API says, and the drift between the real and the e
 - **Only the server's keys are estimated** (`OWN_PAYERS`: diesel, demo, key test). A player's own
   key spends their wallet. Anything else on the same provider account is in the provider's figure
   only, and a window opening before the first logged request is flagged rather than trusted.
+- **The balances come first** (owner, 20 Nov 2026: "na górze od razu widoczne, u którego dostawcy ile
+  jest pieniędzy, żebym wiedział, że trzeba zaraz doładować, a obok linki do doładowania"). *Stan
+  portfeli* heads the tab: a tile per provider with the figure large, ✓/⚠/‼/? and words for the state
+  (low under `LOW_USD` $5, empty under `EMPTY_USD` $0.50; the border dashed or doubled, never a hue),
+  how the figure was got, and *Doładuj ↗* to `TOP_UP` (`utils/rpg/fundsSigns.ts`, the game's banner's
+  links). Every open **peeks**: `POST {check, peek}` asks each provider live and stores nothing, so the
+  drift table is not filled by visits; *Odczytaj portfele teraz* still stores. `walletStanding` picks
+  the figure: a live balance (fal's dollars, ElevenLabs' credits), else the newest balance reading less
+  what the log priced on our keys since (`≈`, the page's `logged` now runs to now), else — OpenAI and
+  Google, whose APIs give no balance — what was spent this month, saying so and asking for one balance
+  typed in by hand, from which the log is subtracted from then on.
+- **A refusal for want of money on our own keys is a Sentry incident at once**
+  (`functions/src/rpg/walletAlarm.ts`, same day: "jak jakiś request failed z powodu pieniędzy, to
+  powinno iść do Sentry od razu"). Our own keys: the gateway's diesel (the server's keys), the demo,
+  the proposal pool — never a player's own key, nor our own 402 for an empty tank. A provider's
+  refusal that reads as an empty balance (`isProviderFundsError`, the game's words minus
+  `rpg-credits`) is a `fatal` message, *"fal.ai: portfel pusty — trzeba doładować (link)"*, one issue
+  per provider (fingerprint `rpg.wallet.empty`, tags `provider`, `where`, `project`), at most every
+  10 minutes per instance; and `rpgWalletAlarms/{provider}` (no rule) for the tile, which shows the
+  last refusal for a day and marks the wallet ‼ empty while the refusal is newer than its figure.
+  The Sentry alert *RPG: pusty portfel u dostawcy — doładuj* (functions project, made 20 Nov 2026
+  from the MCP, a dashboard object not in git) e-mails on every event tagged `wallet:empty`, at most
+  every 30 minutes, so a provider that stays empty keeps saying so rather than once per issue.
 
 ### The content rules: every person is invented
 

@@ -272,3 +272,71 @@
   overflow: auto;
   overscroll-behavior: contain;
 }
+
+/* The balances at the top of the wallets (owner, 20 Nov 2026): a tile per provider, the figure large.
+   The state is the glyph and the words; the border says it again without colour — dashed when low,
+   doubled when empty — for a black-and-white phone. */
+.rpg-wallet-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.rpg-wallet-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid var(--retro-gray);
+  background: var(--retro-white);
+  color: var(--retro-black);
+}
+
+.rpg-wallet-tile[data-level='low'] {
+  border-style: dashed;
+  border-color: var(--retro-black);
+}
+
+.rpg-wallet-tile[data-level='empty'] {
+  border: 4px double var(--retro-black);
+}
+
+.rpg-wallet-tile-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.rpg-wallet-tile[data-level='low'] .rpg-wallet-level,
+.rpg-wallet-tile[data-level='empty'] .rpg-wallet-level {
+  font-weight: bold;
+}
+
+.rpg-wallet-figure {
+  font-size: 1.8em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.rpg-wallet-credits {
+  display: block;
+  font-size: 0.5em;
+}
+
+.rpg-wallet-tile .rpg-wallet-basis,
+.rpg-wallet-tile .rpg-wallet-alarm {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rpg-wallet-topup {
+  align-self: flex-start;
+  margin-top: auto;
+  text-decoration: none;
+}

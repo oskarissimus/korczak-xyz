@@ -103,6 +103,32 @@ export function reportError(
 }
 
 /**
+ * Report something that needs a person, not a stack trace: a message at `fatal`, grouped by the
+ * fingerprint given rather than by message, so one provider's empty wallet is one issue however its
+ * words change. The first use is `rpg/walletAlarm.ts` (owner, 20 Nov 2026: a request refused for want
+ * of money goes to Sentry at once, as an incident saying to top up).
+ */
+export function reportIncident(
+  fingerprint: string[],
+  message: string,
+  tags: Record<string, string>,
+  extra?: Record<string, unknown>
+): void {
+  if (!started) return;
+  try {
+    Sentry.withScope((scope) => {
+      scope.setLevel('fatal');
+      scope.setFingerprint(fingerprint);
+      for (const [k, v] of Object.entries(tags)) scope.setTag(k, v);
+      if (extra) scope.setContext('incident', extra);
+      Sentry.captureMessage(message, 'fatal');
+    });
+  } catch {
+    // Reporting must never be what fails a request.
+  }
+}
+
+/**
  * Get queued events out before the instance freezes.
  *
  * This is the part of serverless Sentry that is easy to leave out and silently loses events: the
