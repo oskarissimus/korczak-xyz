@@ -741,7 +741,11 @@
   width: 340px;
   max-height: calc(100% - 96px);
   overflow-y: auto;
-  padding: 8px 14px;
+  /* No padding of its own (owner, 20 Nov 2026: the highlight should reach the sheet's edges, not stop
+     at a margin): the rows carry the inset (--sheet-x) and the dividers keep it, and the sheet's own
+     `overflow` clips the first and last rows' highlight to its rounded corners. */
+  --sheet-x: 16px;
+  padding: 0;
   border: 1px solid var(--d-line);
   border-radius: var(--d-radius);
   background: #17171a;
@@ -757,11 +761,11 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+  position: relative;
   min-height: 48px;
   margin: 0;
-  padding: 0 2px;
+  padding: 0 var(--sheet-x);
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -774,8 +778,20 @@
   cursor: pointer;
 }
 
-:root:root .rpg-home-sheet > :last-child {
-  border-bottom: 0;
+:root:root .rpg-home-sheet .rpg-menu-item::after,
+:root:root .rpg-home-sheet .rpg-dz-badge::after {
+  content: '';
+  position: absolute;
+  right: var(--sheet-x);
+  bottom: 0;
+  left: var(--sheet-x);
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+:root:root .rpg-home-sheet > :last-child::after {
+  content: none;
 }
 
 :root:root .rpg-home-sheet .rpg-menu-item small {
@@ -820,7 +836,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  margin: 6px 0;
+  margin: 8px var(--sheet-x) 6px;
   padding: 10px 14px;
   border: 0;
   border-radius: var(--d-radius);
@@ -1116,7 +1132,8 @@
     left: 0;
     width: auto;
     max-height: 88%;
-    padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
+    --sheet-x: 18px;
+    padding: 0 0 env(safe-area-inset-bottom);
     border-width: 1px 0 0;
     border-radius: 14px 14px 0 0;
   }
@@ -1244,7 +1261,8 @@
   }
 
   :root:root .rpg-home .rpg-home-sheet {
-    padding: 4px 12px calc(10px + env(safe-area-inset-bottom));
+    --sheet-x: 14px;
+    padding: 0 0 env(safe-area-inset-bottom);
   }
 
   :root:root .rpg-home-sheet .rpg-menu-item,
