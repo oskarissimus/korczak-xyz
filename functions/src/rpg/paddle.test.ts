@@ -249,6 +249,25 @@ describe('the Paddle webhook', () => {
     expect(store.get('rpgLedger/u1')?.dieselSubUsd).toBe(0);
   });
 
+  it('pours one discount once per account, and does not count a renewal as its use', async () => {
+    const withCode = (txn: string, uid: string, origin = 'web') => {
+      const body = JSON.parse(paid(txn, uid, 550));
+      body.data.discount_id = 'dsc_x';
+      body.data.origin = origin;
+      return JSON.stringify(body);
+    };
+    store.set('rpgLedger/u1', { dieselUsd: 0, dieselGrantedAt: 1 });
+    expect((await deliver(withCode('txn_d1', 'u1'))).json.outcome).toBe('credited');
+    expect(store.get('rpgLedger/u1')?.paddleDiscounts).toEqual({ dsc_x: 'txn_d1' });
+    expect((await deliver(withCode('txn_d2', 'u1'))).json.outcome).toBe('repeat-discount');
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(5.5);
+    expect(store.get('rpgPurchases/txn_d2')).toMatchObject({ status: 'repeat-discount', firstTxnId: 'txn_d1' });
+    expect((await deliver(withCode('txn_d3', 'u1', 'subscription_recurring'))).json.outcome).toBe('credited');
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(11);
+    store.set('rpgLedger/u2', { dieselUsd: 0, dieselGrantedAt: 1 });
+    expect((await deliver(withCode('txn_d4', 'u2'))).json.outcome).toBe('credited');
+  });
+
   it('ignores events it has nothing to do with', async () => {
     expect((await deliver(JSON.stringify({ event_type: 'customer.created', data: {} }))).json.outcome).toBe('ignored');
   });

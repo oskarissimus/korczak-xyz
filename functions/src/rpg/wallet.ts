@@ -15,6 +15,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import {
   BALANCE_FIELD,
   DIESEL_CONFIG_DOC,
+  DISCOUNTS_FIELD,
   DIESEL_KEYS,
   GRANTED_FIELD,
   WALLET_COLLECTION,
@@ -136,13 +137,15 @@ export interface Purchase {
   priceIds: string[];
   /** A subscription's delivery: it replaces what is left of the last one instead of adding to it. */
   subscriptionId?: string | null;
+  /** The Paddle discount the buyer applied, which pours once per account (`DISCOUNTS_FIELD`); not set on renewals. */
+  discountId?: string | null;
 }
 
 /**
  * Pours a purchase into the tank, once: the purchase document and the litres are one transaction, so
  * a webhook Paddle delivers twice (it retries until a 200) pours once. Grants the first tank too.
  */
-export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplicate'> {
+export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplicate' | 'repeat-discount'> {
   const grant = await grantUsd();
   const ref = walletDoc(p.uid);
   const purchase = db.collection(PURCHASES_COLLECTION).doc(p.txnId);
@@ -150,6 +153,12 @@ export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplica
   return db.runTransaction(async (tx) => {
     const [done, snap] = await Promise.all([tx.get(purchase), tx.get(ref)]);
     if (done.exists) return 'duplicate' as const;
+    const used = (snap.data()?.[DISCOUNTS_FIELD] ?? {}) as Record<string, unknown>;
+    if (p.discountId && used[p.discountId] !== undefined) {
+      // The account's second go with one code: kept for the record, nothing poured.
+      tx.set(purchase, { ...p, subscriptionId: p.subscriptionId ?? null, usd: 0, expiredUsd: 0, status: 'repeat-discount', firstTxnId: used[p.discountId], at: Date.now(), adjustments: {} });
+      return 'repeat-discount' as const;
+    }
     const known = balanceOf(snap.data());
     const balance = known ?? grant;
     // A delivery: last period's litres that were not spent expire as this one comes in.
@@ -163,6 +172,7 @@ export async function creditPurchase(p: Purchase): Promise<'credited' | 'duplica
           ? { [SUB_BALANCE_FIELD]: usd, dieselSubExpiredUsd: FieldValue.increment(expired) }
           : {}),
         dieselBoughtUsd: FieldValue.increment(usd),
+        ...(p.discountId ? { [DISCOUNTS_FIELD]: { [p.discountId]: p.txnId } } : {}),
         dieselUpdatedAt: Date.now(),
         ...(known === null ? { [GRANTED_FIELD]: Date.now(), dieselGrantUsd: grant } : {}),
       },

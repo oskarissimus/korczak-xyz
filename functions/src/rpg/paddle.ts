@@ -17,6 +17,9 @@
  *   its litres replace what is left of the last delivery (`creditPurchase`), and a renewal finds its
  *   account in `rpgSubscriptions/{id}`. `subscription.*` keeps the page's view of it on the ledger and
  *   takes the last delivery's rest away when it ends — subscription diesel does not carry over.
+ * - **Each discount pours once per account** (`DISCOUNTS_FIELD`): Paddle's `usage_limit` is only a
+ *   total, so a second paid transaction of one account with the same `discount_id` is kept as
+ *   `repeat-discount` and pours nothing. Renewals (`origin: subscription_*`) are not a use.
  * - **A refund or a chargeback takes its share back** (`adjustment.created`/`updated` once
  *   approved): the adjustment's total over the transaction's, of the litres bought.
  * - **Only from Paddle's own addresses** (owner, 18 Nov 2026, for going live): before the signature,
@@ -175,7 +178,12 @@ async function onPaid(event: PaddleEvent): Promise<string> {
     reportError('rpgApi.paddle.orphan', new Error(`paddle: paid transaction ${txnId} has ${uid ? 'no litres' : 'no uid'}`), { txnId });
     return 'orphan';
   }
-  return creditPurchase({ txnId, uid, litres, totalMinor, currency, eventId: str(event.event_id), priceIds, subscriptionId });
+  // A renewal carries a recurring discount again; only the purchase it was applied to counts as its use.
+  const renewal = str(data.origin)?.startsWith('subscription_') ?? false;
+  const discountId = renewal ? null : str(data.discount_id);
+  const outcome = await creditPurchase({ txnId, uid, litres, totalMinor, currency, eventId: str(event.event_id), priceIds, subscriptionId, discountId });
+  if (outcome === 'repeat-discount') reportError('rpgApi.paddle.discount', new Error(`paddle: ${uid} used discount ${discountId} again (${txnId}); nothing poured`), { txnId, discountId });
+  return outcome;
 }
 
 function recurring(items: unknown): boolean {

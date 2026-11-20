@@ -52,6 +52,21 @@ const UNKNOWN_USD = 0.25;
 /** A picture from Gemini's own API: about 1,300 image tokens; reserved with room. */
 const IMAGE_TOKENS = 4096;
 
+/**
+ * Each Paddle discount pours once per account (owner, 20 Nov 2026: "one person may use a code only
+ * once — I want to share it in a group chat and not have one person fill up to the brim"). Paddle's
+ * `usage_limit` is only a total, so `rpgLedger/{uid}.paddleDiscounts` maps each discount the account
+ * redeemed to its transaction: the webhook pours a second one for nothing, and the checkout closes
+ * the moment a used code is applied, before it costs one of the code's uses.
+ */
+export const DISCOUNTS_FIELD = 'paddleDiscounts';
+
+/** The discounts the ledger says this account has redeemed. */
+export function discountsOf(data: Record<string, unknown> | undefined): string[] {
+  const m = data?.[DISCOUNTS_FIELD];
+  return m && typeof m === 'object' ? Object.keys(m as Record<string, unknown>) : [];
+}
+
 export interface WalletStatus {
   /** What is left, in dollars (said in litres). */
   balanceUsd: number;
@@ -63,6 +78,8 @@ export interface WalletStatus {
   subUsd?: number;
   /** The monthly delivery, when there is one (read live off the ledger). */
   subscription?: import('./paddle').SubscriptionView | null;
+  /** Paddle discounts this account has redeemed, each once (`DISCOUNTS_FIELD`; read live off the ledger). */
+  discountsUsed?: string[];
 }
 
 /**

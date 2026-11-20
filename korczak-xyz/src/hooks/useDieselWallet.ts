@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 
 import { fetchWallet } from '../utils/rpg/gateway';
-import { BALANCE_FIELD, WALLET_COLLECTION, type WalletStatus } from '../utils/rpg/wallet';
+import { BALANCE_FIELD, WALLET_COLLECTION, discountsOf, type WalletStatus } from '../utils/rpg/wallet';
 import { subLeftOf, subscriptionOf } from '../utils/rpg/paddle';
 
 type User = { uid: string };
@@ -45,7 +45,7 @@ export function useDieselWallet(user: User | null): WalletStatus | null {
           if (typeof v !== 'number' || !Number.isFinite(v)) return;
           const balanceUsd = Math.max(0, v);
           // The subscription and what is left of its delivery ride on the same document.
-          setWallet((w) => (w ? { ...w, balanceUsd, subUsd: subLeftOf(data, balanceUsd), subscription: subscriptionOf(data) } : w));
+          setWallet((w) => (w ? { ...w, balanceUsd, subUsd: subLeftOf(data, balanceUsd), subscription: subscriptionOf(data), discountsUsed: discountsOf(data) } : w));
         },
         () => {
           /* the rule not deployed yet: the gauge stays at what the gateway said */

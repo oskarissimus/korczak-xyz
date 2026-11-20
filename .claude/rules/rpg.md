@@ -2012,6 +2012,14 @@ the price of a world or a beat is in it too."
   own promo codes (`rpgCodes`, one day) are gone: an admin buys like anyone, with a 100% discount
   code made in Paddle, and so do beta testers. The admin panel's *Top up an account* by e-mail stays,
   as the one support tool for putting litres back by hand.
+- **A Paddle discount pours once per account** (owner, 20 Nov 2026: "one code, 20 uses, shared in a
+  group chat — nobody should fill up to the brim while others never try"). Paddle's `usage_limit` is a
+  total only, so `rpgLedger/{uid}.paddleDiscounts` maps each discount the account redeemed to its
+  transaction (`DISCOUNTS_FIELD`): the webhook keeps a second paid transaction with the same
+  `discount_id` as `repeat-discount` and pours nothing (renewals, `origin: subscription_*`, are not a
+  use), and the page closes the checkout on `checkout.discount.applied` with a code the ledger lists,
+  before it costs one of the code's uses (`discount-used`). The friends' code is `DIZEL550`
+  (`dsc_01m7x7s5kc02qsr6n5mz2rv9mr`): the Barrel free, 20 uses.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
 - **On the demo a canister is still a preview**: there is no account to pour into, so a tap plays the

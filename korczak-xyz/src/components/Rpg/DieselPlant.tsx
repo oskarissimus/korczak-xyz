@@ -143,7 +143,7 @@ export default function DieselPlant({
         setPhase('refuel');
         later(() => setPhase('running'), REFUEL_MS);
         later(() => setBought(null), REFUEL_MS + PREVIEW_HOLD_MS * 3);
-      } else if (outcome === 'failed') {
+      } else if (outcome === 'failed' || outcome === 'discount-used') {
         later(() => setBought(null), PREVIEW_HOLD_MS * 2);
       }
     });
@@ -250,7 +250,9 @@ export default function DieselPlant({
             ? t.dieselCheckout
             : bought.outcome === 'paid'
               ? t.dieselPaid(formatLitres(bought.litres, lang))
-              : t.dieselCheckoutFailed
+              : bought.outcome === 'discount-used'
+                ? t.dieselDiscountUsed
+                : t.dieselCheckoutFailed
           : preview && phase !== 'stopped'
           ? t.dieselPreview(formatLitres(preview.litres, lang))
           : phase === 'refuel'

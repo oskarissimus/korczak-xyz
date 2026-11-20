@@ -6,7 +6,9 @@
  * channel; Paddle asks for it not to be self-hosted). One load per page, shared by every buy.
  *
  * `buyCanister` resolves when the overlay is done with: `paid` once Paddle says the checkout
- * completed, `closed` when the reader shut it first, `failed` when Paddle.js would not load. A paid
+ * completed, `closed` when the reader shut it first, `failed` when Paddle.js would not load,
+ * `discount-used` when a code this account has already redeemed was applied (closed at once, before
+ * it costs one of the code's uses; the webhook would pour nothing for it anyway). A paid
  * checkout does not pour anything itself — the webhook does (`functions/src/rpg/paddle.ts`), and
  * the tank's live snapshot (`useDieselWallet`) raises the gauge when it lands, a second or two later.
  */
@@ -16,10 +18,11 @@ import type { Canister } from './diesel';
 
 const SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js';
 
-export type CheckoutOutcome = 'paid' | 'closed' | 'failed';
+export type CheckoutOutcome = 'paid' | 'closed' | 'failed' | 'discount-used';
 
 interface PaddleEventData {
   name?: string;
+  data?: { discount?: { id?: string } | null } | null;
 }
 
 interface PaddleJs {
@@ -27,6 +30,7 @@ interface PaddleJs {
   Initialize(options: { token: string; eventCallback?: (e: PaddleEventData) => void }): void;
   Checkout: {
     open(options: Record<string, unknown>): void;
+    close(): void;
   };
 }
 
@@ -39,6 +43,8 @@ declare global {
 /** The one checkout in flight: Paddle.js has a single global callback, so the latest buy listens. */
 let pending: ((outcome: CheckoutOutcome) => void) | null = null;
 let ready: Promise<PaddleJs> | null = null;
+/** The discounts the account in the open checkout has already redeemed (`DISCOUNTS_FIELD`). */
+let usedDiscounts: readonly string[] = [];
 
 function settle(outcome: CheckoutOutcome) {
   const done = pending;
@@ -57,6 +63,14 @@ function load(): Promise<PaddleJs> {
         token: PADDLE.token,
         eventCallback: (e) => {
           // Completed comes before the reader closes the success screen: paid is said at once.
+          if (e.name === 'checkout.discount.applied' && pending) {
+            const id = e.data?.discount?.id;
+            if (id && usedDiscounts.includes(id)) {
+              settle('discount-used');
+              window.Paddle?.Checkout.close();
+              return;
+            }
+          }
           if (e.name === 'checkout.completed') settle('paid');
           else if (e.name === 'checkout.closed') settle('closed');
         },
@@ -89,16 +103,16 @@ export function openPaymentLink(): void {
 }
 
 /** Opens the overlay for one canister, for the signed-in account `uid`. */
-export function buyCanister(c: Canister, uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
-  return openCheckout(PADDLE.prices[c.id], { uid, canister: c.id }, email, lang);
+export function buyCanister(c: Canister, uid: string, email: string | null, lang: string, used: readonly string[] = []): Promise<CheckoutOutcome> {
+  return openCheckout(PADDLE.prices[c.id], { uid, canister: c.id }, email, lang, used);
 }
 
 /** Opens the overlay for the monthly delivery (`SUBSCRIPTION`); renewals pour by webhook with no page open. */
-export function subscribeMonthly(uid: string, email: string | null, lang: string): Promise<CheckoutOutcome> {
-  return openCheckout(PADDLE.subscription, { uid, canister: 'monthly' }, email, lang);
+export function subscribeMonthly(uid: string, email: string | null, lang: string, used: readonly string[] = []): Promise<CheckoutOutcome> {
+  return openCheckout(PADDLE.subscription, { uid, canister: 'monthly' }, email, lang, used);
 }
 
-async function openCheckout(priceId: string, customData: Record<string, string>, email: string | null, lang: string): Promise<CheckoutOutcome> {
+async function openCheckout(priceId: string, customData: Record<string, string>, email: string | null, lang: string, used: readonly string[]): Promise<CheckoutOutcome> {
   let paddle: PaddleJs;
   try {
     paddle = await load();
@@ -106,6 +120,7 @@ async function openCheckout(priceId: string, customData: Record<string, string>,
     return 'failed';
   }
   settle('closed');
+  usedDiscounts = used;
   return new Promise<CheckoutOutcome>((resolve) => {
     pending = resolve;
     try {

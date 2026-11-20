@@ -3139,7 +3139,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           const user = auth.user!;
           log.info('rpg.diesel.checkout', { canister: c.id });
           const { buyCanister } = await import('../../utils/rpg/paddleCheckout');
-          const outcome = await buyCanister(c, user.uid, user.email, gameLang);
+          const outcome = await buyCanister(c, user.uid, user.email, gameLang, wallet?.discountsUsed ?? []);
           log.info('rpg.diesel.checkout.end', { canister: c.id, outcome });
           return outcome;
         }
@@ -3150,7 +3150,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           const user = auth.user!;
           log.info('rpg.diesel.subscribe');
           const { subscribeMonthly } = await import('../../utils/rpg/paddleCheckout');
-          const outcome = await subscribeMonthly(user.uid, user.email, gameLang);
+          const outcome = await subscribeMonthly(user.uid, user.email, gameLang, wallet?.discountsUsed ?? []);
           log.info('rpg.diesel.subscribe.end', { outcome });
           return outcome;
         }
