@@ -19,12 +19,13 @@
 
 import type { Spend } from './devlog';
 import { isDead, jobDone, slainBy, type Beat, type DialogueOption, type Lang, type QuestMood, type StepRecord } from './quest';
+import { rpgKey } from './profile';
 import { rpgSet } from './storage';
 import { saveUnit, touch } from './sync';
 import type { TranscriptLine } from './transcript';
 
 const OLD_KEY = 'rpg-save';
-const KEY = 'rpg-saves';
+const KEY = () => rpgKey('rpg-saves');
 const VERSION = 1;
 
 export interface SavedGame {
@@ -81,13 +82,13 @@ export function saveWorldId(game: Pick<SavedGame, 'worldId' | 'lang'>): string {
 function readAll(): Record<string, SavedGame> {
   let all: Record<string, SavedGame> = {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const parsed = JSON.parse(localStorage.getItem(KEY()) ?? '{}');
     if (parsed && typeof parsed === 'object') all = parsed;
     const old = JSON.parse(localStorage.getItem(OLD_KEY) ?? 'null');
     if (valid(old)) {
       const id = saveWorldId(old);
       if (!all[id] || all[id].at < old.at) all[id] = old;
-      localStorage.setItem(KEY, JSON.stringify(all));
+      localStorage.setItem(KEY(), JSON.stringify(all));
       touch(saveUnit(id));
     }
     if (old !== null) localStorage.removeItem(OLD_KEY);
@@ -98,7 +99,7 @@ function readAll(): Record<string, SavedGame> {
 }
 
 function writeAll(all: Record<string, SavedGame>): boolean {
-  return rpgSet(KEY, JSON.stringify(all));
+  return rpgSet(KEY(), JSON.stringify(all));
 }
 
 /** The quest played last, in any world but those `skip` names (the trash, `worldSave.ts`'s `isTrashed`). */

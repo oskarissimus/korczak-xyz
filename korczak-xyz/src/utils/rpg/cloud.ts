@@ -30,12 +30,15 @@ import { isRecoverableClientError, runCloud } from '../../lib/firestoreHealth';
 import { describeError, log } from '../../lib/logger';
 import { chronicleTimes, loadChronicle, writeChronicle } from './chronicle';
 import { classicWorld } from './genesis';
+import { LANGUAGES } from './language';
+import { profile, rpgKey, withProfile } from './profile';
 import type { ChronicleEntry, Lang } from './quest';
-import { allGames, loadGameFor, writeGameFor, type SavedGame } from './save';
-import { allStamps, markPushed, onTouch, saveUnit, seed, setSyncing, stampOf, STATE_UNIT, tookCloud, worldUnit } from './sync';
+import { allGames, dropGameFor, loadGameFor, writeGameFor, type SavedGame } from './save';
+import { allStamps, forget, markPushed, onTouch, saveUnit, seed, setSyncing, stampOf, STATE_UNIT, tookCloud, worldUnit } from './sync';
 import {
   atlasIds,
   currentIds,
+  dropWorldHere,
   LOCAL_WORLDS,
   libraryEntry,
   libraryWorlds,
@@ -62,12 +65,12 @@ const stateDoc = (uid: string) => doc(getDb()!, 'users', uid, 'rpgState', 'curre
  * the trash (`sweepToTrash`). Written by hand, or by the trash's own button; the game only reads it.
  */
 export const cleanSlateDoc = (uid: string) => doc(getDb()!, 'users', uid, 'rpgState', 'cleanSlate');
-const SWEPT_KEY = 'rpg-clean-slate';
+const SWEPT_KEY = () => rpgKey('rpg-clean-slate');
 
 /** The clean slate this browser last swept, by its `at`. */
 export function sweptAt(): number {
   try {
-    return Number(localStorage.getItem(SWEPT_KEY)) || 0;
+    return Number(localStorage.getItem(SWEPT_KEY())) || 0;
   } catch {
     return 0;
   }
@@ -75,7 +78,7 @@ export function sweptAt(): number {
 
 function markSwept(at: number) {
   try {
-    localStorage.setItem(SWEPT_KEY, String(at));
+    localStorage.setItem(SWEPT_KEY(), String(at));
   } catch {
     /* swept again on the next pull, which finds nothing left to sweep */
   }
@@ -200,6 +203,9 @@ export async function pull(uid: string): Promise<boolean> {
     log.warn('rpg.cleanSlate.unreadable', describeError(e));
     return 0;
   });
+  // Signed out (or into another account) while the account was being read: what came down is not
+  // the store's that is on screen now, and must not land in it (`profile.ts`).
+  if (profile() !== uid) return false;
   let changed = false;
 
   const state = stateSnap.exists() ? (stateSnap.data() as { updatedAt?: number; current?: Record<Lang, string> }) : null;
@@ -243,6 +249,8 @@ export async function pull(uid: string): Promise<boolean> {
   }
 
   if (state) cloudAt.set(STATE_UNIT, state.updatedAt ?? 0);
+  const released = releaseGuest(cloudAt);
+  if (released) log.info('rpg.guest.released', { units: released });
   // What this browser has that the account has not: newer here than there, or not there at all.
   // Never the other way: a unit the account has newer is never pushed over, even one not taken here.
   for (const [unit, s] of Object.entries(allStamps())) {
@@ -256,13 +264,53 @@ export async function pull(uid: string): Promise<boolean> {
 export async function fetchWorld(uid: string, id: string): Promise<void> {
   if (!getDb()) return;
   const [w, s] = await runCloud('rpg.fetchWorld', () => Promise.all([getDoc(doc(worlds(uid), id)), getDoc(doc(saves(uid), id))]));
+  if (profile() !== uid) return;
   if (w.exists() && (w.data().updatedAt ?? 0) > stampOf(worldUnit(id)).local) applyWorld(id, w.data() as WorldDoc, true);
   if (s.exists() && (s.data().updatedAt ?? 0) > stampOf(saveUnit(id)).local) {
     applySave(id, s.data() as { updatedAt: number; data?: string | null });
   }
 }
 
+/**
+ * The guest's copies of what this account already holds leave the guest's store (`profile.ts`). Until
+ * 20 Nov 2026 the guest and the account shared one store, which every sign-in synced both ways, so a
+ * browser signed in once and then out kept showing the account's worlds to the guest. A unit goes only
+ * when the guest's copy is provably on this account: pushed or taken from it (`pushed > 0`), not
+ * changed since (`local <= pushed`), and the account holding that version or a later one. Anything the
+ * guest played since, or that never reached an account, stays the guest's. The classic worlds stay
+ * too: every account has one under the same id, so it proves nothing. Returns how many units went.
+ */
+export function releaseGuest(cloudAt: Map<string, number>): number {
+  return withProfile(null, () => {
+    const stamps = allStamps();
+    const units = new Map<string, string[]>();
+    const kept = new Set<string>();
+    for (const [unit, s] of Object.entries(stamps)) {
+      const m = /^(world|save):(.+)$/.exec(unit);
+      if (!m) continue;
+      const id = m[2];
+      units.set(id, [...(units.get(id) ?? []), unit]);
+      const there = cloudAt.get(unit);
+      if (LANGUAGES.includes(id) || there === undefined || !s.pushed || s.local > s.pushed || there < s.pushed) kept.add(id);
+    }
+    // A world goes whole or not at all: a quest the guest went on with keeps its world here too.
+    let n = 0;
+    for (const [id, list] of units) {
+      if (kept.has(id)) continue;
+      dropWorldHere(id);
+      writeChronicle(id, []);
+      dropGameFor(id);
+      for (const unit of list) forget(unit);
+      n += list.length;
+    }
+    return n;
+  });
+}
+
 async function push(uid: string, unit: string): Promise<void> {
+  // Read from this account's store only: after a sign-out the unit waits, newer than the account's
+  // copy, for the next sign-in's pull to queue it again.
+  if (profile() !== uid) return;
   const at = stampOf(unit).local || Date.now();
   if (unit === STATE_UNIT) {
     await runCloud('rpg.push.state', () => setDoc(stateDoc(uid), { updatedAt: at, current: currentIds() }));
@@ -284,13 +332,16 @@ async function push(uid: string, unit: string): Promise<void> {
       return;
     }
     await runCloud('rpg.push.save', () => setDoc(doc(saves(uid), id), { updatedAt: at, data }));
-    if (game) remoteSaves = { ...remoteSaves, [id]: { title: saveTitle(game), at: game.at } };
+    if (profile() !== uid) {
+      /* signed out meanwhile: the library on screen is the guest's */
+    } else if (game) remoteSaves = { ...remoteSaves, [id]: { title: saveTitle(game), at: game.at } };
     else {
       const { [id]: _gone, ...rest } = remoteSaves;
       remoteSaves = rest;
     }
   } else return;
-  markPushed(unit, at);
+  // The store may have switched while the write was in flight; the stamp belongs to this account's.
+  withProfile(uid, () => markPushed(unit, at));
 }
 
 const queue = new Set<string>();
@@ -365,6 +416,8 @@ export function startSync(uid: string, pulled: () => void): () => void {
   return () => {
     off();
     document.removeEventListener('visibilitychange', onVisible);
+    // The account's quests are not the next profile's; `push` skips anything the switch overtakes.
+    remoteSaves = {};
     void flush().finally(() => {
       if (syncingUid !== uid) return;
       syncingUid = null;

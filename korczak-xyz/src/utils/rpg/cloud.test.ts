@@ -41,7 +41,8 @@ vi.mock('../../lib/logger', () => ({
 }));
 
 import { addToChronicle, loadChronicle } from './chronicle';
-import { cleanSlate, questsInProgress, saveData, SAVE_MAX, syncNow } from './cloud';
+import { cleanSlate, questsInProgress, saveData, SAVE_MAX, startSync, syncNow } from './cloud';
+import { profile, setProfile } from './profile';
 import { CLASSIC_LOOK, type WorldBible } from './genesis';
 import { clearGame, loadGame, loadGameFor, saveGame, type SavedGame } from './save';
 import { addToAtlas, isTrashed, libraryWorlds, loadAtlas, loadWorld, restoreWorld, saveWorld, trashedWorlds, trashWorld } from './worldSave';
@@ -63,6 +64,9 @@ beforeEach(() => {
   devices.phone.clear();
   devices.desk.clear();
   vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000));
+  // Every device here is signed in to the one account, as the game sets it (`profile.ts`).
+  on('phone');
+  setProfile('u');
 });
 
 const world = (id: string, name: string, lang: 'pl' | 'en' = 'pl'): WorldBible => ({
@@ -246,3 +250,92 @@ describe('the trash', () => {
     expect(loadWorld('pl')?.name).toBe('Solniska');
   });
 });
+
+describe('the guest and the account', () => {
+  it("keeps the guest's worlds and the account's apart in one browser", async () => {
+    on('phone');
+    setProfile(null);
+    saveWorld(world('wg', 'Gościniec'));
+    setProfile('u');
+    expect(libraryWorlds()).toEqual([]);
+    saveWorld(world('wa', 'Kontowo'));
+    await syncNow('u');
+    expect(libraryWorlds().map((e) => e.world.name)).toEqual(['Kontowo']);
+    // Nothing of the guest's went up to the account.
+    expect(server.has('users/u/rpgWorlds/wg')).toBe(false);
+    setProfile(null);
+    expect(libraryWorlds().map((e) => e.world.name)).toEqual(['Gościniec']);
+  });
+
+  it("takes the account's worlds out of a guest store the old shared one left them in, and nothing else", async () => {
+    // Before the split: one store, signed in, synced both ways.
+    on('phone');
+    saveWorld(world('w1', 'Solniska'));
+    addToChronicle('w1', { title: 'Pierwszy', at: clock, steps: [], ending: 'koniec' });
+    saveGame(game('w1', 'Drugi'));
+    saveWorld(world('w3', 'Wspólny'));
+    await syncNow('u');
+    sharedStore(devices.phone);
+    // Signed out, the old code left all of it, and the guest played a world of their own and went on
+    // in one of the account's.
+    setProfile(null);
+    saveWorld(world('w2', 'Gościniec'));
+    saveGame(game('w3', 'Po wylogowaniu'));
+    expect(libraryWorlds().map((e) => e.world.id).sort()).toEqual(['w1', 'w2', 'w3']);
+
+    setProfile('u');
+    await syncNow('u');
+    expect(libraryWorlds().map((e) => e.world.id).sort()).toEqual(['w1', 'w3']);
+    expect(questsInProgress().w1?.title).toBe('Drugi');
+    expect(server.has('users/u/rpgWorlds/w2')).toBe(false);
+
+    setProfile(null);
+    // w1 is on the account exactly as the guest had it: gone from here. w2 never reached it, and
+    // w3's quest changed after, so w3 stays whole: the guest's.
+    expect(libraryWorlds().map((e) => e.world.id).sort()).toEqual(['w2', 'w3']);
+    expect(loadChronicle('w1')).toEqual([]);
+    expect(loadGameFor('w1')).toBeNull();
+    expect(loadGameFor('w3')?.beats[0].title).toBe('Po wylogowaniu');
+    setProfile('u');
+  });
+
+  it('writes nothing of the account into the guest store when signed out mid-pull', async () => {
+    on('desk');
+    saveWorld(world('w1', 'Solniska'));
+    await syncNow('u');
+    devices.desk.clear();
+    const pulling = syncNow('u');
+    setProfile(null);
+    await pulling;
+    expect(libraryWorlds()).toEqual([]);
+    setProfile('u');
+  });
+
+  it("sends the account what it was owed at sign-out, and nothing of the guest's after", async () => {
+    on('phone');
+    (globalThis as { document?: unknown }).document = { visibilityState: 'visible', addEventListener: () => {}, removeEventListener: () => {} };
+    const stop = startSync('u', () => {});
+    await new Promise((r) => setTimeout(r, 0));
+    saveWorld(world('w1', 'Solniska'));
+    stop();
+    setProfile(null);
+    saveWorld(world('wg', 'Gościniec'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(server.has('users/u/rpgWorlds/w1')).toBe(true);
+    expect(server.has('users/u/rpgWorlds/wg')).toBe(false);
+    // The guest store got no stamp of the account's push.
+    expect(JSON.parse(devices.phone.get('rpg-sync') ?? '{}')['world:w1']).toBeUndefined();
+    expect(JSON.parse(devices.phone.get('rpg-sync@u') ?? '{}')['world:w1'].pushed).toBeGreaterThan(0);
+    expect(profile()).toBeNull();
+    setProfile('u');
+  });
+});
+
+/** The store as it was before the split: the account's keys were the bare ones every guest read. */
+function sharedStore(store: Map<string, string>) {
+  for (const [k, v] of [...store.entries()]) {
+    if (!k.endsWith('@u')) continue;
+    store.set(k.slice(0, -2), v);
+    store.delete(k);
+  }
+}

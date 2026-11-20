@@ -21,9 +21,10 @@ import { parsePlace, type PlaceSpec } from './place';
 import { isDead, type Character, type Lang } from './quest';
 import { clearGame, dropGameFor, loadGameFor, writeGameFor } from './save';
 import { forget, saveUnit, STATE_UNIT, touch, unsafeToDrop, worldUnit } from './sync';
+import { rpgKey } from './profile';
 import { rpgSet } from './storage';
 
-const KEY = 'rpg-worlds';
+const KEY = () => rpgKey('rpg-worlds');
 /** How many earlier worlds the next genesis is told to avoid. */
 const KEEP_PAST = 8;
 
@@ -74,7 +75,7 @@ function trimmed(library: Record<string, LibraryEntry>): Record<string, LibraryE
 
 function read(): Stored {
   try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const parsed = JSON.parse(localStorage.getItem(KEY()) ?? '{}');
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
@@ -83,7 +84,7 @@ function read(): Stored {
 
 function write(stored: Stored) {
   try {
-    rpgSet(KEY, JSON.stringify(stored));
+    rpgSet(KEY(), JSON.stringify(stored));
   } catch {
     /* a full or blocked storage forgets the world; the game plays on */
   }
@@ -232,6 +233,25 @@ export function writeLibraryEntry(entry: LibraryEntry): void {
     else current[entry.world.lang] = entry.world;
   }
   write({ ...stored, current, library: trimmed(library) });
+}
+
+/**
+ * Takes a world out of this browser's store altogether, touching nothing: its library entry, its place
+ * as a current world, its atlas. For the guest's copy of a world the account holds (`cloud.ts`'s
+ * `releaseGuest`); the chronicle and the quest are the callers' to drop.
+ */
+export function dropWorldHere(id: string): void {
+  const stored = read();
+  const library = { ...(stored.library ?? {}) };
+  delete library[id];
+  const current = { ...stored.current };
+  for (const [lang, w] of Object.entries(current) as [Lang, WorldBible | undefined][]) if (w?.id === id) delete current[lang];
+  write({ ...stored, current, library });
+  const atlases = readAtlases();
+  if (id in atlases) {
+    delete atlases[id];
+    writeAtlases(atlases);
+  }
 }
 
 /** A world played again: first in the library. */
@@ -400,7 +420,7 @@ export function pastWorlds(): string[] {
  * world's atlas is dropped with it, since its places mean nothing anywhere else.
  */
 
-const ATLAS_KEY = 'rpg-atlas';
+const ATLAS_KEY = () => rpgKey('rpg-atlas');
 /** As many places as the three rings hold apart (`freeSlot`), and a crowd that still fits a prompt. */
 export const ATLAS_PLACES = 16;
 export const ATLAS_PEOPLE = 24;
@@ -425,7 +445,7 @@ export const ATLAS_DEAD = 40;
 
 function readAtlases(): Record<string, Atlas> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(ATLAS_KEY) ?? '{}');
+    const parsed = JSON.parse(localStorage.getItem(ATLAS_KEY()) ?? '{}');
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
@@ -509,7 +529,7 @@ export function writeAtlas(worldId: string, atlas: Atlas | null): void {
 
 function writeAtlases(all: Record<string, Atlas>) {
   try {
-    rpgSet(ATLAS_KEY, JSON.stringify(all));
+    rpgSet(ATLAS_KEY(), JSON.stringify(all));
   } catch {
     /* a full storage forgets the atlas; the world just grows less */
   }

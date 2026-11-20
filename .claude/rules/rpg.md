@@ -2210,6 +2210,27 @@ writing browser's clock:
   last play, a chronicle's last quest, a save's own time, and the state with 1). So on the first
   pull another device's newer choice wins over it.
 
+**The guest and each account keep their own game in the browser** (`utils/rpg/profile.ts`; owner,
+20 Nov 2026: "signed in and signed out I have the same worlds?"). Until then there was one set of
+keys for whoever held the browser: signing in synced it both ways, so the guest's worlds went up to
+the account, and signing out left the account's worlds on screen for the guest.
+- An account's keys are suffixed `@<uid>` (`rpg-worlds@<uid>`, and so `rpg-atlas`, `rpg-saves`,
+  `rpg-chronicle`, `rpg-sync`, `rpg-clean-slate`); the guest keeps the bare ones. Every read and write
+  asks `rpgKey`. Preferences (language, music, model, wish, voices, `rpg-genesis`) stay shared.
+- `rpg-profile` holds whose store is open, so a page opens on it before auth answers; `Rpg.tsx` sets
+  it from the auth state (`setProfile`) in an effect declared before `startSync`, and reads the intro
+  again when it changes. Signing in never sends the guest's worlds to the account any more.
+- **A sign-out never writes the account into the guest store**: `pull` and `fetchWorld` drop what
+  came down if the profile changed while they waited, `push` skips a unit once the profile is not its
+  account (it stays newer there and the next sign-in queues it again), and the pushed stamp is
+  written into the account's store whatever is open by then.
+- **The stores left shared from before** (`releaseGuest`, every pull): the guest's copy of a world
+  goes from the guest store when it is provably on this account — pushed or taken (`pushed > 0`), not
+  changed since (`local <= pushed`), the account holding that version or later — for every unit of
+  that world, so a quest the guest went on with keeps its world. Classic worlds (id = a language) stay,
+  since every account has one by that id. Nothing is deleted that the account does not hold. The worlds
+  guests made before the split and that a sign-in pushed stay on the account; they cannot be told apart.
+
 **The library** (`worldSave.ts`, `library` in `rpg-worlds`, 60 worlds at most):
 - It holds every invented world played here or on the account, newest played first. `saveWorld`
   and `playedWorld` order it.

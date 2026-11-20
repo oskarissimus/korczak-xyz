@@ -16,6 +16,7 @@
 
 import { isQuotaError, storageBytes } from '../../lib/localStorage';
 import { log } from '../../lib/logger';
+import { rpgKey } from './profile';
 
 let full = false;
 const reported = new Set<string>();
@@ -60,9 +61,9 @@ function readJson(key: string): Record<string, unknown> | null {
  */
 export function makeRoom(): number {
   const before = storageBytes();
-  const saves = readJson('rpg-saves') as Record<string, { transcript?: unknown[] }> | null;
-  const worlds = readJson('rpg-worlds') as { library?: Record<string, { deleted?: number }> } | null;
-  const stamps = (readJson('rpg-sync') ?? {}) as Record<string, { local: number; pushed: number }>;
+  const saves = readJson(rpgKey('rpg-saves')) as Record<string, { transcript?: unknown[] }> | null;
+  const worlds = readJson(rpgKey('rpg-worlds')) as { library?: Record<string, { deleted?: number }> } | null;
+  const stamps = (readJson(rpgKey('rpg-sync')) ?? {}) as Record<string, { local: number; pushed: number }>;
   const onAccount = (unit: string) => {
     const s = stamps[unit];
     return !s || s.local <= s.pushed;
@@ -75,12 +76,12 @@ export function makeRoom(): number {
       // The transcript is only for the developer console; the account keeps its own copy.
       for (const g of Object.values(saves)) if (g && Array.isArray(g.transcript) && g.transcript.length) g.transcript = [];
       for (const id of trashed) if (onAccount(`save:${id}`)) delete saves[id];
-      localStorage.setItem('rpg-saves', JSON.stringify(saves));
+      localStorage.setItem(rpgKey('rpg-saves'), JSON.stringify(saves));
     }
-    const atlases = readJson('rpg-atlas');
+    const atlases = readJson(rpgKey('rpg-atlas'));
     if (atlases) {
       for (const id of trashed) if (onAccount(`world:${id}`)) delete atlases[id];
-      localStorage.setItem('rpg-atlas', JSON.stringify(atlases));
+      localStorage.setItem(rpgKey('rpg-atlas'), JSON.stringify(atlases));
     }
   } catch {
     /* even the smaller copies did not fit; what was freed before stays freed */

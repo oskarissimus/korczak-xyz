@@ -14,9 +14,10 @@
  * (`unsafeToDrop`).
  */
 
+import { rpgKey } from './profile';
 import { rpgSet } from './storage';
 
-const KEY = 'rpg-sync';
+const KEY = () => rpgKey('rpg-sync');
 
 interface Stamp {
   /** When this browser last changed it, or took the account's copy of it. */
@@ -29,7 +30,7 @@ type Stamps = Record<string, Stamp>;
 
 function read(): Stamps {
   try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const parsed = JSON.parse(localStorage.getItem(KEY()) ?? '{}');
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
@@ -38,7 +39,7 @@ function read(): Stamps {
 
 function write(stamps: Stamps) {
   try {
-    rpgSet(KEY, JSON.stringify(stamps));
+    rpgSet(KEY(), JSON.stringify(stamps));
   } catch {
     /* without stamps the next pull takes the account's copy */
   }

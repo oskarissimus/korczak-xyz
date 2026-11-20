@@ -108,6 +108,7 @@ import { rememberTiming, type Task } from '../../utils/rpg/progress';
 import { moving, rigsOfStart } from '../../utils/rpg/rigging';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
+import { setProfile } from '../../utils/rpg/profile';
 import { LANGUAGES, guessLang, nativeName, startingLang, storeLangChoice } from '../../utils/rpg/language';
 import { pushLangChoice, syncLangChoice } from '../../utils/rpg/langSync';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
@@ -798,6 +799,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       live = false;
     };
   }, [uid]);
+  // The guest and each account keep their own game in this browser (`profile.ts`): signing in or out
+  // switches the store and reads the intro again. Declared before the sync, so it runs first; while
+  // auth is still checking, the store stays the one the last page load left (`rpg-profile`).
+  useEffect(() => {
+    if (auth.loading || !setProfile(uid)) return;
+    if (startedRef.current) stalePullRef.current = true;
+    else reloadIntro();
+  }, [uid, auth.loading, reloadIntro]);
   useEffect(() => {
     if (!uid) return;
     return startSync(uid, () => {
