@@ -114,7 +114,6 @@ import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rp
 import { formatMs, formatUsd } from '../../utils/rpg/cost';
 import { drawSeeds } from '../../utils/rpg/seedWords';
 import { loadWish, NO_WISH, saveWish, wished, type Wish } from '../../utils/rpg/wish';
-import WorldWish from './WorldWish';
 import WorldProposals from './WorldProposals';
 import { ensureProposals, pickedProposal } from '../../utils/rpg/proposals';
 import type { PoolItem } from '../../utils/rpg/proposalPool';
@@ -286,7 +285,7 @@ function clip(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n - 1)}…` : text;
 }
 
-/** The exotic slider's last position (`GenesisContext.exotic`). */
+/** The exotic slider's last position (`GenesisContext.exotic`); the slider itself is gone. */
 const EXOTIC_KEY = 'rpg-exotic';
 /**
  * Who rigs the generated people (`Rigger` in `people.ts`); ours (`skin`) unless 'meshy', 'voxel' or 'fit'; the
@@ -486,15 +485,16 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const introOnRef = useRef(true);
   introOnRef.current = introOn;
   const intro = useSyncExternalStore(subscribeIntro, introView, introView);
-  /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). */
-  const [exotic, setExotic] = useState(DEFAULT_EXOTIC);
+  /** How exotic the next world is, 0 (a classic RPG setting) to 100 (anything at all). No control
+   *  sets it any more (the slider went with *More world options*, 20 Nov 2026); a value kept from
+   *  before still holds, otherwise the default. */
   const exoticRef = useRef(DEFAULT_EXOTIC);
-  exoticRef.current = exotic;
-  /** The words and description the next world is made of (`WorldWish`); empty, the dice decide. */
+  /** The description the next world is made of (the home screen's field); empty, the dice decide.
+   *  Picked words went with *More world options* (20 Nov 2026), so any kept from before are dropped. */
   const [wish, setWish] = useState<Wish>(NO_WISH);
   const wishRef = useRef<Wish>(NO_WISH);
   wishRef.current = wish;
-  useEffect(() => setWish(loadWish()), []);
+  useEffect(() => setWish({ ...loadWish(), words: [] }), []);
   const pickWish = (next: Wish) => {
     setWish(next);
     saveWish(next);
@@ -740,7 +740,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'world' | 'library' | 'settings' | 'language' | 'controls' | 'trash' | 'diesel'>('main');
+  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'controls' | 'trash' | 'diesel'>('main');
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
   /** The home screen's field, which a proposal's idea is put into. */
@@ -1441,7 +1441,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     scene?.clearNpcs();
     scene?.setMarker(null);
     scene?.teleport('spawn');
-    // The player's own words and description when they gave any (`WorldWish`), the dice otherwise.
+    // The player's own description when they gave one (the home screen's field), the dice otherwise.
     const asked = askedNow;
     const own = !again && wished(asked);
     const seeds = again?.seeds ?? (own ? asked.words : await drawSeeds());
@@ -2619,19 +2619,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       setPainter(keptPainter && keptPainter in PERSON_PAINTERS ? (keptPainter as PersonPainter) : GAME_PAINTER);
       setPose(localStorage.getItem(POSE_KEY) === 'apose' ? 'apose' : DEFAULT_POSE);
       const kept = localStorage.getItem(EXOTIC_KEY);
-      if (kept !== null) setExotic(clampExotic(kept));
+      if (kept !== null) exoticRef.current = clampExotic(kept);
     } catch {
       /* no storage, the usual order */
     }
   }, []);
-  const pickExotic = (value: number) => {
-    setExotic(clampExotic(value));
-    try {
-      localStorage.setItem(EXOTIC_KEY, String(clampExotic(value)));
-    } catch {
-      /* forgotten on reload */
-    }
-  };
   const pickFastStart = (on: boolean) => {
     setFastStart(on);
     try {
@@ -3022,27 +3014,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         ? t.talkTo(beat.npc.name)
         : beat.objectiveText;
 
-  // How far from a classic RPG setting the next world may go. Words at both ends, and the value in
-  // words too, since the owner's phone is black and white and a slider's fill says nothing there.
-  const exoticSlider = (
-    <label className="rpg-exotic">
-      <span className="rpg-exotic-title">{t.exoticLabel(t.exoticBand(exotic))}</span>
-      <span className="rpg-exotic-row">
-        <span>{t.exoticLeft}</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={exotic}
-          onChange={(e) => pickExotic(Number(e.target.value))}
-          aria-valuetext={t.exoticBand(exotic)}
-        />
-        <span>{t.exoticRight}</span>
-      </span>
-    </label>
-  );
-
   // The worlds played before, read again whenever the library may have changed.
   const libraryRows: LibraryRow[] = React.useMemo(() => {
     void libraryTick;
@@ -3182,8 +3153,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const mainMenu = (
     <nav className="rpg-menu" aria-label={t.title}>
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
-      {(creatable || !keysReady) && item('world', t.homeMore, () => setMenu('world'), { sub: wish.words.length ? wish.words.join(', ') : undefined, waiting: !keysReady })}
       {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
       {item('controls', t.menuControls, () => setMenu('controls'))}
@@ -3244,8 +3213,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         {keysReady && storyProvider === 'static' && item('start', t.start, () => begin())}
         {sheetAccount}
         {item('library', t.homeWorlds(libraryRows.length), () => setMenu('library'), { disabled: libraryRows.length === 0 })}
-        {(creatable || !keysReady) && world && item('quest', t.menuNewQuest, () => begin(), { waiting: !keysReady, sub: [t.menuInWorld(world.name), diesel && dieselModel ? dieselTag(gameLang, questLitres(dieselModel, priceParts)) : undefined].filter(Boolean).join(' · ') })}
-        {(creatable || !keysReady) && item('world', t.homeMore, () => setMenu('world'), { sub: wish.words.length ? wish.words.join(', ') : undefined, waiting: !keysReady })}
         {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
         {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
         {item('settings', t.menuSettings, () => setMenu('settings'))}
@@ -3263,24 +3230,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     if (!keysReady || !creatable) return;
     begin(true);
   };
-
-  const worldMenu = (
-    <div className="rpg-panel">
-      <h3>{t.menuNewWorld}</h3>
-      {exoticSlider}
-      <WorldWish lang={gameLang} wish={wish} onChange={pickWish} open />
-      {diesel && dieselModel && (
-        <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
-      )}
-      <div className="rpg-panel-actions">
-        <button type="button" className="rpg-start" disabled={!creatable} onClick={() => begin(true)}>
-          {t.menuCreate}
-          {diesel && dieselModel && <small className="rpg-dz-tag"> {dieselTag(gameLang, worldLitres(dieselModel, priceParts))}</small>}
-        </button>
-        {back}
-      </div>
-    </div>
-  );
 
   // Settings in groups, every row left-aligned, one font and one kind of control (owner, 11 Nov 2026,
   // from the accepted iPhone SE mockup, rpg/ustawienia/ in the project files: "on a small screen the
@@ -3944,7 +3893,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                 </div>
               )}
               {menu === 'diesel' && (dieselMenu || mainMenu)}
-              {menu === 'world' && worldMenu}
               {menu === 'settings' && settingsMenu}
               {menu === 'language' && languageMenu}
               {menu === 'controls' && controlsMenu}

@@ -16,7 +16,6 @@ describe('uiSource', () => {
   it('leaves out what a placeholder cannot stand for', () => {
     // arithmetic on an argument, an array argument, a function whose words are on the table
     expect(source.devRigs).toBeUndefined();
-    expect(source.wishSummary).toBeUndefined();
     expect(source.aiQuest).toBeUndefined();
     expect(source.aiQuestGoogle).toContain('Google');
   });
@@ -74,7 +73,6 @@ describe('uiTable', () => {
 
   it('leaves an untranslatable function in English', () => {
     expect(t.devRigs(2, 1, '1 s', '2 s')).toBe(translations.en.devRigs(2, 1, '1 s', '2 s'));
-    expect(t.wishSummary(['hat'], '')).toBe(translations.en.wishSummary(['hat'], ''));
   });
 
   it('fills placeholders in order', () => {

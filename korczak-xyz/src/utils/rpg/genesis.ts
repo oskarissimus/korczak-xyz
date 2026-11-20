@@ -429,9 +429,8 @@ export interface GenesisContext {
 
 /** The longest description of a world the player may write. */
 export const WISH_MAX = 600;
-/** How many words the player may choose, and how long each. */
+/** How many words a world may be asked to be made of. */
 export const CHOSEN_MAX = 6;
-export const CHOSEN_LEN = 40;
 
 /** Where the slider starts: closer to the familiar, since all the way right was too much. */
 export const DEFAULT_EXOTIC = 35;

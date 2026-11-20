@@ -138,7 +138,7 @@ cost is the same either way; a refused key now spends ten free 403s instead of f
 The toast at a new world's first quest says the same (`buildingWorld`); a new quest in an
 old world still says the storyteller is writing.
 
-**A slider from classic to exotic** (owner, Oct 2026, a day later: "we overdid it, it is too
+**A slider from classic to exotic** (gone from the menu since 20 Nov 2026 with *More world options*; a kept `rpg-exotic` still holds, otherwise 35) (owner, Oct 2026, a day later: "we overdid it, it is too
 exotic; a slider, typical RPG worlds on the left, the exotic ones on the right"). Under the start
 buttons, 0–100, kept in localStorage `rpg-exotic`, starting at 35 (`DEFAULT_EXOTIC`), its band said
 in words because the owner's phone is black and white. It goes in as `GenesisContext.exotic` and
@@ -148,7 +148,7 @@ that the anything-goes prompt — plus the typicality the candidates aim at and 
 (`typicalityTarget`, 85 down to 5) and the temperature (`genesisTemperature`, 0.9 up to 1.35). The
 demo takes it too.
 
-**Or the player says what the world is made of** (owner, Oct 2026: "a dropdown to pick the seed
+**Or the player says what the world is made of** (the word picker, `WorldWish.tsx`, was removed on 20 Nov 2026; only the home field's description remains, and kept words are dropped on load) (owner, Oct 2026: "a dropdown to pick the seed
 words, and typing your own — hat, sand, revolver makes a Wild West — or just a field for a prompt").
 Under the slider, folded until something is chosen (`WorldWish.tsx`, kept in localStorage
 `rpg-wish` by `utils/rpg/wish.ts`): a `<select>` of ~110 world-pointing words in the game's
@@ -349,8 +349,10 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   scrolled without end (no ↻). Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
   being born, else Continue), the account (sign in, sign up, or the account and sign-out), *My worlds
-  (n)*, a new quest in the current world, *More world options*, the diesel badge, language, Settings,
-  Controls. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
+  (n)*, the diesel badge, language, Settings, Controls. *New quest in this world* and *More world
+  options* (the slider and the picked words) were taken off on 20 Nov 2026 (owner: remove both
+  buttons and the pages under them), so the home field and the proposals are the only ways to a new
+  world, and a new quest starts from a world's own end or the library. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
   the screen itself, since then nothing can be made.
 - **Settings are groups of rows** (owner, 11 Nov 2026: "on a small screen the boxes are cut off,
   everything centred, no groups, every line a different font"; the accepted iPhone SE mockup is in

@@ -167,7 +167,6 @@
 
 :root:root .rpg-menu-back,
 :root:root .rpg-proposals-refresh,
-:root:root .rpg-wish button,
 :root:root .rpg-lang button,
 :root:root .rpg-library-head button,
 :root:root .rpg-library-actions button:not(.rpg-start),
@@ -190,7 +189,6 @@
 
 :root:root .rpg-menu-back:hover,
 :root:root .rpg-proposals-refresh:hover:not(:disabled),
-:root:root .rpg-wish button:hover:not(:disabled),
 :root:root .rpg-lang button:hover,
 :root:root .rpg-dz-offer:hover:not(:disabled),
 :root:root button.rpg-dz-badge:hover,
@@ -215,9 +213,6 @@
 /* --- fields --- */
 
 :root:root .rpg-dialogue-free input,
-:root:root .rpg-wish select,
-:root:root .rpg-wish input,
-:root:root .rpg-wish textarea,
 :root:root .rpg-lang select,
 :root:root .auth-card--game .auth-field input,
 :root:root .rpg-page select {
@@ -231,10 +226,6 @@
 :root:root .auth-card--game .auth-field input:focus {
   border-color: var(--d-accent);
   box-shadow: 0 0 0 3px var(--d-accent-soft);
-}
-
-:root:root .rpg-exotic-row input {
-  accent-color: var(--d-accent);
 }
 
 /* --- every panel is one surface --- */
