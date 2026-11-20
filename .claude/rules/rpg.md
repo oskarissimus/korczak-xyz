@@ -2020,7 +2020,7 @@ the price of a world or a beat is in it too."
   transaction (`DISCOUNTS_FIELD`): the webhook keeps a second paid transaction with the same
   `discount_id` as `repeat-discount` and pours nothing (renewals, `origin: subscription_*`, are not a
   use), and the page closes the checkout on `checkout.discount.applied` with a code the ledger lists,
-  before it costs one of the code's uses (`discount-used`). The friends' code is `DIZEL550`
+  before it costs one of the code's uses (`discount-used`). The friends' code is `BECZKADIZLA`
   (`dsc_01m7x7s5kc02qsr6n5mz2rv9mr`): the Barrel free, 20 uses.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
