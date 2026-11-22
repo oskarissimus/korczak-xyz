@@ -348,8 +348,10 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
   scrolled without end (no ↻). Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
-  being born, else Continue), the account (sign in, sign up, or the account and sign-out), *My worlds
-  (n)*, the diesel badge, language, Settings, Controls. *New quest in this world* and *More world
+  being born, else Continue), the account (sign in, sign up, or *Sign out* with the email on its
+  right), *My worlds (n)*, the diesel badge, language, Settings. *Account and keys* and *Controls*
+  left the sheet for Settings on 22 Nov 2026 (owner: "the email on the sign-out line, the admin panel
+  and the keys in the settings"; "Controls into the settings too"). *New quest in this world* and *More world
   options* (the slider and the picked words) were taken off on 20 Nov 2026 (owner: remove both
   buttons and the pages under them), so the home field and the proposals are the only ways to a new
   world, and a new quest starts from a world's own end or the library. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
@@ -358,7 +360,11 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   everything centred, no groups, every line a different font"; the accepted iPhone SE mockup is in
   `rpg/ustawienia/` in the project files). `settingsMenu` in `Rpg.tsx`: ← and the title at the top,
   then *Game* (language, jumping), *Story* (model, quick start, intro), *Characters* (picture, model,
-  rig, pose — only with a fal key), *Account and keys*, *Data* (chronicle, trash), each a card of rows
+  rig, pose — only with a fal key), *Account* (on everyrpg, signed in: who, Sign out, the admin
+  panel for admins; then what the story and voice run on, the rules, the legal pages), *API keys*
+  (everyrpg, signed in: `SettingsKeys`, the account page's `GameKeys` with the provider cards, loaded
+  lazily; on korczak.xyz a link to the site's account page instead), *Controls* (the old Controls
+  screen's rows and the intro), *Data* (chronicle, trash), each a card of rows
   built by `settingSelect`/`settingSwitch`/`settingGroup`, all left-aligned and in Manrope. A select
   is its card's full width and ends a long option in "…" (16 px, so iOS does not zoom); a checkbox is
   a switch, white when on. The styles are `.rpg-set-*` at the end of `rpg-theme.css`.

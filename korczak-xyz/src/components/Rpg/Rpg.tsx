@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { ACCOUNT_KEY, setGatewayContext } from '../../utils/rpg/gateway';
@@ -189,6 +189,8 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
+// The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
+const SettingsKeys = lazy(() => import('./SettingsKeys'));
 import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
@@ -741,7 +743,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'controls' | 'trash' | 'diesel'>('main');
+  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>('main');
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
   /** The home screen's field, which a proposal's idea is put into. */
@@ -3164,7 +3166,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
       {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
-      {item('controls', t.menuControls, () => setMenu('controls'))}
     </nav>
   );
 
@@ -3178,17 +3179,13 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // Sign-in and the keys are their own pages on the standalone site (`src-rpg/pages`).
   const accountRoot = gameLang === 'pl' ? '/pl/' : '/';
   // The sheet behind ⋯ on the home screen (owner, 10 Nov 2026, from the accepted mockup): the way back
-  // into play first, as the one white button, then the account, the library and the rest of the menu.
+  // into play first, as the one white button, then sign-out, the library and the rest of the menu.
   const sheetAccount = !standalone || auth.loading
     ? null
     : auth.user
-      ? [
-          <a key="account" className="rpg-menu-item" href={`${accountRoot}account/`}>
-            <span>{t.menuAccount}</span>
-            <small>{auth.user.email ?? ''}</small>
-          </a>,
-          item('signout', t.menuSignOut, () => void auth.signOut()),
-        ]
+      ? // The account and its keys are in Settings (owner, 22 Nov 2026); the sheet says who is signed in
+        // on the sign-out line.
+        [item('signout', t.menuSignOut, () => void auth.signOut(), { sub: auth.user.email ?? '' })]
       : auth.identity
         ? [
             <a key="pending" className="rpg-menu-item" href={`${accountRoot}login/`}>
@@ -3225,7 +3222,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
         {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
         {item('settings', t.menuSettings, () => setMenu('settings'))}
-        {item('controls', t.menuControls, () => setMenu('controls'))}
       </nav>
     </div>
   );
@@ -3274,6 +3270,51 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       </button>
       <h3>{title}</h3>
     </header>
+  );
+  // A key and what it does, the action on the left and its keys on the right; on a phone, a line each.
+  // A group of Settings since 22 Nov 2026 (owner: "Sterowanie też niech idzie do ustawień").
+  const controlRow = (text: string, keys: string[] = []) => (
+    <div key={text} className="rpg-set-row rpg-set-line">
+      <span className="rpg-set-text">
+        <span className="rpg-set-control">{text}</span>
+      </span>
+      {keys.length > 0 && (
+        <span className="rpg-set-keys">
+          {keys.map((k) => (
+            <kbd key={k}>{k}</kbd>
+          ))}
+        </span>
+      )}
+    </div>
+  );
+  const controlsGroup = settingGroup(
+    t.menuControls,
+    <>
+      {touch ? (
+        <>
+          {controlRow(t.touchMove)}
+          {controlRow(t.touchLook)}
+          {controlRow(t.touchAct)}
+          {jumping && controlRow(t.touchJump)}
+          {controlRow(t.touchSenses)}
+          {controlRow(t.touchJournal)}
+        </>
+      ) : (
+        <>
+          {controlRow(t.move, ['W', 'A', 'S', 'D'])}
+          {controlRow(t.run, ['Shift'])}
+          {controlRow(t.mouse)}
+          {controlRow(t.attack, ['LMB'])}
+          {jumping && controlRow(t.jumpHelp, ['Space'])}
+          {controlRow(t.interact, ['E'])}
+          {controlRow(t.sensesHelp, ['Q'])}
+          {controlRow(t.journal, ['J'])}
+        </>
+      )}
+      <div className="rpg-set-row">
+        <p className="rpg-set-note">{t.intro}</p>
+      </div>
+    </>,
   );
   const peopleSettings = keysReady && falKey;
   const settingsMenu = (
@@ -3380,6 +3421,24 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {settingGroup(
         t.settingsAccount,
         <>
+          {/* Who is signed in, sign-out and the admin panel: the account page's *Sign-in*, here since
+              22 Nov 2026 (owner: "the admin panel and the keys belong in the settings"). */}
+          {standalone && auth.user && (
+            <div className="rpg-set-row rpg-set-line">
+              <span className="rpg-set-text">
+                <span className="rpg-set-label">{t.signedInAs}</span>
+                <span className="rpg-set-note">{auth.user.email}</span>
+              </span>
+              <button type="button" className="rpg-set-button" onClick={() => void auth.signOut()}>
+                {t.menuSignOut}
+              </button>
+            </div>
+          )}
+          {standalone && auth.user && auth.isAdmin && (
+            <a className="rpg-set-row rpg-set-link" href={lang === 'pl' ? '/pl/admin/' : '/admin/'}>
+              {t.adminPanel}
+            </a>
+          )}
           <div className="rpg-set-row">
             {keysReady ? (
               <ul className="rpg-set-status">
@@ -3397,7 +3456,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                 {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
                 <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !account.keys.elevenLabs ? t.dieselVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
                 {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
-                  <li className="rpg-set-note">{storyProvider === 'demo' ? t.ownKey : t.addKey}</li>
+                  <li className="rpg-set-note">
+                    {standalone && auth.user ? (storyProvider === 'demo' ? t.ownKeyBelow : t.addKeyBelow) : storyProvider === 'demo' ? t.ownKey : t.addKey}
+                  </li>
                 )}
                 {demo?.today && <li className="rpg-set-note">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</li>}
               </ul>
@@ -3405,29 +3466,29 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               <p className="rpg-set-note">{t.readingKeys}</p>
             )}
           </div>
-          <a className="rpg-set-row rpg-set-link" href={lang === 'pl' ? '/pl/account/' : '/account/'}>
-            {t.keysLink}
-          </a>
+          {/* On korczak.xyz the keys stay on the site's account page, shared by every app. */}
+          {!standalone && (
+            <a className="rpg-set-row rpg-set-link" href={lang === 'pl' ? '/pl/account/' : '/account/'}>
+              {t.keysLink}
+            </a>
+          )}
           <a className="rpg-set-row rpg-set-link" href={rulesHref}>
             {t.rulesLink}
           </a>
           <a className="rpg-set-row rpg-set-link" href={legalHref('terms')}>
             {t.legalLink}
           </a>
-          {/* Also here: on a phone the home screen's top bar has room for the account's initial only. */}
-          {standalone && auth.user && (
-            <div className="rpg-set-row rpg-set-line">
-              <span className="rpg-set-text">
-                <span className="rpg-set-label">{t.signedInAs}</span>
-                <span className="rpg-set-note">{auth.user.email}</span>
-              </span>
-              <button type="button" className="rpg-set-button" onClick={() => void auth.signOut()}>
-                {t.menuSignOut}
-              </button>
-            </div>
-          )}
         </>,
       )}
+
+      {/* The account page's *API keys* and the provider cards, in the same groups. */}
+      {standalone && auth.user && (
+        <Suspense fallback={<p className="rpg-set-note">{t.readingKeys}</p>}>
+          <SettingsKeys api={account} lang={lang === 'pl' ? 'pl' : 'en'} />
+        </Suspense>
+      )}
+
+      {controlsGroup}
 
       {settingGroup(
         t.settingsData,
@@ -3467,7 +3528,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // Every language on the list, by its own name (owner, 9 Nov 2026: "change language in main menu to
   // any language"). English and Polish are written by hand; any other is translated on the server the
   // first time somebody picks it, and the menu says so while it is.
-  // Language and Controls in the settings' look too (owner, 14 Nov 2026): the same bar, a card of rows.
+  // Language in the settings' look too (owner, 14 Nov 2026): the same bar, a card of rows.
   const languageMenu = (
     <div className="rpg-settings">
       {settingsBar(t.language)}
@@ -3492,59 +3553,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               <p className="rpg-set-note">{t.languageHint}</p>
             </>,
           )}
-        </div>
-      </section>
-    </div>
-  );
-
-  // A key and what it does, the action on the left and its keys on the right; on a phone, a line each.
-  const controlRow = (text: string, keys: string[] = []) => (
-    <div key={text} className="rpg-set-row rpg-set-line">
-      <span className="rpg-set-text">
-        <span className="rpg-set-control">{text}</span>
-      </span>
-      {keys.length > 0 && (
-        <span className="rpg-set-keys">
-          {keys.map((k) => (
-            <kbd key={k}>{k}</kbd>
-          ))}
-        </span>
-      )}
-    </div>
-  );
-  const controlsMenu = (
-    <div className="rpg-settings">
-      {settingsBar(t.menuControls)}
-      <section className="rpg-set-group">
-        <div className="rpg-set-card">
-          {touch ? (
-            <>
-              {controlRow(t.touchMove)}
-              {controlRow(t.touchLook)}
-              {controlRow(t.touchAct)}
-              {jumping && controlRow(t.touchJump)}
-              {controlRow(t.touchSenses)}
-              {controlRow(t.touchJournal)}
-            </>
-          ) : (
-            <>
-              {controlRow(t.move, ['W', 'A', 'S', 'D'])}
-              {controlRow(t.run, ['Shift'])}
-              {controlRow(t.mouse)}
-              {controlRow(t.attack, ['LMB'])}
-              {jumping && controlRow(t.jumpHelp, ['Space'])}
-              {controlRow(t.interact, ['E'])}
-              {controlRow(t.sensesHelp, ['Q'])}
-              {controlRow(t.journal, ['J'])}
-            </>
-          )}
-        </div>
-      </section>
-      <section className="rpg-set-group">
-        <div className="rpg-set-card">
-          <div className="rpg-set-row">
-            <p className="rpg-set-note">{t.intro}</p>
-          </div>
         </div>
       </section>
     </div>
@@ -3904,7 +3912,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               {menu === 'diesel' && (dieselMenu || mainMenu)}
               {menu === 'settings' && settingsMenu}
               {menu === 'language' && languageMenu}
-              {menu === 'controls' && controlsMenu}
             </>
           )}
         </div>

@@ -787,6 +787,73 @@ const CARDS: Record<Provider, ComponentType<CardProps>> = {
 };
 
 /**
+ * The keys the game spends, as settings groups: the blurb and the sync line, then a card per provider.
+ * The account page shows it under *Sign-in*; the game's own Settings show it too (owner, 22 Nov 2026:
+ * "the admin panel and the keys belong in the settings"), lazily, through `Rpg/SettingsKeys.tsx`.
+ */
+function GameKeys({
+  api,
+  refresh,
+  onRefresh,
+  t,
+  lang,
+}: {
+  api: AccountKeysApi;
+  refresh: number;
+  onRefresh: () => void;
+  t: Translation;
+  lang: Lang;
+}) {
+  const group = (title: string, rows: ReactNode) => (
+    <section className="rpg-set-group">
+      <h4>{title}</h4>
+      <div className="rpg-set-card">{rows}</div>
+    </section>
+  );
+  return (
+    <>
+      {group(
+        t.keysTitle,
+        <>
+          <div className="rpg-set-row">
+            <p className="rpg-set-note">{t.keysBlurbGame}</p>
+          </div>
+          <div className="rpg-set-row rpg-set-line">
+            <span className="rpg-set-text">
+              <span className={api.sync === 'error' ? 'rpg-set-label acct-warn' : 'rpg-set-label'}>
+                {t[SYNC_LABEL[api.sync]]}
+              </span>
+            </span>
+            <button type="button" className="rpg-set-button" onClick={onRefresh}>
+              {t.refresh}
+            </button>
+          </div>
+        </>,
+      )}
+
+      {api.ready && (
+        <div className="acct-game-cards">
+          {GAME_PROVIDERS.map((provider) => {
+            const Card = CARDS[provider];
+            return <Card key={provider} api={api} usedBy={null} refresh={refresh} t={t} lang={lang} />;
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** `GameKeys` on its own, for the game's Settings: the auth and the key store are the game's. */
+export function SettingsKeys({ api, lang }: { api: AccountKeysApi; lang: Lang }) {
+  const [refresh, setRefresh] = useState(0);
+  return (
+    <div className="acct-game">
+      <GameKeys api={api} refresh={refresh} onRefresh={() => setRefresh((n) => n + 1)} t={translations[lang]} lang={lang} />
+    </div>
+  );
+}
+
+/**
  * everyrpg.korczak.xyz's account page, in the look of the game's settings (owner, 14 Nov 2026: "this
  * page in the same style as the settings"): groups of rows in cards under small uppercase headings,
  * everything left-aligned, Manrope. The page draws the ← and the title itself (`src-rpg/pages/account.astro`),
@@ -864,33 +931,7 @@ function GameAccount({
         </>,
       )}
 
-      {group(
-        t.keysTitle,
-        <>
-          <div className="rpg-set-row">
-            <p className="rpg-set-note">{t.keysBlurbGame}</p>
-          </div>
-          <div className="rpg-set-row rpg-set-line">
-            <span className="rpg-set-text">
-              <span className={api.sync === 'error' ? 'rpg-set-label acct-warn' : 'rpg-set-label'}>
-                {t[SYNC_LABEL[api.sync]]}
-              </span>
-            </span>
-            <button type="button" className="rpg-set-button" onClick={onRefresh}>
-              {t.refresh}
-            </button>
-          </div>
-        </>,
-      )}
-
-      {api.ready && (
-        <div className="acct-game-cards">
-          {GAME_PROVIDERS.map((provider) => {
-            const Card = CARDS[provider];
-            return <Card key={provider} api={api} usedBy={null} refresh={refresh} t={t} lang={lang} />;
-          })}
-        </div>
-      )}
+      <GameKeys api={api} refresh={refresh} onRefresh={onRefresh} t={t} lang={lang} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ What exists here, in both locales:
 |---|---|
 | `/` | the game, the whole screen, no site around it |
 | `/login/` | sign in and sign up (`LoginForm`, `variant="game"`) |
-| `/account/` | the four keys the game spends (`Account`, `variant="game"`) |
+| `/account/` | the four keys the game spends (`Account`, `variant="game"`); the same keys are in the game's Settings, so this page is for links from outside |
 | `/admin/` | the admin panel: the server's keys and the demo's dials (`AdminPanel`, admins only) |
 
 `Layout.astro` is not used: no navbar, footer, taskbar, desktop or window frame, no client
