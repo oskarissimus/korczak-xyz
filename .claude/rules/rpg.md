@@ -358,6 +358,19 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   buttons and the pages under them), so the home field and the proposals are the only ways to a new
   world, and a new quest starts from a world's own end or the library. Opening any of them, or Escape, or the scrim, closes it. Only a dark diesel plant stays on
   the screen itself, since then nothing can be made.
+- **Settings are tabs, in the admin panel's pills** (owner, 23 Nov 2026: "Settings should have tabs
+  like the admin panel, and the admin panel a tab with its own sub-tabs"). `settingsTabs` in
+  `Rpg.tsx`: *Game* (language, jumping, then *Data*), *Story* (model, quick start, intro, then
+  *Characters*; only once there is something to pick), *Account* (who, what the game runs on, the
+  rules; then *API keys*), *Controls*, and *Admin* for admins on everyrpg — `AdminPanel` loaded
+  lazily inside it, its own tabs under a hairline (styles `rpg-admin.css`, moved out of
+  `src-rpg/styles/pages.css`, imported by the index pages). A tab's first group has no heading,
+  the tab names it. The address is the hash (`settingsRoute.ts`): `#settings/story`,
+  `#settings/admin/costs`, written with `replaceState` while Settings are open and cleared when
+  they close; a `#settings…` address opens them on load. `/admin/` is now only a forward that
+  carries its old hash (`/admin/#costs` → `/#settings/admin/costs`); the panel's own hash handling
+  stays for korczak.xyz's `/apps/admin/`. A tab asked for that is not there yet (admin before
+  sign-in has answered) shows *Game* while the address keeps what was asked.
 - **Settings are groups of rows** (owner, 11 Nov 2026: "on a small screen the boxes are cut off,
   everything centred, no groups, every line a different font"; the accepted iPhone SE mockup is in
   `rpg/ustawienia/` in the project files). `settingsMenu` in `Rpg.tsx`: ← and the title at the top,

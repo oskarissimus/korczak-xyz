@@ -1349,6 +1349,50 @@
   margin-top: 22px;
 }
 
+/* Settings' tabs (owner, 23 Nov 2026: "tabs like the admin panel"): the admin panel's pills, the
+   picked one white — read by fill, not hue. A hairline under the row keeps them apart from the admin
+   tab's own sub-tabs below (rpg-admin.css). The row wraps on a phone rather than scrolling sideways. */
+:root:root .rpg-set-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--d-line);
+}
+
+:root:root .rpg-set-tab {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--d-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--d-ink-dim);
+  font: 600 14px/1 var(--d-font);
+  cursor: pointer;
+}
+
+:root:root .rpg-set-tab:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: var(--d-ink);
+}
+
+:root:root .rpg-set-tab[aria-selected='true'] {
+  border-color: #fff;
+  background: #fff;
+  color: #0b0b0d;
+}
+
+:root:root .rpg-set-tab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* The admin tab's tables and chart want more room than a column of rows. */
+:root:root .rpg-settings.rpg-settings--wide {
+  width: min(100%, 760px);
+}
+
 :root:root .rpg-set-group h4 {
   margin: 0 0 8px 2px;
   font: 800 11px/1 var(--d-font);

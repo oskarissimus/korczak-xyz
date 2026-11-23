@@ -924,7 +924,7 @@ function GameAccount({
             </button>
           </div>
           {auth.isAdmin && (
-            <a className="rpg-set-row rpg-set-link" href={`${prefix}/admin/`}>
+            <a className="rpg-set-row rpg-set-link" href={`${prefix}/#settings/admin`}>
               {t.adminPanel}
             </a>
           )}

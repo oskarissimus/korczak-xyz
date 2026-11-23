@@ -1,25 +1,21 @@
 ---
+// The admin panel was its own page here until 23 Nov 2026; it is now the *Admin* tab of the game's
+// Settings (owner: "the admin panel should be a tab too, with its own sub-tabs"). This page only
+// forwards old links and bookmarks: `/admin/#costs` → `/#settings/admin/costs` (settingsRoute.ts).
+// The hash never reaches the server, so this cannot be a line in _redirects.
 import Game from '../layouts/Game.astro';
-import AdminPanel from '../../src/components/Rpg/AdminPanel';
 import { useTranslations } from '../../src/i18n';
-import '../../src/styles/auth.css';
-import '../../src/styles/account.css';
-import '../../src/styles/chartReadout.css';
-import '../../src/styles/rpgAdminCosts.css';
-import '../styles/pages.css';
 
 const lang = 'en';
 const t = useTranslations(lang);
+const target = '/#settings/admin';
 ---
 
 <Game title={`${t('rpg.admin')} · ${t('Rpg')}`} lang={lang} path="/admin/" noindex>
-  <main class="rpg-page rpg-page--settings">
-    <div class="rpg-settings">
-      <header class="rpg-settings-bar">
-        <a class="rpg-settings-back" href="/" aria-label={t('auth.backToGame')} title={t('auth.backToGame')}>←</a>
-        <h1>{t('rpg.admin')}</h1>
-      </header>
-      <AdminPanel client:only="react" lang={lang} variant="game" />
-    </div>
+  <script is:inline define:vars={{ target }}>
+    location.replace(target + (location.hash.length > 1 ? '/' + location.hash.slice(1) : ''));
+  </script>
+  <main class="rpg-page">
+    <p><a href={target}>{t('rpg.admin')}</a></p>
   </main>
 </Game>

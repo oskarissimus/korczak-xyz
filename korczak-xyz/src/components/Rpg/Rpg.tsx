@@ -191,6 +191,9 @@ import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
 // The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
+// The admin panel as Settings' last tab (admins only, standalone): loaded the first time it is opened.
+const SettingsAdmin = lazy(() => import('./AdminPanel'));
+import { parseSettingsHash, settingsHash, settingsRouteNow, writeHash, type AdminTab, type SettingsTab } from './settingsRoute';
 import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
@@ -747,7 +750,30 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>('main');
+  // A `#settings/…` address opens Settings on that tab (`settingsRoute.ts`).
+  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>(() => (settingsRouteNow() ? 'settings' : 'main'));
+  /** Settings' tab and the admin tab's own, kept while Settings are closed so they reopen where they were. */
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>(() => settingsRouteNow()?.tab ?? 'game');
+  const [adminTab, setAdminTab] = useState<AdminTab>(() => settingsRouteNow()?.admin ?? 'keys');
+  // The address follows Settings: the tab while they are open, nothing once they close. The tab
+  // asked for is written even while it is not shown yet (the admin tab before sign-in has answered),
+  // so a reload does not lose it.
+  useEffect(() => {
+    if (menu === 'settings') writeHash(settingsHash({ tab: settingsTab, admin: adminTab }));
+    else if (location.hash.startsWith('#settings')) writeHash('');
+  }, [menu, settingsTab, adminTab]);
+  // A link to another tab on the same page (the hash typed or followed) switches to it.
+  useEffect(() => {
+    const onHash = () => {
+      const route = parseSettingsHash(location.hash);
+      if (!route) return;
+      setSettingsTab(route.tab);
+      setAdminTab(route.admin);
+      setMenu('settings');
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
   // Sign-out asks first (owner, 23 Nov 2026: "the sign-out button at the bottom, with a confirmation modal").
@@ -3317,9 +3343,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
-  const settingGroup = (title: string, rows: React.ReactNode) => (
+  // A tab's first group goes untitled: the tab above already names it.
+  const settingGroup = (title: string | null, rows: React.ReactNode) => (
     <section className="rpg-set-group">
-      <h4>{title}</h4>
+      {title && <h4>{title}</h4>}
       <div className="rpg-set-card">{rows}</div>
     </section>
   );
@@ -3348,7 +3375,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </div>
   );
   const controlsGroup = settingGroup(
-    t.menuControls,
+    null,
     <>
       {touch ? (
         <>
@@ -3377,12 +3404,67 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     </>,
   );
   const peopleSettings = keysReady && falKey;
+  const storySettings = keysReady && (models.length > 0 || storyProvider === 'google' || storyProvider === 'demo');
+  // Settings in tabs, in the admin panel's pills (owner, 23 Nov 2026: "Settings should have tabs like
+  // the admin panel, and the admin panel a tab with its own sub-tabs"). Game: language, jumping and
+  // what this browser keeps; Story: the model and the characters' pipeline (only once there is
+  // something to pick); Account: who, what the game runs on, the keys; Controls; Admin, for admins
+  // on everyrpg only. A tab asked for that is not there (yet) shows Game.
+  const settingsTabs: SettingsTab[] = [
+    'game',
+    ...(storySettings || peopleSettings ? (['story'] as const) : []),
+    'account',
+    'controls',
+    ...(standalone && auth.user && auth.isAdmin ? (['admin'] as const) : []),
+  ];
+  const shownTab: SettingsTab = settingsTabs.includes(settingsTab) ? settingsTab : 'game';
+  const tabLabel: Record<SettingsTab, string> = {
+    game: t.settingsGame,
+    story: t.settingsStory,
+    account: t.settingsAccount,
+    controls: t.menuControls,
+    admin: t.settingsAdmin,
+  };
+  const pickSettingsTab = (next: SettingsTab) => {
+    setSettingsTab(next);
+    document.querySelector('.rpg-menu-screen')?.scrollTo({ top: 0 });
+  };
+  const moveSettingsTab = (e: React.KeyboardEvent, i: number) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = settingsTabs[(i + step + settingsTabs.length) % settingsTabs.length];
+    pickSettingsTab(next);
+    document.getElementById(`rpg-set-tab-${next}`)?.focus();
+  };
+  const settingsTabRow = (
+    <div className="rpg-set-tabs" role="tablist" aria-label={t.settingsTabsLabel}>
+      {settingsTabs.map((name, i) => (
+        <button
+          key={name}
+          id={`rpg-set-tab-${name}`}
+          type="button"
+          role="tab"
+          className="rpg-set-tab"
+          aria-selected={shownTab === name}
+          aria-controls="rpg-set-panel"
+          tabIndex={shownTab === name ? 0 : -1}
+          onClick={() => pickSettingsTab(name)}
+          onKeyDown={(e) => moveSettingsTab(e, i)}
+        >
+          {tabLabel[name]}
+        </button>
+      ))}
+    </div>
+  );
   const settingsMenu = (
-    <div className="rpg-settings">
+    <div className={shownTab === 'admin' ? 'rpg-settings rpg-settings--wide' : 'rpg-settings'}>
       {settingsBar(t.menuSettings)}
+      {settingsTabRow}
+      <div id="rpg-set-panel" role="tabpanel" aria-labelledby={`rpg-set-tab-${shownTab}`}>
 
-      {settingGroup(
-        t.settingsGame,
+      {shownTab === 'game' && settingGroup(
+        null,
         <>
           {settingSelect(
             t.language,
@@ -3407,10 +3489,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         </>,
       )}
 
-      {keysReady &&
-        (models.length > 0 || storyProvider === 'google' || storyProvider === 'demo') &&
+      {shownTab === 'story' && storySettings &&
         settingGroup(
-          t.settingsStory,
+          null,
           <>
             {models.length > 0 &&
               settingSelect(
@@ -3429,9 +3510,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           </>,
         )}
 
-      {peopleSettings &&
+      {shownTab === 'story' && peopleSettings &&
         settingGroup(
-          t.settingsPeople,
+          storySettings ? t.settingsPeople : null,
           <>
             {settingSelect(
               t.painter,
@@ -3478,8 +3559,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           </>,
         )}
 
-      {settingGroup(
-        t.settingsAccount,
+      {shownTab === 'account' && settingGroup(
+        null,
         <>
           {/* Who is signed in, sign-out and the admin panel: the account page's *Sign-in*, here since
               22 Nov 2026 (owner: "the admin panel and the keys belong in the settings"). */}
@@ -3493,11 +3574,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                 {t.menuSignOut}
               </button>
             </div>
-          )}
-          {standalone && auth.user && auth.isAdmin && (
-            <a className="rpg-set-row rpg-set-link" href={lang === 'pl' ? '/pl/admin/' : '/admin/'}>
-              {t.adminPanel}
-            </a>
           )}
           <div className="rpg-set-row">
             {keysReady ? (
@@ -3544,15 +3620,22 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       )}
 
       {/* The account page's *API keys* and the provider cards, in the same groups. */}
-      {standalone && auth.user && (
+      {shownTab === 'account' && standalone && auth.user && (
         <Suspense fallback={<p className="rpg-set-note">{t.readingKeys}</p>}>
           <SettingsKeys api={account} lang={lang === 'pl' ? 'pl' : 'en'} />
         </Suspense>
       )}
 
-      {controlsGroup}
+      {shownTab === 'controls' && controlsGroup}
 
-      {settingGroup(
+      {/* The admin panel, its own tabs inside (AdminPanel.tsx); the sub-tab is in the address too. */}
+      {shownTab === 'admin' && (
+        <Suspense fallback={<p className="rpg-set-note">{t.readingKeys}</p>}>
+          <SettingsAdmin lang={lang === 'pl' ? 'pl' : 'en'} variant="game" tab={adminTab} onTab={setAdminTab} />
+        </Suspense>
+      )}
+
+      {shownTab === 'game' && settingGroup(
         t.settingsData,
         <>
           {chronicle.length > 0 && (
@@ -3584,6 +3667,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           )}
         </>,
       )}
+      </div>
     </div>
   );
 

@@ -16,6 +16,10 @@
  * others are only `hidden`, so a half-typed key, the costs already read and the open request survive
  * a switch, and nothing is fetched again. The tab is in the URL's hash (`#costs`), so a reload or a
  * bookmark opens the same one. A new section is a new tab: a name in `TABS`, its label, a panel.
+ *
+ * On everyrpg.korczak.xyz the panel is the *Admin* tab of the game's Settings since 23 Nov 2026
+ * (owner: "the admin panel should be a tab too, with its own sub-tabs"): there `Rpg.tsx` owns the
+ * URL (`#settings/admin/costs`) and passes `tab` and `onTab`, and the panel leaves the hash alone.
  */
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
@@ -24,12 +28,13 @@ import { useAuth } from '../../hooks/useAuth';
 import AdminCosts, { type CostsTab } from './AdminCosts';
 import { describeError, log } from '../../lib/logger';
 import { adminConfig } from '../../utils/rpg/gateway';
+import { ADMIN_TABS, type AdminTab } from './settingsRoute';
 import { SERVER_KEY_NAMES, type AdminPatch, type AdminStatus, type ServerKeyName } from '../../utils/rpg/adminConfig';
 
 type Lang = 'en' | 'pl';
 
-const TABS = ['keys', 'demo', 'diesel', 'costs', 'wallets', 'prices'] as const;
-type Tab = (typeof TABS)[number];
+const TABS = ADMIN_TABS;
+type Tab = AdminTab;
 
 function tabFromHash(): Tab {
   const h = typeof location === 'undefined' ? '' : location.hash.slice(1);
@@ -166,22 +171,40 @@ const LABELS: Record<ServerKeyName, string> = {
 
 const EMPTY_DRAFTS = Object.fromEntries(SERVER_KEY_NAMES.map((n) => [n, ''])) as Record<ServerKeyName, string>;
 
-export default function AdminPanel({ lang, variant = 'game' }: { lang: Lang; variant?: 'site' | 'game' }) {
+export default function AdminPanel({
+  lang,
+  variant = 'game',
+  tab: shownTab,
+  onTab,
+}: {
+  lang: Lang;
+  variant?: 'site' | 'game';
+  /** The sub-tab, when the page around the panel keeps it (the game's Settings); else the hash does. */
+  tab?: Tab;
+  onTab?: (next: Tab) => void;
+}) {
   const t = translations[lang];
   const { identity, isAdmin, loading } = useAuth();
   const [status, setStatus] = useState<AdminStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(tabFromHash);
+  const controlled = onTab !== undefined;
+  const [ownTab, setTab] = useState<Tab>(() => (controlled ? 'keys' : tabFromHash()));
+  const tab = controlled ? (shownTab ?? 'keys') : ownTab;
 
   useEffect(() => {
+    if (controlled) return;
     const onHash = () => setTab(tabFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, []);
+  }, [controlled]);
 
   const pick = (next: Tab) => {
+    if (onTab) {
+      onTab(next);
+      return;
+    }
     setTab(next);
     // replaceState, not location.hash: no history entry per tab, and no jump to an element by that id.
     try {
