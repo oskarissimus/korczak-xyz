@@ -5,8 +5,8 @@
  *
  * In the settings' look: the tank as one card — what is in it, about how many quests that is, and the
  * plant drawn in white lines beside it, smoking and blinking while it runs, dark when it is empty —
- * then the three canisters, the monthly delivery as a fourth below them (or its state, once the account
- * has one) — each a button that opens the checkout for it at once (no separate Pay button). The legal pages
+ * then the subscription, the page's call to action (or its state, once the account has one), with the
+ * three canisters under it — each a button that opens the checkout for it at once (no separate Pay button). The legal pages
  * are in the page's footer, so they are not repeated here.
  *
  * The checkout is the old plant's (`DieselPlant.tsx`): Paddle's overlay through `onBuy`/`onSubscribe`;
@@ -146,40 +146,21 @@ export default function DieselShop({
         <PlantLines />
       </section>
 
-      <div className="rpg-dzs-offers">
-        {CANISTERS.map((c) => (
-          <button
-            type="button"
-            key={c.id}
-            className="rpg-dzs-offer"
-            aria-busy={bought?.id === c.id && bought.outcome === null}
-            disabled={!onBuy || busy}
-            onClick={() => pay(c.id)}
-          >
-            <strong>{t.dieselCanister[c.id]}</strong>
-            <span>{formatLitres(c.litres, lang)}</span>
-            <b>{c.pln} zł</b>
-          </button>
-        ))}
-        {offerMonthly && (
-          <button
-            type="button"
-            className="rpg-dzs-offer rpg-dzs-monthly"
-            aria-busy={bought?.id === 'monthly' && bought.outcome === null}
-            disabled={busy}
-            onClick={() => pay('monthly')}
-          >
-            <span className="rpg-dzs-monthly-head">
-              <strong>{t.dieselSubTitle}</strong>
-              <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
-            </span>
-            <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
-          </button>
-        )}
-      </div>
-
-      {!onBuy && <p className="rpg-dzs-note">{t.dieselTankSoon}</p>}
-
+      {offerMonthly && (
+        <button
+          type="button"
+          className="rpg-dzs-offer rpg-dzs-monthly"
+          aria-busy={bought?.id === 'monthly' && bought.outcome === null}
+          disabled={busy}
+          onClick={() => pay('monthly')}
+        >
+          <span className="rpg-dzs-monthly-head">
+            <strong>{t.dieselSubTitle}</strong>
+            <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
+          </span>
+          <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
+        </button>
+      )}
       {subscription && (
         <div className="rpg-dzs-sub">
           <strong>{t.dieselSubTitle}</strong>
@@ -196,6 +177,24 @@ export default function DieselShop({
           )}
         </div>
       )}
+      <div className="rpg-dzs-offers">
+        {CANISTERS.map((c) => (
+          <button
+            type="button"
+            key={c.id}
+            className="rpg-dzs-offer"
+            aria-busy={bought?.id === c.id && bought.outcome === null}
+            disabled={!onBuy || busy}
+            onClick={() => pay(c.id)}
+          >
+            <strong>{t.dieselCanister[c.id]}</strong>
+            <span>{formatLitres(c.litres, lang)}</span>
+            <b>{c.pln} zł</b>
+          </button>
+        ))}
+      </div>
+
+      {!onBuy && <p className="rpg-dzs-note">{t.dieselTankSoon}</p>}
       {PADDLE.environment === 'sandbox' && <p className="rpg-dzs-note">{t.dieselSandboxNote}</p>}
     </div>
   );

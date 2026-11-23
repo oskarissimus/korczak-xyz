@@ -22,3 +22,24 @@ describe('settingsRoute', () => {
     expect(parseSettingsHash(settingsHash({ tab: 'controls', admin: 'keys' }))).toEqual({ tab: 'controls', admin: 'keys' });
   });
 });
+
+describe('gameRoute', () => {
+  it('names every screen and round-trips it', async () => {
+    const { parseGameHash, gameHash } = await import('./settingsRoute');
+    for (const h of ['#worlds', '#worlds/trash', '#language', '#diesel', '#settings/story', '#settings/admin/costs', '#world/wmvsih7dt0'])
+      expect(gameHash(parseGameHash(h))).toBe(h);
+    expect(parseGameHash('')).toEqual({ kind: 'home' });
+    expect(parseGameHash('#nope')).toEqual({ kind: 'home' });
+    expect(parseGameHash('#world/')).toEqual({ kind: 'home' });
+    expect(parseGameHash('#world/<script>')).toEqual({ kind: 'home' });
+    expect(parseGameHash('#world/abc')).toEqual({ kind: 'world', id: 'abc' });
+  });
+
+  it('tells a tab change from a screen change', async () => {
+    const { sameScreen } = await import('./settingsRoute');
+    expect(sameScreen('#settings/game', '#settings/admin/costs')).toBe(true);
+    expect(sameScreen('#world/a', '#world/b')).toBe(true);
+    expect(sameScreen('#settings/game', '#diesel')).toBe(false);
+    expect(sameScreen('', '#diesel')).toBe(false);
+  });
+});

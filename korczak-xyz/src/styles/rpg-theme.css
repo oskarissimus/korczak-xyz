@@ -1813,7 +1813,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 :root:root .rpg-dzs-offer {
@@ -1874,9 +1874,10 @@
   color: var(--d-ink-strong);
 }
 
-/* The monthly delivery: the fourth offer, across the whole row. */
+/* The subscription: above the canisters, across the whole width (owner, 23 Nov 2026). */
 :root:root .rpg-dzs-monthly {
-  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 16px;
   align-items: stretch;
   padding: 12px 14px;
   text-align: left;

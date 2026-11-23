@@ -188,13 +188,13 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 import { uiPending, useUi } from './ui';
-import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
+import DieselPlant, { CanisterIcon, DieselBadge, dieselTag } from './DieselPlant';
 import DieselShop from './DieselShop';
 // The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
 // The admin panel as Settings' last tab (admins only, standalone): loaded the first time it is opened.
 const SettingsAdmin = lazy(() => import('./AdminPanel'));
-import { parseSettingsHash, settingsHash, settingsRouteNow, writeHash, type AdminTab, type SettingsTab } from './settingsRoute';
+import { gameHash, gameRouteNow, parseGameHash, pushHash, routeDepth, sameScreen, settingsRouteNow, writeHash, type AdminTab, type GameRoute, type SettingsTab } from './settingsRoute';
 import { questLitres, EMPTY_LITRES, formatLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
@@ -752,29 +752,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
   // A `#settings/…` address opens Settings on that tab (`settingsRoute.ts`).
-  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>(() => (settingsRouteNow() ? 'settings' : 'main'));
+  // Any screen's address opens it (`settingsRoute.ts`, `#worlds`, `#diesel`…); a world's is opened below.
+  const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>(() => {
+    const r = gameRouteNow();
+    return r.kind === 'screen' ? r.screen : 'main';
+  });
   /** Settings' tab and the admin tab's own, kept while Settings are closed so they reopen where they were. */
   const [settingsTab, setSettingsTab] = useState<SettingsTab>(() => settingsRouteNow()?.tab ?? 'game');
   const [adminTab, setAdminTab] = useState<AdminTab>(() => settingsRouteNow()?.admin ?? 'keys');
-  // The address follows Settings: the tab while they are open, nothing once they close. The tab
-  // asked for is written even while it is not shown yet (the admin tab before sign-in has answered),
-  // so a reload does not lose it.
-  useEffect(() => {
-    if (menu === 'settings') writeHash(settingsHash({ tab: settingsTab, admin: adminTab }));
-    else if (location.hash.startsWith('#settings')) writeHash('');
-  }, [menu, settingsTab, adminTab]);
-  // A link to another tab on the same page (the hash typed or followed) switches to it.
-  useEffect(() => {
-    const onHash = () => {
-      const route = parseSettingsHash(location.hash);
-      if (!route) return;
-      setSettingsTab(route.tab);
-      setAdminTab(route.admin);
-      setMenu('settings');
-    };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
   // Sign-out asks first (owner, 23 Nov 2026: "the sign-out button at the bottom, with a confirmation modal").
@@ -3006,7 +2991,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
    */
   const openingRef = useRef<{ id: string; cont: boolean } | null>(null);
   const [opening, setOpening] = useState(0);
-  const openWorld = async (id: string, cont: boolean) => {
+  const openWorld = async (id: string, cont: boolean): Promise<boolean> => {
     // Inside the tap, for iOS: whatever starts after the fetch has lost the gesture.
     primeVoice();
     primeMusic();
@@ -3018,11 +3003,12 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       }
     }
     const w = findWorld(id);
-    if (!w) return;
+    if (!w) return false;
     saveWorld(w);
     openingRef.current = { id, cont };
     if (w.lang !== gameLangRef.current) chooseLang(w.lang);
     setOpening((n) => n + 1);
+    return true;
   };
   useEffect(() => {
     const pending = openingRef.current;
@@ -3060,6 +3046,81 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       reloadIntro();
     } else setSaved(loadGame(isTrashed));
   };
+
+  // The address follows the screen (owner, 23 Nov 2026: "every settings page and the like should have
+  // browser routing, and the game in a world too, with the world's id"; `settingsRoute.ts`). Opening a
+  // screen or a world is a history entry, a tab within one is not, and closing one goes back to the
+  // entry it was opened from, so the browser's Back and the game's ← agree. A world being opened from
+  // its address (on load, or Back/Forward onto it) holds the address until it is in play.
+  const bootRoute = useRef<GameRoute>(gameRouteNow());
+  const pendingWorldRef = useRef<string | null>(bootRoute.current.kind === 'world' ? bootRoute.current.id : null);
+  const routeWorld = started ? world?.id ?? null : null;
+  const desiredHash = started
+    ? routeWorld
+      ? gameHash({ kind: 'world', id: routeWorld })
+      : null
+    : menu === 'main'
+      ? ''
+      : gameHash({ kind: 'screen', screen: menu, settings: { tab: settingsTab, admin: adminTab } });
+  useEffect(() => {
+    if (started && routeWorld && routeWorld === pendingWorldRef.current) pendingWorldRef.current = null;
+  }, [started, routeWorld]);
+  useEffect(() => {
+    if (desiredHash === null || pendingWorldRef.current) return;
+    const now = location.hash;
+    if (now === desiredHash || (!now && !desiredHash)) return;
+    let prev: unknown;
+    try {
+      prev = (window.history.state as { rpgPrev?: unknown } | null)?.rpgPrev;
+    } catch {
+      prev = undefined;
+    }
+    if (routeDepth() > 0 && (!desiredHash || prev === desiredHash)) window.history.back();
+    else if (!desiredHash || (now && sameScreen(now, desiredHash))) writeHash(desiredHash);
+    else pushHash(desiredHash);
+  }, [desiredHash, started, routeWorld]);
+  // Back, Forward or a typed address: the screen it names, leaving the world being played if need be.
+  const routeRef = useRef({ started, routeWorld, leave, openWorld });
+  routeRef.current = { started, routeWorld, leave, openWorld };
+  const openRoutedWorld = (id: string) => {
+    pendingWorldRef.current = id;
+    void routeRef.current.openWorld(id, true).then((ok) => {
+      if (ok) return;
+      pendingWorldRef.current = null;
+      writeHash('');
+    });
+  };
+  useEffect(() => {
+    const onPop = () => {
+      const r = parseGameHash(location.hash);
+      const cur = routeRef.current;
+      if (r.kind === 'world') {
+        if (cur.started && cur.routeWorld === r.id) return;
+        if (cur.started) cur.leave();
+        openRoutedWorld(r.id);
+        return;
+      }
+      if (cur.started) cur.leave();
+      if (r.kind === 'screen') {
+        if (r.settings) {
+          setSettingsTab(r.settings.tab);
+          setAdminTab(r.settings.admin);
+        }
+        setMenu(r.screen);
+      } else setMenu('main');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // A world's address opened as the page loads: played once the account and the keys have answered.
+  useEffect(() => {
+    const r = bootRoute.current;
+    if (r.kind !== 'world' || auth.loading || !keysReady) return;
+    bootRoute.current = { kind: 'home' };
+    openRoutedWorld(r.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.loading, keysReady]);
 
   const fullscreen = () => {
     const el = containerRef.current;
@@ -3165,6 +3226,38 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const diesel = onDiesel
     ? { litres: litres(wallet!.balanceUsd), capacity: litres(Math.max(wallet!.grantUsd, wallet!.balanceUsd)), tank: true }
     : null;
+  // The tank's row holds its place in the ⋯ sheet before the wallet answers (owner, 23 Nov 2026: the
+  // row appeared under an open sheet and pushed everything below it down). Signed in, or still finding
+  // out, and with no story key of the reader's own, a tank is coming: the row stands there, showing the
+  // last amount this browser saw (`rpg-diesel-last`), or "…", until the real one replaces it in place.
+  useEffect(() => {
+    if (!diesel) return;
+    try {
+      localStorage.setItem('rpg-diesel-last', String(Math.round(diesel.litres)));
+    } catch {
+      /* private mode: the row says "…" instead */
+    }
+  }, [diesel?.litres]);
+  const lastLitres = (() => {
+    try {
+      const v = Number(localStorage.getItem('rpg-diesel-last'));
+      return localStorage.getItem('rpg-diesel-last') !== null && Number.isFinite(v) ? v : null;
+    } catch {
+      return null;
+    }
+  })();
+  // Still finding out who is signed in counts only where this browser has seen a tank before, so a
+  // signed-out reader's sheet does not hold a row that then goes.
+  const dieselComing =
+    !diesel && ((auth.loading && lastLitres !== null) || (auth.user && !wallet)) && !account.keys.google && !account.keys.openai;
+  useEffect(() => {
+    if (auth.loading || auth.user) return;
+    try {
+      localStorage.removeItem('rpg-diesel-last');
+    } catch {
+      /* nothing kept */
+    }
+  }, [auth.loading, auth.user]);
   /** The sign-up bonus, said in litres, for the invitation; the default when the function has not said. */
   const signupLitres = formatLitres(litres(demo?.signupUsd ?? DEFAULT_GRANT_USD), gameLang);
   /** The guest's one world and first beat are both used (known only once the function has said). */
@@ -3267,7 +3360,16 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         {keysReady && storyProvider === 'static' && item('start', t.start, () => begin())}
         {sheetAccount}
         {item('library', t.homeWorlds(libraryRows.length), () => setMenu('library'), { disabled: libraryRows.length === 0 })}
-        {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
+        {diesel ? (
+          <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
+        ) : (
+          dieselComing && (
+            <span className="rpg-dz-badge rpg-dz-badge-coming" aria-busy="true">
+              <CanisterIcon level={0.5} />
+              <span>{t.dieselLeft(lastLitres === null ? '…' : formatLitres(lastLitres, gameLang))}</span>
+            </span>
+          )
+        )}
         {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
         {item('settings', t.menuSettings, () => setMenu('settings'))}
         {standalone && !auth.loading && auth.user &&

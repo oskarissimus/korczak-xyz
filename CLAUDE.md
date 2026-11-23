@@ -235,6 +235,26 @@ tuner, the flashcards and the sleep log in Safari rather than in the app. There 
 an existing install a new identity — deleting the icon and installing once from the new URL is the
 whole fix. The songbook and the site app are unaffected, their paths not having moved.
 
+## Nothing moves when something loads (no layout shift)
+
+The owner has had to point out layout shift more than once (the latest, 23 Nov 2026: the diesel row
+appearing in the RPG's ⋯ sheet a moment after it opened and pushing every row under it down). So it is
+a check on every UI change, not something to wait to be told about:
+
+- **Anything that arrives late gets its place up front.** A row, a badge, a price, a count, a picture
+  or a panel that depends on a fetch, the account, the keys or a snapshot is rendered as a placeholder
+  of the same size from the first frame (the last known value from localStorage where there is one,
+  else "…"), and the real value replaces it in place. Do not render `cond && <Row/>` where `cond`
+  becomes true after a request: reserve the row while the answer is still coming. Pictures get a fixed
+  box (`width`/`height` or `aspect-ratio`). Fonts are self-hosted and already loaded with the page.
+- **Look for it before pushing.** When a change touches what a screen shows while things load, open it
+  in Playwright with the network slowed or the late call delayed, and compare a screenshot taken
+  before the data arrives with one after: nothing that was already on screen may have moved. The
+  RPG's home screen and its sheet behind ⋯ are the places it has happened; `MenuSkeleton.astro` must
+  keep drawing the same boxes as the island.
+- **In a review, say so.** A diff that adds UI shown conditionally on async state is reviewed for
+  layout shift as for any other bug, and the fix is the reserved space, not a delay or a fade.
+
 ## Localization (i18n)
 
 The site supports English (default) and Polish. All user-facing strings should be localized —

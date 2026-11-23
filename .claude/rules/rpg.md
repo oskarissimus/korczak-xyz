@@ -348,7 +348,7 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
   scrolled without end (no ↻). Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
-  being born, else Continue), the account's sign-in and sign-up, *My worlds (n)*, the diesel badge, language, Settings,
+  being born, else Continue), the account's sign-in and sign-up, *My worlds (n)*, the diesel badge (its row held by a placeholder with the last litres seen, `rpg-diesel-last`, until the wallet answers — no layout shift), language, Settings,
   and last, signed in, *Sign out* with the email on its right (owner, 23 Nov 2026: "at the bottom,
   with a confirmation modal"): it and the Settings' own Sign out open `signOutModal`, the failed-step
   panel's look over a scrim (`.rpg-confirm`), and only its white button signs out. *Account and keys* and *Controls*
@@ -367,7 +367,16 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   `src-rpg/styles/pages.css`, imported by the index pages). A tab's first group has no heading,
   the tab names it. The address is the hash (`settingsRoute.ts`): `#settings/story`,
   `#settings/admin/costs`, written with `replaceState` while Settings are open and cleared when
-  they close; a `#settings…` address opens them on load. `/admin/` is now only a forward that
+  they close; a `#settings…` address opens them on load. **Every screen has an address since
+  23 Nov 2026** (owner: "every settings page and the like should have browser routing, and the game
+  in a world too, with the world's id"): `#worlds`, `#worlds/trash`, `#language`, `#diesel`,
+  `#settings/…`, and `#world/<id>` while a world is played (`parseGameHash`/`gameHash` in
+  `settingsRoute.ts`, the effect after `leave` in `Rpg.tsx`). Opening a screen or a world pushes a
+  history entry (`pushHash`, which keeps `rpgDepth` and the hash it came from in `history.state`); a
+  tab within one replaces it; closing one goes back to the entry it was opened from, so the browser's
+  Back and the game's ← agree. Back/Forward onto a world, or loading its address, opens it through
+  `openWorld` once the account and keys have answered, holding the address meanwhile
+  (`pendingWorldRef`); an id this browser and the account do not know falls back to the home screen. `/admin/` is now only a forward that
   carries its old hash (`/admin/#costs` → `/#settings/admin/costs`); the panel's own hash handling
   stays for korczak.xyz's `/apps/admin/`. A tab asked for that is not there yet (admin before
   sign-in has answered) shows *Game* while the address keeps what was asked.
@@ -2082,8 +2091,8 @@ the price of a world or a beat is in it too."
   notes and the links struck out and the subscription on the same page). `DieselShop.tsx`, styles
   `.rpg-dzs-*` at the end of `rpg-theme.css`: ← and *Dizel* in `settingsBar`, the tank as one card (the
   litres, *ok. N questów* from `questLitres`, the plant in white lines — smoking and blinking while it
-  runs, dark when empty, the gauge pulsing while a payment pours), the three canisters as cards and the
-  monthly delivery as a fourth across the row (or its state once the account has one) — each card a
+  runs, dark when empty, the gauge pulsing while a payment pours), the subscription first, the page's white
+  call to action (or its state once the account has one), then the three canisters as cards — each card a
   button that opens Paddle's checkout for it at once (owner, the same evening: "remove the Pay button,
   let each option be a button"). The monthly delivery is called *Subskrypcja* / *Subscription* everywhere,
   with its *600 L na miesiąc* set large, and its offer is the page's one white card — the call to
