@@ -77,6 +77,8 @@ const sources = {
   roaster: { file: join(iconsDir, 'roaster.svg'), maskable: 'bleed' },
   'audio-guide': { file: join(iconsDir, 'audio-guide.svg'), maskable: 'bleed' },
   rpg: { file: join(iconsDir, 'rpg.svg'), maskable: 'bleed' },
+  // everyrpg.korczak.xyz's own icon, also the tab favicon there, hence the 32.
+  'rpg-game': { file: join(iconsDir, 'rpg-game.svg'), maskable: 'bleed', sizes: [32, ...SIZES] },
 };
 
 /**
@@ -101,16 +103,19 @@ async function maskable(source, mode) {
 
 await mkdir(outDir, { recursive: true });
 
-for (const [app, { file, maskable: mode }] of Object.entries(sources)) {
+let written = 0;
+for (const [app, { file, maskable: mode, sizes = SIZES }] of Object.entries(sources)) {
   await checkSniffable(file);
-  for (const size of SIZES) {
+  for (const size of sizes) {
     const target = join(outDir, `${app}-${size}.png`);
     await render(file, size).png().toFile(target);
     console.log(`  ${app}-${size}.png`);
+    written++;
   }
   const mask = await maskable(file, mode);
   await writeFile(join(outDir, `${app}-maskable.png`), await mask.toBuffer());
   console.log(`  ${app}-maskable.png`);
+  written++;
 }
 
-console.log(`\nWrote ${Object.keys(sources).length * (SIZES.length + 1)} icons to ${outDir}`);
+console.log(`\nWrote ${written} icons to ${outDir}`);

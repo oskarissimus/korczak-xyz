@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Every RPG on everyrpg.korczak.xyz: the decision diamond (◆) in the game's own black and
+       white, chosen 23 Nov 2026. Not the Win95 device of rpg.svg: that one sits among the site's
+       apps on korczak.xyz, this one stands alone. Vertices 196px from centre, inside the 80%
+       maskable circle. -->
+  <rect width="512" height="512" fill="#0b0b0c"/>
+  <path d="M256 60 L452 256 L256 452 L60 256 Z" fill="none" stroke="#f4f4f5" stroke-width="20"/>
+  <path d="M256 170 L342 256 L256 342 L170 256 Z" fill="#f4f4f5"/>
+</svg>

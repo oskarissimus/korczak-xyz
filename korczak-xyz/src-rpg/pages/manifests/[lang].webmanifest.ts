@@ -3,9 +3,9 @@ import { languages, useTranslations, type Lang } from '../../../src/i18n';
 import { iconUrl } from '../../../src/utils/pwa/iconUrl';
 
 /**
- * The game installed from everyrpg.korczak.xyz: one app per locale, the whole origin its scope. Same
- * artwork as the copy on korczak.xyz (`src/pages/manifests/[app].webmanifest.ts`), but a different
- * origin is a different app to the browser, so the two never collide.
+ * The game installed from everyrpg.korczak.xyz: one app per locale, the whole origin its scope. Its own
+ * artwork (`rpg-game.svg`, the game's black-and-white diamond), not the Win95 device the copy on
+ * korczak.xyz wears among the site's apps; a different origin is a different app to the browser anyway.
  */
 export const getStaticPaths = () => (Object.keys(languages) as Lang[]).map((lang) => ({ params: { lang } }));
 
@@ -14,12 +14,12 @@ export const GET: APIRoute = ({ params }) => {
   const t = useTranslations(lang);
   const root = lang === 'pl' ? '/pl/' : '/';
   const icons = [180, 192, 512].map((size) => ({
-    src: iconUrl(`rpg-${size}.png`),
+    src: iconUrl(`rpg-game-${size}.png`),
     sizes: `${size}x${size}`,
     type: 'image/png',
     purpose: 'any',
   }));
-  icons.push({ src: iconUrl('rpg-maskable.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' });
+  icons.push({ src: iconUrl('rpg-game-maskable.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' });
   return new Response(
     JSON.stringify(
       {

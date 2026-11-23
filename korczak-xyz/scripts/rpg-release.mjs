@@ -67,8 +67,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const name of readdirSync(icons)) {
     if (name.startsWith('rpg-')) copyFileSync(new URL(name, icons), join(dist, 'icons', name));
   }
-  if (!existsSync(join(dist, 'icons', 'rpg-192.png'))) {
-    console.error('rpg-release: public/icons/rpg-*.png are missing');
+  if (!existsSync(join(dist, 'icons', 'rpg-game-192.png'))) {
+    console.error('rpg-release: public/icons/rpg-game-*.png are missing');
     process.exit(1);
   }
   const problems = pageProblems(htmlPages(dist));
