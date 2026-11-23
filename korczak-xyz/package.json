@@ -40,7 +40,7 @@
     "nanostores": "^1.5.5",
     "pitchy": "^4.1.0",
     "pmtiles": "^4.5.0",
-    "postcss": "^8.5.32",
+    "postcss": "^8.5.33",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwindcss": "^3.4.19",
