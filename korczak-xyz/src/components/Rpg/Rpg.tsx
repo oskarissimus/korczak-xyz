@@ -750,6 +750,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>('main');
   /** The home screen's sheet behind ⋯: everything but the field and the proposals. */
   const [sheet, setSheet] = useState(false);
+  // Sign-out asks first (owner, 23 Nov 2026: "the sign-out button at the bottom, with a confirmation modal").
+  const [confirmOut, setConfirmOut] = useState(false);
   /** The home screen's field, which a proposal's idea is put into. */
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   // The field grows with its text (max-height in rpg-theme.css caps it, then it scrolls), and the
@@ -778,6 +780,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     window.addEventListener('keydown', close, true);
     return () => window.removeEventListener('keydown', close, true);
   }, [sheet]);
+  useEffect(() => {
+    if (!confirmOut) return;
+    const close = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setConfirmOut(false);
+      }
+    };
+    window.addEventListener('keydown', close, true);
+    return () => window.removeEventListener('keydown', close, true);
+  }, [confirmOut]);
+  useEffect(() => {
+    if (!auth.user) setConfirmOut(false);
+  }, [auth.user]);
   const startedRef = useRef(false);
   startedRef.current = started;
   /** A pull that changed something while a quest was on screen: shown on the way back to the intro. */
@@ -3197,8 +3213,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     ? null
     : auth.user
       ? // The account and its keys are in Settings (owner, 22 Nov 2026); the sheet says who is signed in
-        // on the sign-out line.
-        [item('signout', t.menuSignOut, () => void auth.signOut(), { sub: auth.user.email ?? '' })]
+        // on the sign-out line, which is the sheet's last row and asks before it signs out (23 Nov 2026).
+        []
       : auth.identity
         ? [
             <a key="pending" className="rpg-menu-item" href={`${accountRoot}login/`}>
@@ -3236,7 +3252,37 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         {diesel && <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />}
         {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
         {item('settings', t.menuSettings, () => setMenu('settings'))}
+        {standalone && !auth.loading && auth.user &&
+          item('signout', t.menuSignOut, () => {
+            setSheet(false);
+            setConfirmOut(true);
+          }, { sub: auth.user.email ?? '' })}
       </nav>
+    </div>
+  );
+  // The confirmation, in the game's own panel (the failed-step panel's look) over a scrim.
+  const signOutModal = confirmOut && auth.user && (
+    <div className="rpg-confirm-layer">
+      <div className="rpg-home-scrim" aria-hidden="true" onClick={() => setConfirmOut(false)} />
+      <div className="rpg-stalled rpg-confirm" role="alertdialog" aria-modal="true" aria-labelledby="rpg-confirm-title" aria-describedby="rpg-confirm-text">
+        <div id="rpg-confirm-title" className="rpg-notice-title">{t.signOutTitle}</div>
+        <p id="rpg-confirm-text" className="rpg-stalled-why">{t.signOutText(auth.user.email ?? '')}</p>
+        <div className="rpg-stalled-actions">
+          <button
+            type="button"
+            className="rpg-start"
+            onClick={() => {
+              setConfirmOut(false);
+              void auth.signOut();
+            }}
+          >
+            {t.menuSignOut}
+          </button>
+          <button type="button" autoFocus onClick={() => setConfirmOut(false)}>
+            {t.signOutCancel}
+          </button>
+        </div>
+      </div>
     </div>
   );
   // A proposal's idea goes into the field, to be made as it is or changed first (owner, 10 Nov 2026).
@@ -3443,7 +3489,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                 <span className="rpg-set-label">{t.signedInAs}</span>
                 <span className="rpg-set-note">{auth.user.email}</span>
               </span>
-              <button type="button" className="rpg-set-button" onClick={() => void auth.signOut()}>
+              <button type="button" className="rpg-set-button" onClick={() => setConfirmOut(true)}>
                 {t.menuSignOut}
               </button>
             </div>
@@ -3935,6 +3981,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                   {sheet && homeSheet}
                 </div>
               )}
+              {signOutModal}
               {menu === 'diesel' && (dieselMenu || mainMenu)}
               {menu === 'settings' && settingsMenu}
               {menu === 'language' && languageMenu}

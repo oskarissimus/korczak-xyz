@@ -1616,3 +1616,36 @@
   font: 600 12px/1 var(--d-font);
   text-align: center;
 }
+
+/* Sign-out's confirmation: the failed-step panel's look, centred over a scrim on whatever screen
+   asked (the ⋯ sheet or Settings). */
+:root:root .rpg-confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+:root:root .rpg-confirm {
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 20px 20px 18px;
+}
+
+:root:root .rpg-confirm .rpg-notice-title {
+  font-family: var(--d-font-display);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--d-ink);
+}
+
+:root:root .rpg-confirm .rpg-stalled-why {
+  margin: 8px 0 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+:root:root .rpg-confirm .rpg-stalled-actions button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 12px;
+}

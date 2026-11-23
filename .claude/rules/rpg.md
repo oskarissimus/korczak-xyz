@@ -348,8 +348,10 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   on the home screen (owner, the same evening: "remove that button from the bottom-right corner"). Along the bottom a low strip of proposed worlds, a cover and an idea each,
   scrolled without end (no ↻). Everything else is the sheet behind ⋯ top right (`homeSheet`, from the bottom on a phone,
   under the button wider): the way back into play as its one white button (`resumeEntry`: the world
-  being born, else Continue), the account (sign in, sign up, or *Sign out* with the email on its
-  right), *My worlds (n)*, the diesel badge, language, Settings. *Account and keys* and *Controls*
+  being born, else Continue), the account's sign-in and sign-up, *My worlds (n)*, the diesel badge, language, Settings,
+  and last, signed in, *Sign out* with the email on its right (owner, 23 Nov 2026: "at the bottom,
+  with a confirmation modal"): it and the Settings' own Sign out open `signOutModal`, the failed-step
+  panel's look over a scrim (`.rpg-confirm`), and only its white button signs out. *Account and keys* and *Controls*
   left the sheet for Settings on 22 Nov 2026 (owner: "the email on the sign-out line, the admin panel
   and the keys in the settings"; "Controls into the settings too"). *New quest in this world* and *More world
   options* (the slider and the picked words) were taken off on 20 Nov 2026 (owner: remove both
