@@ -19,7 +19,7 @@
  *
  * On everyrpg.korczak.xyz the panel is the *Admin* tab of the game's Settings since 23 Nov 2026
  * (owner: "the admin panel should be a tab too, with its own sub-tabs"): there `Rpg.tsx` owns the
- * URL (`#settings/admin/costs`) and passes `tab` and `onTab`, and the panel leaves the hash alone.
+ * URL (`settings/admin/costs`) and passes `tab` and `onTab`, and the panel leaves the hash alone.
  */
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';

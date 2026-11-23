@@ -69,3 +69,24 @@
 
 /games/*                      /apps/:splat               301
 /pl/games/*                   /pl/apps/:splat            301
+
+# The RPG's screens have addresses that are paths after its page (owner, 23 Nov 2026):
+# /apps/rpg/settings/story, /apps/rpg/worlds, /apps/rpg/world/<id>… The game is one static page per
+# locale, so each is answered with that page by a 200 rewrite, and the page reads the path
+# (src/components/Rpg/settingsRoute.ts). everyrpg.korczak.xyz has the same in public-rpg/_redirects.
+
+/apps/rpg/settings          /apps/rpg/ 200
+/apps/rpg/settings/*        /apps/rpg/ 200
+/apps/rpg/worlds            /apps/rpg/ 200
+/apps/rpg/worlds/*          /apps/rpg/ 200
+/apps/rpg/language          /apps/rpg/ 200
+/apps/rpg/diesel            /apps/rpg/ 200
+/apps/rpg/world/*           /apps/rpg/ 200
+
+/pl/apps/rpg/settings       /pl/apps/rpg/ 200
+/pl/apps/rpg/settings/*     /pl/apps/rpg/ 200
+/pl/apps/rpg/worlds         /pl/apps/rpg/ 200
+/pl/apps/rpg/worlds/*       /pl/apps/rpg/ 200
+/pl/apps/rpg/language       /pl/apps/rpg/ 200
+/pl/apps/rpg/diesel         /pl/apps/rpg/ 200
+/pl/apps/rpg/world/*        /pl/apps/rpg/ 200

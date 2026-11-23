@@ -12,7 +12,7 @@ What exists here, in both locales:
 | `/` | the game, the whole screen, no site around it |
 | `/login/` | sign in and sign up (`LoginForm`, `variant="game"`) |
 | `/account/` | the four keys the game spends (`Account`, `variant="game"`); the same keys are in the game's Settings, so this page is for links from outside |
-| `/admin/` | forwards to the admin panel, which is the *Admin* tab of the game's Settings since 23 Nov 2026: `/admin/#costs` → `/#settings/admin/costs` (`Rpg/settingsRoute.ts`) |
+| `/admin/` | forwards to the admin panel, which is the *Admin* tab of the game's Settings since 23 Nov 2026: `/admin/#costs` → `/settings/admin/costs` (`Rpg/settingsRoute.ts`) |
 
 `Layout.astro` is not used: no navbar, footer, taskbar, desktop or window frame, no client
 router and no service worker. `layouts/Game.astro` keeps only what the game needs from it — the

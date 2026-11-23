@@ -1,0 +1,21 @@
+# everyrpg.korczak.xyz. The game's screens have addresses that are paths (owner, 23 Nov 2026):
+# /settings/story, /worlds, /worlds/trash, /language, /diesel, /world/<id>, and the same under /pl/.
+# The game is one static page per locale, so each of those is answered with that page by a 200
+# rewrite, and the page reads the path (src/components/Rpg/settingsRoute.ts). A path the game does
+# not know still gets the 404 page.
+
+/settings                   / 200
+/settings/*                 / 200
+/worlds                     / 200
+/worlds/*                   / 200
+/language                   / 200
+/diesel                     / 200
+/world/*                    / 200
+
+/pl/settings                /pl/ 200
+/pl/settings/*              /pl/ 200
+/pl/worlds                  /pl/ 200
+/pl/worlds/*                /pl/ 200
+/pl/language                /pl/ 200
+/pl/diesel                  /pl/ 200
+/pl/world/*                 /pl/ 200

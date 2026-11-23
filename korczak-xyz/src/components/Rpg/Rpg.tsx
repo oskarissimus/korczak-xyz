@@ -194,7 +194,7 @@ import DieselShop from './DieselShop';
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
 // The admin panel as Settings' last tab (admins only, standalone): loaded the first time it is opened.
 const SettingsAdmin = lazy(() => import('./AdminPanel'));
-import { gameHash, gameRouteNow, parseGameHash, pushHash, routeDepth, sameScreen, settingsRouteNow, writeHash, type AdminTab, type GameRoute, type SettingsTab } from './settingsRoute';
+import { currentRoute, gameHash, gameRouteNow, parseGameHash, pushRoute, routeDepth, routeIsCurrent, sameScreen, settingsRouteNow, writeRoute, type AdminTab, type GameRoute, type SettingsTab } from './settingsRoute';
 import { questLitres, EMPTY_LITRES, formatLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
@@ -751,8 +751,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
-  // A `#settings/…` address opens Settings on that tab (`settingsRoute.ts`).
-  // Any screen's address opens it (`settingsRoute.ts`, `#worlds`, `#diesel`…); a world's is opened below.
+  // Any screen's address opens it (`settingsRoute.ts`: `…/worlds`, `…/diesel`…); a world's is opened below.
   const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>(() => {
     const r = gameRouteNow();
     return r.kind === 'screen' ? r.screen : 'main';
@@ -3067,8 +3066,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   }, [started, routeWorld]);
   useEffect(() => {
     if (desiredHash === null || pendingWorldRef.current) return;
-    const now = location.hash;
-    if (now === desiredHash || (!now && !desiredHash)) return;
+    const now = currentRoute();
+    if (now === desiredHash && routeIsCurrent(desiredHash)) return;
     let prev: unknown;
     try {
       prev = (window.history.state as { rpgPrev?: unknown } | null)?.rpgPrev;
@@ -3076,8 +3075,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       prev = undefined;
     }
     if (routeDepth() > 0 && (!desiredHash || prev === desiredHash)) window.history.back();
-    else if (!desiredHash || (now && sameScreen(now, desiredHash))) writeHash(desiredHash);
-    else pushHash(desiredHash);
+    else if (now === desiredHash || !desiredHash || (now && sameScreen(now, desiredHash))) writeRoute(desiredHash);
+    else pushRoute(desiredHash);
   }, [desiredHash, started, routeWorld]);
   // Back, Forward or a typed address: the screen it names, leaving the world being played if need be.
   const routeRef = useRef({ started, routeWorld, leave, openWorld });
@@ -3087,12 +3086,12 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     void routeRef.current.openWorld(id, true).then((ok) => {
       if (ok) return;
       pendingWorldRef.current = null;
-      writeHash('');
+      writeRoute('');
     });
   };
   useEffect(() => {
     const onPop = () => {
-      const r = parseGameHash(location.hash);
+      const r = parseGameHash(currentRoute());
       const cur = routeRef.current;
       if (r.kind === 'world') {
         if (cur.started && cur.routeWorld === r.id) return;

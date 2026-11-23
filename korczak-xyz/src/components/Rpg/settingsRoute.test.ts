@@ -43,3 +43,23 @@ describe('gameRoute', () => {
     expect(sameScreen('', '#diesel')).toBe(false);
   });
 });
+
+describe('splitPath', () => {
+  it('finds the game page and the route after it on both hosts', async () => {
+    const { splitPath } = await import('./settingsRoute');
+    expect(splitPath('/')).toEqual({ base: '/', route: '' });
+    expect(splitPath('/pl/')).toEqual({ base: '/pl/', route: '' });
+    expect(splitPath('/apps/rpg/')).toEqual({ base: '/apps/rpg/', route: '' });
+    expect(splitPath('/apps/rpg')).toEqual({ base: '/apps/rpg/', route: '' });
+    expect(splitPath('/settings/story')).toEqual({ base: '/', route: '#settings/story' });
+    expect(splitPath('/pl/settings/admin/costs/')).toEqual({ base: '/pl/', route: '#settings/admin/costs' });
+    expect(splitPath('/apps/rpg/worlds/trash')).toEqual({ base: '/apps/rpg/', route: '#worlds/trash' });
+    expect(splitPath('/pl/apps/rpg/world/k3x9')).toEqual({ base: '/pl/apps/rpg/', route: '#world/k3x9' });
+    expect(splitPath('/diesel')).toEqual({ base: '/', route: '#diesel' });
+  });
+  it('leaves a path that is not a route alone', async () => {
+    const { splitPath } = await import('./settingsRoute');
+    expect(splitPath('/world/Bad Id!')).toEqual({ base: '/world/Bad Id!/', route: '' });
+    expect(splitPath('/worlds/nope')).toEqual({ base: '/worlds/nope/', route: '' });
+  });
+});

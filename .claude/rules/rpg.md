@@ -365,19 +365,27 @@ hosts; the ten looks, `?design=` and `/designs/` are gone.
   rules; then *API keys*), *Controls*, and *Admin* for admins on everyrpg — `AdminPanel` loaded
   lazily inside it, its own tabs under a hairline (styles `rpg-admin.css`, moved out of
   `src-rpg/styles/pages.css`, imported by the index pages). A tab's first group has no heading,
-  the tab names it. The address is the hash (`settingsRoute.ts`): `#settings/story`,
-  `#settings/admin/costs`, written with `replaceState` while Settings are open and cleared when
-  they close; a `#settings…` address opens them on load. **Every screen has an address since
-  23 Nov 2026** (owner: "every settings page and the like should have browser routing, and the game
-  in a world too, with the world's id"): `#worlds`, `#worlds/trash`, `#language`, `#diesel`,
-  `#settings/…`, and `#world/<id>` while a world is played (`parseGameHash`/`gameHash` in
-  `settingsRoute.ts`, the effect after `leave` in `Rpg.tsx`). Opening a screen or a world pushes a
-  history entry (`pushHash`, which keeps `rpgDepth` and the hash it came from in `history.state`); a
-  tab within one replaces it; closing one goes back to the entry it was opened from, so the browser's
-  Back and the game's ← agree. Back/Forward onto a world, or loading its address, opens it through
-  `openWorld` once the account and keys have answered, holding the address meanwhile
-  (`pendingWorldRef`); an id this browser and the account do not know falls back to the home screen. `/admin/` is now only a forward that
-  carries its old hash (`/admin/#costs` → `/#settings/admin/costs`); the panel's own hash handling
+  the tab names it. **Every screen has an address since 23 Nov 2026** (owner: "every settings page
+  and the like should have browser routing, and the game in a world too, with the world's id"), and
+  it is a **path, not a hash** (owner, the same evening, on the decision card: "Ścieżki bez #").
+  After the game's own page — `/` or `/pl/` on everyrpg, `/apps/rpg/` on korczak.xyz — come
+  `settings/story`, `settings/admin/costs`, `worlds`, `worlds/trash`, `language`, `diesel`, and
+  `world/<id>` while a world is played. The site is static, so `_redirects` answers each of those
+  paths with the locale's game page by a **200 rewrite** (`public-rpg/_redirects`, and the
+  `/apps/rpg/` block at the end of `public/_redirects`); an unknown path still gets the 404 page.
+  Checked with `wrangler dev --env rpg` on the built dist before it shipped. A new screen needs its
+  line there as well as in `SCREEN_HASH`. Inside `settingsRoute.ts` a route is still written as a
+  hash-like token (`#settings/story`): `splitPath` reads the page and the token off a path,
+  `currentRoute()` off the address (falling back to an old `#…` address, which is then rewritten to
+  the path), `routeUrl()` builds the address back. `parseGameHash`/`gameHash` parse and print
+  tokens; the effect after `leave` in `Rpg.tsx` keeps the address in step. Opening a screen or a
+  world pushes a history entry (`pushRoute`, which keeps `rpgDepth` and the route it came from in
+  `history.state`); a tab within one replaces it; closing one goes back to the entry it was opened
+  from, so the browser's Back and the game's ← agree. Back/Forward onto a world, or loading its
+  address, opens it through `openWorld` once the account and keys have answered, holding the
+  address meanwhile (`pendingWorldRef`); an id this browser and the account do not know falls back
+  to the home screen. `/admin/` is now only a forward that carries its old hash (`/admin/#costs` →
+  `/settings/admin/costs`); the panel's own hash handling
   stays for korczak.xyz's `/apps/admin/`. A tab asked for that is not there yet (admin before
   sign-in has answered) shows *Game* while the address keeps what was asked.
 - **Settings are groups of rows** (owner, 11 Nov 2026: "on a small screen the boxes are cut off,

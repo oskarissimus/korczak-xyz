@@ -1,14 +1,14 @@
 ---
 // The admin panel was its own page here until 23 Nov 2026; it is now the *Admin* tab of the game's
 // Settings (owner: "the admin panel should be a tab too, with its own sub-tabs"). This page only
-// forwards old links and bookmarks: `/admin/#costs` → `/#settings/admin/costs` (settingsRoute.ts).
+// forwards old links and bookmarks: `/admin/#costs` → `/pl/settings/admin/costs` (settingsRoute.ts).
 // The hash never reaches the server, so this cannot be a line in _redirects.
 import Game from '../../layouts/Game.astro';
 import { useTranslations } from '../../../src/i18n';
 
 const lang = 'pl';
 const t = useTranslations(lang);
-const target = '/pl/#settings/admin';
+const target = '/pl/settings/admin';
 ---
 
 <Game title={`${t('rpg.admin')} · ${t('Rpg')}`} lang={lang} path="/admin/" noindex>
