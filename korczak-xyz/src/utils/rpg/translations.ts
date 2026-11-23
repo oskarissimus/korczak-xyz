@@ -100,6 +100,9 @@ const en = {
   dieselSubCancel: 'Cancel the subscription',
   dieselCanister: { can: 'Canister', barrel: 'Barrel', tank: 'Tanker' } as Record<'can' | 'barrel' | 'tank', string>,
   dieselPlantTitle: 'Diesel',
+  dieselInTank: 'In the tank',
+  dieselQuestsLeft: (n: number) => (n === 1 ? 'about 1 quest' : `about ${n} quests`),
+  dieselPay: (price: string) => `Pay ${price}`,
   dieselPrices: (world: string, quest: string, step: string, line: string) =>
     `A new world with its first quest ~${world} · a new quest ~${quest} · of which a step of the story ~${step} and a spoken line ~${line}`,
   dieselNote: 'Everything the game generates is paid for in litres of diesel.',
@@ -481,6 +484,14 @@ const pl: typeof en = {
   dieselSubCancel: 'Anuluj subskrypcję',
   dieselCanister: { can: 'Kanister', barrel: 'Beczka', tank: 'Cysterna' },
   dieselPlantTitle: 'Dizel',
+  dieselInTank: 'W baku',
+  dieselQuestsLeft: (n) => {
+    const tens = n % 100;
+    const ones = n % 10;
+    const word = n === 1 ? 'quest' : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? 'questy' : 'questów';
+    return `ok. ${n} ${word}`;
+  },
+  dieselPay: (price) => `Zapłać ${price}`,
   dieselPrices: (world, quest, step, line) =>
     `Nowy świat z pierwszym questem ~${world} · nowy quest ~${quest} · w tym krok opowieści ~${step} i kwestia czytana na głos ~${line}`,
   dieselNote: 'Wszystko, co gra generuje, opłaca się litrami dizla.',

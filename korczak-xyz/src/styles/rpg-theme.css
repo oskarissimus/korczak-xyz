@@ -1693,3 +1693,289 @@
   min-width: 0;
   padding: 10px 12px;
 }
+
+/* The diesel page (`DieselShop.tsx`, owner 23 Nov 2026, variant B of `rpg/dizel-redesign/`): the tank
+   as a card with the plant in white lines, the canisters as cards to pick (the picked one ringed in
+   white — by outline, not hue), the monthly delivery under them, and one white button. */
+:root:root .rpg-dzs {
+  margin-top: 16px;
+}
+
+:root:root .rpg-dzs-tank {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)), var(--d-surface-bg);
+}
+
+:root:root .rpg-dzs-tank-text {
+  flex: 1;
+  min-width: 0;
+}
+
+:root:root .rpg-dzs h4 {
+  margin: 0;
+  font: 800 11px/1 var(--d-font);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-litres {
+  margin: 10px 0 0;
+  font: 700 42px/1 var(--d-font);
+  letter-spacing: -0.02em;
+  color: var(--d-ink-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+:root:root .rpg-dzs-litres small {
+  margin-left: 4px;
+  font: 600 19px/1 var(--d-font);
+  letter-spacing: 0;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-line {
+  min-height: 1.4em;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-art {
+  flex: none;
+  width: 42%;
+  max-width: 150px;
+  height: auto;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+:root:root .rpg-dzs-art .rpg-dzs-gauge,
+:root:root .rpg-dzs-art .rpg-dzs-leds {
+  fill: #fff;
+  transition: opacity 0.6s;
+}
+
+:root:root .rpg-dzs-art .rpg-dzs-smoke circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-smoke circle {
+  animation: rpg-dzs-puff 2.7s ease-out infinite;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-smoke circle:nth-child(2) {
+  animation-delay: 0.9s;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-smoke circle:nth-child(3) {
+  animation-delay: 1.8s;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-leds circle {
+  animation: rpg-dz-blink 1.3s steps(2, jump-none) infinite;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-leds circle:nth-child(2n) {
+  animation-delay: 0.45s;
+}
+
+:root:root .rpg-dzs-running .rpg-dzs-cable {
+  animation: rpg-dz-flow 0.6s linear infinite;
+}
+
+/* Empty: everything dark and still. Refuelling: the gauge fills again and the lights come back. */
+:root:root .rpg-dzs-stopped .rpg-dzs-art {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+:root:root .rpg-dzs-stopped .rpg-dzs-gauge,
+:root:root .rpg-dzs-stopped .rpg-dzs-leds {
+  opacity: 0;
+}
+
+:root:root .rpg-dzs-refuel .rpg-dzs-gauge {
+  animation: rpg-dzs-fill 1.2s ease-in-out infinite alternate;
+}
+
+:root:root .rpg-dzs-offers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+:root:root .rpg-dzs-offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 6px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  color: var(--d-ink);
+  font: 400 13px/1.3 var(--d-font);
+  text-align: center;
+  cursor: pointer;
+}
+
+:root:root .rpg-dzs-offer:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+:root:root .rpg-dzs-offer[aria-checked='true'] {
+  border-color: #fff;
+  box-shadow: inset 0 0 0 1px #fff;
+}
+
+:root:root .rpg-dzs-offer:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+:root:root .rpg-dzs-offer strong {
+  overflow: hidden;
+  max-width: 100%;
+  font: 600 21px/1.1 var(--d-font-display);
+  color: var(--d-ink-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root:root .rpg-dzs-offer span {
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-offer b {
+  margin-top: 6px;
+  font: 800 15px/1 var(--d-font);
+  color: var(--d-ink-strong);
+}
+
+/* The monthly delivery: the fourth offer, across the whole row. */
+:root:root .rpg-dzs-monthly {
+  grid-column: 1 / -1;
+  align-items: stretch;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+:root:root .rpg-dzs-monthly-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+:root:root .rpg-dzs-monthly-head b {
+  margin: 0;
+  white-space: nowrap;
+}
+
+:root:root .rpg-dzs-monthly small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-pay {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: var(--d-radius);
+  background: #fff;
+  color: #0b0b0d;
+  font: 700 16px/1 var(--d-font);
+  cursor: pointer;
+}
+
+:root:root .rpg-dzs-pay:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+:root:root .rpg-dzs-pay:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* The account's subscription, once it has one: its state where the offer was. */
+:root:root .rpg-dzs-sub {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  font-size: 14px;
+}
+
+:root:root .rpg-dzs-sub p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--d-ink-dim);
+}
+
+:root:root .rpg-dzs-sub a {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--d-ink);
+}
+
+:root:root .rpg-dzs-note {
+  margin: 12px 2px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--d-ink-dim);
+}
+
+@keyframes rpg-dzs-puff {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.6);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-4px, -16px) scale(2);
+  }
+}
+
+@keyframes rpg-dzs-fill {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:root .rpg-dzs-running .rpg-dzs-smoke circle,
+  :root:root .rpg-dzs-running .rpg-dzs-leds circle,
+  :root:root .rpg-dzs-running .rpg-dzs-cable,
+  :root:root .rpg-dzs-refuel .rpg-dzs-gauge {
+    animation: none;
+  }
+
+  :root:root .rpg-dzs-running .rpg-dzs-smoke circle {
+    opacity: 0.5;
+  }
+}

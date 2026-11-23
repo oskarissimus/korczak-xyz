@@ -11,7 +11,7 @@
  * wrote, so talking costs no request.
  */
 
-import React, { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { ACCOUNT_KEY, setGatewayContext } from '../../utils/rpg/gateway';
@@ -189,12 +189,13 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
+import DieselShop from './DieselShop';
 // The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
 // The admin panel as Settings' last tab (admins only, standalone): loaded the first time it is opened.
 const SettingsAdmin = lazy(() => import('./AdminPanel'));
 import { parseSettingsHash, settingsHash, settingsRouteNow, writeHash, type AdminTab, type SettingsTab } from './settingsRoute';
-import { beatLitres, questLitres, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
+import { questLitres, EMPTY_LITRES, formatLitres, litres, plantState, worldLitres, type Canister } from '../../utils/rpg/diesel';
 
 interface DialogueLine {
   speaker: string;
@@ -3197,15 +3198,6 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // What a quest and a world cost in all, not only the model's words: the lines, the score and the
   // models are most of it (`questLitres`, measured on the ledger) — and only what is on for this reader.
   const priceParts = { voice: Boolean(voiceOn && voiceKey), music: Boolean(musicOn && musicKey), fal: Boolean(falKey) };
-  const dieselPrices =
-    diesel && dieselModel
-      ? t.dieselPrices(
-          formatLitres(worldLitres(dieselModel, priceParts) ?? 0, gameLang),
-          formatLitres(questLitres(dieselModel, priceParts) ?? 0, gameLang),
-          formatLitres(beatLitres(dieselModel) ?? 0, gameLang),
-          formatLitres(lineLitres(), gameLang),
-        )
-      : null;
   const back = (
     <button type="button" className="rpg-menu-back" onClick={() => setMenu('main')}>
       ← {t.menuBack}
@@ -3705,24 +3697,19 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   );
 
   // The world the next quest is played in: its name and who you are there, the pitch a tap away.
+  // The page behind the badge, in the settings' look (`DieselShop.tsx`, owner 23 Nov 2026): the legal
+  // pages are the footer's, so the page no longer lists them.
   const dieselMenu = diesel && (
-    <div className="rpg-panel">
-      <h3>⛽ {t.dieselPlantTitle}</h3>
-      <DieselPlant lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} tank={diesel.tank} onBuy={buyDiesel} onSubscribe={subscribeDiesel} {...dieselSub} showCanisters />
-      {dieselPrices && <p className="rpg-dz-note">{dieselPrices}</p>}
-      <p className="rpg-dz-note">{t.dieselNote}</p>
-      <p className="rpg-dz-note">
-        <a href={rulesHref}>{t.rulesLink}</a>
-      </p>
-      <p className="rpg-dz-note">
-        {(['pricing', 'terms', 'refunds', 'privacy'] as const).map((page, i) => (
-          <Fragment key={page}>
-            {i > 0 && ' · '}
-            <a href={legalHref(page)}>{t.legalLinks[page]}</a>
-          </Fragment>
-        ))}
-      </p>
-      <div className="rpg-panel-actions">{back}</div>
+    <div className="rpg-settings">
+      {settingsBar(t.dieselPlantTitle)}
+      <DieselShop
+        lang={gameLang}
+        litres={diesel.litres}
+        questLitres={dieselModel ? questLitres(dieselModel, priceParts) : null}
+        onBuy={buyDiesel}
+        onSubscribe={subscribeDiesel}
+        {...dieselSub}
+      />
     </div>
   );
 

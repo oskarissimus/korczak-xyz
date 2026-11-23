@@ -2073,10 +2073,20 @@ the price of a world or a beat is in it too."
   keyframes), and only then do the lights come on.
 - **Where it shows**, only for an account on its tank (since 23 Nov 2026 a guest has no diesel —
   *A guest gets one world and one first beat*, above; until then all of this was the demo's day): the canister badge on the main menu (the plant
-  itself when empty), the panel behind the badge with the prices, the badge and a price tag on
+  itself when empty), the page behind the badge, the badge and a price tag on
   New world, a price tag on New quest, the line in Settings, and the plant on the ending screen. A
   spent cap closes the demo (`available: false`, so the story falls back to `static`), and that is
   exactly when the dark plant must show — the condition reads the cap reasons for that.
+- **The page behind the badge is in the settings' look** (owner, 23 Nov 2026: "this page is from the
+  old days"; variant B of the mockups in `rpg/dizel-redesign/` in the project files, with the tabs, the
+  notes and the links struck out and the subscription on the same page). `DieselShop.tsx`, styles
+  `.rpg-dzs-*` at the end of `rpg-theme.css`: ← and *Dizel* in `settingsBar`, the tank as one card (the
+  litres, *ok. N questów* from `questLitres`, the plant in white lines — smoking and blinking while it
+  runs, dark when empty, the gauge pulsing while a payment pours), the three canisters as cards to pick
+  (Barrel picked first), the monthly delivery as a fourth across the row or its state once the account
+  has one, and one white *Zapłać …* button. No price list, payment methods or legal links: those are
+  the footer's and `/pricing/`. The ending screen and the empty plant on the home screen are still
+  `DieselPlant`.
 - **The tags are estimates of the whole thing**, said with "~"; the console keeps the bill. Until
   9 Nov 2026 they priced only the model's words — ~1.9 L for a world, ~0.9 L for a quest — while the
   ledger measured $0.41–0.72 for a world and its first quest, most of it ElevenLabs and fal.ai (owner:
