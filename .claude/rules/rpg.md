@@ -2089,9 +2089,14 @@ the price of a world or a beat is in it too."
 - **The page behind the badge is in the settings' look** (owner, 23 Nov 2026: "this page is from the
   old days"; variant B of the mockups in `rpg/dizel-redesign/` in the project files, with the tabs, the
   notes and the links struck out and the subscription on the same page). `DieselShop.tsx`, styles
-  `.rpg-dzs-*` at the end of `rpg-theme.css`: ← and *Dizel* in `settingsBar`, the tank as one card (the
-  litres, *ok. N questów* from `questLitres`, the plant in white lines — smoking and blinking while it
-  runs, dark when empty, the gauge pulsing while a payment pours), the subscription first, the page's white
+  `.rpg-dzs-*` at the end of `rpg-theme.css`: ← and *Dizel* in `settingsBar`, then the pictures of
+  variant C in `rpg/dizel-obrazki/` with B's uncropped canister, barrel and tanker (owner, same evening).
+  The tank is one line — *W baku* and the litres — with a white gauge under it (full at the biggest
+  canister plus a month of the subscription, pulsing while a payment pours) and *ok. N questów* from
+  `questLitres`; the subscription's card has a cover picture like a world's; each canister card has its
+  picture, whole on black under `mix-blend-mode: lighten`. The pictures are `src/assets/rpg/diesel/*.webp`
+  (FLUX schnell, made once) and every one has a fixed box (`width`/`height` plus `aspect-ratio`), so
+  nothing moves as they load. Order: the subscription first, the page's white
   call to action (or its state once the account has one), then the three canisters as cards — each card a
   button that opens Paddle's checkout for it at once (owner, the same evening: "remove the Pay button,
   let each option be a button"). The monthly delivery is called *Subskrypcja* / *Subscription* everywhere,

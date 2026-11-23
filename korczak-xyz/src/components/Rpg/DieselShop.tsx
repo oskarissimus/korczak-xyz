@@ -3,11 +3,13 @@
  * the game and the other screens"; variant B of the mockups in `rpg/dizel-redesign/` in the project
  * files, with the tabs, the notes and the links struck out and the subscription on the same page).
  *
- * In the settings' look: the tank as one card — what is in it, about how many quests that is, and the
- * plant drawn in white lines beside it, smoking and blinking while it runs, dark when it is empty —
- * then the subscription, the page's call to action (or its state, once the account has one), with the
- * three canisters under it — each a button that opens the checkout for it at once (no separate Pay button). The legal pages
- * are in the page's footer, so they are not repeated here.
+ * In the settings' look, with pictures (owner, 23 Nov 2026: variant C of `rpg/dizel-obrazki/`, but with
+ * variant B's canister, barrel and tanker, which are not cropped): what is in the tank as one line with
+ * a gauge under it and about how many quests that is; then the subscription, the page's call to
+ * action, as a white card with a cover picture like a world's (or its state, once the account has
+ * one); then the three canisters as cards with their picture — each a button that opens the checkout
+ * for it at once (no separate Pay button). Every picture has its box from the first frame. The legal
+ * pages are in the page's footer, so they are not repeated here.
  *
  * The checkout is the old plant's (`DieselPlant.tsx`): Paddle's overlay through `onBuy`/`onSubscribe`;
  * the litres arrive by webhook and the tank's snapshot raises the number. The plant on the main menu
@@ -21,6 +23,10 @@ import { PADDLE } from '../../utils/rpg/paddleConfig';
 import type { CheckoutOutcome } from '../../utils/rpg/paddleCheckout';
 import type { Lang } from '../../utils/rpg/quest';
 import { ui } from './ui';
+import canisterImg from '../../assets/rpg/diesel/canister.webp?url';
+import barrelImg from '../../assets/rpg/diesel/barrel.webp?url';
+import tankerImg from '../../assets/rpg/diesel/tanker.webp?url';
+import subscriptionImg from '../../assets/rpg/diesel/subscription.webp?url';
 
 /** How long the refuel glow lasts after a payment. */
 const REFUEL_MS = 3600;
@@ -29,42 +35,16 @@ const HOLD_MS = 5000;
 
 type Pick = Canister['id'] | 'monthly';
 
+/** Each canister's picture, whole on black (variant B's, not cropped). */
+const PICTURE: Record<Canister['id'], string> = { can: canisterImg, barrel: barrelImg, tank: tankerImg };
+
+/** What the gauge counts as a full tank: the biggest canister and a month of the subscription. */
+const FULL_TANK = Math.max(...CANISTERS.map((c) => c.litres)) + SUBSCRIPTION.litres;
+
 /** "14 grudnia" / "14 December": the day a delivery renews or ends. */
 function dayOf(iso: string, lang: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString(lang === 'pl' ? 'pl-PL' : 'en-GB', { day: 'numeric', month: 'long' });
-}
-
-/** The plant in white lines: a generator with its exhaust, a cable and one rack. */
-function PlantLines() {
-  return (
-    <svg viewBox="0 0 150 110" className="rpg-dzs-art" aria-hidden="true">
-      <g className="rpg-dzs-smoke">
-        <circle cx="48" cy="18" r="3.5" />
-        <circle cx="48" cy="18" r="3.5" />
-        <circle cx="48" cy="18" r="3.5" />
-      </g>
-      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-        <path d="M44 26v22M40 26h8" />
-        <rect x="4" y="48" width="70" height="38" rx="4" />
-        <path d="M36 56v22M43 56v22M50 56v22M57 56v22M64 56v22" />
-        <rect x="11" y="56" width="16" height="22" rx="1" />
-        <circle cx="14" cy="90" r="4" />
-        <circle cx="64" cy="90" r="4" />
-        <path className="rpg-dzs-cable" d="M74 76 C86 96 96 96 106 76" strokeDasharray="3 3" />
-        <rect x="106" y="32" width="34" height="62" rx="2" />
-        <path d="M110 42h26M110 52h26M110 62h26M110 72h26M110 82h26" />
-      </g>
-      <rect className="rpg-dzs-gauge" x="13" y="65" width="12" height="11" />
-      <g className="rpg-dzs-leds">
-        <circle cx="113" cy="37" r="1.4" />
-        <circle cx="117" cy="47" r="1.4" />
-        <circle cx="113" cy="57" r="1.4" />
-        <circle cx="117" cy="67" r="1.4" />
-        <circle cx="113" cy="77" r="1.4" />
-      </g>
-    </svg>
-  );
 }
 
 export default function DieselShop({
@@ -130,20 +110,24 @@ export default function DieselShop({
       ? t.dieselRefuel
       : null;
 
+  const fill = Math.max(0, Math.min(1, litres / FULL_TANK));
+
   return (
     <div className={`rpg-dzs rpg-dzs-${refuel ? 'refuel' : stopped ? 'stopped' : 'running'}`}>
       <section className="rpg-dzs-tank" aria-label={stopped ? t.dieselStopped : t.dieselRunning}>
-        <div className="rpg-dzs-tank-text">
+        <div className="rpg-dzs-tank-row">
           <h4>{t.dieselInTank}</h4>
           <p className="rpg-dzs-litres">
             {Math.round(litres).toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-GB')}
             <small>L</small>
           </p>
-          <p className="rpg-dzs-line" role="status">
-            {status ?? (stopped ? t.dieselOut : quests !== null ? t.dieselQuestsLeft(quests) : '')}
-          </p>
         </div>
-        <PlantLines />
+        <div className="rpg-dzs-gauge" aria-hidden="true">
+          <i style={{ width: `${fill * 100}%` }} />
+        </div>
+        <p className="rpg-dzs-line" role="status">
+          {status ?? (stopped ? t.dieselOut : quests !== null ? t.dieselQuestsLeft(quests) : '')}
+        </p>
       </section>
 
       {offerMonthly && (
@@ -154,27 +138,33 @@ export default function DieselShop({
           disabled={busy}
           onClick={() => pay('monthly')}
         >
-          <span className="rpg-dzs-monthly-head">
-            <strong>{t.dieselSubTitle}</strong>
-            <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
+          <img className="rpg-dzs-cover" src={subscriptionImg} alt="" width={800} height={400} />
+          <span className="rpg-dzs-monthly-body">
+            <span className="rpg-dzs-monthly-head">
+              <strong>{t.dieselSubTitle}</strong>
+              <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
+            </span>
+            <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
           </span>
-          <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
         </button>
       )}
       {subscription && (
         <div className="rpg-dzs-sub">
-          <strong>{t.dieselSubTitle}</strong>
-          <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
-          <p>
-            {subscription.endsAt
-              ? t.dieselSubEnding(formatLitres(subLitres, lang), dayOf(subscription.endsAt, lang))
-              : t.dieselSubActive(formatLitres(subLitres, lang), subscription.nextBilledAt ? dayOf(subscription.nextBilledAt, lang) : '—')}
-          </p>
-          {subscription.cancelUrl && !subscription.endsAt && (
-            <a href={subscription.cancelUrl} target="_blank" rel="noopener noreferrer">
-              {t.dieselSubCancel}
-            </a>
-          )}
+          <img className="rpg-dzs-cover" src={subscriptionImg} alt="" width={800} height={400} />
+          <div className="rpg-dzs-sub-body">
+            <strong>{t.dieselSubTitle}</strong>
+            <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
+            <p>
+              {subscription.endsAt
+                ? t.dieselSubEnding(formatLitres(subLitres, lang), dayOf(subscription.endsAt, lang))
+                : t.dieselSubActive(formatLitres(subLitres, lang), subscription.nextBilledAt ? dayOf(subscription.nextBilledAt, lang) : '—')}
+            </p>
+            {subscription.cancelUrl && !subscription.endsAt && (
+              <a href={subscription.cancelUrl} target="_blank" rel="noopener noreferrer">
+                {t.dieselSubCancel}
+              </a>
+            )}
+          </div>
         </div>
       )}
       <div className="rpg-dzs-offers">
@@ -182,14 +172,19 @@ export default function DieselShop({
           <button
             type="button"
             key={c.id}
-            className="rpg-dzs-offer"
+            className="rpg-dzs-offer rpg-dzs-can"
             aria-busy={bought?.id === c.id && bought.outcome === null}
             disabled={!onBuy || busy}
             onClick={() => pay(c.id)}
           >
-            <strong>{t.dieselCanister[c.id]}</strong>
-            <span>{formatLitres(c.litres, lang)}</span>
-            <b>{c.pln} zł</b>
+            <img className="rpg-dzs-pic" src={PICTURE[c.id]} alt="" width={320} height={320} />
+            <span className="rpg-dzs-can-body">
+              <strong>{t.dieselCanister[c.id]}</strong>
+              <span className="rpg-dzs-can-row">
+                <span>{formatLitres(c.litres, lang)}</span>
+                <b>{c.pln} zł</b>
+              </span>
+            </span>
           </button>
         ))}
       </div>
