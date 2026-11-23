@@ -439,7 +439,7 @@ function FalCard({ api, usedBy, t }: CardProps) {
         <dd>{t.falNoApi}</dd>
       </dl>
       <p className="acct-dim">
-        <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noopener">
+        <a href="https://fal.ai/dashboard/usage-billing/credits" target="_blank" rel="noopener">
           {t.falBillingLink}
         </a>
         {' · '}

@@ -13,7 +13,7 @@ export const FUNDS_PROVIDERS: readonly FundsProvider[] = ['google', 'openai', 'e
 
 /** Where each provider's balance is topped up. */
 export const TOP_UP: Record<FundsProvider, { name: string; url: string }> = {
-  fal: { name: 'fal.ai', url: 'https://fal.ai/dashboard/billing' },
+  fal: { name: 'fal.ai', url: 'https://fal.ai/dashboard/usage-billing/credits' },
   elevenlabs: { name: 'ElevenLabs', url: 'https://elevenlabs.io/app/subscription' },
   google: { name: 'Google AI Studio', url: 'https://aistudio.google.com/usage' },
   openai: { name: 'OpenAI', url: 'https://platform.openai.com/settings/organization/billing' },
