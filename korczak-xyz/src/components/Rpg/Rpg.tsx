@@ -188,7 +188,7 @@ import { weaponLength, weaponLook, weaponPrompt } from '../../utils/rpg/weapon';
 /** The fal.ai pieces a quest and its world make beyond the hub, for the start's progress (`progressTasks`). */
 const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creature', 'weapon']);
 import { uiPending, useUi } from './ui';
-import DieselPlant, { CanisterIcon, DieselBadge, dieselTag } from './DieselPlant';
+import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
 import DieselShop from './DieselShop';
 // The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
@@ -3303,7 +3303,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const mainMenu = (
     <nav className="rpg-menu" aria-label={t.title}>
       {keysReady && storyProvider === 'static' && item('start', t.start, () => begin(), { primary: !ownSave })}
-      {item('language', `🌐 ${t.language}`, () => setMenu('language'), { sub: nativeName(gameLang) })}
+      {item('language', t.language, () => setMenu('language'), { sub: nativeName(gameLang) })}
       {item('settings', t.menuSettings, () => setMenu('settings'))}
     </nav>
   );
@@ -3360,11 +3360,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         {sheetAccount}
         {item('library', t.homeWorlds(libraryRows.length), () => setMenu('library'), { disabled: libraryRows.length === 0 })}
         {diesel ? (
-          <DieselBadge lang={gameLang} litres={diesel.litres} capacity={diesel.capacity} onClick={() => setMenu('diesel')} />
+          <DieselBadge lang={gameLang} litres={diesel.litres} onClick={() => setMenu('diesel')} />
         ) : (
           dieselComing && (
             <span className="rpg-dz-badge rpg-dz-badge-coming" aria-busy="true">
-              <CanisterIcon level={0.5} />
               <span>{t.dieselLeft(lastLitres === null ? '…' : formatLitres(lastLitres, gameLang))}</span>
             </span>
           )

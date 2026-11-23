@@ -826,11 +826,6 @@
   font-weight: 800;
 }
 
-/* The language row says the language itself ("🌐 Polski"), not the word "Language". */
-:root:root .rpg-home-sheet .rpg-menu-item[data-key='language'] > span::before {
-  content: '🌐 ';
-}
-
 /* Continue, or the world being born: the sheet's one white button. */
 :root:root .rpg-home-sheet .rpg-home-resume {
   display: flex;

@@ -39,23 +39,21 @@ export function CanisterIcon({ level = 1, size = 18 }: { level?: number; size?: 
   );
 }
 
-/** The canister and how much is in it, one line — what "how much diesel do I have" shows. */
+/** How much is in the tank, one line of the ⋯ sheet: words only, like every other row there (23 Nov
+ * 2026: the canister and the globe were its only two icons, and they broke the rows' left edge). */
 export function DieselBadge({
   lang,
   litres,
-  capacity,
   onClick,
 }: {
   lang: Lang;
   litres: number;
-  capacity: number;
   onClick?: () => void;
 }) {
   const t = ui(lang);
   const empty = plantState(litres) === 'stopped';
   const body = (
     <>
-      <CanisterIcon level={capacity > 0 ? litres / capacity : 0} />
       <span>{t.dieselLeft(formatLitres(litres, lang))}</span>
     </>
   );

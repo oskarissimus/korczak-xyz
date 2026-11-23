@@ -2429,7 +2429,7 @@ lack it and answer in the browser's language). `Lang` is now any of them, not `'
   the language of a quest left half way, else `/pl/` when that is the page, else the first of
   `navigator.languages` on the list, else English. A saved quest no longer switches the language on
   load; it is offered when it is in the game's language.
-- **The choice**: *🌐 Language* on the main menu (and the same picker in Settings), a `<select>` of
+- **The choice**: *Language* on the main menu (and the same picker in Settings), a `<select>` of
   every language by its own name, with a one-tap way back to the browser's language. Opening a world
   of another language from the library counts as a choice.
 - **On the account**: `users/{uid}/rpgState/lang` `{lang, at}` (`langSync.ts`). At sign-in the later
