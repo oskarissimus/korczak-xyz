@@ -1695,8 +1695,9 @@
 }
 
 /* The diesel page (`DieselShop.tsx`, owner 23 Nov 2026, variant B of `rpg/dizel-redesign/`): the tank
-   as a card with the plant in white lines, the canisters as cards to pick (the picked one ringed in
-   white — by outline, not hue), the monthly delivery under them, and one white button. */
+   as a card with the plant in white lines, then the canisters and the monthly delivery as cards, each
+   a button straight into the checkout (no Pay button, owner 23 Nov 2026); the one opening is ringed
+   in white — by outline, not hue. */
 :root:root .rpg-dzs {
   margin-top: 16px;
 }
@@ -1835,9 +1836,18 @@
   border-color: rgba(255, 255, 255, 0.6);
 }
 
-:root:root .rpg-dzs-offer[aria-checked='true'] {
+:root:root .rpg-dzs-offer:active:not(:disabled),
+:root:root .rpg-dzs-offer[aria-busy='true'] {
   border-color: #fff;
   box-shadow: inset 0 0 0 1px #fff;
+}
+
+:root:root .rpg-dzs-offer:disabled {
+  cursor: default;
+}
+
+:root:root .rpg-dzs-offer:disabled:not([aria-busy='true']) {
+  opacity: 0.55;
 }
 
 :root:root .rpg-dzs-offer:focus-visible {
@@ -1884,33 +1894,31 @@
   white-space: nowrap;
 }
 
+:root:root .rpg-dzs-sub strong {
+  display: block;
+  font: 600 21px/1.1 var(--d-font-display);
+  color: var(--d-ink-strong);
+}
+
+:root:root .rpg-dzs-sub .rpg-dzs-monthly-litres {
+  display: block;
+  margin: 4px 0 6px;
+  font: 700 24px/1.1 var(--d-font);
+  letter-spacing: -0.01em;
+  color: var(--d-ink-strong);
+}
+
+:root:root .rpg-dzs-offer .rpg-dzs-monthly-litres {
+  margin: 4px 0 2px;
+  font: 700 24px/1.1 var(--d-font);
+  letter-spacing: -0.01em;
+  color: var(--d-ink-strong);
+}
+
 :root:root .rpg-dzs-monthly small {
   font-size: 12px;
   line-height: 1.4;
   color: var(--d-ink-dim);
-}
-
-:root:root .rpg-dzs-pay {
-  display: block;
-  width: 100%;
-  min-height: 50px;
-  margin-top: 16px;
-  border: 0;
-  border-radius: var(--d-radius);
-  background: #fff;
-  color: #0b0b0d;
-  font: 700 16px/1 var(--d-font);
-  cursor: pointer;
-}
-
-:root:root .rpg-dzs-pay:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-:root:root .rpg-dzs-pay:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
 }
 
 /* The account's subscription, once it has one: its state where the offer was. */

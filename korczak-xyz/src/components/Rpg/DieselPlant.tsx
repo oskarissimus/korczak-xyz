@@ -282,7 +282,7 @@ export default function DieselPlant({
                   <p className="rpg-dz-note rpg-dz-sub">
                     {subscription.endsAt
                       ? t.dieselSubEnding(formatLitres(subLitres, lang), dayOf(subscription.endsAt, lang))
-                      : t.dieselSubActive(formatLitres(subLitres, lang), subscription.nextBilledAt ? dayOf(subscription.nextBilledAt, lang) : '—')}
+                      : `${t.dieselSubTitle} · ${t.dieselSubActive(formatLitres(subLitres, lang), subscription.nextBilledAt ? dayOf(subscription.nextBilledAt, lang) : '—')}`}
                     {subscription.cancelUrl && !subscription.endsAt && (
                       <>
                         {' '}

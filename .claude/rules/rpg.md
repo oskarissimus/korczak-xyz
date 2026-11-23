@@ -2082,9 +2082,11 @@ the price of a world or a beat is in it too."
   notes and the links struck out and the subscription on the same page). `DieselShop.tsx`, styles
   `.rpg-dzs-*` at the end of `rpg-theme.css`: ← and *Dizel* in `settingsBar`, the tank as one card (the
   litres, *ok. N questów* from `questLitres`, the plant in white lines — smoking and blinking while it
-  runs, dark when empty, the gauge pulsing while a payment pours), the three canisters as cards to pick
-  (Barrel picked first), the monthly delivery as a fourth across the row or its state once the account
-  has one, and one white *Zapłać …* button. No price list, payment methods or legal links: those are
+  runs, dark when empty, the gauge pulsing while a payment pours), the three canisters as cards and the
+  monthly delivery as a fourth across the row (or its state once the account has one) — each card a
+  button that opens Paddle's checkout for it at once (owner, the same evening: "remove the Pay button,
+  let each option be a button"). The monthly delivery is called *Subskrypcja* / *Subscription* everywhere,
+  with its *600 L na miesiąc* set large (owner, same evening). No price list, payment methods or legal links: those are
   the footer's and `/pricing/`. The ending screen and the empty plant on the home screen are still
   `DieselPlant`.
 - **The tags are estimates of the whole thing**, said with "~"; the console keeps the bill. Until

@@ -5,8 +5,8 @@
  *
  * In the settings' look: the tank as one card — what is in it, about how many quests that is, and the
  * plant drawn in white lines beside it, smoking and blinking while it runs, dark when it is empty —
- * then the three canisters as cards to pick from, the monthly delivery as a fourth below them (or its
- * state, once the account has one), and one white button that says what will be paid. The legal pages
+ * then the three canisters, the monthly delivery as a fourth below them (or its state, once the account
+ * has one) — each a button that opens the checkout for it at once (no separate Pay button). The legal pages
  * are in the page's footer, so they are not repeated here.
  *
  * The checkout is the old plant's (`DieselPlant.tsx`): Paddle's overlay through `onBuy`/`onSubscribe`;
@@ -87,10 +87,9 @@ export default function DieselShop({
 }) {
   const t = ui(lang);
   const stopped = plantState(litres) === 'stopped';
-  const [pick, setPick] = useState<Pick>('barrel');
   const [refuel, setRefuel] = useState(false);
-  /** A checkout open (`null` outcome) or just finished. */
-  const [bought, setBought] = useState<{ litres: number; outcome: CheckoutOutcome | null } | null>(null);
+  /** A checkout open (`null` outcome) or just finished, and which offer opened it. */
+  const [bought, setBought] = useState<{ id: Pick; litres: number; outcome: CheckoutOutcome | null } | null>(null);
   const timers = useRef<number[]>([]);
   const later = (fn: () => void, ms: number) => {
     timers.current.push(window.setTimeout(fn, ms));
@@ -98,19 +97,18 @@ export default function DieselShop({
   useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
 
   const offerMonthly = Boolean(onSubscribe) && !subscription;
-  const chosen = pick === 'monthly' && !offerMonthly ? 'barrel' : pick;
-  const canister = CANISTERS.find((c) => c.id === chosen);
   const busy = refuel || (bought !== null && bought.outcome === null);
-  const price = chosen === 'monthly' ? t.dieselSubPrice(SUBSCRIPTION.pln) : `${canister!.pln} zł`;
 
-  const pay = () => {
+  /** Each offer is its own button straight into Paddle's checkout (owner, 23 Nov 2026: no Pay button). */
+  const pay = (id: Pick) => {
     if (busy) return;
-    const amount = chosen === 'monthly' ? SUBSCRIPTION.litres : canister!.litres;
-    const open = chosen === 'monthly' ? onSubscribe : onBuy && (() => onBuy(canister!));
+    const canister = CANISTERS.find((c) => c.id === id);
+    const amount = canister ? canister.litres : SUBSCRIPTION.litres;
+    const open = canister ? onBuy && (() => onBuy(canister)) : onSubscribe;
     if (!open) return;
-    setBought({ litres: amount, outcome: null });
+    setBought({ id, litres: amount, outcome: null });
     void open().then((outcome) => {
-      setBought(outcome === 'closed' ? null : { litres: amount, outcome });
+      setBought(outcome === 'closed' ? null : { id, litres: amount, outcome });
       if (outcome === 'paid') {
         setRefuel(true);
         later(() => setRefuel(false), REFUEL_MS);
@@ -148,15 +146,15 @@ export default function DieselShop({
         <PlantLines />
       </section>
 
-      <div className="rpg-dzs-offers" role="radiogroup" aria-label={t.dieselPlantTitle}>
+      <div className="rpg-dzs-offers">
         {CANISTERS.map((c) => (
           <button
             type="button"
             key={c.id}
-            role="radio"
-            aria-checked={chosen === c.id}
             className="rpg-dzs-offer"
-            onClick={() => setPick(c.id)}
+            aria-busy={bought?.id === c.id && bought.outcome === null}
+            disabled={!onBuy || busy}
+            onClick={() => pay(c.id)}
           >
             <strong>{t.dieselCanister[c.id]}</strong>
             <span>{formatLitres(c.litres, lang)}</span>
@@ -166,31 +164,27 @@ export default function DieselShop({
         {offerMonthly && (
           <button
             type="button"
-            role="radio"
-            aria-checked={chosen === 'monthly'}
             className="rpg-dzs-offer rpg-dzs-monthly"
-            onClick={() => setPick('monthly')}
+            aria-busy={bought?.id === 'monthly' && bought.outcome === null}
+            disabled={busy}
+            onClick={() => pay('monthly')}
           >
             <span className="rpg-dzs-monthly-head">
               <strong>{t.dieselSubTitle}</strong>
               <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
             </span>
-            <span>{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
+            <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
             <small>{t.dieselSubNote}</small>
           </button>
         )}
       </div>
 
-      {onBuy ? (
-        <button type="button" className="rpg-dzs-pay" onClick={pay} disabled={busy}>
-          {t.dieselPay(price)}
-        </button>
-      ) : (
-        <p className="rpg-dzs-note">{t.dieselTankSoon}</p>
-      )}
+      {!onBuy && <p className="rpg-dzs-note">{t.dieselTankSoon}</p>}
 
       {subscription && (
         <div className="rpg-dzs-sub">
+          <strong>{t.dieselSubTitle}</strong>
+          <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
           <p>
             {subscription.endsAt
               ? t.dieselSubEnding(formatLitres(subLitres, lang), dayOf(subscription.endsAt, lang))
